@@ -1,0 +1,133 @@
+{
+	"info": {
+		"_postman_id": "1e5d7c3b-5c65-457e-b40e-2e3a4e5d42ec",
+		"name": "Check Trasaction-INTERNATIONAL UNIVERSITY",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "27129126"
+	},
+	"item": [
+		{
+			"name": "New Request",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"let merchant_idV = \"dnwashanddry\";\r",
+							"pm.collectionVariables.set(\"merchant_idV\", merchant_idV );\r",
+							"console.log( pm.collectionVariables.get(\"merchant_idV\" ));\r",
+							"\r",
+							"\r",
+							"//setting trand_id value\r",
+							"// let tran_idV = Date.now();1651832575, 1651832799\r",
+							"let tran_idV = 'ABAOrder-Goods-25692';//please input the tran_id here!!\r",
+							"pm.collectionVariables.set(\"tran_idV\", tran_idV.toString() );\r",
+							"console.log( pm.collectionVariables.get(\"tran_idV\" ) );\r",
+							"\r",
+							"let hashMsg = merchant_idV + tran_idV.toString() ;\r",
+							"pm.collectionVariables.set(\"hashMsg\", hashMsg );\r",
+							"\r",
+							"console.log( \"This is hash message\", pm.collectionVariables.get(\"hashMsg\" ) );\r",
+							"\r",
+							"let secret = '[REMOVED-HISTORICAL-cb78f440b7d0]'\r",
+							"\r",
+							"let crypto = require('crypto-js');\r",
+							"\r",
+							"let hashUnEnc = crypto.HmacSHA512(hashMsg , secret);\r",
+							"pm.collectionVariables.set(\"hashUnEnc\", hashUnEnc );\r",
+							"\r",
+							"//console.log( \"This is hash valune not encoded\", pm.collectionVariables.get(\"hashUnEnc\" ) );\r",
+							"\r",
+							"let hashV = crypto.enc.Base64.stringify(hashUnEnc);\r",
+							"pm.collectionVariables.set(\"hashV\", hashV );\r",
+							"\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Referer",
+						"value": "http://localhost",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "req_time",
+							"value": "",
+							"type": "text",
+							"disabled": true
+						},
+						{
+							"key": "merchant_id",
+							"value": "{{merchant_idV}}",
+							"type": "text"
+						},
+						{
+							"key": "tran_id",
+							"value": "{{tran_idV}}",
+							"type": "text"
+						},
+						{
+							"key": "hash",
+							"value": "{{hashV}}",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/check-transaction-2",
+					"protocol": "https",
+					"host": [
+						"checkout-sandbox",
+						"payway",
+						"com",
+						"kh"
+					],
+					"path": [
+						"api",
+						"payment-gateway",
+						"v1",
+						"payments",
+						"check-transaction-2"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "req_timeV",
+			"value": ""
+		},
+		{
+			"key": "merchant_idV",
+			"value": ""
+		},
+		{
+			"key": "tran_idV",
+			"value": ""
+		},
+		{
+			"key": "hashMsg",
+			"value": ""
+		},
+		{
+			"key": "hashUnEnc",
+			"value": ""
+		},
+		{
+			"key": "hashV",
+			"value": ""
+		}
+	]
+}

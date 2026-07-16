@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>PayWay Checkout (Improved)</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta name="author" content="PayWay">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+
+    <style>
+        :root {
+            --surface: #ffffff;
+            --ink: #0f0f10;
+            --ink-muted: #5a5a5f;
+            --border: #e5e7eb;
+            --panel: #f7f7f8;
+            --focus: #111111;
+            --success: #16a34a;
+            --warning: #d97706;
+            --error: #dc2626;
+            --info: #4b5563;
+            --radius: 0.5rem;
+        }
+
+        [data-theme="dark"] {
+            --surface: #1a1a1a;
+            --ink: #f5f5f5;
+            --ink-muted: #a3a3a3;
+            --border: #374151;
+            --panel: #2d2d2d;
+            --focus: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: var(--surface);
+            color: var(--ink);
+            line-height: 1.6;
+            padding: 20px;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: var(--ink-muted);
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            margin: 16px 0;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .badge {
+            border-radius: 9999px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            padding: 4px 12px;
+            font-size: 12px;
+            color: var(--ink-muted);
+            backdrop-filter: blur(10px);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .grid {
+                grid-template-columns: 420px 1fr;
+            }
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .card-header {
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .card-description {
+            color: var(--ink-muted);
+            font-size: 0.875rem;
+        }
+
+        .preview-panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: sticky;
+            top: 20px;
+        }
+
+        .payment-summary {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .total-amount {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--ink);
+            margin: 8px 0;
+        }
+
+        .currency-label {
+            font-size: 0.875rem;
+            color: var(--ink-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .payment-option-card {
+            width: 100%;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .payment-option-card:hover {
+            border-color: var(--focus);
+            background: var(--surface);
+        }
+
+        .payment-option-card.selected {
+            border-color: var(--focus);
+            background: var(--surface);
+            box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1);
+        }
+
+        [data-theme="dark"] .payment-option-card.selected {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+        }
+
+        .payment-option-radio {
+            width: 20px;
+            height: 20px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .payment-option-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .payment-logo {
+            max-width: 60px;
+            max-height: 40px;
+            object-fit: contain;
+        }
+
+        .payment-details {
+            flex: 1;
+        }
+
+        .payment-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 2px;
+        }
+
+        .payment-description {
+            font-size: 0.875rem;
+            color: var(--ink-muted);
+        }
+
+        .btn {
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--focus);
+            color: white;
+            width: 100%;
+            justify-content: center;
+            font-size: 16px;
+            padding: 14px 24px;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-ghost {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--ink);
+        }
+
+        .btn-ghost:hover {
+            background: var(--panel);
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            background: var(--panel);
+        }
+
+        fieldset {
+            border: none;
+            margin: 0 0 24px 0;
+            padding: 0;
+        }
+
+        legend {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 12px;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        label {
+            font-weight: 500;
+            margin-bottom: 6px;
+            display: block;
+            font-size: 0.875rem;
+        }
+
+        .required {
+            color: var(--error);
+        }
+
+        input,
+        textarea,
+        select {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-family: inherit;
+            font-size: 14px;
+            width: 100%;
+            background: var(--surface);
+            color: var(--ink);
+            transition: all 0.2s;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--focus);
+            box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1);
+        }
+
+        [data-theme="dark"] input:focus,
+        [data-theme="dark"] textarea:focus,
+        [data-theme="dark"] select:focus {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+        }
+
+        input.valid {
+            border-color: var(--success);
+        }
+
+        input.invalid {
+            border-color: var(--error);
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--ink-muted);
+            margin-top: 4px;
+        }
+
+        .error-text {
+            font-size: 12px;
+            color: var(--error);
+            margin-top: 4px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 12px 0;
+            border: 1px solid;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+
+        .alert-success {
+            background: #ecfdf5;
+            border-color: #bbf7d0;
+            color: #065f46;
+        }
+
+        .alert-info {
+            background: #f3f4f6;
+            border-color: #e5e7eb;
+            color: #374151;
+        }
+
+        [data-theme="dark"] .alert-error {
+            background: rgba(220, 38, 38, 0.1);
+            border-color: rgba(220, 38, 38, 0.3);
+            color: #fca5a5;
+        }
+
+        [data-theme="dark"] .alert-success {
+            background: rgba(22, 163, 74, 0.1);
+            border-color: rgba(22, 163, 74, 0.3);
+            color: #86efac;
+        }
+
+        [data-theme="dark"] .alert-info {
+            background: rgba(75, 85, 99, 0.1);
+            border-color: rgba(75, 85, 99, 0.3);
+            color: #d1d5db;
+        }
+
+        details {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--panel);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        summary {
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            font-size: 1rem;
+        }
+
+        details[open] summary {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loading-spinner {
+            border: 2px solid var(--border);
+            border-top: 2px solid var(--focus);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.sandbox {
+            background: rgba(217, 119, 6, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(217, 119, 6, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .preview-panel {
+                position: static;
+                order: -1;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .total-amount {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div style="margin: 0 0 16px 0; padding: 10px 12px; border: 1px solid var(--border); background: var(--panel); border-radius: 10px;">
+            <strong>Improved version</strong>
+            <span style="color: var(--ink-muted);">— modern UI + dark mode. Open <a href="/basic" style="color: inherit; text-decoration: underline;">Basic version</a> to compare.</span>
+        </div>
+        <header>
+            <h1>PayWay Checkout</h1>
+            <p class="subtitle">Secure payment processing with ABA KHQR</p>
+            <div class="header-actions">
+                <span class="status-badge sandbox">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                        <circle cx="6" cy="6" r="6" />
+                    </svg>
+                    Sandbox Mode
+                </span>
+                <button class="btn-icon" id="btnToggleDark" title="Toggle dark mode">
+                    <svg id="iconMoon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="iconSun" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div id="alertRegion" role="status" aria-live="polite"></div>
+
+        <div class="grid">
+            <!-- Preview Panel -->
+            <aside class="preview-panel">
+                <div class="payment-summary">
+                    <p class="currency-label">Total Amount</p>
+                    <h2 class="total-amount" id="displayAmount">$10.00</h2>
+                    <p class="help-text">USD</p>
+                </div>
+
+                <div style="width: 100%;">
+                    <div class="payment-option-card selected" id="paymentOptionCard">
+                        <input type="radio" name="payment_option" class="payment-option-radio" checked value="abapay_khqr" id="khqrOption">
+                        <label class="payment-option-content" for="khqrOption" style="cursor: pointer; margin: 0;">
+                            <img class="payment-logo" src="logos/aba_khqr_logo.png" alt="ABA KHQR">
+                            <div class="payment-details">
+                                <div class="payment-title">ABA KHQR</div>
+                                <div class="payment-description">Scan to pay with any banking app</div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <button class="btn btn-primary" id="checkout_button">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                            <line x1="1" y1="10" x2="23" y2="10"></line>
+                        </svg>
+                        <span id="btnText">Proceed to Payment</span>
+                        <span id="btnSpinner" class="loading-spinner hidden"></span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Form Panel -->
+            <main>
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Payment Configuration</h2>
+                        <p class="card-description">Configure your payment settings below</p>
+                    </div>
+
+                    <details open>
+                        <summary>Transaction Details</summary>
+                        <form id="paymentForm" onsubmit="return false;">
+                            <fieldset>
+                                <div class="field">
+                                    <label for="amount">
+                                        Amount <span class="required">*</span>
+                                    </label>
+                                    <input type="number" id="amount" step="0.01" min="0.01" value="10.00" required>
+                                    <p class="help-text">Transaction amount in USD</p>
+                                </div>
+
+                                <div class="field">
+                                    <label for="firstName">
+                                        First Name <span class="required">*</span>
+                                    </label>
+                                    <input type="text" id="firstName" value="John" required>
+                                </div>
+
+                                <div class="field">
+                                    <label for="lastName">
+                                        Last Name <span class="required">*</span>
+                                    </label>
+                                    <input type="text" id="lastName" value="Doe" required>
+                                </div>
+
+                                <div class="field">
+                                    <label for="phone">
+                                        Phone Number <span class="required">*</span>
+                                    </label>
+                                    <input type="tel" id="phone" value="012345678" required>
+                                    <p class="help-text">Format: 012345678</p>
+                                </div>
+
+                                <div class="field">
+                                    <label for="email">Email</label>
+                                    <input type="email" id="email" placeholder="customer@example.com">
+                                    <p class="help-text">Optional - for receipt delivery</p>
+                                </div>
+                            </fieldset>
+                        </form>
+                    </details>
+
+                    <details>
+                        <summary>Advanced Settings</summary>
+                        <fieldset>
+                            <div class="field">
+                                <label for="merchantId">
+                                    Merchant ID <span class="required">*</span>
+                                </label>
+                                <input type="text" id="merchantId" value="nie.cambodia" readonly>
+                                <p class="help-text">Your PayWay merchant identifier</p>
+                            </div>
+
+                            <div class="field">
+                                <label for="paymentGate">Payment Gate</label>
+                                <select id="paymentGate">
+                                    <option value="0">Default (0)</option>
+                                    <option value="1">Gate 1</option>
+                                    <option value="2">Gate 2</option>
+                                </select>
+                            </div>
+
+                            <div class="field">
+                                <label for="transactionId">Transaction ID</label>
+                                <input type="text" id="transactionId" readonly>
+                                <p class="help-text">Auto-generated unique identifier</p>
+                            </div>
+                        </fieldset>
+                    </details>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Hidden PayWay Form -->
+    <div id="aba_main_modal" class="aba-modal" style="display: none;">
+        <div class="aba-modal-content">
+            <form method="POST" target="aba_webservice" action="" id="aba_merchant_request">
+                <input type="hidden" name="hash" value="" id="hash" />
+                <input type="hidden" name="tran_id" value="" id="tran_id" />
+                <input type="hidden" name="amount" value="" id="hidden_amount" />
+                <input type="hidden" name="firstname" value="" id="hidden_firstname" />
+                <input type="hidden" name="lastname" value="" id="hidden_lastname" />
+                <input type="hidden" name="phone" value="" id="hidden_phone" />
+                <input type="hidden" name="email" value="" id="hidden_email" />
+                <input type="hidden" name="req_time" value="" id="req_time" />
+                <input type="hidden" name="merchant_id" value="" id="hidden_merchant_id" />
+                <input type="hidden" name="payment_option" value="" id="hidden_payment_option" />
+                <input type="hidden" name="payment_gate" value="" id="hidden_payment_gate" />
+            </form>
+        </div>
+    </div>
+
+    <script src="https://checkout.payway.com.kh/plugins/checkout2-0.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            // Initialize transaction ID
+            const transactionId = Date.now();
+            $('#transactionId').val(transactionId);
+
+            // Update display amount when input changes
+            $('#amount').on('input', function () {
+                const amount = parseFloat($(this).val()) || 0;
+                $('#displayAmount').text('$' + amount.toFixed(2));
+            });
+
+            // Dark mode toggle
+            function toggleDarkMode() {
+                const html = document.documentElement;
+                const isDark = html.getAttribute('data-theme') === 'dark';
+                html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+                $('#iconMoon').toggleClass('hidden', !isDark);
+                $('#iconSun').toggleClass('hidden', isDark);
+                localStorage.setItem('payway_theme', isDark ? 'light' : 'dark');
+            }
+
+            // Load saved theme
+            function loadTheme() {
+                const theme = localStorage.getItem('payway_theme') || 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+                $('#iconMoon').toggleClass('hidden', theme === 'dark');
+                $('#iconSun').toggleClass('hidden', theme === 'light');
+            }
+
+            $('#btnToggleDark').click(toggleDarkMode);
+            loadTheme();
+
+            // Show alert
+            function showAlert(message, type = 'info') {
+                const alertHtml = `
+                    <div class='alert alert-${type}'>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            ${type === 'error' ? '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>' :
+                        type === 'success' ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' :
+                            '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>'}
+                        </svg>
+                        ${message}
+                    </div>
+                `;
+                $('#alertRegion').html(alertHtml);
+                setTimeout(() => $('#alertRegion').html(''), 5000);
+            }
+
+            // Checkout handler
+            $('#checkout_button').click(async function () {
+                // Validate form
+                const amount = $('#amount').val();
+                const firstName = $('#firstName').val();
+                const lastName = $('#lastName').val();
+                const phone = $('#phone').val();
+
+                if (!amount || !firstName || !lastName || !phone) {
+                    showAlert('Please fill in all required fields', 'error');
+                    return;
+                }
+
+                // Show loading state
+                $('#btnText').addClass('hidden');
+                $('#btnSpinner').removeClass('hidden');
+                $(this).prop('disabled', true);
+
+                try {
+                    const email = $('#email').val() || '';
+                    const merchantId = $('#merchantId').val();
+                    const paymentOption = $('input[name="payment_option"]:checked').val();
+                    const paymentGate = $('#paymentGate').val();
+                    const reqTime = Math.floor(Date.now() / 1000);
+
+                    // Call backend API to generate hash
+                    const response = await fetch('/api/generate-hash', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            req_time: reqTime,
+                            merchant_id: merchantId,
+                            tran_id: transactionId,
+                            amount: amount,
+                            firstname: firstName,
+                            lastname: lastName,
+                            email: email,
+                            phone: phone,
+                            payment_option: paymentOption
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // Populate hidden form
+                        const form = $('#aba_merchant_request');
+                        form.attr('action', data.api_url);
+                        $('#hash').val(data.hash);
+                        $('#tran_id').val(transactionId);
+                        $('#hidden_amount').val(amount);
+                        $('#hidden_firstname').val(firstName);
+                        $('#hidden_lastname').val(lastName);
+                        $('#hidden_phone').val(phone);
+                        $('#hidden_email').val(email);
+                        $('#req_time').val(reqTime);
+                        $('#hidden_merchant_id').val(merchantId);
+                        $('#hidden_payment_option').val(paymentOption);
+                        $('#hidden_payment_gate').val(paymentGate);
+
+                        // Trigger PayWay checkout
+                        showAlert('Initiating payment...', 'success');
+                        AbaPayway.checkout();
+                    } else {
+                        showAlert('Error: ' + (data.error || 'Failed to generate payment hash'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Checkout error:', error);
+                    showAlert('Unable to connect to payment server. Please try again.', 'error');
+                } finally {
+                    // Reset button state
+                    $('#btnText').removeClass('hidden');
+                    $('#btnSpinner').addClass('hidden');
+                    $('#checkout_button').prop('disabled', false);
+                }
+            });
+
+            // Form validation
+            $('input[required]').on('blur', function () {
+                if (!$(this).val()) {
+                    $(this).addClass('invalid');
+                } else {
+                    $(this).removeClass('invalid').addClass('valid');
+                }
+            });
+
+            // Initialize
+            showAlert('Payment form ready. Fill in your details to proceed.', 'info');
+        });
+    </script>
+</body>
+
+</html>

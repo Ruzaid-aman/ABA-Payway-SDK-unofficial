@@ -1,0 +1,919 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as crypto from 'node:crypto';
+import { PayWay } from '../client.js';
+import { PayWayConfigError, PayWayAPIError } from '../errors.js';
+import { ENDPOINTS } from '../constants.js';
+
+// ---------------------------------------------------------------------------
+// Test fixtures
+// ---------------------------------------------------------------------------
+
+const TEST_CONFIG = {
+  merchantId: 'test-merchant-001',
+  apiKey: 'test-api-key-secret',
+  environment: 'sandbox' as const,
+};
+
+/** Generate a 1024-bit RSA key pair for endpoints that need publicKeyPem. */
+function generateTestKeyPair() {
+  return crypto.generateKeyPairSync('rsa', {
+    modulusLength: 1024,
+    publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+  });
+}
+
+const TEST_RSA = generateTestKeyPair();
+
+const CONFIG_WITH_RSA = {
+  ...TEST_CONFIG,
+  publicKeyPem: TEST_RSA.publicKey,
+};
+
+/** Create a mock Response that resolves to JSON. */
+function mockJsonResponse(body: any, status = 200, statusText = 'OK'): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText,
+    json: () => Promise.resolve(body),
+    headers: new Headers(),
+    redirected: false,
+    type: 'basic',
+    url: '',
+    clone: () => ({} as Response),
+    body: null,
+    bodyUsed: false,
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    blob: () => Promise.resolve(new Blob()),
+    formData: () => Promise.resolve(new FormData()),
+    text: () => Promise.resolve(JSON.stringify(body)),
+    bytes: () => Promise.resolve(new Uint8Array()),
+  } as Response;
+}
+
+// ---------------------------------------------------------------------------
+// Constructor validation
+// ---------------------------------------------------------------------------
+
+describe('PayWay constructor', () => {
+  it('throws PayWayConfigError when config is missing', () => {
+    // @ts-expect-error — intentionally testing runtime guard
+    expect(() => new PayWay(null)).toThrow(PayWayConfigError);
+  });
+
+  it('throws PayWayConfigError when merchantId is missing', () => {
+    // @ts-expect-error
+    expect(() => new PayWay({ apiKey: 'key' })).toThrow(PayWayConfigError);
+    // @ts-expect-error
+    expect(() => new PayWay({ apiKey: 'key' })).toThrow('merchantId is required');
+  });
+
+  it('throws PayWayConfigError when apiKey is missing', () => {
+    // @ts-expect-error
+    expect(() => new PayWay({ merchantId: 'M001' })).toThrow(PayWayConfigError);
+    // @ts-expect-error
+    expect(() => new PayWay({ merchantId: 'M001' })).toThrow('apiKey is required');
+  });
+
+  it('accepts a valid config', () => {
+    expect(() => new PayWay(TEST_CONFIG)).not.toThrow();
+  });
+
+  it('defaults to sandbox environment', () => {
+    const pw = new PayWay({ merchantId: 'M001', apiKey: 'key' });
+    // We can verify by checking it uses sandbox URL in requests
+    expect(pw).toBeInstanceOf(PayWay);
+  });
+
+  it('allows a custom baseUrl to override environment', () => {
+    const pw = new PayWay({
+      ...TEST_CONFIG,
+      baseUrl: 'https://custom-gateway.example.com',
+    });
+    expect(pw).toBeInstanceOf(PayWay);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkResponseError (tested through the private request path)
+// ---------------------------------------------------------------------------
+
+describe('checkResponseError (via API calls)', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(TEST_CONFIG);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('throws PayWayAPIError for status object with non-zero code', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({
+        status: { code: 6, message: 'Transaction not found' },
+      }),
+    );
+
+    await expect(
+      payway.checkout.checkTransaction('TX-NOTFOUND'),
+    ).rejects.toThrow(PayWayAPIError);
+
+    await fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({
+        status: { code: 6, message: 'Transaction not found' },
+      }),
+    );
+
+    try {
+      await payway.checkout.checkTransaction('TX-NOTFOUND');
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(PayWayAPIError);
+      expect(e.message).toBe('Transaction not found');
+      expect(e.paywayCode).toBe('6');
+    }
+  });
+
+  it('passes through when status.code is "0" (success)', async () => {
+    const successBody = {
+      status: { code: 0, message: 'Success' },
+      data: { tran_id: 'T123' },
+    };
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse(successBody));
+
+    const result = await payway.checkout.checkTransaction('T123');
+    expect(result).toEqual(successBody);
+  });
+
+  it('passes through when status.code is "00" (success)', async () => {
+    const successBody = {
+      status: { code: '00', message: 'Success' },
+    };
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse(successBody));
+
+    const result = await payway.checkout.closeTransaction('T123');
+    expect(result).toEqual(successBody);
+  });
+
+  it('throws PayWayAPIError for string status "FAILED"', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: 'FAILED', code: '99', message: 'System error' }),
+    );
+
+    await expect(
+      payway.checkout.checkTransaction('TX-FAIL'),
+    ).rejects.toThrow(PayWayAPIError);
+  });
+
+  it('throws PayWayAPIError for top-level non-zero code (no status object)', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ code: 1, message: 'Wrong Hash.' }),
+    );
+
+    await expect(
+      payway.checkout.checkTransaction('TX-BADHASH'),
+    ).rejects.toThrow('Wrong Hash.');
+  });
+
+  it('throws PayWayAPIError on HTTP non-2xx responses', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ error: 'Forbidden' }, 403, 'Forbidden'),
+    );
+
+    await expect(
+      payway.checkout.checkTransaction('TX-403'),
+    ).rejects.toThrow(PayWayAPIError);
+  });
+
+  it('throws PayWayAPIError on timeout (AbortError)', async () => {
+    const pw = new PayWay({ ...TEST_CONFIG, timeout: 50 });
+
+    fetchSpy.mockImplementationOnce(
+      (_url: string, opts: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          const onAbort = () => {
+            const err = new DOMException('The operation was aborted.', 'AbortError');
+            reject(err);
+          };
+          if (opts?.signal?.aborted) {
+            onAbort();
+          } else {
+            opts?.signal?.addEventListener('abort', onAbort);
+          }
+        }),
+    );
+
+    await expect(
+      pw.checkout.checkTransaction('TX-SLOW'),
+    ).rejects.toThrow(/timed out/);
+  });
+
+  it('throws PayWayAPIError when response body is invalid JSON', async () => {
+    const invalidResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: () => Promise.resolve('not-json'),
+      headers: new Headers(),
+      redirected: false,
+      type: 'basic',
+      url: '',
+      clone: () => ({} as Response),
+      body: null,
+      bodyUsed: false,
+      json: () => Promise.reject(new Error('Unexpected JSON parse')),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      blob: () => Promise.resolve(new Blob()),
+      formData: () => Promise.resolve(new FormData()),
+      bytes: () => Promise.resolve(new Uint8Array()),
+    } as Response;
+
+    fetchSpy.mockResolvedValueOnce(invalidResponse);
+
+    await expect(
+      payway.checkout.checkTransaction('TX-JSON'),
+    ).rejects.toThrow('Invalid JSON response from PayWay API');
+  });
+
+  it('throws PayWayAPIError for non-fetch network errors', async () => {
+    fetchSpy.mockRejectedValueOnce(new Error('Network unreachable'));
+
+    await expect(
+      payway.checkout.checkTransaction('TX-NETWORK'),
+    ).rejects.toThrow(/Network error/);
+  });
+
+  it('returns gateway error details from PayWayAPIError', async () => {
+    const apiError = new PayWayAPIError('Wrong hash', {
+      paywayCode: '1',
+      rawBody: { code: '1', message: 'Wrong hash' },
+      statusCode: 200,
+    });
+
+    const details = payway.getGatewayErrorDetails(apiError);
+
+    expect(details).toEqual({
+      code: '1',
+      message: 'Wrong hash',
+      rawBody: { code: '1', message: 'Wrong hash' },
+      statusCode: 200,
+    });
+  });
+
+  it('returns gateway error details from plain object error shapes', async () => {
+    const details = payway.getGatewayErrorDetails({
+      status: { code: '6', message: 'Transaction not found' },
+    });
+
+    expect(details).toEqual({
+      code: '6',
+      message: 'Transaction not found',
+      rawBody: { status: { code: '6', message: 'Transaction not found' } },
+      statusCode: undefined,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkout domain — happy path
+// ---------------------------------------------------------------------------
+
+describe('checkout domain', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(TEST_CONFIG);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('createTransaction', () => {
+    it('returns a signed payload with hash (no fetch call)', () => {
+      const result = payway.checkout.createTransaction({
+        transactionId: 'T001',
+        amount: 15.0,
+        currency: 'USD',
+        items: [{ name: 'Widget', quantity: 1, price: 15.0 }],
+        returnUrl: 'https://example.com/return',
+      });
+
+      expect(result).toHaveProperty('hash');
+      expect(result).toHaveProperty('tran_id', 'T001');
+      expect(result).toHaveProperty('amount', '15.00');
+      expect(result).toHaveProperty('merchant_id', TEST_CONFIG.merchantId);
+      expect(result).toHaveProperty('req_time');
+      expect(result.req_time).toMatch(/^\d{14}$/);
+      // items and return_url should be base64 encoded
+      expect(typeof result.items).toBe('string');
+      expect(typeof result.return_url).toBe('string');
+      // Verify no fetch was called (this is a local signing operation)
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('defaults currency to USD and type to purchase', () => {
+      const result = payway.checkout.createTransaction({
+        transactionId: 'T002',
+        amount: 5.0,
+      });
+
+      expect(result).toHaveProperty('currency', 'USD');
+      expect(result).toHaveProperty('type', 'purchase');
+    });
+  });
+
+  describe('checkTransaction', () => {
+    it('sends POST to correct endpoint with hash', async () => {
+      const responseBody = {
+        status: { code: 0, message: 'Success', tran_id: 'T001' },
+      };
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse(responseBody));
+
+      const result = await payway.checkout.checkTransaction('T001');
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain(ENDPOINTS.checkTransaction);
+      expect(opts.method).toBe('POST');
+
+      const body = JSON.parse(opts.body);
+      expect(body).toHaveProperty('tran_id', 'T001');
+      expect(body).toHaveProperty('merchant_id', TEST_CONFIG.merchantId);
+      expect(body).toHaveProperty('hash');
+      expect(body).toHaveProperty('req_time');
+
+      expect(result).toEqual(responseBody);
+    });
+  });
+
+  describe('closeTransaction', () => {
+    it('sends POST to close-transaction endpoint', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: '00', message: 'Closed' } }),
+      );
+
+      await payway.checkout.closeTransaction('T001');
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain(ENDPOINTS.closeTransaction);
+    });
+  });
+
+  describe('getTransactionList', () => {
+    it('uses standard HMAC string concatenation for all fields', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: '00', message: 'Success' }, data: [] }),
+      );
+
+      await payway.checkout.getTransactionList({
+        fromDate: '20260101',
+        toDate: '20260715',
+        fromAmount: '100',
+      });
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(body).toHaveProperty('hash');
+      expect(body).toHaveProperty('from_date', '20260101');
+      expect(body).toHaveProperty('to_date', '20260715');
+    });
+  });
+
+  describe('refund', () => {
+    it('throws PayWayConfigError if publicKeyPem is not configured', async () => {
+      // payway was created without publicKeyPem
+      await expect(payway.checkout.refund('T001', 5.0)).rejects.toThrow(PayWayConfigError);
+      await expect(payway.checkout.refund('T001', 5.0)).rejects.toThrow('publicKeyPem');
+    });
+
+    it('sends form-encoded request with merchant_auth when RSA key is present', async () => {
+      const pwRsa = new PayWay(CONFIG_WITH_RSA);
+      fetchSpy.mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: '00', message: 'Refunded' } }),
+      );
+
+      await pwRsa.checkout.refund('T001', 5.0);
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain(ENDPOINTS.refund);
+      expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+      // Body is URL-encoded
+      const params = new URLSearchParams(opts.body);
+      expect(params.get('merchant_id')).toBe(TEST_CONFIG.merchantId);
+      expect(params.has('merchant_auth')).toBe(true);
+      expect(params.has('hash')).toBe(true);
+      expect(params.has('request_time')).toBe(true);
+    });
+  });
+
+  describe('getExchangeRate', () => {
+    it('sends POST to exchange-rate endpoint', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: 0 }, data: { rate: 4100 } }),
+      );
+
+      const result = await payway.checkout.getExchangeRate();
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain(ENDPOINTS.getExchangeRate);
+      expect((result as any).data.rate).toBe(4100);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// credentialsOnFile domain — happy path
+// ---------------------------------------------------------------------------
+
+describe('credentialsOnFile domain', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(TEST_CONFIG);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('linkAccount sends POST with request_time field', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'OK' } }),
+    );
+
+    await payway.credentialsOnFile.linkAccount({
+      requestId: 'REQ-001',
+      currency: 'USD',
+    });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body).toHaveProperty('request_id', 'REQ-001');
+    expect(body).toHaveProperty('request_time');
+    expect(body).toHaveProperty('merchant_id', TEST_CONFIG.merchantId);
+    expect(body).toHaveProperty('hash');
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.linkAccount);
+  });
+
+  it('linkCard sends POST with correct fields', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'OK' } }),
+    );
+
+    await payway.credentialsOnFile.linkCard({
+      requestId: 'REQ-002',
+      returnUrl: 'https://example.com/return',
+    });
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.linkCard);
+    expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+    const params = new URLSearchParams(opts.body);
+    expect(params.get('request_id')).toBe('REQ-002');
+    // return_url should be base64 encoded
+    expect(params.get('return_url')).not.toContain('https://');
+  });
+
+  it('payment sends POST with amount formatted for currency', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'OK' } }),
+    );
+
+    await payway.credentialsOnFile.payment({
+      requestId: 'REQ-003',
+      transactionId: 'T003',
+      amount: 25.5,
+      paymentToken: 'tok_abc',
+      currency: 'USD',
+    });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body).toHaveProperty('amount', '25.50');
+    expect(body).toHaveProperty('pwt', 'tok_abc');
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.payment);
+  });
+
+  it('renewToken sends POST to renew endpoint', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'Renewed' } }),
+    );
+
+    await payway.credentialsOnFile.renewToken({
+      requestId: 'REQ-004',
+      ctid: 'CUST-004',
+      paymentToken: 'tok_expired',
+    });
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.renewToken);
+  });
+
+  it('getTokenDetails sends POST to get-token-details', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'OK' }, data: { token_type: 'card' } }),
+    );
+
+    await payway.credentialsOnFile.getTokenDetails({
+      requestId: 'REQ-005',
+      ctid: 'CUST-005',
+      paymentToken: 'tok_abc',
+    });
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.getTokenDetails);
+  });
+
+  it('removeToken sends POST to remove-token', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'Removed' } }),
+    );
+
+    await payway.credentialsOnFile.removeToken({
+      requestId: 'REQ-006',
+      ctid: 'CUST-006',
+      paymentToken: 'tok_abc',
+    });
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.removeToken);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// qr domain — happy path
+// ---------------------------------------------------------------------------
+
+describe('qr domain', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(TEST_CONFIG);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('generateQr sends the sandbox-verified QR API payload', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0 }, data: { qr_image: 'base64data' } }),
+    );
+
+    await payway.qr.generateQr({
+      transactionId: 'QR-001',
+      amount: 10.0,
+      currency: 'USD',
+      paymentOption: 'abapay_khqr',
+      callbackUrl: 'https://example.com/qr-callback',
+    });
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.generateQr);
+    const body = JSON.parse(opts.body);
+    expect(body).toHaveProperty('tran_id', 'QR-001');
+    expect(body).toHaveProperty('amount', '10.00');
+    expect(body).toHaveProperty('purchase_type', 'purchase');
+    expect(body).toHaveProperty('payment_option', 'abapay_khqr');
+    expect(body).toHaveProperty('qr_image_template', 'template2');
+    expect(body.callback_url).not.toContain('https://');
+    expect(body).toHaveProperty('hash');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// paymentLink domain — happy path
+// ---------------------------------------------------------------------------
+
+describe('paymentLink domain', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(CONFIG_WITH_RSA);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('create sends form-encoded request with RSA merchant_auth', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'Created' }, data: { id: 'PL-001' } }),
+    );
+
+    await payway.paymentLink.create({
+      title: 'Test Payment Link',
+      amount: 50.0,
+      merchantRefNo: 'REF-001',
+    });
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.createPaymentLink);
+    expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+    const params = new URLSearchParams(opts.body);
+    expect(params.has('merchant_auth')).toBe(true);
+  });
+
+  it('getDetails sends form-encoded request with merchant_auth containing the id', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00' }, data: { title: 'My Link' } }),
+    );
+
+    await payway.paymentLink.getDetails('PL-001');
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.getPaymentLinkDetails);
+    expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+    const params = new URLSearchParams(opts.body);
+    // id is inside the RSA-encrypted merchant_auth, not a top-level form field
+    expect(params.has('merchant_auth')).toBe(true);
+    expect(params.has('hash')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// preAuth domain — happy path
+// ---------------------------------------------------------------------------
+
+describe('preAuth domain', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(CONFIG_WITH_RSA);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('complete sends the JSON pre-auth request contract', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'Completed' } }),
+    );
+
+    await payway.preAuth.complete('T-PREAUTH-001', 100.0);
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.completePreAuth);
+    expect(opts.headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(opts.body)).toHaveProperty('merchant_auth');
+  });
+
+  it('cancel sends the JSON pre-auth request contract', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'Cancelled' } }),
+    );
+
+    await payway.preAuth.cancel('T-PREAUTH-001');
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.cancelPreAuth);
+  });
+
+  it('completeWithPayout uses the completion path with encrypted payout instructions', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'Completed' } }),
+    );
+
+    await payway.preAuth.completeWithPayout('T-PREAUTH-002', 200.0, [{ acc: '000123456', amt: 200 }]);
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.completePreAuth);
+    expect(opts.headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(opts.body)).toHaveProperty('merchant_auth');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// payout domain — happy path
+// ---------------------------------------------------------------------------
+
+describe('payout domain', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(CONFIG_WITH_RSA);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('payout sends the encrypted beneficiary instruction with a hexadecimal hash', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0, message: 'OK' } }),
+    );
+
+    await payway.payout.payout({
+      transactionId: 'PO-001',
+      amount: 50.0,
+      beneficiaries: [{ account: '000123456', amount: 50.0 }],
+      currency: 'USD',
+    });
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.payout);
+    const body = JSON.parse(opts.body);
+    expect(body).toHaveProperty('tran_id', 'PO-001');
+    expect(body).toHaveProperty('beneficiaries');
+    expect(body.hash).toMatch(/^[a-f0-9]{128}$/);
+    expect(body).toHaveProperty('hash');
+  });
+
+  it('updateBeneficiaryStatus sends POST with status', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0, message: 'Updated' } }),
+    );
+
+    await payway.payout.updateBeneficiaryStatus({
+      payee: '000123456',
+      status: 1,
+    });
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.updateBeneficiaryStatus);
+  });
+
+  it('addBeneficiary sends an RSA-encrypted payee', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0, message: 'Added' } }),
+    );
+
+    await payway.payout.addBeneficiary({
+      payee: '000123456',
+    });
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.addBeneficiary);
+    const body = JSON.parse(opts.body);
+    expect(body).toHaveProperty('merchant_auth');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// khqr domain — happy path
+// ---------------------------------------------------------------------------
+
+describe('khqr domain', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(TEST_CONFIG);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('getTransactionsByMerchantRef sends POST with merchant_ref', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0, message: 'OK' }, data: [] }),
+    );
+
+    await payway.khqr.getTransactionsByMerchantRef('MCREF-001');
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.getTransactionsByMerchantRef);
+    const body = JSON.parse(opts.body);
+    expect(body).toHaveProperty('merchant_ref', 'MCREF-001');
+    expect(body).toHaveProperty('hash');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// verifyCallback (public method on PayWay instance)
+// ---------------------------------------------------------------------------
+
+describe('PayWay.verifyCallback', () => {
+  it('delegates to verifyCallbackSignature with the configured apiKey', () => {
+    const payway = new PayWay(TEST_CONFIG);
+
+    const body = { tran_id: 'T999', amount: '10.00', status: '0' };
+    // Compute expected signature
+    const sortedConcat = '10.000T999'; // amount, status, tran_id
+    const validSig = crypto
+      .createHmac('sha512', TEST_CONFIG.apiKey)
+      .update(sortedConcat)
+      .digest('base64');
+
+    expect(payway.verifyCallback(body, validSig)).toBe(true);
+    expect(payway.verifyCallback(body, 'bad-sig')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Request mechanics
+// ---------------------------------------------------------------------------
+
+describe('request mechanics', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('auto-fills req_time when not provided', async () => {
+    const payway = new PayWay(TEST_CONFIG);
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0 } }),
+    );
+
+    await payway.checkout.checkTransaction('T001');
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body.req_time).toMatch(/^\d{14}$/);
+  });
+
+  it('uses sandbox base URL by default', async () => {
+    const payway = new PayWay(TEST_CONFIG);
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0 } }),
+    );
+
+    await payway.checkout.checkTransaction('T001');
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toMatch(/^https:\/\/checkout-sandbox\.payway\.com\.kh/);
+  });
+
+  it('uses production base URL when environment is production', async () => {
+    const payway = new PayWay({ ...TEST_CONFIG, environment: 'production' });
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0 } }),
+    );
+
+    await payway.checkout.checkTransaction('T001');
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toMatch(/^https:\/\/checkout\.payway\.com\.kh/);
+  });
+
+  it('uses custom baseUrl when provided', async () => {
+    const payway = new PayWay({ ...TEST_CONFIG, baseUrl: 'https://custom.example.com' });
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0 } }),
+    );
+
+    await payway.checkout.checkTransaction('T001');
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toMatch(/^https:\/\/custom\.example\.com/);
+  });
+
+  it('sends JSON content-type for HMAC-only endpoints', async () => {
+    const payway = new PayWay(TEST_CONFIG);
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0 } }),
+    );
+
+    await payway.checkout.checkTransaction('T001');
+
+    const opts = fetchSpy.mock.calls[0][1];
+    expect(opts.headers['Content-Type']).toBe('application/json');
+  });
+
+  it('sends form-urlencoded content-type for merchant-auth endpoints', async () => {
+    const payway = new PayWay(CONFIG_WITH_RSA);
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00' } }),
+    );
+
+    await payway.checkout.refund('T001', 5.0);
+
+    const opts = fetchSpy.mock.calls[0][1];
+    expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+  });
+});

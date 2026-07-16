@@ -1,0 +1,35 @@
+# QR API — Paths
+
+/api/payment-gateway/v1/payments/generate-qr:
+  post:
+    operationId: generateQr
+    summary: Generate a dynamic QR code for payment
+    tags: [ABA QR API]
+    description: >
+      Generates a dynamic KHQR code that can be displayed on any screen
+      (POS terminal, kiosk, website) for customers to scan and pay.
+      The QR is unique per transaction and expires after the configured
+      lifetime. Supports ABA PAY and KHQR payment methods.
+    x-hmac-fields:
+      - req_time
+      - merchant_id
+      - tran_id
+      - amount
+      - purchase_type
+      - payment_option
+      - callback_url
+      - currency
+      - qr_image_template
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/qr-api.yaml#/GenerateQrRequest'
+    responses:
+      '200':
+        description: QR code payload and deeplinks
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/qr-api.yaml#/GenerateQrResponse'

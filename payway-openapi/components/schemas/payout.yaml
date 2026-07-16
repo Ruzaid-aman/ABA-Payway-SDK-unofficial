@@ -1,0 +1,74 @@
+# Payout — Schemas
+
+PayoutRequest:
+  type: object
+  required: [merchant_id, tran_id, beneficiaries, amount, currency, hash]
+  properties:
+    merchant_id:
+      type: string
+      description: Merchant key issued by ABA Bank.
+    tran_id:
+      type: string
+      maxLength: 20
+      description: Merchant-generated unique payout transaction identifier.
+    amount:
+      type: number
+      description: Payout amount.
+    beneficiaries:
+      type: string
+      description: Base64 of RSA-encrypted JSON array of {account, amount}.
+    currency:
+      type: string
+      enum: [KHR, USD]
+    custom_fields:
+      type: string
+      description: JSON string associated with the payout.
+    hash:
+      type: string
+      description: hex(HMAC-SHA512(merchant_id + tran_id + beneficiaries + amount + custom_fields + currency, api_key)).
+
+PayoutResponse:
+  type: object
+  properties:
+    status:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        tran_id: { type: string }
+    bank_ref:
+      type: string
+      description: Core-banking reference for the payout transaction.
+
+UpdateBeneficiaryStatusRequest:
+  type: object
+  required: [request_time, merchant_id, merchant_auth, hash]
+  properties:
+    request_time: { type: string, description: "UTC timestamp, YYYYMMDDHHmmss." }
+    merchant_id: { type: string }
+    merchant_auth:
+      type: string
+      description: Base64 of RSA-encrypted JSON {mc_id, payee, status}, where status is 0 or 1.
+    hash: { type: string, description: "base64(HMAC-SHA512(request_time + merchant_auth, api_key))." }
+
+AddBeneficiaryRequest:
+  type: object
+  required: [request_time, merchant_id, merchant_auth, hash]
+  properties:
+    request_time: { type: string, description: "UTC timestamp, YYYYMMDDHHmmss." }
+    merchant_id: { type: string }
+    merchant_auth:
+      type: string
+      description: Base64 of RSA-encrypted JSON {mc_id, payee}.
+    hash: { type: string, description: "base64(HMAC-SHA512(request_time + merchant_auth, api_key))." }
+
+BeneficiaryResponse:
+  type: object
+  properties:
+    status:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }

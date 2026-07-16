@@ -1,0 +1,317 @@
+/api/payment-gateway/v1/payments/purchase:
+  post:
+    operationId: createPurchase
+    summary: Create a purchase transaction
+    tags: [Ecommerce Checkout]
+    description: >
+      Initiates a payment transaction and returns either a hosted
+      checkout page (HTML) or, for abapay_khqr_deeplink, a JSON payload
+      containing the KHQR string and deeplinks. See info.description
+      for the auth model this endpoint depends on.
+    x-hmac-fields:
+      # Exact order PayWay's reference implementation concatenates.
+      # Every position must be present even if the caller left the
+      # field unset (substitute '').
+      - req_time
+      - merchant_id
+      - tran_id
+      - amount
+      - items
+      - shipping
+      - firstname
+      - lastname
+      - email
+      - phone
+      - type
+      - payment_option
+      - return_url
+      - cancel_url
+      - continue_success_url
+      - return_deeplink
+      - currency
+      - custom_fields
+      - return_params
+      - payout
+      - lifetime
+      - additional_params
+      - google_pay_token
+      - skip_success_page
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            $ref: '../components/schemas/ecommerce-checkout.yaml#/PurchaseRequest'
+    responses:
+      '200':
+        description: >
+          Hosted checkout page (HTML) or a JSON QR payload, depending on
+          payment_option. Response codes for the JSON error case are
+          enumerated in ErrorStatus.
+        content:
+          text/html:
+            schema:
+              type: string
+              description: Hosted checkout page markup to render/redirect the customer to.
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '../components/schemas/ecommerce-checkout.yaml#/PurchaseQrResponse'
+                - $ref: '../components/schemas/ecommerce-checkout.yaml#/ErrorStatus'
+
+/api/payment-gateway/v1/payments/check-transaction-2:
+  post:
+    operationId: checkTransaction
+    summary: Check transaction status (transactions younger than 7 days only)
+    tags: [Ecommerce Checkout]
+    description: >
+      Rate limit: 600 requests/second. For transactions older than 7
+      days, use Get Transaction Details instead (not in this skeleton —
+      add before shipping if needed).
+      NOTE: path includes an unverified "-2" suffix — confirm against
+      sandbox; see info.description item 6.
+    x-hmac-fields:
+      - req_time
+      - merchant_id
+      - tran_id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/ecommerce-checkout.yaml#/TranLookupRequest'
+          example:
+            req_time: "20250213065545"
+            merchant_id: ec000002
+            tran_id: "17394277693"
+            hash: "4slqXzgVig09Hf...2vgALgdENA=="
+    responses:
+      '200':
+        description: Transaction status payload
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/ecommerce-checkout.yaml#/CheckTransactionResponse'
+
+/api/payment-gateway/v1/payments/close-transaction:
+  post:
+    operationId: closeTransaction
+    summary: Close (cancel) a transaction before payment completes
+    tags: [Ecommerce Checkout]
+    description: >
+      Use for flash sales, bookings, or any flow needing to invalidate a
+      transaction before the customer pays. Once closed, any incoming
+      payment is rejected/reversed and no callback fires.
+    x-hmac-fields:
+      - req_time
+      - merchant_id
+      - tran_id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/ecommerce-checkout.yaml#/TranLookupRequest'
+          example:
+            req_time: "20241022053608"
+            merchant_id: lavacafe
+            tran_id: "1729573626"
+            hash: "ln9Td4JiGPc...R6y2tmUoF2NERNaQ=="
+    responses:
+      '200':
+        description: Close confirmation
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/ecommerce-checkout.yaml#/CloseTransactionResponse'
+            examples:
+              success:
+                summary: Transaction closed successfully
+                value:
+                  status: { code: "00", message: "Success!", tran_id: "1729573626" }
+              wrongHash:
+                summary: Hash mismatch
+                value:
+                  status: { code: "1", message: "Wrong hash" }
+
+/api/payment-gateway/v1/payments/transaction-detail:
+  post:
+    operationId: getTransactionDetail
+    summary: Get full details of a past transaction, including operation history
+    tags: [Ecommerce Checkout]
+    description: >
+      Unlike check-transaction, this is NOT for real-time status
+      checks during payment processing — it's for retrieving history
+      on any past transaction, including its list of operations
+      (captures, refunds, cancellations). Hard rate limit: 10
+      requests/minute, and per the docs this "cannot be increased" —
+      do not build a polling pattern against this endpoint; use
+      check-transaction for anything time-sensitive within 7 days.
+    x-hmac-fields:
+      - req_time
+      - merchant_id
+      - tran_id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/ecommerce-checkout.yaml#/TranLookupRequest'
+          example:
+            req_time: "20250213084236"
+            merchant_id: ec000002
+            tran_id: "17394277693"
+            hash: "QskVi2gEctW...j7Td6kEi/KLPvGcK3ZiA=="
+    responses:
+      '200':
+        description: Full transaction detail with operation history
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/ecommerce-checkout.yaml#/TransactionDetailResponse'
+
+/api/payment-gateway/v1/payments/transaction-list-2:
+  post:
+    operationId: getTransactionList
+    summary: List transactions for one outlet, filtered and paginated
+    tags: [Ecommerce Checkout]
+    description: >
+      Scoped to a SINGLE outlet — there is no "all outlets under this
+      business profile" mode. Date range is capped at 3 days
+      (including today), even reaching arbitrarily far into the past.
+      Rate limit: 50 requests/minute.
+      NOTE: path includes an unverified "-2" suffix, same caveat as
+      check-transaction — see info.description item 6.
+    x-hmac-fields:
+      # PayWay's own PHP sample concatenates $to_date + $from_amount
+      # with arithmetic `+` instead of `.` (string concat) — almost
+      # certainly a docs typo, but unverified. See info.description
+      # item 10 before trusting this field order blindly; validate
+      # against a live sandbox call before shipping.
+      - req_time
+      - merchant_id
+      - from_date
+      - to_date
+      - from_amount
+      - to_amount
+      - status
+      - page
+      - pagination
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/ecommerce-checkout.yaml#/TransactionListRequest'
+          example:
+            req_time: "20250213081756"
+            merchant_id: ec000002
+            from_date: null
+            to_date: null
+            from_amount: "0.01"
+            to_amount: "1000"
+            status: null
+            page: "1"
+            pagination: "40"
+            hash: "o1mDvIjTyzoFcN7zvm7...aUYAGXjsx4Ej0E6P2CoxtOQ=="
+    responses:
+      '200':
+        description: Paginated transaction list for the outlet
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/ecommerce-checkout.yaml#/TransactionListResponse'
+
+/api/merchant-portal/merchant-access/online-transaction/refund:
+  post:
+    operationId: refundTransaction
+    summary: Issue a full or partial refund
+    tags: [Ecommerce Checkout]
+    description: >
+      Only COMPLETED transactions are eligible. Must be requested
+      within 30 days of the original payment. Multiple partial refunds
+      are allowed until the full paid amount is exhausted. ABA PAY
+      refunds are immediate; Card/WeChat/Alipay follow PayWay's
+      settlement agreement timing. Rate limit: 500 requests/second.
+      CREDENTIALS: requires an RSA public key IN ADDITION TO the HMAC
+      api_key — see info.description item 7. This is the only
+      operation in this spec with that requirement.
+    x-hmac-fields:
+      - request_time  # NOT req_time — see info.description item 8
+      - merchant_id
+      - merchant_auth
+    x-merchant-auth-encryption:
+      algorithm: RSA public-key encryption, PKCS1 padding (chunk size implies 1024-bit key)
+      chunk_size_bytes: 117
+      plaintext_shape:
+        mc_id: "same value as merchant_id"
+        tran_id: "purchase transaction id to refund"
+        refund_amount: "decimal amount to refund"
+      process: >
+        JSON-encode {mc_id, tran_id, refund_amount} -> split into
+        117-byte chunks -> RSA-encrypt each chunk with the merchant's
+        RSA public key -> concatenate encrypted chunks -> base64
+        encode the result into the merchant_auth field. This encrypted
+        value is then itself one of the three fields HMAC-signed
+        into `hash` (see x-hmac-fields above).
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/ecommerce-checkout.yaml#/RefundRequest'
+          example:
+            request_time: "20200728093403"
+            merchant_id: ec000002
+            merchant_auth: "[REMOVED-HISTORICAL-c2a924c7bffe]"
+            hash: "3nd/2Z4g45...wnA2WA/M/Qg=="
+    responses:
+      '200':
+        description: Refund result
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/ecommerce-checkout.yaml#/RefundResponse'
+            examples:
+              success:
+                summary: Refund succeeded
+                value:
+                  grand_total: 1.5
+                  total_refunded: 0.09
+                  currency: USD
+                  transaction_status: REFUNDED
+                  status: { code: "00", message: "Success!" }
+              wrongHash:
+                summary: Hash mismatch (note the alphanumeric code — distinct code space from other endpoints)
+                value:
+                  status: { code: "PTL02", message: "Wrong Hash" }
+
+/api/payment-gateway/v1/exchange-rate:
+  post:
+    operationId: getExchangeRate
+    summary: Fetch ABA Bank's current buy/sell exchange rates
+    tags: [Ecommerce Checkout]
+    description: >
+      Rates match https://www.ababank.com/en/forex-exchange. This is
+      the only operation with a 2-field hash (no tran_id involved).
+    x-hmac-fields:
+      - req_time
+      - merchant_id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/ecommerce-checkout.yaml#/ExchangeRateRequest'
+          example:
+            req_time: "20250212104216"
+            merchant_id: ec000002
+            hash: "2P+5NrSb5g2XyITaxttsnjW...JVKguqghoQrq4y4C3tbUiA=="
+    responses:
+      '200':
+        description: Current exchange rates keyed by lowercase ISO currency code
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/ecommerce-checkout.yaml#/ExchangeRateResponse'
+

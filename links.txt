@@ -1,0 +1,38 @@
+Title | Link
+Overview | https://developer.payway.com.kh/overview-865678m0
+API Endpoints | https://developer.payway.com.kh/api-endpoints-984508m0
+Ecommerce Checkout | https://developer.payway.com.kh/ecommerce-checkout-3158159f0
+Purchase | https://developer.payway.com.kh/purchase-14530820e0
+Get a transaction details | https://developer.payway.com.kh/get-a-transaction-details-14530824e0
+Close transaction | https://developer.payway.com.kh/close-transaction-14530822e0
+Check transaction | https://developer.payway.com.kh/check-transaction-14530826e0
+Refund API | https://developer.payway.com.kh/refund-api-14530821e0
+Get transaction list | https://developer.payway.com.kh/get-transaction-list-14530825e0
+Exchange rate | https://developer.payway.com.kh/exchange-rate-14530823e0
+Checkout Plugins | https://developer.payway.com.kh/checkout-plugins-3186291f0
+Shopify Plugin | https://developer.payway.com.kh/-902970m0#1-introduction
+Prestashop Plugin | https://developer.payway.com.kh/-871485m0#1-introduction
+WooCommerce Plugin | https://developer.payway.com.kh/-873826m0#1-introduction
+Credentials on File | https://developer.payway.com.kh/credentials-on-file-3158155f0
+Link Account | https://developer.payway.com.kh/link-account-14530828e0
+Link Card | https://developer.payway.com.kh/link-card-14530829e0
+Purchase using token | https://developer.payway.com.kh/purchase-using-token-14530833e0
+Remove account token | https://developer.payway.com.kh/remove-account-token-14530830e0
+Remove card token | https://developer.payway.com.kh/remove-card-token-14530831e0
+Get linked account details | https://developer.payway.com.kh/get-linked-account-details-14530834e0
+ABA QR API | https://developer.payway.com.kh/aba-qr-api-3158158f0
+QR API | https://developer.payway.com.kh/qr-api-14530840e0
+Payment Link | https://developer.payway.com.kh/payment-link-3158157f0
+Create payment link | https://developer.payway.com.kh/create-payment-link-14530837e0
+Get payment link details | https://developer.payway.com.kh/get-payment-link-details-14530838e0
+Pre-auth | https://developer.payway.com.kh/pre-auth-3158156f0
+Complete pre-auth transactions | https://developer.payway.com.kh/complete-pre-auth-transactions-14530835e0
+Complete pre-auh transaction with payout | https://developer.payway.com.kh/complete-pre-auh-transaction-with-payout-14666701e0
+Cancel pre-purchase transaction | https://developer.payway.com.kh/cancel-pre-purchase-transaction-14530836e0
+Payout Overview | https://developer.payway.com.kh/payout-3158153f0
+Payout | https://developer.payway.com.kh/payout-14530816e0
+Update a beneficiary status | https://developer.payway.com.kh/update-a-beneficiary-status-14530817e0
+Add a beneficiary to whitelist | https://developer.payway.com.kh/add-a-beneficiary-to-whitelist-14530818e0
+KHQR Guideline | https://developer.payway.com.kh/khqr-guideline-3192101f0
+Get transactions | https://developer.payway.com.kh/get-transactions-22366268e0
+Resources Test Cards | https://developer.payway.com.kh/resources-3305682f0

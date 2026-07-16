@@ -1,0 +1,53 @@
+# KHQR — Schemas
+
+GetTransactionsByMcRefRequest:
+  type: object
+  required: [req_time, merchant_id, merchant_ref, hash]
+  properties:
+    req_time:
+      type: string
+      description: UTC timestamp, format YYYYMMDDHHmmss.
+      example: "20250213084236"
+    merchant_id:
+      type: string
+      description: Merchant key issued by ABA Bank.
+      example: "ec000002"
+    merchant_ref:
+      type: string
+      description: Merchant reference number.
+      example: "17394277693"
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(req_time + merchant_id + merchant_ref, api_key)).
+
+GetTransactionsByMcRefResponse:
+  type: object
+  properties:
+    status:
+      type: integer
+      description: "0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error."
+    transactions:
+      type: array
+      items:
+        $ref: '#/KhqrTransaction'
+
+KhqrTransaction:
+  type: object
+  properties:
+    transaction_id: { type: string }
+    transaction_date: { type: string }
+    bank_ref: { type: string }
+    apv: { type: string }
+    discount_amount: { type: number }
+    payment_status: { type: string }
+    payment_amount: { type: number }
+    payment_currency: { type: string }
+    payment_type: { type: string }
+    payer_account: { type: string }
+    total_amount: { type: number }
+    original_amount: { type: number }
+    original_currency: { type: string }
+    payment_status_code: { type: integer }
+    bank_name: { type: string }
+    refund_amount: { type: number }
+    merchant_ref: { type: string }

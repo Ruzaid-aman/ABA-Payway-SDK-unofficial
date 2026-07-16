@@ -1,0 +1,73 @@
+# Pre-auth — Paths
+
+/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion:
+  post:
+    operationId: completePreAuth
+    summary: Complete a pre-authorized transaction (capture funds)
+    tags: [Pre-auth]
+    description: >
+      Captures funds from a pre-authorized transaction. Must be called
+      within the hold period (typically 7 days for cards). Only
+      PRE-AUTH status transactions are eligible.
+    x-hmac-fields:
+      - merchant_auth
+      - request_time
+      - merchant_id
+    x-merchant-auth-encryption:
+      algorithm: RSA public-key encryption, PKCS1 padding
+      chunk_size_bytes: 117
+      plaintext_shape:
+        mc_id: "same value as merchant_id"
+        tran_id: "pre-auth transaction id to complete"
+        complete_amount: "capture amount (can be less than or equal to pre-auth amount)"
+      process: >
+        JSON-encode {mc_id, tran_id, amount} -> RSA-encrypt in 117-byte
+        chunks -> base64 encode into merchant_auth.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/pre-auth.yaml#/CompletePreAuthRequest'
+    responses:
+      '200':
+        description: Pre-auth completion result
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/pre-auth.yaml#/CompletePreAuthResponse'
+
+/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation:
+  post:
+    operationId: cancelPreAuth
+    summary: Cancel a pre-authorized transaction (release hold)
+    tags: [Pre-auth]
+    description: >
+      Releases the hold on funds from a pre-authorized transaction.
+      Only PRE-AUTH status transactions can be cancelled.
+    x-hmac-fields:
+      - merchant_id
+      - merchant_auth
+      - request_time
+    x-merchant-auth-encryption:
+      algorithm: RSA public-key encryption, PKCS1 padding
+      chunk_size_bytes: 117
+      plaintext_shape:
+        mc_id: "same value as merchant_id"
+        tran_id: "pre-auth transaction id to cancel"
+      process: >
+        JSON-encode {mc_id, tran_id} -> RSA-encrypt in 117-byte chunks
+        -> base64 encode into merchant_auth.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/pre-auth.yaml#/CancelPreAuthRequest'
+    responses:
+      '200':
+        description: Pre-auth cancellation result
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/pre-auth.yaml#/CancelPreAuthResponse'

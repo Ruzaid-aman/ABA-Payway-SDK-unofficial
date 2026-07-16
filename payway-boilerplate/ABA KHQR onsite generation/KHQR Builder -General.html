@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KHQR Builder - Offline</title>
+  <style>
+    :root {
+      --surface: #ffffff;
+      --ink: #0f0f10;
+      --ink-muted: #5a5a5f;
+      --border: #e5e7eb;
+      --panel: #f7f7f8;
+      --focus: #111111;
+      --success: #16a34a;
+      --warning: #d97706;
+      --error: #dc2626;
+      --info: #4b5563;
+    }
+
+    [data-theme="dark"] {
+      --surface: #1a1a1a;
+      --ink: #f5f5f5;
+      --ink-muted: #a3a3a3;
+      --border: #374151;
+      --panel: #2d2d2d;
+      --focus: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--surface);
+      color: var(--ink);
+      line-height: 1.6;
+      padding: 20px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    .subtitle { color: var(--ink-muted); margin-bottom: 16px; }
+
+    .header-actions { display: flex; gap: 8px; margin: 16px 0; }
+
+    @media (max-width: 768px) {
+      .header-actions { flex-wrap: wrap; }
+      .btn { font-size: 12px; padding: 8px 12px; }
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      margin-top: 20px;
+    }
+
+    @media (min-width: 768px) {
+      .grid { grid-template-columns: 360px 1fr; }
+    }
+
+    .preview-panel {
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .qr-canvas { margin: 0 auto; display: block; border: 2px solid var(--border); }
+
+    @media (max-width: 768px) {
+      .qr-canvas { width: 200px; height: 200px; }
+    }
+
+    .qr-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .empty-state {
+      color: var(--ink-muted);
+      text-align: center;
+      padding: 32px;
+    }
+
+    .btn {
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--focus);
+      color: white;
+    }
+
+    .btn-primary:hover { background: #333; }
+
+    .btn-ghost {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--ink);
+    }
+
+    .btn-ghost:hover { background: var(--panel); }
+
+    .alert {
+      padding: 12px;
+      border-radius: 8px;
+      margin: 8px 0;
+      border: 1px solid;
+    }
+
+    .alert-error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+    .alert-warning { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+    .alert-success { background: #ecfdf5; border-color: #bbf7d0; color: #065f46; }
+    .alert-info { background: #f3f4f6; border-color: #e5e7eb; color: #374151; }
+
+    details {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    summary {
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 8px;
+    }
+
+    details[open] summary { margin-bottom: 16px; }
+
+    fieldset {
+      border: none;
+      margin: 0 0 24px 0;
+      padding: 0;
+    }
+
+    legend {
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    @media (min-width: 768px) {
+      .field-grid { grid-template-columns: repeat(2, 1fr); }
+      .field-grid-3 { grid-template-columns: repeat(3, 1fr); }
+      .field-grid-4 { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .field { display: flex; flex-direction: column; }
+
+    label {
+      font-weight: 500;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    input, select, textarea {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: ui-monospace, 'Courier New', monospace;
+      font-size: 14px;
+      width: 100%;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--focus);
+      box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.1);
+    }
+
+    input.valid { border-color: var(--success); }
+    input.invalid { border-color: var(--error); }
+
+    textarea {
+      resize: vertical;
+      white-space: pre;
+      word-break: break-all;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: var(--ink-muted);
+      margin-top: 4px;
+    }
+
+    .error-text {
+      font-size: 12px;
+      color: var(--error);
+      margin-top: 4px;
+    }
+
+    .icon-valid { color: var(--success); }
+    .icon-invalid { color: var(--error); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--panel);
+      font-weight: 600;
+    }
+
+    td {
+      font-family: ui-monospace, 'Courier New', monospace;
+      word-break: break-all;
+    }
+
+    .hidden { display: none !important; }
+
+    .copy-btn-wrapper {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .test-pass { color: var(--success); font-weight: 600; }
+    .test-fail { color: var(--error); font-weight: 600; }
+
+    #selfTestTable td:last-child {
+      max-width: 320px;
+      font-family: ui-monospace, 'Courier New', monospace;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>KHQR Builder</h1>
+      <p class="subtitle">Compose TLV → Compute CRC → Generate QR</p>
+      <p><a href="https://developer.payway.com.kh/khqr-guideline-3192101f0" target="_blank">KHQR Guideline</a></p>
+      <div class="header-actions">
+        <select id="presetSelector" class="btn btn-ghost">
+          <option value="">Select Preset</option>
+          <option value="generic_sample">Generic Sample</option>
+          <option value="custom">Custom</option>
+        </select>
+        <button class="btn btn-ghost" id="btnToggleDark">🌙 Dark Mode</button>
+        <label for="importConfig" class="btn btn-ghost" style="cursor: pointer;">Import Config</label>
+        <input type="file" id="importConfig" accept=".json" style="display: none;">
+        <button class="btn btn-ghost" id="btnExportConfig">Export Config</button>
+        <button class="btn btn-ghost" id="btnReset">Reset</button>
+        <button class="btn btn-ghost" id="btnExportHtml">Export as HTML</button>
+      </div>
+    </header>
+
+    <div id="alertRegion" role="status" aria-live="polite"></div>
+
+    <div class="grid">
+      <aside class="preview-panel">
+        <p id="qrEmptyState" class="empty-state">Compute CRC to render the QR code.</p>
+        <canvas id="qrCanvas" width="256" height="256" class="qr-canvas hidden" aria-label="QR code"></canvas>
+        <div id="qrButtons" class="qr-buttons hidden">
+          <button class="btn btn-primary" id="btnCopyQrPng">Copy QR as PNG</button>
+          <button class="btn btn-ghost" id="btnDownloadQrPng">Download PNG</button>
+        </div>
+      </aside>
+
+      <main>
+        <details open>
+          <summary>Input Fields</summary>
+          <p class="help-text">All fields validate live. Required fields show *.</p>
+          <form id="khqrForm" onsubmit="return false;">
+            <!-- Core KHQR -->
+            <fieldset>
+              <legend>Core KHQR</legend>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="t00">Payload Format Indicator* <span id="t00-icon"></span></label>
+                  <input id="t00" type="text" value="01" readonly class="valid" aria-invalid="false" aria-describedby="t00-error" title="Payload Format Indicator: Indicates the version of the QR code format. Always '01' for KHQR.">
+                  <span id="t00-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t01">Point of Initiation Method* <span id="t01-icon"></span></label>
+                  <select id="t01" aria-invalid="false" aria-describedby="t01-error" title="Point of Initiation Method: '11' for Static QR (without amount), '12' for Dynamic QR (with amount).">
+                    <option value="11">11 - Static QR</option>
+                    <option value="12" selected>12 - Dynamic QR</option>
+                  </select>
+                  <p class="help-text">11 = static QR (without amount), 12 = dynamic QR (with amount)</p>
+                  <span id="t01-error" class="error-text" aria-live="polite"></span>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Merchant Account Information -->
+            <fieldset>
+              <legend>Merchant Account Information (Tag 30)</legend>
+              <p class="help-text">Nested TLV: 30 = TLV(00=Bakong ID) + TLV(01=MID) + TLV(02=Bank Name)</p>
+              <div class="field-grid field-grid-3">
+                <div class="field">
+                  <label for="t30_00">Bakong ID* <span id="t30_00-icon"></span></label>
+                  <input id="t30_00" type="text" value="" placeholder="e.g., MERCHANT@BANK" aria-invalid="false" aria-describedby="t30_00-error" title="Bakong ID: Acquiring Bakong ID provided by ABA.">
+                  <span id="t30_00-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t30_01">Merchant ID (MID)* <span id="t30_01-icon"></span></label>
+                  <input id="t30_01" type="text" value="" placeholder="15-digit numeric ID" aria-invalid="false" aria-describedby="t30_01-error" title="Merchant ID (MID): Your MID provided by ABA Bank.">
+                  <span id="t30_01-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t30_02">Bank Name* <span id="t30_02-icon"></span></label>
+                  <input id="t30_02" type="text" value="" placeholder="e.g., Acme Bank" aria-invalid="false" aria-describedby="t30_02-error" title="Bank Name: Name of the acquiring Bank.">
+                  <span id="t30_02-error" class="error-text" aria-live="polite"></span>
+                </div>
+              </div>
+              <div class="field">
+                <label for="t30_preview">Tag 30 (assembled)</label>
+                <textarea id="t30_preview" rows="2" readonly></textarea>
+              </div>
+            </fieldset>
+
+            <!-- Transaction Details -->
+            <fieldset>
+              <legend>Transaction Details</legend>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="t52">Merchant Category Code (MCC)* <span id="t52-icon"></span></label>
+                  <input id="t52" type="text" value="" placeholder="e.g., 5047" aria-invalid="false" aria-describedby="t52-error" title="Merchant Category Code (MCC): Code representing the merchant's business category.">
+                  <span id="t52-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t53">Currency (ISO 4217)* <span id="t53-icon"></span></label>
+                  <input id="t53" type="text" value="" placeholder="e.g., 840" aria-invalid="false" aria-describedby="t53-error" title="Currency (ISO 4217): Transaction currency code, e.g., 116 for KHR, 840 for USD.">
+                  <span id="t53-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t54" id="t54-label">Amount (USD)* <span id="t54-icon"></span></label>
+                  <input id="t54" type="text" value="" placeholder="e.g., 28.82" aria-invalid="false" aria-describedby="t54-error" title="Amount: Transaction amount in the specified currency. Do not use decimal places for KHR.">
+                  <span id="t54-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t58">Country Code* <span id="t58-icon"></span></label>
+                  <input id="t58" type="text" value="KH" readonly class="valid" aria-invalid="false" aria-describedby="t58-error" title="Country Code: ISO country code, e.g., 'KH' for Cambodia.">
+                  <span id="t58-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t59">Merchant Name* <span id="t59-icon"></span></label>
+                  <input id="t59" type="text" value="" placeholder="UPPERCASE ASCII" aria-invalid="false" aria-describedby="t59-error" title="Merchant Name: Display name shown when a mobile banking app scans the QR. Must match ABA registered profile.">
+                  <span id="t59-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t60">Merchant City* <span id="t60-icon"></span></label>
+                  <input id="t60" type="text" value="" placeholder="UPPERCASE ASCII" aria-invalid="false" aria-describedby="t60-error" title="Merchant City: City where the merchant is located. Use standard abbreviations if applicable.">
+                  <span id="t60-error" class="error-text" aria-live="polite"></span>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Additional Data Field Template -->
+            <fieldset>
+              <legend>Additional Data Field Template (Tag 62)</legend>
+              <p class="help-text">Nested TLV: 62 = TLV(01=Bill No) + TLV(68=PayWay Template)</p>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="t62_01">Merchant Reference (Bill No) [62.01]* <span id="t62_01-icon"></span></label>
+                  <input id="t62_01" type="text" value="" placeholder="e.g., BILL123456" aria-invalid="false" aria-describedby="t62_01-error" title="Merchant Reference (Bill No): Unique reference number for the transaction.">
+                  <span id="t62_01-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t62_68">PayWay Data Field Template [62.68]* <span id="t62_68-icon"></span></label>
+                  <input id="t62_68" type="text" value="" placeholder="e.g., 0010PAYWAY@TEMPLATE" aria-invalid="false" aria-describedby="t62_68-error" title="PayWay Data Field Template: Template provided by ABA for PayWay integration.">
+                  <span id="t62_68-error" class="error-text" aria-live="polite"></span>
+                </div>
+              </div>
+              <div class="field">
+                <label for="t62_preview">Tag 62 (assembled)</label>
+                <textarea id="t62_preview" rows="2" readonly></textarea>
+              </div>
+            </fieldset>
+
+            <!-- Unreserved Templates -->
+            <fieldset>
+              <legend>Unreserved Templates (Tag 99)</legend>
+              <p class="help-text">Nested TLV: 99 = TLV(00=creation_ms) + TLV(01=expiry_ms). Use date-time pickers to derive 13-digit ms.</p>
+              <div class="field-grid field-grid-4">
+                <div class="field">
+                  <label for="dt_creation">Creation Date-Time*</label>
+                  <input id="dt_creation" type="datetime-local" aria-describedby="t99_00-error" title="Creation Date-Time: Select the date and time when the QR is created. Automatically converts to Unix timestamp in milliseconds.">
+                  <span id="t99_00-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t99_00">Creation Timestamp (ms) [99.00]* <span id="t99_00-icon"></span></label>
+                  <input id="t99_00" type="text" aria-describedby="t99_00-error" title="Creation Timestamp: Unix timestamp in milliseconds when the QR was created.">
+                </div>
+                <div class="field">
+                  <label for="dt_expiry">Expiry Date-Time*</label>
+                  <input id="dt_expiry" type="datetime-local" aria-describedby="t99_01-error" title="Expiry Date-Time: Select the date and time when the QR expires. Automatically converts to Unix timestamp in milliseconds.">
+                  <span id="t99_01-error" class="error-text" aria-live="polite"></span>
+                </div>
+                <div class="field">
+                  <label for="t99_01">Expiry Timestamp (ms) [99.01]* <span id="t99_01-icon"></span></label>
+                  <input id="t99_01" type="text" aria-describedby="t99_01-error" title="Expiry Timestamp: Unix timestamp in milliseconds when the QR expires.">
+                </div>
+              </div>
+              <div class="field">
+                <label for="t99_preview">Tag 99 (assembled)</label>
+                <textarea id="t99_preview" rows="2" readonly></textarea>
+              </div>
+            </fieldset>
+
+            <!-- CRC & Actions -->
+            <fieldset>
+              <legend>CRC & Actions</legend>
+              <label for="crcBefore">QR String BEFORE CRC (base + 6304)</label>
+              <textarea id="crcBefore" rows="3" readonly></textarea>
+              <div class="copy-btn-wrapper">
+                <button class="btn btn-ghost" id="btnCopyPreCrc">Copy Before-CRC</button>
+              </div>
+              <button class="btn btn-primary" id="btnComputeCRC">Compute CRC</button>
+              <label for="t63" style="margin-top:16px; display:block;">CRC (read-only after compute)</label>
+              <input id="t63" type="text" readonly aria-invalid="false">
+              <label for="qrStringFinal" style="margin-top:16px; display:block;">Final QR String (with CRC)</label>
+              <textarea id="qrStringFinal" rows="4" readonly></textarea>
+              <div class="copy-btn-wrapper">
+                <button class="btn btn-ghost" id="btnCopyFinal">Copy Final QR string</button>
+              </div>
+            </fieldset>
+          </form>
+        </details>
+
+        <section id="validationSummary">
+          <h2>Validation & Alerts</h2>
+          <ul id="alertList" role="alert" aria-live="polite"></ul>
+        </section>
+
+        <section id="selfTestSection">
+          <h2>Self-Tests</h2>
+          <p class="help-text">Run deterministic vectors to verify TLV and CRC behavior after any change.</p>
+          <button class="btn btn-ghost" id="btnRunSelfTests" type="button">Run Self-Tests</button>
+          <p id="selfTestSummary" class="help-text" role="status" aria-live="polite"></p>
+          <table id="selfTestTable">
+            <thead>
+              <tr><th>Test</th><th>Expected</th><th>Actual</th><th>Result</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <details id="debugPanel">
+          <summary>Debug (Lengths & TLV breakdown)</summary>
+          <table id="lengthTable">
+            <thead>
+              <tr><th>Tag</th><th>Length</th><th>Value Preview</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </details>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    // KHQR Builder JavaScript implementation
+    (() => {
+      // Elements
+      const fields = {
+        t00: document.getElementById('t00'),
+        t01: document.getElementById('t01'),
+        t30_00: document.getElementById('t30_00'),
+        t30_01: document.getElementById('t30_01'),
+        t30_02: document.getElementById('t30_02'),
+        t52: document.getElementById('t52'),
+        t53: document.getElementById('t53'),
+        t54: document.getElementById('t54'),
+        t58: document.getElementById('t58'),
+        t59: document.getElementById('t59'),
+        t60: document.getElementById('t60'),
+        t62_01: document.getElementById('t62_01'),
+        t62_68: document.getElementById('t62_68'),
+        dt_creation: document.getElementById('dt_creation'),
+        t99_00: document.getElementById('t99_00'),
+        dt_expiry: document.getElementById('dt_expiry'),
+        t99_01: document.getElementById('t99_01'),
+        t63: document.getElementById('t63'),
+        crcBefore: document.getElementById('crcBefore'),
+        qrStringFinal: document.getElementById('qrStringFinal'),
+        t30_preview: document.getElementById('t30_preview'),
+        t62_preview: document.getElementById('t62_preview'),
+        t99_preview: document.getElementById('t99_preview'),
+        qrCanvas: document.getElementById('qrCanvas'),
+        qrButtons: document.getElementById('qrButtons'),
+        qrEmptyState: document.getElementById('qrEmptyState'),
+        alertRegion: document.getElementById('alertRegion'),
+        alertList: document.getElementById('alertList'),
+        lengthTableBody: document.querySelector('#lengthTable tbody'),
+        selfTestTableBody: document.querySelector('#selfTestTable tbody'),
+        selfTestSummary: document.getElementById('selfTestSummary'),
+        presetSelector: document.getElementById('presetSelector'),
+        importConfig: document.getElementById('importConfig'),
+      };
+
+      const buttons = {
+        btnReset: document.getElementById('btnReset'),
+        btnExportHtml: document.getElementById('btnExportHtml'),
+        btnComputeCRC: document.getElementById('btnComputeCRC'),
+        btnCopyPreCrc: document.getElementById('btnCopyPreCrc'),
+        btnCopyFinal: document.getElementById('btnCopyFinal'),
+        btnCopyQrPng: document.getElementById('btnCopyQrPng'),
+        btnDownloadQrPng: document.getElementById('btnDownloadQrPng'),
+        btnToggleDark: document.getElementById('btnToggleDark'),
+        btnExportConfig: document.getElementById('btnExportConfig'),
+        btnRunSelfTests: document.getElementById('btnRunSelfTests'),
+      };
+
+      // Deterministic self-test vectors for regression checks.
+      const SELF_TEST_VECTORS = {
+        crcCanonicalInput: '123456789',
+        crcCanonicalExpected: '29B1',
+        preA: '00020101021230470012MERCHANT@ABA01151234567890123450208ABA Bank520459875303840540512.345802KH5907MY SHOP6010PHNOM PENH62500108INV-000168340010PAYWAY@ABA0208104514230604A227993400131759805345337011317598089453376304',
+        crcAExpected: 'DD6D',
+      };
+      SELF_TEST_VECTORS.finalAExpected = SELF_TEST_VECTORS.preA + SELF_TEST_VECTORS.crcAExpected;
+
+      // Validation rules
+      const validators = {
+        ascii: value => /^[\x20-\x7E]*$/.test(value),
+        digits: value => /^\d+$/.test(value),
+        hex4: value => /^[0-9A-F]{4}$/.test(value),
+        amount_decimal: value => /^(?:\d{1,11})(?:\.\d{0,2})?$/.test(value),
+        len3: value => value.length === 3,
+        len4: value => value.length === 4,
+        len13: value => value.length === 13,
+        gt: (value, compare) => Number(value) > Number(compare),
+      };
+
+      // State
+      let state = {
+        has_crc: false,
+        validation: {},
+        alerts: [],
+      };
+
+      // Preset configurations
+      const presets = {
+        generic_sample: {
+          t30_00: 'MERCHANT@BANK',
+          t30_01: '123456789012345',
+          t30_02: 'BANK NAME',
+          t52: '1234',
+          t53: '840',
+          t54: '0.00',
+          t59: 'MERCHANT NAME',
+          t60: 'CITY NAME',
+          t62_01: 'BILL123456',
+          t62_68: '0010PAYWAY@TEMPLATE',
+          t99_00: '1700000000000',
+          t99_01: '1700003600000',
+        },
+      };
+
+      // Utility functions
+      function twoDigitLength(len) {
+        if (len > 99) throw new Error('TLV value length exceeds two-digit maximum (99).');
+        return len < 10 ? '0' + len : '' + len;
+      }
+
+      function tlv(tag, value) {
+        return tag + twoDigitLength(value.length) + value;
+      }
+
+      function crc16ccitt(str) {
+        let crc = 0xFFFF;
+        const poly = 0x1021;
+        for (let i = 0; i < str.length; i++) {
+          crc ^= (str.charCodeAt(i) & 0xFF) << 8;
+          for (let b = 0; b < 8; b++) {
+            crc = (crc & 0x8000) ? ((crc << 1) ^ poly) & 0xFFFF : (crc << 1) & 0xFFFF;
+          }
+        }
+        return crc.toString(16).toUpperCase().padStart(4, '0');
+      }
+
+      function normalizeAmount(value) {
+        if (!value) return '';
+        let parts = value.split('.');
+        let intPart = parts[0].replace(/^0+(?=\d)/, '');
+        if (intPart === '') intPart = '0';
+        let decPart = parts[1] || '';
+        if (decPart.length > 2) decPart = decPart.slice(0, 2);
+        if (value.endsWith('.')) {
+          return intPart + '.';
+        } else {
+          return decPart ? intPart + '.' + decPart : intPart;
+        }
+      }
+
+      function updateAmountLabel() {
+        const currency = fields.t53.value.trim();
+        let currencyName = 'USD';
+        if (currency === '116') currencyName = 'KHR';
+        else if (currency === '840') currencyName = 'USD';
+        else currencyName = currency || 'Currency';
+        document.getElementById('t54-label').textContent = `Amount (${currencyName})*`;
+      }
+
+      // Validation and UI update
+      function validateField(id) {
+        const el = fields[id];
+        const val = el.value.trim();
+        let valid = true;
+        let message = '';
+
+        switch (id) {
+          case 't00':
+            // readonly, always valid
+            break;
+          case 't01':
+            if (!['11','12'].includes(val)) { valid = false; message = 'Invalid value.'; }
+            break;
+          case 't30_00':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else if (!validators.ascii(val)) { valid = false; message = 'Only ASCII characters are allowed.'; }
+            else if (val.length < 6 || val.length > 99) { valid = false; message = 'Length must be 6-99.'; }
+            break;
+          case 't30_01':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else if (!validators.digits(val)) { valid = false; message = 'Only digits allowed.'; }
+            else if (val.length < 8 || val.length > 99) { valid = false; message = 'Length must be 8-99.'; }
+            break;
+          case 't30_02':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else if (!validators.ascii(val)) { valid = false; message = 'Only ASCII characters are allowed.'; }
+            else if (val.length < 3 || val.length > 99) { valid = false; message = 'Length must be 3-99.'; }
+            break;
+          case 't52':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else if (!validators.digits(val)) { valid = false; message = 'Only digits allowed.'; }
+            else if (val.length !== 4) { valid = false; message = 'Length must be exactly 4.'; }
+            break;
+          case 't53':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else if (!validators.digits(val)) { valid = false; message = 'Only digits allowed.'; }
+            else if (val.length !== 3) { valid = false; message = 'Length must be exactly 3.'; }
+            break;
+          case 't54':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else {
+              const currency = fields.t53.value.trim();
+              if (currency === '116') { // KHR
+                if (!validators.digits(val)) { valid = false; message = 'Only digits allowed for KHR (no decimals).'; }
+              } else { // USD or others, allow decimals
+                const norm = normalizeAmount(val);
+                if (!validators.amount_decimal(norm)) { valid = false; message = 'Enter a decimal amount with up to 2 fractional digits.'; }
+                else if (norm !== val) { el.value = norm; }
+              }
+            }
+            break;
+          case 't59':
+          case 't60':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else {
+              const upper = val.toUpperCase();
+              if (val !== upper) { el.value = upper; }
+              if (!validators.ascii(upper)) { valid = false; message = 'Only ASCII characters are allowed.'; }
+              else if (id === 't59' && (upper.length < 3 || upper.length > 99)) { valid = false; message = 'Length must be 3-99.'; }
+              else if (id === 't60' && (upper.length < 2 || upper.length > 99)) { valid = false; message = 'Length must be 2-99.'; }
+            }
+            break;
+          case 't62_01':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else if (!validators.ascii(val)) { valid = false; message = 'Only ASCII characters are allowed.'; }
+            else if (val.length > 25) { valid = false; message = 'Maximum length is 25.'; }
+            break;
+          case 't62_68':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else if (!validators.ascii(val)) { valid = false; message = 'Only ASCII characters are allowed.'; }
+            else if (val.length > 99) { valid = false; message = 'Maximum length is 99.'; }
+            break;
+          case 't99_00':
+          case 't99_01':
+            if (!val) { valid = false; message = 'This field is required.'; }
+            else if (!validators.digits(val)) { valid = false; message = 'Only digits allowed.'; }
+            else if (val.length !== 13) { valid = false; message = 'Length must be exactly 13.'; }
+            else if (id === 't99_01') {
+              const now = Date.now();
+              if (Number(val) <= now) { valid = false; message = 'Expiry must be in the future.'; }
+            }
+            break;
+        }
+
+        state.validation[id] = { valid, message };
+        updateFieldValidationUI(id, valid, message);
+        updateAlerts();
+        assembleAll();
+      }
+
+      function updateFieldValidationUI(id, valid, message) {
+        const icon = document.getElementById(id + '-icon');
+        const error = document.getElementById(id + '-error');
+        const el = fields[id];
+        if (!icon || !error || !el) return;
+        icon.textContent = valid ? '✓' : '!';
+        icon.className = valid ? 'icon-valid' : 'icon-invalid';
+        el.classList.toggle('valid', valid);
+        el.classList.toggle('invalid', !valid);
+        error.textContent = message || '';
+        el.setAttribute('aria-invalid', (!valid).toString());
+      }
+
+      function updateAlerts() {
+        const alertRegion = fields.alertRegion;
+        const alertList = document.getElementById('alertList');
+        alertList.innerHTML = '';
+        const errors = Object.entries(state.validation).filter(([_, v]) => !v.valid).map(([k,v]) => v.message);
+        if (errors.length > 0) {
+          alertRegion.innerHTML = `<div class='alert alert-error'>Fix highlighted fields to compute CRC.</div>`;
+          errors.forEach(msg => {
+            const li = document.createElement('li');
+            li.textContent = msg;
+            alertList.appendChild(li);
+          });
+        } else {
+          alertRegion.innerHTML = '';
+        }
+      }
+
+      // Assemble nested TLVs
+      function assembleNestedTLV() {
+        try {
+          const t30 = tlv('00', fields.t30_00.value) + tlv('01', fields.t30_01.value) + tlv('02', fields.t30_02.value);
+          fields.t30_preview.value = tlv('30', t30);
+        } catch { fields.t30_preview.value = '' }
+
+        try {
+          const t62 = tlv('01', fields.t62_01.value) + tlv('68', fields.t62_68.value);
+          fields.t62_preview.value = tlv('62', t62);
+        } catch { fields.t62_preview.value = '' }
+
+        try {
+          const t99 = tlv('00', fields.t99_00.value) + tlv('01', fields.t99_01.value);
+          fields.t99_preview.value = tlv('99', t99);
+        } catch { fields.t99_preview.value = '' }
+      }
+
+      // Assemble base string
+      function assembleBaseString() {
+        try {
+          const base = tlv('00', fields.t00.value) + tlv('01', fields.t01.value) + fields.t30_preview.value +
+            tlv('52', fields.t52.value) + tlv('53', fields.t53.value) + tlv('54', fields.t54.value) +
+            tlv('58', fields.t58.value) + tlv('59', fields.t59.value) + tlv('60', fields.t60.value) +
+            fields.t62_preview.value + fields.t99_preview.value;
+          fields.crcBefore.value = base + '6304';
+          return base;
+        } catch {
+          fields.crcBefore.value = '';
+          return '';
+        }
+      }
+
+      // Assemble all
+      function assembleAll() {
+        assembleNestedTLV();
+        assembleBaseString();
+        fields.t63.value = '';
+        fields.qrStringFinal.value = '';
+        state.has_crc = false;
+        fields.qrCanvas.classList.add('hidden');
+        fields.qrButtons.classList.add('hidden');
+        fields.qrEmptyState.classList.remove('hidden');
+        updateDebugTable();
+      }
+
+      // Update debug table
+      function updateDebugTable() {
+        const tbody = fields.lengthTableBody;
+        tbody.innerHTML = '';
+        const tags = ['00','01','30','52','53','54','58','59','60','62','99','63'];
+        const values = {
+          '00': fields.t00.value,
+          '01': fields.t01.value,
+          '30': fields.t30_preview.value,
+          '52': fields.t52.value,
+          '53': fields.t53.value,
+          '54': fields.t54.value,
+          '58': fields.t58.value,
+          '59': fields.t59.value,
+          '60': fields.t60.value,
+          '62': fields.t62_preview.value,
+          '99': fields.t99_preview.value,
+          '63': fields.t63.value
+        };
+        tags.forEach(tag => {
+          const tr = document.createElement('tr');
+          const tdTag = document.createElement('td'); tdTag.textContent = tag;
+          const tdLen = document.createElement('td'); tdLen.textContent = values[tag] ? values[tag].length.toString() : '0';
+          const tdVal = document.createElement('td'); tdVal.textContent = values[tag] || '';
+          tr.appendChild(tdTag);
+          tr.appendChild(tdLen);
+          tr.appendChild(tdVal);
+          tbody.appendChild(tr);
+        });
+      }
+
+      function buildSelfTestPreA() {
+        const t30 = tlv('00', 'MERCHANT@ABA') + tlv('01', '123456789012345') + tlv('02', 'ABA Bank');
+        const t62 = tlv('01', 'INV-0001') + tlv('68', '0010PAYWAY@ABA0208104514230604A227');
+        const t99 = tlv('00', '1759805345337') + tlv('01', '1759808945337');
+        const base =
+          tlv('00', '01') +
+          tlv('01', '12') +
+          tlv('30', t30) +
+          tlv('52', '5987') +
+          tlv('53', '840') +
+          tlv('54', '12.34') +
+          tlv('58', 'KH') +
+          tlv('59', 'MY SHOP') +
+          tlv('60', 'PHNOM PENH') +
+          tlv('62', t62) +
+          tlv('99', t99);
+        return base + '6304';
+      }
+
+      function runSelfTests() {
+        const rows = [];
+
+        rows.push({
+          name: 'CRC canonical: 123456789',
+          expected: SELF_TEST_VECTORS.crcCanonicalExpected,
+          actual: crc16ccitt(SELF_TEST_VECTORS.crcCanonicalInput),
+        });
+
+        rows.push({
+          name: 'TLV encoding: 00 + 01',
+          expected: '000201',
+          actual: tlv('00', '01'),
+        });
+
+        const preAActual = buildSelfTestPreA();
+        rows.push({
+          name: 'Assemble fixed payload before CRC',
+          expected: SELF_TEST_VECTORS.preA,
+          actual: preAActual,
+        });
+
+        const crcAActual = crc16ccitt(preAActual);
+        rows.push({
+          name: 'CRC on fixed payload',
+          expected: SELF_TEST_VECTORS.crcAExpected,
+          actual: crcAActual,
+        });
+
+        rows.push({
+          name: 'Final fixed payload string',
+          expected: SELF_TEST_VECTORS.finalAExpected,
+          actual: preAActual + crcAActual,
+        });
+
+        const tbody = fields.selfTestTableBody;
+        tbody.innerHTML = '';
+
+        let passed = 0;
+        rows.forEach(row => {
+          const isPass = row.expected === row.actual;
+          if (isPass) passed++;
+
+          const tr = document.createElement('tr');
+          const tdName = document.createElement('td');
+          tdName.textContent = row.name;
+          const tdExpected = document.createElement('td');
+          tdExpected.textContent = row.expected;
+          const tdActual = document.createElement('td');
+          tdActual.textContent = row.actual;
+          const tdResult = document.createElement('td');
+          tdResult.textContent = isPass ? 'PASS' : 'FAIL';
+          tdResult.className = isPass ? 'test-pass' : 'test-fail';
+
+          tr.appendChild(tdName);
+          tr.appendChild(tdExpected);
+          tr.appendChild(tdActual);
+          tr.appendChild(tdResult);
+          tbody.appendChild(tr);
+        });
+
+        const total = rows.length;
+        fields.selfTestSummary.textContent = `${passed}/${total} tests passed.`;
+        if (passed === total) {
+          showAlert('Self-tests passed.', 'success');
+        } else {
+          showAlert('Self-tests detected a regression. Review failed rows.', 'error');
+        }
+      }
+
+      // Compute CRC button handler
+      function computeCRC() {
+        // Validate all fields first
+        ['t00','t01','t30_00','t30_01','t30_02','t52','t53','t54','t58','t59','t60','t62_01','t62_68','t99_00','t99_01'].forEach(id => validateField(id));
+
+        const invalids = Object.values(state.validation).filter(v => !v.valid);
+        if (invalids.length > 0) {
+          alert('Fix highlighted fields to compute CRC.');
+          return;
+        }
+        const pre = fields.crcBefore.value;
+        if (!pre) {
+          alert('Base string incomplete.');
+          return;
+        }
+        try {
+          const crc = crc16ccitt(pre);
+          fields.t63.value = crc;
+          const finalStr = pre + crc;
+          fields.qrStringFinal.value = finalStr;
+          state.has_crc = true;
+          renderQRCode(finalStr);
+          showAlert('CRC computed successfully.', 'success');
+        } catch (e) {
+          showAlert('Failed to compute CRC.', 'error');
+        }
+      }
+
+      // Render QR code
+      function renderQRCode(text) {
+        const canvas = fields.qrCanvas;
+        if (!canvas) return;
+        const QRCodeLib = window.QRCode || window.qrcode;
+        if (!QRCodeLib) {
+          showAlert('QR code library not loaded.', 'error');
+          return;
+        }
+        QRCodeLib.toCanvas(canvas, text, { width: 256, margin: 2, errorCorrectionLevel: 'M' }, err => {
+          if (err) {
+            showAlert('Failed to render QR code.', 'error');
+            return;
+          }
+          fields.qrCanvas.classList.remove('hidden');
+          fields.qrButtons.classList.remove('hidden');
+          fields.qrEmptyState.classList.add('hidden');
+          showAlert('QR generated.', 'success');
+        });
+      }
+
+      // Copy text to clipboard
+      async function copyText(text, successMsg) {
+        try {
+          await navigator.clipboard.writeText(text);
+          showAlert(successMsg, 'success');
+        } catch {
+          showAlert('Copy failed. Your browser may block clipboard access.', 'error');
+        }
+      }
+
+      // Copy QR as PNG
+      async function copyQrAsPng() {
+        const canvas = fields.qrCanvas;
+        if (!canvas) return;
+        try {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          showAlert('QR code copied as PNG.', 'success');
+        } catch {
+          showAlert('PNG copy not supported. Use Download instead.', 'warning');
+        }
+      }
+
+      // Download QR as PNG
+      function downloadQrAsPng() {
+        const canvas = fields.qrCanvas;
+        if (!canvas) return;
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'khqr-code.png';
+        a.click();
+      }
+
+      // Show alert
+      function showAlert(message, severity) {
+        fields.alertRegion.innerHTML = `<div class='alert alert-${severity}'>${message}</div>`;
+      }
+
+      // Toggle dark mode
+      function toggleDarkMode() {
+        const html = document.documentElement;
+        const isDark = html.getAttribute('data-theme') === 'dark';
+        html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+        buttons.btnToggleDark.textContent = isDark ? '🌙 Dark Mode' : '☀️ Light Mode';
+        localStorage.setItem('khqr_theme', isDark ? 'light' : 'dark');
+      }
+
+      // Load theme
+      function loadTheme() {
+        const theme = localStorage.getItem('khqr_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        buttons.btnToggleDark.textContent = theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
+      }
+
+      // Export configuration as JSON
+      function exportConfig() {
+        const data = {};
+        ['t30_00','t30_01','t30_02','t52','t53','t54','t59','t60','t62_01','t62_68','t99_00','t99_01'].forEach(id => {
+          data[id] = fields[id].value;
+        });
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'khqr-config.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        showAlert('Configuration exported as JSON.', 'success');
+      }
+
+      // Import configuration from JSON
+      function importConfig(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            Object.keys(data).forEach(key => {
+              if (fields[key]) {
+                fields[key].value = data[key];
+                if (key.startsWith('t99_')) {
+                  syncTimestampToDateTime(fields[key], fields[key.replace('t99_', 'dt_')]);
+                }
+              }
+            });
+            // Re-validate all fields
+            ['t00','t01','t30_00','t30_01','t30_02','t52','t53','t54','t58','t59','t60','t62_01','t62_68','t99_00','t99_01'].forEach(id => validateField(id));
+            assembleAll();
+            saveFormData();
+            showAlert('Configuration imported successfully.', 'success');
+          } catch (err) {
+            showAlert('Failed to import configuration. Invalid JSON file.', 'error');
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      // Reset form
+      function handleReset() {
+        fields.t30_00.value = '';
+        fields.t30_01.value = '';
+        fields.t30_02.value = '';
+        fields.t52.value = '5047';
+        fields.t53.value = '840';
+        fields.t54.value = '';
+        fields.t59.value = '';
+        fields.t60.value = '';
+        fields.t62_01.value = '';
+        fields.t62_68.value = '';
+        fields.dt_creation.value = '';
+        fields.t99_00.value = '';
+        fields.dt_expiry.value = '';
+        fields.t99_01.value = '';
+        fields.t63.value = '';
+        fields.crcBefore.value = '';
+        fields.qrStringFinal.value = '';
+        fields.t30_preview.value = '';
+        fields.t62_preview.value = '';
+        fields.t99_preview.value = '';
+        fields.qrCanvas.classList.add('hidden');
+        fields.qrButtons.classList.add('hidden');
+        fields.qrEmptyState.classList.remove('hidden');
+        fields.alertRegion.innerHTML = '';
+        state.validation = {};
+        updateDebugTable();
+        // Clear local storage
+        localStorage.removeItem('khqr_form_data');
+      }
+
+      // Load preset
+      function loadPreset(presetKey) {
+        if (!presets[presetKey]) return;
+        const data = presets[presetKey];
+        Object.keys(data).forEach(key => {
+          if (fields[key]) {
+            fields[key].value = data[key];
+            if (key.startsWith('t99_')) {
+              syncTimestampToDateTime(fields[key], fields[key.replace('t99_', 'dt_')]);
+            }
+          }
+        });
+        // Re-validate all fields
+        ['t00','t01','t30_00','t30_01','t30_02','t52','t53','t54','t58','t59','t60','t62_01','t62_68','t99_00','t99_01'].forEach(id => validateField(id));
+        assembleAll();
+        fields.presetSelector.value = presetKey;
+      }
+
+      // Save form data to localStorage
+      function saveFormData() {
+        const data = {};
+        ['t30_00','t30_01','t30_02','t52','t53','t54','t59','t60','t62_01','t62_68','t99_00','t99_01'].forEach(id => {
+          data[id] = fields[id].value;
+        });
+        localStorage.setItem('khqr_form_data', JSON.stringify(data));
+      }
+
+      // Load form data from localStorage
+      function loadFormData() {
+        const data = localStorage.getItem('khqr_form_data');
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            Object.keys(parsed).forEach(key => {
+              if (fields[key]) {
+                fields[key].value = parsed[key];
+                if (key.startsWith('t99_')) {
+                  syncTimestampToDateTime(fields[key], fields[key.replace('t99_', 'dt_')]);
+                }
+              }
+            });
+            // Re-validate all fields
+            ['t00','t01','t30_00','t30_01','t30_02','t52','t53','t54','t58','t59','t60','t62_01','t62_68','t99_00','t99_01'].forEach(id => validateField(id));
+            assembleAll();
+          } catch (e) {
+            console.warn('Failed to load saved form data:', e);
+          }
+        }
+      }
+
+      // Sync datetime-local and timestamp fields
+      function syncDateTimeToTimestamp(dtField, tsField) {
+        const val = dtField.value;
+        if (!val) {
+          tsField.value = '';
+          validateField(tsField.id);
+          return;
+        }
+        const ms = new Date(val).getTime();
+        if (isNaN(ms)) {
+          tsField.value = '';
+          validateField(tsField.id);
+          return;
+        }
+        tsField.value = ms.toString();
+        validateField(tsField.id);
+      }
+
+      function syncTimestampToDateTime(tsField, dtField) {
+        const val = tsField.value;
+        if (!val) {
+          dtField.value = '';
+          return;
+        }
+        const ms = Number(val);
+        if (isNaN(ms)) {
+          dtField.value = '';
+          return;
+        }
+        const iso = new Date(ms).toISOString();
+        dtField.value = iso.substring(0,16);
+      }
+
+      // Event listeners
+      Object.values(fields).forEach(el => {
+        if (!el) return;
+        if ((el.tagName === 'INPUT' || el.tagName === 'SELECT') && !el.readOnly && el.id !== 'presetSelector') {
+          const eventType = el.tagName === 'SELECT' ? 'change' : 'input';
+          el.addEventListener(eventType, () => {
+            if (el.id === 't59' || el.id === 't60') {
+              el.value = el.value.toUpperCase();
+            }
+            validateField(el.id);
+            if (el.id === 't53') {
+              updateAmountLabel();
+              validateField('t54'); // Re-validate amount when currency changes
+            }
+            saveFormData();
+          });
+        }
+      });
+
+      fields.dt_creation.addEventListener('change', () => syncDateTimeToTimestamp(fields.dt_creation, fields.t99_00));
+      fields.dt_expiry.addEventListener('change', () => syncDateTimeToTimestamp(fields.dt_expiry, fields.t99_01));
+      fields.t99_00.addEventListener('input', () => syncTimestampToDateTime(fields.t99_00, fields.dt_creation));
+      fields.t99_01.addEventListener('input', () => syncTimestampToDateTime(fields.t99_01, fields.dt_expiry));
+
+      buttons.btnComputeCRC.addEventListener('click', computeCRC);
+      buttons.btnCopyPreCrc.addEventListener('click', () => copyText(fields.crcBefore.value, 'Copied before-CRC string.'));
+      buttons.btnCopyFinal.addEventListener('click', () => copyText(fields.qrStringFinal.value, 'Copied final QR string.'));
+      buttons.btnCopyQrPng.addEventListener('click', copyQrAsPng);
+      buttons.btnDownloadQrPng.addEventListener('click', downloadQrAsPng);
+      buttons.btnReset.addEventListener('click', handleReset);
+      buttons.btnExportHtml.addEventListener('click', () => alert('This page is the HTML file. Save it to keep offline.'));
+      buttons.btnToggleDark.addEventListener('click', toggleDarkMode);
+      buttons.btnExportConfig.addEventListener('click', exportConfig);
+      buttons.btnRunSelfTests.addEventListener('click', runSelfTests);
+
+      fields.presetSelector.addEventListener('change', (e) => {
+        const preset = e.target.value;
+        if (preset && presets[preset]) {
+          loadPreset(preset);
+        }
+      });
+
+      fields.importConfig.addEventListener('change', importConfig);
+
+      // Initial validation and assembly
+      ['t30_00','t30_01','t30_02','t52','t53','t54','t59','t60','t62_01','t62_68','t99_00','t99_01'].forEach(id => validateField(id));
+
+      // Initial sync datetime fields
+      syncTimestampToDateTime(fields.t99_00, fields.dt_creation);
+      syncTimestampToDateTime(fields.t99_01, fields.dt_expiry);
+
+      // Load saved data
+      loadFormData();
+
+      // Load theme
+      loadTheme();
+
+      // Initial assembly
+      assembleAll();
+
+      // Initial update amount label
+      updateAmountLabel();
+    })();
+  </script>
+
+  <!-- QRCode.js by Kazuhiko Arase (MIT License) embedded -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+
+</body>
+</html>

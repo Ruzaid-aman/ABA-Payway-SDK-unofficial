@@ -1,0 +1,17 @@
+src/
+payway-openapi/
+scripts/
+tests/
+examples/
+scratch/
+tsconfig.json
+tsup.config.ts
+biome.json
+package-lock.json
+node_modules/
+.npmignore
+.gitignore
+.git/
+*.yaml
+*.py
+*.txt

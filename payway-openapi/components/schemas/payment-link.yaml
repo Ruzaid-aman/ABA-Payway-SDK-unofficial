@@ -1,0 +1,69 @@
+# Payment Link — Schemas
+
+CreatePaymentLinkRequest:
+  type: object
+  required: [request_time, merchant_id, merchant_auth, hash]
+  description: >
+    Uses RSA-encrypted merchant_auth containing transaction details.
+    See x-merchant-auth-encryption on the operation for encryption process.
+  properties:
+    request_time:
+      type: string
+      description: UTC timestamp, YYYYMMDDHHmmss.
+    merchant_id:
+      type: string
+      description: Merchant key issued by ABA Bank.
+    merchant_auth:
+      type: string
+      description: >
+        Base64 of RSA-encrypted, chunked JSON containing transaction
+        details (title, amount, description, payment_limit, return_url, merchant_ref_no, expired_date).
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+
+CreatePaymentLinkResponse:
+  type: object
+  properties:
+    status:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+    payment_link:
+      type: string
+      description: The generated payment link URL to share with customers.
+    tran_id:
+      type: string
+
+GetPaymentLinkDetailsRequest:
+  type: object
+  required: [request_time, merchant_id, merchant_auth, hash]
+  properties:
+    request_time: { type: string, description: "UTC timestamp, YYYYMMDDHHmmss." }
+    merchant_id: { type: string }
+    merchant_auth:
+      type: string
+      description: RSA-encrypted JSON {mc_id, id}.
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+
+GetPaymentLinkDetailsResponse:
+  type: object
+  properties:
+    status:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+    data:
+      type: object
+      properties:
+        tran_id: { type: string }
+        amount: { type: number }
+        currency: { type: string }
+        payment_status: { type: string }
+        payment_link: { type: string }
+        created_date: { type: string }
+        expiry_date: { type: string }

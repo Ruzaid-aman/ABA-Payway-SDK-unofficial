@@ -1,0 +1,73 @@
+TranLookupRequest:
+  type: object
+  required: [req_time, merchant_id, tran_id, hash]
+  description: Shared shape for check-transaction and close-transaction — both sign only these 3 fields (see per-operation x-hmac-fields).
+  properties:
+    req_time:
+      type: string
+      description: UTC request timestamp, format YYYYMMDDHHmmss.
+    merchant_id:
+      type: string
+      description: Merchant key issued by ABA Bank.
+    tran_id:
+      type: string
+      description: The original purchase transaction id to look up or close.
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(req_time + merchant_id + tran_id, api_key)).
+
+StatusBlock:
+  type: object
+  required: [code, message]
+  properties:
+    code:
+      type: string
+      description: >
+        Endpoint-specific status code. NOTE: check-transaction and
+        close-transaction each define their own code space (e.g. "00"
+        success vs "0" on purchase-family errors) — do not assume a
+        single shared enum across endpoints; encode per-operation
+        code tables separately in the generated SDK's error types.
+    message:
+      type: string
+      description: Human-readable detail for `code`.
+    tran_id:
+      type: string
+      description: Echoes the transaction id the status applies to.
+    lang:
+      type: string
+      description: >
+        Observed empirically (live sandbox probe, 2026-07-16) on
+        transaction-list-2's error responses only (e.g. "en"). Not
+        confirmed present on other -2 endpoints or on success
+        responses -- treat as optional/nullable everywhere, and
+        re-verify before assuming it appears on a given operation.
+    trace_id:
+      type: string
+      description: >
+        Observed empirically (live sandbox probe, 2026-07-16) on
+        transaction-list-2's error responses only. Same caveat as
+        `lang` -- optional, not confirmed on other endpoints.
+
+ErrorStatus:
+  type: object
+  description: >
+    purchase's JSON error shape (distinct from the HTML success
+    path). Non-exhaustive: purchase alone defines ~80 distinct error
+    codes (wrong hash, invalid amount, currency not allowed, payout
+    validation, Google Pay token failures, etc.) — pull the full
+    table from the scraped spec into your SDK's error-code enum
+    rather than hand-copying a subset here; this skeleton
+    intentionally does not restate all ~80 to keep the spec
+    reviewable, but the generated client MUST surface `code` typed,
+    not just `message` stringly.
+  properties:
+    status:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required: [code, message]
+  required: [status]

@@ -1,0 +1,192 @@
+openapi: 3.1.0
+info:
+  title: ABA PayWay Payment Gateway API
+  version: "1.0.0"
+  description: |
+    Hand-authored OpenAPI spec for ABA PayWay's Ecommerce Checkout surface,
+    reconstructed from https://developer.payway.com.kh (Purchase, Check
+    Transaction, Close Transaction, Refund, Get Transaction List, Get a
+    Transaction Details, Exchange Rate) plus the return_url callback
+    contract described on the Ecommerce Checkout overview page.
+
+    ## Authentication model — READ BEFORE GENERATING CLIENT CODE
+
+    PayWay does not use a transport-level auth scheme (no Bearer token, no
+    API-key header). Every request carries a `hash` field **inside the
+    request body itself**, computed as:
+
+        hash = base64( HMAC-SHA512( concat(fields...), api_key ) )
+
+    `api_key` is the merchant's secret, issued out-of-band by ABA Bank.
+    `fields` is an **ordered, endpoint-specific** list of other body
+    fields — see the `x-hmac-fields` extension on each operation below.
+    OpenAPI's native `securitySchemes` object assumes auth material lives
+    in a header/query/cookie, so it cannot express "sign these N body
+    fields in this order." We model it instead as a vendor extension that
+    SDK codegen tooling (or hand-written signing middleware) must read
+    explicitly — do not rely on Stainless/Speakeasy/openapi-generator to
+    infer this automatically; none of them do body-field HMAC signing out
+    of the box.
+
+    ### Non-negotiable implementation rules
+    1. Every field listed in `x-hmac-fields` MUST occupy its position in
+       the concatenation, even if the caller left it unset — substitute
+       an empty string `''`, never omit the position. PayWay's reference
+       PHP implementation concatenates raw (possibly-null) variables
+       directly; omitting a position silently shifts every field after it
+       and produces a hash mismatch (`code: 1`, "Wrong hash") with no
+       further diagnostic detail.
+    2. `req_time` MUST be UTC, formatted `YYYYMMDDHHmmss`, and generated
+       at the moment of signing — not cached — since it is itself part of
+       the signed payload.
+    3. The callback (return_url) verification algorithm is DIFFERENT from
+       request signing: sort response keys ascending, JSON-encode any
+       array/object values, concatenate all values, HMAC-SHA512 against
+       the same api_key, compare to the `X-PAYWAY-HMAC-SHA512` header
+       using constant-time comparison. See the `PaymentCallback` webhook
+       below. Do not reuse the request-signing function for this.
+    4. `purchase` accepts `multipart/form-data`; `check-transaction` and
+       `close-transaction` accept `application/json`. Do not assume a
+       uniform content type across operations when generating client
+       method signatures.
+    5. `purchase`'s 200 response is polymorphic: HTML (hosted checkout
+       page) by default, or a JSON object containing `qr_string`,
+       `abapay_deeplink`, `checkout_qr_url` when
+       `payment_option=abapay_khqr_deeplink`. Client method return types
+       must model both branches — do not assume HTML-only.
+    6. CONFIRMED via live sandbox probe (scripts/sandbox-probe.ts,
+       2026-07-16): the `-2` suffix on `check-transaction-2` and
+       `transaction-list-2` is real -- it is NOT a docs-platform
+       artifact. Both the suffixed and legacy non-suffixed paths are
+       live, but they are DIFFERENT API versions with different
+       response shapes, not aliases:
+         - check-transaction-2:  {"status":{"code":6,"message":"...","tran_id":"..."}}
+         - check-transaction  :  {"status":6,"description":"..."}   <- flat, different key names
+       Same pattern on transaction-list(-2): the -2 variant returns
+       string-typed codes plus extra lang/trace_id fields; the legacy
+       variant returns integer codes and a pw_tran_id field instead.
+       This spec intentionally targets the -2 contract throughout --
+       do not switch to the non-suffixed paths, their response shape
+       does not match the schemas in this spec.
+    7. `refund` uses a THIRD, distinct auth layer on top of HMAC: the
+       `merchant_auth` field is an RSA-public-key-encrypted, then
+       Base64-encoded, JSON blob of `{mc_id, tran_id, refund_amount}`.
+       PayWay's reference implementation encrypts in 117-byte chunks
+       (consistent with a 1024-bit RSA key under PKCS1 padding —
+       worth flagging to ABA Bank as low by modern standards and
+       confirming no larger key is available). This means your SDK's
+       credential config needs to hold BOTH the HMAC `api_key` AND a
+       separate RSA public key, and refund needs its own signing
+       pipeline entirely distinct from every other operation. Do not
+       try to unify it with `x-hmac-fields`.
+    8. `refund` also uses `request_time` as its field name where every
+       other endpoint uses `req_time` — this is very likely a vendor
+       documentation inconsistency, not an intentional API difference,
+       but the generated SDK method must honor it literally (send
+       `request_time` on the wire for refund) or the request fails
+       validation before the hash is even checked. Flag this loudly in
+       code review; it's the kind of thing that gets "corrected" by
+       someone skimming and then silently breaks in production.
+    9. Path prefixes are not uniform: most operations live under
+       `/api/payment-gateway/v1/...`, but `refund` lives under
+       `/api/merchant-portal/merchant-access/online-transaction/refund`
+       and `exchange-rate` lives directly under
+       `/api/payment-gateway/v1/exchange-rate` (no `/payments/`
+       segment). Do not assume a shared base path when generating
+       client method routing.
+    10. CONFIRMED via live sandbox probe (scripts/sandbox-probe.ts,
+        2026-07-16): plain string concatenation is correct for ALL
+        fields, including to_date/from_amount. Probed both variants
+        with an intentionally invalid start date: the string-concat
+        hash was ACCEPTED (server responded with a business-logic
+        error, code "49" "Invalid Start Date" -- meaning it passed
+        signature validation) while the PHP-arithmetic (+) hash was
+        REJECTED (code "1", "Wrong Hash."). PayWay's own PHP reference
+        sample has a typo; src/auth.ts's generateHmac() was already
+        correct and needs no changes.
+
+servers:
+  - url: https://checkout-sandbox.payway.com.kh
+    description: Sandbox (per PayWay docs export; confirm production host separately — likely checkout.payway.com.kh, not verified here)
+
+tags:
+  - name: Ecommerce Checkout
+    description: Core hosted-checkout payment flow
+  - name: Credentials on File
+    description: Tokenized card and account payments
+  - name: ABA QR API
+    description: Dynamic and static QR payments
+  - name: Payment Link
+    description: PayWay payment links creation
+  - name: Pre-auth
+    description: Pre-authorization holds and captures
+  - name: Payout
+    description: B2C/B2B disbursements
+  - name: KHQR Guideline
+    description: KHQR transaction lookup
+
+# --- Ecommerce Checkout paths ---
+paths:
+  /api/payment-gateway/v1/payments/purchase:
+    $ref: './paths/ecommerce-checkout.yaml#/~1api~1payment-gateway~1v1~1payments~1purchase'
+  /api/payment-gateway/v1/payments/check-transaction-2:
+    $ref: './paths/ecommerce-checkout.yaml#/~1api~1payment-gateway~1v1~1payments~1check-transaction-2'
+  /api/payment-gateway/v1/payments/close-transaction:
+    $ref: './paths/ecommerce-checkout.yaml#/~1api~1payment-gateway~1v1~1payments~1close-transaction'
+  /api/payment-gateway/v1/payments/transaction-detail:
+    $ref: './paths/ecommerce-checkout.yaml#/~1api~1payment-gateway~1v1~1payments~1transaction-detail'
+  /api/payment-gateway/v1/payments/transaction-list-2:
+    $ref: './paths/ecommerce-checkout.yaml#/~1api~1payment-gateway~1v1~1payments~1transaction-list-2'
+  /api/merchant-portal/merchant-access/online-transaction/refund:
+    $ref: './paths/ecommerce-checkout.yaml#/~1api~1merchant-portal~1merchant-access~1online-transaction~1refund'
+  /api/payment-gateway/v1/exchange-rate:
+    $ref: './paths/ecommerce-checkout.yaml#/~1api~1payment-gateway~1v1~1exchange-rate'
+
+  # --- Credentials on File paths ---
+  /api/payment-credential/v3/aof/link-account:
+    $ref: './paths/credentials-on-file.yaml#/~1api~1payment-credential~1v3~1aof~1link-account'
+  /api/payment-credential/v3/cof/link-card:
+    $ref: './paths/credentials-on-file.yaml#/~1api~1payment-credential~1v3~1cof~1link-card'
+  /api/payment-gateway/v3/purchase/payment-credential:
+    $ref: './paths/credentials-on-file.yaml#/~1api~1payment-gateway~1v3~1purchase~1payment-credential'
+  /api/payment-credential/v3/token-management/renew-expired-account-token:
+    $ref: './paths/credentials-on-file.yaml#/~1api~1payment-credential~1v3~1token-management~1renew-expired-account-token'
+  /api/payment-credential/v3/token-management/get-token-details:
+    $ref: './paths/credentials-on-file.yaml#/~1api~1payment-credential~1v3~1token-management~1get-token-details'
+  /api/payment-credential/v3/token-management/remove-token:
+    $ref: './paths/credentials-on-file.yaml#/~1api~1payment-credential~1v3~1token-management~1remove-token'
+
+  # --- QR API paths ---
+  /api/payment-gateway/v1/payments/generate-qr:
+    $ref: './paths/qr-api.yaml#/~1api~1payment-gateway~1v1~1payments~1generate-qr'
+
+  # --- Payment Link paths ---
+  /api/merchant-portal/merchant-access/payment-link/create:
+    $ref: './paths/payment-link.yaml#/~1api~1merchant-portal~1merchant-access~1payment-link~1create'
+  /api/merchant-portal/merchant-access/payment-link/detail:
+    $ref: './paths/payment-link.yaml#/~1api~1merchant-portal~1merchant-access~1payment-link~1detail'
+
+  # --- Pre-auth paths ---
+  /api/merchant-portal/merchant-access/online-transaction/pre-auth-completion:
+    $ref: './paths/pre-auth.yaml#/~1api~1merchant-portal~1merchant-access~1online-transaction~1pre-auth-completion'
+  /api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation:
+    $ref: './paths/pre-auth.yaml#/~1api~1merchant-portal~1merchant-access~1online-transaction~1pre-auth-cancellation'
+
+  # --- Payout paths ---
+  /api/payment-gateway/v2/direct-payment/merchant/payout:
+    $ref: './paths/payout.yaml#/~1api~1payment-gateway~1v2~1direct-payment~1merchant~1payout'
+  /api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status:
+    $ref: './paths/payout.yaml#/~1api~1merchant-portal~1merchant-access~1whitelist-account~1update-whitelist-status'
+  /api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout:
+    $ref: './paths/payout.yaml#/~1api~1merchant-portal~1merchant-access~1whitelist-account~1add-whitelist-payout'
+
+  # --- KHQR paths ---
+  /api/payment-gateway/v1/payments/get-transactions-by-mc-ref:
+    $ref: './paths/khqr.yaml#/~1api~1payment-gateway~1v1~1payments~1get-transactions-by-mc-ref'
+
+webhooks:
+  $ref: './components/webhooks.yaml'
+
+components:
+  schemas:
+    $ref: './components/schemas/ecommerce-checkout.yaml'

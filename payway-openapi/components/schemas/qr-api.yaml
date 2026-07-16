@@ -1,0 +1,47 @@
+# QR API — Schemas
+
+GenerateQrRequest:
+  type: object
+  required: [req_time, merchant_id, tran_id, amount, purchase_type, payment_option, callback_url, currency, qr_image_template, hash]
+  properties:
+    req_time:
+      type: string
+      description: UTC request timestamp, format YYYYMMDDHHmmss.
+    merchant_id:
+      type: string
+      description: Merchant key issued by ABA Bank.
+    tran_id:
+      type: string
+      maxLength: 20
+      description: Merchant-generated unique transaction identifier.
+    amount:
+      type: number
+      description: Payment amount.
+    purchase_type:
+      type: string
+      enum: [purchase]
+    payment_option:
+      type: string
+      example: abapay_khqr
+    callback_url:
+      type: string
+      description: Base64-encoded callback URL.
+    currency:
+      type: string
+      enum: [KHR, USD]
+    qr_image_template:
+      type: string
+      example: template2
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)).
+
+GenerateQrResponse:
+  type: object
+  properties:
+    qrString:
+      type: string
+      description: Raw KHQR payload string, scannable by any KHQR-member banking app.
+    qrImage:
+      type: string
+      description: Data URL containing the rendered QR PNG image.

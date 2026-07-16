@@ -1,0 +1,82 @@
+# Payout — Paths
+
+/api/payment-gateway/v2/direct-payment/merchant/payout:
+  post:
+    operationId: payout
+    summary: Disburse funds to a beneficiary account
+    tags: [Payout]
+    description: >
+      Transfers funds from the merchant's settlement account to a
+      whitelisted beneficiary ABA account. Beneficiaries must be added
+      to the whitelist and approved before payouts can be made.
+    x-hmac-fields:
+      - merchant_id
+      - tran_id
+      - beneficiaries
+      - amount
+      - custom_fields
+      - currency
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/payout.yaml#/PayoutRequest'
+    responses:
+      '200':
+        description: Payout result
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/payout.yaml#/PayoutResponse'
+
+/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status:
+  post:
+    operationId: updateBeneficiaryStatus
+    summary: Update the status of a beneficiary
+    tags: [Payout]
+    description: >
+      Enables or disables a whitelisted beneficiary account. Disabled
+      beneficiaries cannot receive payouts until re-enabled.
+    x-hmac-fields:
+      - request_time
+      - merchant_auth
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/payout.yaml#/UpdateBeneficiaryStatusRequest'
+    responses:
+      '200':
+        description: Beneficiary status update result
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/payout.yaml#/BeneficiaryResponse'
+
+/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout:
+  post:
+    operationId: addBeneficiary
+    summary: Add a beneficiary to the payout whitelist
+    tags: [Payout]
+    description: >
+      Registers a new ABA account as a payout beneficiary. The
+      beneficiary must be approved by ABA Bank before payouts can
+      be directed to it. Up to 10 beneficiaries can be whitelisted.
+    x-hmac-fields:
+      - request_time
+      - merchant_auth
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/payout.yaml#/AddBeneficiaryRequest'
+    responses:
+      '200':
+        description: Beneficiary addition result
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/payout.yaml#/BeneficiaryResponse'

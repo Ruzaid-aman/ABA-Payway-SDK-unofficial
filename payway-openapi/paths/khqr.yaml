@@ -1,0 +1,28 @@
+# KHQR — Paths (from subagent output)
+
+/api/payment-gateway/v1/payments/get-transactions-by-mc-ref:
+  post:
+    operationId: getTransactionsByMerchantRef
+    summary: Get transactions by merchant reference
+    tags: [KHQR Guideline]
+    description: >
+      Retrieves purchase transactions using a merchant_ref number.
+      Returns details for any past transaction, limited to the last
+      50 transactions matching the reference.
+    x-hmac-fields:
+      - req_time
+      - merchant_id
+      - merchant_ref
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/khqr.yaml#/GetTransactionsByMcRefRequest'
+    responses:
+      '200':
+        description: Matching transactions
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/khqr.yaml#/GetTransactionsByMcRefResponse'

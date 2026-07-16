@@ -1,0 +1,557 @@
+PurchaseRequest:
+  type: object
+  required: [req_time, merchant_id, tran_id, amount, hash]
+  properties:
+    req_time:
+      type: string
+      description: UTC request timestamp, format YYYYMMDDHHmmss. Must be freshly generated at signing time.
+      example: "20250213065545"
+    merchant_id:
+      type: string
+      maxLength: 30
+      description: Merchant key issued by ABA Bank.
+    tran_id:
+      type: string
+      maxLength: 20
+      description: Merchant-generated unique transaction identifier.
+    firstname:
+      type: string
+      maxLength: 100
+      description: Buyer's first name. Must not contain digits/special characters (rejected as error code 16).
+    lastname:
+      type: string
+      maxLength: 100
+      description: Buyer's last name. Same validation as firstname (error code 17).
+    email:
+      type: string
+      maxLength: 50
+      description: Buyer's email (validated server-side, error code 19 if invalid).
+    phone:
+      type: string
+      maxLength: 20
+      description: Buyer's phone (validated server-side, error code 18 if invalid).
+    type:
+      type: string
+      maxLength: 20
+      default: purchase
+      enum: [purchase, pre-auth]
+      description: >
+        "pre-auth" only supports ABA PAY, KHQR, and Card. Using
+        pre-auth with an unsupported payment_option returns error
+        code 22.
+    payment_option:
+      type: string
+      maxLength: 20
+      enum: [cards, abapay_khqr, abapay_khqr_deeplink, alipay, wechat, google_pay]
+      description: >
+        Omit to let PayWay auto-display all payment options the
+        merchant profile supports. abapay_khqr_deeplink changes the
+        200 response from HTML to a JSON object (qr_string,
+        abapay_deeplink, checkout_qr_url) — see PurchaseQrResponse.
+    items:
+      type: string
+      maxLength: 500
+      description: >
+        Base64-encoded JSON array of {name, quantity, price}.
+        Descriptive only — NOT used for amount validation or
+        calculation; `amount` is the sole source of truth for what's
+        charged.
+    shipping:
+      type: number
+      default: 0
+      description: Shipping fee, additive to amount at checkout.
+    amount:
+      type: number
+      description: >
+        Purchase amount. Zero is rejected (error 45). KHR currency
+        cannot carry decimals (error 46) and must exceed 100 KHR
+        (error 47).
+    currency:
+      type: string
+      enum: [KHR, USD]
+      description: Defaults to the currency of the first account on the merchant profile if omitted.
+    return_url:
+      type: string
+      description: >
+        Base64-encoded callback URL. Custom return_url values must be
+        pre-whitelisted on the merchant profile (error 6/81) or the
+        request is rejected.
+    cancel_url:
+      type: string
+      description: Redirect target when the customer closes/cancels the payment dialog.
+    skip_success_page:
+      type: integer
+      enum: [0, 1]
+      description: >
+        Overrides the profile-level "skip success page" setting for
+        this request only. 1 = skip, redirecting via
+        continue_success_url.
+    continue_success_url:
+      type: string
+      description: Redirect target after a successful payment (used when skip_success_page=1).
+    return_deeplink:
+      type: string
+      description: >
+        Base64-encoded JSON {ios_scheme, android_scheme}. Mandatory
+        for mobile-app integrations so ABA Mobile can hand control
+        back to the merchant's native app.
+    custom_fields:
+      type: string
+      description: >
+        Base64-encoded arbitrary JSON merchants want attached to the
+        transaction record/export (not used by PayWay's own logic).
+    return_params:
+      type: string
+      description: Opaque string echoed back verbatim in the return_url pushback payload.
+    view_type:
+      type: string
+      enum: [hosted_view, popup]
+      description: hosted_view opens a new tab; popup renders as a bottom sheet (mobile) or modal (desktop).
+    payment_gate:
+      type: integer
+      description: Set to 0 to route through Checkout service when the profile also has QR Payment API enabled.
+    payout:
+      type: string
+      description: >
+        Base64-encoded JSON array of {acc, amt} splitting the payment
+        across up to 10 destination accounts (error 25 if exceeded).
+        Accounts must be whitelisted first (error 37).
+    additional_params:
+      type: string
+      description: Base64-encoded JSON, currently only used for WeChat Mini Program (wechat_sub_appid, wechat_sub_openid).
+    lifetime:
+      type: integer
+      description: >
+        Minutes before the payment link expires. Min 3, max 43200
+        (30 days). Below 3 is rejected (error 69). Behavior on
+        expiry differs by method: ABA PAY/Card simply fail; KHQR
+        reverses funds to the payer; WeChat/Alipay do not reverse.
+    google_pay_token:
+      type: string
+      description: Required when payment_option=google_pay and the merchant manages payment-method selection itself.
+    hash:
+      type: string
+      description: >
+        base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)).
+        See operation-level x-hmac-fields for the exact field order —
+        it is NOT alphabetical and NOT the same as check/close-transaction.
+
+PurchaseQrResponse:
+  type: object
+  description: Returned instead of HTML when payment_option=abapay_khqr_deeplink.
+  properties:
+    qr_string:
+      type: string
+      description: Raw KHQR payload string, scannable by any KHQR-member banking app.
+    abapay_deeplink:
+      type: string
+      description: Deeplink that opens ABA Mobile directly to the pre-filled payment.
+    checkout_qr_url:
+      type: string
+      description: Hosted URL rendering the QR code as an image/page, for platforms that can't render qr_string themselves.
+
+TranLookupRequest:
+  type: object
+  required: [req_time, merchant_id, tran_id, hash]
+  description: Shared shape for check-transaction and close-transaction — both sign only these 3 fields (see per-operation x-hmac-fields).
+  properties:
+    req_time:
+      type: string
+      description: UTC request timestamp, format YYYYMMDDHHmmss.
+    merchant_id:
+      type: string
+      description: Merchant key issued by ABA Bank.
+    tran_id:
+      type: string
+      description: The original purchase transaction id to look up or close.
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(req_time + merchant_id + tran_id, api_key)).
+
+CheckTransactionResponse:
+  type: object
+  required: [status]
+  properties:
+    data:
+      type: object
+      description: Present on successful lookup (status.code == "00").
+      properties:
+        payment_status_code:
+          type: integer
+          description: "0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED"
+        payment_status:
+          type: string
+          enum: [APPROVED, PRE-AUTH, REFUNDED, PENDING, DECLINED, CANCELLED]
+        total_amount:
+          type: number
+          description: Amount due after discount.
+        original_amount:
+          type: number
+        refund_amount:
+          type: number
+          description: Sum of all refunds issued against this transaction.
+        discount_amount:
+          type: number
+          description: In the original transaction's currency.
+        payment_amount:
+          type: number
+          description: Amount actually paid by the customer.
+        payment_currency:
+          type: string
+        apv:
+          type: string
+          description: Transaction approval code.
+        transaction_date:
+          type: string
+          description: Timestamp the transaction was created in the payment gateway.
+    status:
+      $ref: '#/StatusBlock'
+  example:
+    data:
+      payment_status_code: 0
+      payment_status: APPROVED
+      total_amount: 10.00
+      original_amount: 10.00
+      refund_amount: 0
+      discount_amount: 0
+      payment_amount: 10.00
+      payment_currency: USD
+      apv: "619195"
+      transaction_date: "2025-02-13 06:56:00"
+    status:
+      code: "00"
+      message: Success!
+      tran_id: "17394277693"
+
+CloseTransactionResponse:
+  type: object
+  required: [status]
+  properties:
+    status:
+      $ref: '#/StatusBlock'
+  # Sample values (success: code 00; failure: code 1 "Wrong hash") —
+  # see the close-transaction operation's response content.examples
+  # for runnable versions; schema objects can't carry a keyed
+  # examples map per the OpenAPI spec.
+
+StatusBlock:
+  type: object
+  required: [code, message]
+  properties:
+    code:
+      type: string
+      description: >
+        Endpoint-specific status code. NOTE: check-transaction and
+        close-transaction each define their own code space (e.g. "00"
+        success vs "0" on purchase-family errors) — do not assume a
+        single shared enum across endpoints; encode per-operation
+        code tables separately in the generated SDK's error types.
+    message:
+      type: string
+      description: Human-readable detail for `code`.
+    tran_id:
+      type: string
+      description: Echoes the transaction id the status applies to.
+
+ErrorStatus:
+  type: object
+  description: >
+    purchase's JSON error shape (distinct from the HTML success
+    path). Non-exhaustive: purchase alone defines ~80 distinct error
+    codes (wrong hash, invalid amount, currency not allowed, payout
+    validation, Google Pay token failures, etc.) — pull the full
+    table from the scraped spec into your SDK's error-code enum
+    rather than hand-copying a subset here; this skeleton
+    intentionally does not restate all ~80 to keep the spec
+    reviewable, but the generated client MUST surface `code` typed,
+    not just `message` stringly.
+  properties:
+    status:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required: [code, message]
+  required: [status]
+
+PaymentCallbackBody:
+  type: object
+  description: >
+    Body shape is NOT fixed — PayWay states additional fields may be
+    present depending on payment method. Treat unknown keys as
+    pass-through when computing the signature (item 3 in
+    info.description sorts ALL present keys, not a fixed subset).
+  required: [tran_id, apv, status]
+  properties:
+    tran_id:
+      type: string
+      description: The tran_id supplied on the original purchase call.
+    apv:
+      type: string
+      description: Transaction approval code.
+    status:
+      type: string
+      description: Payment status for this callback.
+    return_params:
+      type: string
+      description: Echoes the return_params value from the original purchase request, if any was supplied.
+
+TransactionOperation:
+  type: object
+  description: One entry in a transaction's operation history (capture, pre-auth completion/cancellation, refund).
+  properties:
+    status:
+      type: string
+      enum: ["Completed", "Pre-Auth", "Completed Pre-Auth", "Cancelled Pre-Auth", "Refunded"]
+    amount:
+      type: number
+      description: Amount associated with this specific operation, not the transaction total.
+    transaction_date:
+      type: string
+      description: Timestamp this operation occurred.
+    bank_ref:
+      type: string
+      description: Core-banking booking entry id — populated for ABA PAY operations only, blank otherwise.
+
+TransactionDetailResponse:
+  type: object
+  required: [status]
+  description: >
+    Response for getTransactionDetail. NOT intended for real-time
+    polling — see rate-limit note on the operation (10 req/min, not
+    raisable).
+  properties:
+    data:
+      type: object
+      description: Present when status.code == "00".
+      properties:
+        transaction_id: { type: string, description: "Echoes the requested tran_id." }
+        payment_status_code:
+          type: integer
+          description: "0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED"
+        payment_status:
+          type: string
+          enum: [APPROVED, PRE-AUTH, PENDING, DECLINED, REFUNDED, CANCELLED]
+        original_amount: { type: number, description: "Before discount." }
+        original_currency: { type: string }
+        payment_amount: { type: number, description: "Amount actually paid by the customer." }
+        payment_currency: { type: string }
+        total_amount: { type: number, description: "Amount due after discount." }
+        refund_amount: { type: number, description: "Total refunded to date." }
+        discount_amount: { type: number }
+        apv: { type: string, description: "Transaction approval code." }
+        transaction_date: { type: string }
+        first_name: { type: string, description: "Payer first name." }
+        last_name: { type: string, description: "Payer last name." }
+        email: { type: string }
+        phone: { type: string }
+        bank_ref: { type: string, description: "ABA core-banking booking entry reference." }
+        payment_type:
+          type: string
+          enum: ["ABA Pay", Alipay, Wechat, KHQR, VISA, MC, JCB, CUP]
+        payer_account: { type: string, description: "Masked account number or card PAN." }
+        bank_name: { type: string, description: "ABA Bank for ABA PAY, or issuer bank for KHQR." }
+        card_source:
+          type: string
+          enum: [ONUS, OFFUS_DOMESTIC, OFFUS_INTERNATIONAL]
+        transaction_operations:
+          type: array
+          description: Full operation history for this transaction.
+          items:
+            $ref: '#/TransactionOperation'
+    status:
+      $ref: '#/StatusBlock'
+      description: >
+        code space for this endpoint: "00" success, "5" wrong hash
+        (note: NOT "1" as in check/close-transaction — do not
+        assume a shared numeric code space across endpoints),
+        "6" transaction not found, "8" invalid merchant profile,
+        "11" internal server error, "429" rate limit exceeded.
+
+TransactionListRequest:
+  type: object
+  required: [req_time, merchant_id, hash]
+  description: >
+    All filter fields are optional but each still occupies a fixed
+    position in the HMAC input per x-hmac-fields on the operation —
+    pass them as null/empty rather than omitting the key.
+  properties:
+    req_time: { type: string, description: "UTC timestamp, YYYYMMDDHHmmss." }
+    merchant_id: { type: string }
+    from_date:
+      type: string
+      nullable: true
+      description: "Format YYYY-MM-DD HH:mm:ss. Defaults to today 00:00:00 if omitted."
+    to_date:
+      type: string
+      nullable: true
+      description: "Format YYYY-MM-DD HH:mm:ss. Defaults to today 23:59:59 if omitted. Date range capped at 3 days total."
+    from_amount: { type: number, nullable: true }
+    to_amount: { type: number, nullable: true }
+    status:
+      type: string
+      nullable: true
+      description: "Comma-separated for multiple values. Case-insensitive. One of APPROVED, PRE-AUTH, REFUNDED, PENDING, DECLINED, CANCELLED."
+    page:
+      type: string
+      default: "1"
+    pagination:
+      type: string
+      default: "40"
+      description: "Max 1000 records per page."
+    hash: { type: string }
+
+TransactionListItem:
+  type: object
+  description: Same shape as TransactionDetailResponse.data minus transaction_operations (no per-item history in list view).
+  properties:
+    transaction_id: { type: string }
+    transaction_date: { type: string }
+    apv: { type: string }
+    payment_status:
+      type: string
+      enum: [APPROVED, PRE-AUTH, REFUNDED, PENDING, DECLINED, CANCELLED]
+    payment_status_code: { type: integer }
+    original_amount: { type: number }
+    original_currency: { type: string, enum: [KHR, USD] }
+    total_amount: { type: number }
+    discount_amount: { type: number }
+    refund_amount: { type: number }
+    payment_amount: { type: number }
+    payment_currency: { type: string }
+    first_name: { type: string, description: "Only present if enabled on the merchant profile." }
+    last_name: { type: string, description: "Only present if enabled on the merchant profile." }
+    email: { type: string, description: "Only present if enabled on the merchant profile." }
+    phone: { type: string, description: "Only present if enabled on the merchant profile." }
+    bank_ref: { type: string, description: "Only present if enabled on the merchant profile." }
+    payer_account: { type: string }
+    bank_name: { type: string }
+    card_source:
+      type: string
+      enum: [ONUS, OFFUS_DOMESTIC, OFFUS_INTERNATIONAL]
+    payment_type:
+      type: string
+      description: "N/A for transactions still pending payment."
+      enum: ["N/A", "ABA Pay", Alipay, Wechat, KHQR, VISA, MC, JCB, CUP]
+
+TransactionListResponse:
+  type: object
+  required: [status]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/TransactionListItem'
+    page: { type: string, description: "Current page index." }
+    pagination: { type: string, description: "Records per page (max 1000)." }
+    status:
+      $ref: '#/StatusBlock'
+      description: >
+        code space: "00" success, "1" wrong hash, "8" invalid
+        merchant profile, "11" internal server error, "429" rate
+        limit exceeded (50 req/min on this endpoint).
+
+RefundRequest:
+  type: object
+  required: [request_time, merchant_id, merchant_auth, hash]
+  description: >
+    NOTE the field name is `request_time`, not `req_time` as on
+    every other endpoint in this spec — see info.description item 8.
+  properties:
+    request_time:
+      type: string
+      description: UTC timestamp, YYYYMMDDHHmmss.
+    merchant_id:
+      type: string
+      maxLength: 20
+    merchant_auth:
+      type: string
+      description: >
+        Base64 of RSA-encrypted, chunked JSON {mc_id, tran_id,
+        refund_amount}. See x-merchant-auth-encryption on the
+        refund operation for the exact construction process and
+        required credential (a separate RSA public key from ABA
+        Bank, distinct from the HMAC api_key).
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+
+RefundResponse:
+  type: object
+  required: [status]
+  properties:
+    grand_total:
+      type: number
+      format: double
+      description: "Amount after any discount, e.g. $20 purchase with $2 discount -> grand_total $18."
+    total_refunded:
+      type: number
+      format: double
+      description: "Cumulative refunded amount across all partial refunds issued so far."
+    currency:
+      type: string
+      description: Original transaction currency.
+    transaction_status:
+      type: string
+      description: "REFUNDED for both full and partial refunds."
+    status:
+      type: object
+      required: [code, message]
+      description: >
+        Distinct, alphanumeric code space unique to this endpoint —
+        do not reuse StatusBlock's assumption of numeric-string
+        codes. Notable codes: 00 success, PTL02 invalid hash, PTL37
+        refund exceeds original amount, PTL57/PTL58 unable/failed to
+        refund, PTL168 concurrent request rejected, PTL181
+        insufficient available balance.
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+ExchangeRateRequest:
+  type: object
+  required: [req_time, merchant_id, hash]
+  properties:
+    req_time: { type: string, description: "UTC timestamp, YYYYMMDDHHmmss." }
+    merchant_id: { type: string }
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(req_time + merchant_id, api_key)) — only 2 fields, the shortest hash input in this API surface.
+
+CurrencyRate:
+  type: object
+  required: [sell, buy]
+  properties:
+    sell: { type: string, description: "Sell rate, as a decimal string." }
+    buy: { type: string, description: "Buy rate, as a decimal string." }
+
+ExchangeRateResponse:
+  type: object
+  required: [status, exchange_rates]
+  description: >
+    The vendor's own schema listed an inconsistent `required` array
+    under exchange_rates (omitting some currencies present in
+    `properties`) — treated as a docs artifact and modeled here via
+    additionalProperties instead of a hardcoded required list, since
+    the actual currency set PayWay returns may change over time
+    without notice.
+  properties:
+    status:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: "00 success, 1 wrong hash, 26 invalid merchant profile."
+        message: { type: string }
+    exchange_rates:
+      type: object
+      description: >
+        Keyed by lowercase ISO currency code (observed: aud, sgd,
+        eur, gbp, myr, thb, hkd, cny, cad, krw, jpy, vnd). Modeled
+        with additionalProperties rather than enumerating every key
+        as required, since PayWay could add/remove currencies.
+      additionalProperties:
+        $ref: '#/CurrencyRate'

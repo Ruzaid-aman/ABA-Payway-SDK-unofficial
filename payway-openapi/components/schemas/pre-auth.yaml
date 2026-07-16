@@ -1,0 +1,62 @@
+# Pre-auth — Schemas
+
+CompletePreAuthRequest:
+  type: object
+  required: [request_time, merchant_id, merchant_auth, hash]
+  description: >
+    Uses RSA-encrypted merchant_auth. NOTE: uses request_time (not req_time),
+    same convention as the Refund endpoint.
+  properties:
+    request_time:
+      type: string
+      description: UTC timestamp, YYYYMMDDHHmmss.
+    merchant_id:
+      type: string
+    merchant_auth:
+      type: string
+      description: >
+        Base64 of RSA-encrypted JSON {mc_id, tran_id, complete_amount, payout?}.
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+
+CompletePreAuthResponse:
+  type: object
+  properties:
+    status:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    transaction_status:
+      type: string
+      description: Updated status after completion (e.g., APPROVED).
+    total_amount:
+      type: number
+
+CancelPreAuthRequest:
+  type: object
+  required: [request_time, merchant_id, merchant_auth, hash]
+  properties:
+    request_time: { type: string, description: "UTC timestamp, YYYYMMDDHHmmss." }
+    merchant_id: { type: string }
+    merchant_auth:
+      type: string
+      description: Base64 of RSA-encrypted JSON {mc_id, tran_id}.
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+
+CancelPreAuthResponse:
+  type: object
+  properties:
+    status:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    transaction_status:
+      type: string
+      description: Updated status after cancellation (e.g., CANCELLED).

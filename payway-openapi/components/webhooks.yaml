@@ -1,0 +1,30 @@
+paymentCallback:
+  post:
+    operationId: paymentCallback
+    summary: PayWay's return_url callback (server-to-server pushback)
+    description: >
+      PayWay POSTs this to the merchant's return_url (or the profile's
+      configured default) after payment completion. Verify
+      X-PAYWAY-HMAC-SHA512 using the SORTED-KEY algorithm described in
+      info.description item 3 — this is NOT the same signing function
+      used for outbound requests. Reject with 401 on mismatch; do not
+      process the notification.
+    parameters:
+      - name: X-PAYWAY-HMAC-SHA512
+        in: header
+        required: true
+        schema:
+          type: string
+        description: >
+          Base64 HMAC-SHA512 of the sorted-and-concatenated response
+          body values, keyed by the merchant's api_key.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: './schemas/ecommerce-checkout.yaml#/PaymentCallbackBody'
+    responses:
+      '200':
+        description: Acknowledge receipt (merchant endpoint's own response, not PayWay's)
+

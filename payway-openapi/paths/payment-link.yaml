@@ -1,0 +1,80 @@
+# Payment Link — Paths
+
+/api/merchant-portal/merchant-access/payment-link/create:
+  post:
+    operationId: createPaymentLink
+    summary: Create a payment link
+    tags: [Payment Link]
+    description: >
+      Generates a shareable payment link that can be sent to customers
+      via SMS, email, chat, or any messaging platform. The link opens
+      PayWay's hosted checkout page. Requires RSA-encrypted merchant_auth.
+    x-hmac-fields:
+      - request_time
+      - merchant_id
+      - merchant_auth
+    x-merchant-auth-encryption:
+      algorithm: RSA public-key encryption, PKCS1 padding
+      chunk_size_bytes: 117
+      plaintext_shape:
+        mc_id: "same value as merchant_id"
+        title: "title of the payment link"
+        amount: "payment amount"
+        description: "optional description of the payment link"
+        payment_limit: "optional limit on payments"
+        return_url: "base64-encoded callback URL"
+        merchant_ref_no: "unique reference number"
+        expired_date: "optional expiration timestamp in seconds"
+      process: >
+        JSON-encode the plaintext shape -> split into 117-byte chunks ->
+        RSA-encrypt each chunk -> concatenate -> base64 encode into
+        merchant_auth field.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/payment-link.yaml#/CreatePaymentLinkRequest'
+    responses:
+      '200':
+        description: Payment link creation result
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/payment-link.yaml#/CreatePaymentLinkResponse'
+
+/api/merchant-portal/merchant-access/payment-link/detail:
+  post:
+    operationId: getPaymentLinkDetails
+    summary: Get payment link details
+    tags: [Payment Link]
+    description: >
+      Retrieves the status and details of a previously created payment link.
+      Also uses RSA-encrypted merchant_auth.
+    x-hmac-fields:
+      - request_time
+      - merchant_id
+      - merchant_auth
+    x-merchant-auth-encryption:
+      algorithm: RSA public-key encryption, PKCS1 padding
+      chunk_size_bytes: 117
+      plaintext_shape:
+        mc_id: "same value as merchant_id"
+        id: "the payment link ID to query (e.g. T+ErECeC9uCGj90ylqGUvw==)"
+      process: >
+        JSON-encode {mc_id, id} -> RSA-encrypt in 117-byte chunks ->
+        base64 encode into merchant_auth.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/payment-link.yaml#/GetPaymentLinkDetailsRequest'
+    responses:
+      '200':
+        description: Payment link details
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/payment-link.yaml#/GetPaymentLinkDetailsResponse'
+
