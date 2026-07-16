@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as crypto from 'node:crypto';
+import * as utils from '../utils.js';
 import { PayWay } from '../client.js';
 import { PayWayConfigError, PayWayAPIError } from '../errors.js';
 import { ENDPOINTS } from '../constants.js';
@@ -320,6 +321,51 @@ describe('checkout domain', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
+    it('calculates the exact HMAC hash for the createTransaction payload', () => {
+      const formatSpy = vi.spyOn(utils, 'formatRequestTime').mockReturnValue('20260716120000');
+      const result = payway.checkout.createTransaction({
+        transactionId: 'T002',
+        amount: 5.0,
+        currency: 'USD',
+        paymentOption: 'abapay_khqr',
+        items: [{ name: 'Widget', quantity: 1, price: 5.0 }],
+        returnUrl: 'https://example.com/return',
+      });
+
+      const expectedItems = Buffer.from(JSON.stringify([{ name: 'Widget', quantity: 1, price: 5.0 }]), 'utf8').toString('base64');
+      const expectedReturnUrl = Buffer.from('https://example.com/return', 'utf8').toString('base64');
+      const expectedConcat = [
+        result.req_time,
+        TEST_CONFIG.merchantId,
+        'T002',
+        '5.00',
+        expectedItems,
+        '',
+        '',
+        '',
+        '',
+        '',
+        'purchase',
+        'abapay_khqr',
+        expectedReturnUrl,
+        '',
+        '',
+        '',
+        'USD',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ].join('');
+
+      const expectedHash = crypto.createHmac('sha512', TEST_CONFIG.apiKey).update(expectedConcat).digest('base64');
+      expect(result.hash).toBe(expectedHash);
+      formatSpy.mockRestore();
+    });
+
     it('defaults currency to USD and type to purchase', () => {
       const result = payway.checkout.createTransaction({
         transactionId: 'T002',
@@ -328,6 +374,42 @@ describe('checkout domain', () => {
 
       expect(result).toHaveProperty('currency', 'USD');
       expect(result).toHaveProperty('type', 'purchase');
+    });
+
+    it('base64-encodes cancel_url, continue_success_url and return_params when present', () => {
+      const cancelUrl = 'https://example.com/cancel';
+      const continueSuccessUrl = 'https://example.com/continue';
+      const returnParams = 'campaign=summer';
+
+      const result = payway.checkout.createTransaction({
+        transactionId: 'T003',
+        amount: 10.0,
+        cancelUrl,
+        continueSuccessUrl,
+        returnParams,
+      });
+
+      expect(result.cancel_url).toBe(Buffer.from(cancelUrl, 'utf8').toString('base64'));
+      expect(result.continue_success_url).toBe(Buffer.from(continueSuccessUrl, 'utf8').toString('base64'));
+      expect(result.return_params).toBe(returnParams);
+    });
+
+    it('rejects non-positive amounts', () => {
+      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 0 })).toThrow('amount must be a positive number');
+      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: -5 })).toThrow('amount must be a positive number');
+    });
+
+    it('rejects KHR amounts with decimal places', () => {
+      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 100.5, currency: 'KHR' })).toThrow('KHR amount must be an integer');
+    });
+
+    it('rejects unsupported currencies', () => {
+      // @ts-expect-error — testing runtime validation
+      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 1, currency: 'EUR' })).toThrow('currency must be one of USD, KHR');
+    });
+
+    it('rejects empty transaction ids', () => {
+      expect(() => payway.checkout.createTransaction({ transactionId: '', amount: 1 })).toThrow('transactionId is required');
     });
   });
 
@@ -385,6 +467,95 @@ describe('checkout domain', () => {
       expect(body).toHaveProperty('hash');
       expect(body).toHaveProperty('from_date', '20260101');
       expect(body).toHaveProperty('to_date', '20260715');
+    });
+
+    it('retries on HTTP 503 and succeeds once service recovers', async () => {
+      const pw = new PayWay({ ...TEST_CONFIG, maxRetries: 2, retryDelayMs: 1 });
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Service unavailable' }, 503, 'Service Unavailable'));
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Service unavailable' }, 503, 'Service Unavailable'));
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Success' } }));
+
+      const result = await pw.checkout.checkTransaction('T001');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(result).toEqual({ status: { code: '00', message: 'Success' } });
+    });
+
+    it('does not fail when onRequest or onResponse hooks throw', async () => {
+      const pw = new PayWay({
+        ...TEST_CONFIG,
+        onRequest: () => {
+          throw new Error('hook fail');
+        },
+        onResponse: () => {
+          throw new Error('hook fail');
+        },
+      });
+
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Success' } }));
+      const result = await pw.checkout.checkTransaction('T001');
+
+      expect(result).toEqual({ status: { code: '00', message: 'Success' } });
+      expect(fetchSpy).toHaveBeenCalledOnce();
+    });
+
+    it('parses rate limit headers and forwards them to onResponse', async () => {
+      const rateLimitSpy = vi.fn();
+      const pw = new PayWay({
+        ...TEST_CONFIG,
+        onResponse: (_endpoint, _status, _body, rateLimitInfo) => {
+          rateLimitSpy(rateLimitInfo);
+        },
+      });
+
+      const response = mockJsonResponse({ status: { code: '00', message: 'Success' } });
+      response.headers.set('x-rate-limit-limit', '50');
+      response.headers.set('x-rate-limit-remaining', '49');
+      response.headers.set('x-rate-limit-reset', '120');
+      fetchSpy.mockResolvedValueOnce(response);
+
+      await pw.checkout.getTransactionList({});
+
+      expect(rateLimitSpy).toHaveBeenCalledTimes(1);
+      expect(rateLimitSpy).toHaveBeenCalledWith(expect.objectContaining({
+        limit: 50,
+        remaining: 49,
+        reset: 120,
+      }));
+    });
+
+    it('throttles requests to documented endpoints when the rate limit is exceeded', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+
+      const pw = new PayWay({
+        ...TEST_CONFIG,
+        rateLimitRules: {
+          [ENDPOINTS.checkTransaction]: { limit: 1, intervalMs: 1000 },
+        },
+      });
+
+      fetchSpy.mockResolvedValue(mockJsonResponse({ status: { code: 0, message: 'Success' } }));
+
+      const first = pw.checkout.checkTransaction('T001');
+      await Promise.resolve();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      await first;
+
+      const secondPromise = pw.checkout.checkTransaction('T002');
+      await Promise.resolve();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(999);
+      await Promise.resolve();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(1);
+      await Promise.resolve();
+      await secondPromise;
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
     });
   });
 
@@ -772,6 +943,28 @@ describe('payout domain', () => {
     expect(url).toContain(ENDPOINTS.addBeneficiary);
     const body = JSON.parse(opts.body);
     expect(body).toHaveProperty('merchant_auth');
+  });
+
+  it('rejects payout when beneficiary amounts do not sum to total', async () => {
+    await expect(
+      payway.payout.payout({
+        transactionId: 'PO-002',
+        amount: 100.0,
+        beneficiaries: [{ account: '000123456', amount: 50.0 }],
+        currency: 'USD',
+      }),
+    ).rejects.toThrow('beneficiary amounts (50) must sum to total amount (100)');
+  });
+
+  it('rejects payout with empty beneficiaries', async () => {
+    await expect(
+      payway.payout.payout({
+        transactionId: 'PO-003',
+        amount: 100.0,
+        beneficiaries: [],
+        currency: 'USD',
+      }),
+    ).rejects.toThrow('beneficiaries must be a non-empty array');
   });
 });
 

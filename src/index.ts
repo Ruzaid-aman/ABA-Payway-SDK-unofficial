@@ -1,6 +1,8 @@
 export {
   PayWay,
   PayWayConfig,
+  RateLimitInfo,
+  RateLimitRule,
   CreateTransactionParams,
   LinkAccountParams,
   LinkCardParams,

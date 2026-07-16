@@ -10,29 +10,6 @@ function generateHmac(payload, fieldList, apiKey, encoding = "base64") {
   }).join("");
   return crypto.createHmac("sha512", apiKey).update(concatenated).digest(encoding);
 }
-function generateHmacArithmetic(payload, fieldList, apiKey, arithmeticPairs) {
-  const sumByFirstField = new Map(
-    arithmeticPairs.map(([a, b]) => {
-      const numA = parseFloat(String(payload[a] ?? 0)) || 0;
-      const numB = parseFloat(String(payload[b] ?? 0)) || 0;
-      return [a, String(numA + numB)];
-    })
-  );
-  const suppressedFields = new Set(arithmeticPairs.map(([, b]) => b));
-  const parts = [];
-  for (const field of fieldList) {
-    if (suppressedFields.has(field)) {
-      continue;
-    }
-    if (sumByFirstField.has(field)) {
-      parts.push(sumByFirstField.get(field));
-    } else {
-      const val = payload[field];
-      parts.push(val === void 0 || val === null ? "" : String(val));
-    }
-  }
-  return crypto.createHmac("sha512", apiKey).update(parts.join("")).digest("base64");
-}
 function encryptMerchantAuth(data, publicKeyPem) {
   const jsonStr = JSON.stringify(data);
   const buffer = Buffer.from(jsonStr, "utf8");
@@ -102,28 +79,46 @@ var ENDPOINTS = {
 };
 
 // src/errors.ts
-var PayWayError = class extends Error {
+var PayWayError = class _PayWayError extends Error {
   constructor(message) {
     super(message);
+    Object.setPrototypeOf(this, _PayWayError.prototype);
     this.name = "PayWayError";
   }
 };
-var PayWayConfigError = class extends PayWayError {
+var PayWayConfigError = class _PayWayConfigError extends PayWayError {
   constructor(message) {
     super(message);
+    Object.setPrototypeOf(this, _PayWayConfigError.prototype);
     this.name = "PayWayConfigError";
   }
 };
-var PayWayAPIError = class extends PayWayError {
+var PayWayAPIError = class _PayWayAPIError extends PayWayError {
   statusCode;
   paywayCode;
   rawBody;
+  endpoint;
+  retryable;
   constructor(message, options) {
     super(message);
+    Object.setPrototypeOf(this, _PayWayAPIError.prototype);
     this.name = "PayWayAPIError";
     this.statusCode = options?.statusCode;
     this.paywayCode = options?.paywayCode;
     this.rawBody = options?.rawBody;
+    this.endpoint = options?.endpoint;
+    this.retryable = options?.retryable;
+  }
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      statusCode: this.statusCode,
+      paywayCode: this.paywayCode,
+      endpoint: this.endpoint,
+      retryable: this.retryable,
+      rawBody: this.rawBody
+    };
   }
 };
 
@@ -132,6 +127,46 @@ function formatRequestTime(date) {
   const now = date || /* @__PURE__ */ new Date();
   const pad = (n) => String(n).padStart(2, "0");
   return now.getUTCFullYear() + pad(now.getUTCMonth() + 1) + pad(now.getUTCDate()) + pad(now.getUTCHours()) + pad(now.getUTCMinutes()) + pad(now.getUTCSeconds());
+}
+var VALID_CURRENCIES = ["USD", "KHR"];
+function validateCurrency(currency) {
+  if (currency !== void 0 && !VALID_CURRENCIES.includes(currency)) {
+    throw new PayWayConfigError(`currency must be one of ${VALID_CURRENCIES.join(", ")}, received: ${currency}`);
+  }
+}
+function validatePositiveAmount(amount, currency) {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new PayWayConfigError(`amount must be a positive number, received: ${amount}`);
+  }
+  if (currency === "USD") {
+    const rounded = Math.round(amount * 100) / 100;
+    if (Math.abs(amount - rounded) > 1e-10) {
+      throw new PayWayConfigError(`USD amount must have at most 2 decimal places, received: ${amount}`);
+    }
+  } else if (currency === "KHR" && !Number.isInteger(amount)) {
+    throw new PayWayConfigError(`KHR amount must be an integer, received: ${amount}`);
+  }
+}
+function validateTransactionId(transactionId) {
+  if (typeof transactionId !== "string" || transactionId.length === 0) {
+    throw new PayWayConfigError("transactionId is required and must be a non-empty string");
+  }
+}
+function validateBeneficiaries(beneficiaries, totalAmount, currency) {
+  if (!Array.isArray(beneficiaries) || beneficiaries.length === 0) {
+    throw new PayWayConfigError("beneficiaries must be a non-empty array");
+  }
+  let sum = 0;
+  for (const b of beneficiaries) {
+    if (typeof b.account !== "string" || b.account.length === 0) {
+      throw new PayWayConfigError("each beneficiary must have a non-empty account string");
+    }
+    validatePositiveAmount(b.amount, currency);
+    sum += b.amount;
+  }
+  if (Math.abs(sum - totalAmount) > Number.EPSILON) {
+    throw new PayWayConfigError(`beneficiary amounts (${sum}) must sum to total amount (${totalAmount})`);
+  }
 }
 function formatAmount(amount, currency) {
   if (currency === "USD") {
@@ -161,8 +196,56 @@ function filterParams(obj) {
   return filtered;
 }
 
+// src/khqr-offline.ts
+function formatAmount2(amount, currency) {
+  if (currency === "KHR") {
+    return Math.round(amount).toString();
+  }
+  return amount.toFixed(2);
+}
+function encodeTlv(tag, value) {
+  const length = value.length;
+  const lengthStr = length.toString().padStart(2, "0");
+  return `${tag}${lengthStr}${value}`;
+}
+function crc16Ccitt(input) {
+  let crc = 65535;
+  for (let i = 0; i < input.length; i += 1) {
+    crc ^= input.charCodeAt(i) << 8;
+    for (let bit = 0; bit < 8; bit += 1) {
+      if ((crc & 32768) !== 0) {
+        crc = (crc << 1 ^ 4129) & 65535;
+      } else {
+        crc = crc << 1 & 65535;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+function generateOfflineQR(params) {
+  const tlvSegments = [];
+  tlvSegments.push(encodeTlv("00", "01"));
+  tlvSegments.push(encodeTlv("01", params.merchantId));
+  tlvSegments.push(encodeTlv("02", params.transactionId));
+  tlvSegments.push(encodeTlv("03", formatAmount2(params.amount, params.currency)));
+  tlvSegments.push(encodeTlv("04", params.currency));
+  tlvSegments.push(encodeTlv("05", params.merchantRef));
+  if (params.tipAmount !== void 0) {
+    tlvSegments.push(encodeTlv("06", formatAmount2(params.tipAmount, params.currency)));
+  }
+  if (params.feeAmount !== void 0) {
+    tlvSegments.push(encodeTlv("07", formatAmount2(params.feeAmount, params.currency)));
+  }
+  if (params.transactionType !== void 0) {
+    tlvSegments.push(encodeTlv("08", params.transactionType));
+  }
+  const payload = tlvSegments.join("");
+  const checksum = crc16Ccitt(payload);
+  return `${payload}${encodeTlv("63", checksum)}`;
+}
+
 // src/client.ts
-function checkResponseError(body) {
+function checkResponseError(body, endpoint) {
   if (!body || typeof body !== "object") {
     return;
   }
@@ -171,8 +254,10 @@ function checkResponseError(body) {
     const message = body.status.message || "Unknown PayWay API Error";
     if (code !== "0" && code !== "00" && code !== "") {
       throw new PayWayAPIError(message, {
+        statusCode: 200,
         paywayCode: code,
-        rawBody: body
+        rawBody: body,
+        endpoint
       });
     }
   }
@@ -182,8 +267,10 @@ function checkResponseError(body) {
       const code = body.code !== void 0 ? String(body.code) : void 0;
       const message = body.message || "Unknown PayWay API Error";
       throw new PayWayAPIError(message, {
+        statusCode: 200,
         paywayCode: code,
-        rawBody: body
+        rawBody: body,
+        endpoint
       });
     }
   }
@@ -192,15 +279,73 @@ function checkResponseError(body) {
     const message = body.message || "Unknown PayWay API Error";
     if (code !== "0" && code !== "00") {
       throw new PayWayAPIError(message, {
+        statusCode: 200,
         paywayCode: code,
-        rawBody: body
+        rawBody: body,
+        endpoint
       });
     }
   }
 }
+function isAbortError(error) {
+  return error?.name === "AbortError" || error?.code === "ABORT_ERR";
+}
+async function parseResponseBody(response) {
+  const text = await response.text();
+  if (!text) {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+function createHttpError(response, rawBody, endpoint) {
+  return new PayWayAPIError(`HTTP Error: ${response.status} ${response.statusText}`, {
+    statusCode: response.status,
+    rawBody,
+    endpoint
+  });
+}
+function createJsonParseError(rawBody, endpoint) {
+  return new PayWayAPIError("Invalid JSON response from PayWay API", {
+    rawBody,
+    endpoint
+  });
+}
+function createNetworkError(error, timeoutMs, endpoint) {
+  if (isAbortError(error)) {
+    return new PayWayAPIError(`Request timed out after ${timeoutMs}ms`, {
+      rawBody: error,
+      endpoint,
+      retryable: true
+    });
+  }
+  return new PayWayAPIError(`Network error: ${error?.message ?? "Unknown network failure"}`, {
+    rawBody: error,
+    endpoint,
+    retryable: true
+  });
+}
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 var PayWay = class {
   config;
   baseUrl;
+  /**
+   * Create a new PayWay SDK client instance.
+   *
+   * @param config - The SDK configuration options.
+   * @param config.merchantId - The merchant ID issued by PayWay.
+   * @param config.apiKey - The API key/secret issued by PayWay for signing.
+   * @param config.publicKeyPem - The 1024-bit RSA public key PEM string for encrypting request payloads.
+   * @param config.environment - The target environment ('sandbox' or 'production'). Defaults to 'sandbox'.
+   * @param config.timeout - The request timeout in milliseconds. Defaults to 30,000 (30 seconds).
+   * @param config.baseUrl - Optional override for the base API URL.
+   * @throws {PayWayConfigError} If the configuration is missing or invalid.
+   */
   constructor(config) {
     if (!config) {
       throw new PayWayConfigError("Config object is required");
@@ -219,7 +364,54 @@ var PayWay = class {
       this.baseUrl = BASE_URLS[env] || BASE_URLS.sandbox;
     }
   }
-  async request(path, body, hmacFields, timeFieldName = "req_time", arithmeticPairs, contentType = "application/json", hashEncoding = "base64") {
+  async _executeFetch(endpoint, headers, bodyPayload) {
+    const timeoutMs = this.config.timeout ?? 3e4;
+    const maxRetries = this.config.maxRetries ?? 0;
+    const retryDelayMs = this.config.retryDelayMs ?? 1e3;
+    const url = `${this.baseUrl}${endpoint}`;
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        try {
+          this.config.onRequest?.(endpoint, bodyPayload);
+        } catch {
+        }
+        const response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: bodyPayload,
+          signal: controller.signal
+        });
+        const parsedBody = await parseResponseBody(response);
+        if (typeof parsedBody === "string") {
+          throw createJsonParseError(parsedBody, endpoint);
+        }
+        if (!response.ok) {
+          throw createHttpError(response, parsedBody, endpoint);
+        }
+        checkResponseError(parsedBody, endpoint);
+        try {
+          this.config.onResponse?.(endpoint, response.status, parsedBody);
+        } catch {
+        }
+        return parsedBody;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        const paywayError = error instanceof PayWayAPIError ? error : createNetworkError(error, timeoutMs, endpoint);
+        const shouldRetry = attempt < maxRetries && (paywayError.statusCode === void 0 && !paywayError.paywayCode || paywayError.statusCode !== void 0 && paywayError.statusCode >= 500);
+        if (shouldRetry) {
+          await delay(retryDelayMs * 2 ** attempt);
+          continue;
+        }
+        throw paywayError;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+    throw new PayWayAPIError("Retry limit exceeded", { endpoint });
+  }
+  async request(path, body, hmacFields, timeFieldName = "req_time", contentType = "application/json", hashEncoding = "base64") {
     const fullBody = {
       ...body,
       merchant_id: this.config.merchantId
@@ -227,49 +419,20 @@ var PayWay = class {
     if (!fullBody[timeFieldName]) {
       fullBody[timeFieldName] = formatRequestTime();
     }
-    fullBody.hash = arithmeticPairs && arithmeticPairs.length > 0 ? generateHmacArithmetic(fullBody, hmacFields, this.config.apiKey, arithmeticPairs) : generateHmac(fullBody, hmacFields, this.config.apiKey, hashEncoding);
-    const controller = new AbortController();
-    const timeoutMs = this.config.timeout ?? 3e4;
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      let bodyPayload;
-      if (contentType === "application/x-www-form-urlencoded") {
-        const form = new URLSearchParams();
-        for (const [key, value] of Object.entries(fullBody)) {
-          if (value !== void 0 && value !== null) {
-            form.append(key, String(value));
-          }
+    fullBody.hash = generateHmac(fullBody, hmacFields, this.config.apiKey, hashEncoding);
+    let bodyPayload;
+    if (contentType === "application/x-www-form-urlencoded") {
+      const form = new URLSearchParams();
+      for (const [key, value] of Object.entries(fullBody)) {
+        if (value !== void 0 && value !== null) {
+          form.append(key, String(value));
         }
-        bodyPayload = form.toString();
-      } else {
-        bodyPayload = JSON.stringify(fullBody);
       }
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": contentType
-        },
-        body: bodyPayload,
-        signal: controller.signal
-      });
-      if (!response.ok) {
-        throw new PayWayAPIError(`HTTP Error: ${response.status} ${response.statusText}`, {
-          statusCode: response.status
-        });
-      }
-      const result = await response.json();
-      checkResponseError(result);
-      return result;
-    } catch (error) {
-      if (error.name === "AbortError") {
-        throw new PayWayAPIError(`Request timed out after ${timeoutMs}ms`, {
-          rawBody: error
-        });
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
+      bodyPayload = form.toString();
+    } else {
+      bodyPayload = JSON.stringify(fullBody);
     }
+    return this._executeFetch(path, { "Content-Type": contentType }, bodyPayload);
   }
   async requestWithMerchantAuth(path, authPayload, options = {}) {
     if (!this.config.publicKeyPem) {
@@ -291,43 +454,86 @@ var PayWay = class {
     const hmacFields = options.hmacFields ?? ["request_time", "merchant_id", "merchant_auth"];
     body.hash = generateHmac(body, hmacFields, this.config.apiKey);
     const contentType = options.contentType ?? "application/x-www-form-urlencoded";
-    const controller = new AbortController();
-    const timeoutMs = this.config.timeout ?? 3e4;
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": contentType
-        },
-        body: contentType === "application/json" ? JSON.stringify(body) : new URLSearchParams(body).toString(),
-        signal: controller.signal
-      });
-      if (!response.ok) {
-        throw new PayWayAPIError(`HTTP Error: ${response.status} ${response.statusText}`, {
-          statusCode: response.status
-        });
-      }
-      const result = await response.json();
-      checkResponseError(result);
-      return result;
-    } catch (error) {
-      if (error.name === "AbortError") {
-        throw new PayWayAPIError(`Request timed out after ${timeoutMs}ms`, {
-          rawBody: error
-        });
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    const bodyPayload = contentType === "application/json" ? JSON.stringify(body) : new URLSearchParams(body).toString();
+    return this._executeFetch(path, { "Content-Type": contentType }, bodyPayload);
   }
+  /**
+   * Verify the signature of a webhook/callback notification from PayWay.
+   *
+   * @param body - The raw request body or parsed payload from the callback without the `hash` field.
+   * @param signature - The signature/hash received from the PayWay callback headers/body.
+   * @returns True if the signature is valid and authentic, false otherwise.
+   */
   verifyCallback(body, signature) {
     return verifyCallbackSignature(body, signature, this.config.apiKey);
   }
+  getGatewayErrorDetails(error) {
+    if (error instanceof PayWayAPIError) {
+      return {
+        code: error.paywayCode,
+        message: error.message,
+        rawBody: error.rawBody,
+        statusCode: error.statusCode
+      };
+    }
+    if (error && typeof error === "object") {
+      const maybeError = error;
+      const rawBody = maybeError.rawBody ?? maybeError;
+      const code = rawBody?.status?.code ?? rawBody?.code ?? maybeError.paywayCode;
+      const message = rawBody?.status?.message ?? rawBody?.message ?? maybeError.message;
+      const statusCode = maybeError.statusCode;
+      if (code !== void 0 || message !== void 0 || rawBody !== void 0) {
+        return {
+          code: code !== void 0 ? String(code) : void 0,
+          message: typeof message === "string" ? message : void 0,
+          rawBody,
+          statusCode
+        };
+      }
+    }
+    return null;
+  }
   // --- Sub-Clients ---
+  /**
+   * Checkout-related API helpers.
+   */
   checkout = {
+    /**
+     * Create a signed transaction payload for a client-side checkout form.
+     * This prepares parameters, formats quantities/currencies/amounts, base64 encodes payloads as needed,
+     * and signs the payload with the merchant HMAC signature.
+     *
+     * @param params - The checkout transaction parameters.
+     * @param params.transactionId - The unique identifier for the transaction.
+     * @param params.amount - The purchase amount.
+     * @param params.firstname - First name of the customer.
+     * @param params.lastname - Last name of the customer.
+     * @param params.email - Email address of the customer.
+     * @param params.phone - Phone number of the customer.
+     * @param params.type - The transaction type ('purchase' or 'pre-auth'). Defaults to 'purchase'.
+     * @param params.paymentOption - The active payment option (e.g. 'cards', 'abapay_khqr').
+     * @param params.items - Shopping cart items list or raw encoded string.
+     * @param params.shipping - The shipping fee amount.
+     * @param params.currency - The currency of the transaction ('KHR' or 'USD'). Defaults to 'USD'.
+     * @param params.returnUrl - The merchant URL where the user is redirected after successful payment.
+     * @param params.cancelUrl - The merchant URL where the user is redirected if payment is cancelled.
+     * @param params.skipSuccessPage - Whether to skip the ABA/PayWay success page (0 or 1).
+     * @param params.continueSuccessUrl - The redirect URL to continue after payment success.
+     * @param params.returnDeeplink - Custom redirect deeplink for mobile applications.
+     * @param params.customFields - Metadata fields to attach to the transaction.
+     * @param params.returnParams - String of custom query parameters to pass back to the redirect URL.
+     * @param params.viewType - The display view style ('hosted_view' or 'popup').
+     * @param params.paymentGate - The gateway type routing.
+     * @param params.payout - Optional array of payout instructions.
+     * @param params.additionalParams - Additional key-value options.
+     * @param params.lifetime - Lifespan of checkout page/session in seconds.
+     * @param params.googlePayToken - Raw Google Pay authorization token.
+     * @returns A signed object containing checkout transaction fields and a `hash` field.
+     */
     createTransaction: (params) => {
+      validateTransactionId(params.transactionId);
+      validatePositiveAmount(params.amount, params.currency || "USD");
+      validateCurrency(params.currency);
       const time = formatRequestTime();
       const payload = filterParams({
         tran_id: params.transactionId,
@@ -342,12 +548,12 @@ var PayWay = class {
         shipping: params.shipping !== void 0 ? formatAmount(params.shipping, params.currency || "USD") : void 0,
         currency: params.currency || "USD",
         return_url: params.returnUrl ? encodeBase64IfNeeded(params.returnUrl) : void 0,
-        cancel_url: params.cancelUrl,
+        cancel_url: params.cancelUrl ? encodeBase64IfNeeded(params.cancelUrl) : void 0,
         skip_success_page: params.skipSuccessPage,
-        continue_success_url: params.continueSuccessUrl,
+        continue_success_url: params.continueSuccessUrl ? encodeBase64IfNeeded(params.continueSuccessUrl) : void 0,
         return_deeplink: params.returnDeeplink ? encodeBase64IfNeeded(params.returnDeeplink) : void 0,
         custom_fields: params.customFields ? encodeBase64IfNeeded(params.customFields) : void 0,
-        return_params: params.returnParams,
+        return_params: params.returnParams ? encodeBase64IfNeeded(params.returnParams) : void 0,
         view_type: params.viewType,
         payment_gate: params.paymentGate,
         payout: params.payout ? encodeBase64IfNeeded(params.payout) : void 0,
@@ -386,6 +592,13 @@ var PayWay = class {
       const hash = generateHmac(payload, fields, this.config.apiKey);
       return { ...payload, hash };
     },
+    /**
+     * Check the status of a checkout transaction.
+     *
+     * @param transactionId - The transaction identifier to query.
+     * @param requestTime - Optional custom ISO/request timestamp.
+     * @returns A promise resolving to the transaction status response.
+     */
     checkTransaction: (transactionId, requestTime) => {
       return this.request(ENDPOINTS.checkTransaction, filterParams({ tran_id: transactionId, req_time: requestTime }), [
         "req_time",
@@ -393,6 +606,13 @@ var PayWay = class {
         "tran_id"
       ]);
     },
+    /**
+     * Close an active checkout transaction.
+     *
+     * @param transactionId - The transaction identifier to close.
+     * @param requestTime - Optional custom ISO/request timestamp.
+     * @returns A promise resolving to the transaction closure response.
+     */
     closeTransaction: (transactionId, requestTime) => {
       return this.request(ENDPOINTS.closeTransaction, filterParams({ tran_id: transactionId, req_time: requestTime }), [
         "req_time",
@@ -400,6 +620,13 @@ var PayWay = class {
         "tran_id"
       ]);
     },
+    /**
+     * Retrieve details for a specific transaction.
+     *
+     * @param transactionId - The transaction identifier to query.
+     * @param requestTime - Optional custom ISO/request timestamp.
+     * @returns A promise resolving to the transaction details response.
+     */
     getTransactionDetail: (transactionId, requestTime) => {
       return this.request(
         ENDPOINTS.getTransactionDetail,
@@ -407,6 +634,20 @@ var PayWay = class {
         ["req_time", "merchant_id", "tran_id"]
       );
     },
+    /**
+     * Query transaction history filtering by date range, amount, status, and pagination options.
+     *
+     * @param params - The transaction list query parameters.
+     * @param params.fromDate - The start date filter (format: YYYY-MM-DD).
+     * @param params.toDate - The end date filter (format: YYYY-MM-DD).
+     * @param params.fromAmount - The minimum transaction amount.
+     * @param params.toAmount - The maximum transaction amount.
+     * @param params.status - The transaction status to filter by.
+     * @param params.page - The page index for pagination.
+     * @param params.pagination - The maximum items per page.
+     * @param params.requestTime - Optional request timestamp.
+     * @returns A promise resolving to the list of transactions.
+     */
     getTransactionList: (params) => {
       return this.request(
         ENDPOINTS.getTransactionList,
@@ -421,16 +662,28 @@ var PayWay = class {
           req_time: params.requestTime
         }),
         ["req_time", "merchant_id", "from_date", "to_date", "from_amount", "to_amount", "status", "page", "pagination"],
-        "req_time",
-        [["to_date", "from_amount"]]
+        "req_time"
       );
     },
+    /**
+     * Refund a captured checkout transaction.
+     *
+     * @param transactionId - The transaction identifier to refund.
+     * @param amount - The amount to refund.
+     * @returns A promise resolving to the refund response details.
+     */
     refund: (transactionId, amount) => {
       return this.requestWithMerchantAuth(ENDPOINTS.refund, {
         tran_id: transactionId,
         refund_amount: amount
       });
     },
+    /**
+     * Retrieve the current exchange rate configured for the merchant.
+     *
+     * @param requestTime - Optional custom ISO/request timestamp.
+     * @returns A promise resolving to the exchange rate response details.
+     */
     getExchangeRate: (requestTime) => {
       return this.request(ENDPOINTS.getExchangeRate, filterParams({ req_time: requestTime }), [
         "req_time",
@@ -438,7 +691,23 @@ var PayWay = class {
       ]);
     }
   };
+  /**
+   * Credentials-on-File API helpers.
+   */
   credentialsOnFile = {
+    /**
+     * Link an ABA Bank account for stored-credential payments.
+     *
+     * @param params - Account linking parameters.
+     * @param params.requestId - Unique client request ID.
+     * @param params.ctid - Stored credential tracking identifier (token).
+     * @param params.returnDeeplink - Deeplink redirect URL for mobile apps.
+     * @param params.tokenFlag - Action flag indicating tokenization details.
+     * @param params.currency - The currency of the account ('KHR' or 'USD').
+     * @param params.callbackUrl - Optional endpoint where PayWay sends status callbacks.
+     * @param params.requestTime - Optional request timestamp.
+     * @returns A promise resolving to the link account response.
+     */
     linkAccount: (params) => {
       return this.request(
         ENDPOINTS.linkAccount,
@@ -464,6 +733,20 @@ var PayWay = class {
         "request_time"
       );
     },
+    /**
+     * Link a debit or credit card to create stored payment credentials.
+     *
+     * @param params - Card linking parameters.
+     * @param params.requestId - Unique client request ID.
+     * @param params.ctid - Stored credential tracking identifier (token).
+     * @param params.returnDeeplink - Deeplink redirect URL for mobile apps.
+     * @param params.tokenFlag - Action flag indicating tokenization details.
+     * @param params.frequency - Card usage authorization frequency ('1W', '1M', or '2M').
+     * @param params.returnUrl - Merchant landing page redirect URL.
+     * @param params.callbackUrl - Optional callback URL for status notifications.
+     * @param params.requestTime - Optional request timestamp.
+     * @returns A promise resolving to the link card response details.
+     */
     linkCard: (params) => {
       return this.request(
         ENDPOINTS.linkCard,
@@ -489,10 +772,24 @@ var PayWay = class {
           "callback_url"
         ],
         "request_time",
-        void 0,
         "application/x-www-form-urlencoded"
       );
     },
+    /**
+     * Execute a payment using a saved stored-credential token.
+     *
+     * @param params - Stored-credential payment parameters.
+     * @param params.requestId - Unique client request ID.
+     * @param params.transactionId - Merchant reference transaction ID.
+     * @param params.amount - The amount to charge.
+     * @param params.ctid - Stored credential tracking identifier.
+     * @param params.paymentToken - The stored payment token.
+     * @param params.tokenFlag - Action flag.
+     * @param params.currency - The payment currency ('KHR' or 'USD'). Defaults to 'USD'.
+     * @param params.callbackUrl - Optional webhook callback URL.
+     * @param params.requestTime - Optional request timestamp.
+     * @returns A promise resolving to the payment execution response.
+     */
     payment: (params) => {
       return this.request(
         ENDPOINTS.payment,
@@ -522,6 +819,16 @@ var PayWay = class {
         "request_time"
       );
     },
+    /**
+     * Renew an existing stored-credential payment token.
+     *
+     * @param params - Token parameters.
+     * @param params.requestId - Unique client request ID.
+     * @param params.ctid - Stored credential tracking identifier.
+     * @param params.paymentToken - The stored payment token.
+     * @param params.requestTime - Optional request timestamp.
+     * @returns A promise resolving to the token renewal status response.
+     */
     renewToken: (params) => {
       return this.request(
         ENDPOINTS.renewToken,
@@ -535,6 +842,16 @@ var PayWay = class {
         "request_time"
       );
     },
+    /**
+     * Query detailed status information for a stored payment token.
+     *
+     * @param params - Token parameters.
+     * @param params.requestId - Unique client request ID.
+     * @param params.ctid - Stored credential tracking identifier.
+     * @param params.paymentToken - The stored payment token.
+     * @param params.requestTime - Optional request timestamp.
+     * @returns A promise resolving to the stored token information details.
+     */
     getTokenDetails: (params) => {
       return this.request(
         ENDPOINTS.getTokenDetails,
@@ -548,6 +865,16 @@ var PayWay = class {
         "request_time"
       );
     },
+    /**
+     * Deactivate and remove a stored payment token from the credentials-on-file registry.
+     *
+     * @param params - Token parameters.
+     * @param params.requestId - Unique client request ID.
+     * @param params.ctid - Stored credential tracking identifier.
+     * @param params.paymentToken - The stored payment token.
+     * @param params.requestTime - Optional request timestamp.
+     * @returns A promise resolving to the token removal confirmation.
+     */
     removeToken: (params) => {
       return this.request(
         ENDPOINTS.removeToken,
@@ -562,7 +889,24 @@ var PayWay = class {
       );
     }
   };
+  /**
+   * QR API helpers.
+   */
   qr = {
+    /**
+     * Generate a dynamic merchant KHQR code for customer payment.
+     *
+     * @param params - The dynamic QR generation parameters.
+     * @param params.transactionId - Merchant reference transaction ID.
+     * @param params.amount - The payment amount.
+     * @param params.paymentOption - The payment option target (e.g. 'abapay_khqr').
+     * @param params.callbackUrl - The webhook notification callback endpoint.
+     * @param params.purchaseType - The type of purchase. Defaults to 'purchase'.
+     * @param params.currency - The currency of the payment ('KHR' or 'USD'). Defaults to 'USD'.
+     * @param params.qrImageTemplate - Theme or layout template for the QR image. Defaults to 'template2'.
+     * @param params.requestTime - Optional request timestamp.
+     * @returns A promise resolving to the generated QR payload containing the QR code and image options.
+     */
     generateQr: (params) => {
       return this.request(
         ENDPOINTS.generateQr,
@@ -590,7 +934,23 @@ var PayWay = class {
       );
     }
   };
+  /**
+   * Payment Link API helpers.
+   */
   paymentLink = {
+    /**
+     * Generate a new reusable or single-use PayWay payment link.
+     *
+     * @param params - Payment link configuration.
+     * @param params.title - Title of the payment link shown to customer.
+     * @param params.amount - The billing amount.
+     * @param params.description - Details or description of the product/service.
+     * @param params.paymentLimit - Optional number of allowed payments for this link.
+     * @param params.returnUrl - Merchant redirect landing URL.
+     * @param params.merchantRefNo - Unique merchant reference number.
+     * @param params.expiredDate - Unix epoch timestamp (seconds) after which the link expires.
+     * @returns A promise resolving to the payment link creation response.
+     */
     create: (params) => {
       return this.requestWithMerchantAuth(
         ENDPOINTS.createPaymentLink,
@@ -605,11 +965,27 @@ var PayWay = class {
         })
       );
     },
+    /**
+     * Retrieve status, configuration, and details of a payment link.
+     *
+     * @param paymentLinkId - The identifier of the payment link.
+     * @returns A promise resolving to the payment link configuration and transaction logs.
+     */
     getDetails: (paymentLinkId) => {
       return this.requestWithMerchantAuth(ENDPOINTS.getPaymentLinkDetails, { id: paymentLinkId });
     }
   };
+  /**
+   * Pre-authorization API helpers.
+   */
   preAuth = {
+    /**
+     * Capture funds for an existing pre-authorized transaction.
+     *
+     * @param transactionId - The transaction ID of the pre-authorized transaction.
+     * @param amount - The final amount to capture and capture/settle.
+     * @returns A promise resolving to the capture response.
+     */
     complete: (transactionId, amount) => {
       return this.requestWithMerchantAuth(ENDPOINTS.completePreAuth, {
         tran_id: transactionId,
@@ -619,6 +995,14 @@ var PayWay = class {
         contentType: "application/json"
       });
     },
+    /**
+     * Capture funds for a pre-authorized transaction and attach multi-account payout instructions.
+     *
+     * @param transactionId - The transaction ID of the pre-authorized transaction.
+     * @param amount - The capture amount.
+     * @param payout - Multi-destination payout instructions.
+     * @returns A promise resolving to the capture and payout execution response.
+     */
     completeWithPayout: (transactionId, amount, payout) => {
       return this.requestWithMerchantAuth(ENDPOINTS.completePreAuth, {
         tran_id: transactionId,
@@ -629,6 +1013,12 @@ var PayWay = class {
         contentType: "application/json"
       });
     },
+    /**
+     * Release/void a pre-authorized transaction to unlock customer funds.
+     *
+     * @param transactionId - The transaction ID of the pre-authorized transaction.
+     * @returns A promise resolving to the cancellation/void status response.
+     */
     cancel: (transactionId) => {
       return this.requestWithMerchantAuth(ENDPOINTS.cancelPreAuth, { tran_id: transactionId }, {
         hmacFields: ["merchant_id", "merchant_auth", "request_time"],
@@ -636,11 +1026,29 @@ var PayWay = class {
       });
     }
   };
+  /**
+   * Payout API helpers.
+   */
   payout = {
-    payout: (params) => {
+    /**
+     * Initiate a bulk/single payout instruction to whitelisted beneficiary accounts.
+     *
+     * @param params - Payout request parameters.
+     * @param params.transactionId - Unique merchant reference identifier.
+     * @param params.amount - Total payout amount.
+     * @param params.beneficiaries - Array of whitelisted recipient account numbers and amounts.
+     * @param params.currency - The currency of the payout ('KHR' or 'USD').
+     * @param params.customFields - Optional metadata object or JSON string.
+     * @returns A promise resolving to the payout transaction status.
+     */
+    payout: async (params) => {
       if (!this.config.publicKeyPem) {
         throw new PayWayConfigError("publicKeyPem is required for RSA-encrypted endpoints");
       }
+      validateTransactionId(params.transactionId);
+      validatePositiveAmount(params.amount, params.currency);
+      validateCurrency(params.currency);
+      validateBeneficiaries(params.beneficiaries, params.amount, params.currency);
       return this.request(
         ENDPOINTS.payout,
         filterParams({
@@ -652,11 +1060,18 @@ var PayWay = class {
         }),
         ["merchant_id", "tran_id", "beneficiaries", "amount", "custom_fields", "currency"],
         "req_time",
-        void 0,
         "application/json",
         "hex"
       );
     },
+    /**
+     * Update the active status of a payout beneficiary.
+     *
+     * @param params - Beneficiary status parameters.
+     * @param params.payee - The beneficiary account number/identifier.
+     * @param params.status - Active state (1 for active, 0 for inactive).
+     * @returns A promise resolving to the status update confirmation.
+     */
     updateBeneficiaryStatus: (params) => {
       return this.requestWithMerchantAuth(
         ENDPOINTS.updateBeneficiaryStatus,
@@ -664,6 +1079,13 @@ var PayWay = class {
         { hmacFields: ["request_time", "merchant_auth"], contentType: "application/json" }
       );
     },
+    /**
+     * Add and whitelist a new payee account for future payout transactions.
+     *
+     * @param params - Beneficiary parameters.
+     * @param params.payee - The payee account number/identifier.
+     * @returns A promise resolving to the whitelisting action response.
+     */
     addBeneficiary: (params) => {
       return this.requestWithMerchantAuth(
         ENDPOINTS.addBeneficiary,
@@ -672,7 +1094,30 @@ var PayWay = class {
       );
     }
   };
+  /**
+   * KHQR-specific API helpers.
+   */
   khqr = {
+    /**
+     * Generate a custom offline QR string without calling the PayWay API.
+     *
+     * This helper produces a merchant-scannable TLV payload with a CRC-16
+     * checksum. It is **not** an official Bakong KHQR / EMVCo QR-MPM code;
+     * use `qr.generateQr()` for PayWay-issued dynamic KHQR codes.
+     *
+     * @param params - Offline QR generation parameters.
+     * @returns A TLV-encoded QR string with a CRC-16 checksum.
+     */
+    generateOfflineQR: (params) => {
+      return generateOfflineQR(params);
+    },
+    /**
+     * Lookup and retrieve KHQR transaction history matching a specific merchant reference.
+     *
+     * @param merchantRef - The merchant reference number.
+     * @param requestTime - Optional custom ISO/request timestamp.
+     * @returns A promise resolving to the transaction retrieval response.
+     */
     getTransactionsByMerchantRef: (merchantRef, requestTime) => {
       return this.request(
         ENDPOINTS.getTransactionsByMerchantRef,

@@ -1,17 +1,71 @@
+# Source files (only dist/ is published)
 src/
 payway-openapi/
 scripts/
-tests/
-examples/
 scratch/
+scratch-consumer/
+
+# Test files
+tests/
+**/*.test.ts
+**/*.test.js
+vitest.config.ts
+coverage/
+
+# Examples and boilerplate
+examples/
+payway-boilerplate/
+docs/examples/
+New folder/
+
+# Build configuration
 tsconfig.json
 tsup.config.ts
 biome.json
+
+# Package management
 package-lock.json
 node_modules/
+
+# Git and npm config
 .npmignore
 .gitignore
 .git/
+
+# Documentation (keep README.md and CHANGELOG.md)
+PROJECT_STATUS.md
+SANDBOX-FINDINGS.md
+building-a-payway-sdk-cto-workflow-and-strategy.md
+docs/
+
+# OpenAPI specs
 *.yaml
+
+# Scripts
 *.py
 *.txt
+
+# Environment and secrets
+.env
+.env.*
+PaywAySandboxkey.txt
+*key*.txt
+*secret*.txt
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Build artifacts (dist/ is included via "files" in package.json)
+*.tgz
+
+# Python
+__pycache__/
+*.pyc

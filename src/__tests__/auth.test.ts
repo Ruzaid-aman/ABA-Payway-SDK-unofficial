@@ -113,6 +113,61 @@ describe('generateHmac', () => {
 // encryptMerchantAuth
 // ---------------------------------------------------------------------------
 
+function stripPkcs1Padding(buffer: Buffer): Buffer {
+  if (buffer.length < 11 || buffer[0] !== 0x00 || buffer[1] !== 0x02) {
+    throw new Error('Invalid PKCS#1 padding');
+  }
+
+  let index = 2;
+  while (index < buffer.length && buffer[index] !== 0x00) {
+    index += 1;
+  }
+
+  if (index >= buffer.length - 1) {
+    throw new Error('Invalid PKCS#1 padding');
+  }
+
+  return buffer.subarray(index + 1);
+}
+
+function decryptMerchantAuth(encryptedBase64: string, privateKey: string): any {
+  const encrypted = Buffer.from(encryptedBase64, 'base64');
+  const chunkSize = 128;
+  const decryptedChunks: Buffer[] = [];
+
+  for (let offset = 0; offset < encrypted.length; offset += chunkSize) {
+    const chunk = encrypted.subarray(offset, offset + chunkSize);
+    const decrypted = crypto.privateDecrypt(
+      {
+        key: privateKey,
+        padding: crypto.constants.RSA_NO_PADDING,
+      },
+      chunk,
+    );
+    decryptedChunks.push(stripPkcs1Padding(decrypted));
+  }
+
+  return JSON.parse(Buffer.concat(decryptedChunks).toString('utf8'));
+}
+
+function buildPayloadWithLength(targetLength: number) {
+  const base = { mc_id: 'M001' };
+  let size = 0;
+  let suffix = '';
+
+  while (size < targetLength) {
+    suffix += 'A';
+    const payload = { ...base, x: suffix };
+    size = Buffer.byteLength(JSON.stringify(payload));
+  }
+
+  if (size !== targetLength) {
+    throw new Error(`Unable to create payload with exact length ${targetLength}, got ${size}`);
+  }
+
+  return { ...base, x: suffix };
+}
+
 describe('encryptMerchantAuth', () => {
   it('returns valid base64 with correct cipher block size for a small payload', () => {
     const { publicKey } = generateTestKeyPair();
@@ -129,25 +184,26 @@ describe('encryptMerchantAuth', () => {
     expect(encBuf.length).toBe(128);
   });
 
-  it('handles data larger than 117 bytes (multi-chunk)', () => {
-    const { publicKey } = generateTestKeyPair();
-    // Create a payload that exceeds 117 bytes when JSON-stringified
-    const data = {
-      mc_id: 'M001',
-      long_field: 'A'.repeat(200),
-    };
-    const jsonStr = JSON.stringify(data);
-    const plaintextLen = Buffer.byteLength(jsonStr);
-    expect(plaintextLen).toBeGreaterThan(117);
+  it('decrypts RSA-encrypted payload back to the original JSON payload', () => {
+    const { publicKey, privateKey } = generateTestKeyPair();
+    const data = { mc_id: 'M001', tran_id: 'T123', refund_amount: 5.0 };
 
     const encrypted = encryptMerchantAuth(data, publicKey);
+    const decrypted = decryptMerchantAuth(encrypted, privateKey);
 
-    // Should be valid base64
-    expect(encrypted).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    expect(decrypted).toEqual(data);
+  });
 
-    // Verify multi-chunk: ceil(plaintextLen / 117) * 128 bytes
-    const expectedChunks = Math.ceil(plaintextLen / 117);
+  it.each([117, 118, 234])('handles JSON payload lengths of exactly %i bytes', (payloadLength) => {
+    const { publicKey } = generateTestKeyPair();
+    const data = buildPayloadWithLength(payloadLength);
+    const jsonStr = JSON.stringify(data);
+
+    expect(Buffer.byteLength(jsonStr)).toBe(payloadLength);
+
+    const encrypted = encryptMerchantAuth(data, publicKey);
     const encBuf = Buffer.from(encrypted, 'base64');
+    const expectedChunks = Math.ceil(payloadLength / 117);
     expect(encBuf.length).toBe(expectedChunks * 128);
   });
 
@@ -206,7 +262,7 @@ describe('verifyCallbackSignature', () => {
 
     // sorted keys: items, status
     const itemsStr = JSON.stringify([{ name: 'Widget' }]);
-    const expected = expectedHmac(itemsStr + 'ok', API_KEY);
+    const expected = expectedHmac(`${itemsStr}ok`, API_KEY);
 
     expect(verifyCallbackSignature(body, expected, API_KEY)).toBe(true);
   });

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayWay Checkout</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 480px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f7f7f8;
+      color: #0f0f10;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 20px; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-weight: 500; margin-bottom: 4px; font-size: 0.875rem; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: #111;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hidden { display: none !important; }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid white;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .method-select { display: flex; gap: 8px; margin-bottom: 16px; }
+    .method-btn {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 14px;
+      background: white;
+      transition: all 0.2s;
+    }
+    .method-btn.active {
+      border-color: #111;
+      background: #f7f7f8;
+    }
+    .status {
+      margin-top: 12px;
+      font-size: 0.875rem;
+      color: #5a5a5f;
+    }
+    .status.error { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Complete Payment</h1>
+
+    <!-- Payment Method Selection -->
+    <div class="method-select" id="methodSelect">
+      <button class="method-btn active" data-method="abapay_khqr">KHQR</button>
+      <button class="method-btn" data-method="cards">Card</button>
+    </div>
+
+    <!-- Form Fields -->
+    <div class="field">
+      <label for="amount">Amount (USD)</label>
+      <input type="number" id="amount" value="15.00" step="0.01" min="0.01">
+    </div>
+    <div class="field">
+      <label for="firstName">First Name <span style="color:#dc2626">*</span></label>
+      <input type="text" id="firstName" value="John" required>
+    </div>
+    <div class="field">
+      <label for="lastName">Last Name <span style="color:#dc2626">*</span></label>
+      <input type="text" id="lastName" value="Doe" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone <span style="color:#dc2626">*</span></label>
+      <input type="tel" id="phone" value="012345678" required>
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="customer@example.com">
+    </div>
+
+    <!-- Pay Button -->
+    <button class="btn" id="payButton">
+      <span id="btnText">Pay Now</span>
+      <span id="btnSpinner" class="spinner hidden"></span>
+    </button>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <!-- Hidden PayWay form (auto-submitted) -->
+  <form id="paywayForm" class="hidden" method="POST" target="_self"></form>
+
+  <script>
+    // Backend API base URL - change to your server's URL
+    var API_BASE = '/api';
+    var selectedMethod = 'abapay_khqr';
+
+    // Payment method selection
+    document.getElementById('methodSelect').addEventListener('click', function(e) {
+      var btn = e.target.closest('.method-btn');
+      if (!btn) return;
+      document.querySelectorAll('.method-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      selectedMethod = btn.dataset.method;
+    });
+
+    // Pay button handler
+    document.getElementById('payButton').addEventListener('click', initiatePayment);
+
+    async function initiatePayment() {
+      var btn = document.getElementById('payButton');
+      var btnText = document.getElementById('btnText');
+      var btnSpinner = document.getElementById('btnSpinner');
+      var status = document.getElementById('status');
+
+      // Validate required fields
+      var firstName = document.getElementById('firstName').value.trim();
+      var lastName = document.getElementById('lastName').value.trim();
+      var phone = document.getElementById('phone').value.trim();
+
+      if (!firstName || !lastName || !phone) {
+        status.textContent = 'Please fill in all required fields (marked with *)';
+        status.className = 'status error';
+        return;
+      }
+
+      // Show loading state
+      btn.disabled = true;
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      status.textContent = 'Preparing payment...';
+      status.className = 'status';
+
+      try {
+        // Step 1: Call your backend to get a signed checkout payload
+        var response = await fetch(API_BASE + '/checkout/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: parseFloat(document.getElementById('amount').value),
+            currency: 'USD',
+            firstName: firstName,
+            lastName: lastName,
+            phone: phone,
+            email: document.getElementById('email').value.trim(),
+            paymentOption: selectedMethod
+          })
+        });
+
+        var data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to create checkout');
+        }
+
+        // Step 2: Populate and auto-submit hidden form to PayWay
+        var form = document.getElementById('paywayForm');
+        form.action = data.checkoutUrl + '/api/payment-gateway/v1/payments/checkout';
+        form.innerHTML = '';
+
+        Object.keys(data.payload).forEach(function(key) {
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = data.payload[key];
+          form.appendChild(input);
+        });
+
+        status.textContent = 'Redirecting to secure payment page...';
+        status.className = 'status';
+
+        // Step 3: Submit to PayWay
+        form.submit();
+
+      } catch (error) {
+        console.error('Checkout error:', error);
+        status.textContent = 'Error: ' + (error.message || 'Failed to initiate payment. Please try again.');
+        status.className = 'status error';
+
+        // Reset button
+        btn.disabled = false;
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

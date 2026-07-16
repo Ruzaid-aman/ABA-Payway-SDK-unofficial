@@ -1,2 +1,0 @@
-1) Merchant Id: ec476910
-2) Public Key (Valid until: 14 October 2026): [REMOVED-HISTORICAL-fab3d41ca176]

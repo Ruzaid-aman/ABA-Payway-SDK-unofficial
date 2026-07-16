@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scan to Pay — KHQR</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f7f7f8;
+      color: #0f0f10;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      max-width: 420px;
+      text-align: center;
+      width: 100%;
+    }
+    .qr-container {
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      display: inline-block;
+      background: white;
+    }
+    .qr-container img {
+      display: block;
+      max-width: 250px;
+      height: auto;
+    }
+    .amount { font-size: 2rem; font-weight: 700; margin: 10px 0; }
+    .label { color: #5a5a5f; font-size: 0.875rem; }
+    .app-list {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .app-badge {
+      background: #f7f7f8;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .expiry { color: #d97706; font-size: 0.8rem; margin-top: 16px; }
+    .spinner {
+      border: 3px solid #e5e7eb;
+      border-top: 3px solid #111;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 0.8s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .success { color: #16a34a; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Scan to Pay</h1>
+    <div class="amount" id="displayAmount">$0.00</div>
+    <div class="label">USD</div>
+
+    <div id="qrLoader" class="spinner"></div>
+
+    <div id="qrContainer" class="qr-container" style="display: none;">
+      <img id="qrImage" src="" alt="KHQR Payment Code">
+    </div>
+
+    <p class="label">Open your banking app and scan this QR code</p>
+
+    <div class="app-list">
+      <span class="app-badge">ABA Pay</span>
+      <span class="app-badge">ACLEDA</span>
+      <span class="app-badge">Bakong</span>
+      <span class="app-badge">Any Bank</span>
+    </div>
+
+    <div id="status" class="expiry"></div>
+  </div>
+
+  <script>
+    // Backend API base URL - change to your server's URL
+    var API_BASE = '/api';
+    var pollInterval = null;
+
+    // Start QR generation on page load
+    generateQR();
+
+    async function generateQR() {
+      try {
+        // Get amount from URL query parameter, default to 15.00
+        var params = new URLSearchParams(window.location.search);
+        var amount = parseFloat(params.get('amount') || '15.00');
+
+        document.getElementById('displayAmount').textContent = '$' + amount.toFixed(2);
+
+        // Call backend to generate QR code
+        var response = await fetch(API_BASE + '/qr/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: amount,
+            currency: 'USD'
+          })
+        });
+
+        var data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to generate QR');
+        }
+
+        // Hide loader, show QR code
+        document.getElementById('qrLoader').classList.add('hidden');
+        document.getElementById('qrContainer').style.display = 'inline-block';
+
+        // Display the pre-rendered QR image from PayWay (Base64 PNG)
+        document.getElementById('qrImage').src = 'data:image/png;base64,' + data.qrImage;
+
+        document.getElementById('status').textContent = 'QR code is valid. Waiting for payment...';
+
+        // Start polling for payment status
+        startPolling(data.transactionId);
+
+      } catch (error) {
+        console.error('QR error:', error);
+        document.getElementById('qrLoader').classList.add('hidden');
+        document.getElementById('status').innerHTML =
+          '<span style="color: #dc2626;">Error: ' + error.message + '</span>';
+      }
+    }
+
+    /**
+     * Poll the backend every 3 seconds to check if payment was completed.
+     * Stops when payment is confirmed.
+     * The primary confirmation comes from the webhook callback — this polling is for UX only.
+     */
+    function startPolling(transactionId) {
+      if (pollInterval) clearInterval(pollInterval);
+
+      pollInterval = setInterval(async function() {
+        try {
+          var response = await fetch(API_BASE + '/checkout/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactionId: transactionId })
+          });
+
+          var data = await response.json();
+
+          if (data.status === '0' || data.status === 0) {
+            // Payment confirmed!
+            clearInterval(pollInterval);
+            document.getElementById('status').innerHTML =
+              '<span class="success">✅ Payment received! Thank you.</span>';
+            document.getElementById('qrContainer').style.opacity = '0.3';
+
+            // Redirect to confirmation page after short delay
+            setTimeout(function() {
+              window.location.href = '/order-confirmation?tran_id=' + transactionId;
+            }, 2000);
+          }
+        } catch (error) {
+          // Silently continue polling — don't show transient errors to user
+          console.error('Poll error:', error);
+        }
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

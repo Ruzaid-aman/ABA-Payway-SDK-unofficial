@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "description": "Production-ready, fully-typed TypeScript SDK for the ABA PayWay payment gateway.",
   "license": "MIT",
+  "author": "Your Name <email@example.com> (https://yourwebsite.com)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/aba-payway-ts.git"
+    "url": "git+https://github.com/antigravity-google/aba-payway-ts.git"
   },
   "keywords": [
     "payway",
@@ -43,7 +44,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",
-    "@redocly/cli": "latest",
+    "@redocly/cli": "^1.25.0",
     "@types/node": "^26.1.1",
     "openapi-typescript": "^7.13.0",
     "tsup": "^8.5.1",

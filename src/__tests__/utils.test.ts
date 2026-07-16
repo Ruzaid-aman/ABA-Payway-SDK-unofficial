@@ -5,6 +5,10 @@ import {
   toBase64,
   encodeBase64IfNeeded,
   filterParams,
+  validateCurrency,
+  validatePositiveAmount,
+  validateTransactionId,
+  validateBeneficiaries,
 } from '../utils.js';
 
 // ---------------------------------------------------------------------------
@@ -171,5 +175,91 @@ describe('filterParams', () => {
   it('preserves nested objects', () => {
     const nested = { inner: 'value' };
     expect(filterParams({ a: nested, b: undefined })).toEqual({ a: nested });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validation helpers
+// ---------------------------------------------------------------------------
+
+describe('validateCurrency', () => {
+  it('accepts USD and KHR', () => {
+    expect(() => validateCurrency('USD')).not.toThrow();
+    expect(() => validateCurrency('KHR')).not.toThrow();
+    expect(() => validateCurrency(undefined)).not.toThrow();
+  });
+
+  it('throws for unsupported currencies', () => {
+    expect(() => validateCurrency('EUR')).toThrow('currency must be one of USD, KHR');
+  });
+});
+
+describe('validatePositiveAmount', () => {
+  it('accepts positive USD amounts with up to 2 decimals', () => {
+    expect(() => validatePositiveAmount(10.99, 'USD')).not.toThrow();
+  });
+
+  it('accepts positive integer KHR amounts', () => {
+    expect(() => validatePositiveAmount(1000, 'KHR')).not.toThrow();
+  });
+
+  it('throws for non-positive amounts', () => {
+    expect(() => validatePositiveAmount(0, 'USD')).toThrow('amount must be a positive number');
+    expect(() => validatePositiveAmount(-1, 'USD')).toThrow('amount must be a positive number');
+  });
+
+  it('throws for KHR amounts with decimals', () => {
+    expect(() => validatePositiveAmount(100.5, 'KHR')).toThrow('KHR amount must be an integer');
+  });
+
+  it('throws for USD amounts with more than 2 decimals', () => {
+    expect(() => validatePositiveAmount(10.999, 'USD')).toThrow('USD amount must have at most 2 decimal places');
+  });
+
+  it('accepts USD amounts that are subject to floating point rounding', () => {
+    // 0.1 + 0.2 === 0.30000000000000004, but it should still validate as 0.30
+    expect(() => validatePositiveAmount(0.1 + 0.2, 'USD')).not.toThrow();
+  });
+});
+
+describe('validateTransactionId', () => {
+  it('accepts non-empty strings', () => {
+    expect(() => validateTransactionId('TX-123')).not.toThrow();
+  });
+
+  it('throws for empty or non-string values', () => {
+    expect(() => validateTransactionId('')).toThrow('transactionId is required');
+    // @ts-expect-error — testing runtime guard
+    expect(() => validateTransactionId(undefined)).toThrow('transactionId is required');
+  });
+});
+
+describe('validateBeneficiaries', () => {
+  it('accepts beneficiaries whose amounts sum to total', () => {
+    expect(() =>
+      validateBeneficiaries(
+        [
+          { account: 'A', amount: 30 },
+          { account: 'B', amount: 70 },
+        ],
+        100,
+        'USD',
+      ),
+    ).not.toThrow();
+  });
+
+  it('throws when beneficiary amounts do not sum to total', () => {
+    expect(() => validateBeneficiaries([{ account: 'A', amount: 50 }], 100, 'USD')).toThrow(
+      'beneficiary amounts (50) must sum to total amount (100)',
+    );
+  });
+
+  it('throws for empty beneficiaries array', () => {
+    expect(() => validateBeneficiaries([], 100, 'USD')).toThrow('beneficiaries must be a non-empty array');
+  });
+
+  it('throws for beneficiaries with missing account', () => {
+    // @ts-expect-error — testing runtime guard
+    expect(() => validateBeneficiaries([{ amount: 100 }], 100, 'USD')).toThrow('each beneficiary must have a non-empty account string');
   });
 });

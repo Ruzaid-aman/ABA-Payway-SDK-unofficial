@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PayWay Payment</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, sans-serif;
+      background: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #0f0f10);
+      padding: 20px;
+    }
+    .app { max-width: 480px; margin: 0 auto; text-align: center; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+    .description { color: var(--tg-theme-hint-color, #8e8e93); font-size: 0.9rem; margin-bottom: 24px; }
+    .amount-card {
+      background: var(--tg-theme-secondary-bg-color, #f7f7f8);
+      border-radius: 12px; padding: 24px; margin-bottom: 24px;
+    }
+    .amount { font-size: 2.5rem; font-weight: 700; }
+    .currency { font-size: 0.875rem; color: var(--tg-theme-hint-color, #8e8e93); text-transform: uppercase; }
+    .btn {
+      display: block; width: 100%; padding: 16px 24px; border: none;
+      border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-primary { background: var(--tg-theme-button-color, #2ea6ff); color: var(--tg-theme-button-text-color, #ffffff); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hidden { display: none !important; }
+    .spinner {
+      display: inline-block; width: 20px; height: 20px;
+      border: 2px solid var(--tg-theme-button-text-color, #ffffff);
+      border-top-color: transparent; border-radius: 50%;
+      animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-message { margin-top: 16px; font-size: 0.85rem; color: var(--tg-theme-hint-color, #8e8e93); }
+    .status-message.error { color: #dc2626; }
+    .payment-methods { display: flex; flex-direction: column; gap: 8px; margin: 24px 0; }
+    .method-card {
+      display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+      border: 2px solid var(--tg-theme-hint-color, #e5e7eb); border-radius: 10px;
+      cursor: pointer; text-align: left;
+    }
+    .method-card.selected { border-color: var(--tg-theme-button-color, #2ea6ff); }
+    .method-name { font-weight: 600; }
+    .method-desc { font-size: 0.8rem; color: var(--tg-theme-hint-color, #8e8e93); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1 id="title">Complete Payment</h1>
+    <p class="description">Pay securely with ABA PayWay</p>
+
+    <div class="amount-card">
+      <div class="amount" id="displayAmount">$0.00</div>
+      <div class="currency">USD</div>
+    </div>
+
+    <div class="payment-methods" id="paymentMethods">
+      <div class="method-card selected" data-method="abapay_khqr">
+        <div>
+          <div class="method-name">ABA KHQR</div>
+          <div class="method-desc">Scan to pay with any bank app</div>
+        </div>
+      </div>
+      <div class="method-card" data-method="cards">
+        <div>
+          <div class="method-name">Credit / Debit Card</div>
+          <div class="method-desc">Visa, Mastercard, UnionPay</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="payButton">
+      <span id="btnText">Pay Now</span>
+      <span id="btnSpinner" class="spinner hidden"></span>
+    </button>
+
+    <div id="status" class="status-message"></div>
+  </div>
+
+  <form id="paywayForm" method="POST" target="_self" class="hidden"></form>
+
+  <script>
+    (function() {
+      var tg = window.Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+
+      // Read amount from query parameter
+      var params = new URLSearchParams(window.location.search);
+      var amount = parseFloat(params.get('amount') || '15.00');
+      var description = params.get('description') || 'Payment';
+
+      document.getElementById('displayAmount').textContent = '$' + amount.toFixed(2);
+      document.getElementById('title').textContent = description;
+
+      var selectedMethod = 'abapay_khqr';
+      var API_BASE = 'https://your-api.com';
+
+      // Payment method selection
+      document.getElementById('paymentMethods').addEventListener('click', function(e) {
+        var card = e.target.closest('.method-card');
+        if (!card) return;
+        document.querySelectorAll('.method-card').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+        selectedMethod = card.dataset.method;
+      });
+
+      // Pay button handler
+      document.getElementById('payButton').addEventListener('click', async function() {
+        var btn = document.getElementById('payButton');
+        var btnText = document.getElementById('btnText');
+        var btnSpinner = document.getElementById('btnSpinner');
+        var status = document.getElementById('status');
+
+        btn.disabled = true;
+        btnText.classList.add('hidden');
+        btnSpinner.classList.remove('hidden');
+        status.textContent = 'Preparing payment...';
+        status.className = 'status-message';
+
+        try {
+          var response = await fetch(API_BASE + '/api/checkout/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: amount,
+              currency: 'USD',
+              firstName: (tg.initDataUnsafe.user || {}).first_name || 'Customer',
+              lastName: (tg.initDataUnsafe.user || {}).last_name || '',
+              paymentOption: selectedMethod
+            })
+          });
+
+          var data = await response.json();
+
+          if (!data.success) {
+            throw new Error(data.error || 'Failed to create payment');
+          }
+
+          // Populate and submit hidden form to PayWay
+          var form = document.getElementById('paywayForm');
+          form.action = data.checkoutUrl + '/api/payment-gateway/v1/payments/checkout';
+          form.innerHTML = '';
+          Object.entries(data.payload).forEach(function(entry) {
+            var key = entry[0], value = entry[1];
+            form.innerHTML += '<input type="hidden" name="' + key + '" value="' + value + '">';
+          });
+
+          status.textContent = 'Redirecting to secure payment page...';
+          form.submit();
+
+        } catch (error) {
+          console.error('Payment error:', error);
+          status.textContent = 'Error: ' + (error.message || 'Please try again.');
+          status.className = 'status-message error';
+          btn.disabled = false;
+          btnText.classList.remove('hidden');
+          btnSpinner.classList.add('hidden');
+        }
+      });
+
+      // Handle return URL (if loaded as result page)
+      var returnParams = new URLSearchParams(window.location.search);
+      var returnTranId = returnParams.get('tran_id');
+      if (returnTranId) {
+        handlePaymentResult(returnTranId);
+      }
+
+      async function handlePaymentResult(tranId) {
+        var status = document.getElementById('status');
+        status.textContent = 'Verifying payment...';
+
+        try {
+          var response = await fetch(API_BASE + '/api/checkout/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactionId: tranId })
+          });
+
+          var data = await response.json();
+
+          if (data.status === '0' || data.status === 0) {
+            document.getElementById('payButton').classList.add('hidden');
+            document.getElementById('title').textContent = 'Payment Successful!';
+            status.textContent = 'Thank you for your payment.';
+            status.className = 'status-message';
+
+            tg.sendData(JSON.stringify({ status: 'paid', tranId: tranId }));
+
+            setTimeout(function() { tg.close(); }, 2000);
+          } else {
+            status.textContent = 'Payment not confirmed. Please try again.';
+            status.className = 'status-message error';
+          }
+        } catch (error) {
+          status.textContent = 'Could not verify payment.';
+          status.className = 'status-message error';
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
