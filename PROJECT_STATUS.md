@@ -30,8 +30,15 @@ All 7 API domains probed against `checkout-sandbox.payway.com.kh`:
 
 ### Phase 2.5 — Test Suite (DONE)
 
-- **90 tests passing** across 3 test files
-- `auth.test.ts` (19 tests), `utils.test.ts` (25 tests), `client.test.ts` (46 tests)
+- **129 tests passing** across 4 test files
+- `auth.test.ts`, `utils.test.ts`, `client.test.ts`, `merchant-scenario-coverage.test.ts`
+
+### Documentation & Reference App (DONE)
+
+- **15-chapter integration guide** in `docs/`, covering setup through deployment
+- **Merchant scenario coverage docs** — 28 attested scenarios, coverage audit report, and `superpowers/` implementation plans
+- **QR-POS reference app** at `payway-boilerplate/merchant-qr-pos/` — full Next.js consumer demo with Express backend, SQLite store, and Vitest tests
+- **Cloudflare Workers webhook archiver guide** — `docs/cloudflare-free-webhook.md`
 
 ### Phase 2.5 — Code Review (DONE)
 
@@ -210,14 +217,15 @@ Tasks must be completed **in this order**:
 - **What**: Add tests for gaps found in code review.
 - **Files**: `src/__tests__/auth.test.ts`, `src/__tests__/client.test.ts`
 - **Actions**:
-  - [ ] Add RSA round-trip test (encrypt then decrypt with private key, verify plaintext matches)
-  - [ ] Add RSA boundary tests (exactly 117 bytes, 118 bytes, 234 bytes, 235 bytes)
-  - [ ] Add test computing expected HMAC value for `createTransaction` and comparing
+  - [x] Add RSA round-trip test (encrypt then decrypt with private key, verify plaintext matches)
+  - [x] Add RSA boundary tests (exactly 117 bytes, 118 bytes, 234 bytes)
+  - [ ] Add RSA boundary at **235 bytes** (currently only 117/118/234 covered)
+  - [x] Add test computing expected HMAC value for `createTransaction` and comparing
   - [ ] Add test for `getTransactionDetail` (currently zero coverage)
   - [ ] Add test for `payout.payout` with `custom_fields` object
-  - [ ] Add test for empty/null response body
+  - [ ] Add explicit test for empty/null response body (mocks exist but assertion coverage unconfirmed)
   - [ ] Run tests — all must pass
-- **Status**: 🔴 Not started
+- **Status**: 🔴 In progress (3 of 7 sub-items remain)
 
 #### Task 14 — KHQR Offline QR Generation
 
@@ -234,14 +242,15 @@ Tasks must be completed **in this order**:
 #### Task 15 — CHANGELOG & Final Polish
 
 - **What**: Create CHANGELOG, final README review, version bump to `1.0.0`.
-- **Files**: `CHANGELOG.md` (NEW), `README.md`, `package.json`
+- **Files**: `CHANGELOG.md`, `docs/README.md`, `package.json`
 - **Actions**:
-  - [ ] Create `CHANGELOG.md` with v0.1.0 and v1.0.0 entries
-  - [ ] Add KHQR offline usage example to README
-  - [ ] Add retry configuration example to README
+  - [x] Create `CHANGELOG.md` with v1.0.0 entry
+  - [x] Add KHQR offline usage example to docs/README.md
+  - [ ] Add retry configuration example to docs/README.md
   - [ ] Bump version to `1.0.0`
   - [ ] Final `npm pack` and consumer smoke test
-- **Status**: 🔴 Not started
+  - [ ] Tag `v1.0.0`
+- **Status**: 🔴 In progress (3 of 6 sub-items remain)
 
 **🎯 After Task 15: Tag `v1.0.0` — production-ready release.**
 
@@ -268,7 +277,7 @@ Tasks must be completed **in this order**:
 
 ```
 Current version:  0.1.0
-Tests:            98+ passing
+Tests:            129 passing
 Build:            Clean (ESM + CJS + .d.ts)
-Next task:        Commit, tag v0.1.0, and publish
+Next task:        Track 1 — 4 missing tests (235-byte RSA, getTransactionDetail, payout custom_fields, null body) then Track 2 — v1.0.0
 ```
