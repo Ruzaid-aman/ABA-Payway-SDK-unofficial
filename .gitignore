@@ -50,6 +50,9 @@ __pycache__/
 *.pyc
 .venv/
 
+# Output logs
+*_out.txt
+
 # Misc
 .cache/
 .temp/

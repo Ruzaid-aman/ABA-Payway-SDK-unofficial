@@ -1,0 +1,683 @@
+{
+  "dataset": "ABA PayWay SDK agent coverage tests",
+  "method": "Pass 1 Q&A extraction; Pass 2 normalization, deduplication, contradiction tagging, and security redaction",
+  "test_cases": [
+    {
+      "id": "TC-001",
+      "category": "Checkout routing",
+      "title": "Purchase returns QR JSON instead of checkout HTML",
+      "merchant_prompt": "A merchant enabled for both QR API and Ecommerce Checkout calls /payments/purchase and receives QR JSON. How can they force the normal checkout response?",
+      "expected_agent_answer": "Explain that multi-service profiles need payment_gate=\"0\" to force Ecommerce Checkout HTML/page behavior; otherwise QR JSON may be returned. Preserve payment_option as needed.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "payment_gate",
+        "0",
+        "QR",
+        "Checkout"
+      ],
+      "source_message_ids": [
+        1551188,
+        1551282,
+        1551285,
+        1551298
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-002",
+      "category": "Secrets and hashing",
+      "title": "Where should the request hash be generated?",
+      "merchant_prompt": "For a multi-tenant merchant, should the API key and hash be calculated in the browser?",
+      "expected_agent_answer": "State that the API key stays server-side; calculate the hash server-side and return only required signed form data to the client. The frontend submits the form.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "server-side",
+        "API key",
+        "form data",
+        "frontend"
+      ],
+      "source_message_ids": [
+        1551084,
+        1551100,
+        1551149
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-003",
+      "category": "Checkout initiation",
+      "title": "Frontend versus server submission",
+      "merchant_prompt": "Can the merchant submit PayWay checkout entirely server-to-server?",
+      "expected_agent_answer": "Explain the documented implementation discussed: signed form data is prepared server-side, then submitted from the frontend to avoid domain/CORS flow issues. Do not expose credentials.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "server-side",
+        "frontend",
+        "CORS",
+        "credentials"
+      ],
+      "source_message_ids": [
+        1551070,
+        1551075,
+        1551149
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-004",
+      "category": "Popup integration",
+      "title": "Required web checkout integration",
+      "merchant_prompt": "How should website checkout be displayed?",
+      "expected_agent_answer": "Use the ABA JavaScript popup integration, form target aba_webservice, and checkout2-0.js. Custom payment form UI is not required; merchant-side channel selector and approved branding remain relevant.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "popup",
+        "aba_webservice",
+        "checkout2-0.js"
+      ],
+      "source_message_ids": [
+        1550849,
+        1550851,
+        1552389
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-005",
+      "category": "Hosted view",
+      "title": "Desktop hosted_view request",
+      "merchant_prompt": "Can hosted_view be implemented on a PC browser?",
+      "expected_agent_answer": "According to the chat, hosted_view is supported for mobile only and was not permitted for desktop. For website desktop checkout, use the supported popup checkout flow. Flag that the merchant disputed this, but the ABA direction remained unchanged.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "mobile",
+        "desktop",
+        "popup"
+      ],
+      "source_message_ids": [
+        1532332,
+        1532344,
+        1550919
+      ],
+      "coverage_status": "confirmed-with-dispute",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-006",
+      "category": "Popup close",
+      "title": "Prevent page refresh on close",
+      "merchant_prompt": "Closing the checkout popup refreshes the merchant page. What workaround was implemented?",
+      "expected_agent_answer": "Load checkout2-0.js with ?hide-close=2. This was tested and confirmed to stop the unwanted refresh/close behavior in the merchant implementation. Note that the exact semantics of values 1 vs 2 were not fully documented.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "hide-close=2",
+        "checkout2-0.js",
+        "refresh"
+      ],
+      "source_message_ids": [
+        1552706,
+        1552726,
+        1552741,
+        1552751
+      ],
+      "coverage_status": "resolved-with-doc-gap",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-007",
+      "category": "Mobile dismissal",
+      "title": "Detect swipe/back dismissal",
+      "merchant_prompt": "How should an integration react when a mobile user swipes away checkout or presses the device back button?",
+      "expected_agent_answer": "The PayWay flow did not expose a reliable merchant event for these actions. Continue status checks until expiry, or use a merchant-side workaround such as MutationObserver only if cancellation is confidently detected. Final payment state must still be verified.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "mobile",
+        "expiry",
+        "Check Transaction API",
+        "verify"
+      ],
+      "source_message_ids": [
+        1552878,
+        1554059,
+        1554060,
+        1554068
+      ],
+      "coverage_status": "workaround",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-008",
+      "category": "Transaction lifetime",
+      "title": "Website QR expiry",
+      "merchant_prompt": "What lifetime should be used for a website QR and how should polling align?",
+      "expected_agent_answer": "Set the request lifetime to match the merchant polling duration. In the implemented storefront flow, 15 minutes was accepted because polling also ran for 15 minutes. Earlier guidance suggested shorter 5 to 10 minute windows, so present it as configuration-dependent.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "lifetime",
+        "polling",
+        "15 minutes"
+      ],
+      "source_message_ids": [
+        1554103,
+        1561827,
+        1561836,
+        1561845,
+        1562072
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-009",
+      "category": "Transaction lifetime",
+      "title": "POS QR expiry",
+      "merchant_prompt": "What lifetime was accepted for POS QR API checkout?",
+      "expected_agent_answer": "Use a short lifetime. The reviewed POS implementation used 5 minutes, and ABA confirmed 5 minutes was acceptable.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "5 minutes",
+        "POS",
+        "QR"
+      ],
+      "source_message_ids": [
+        1562487,
+        1563519,
+        1563532
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-010",
+      "category": "Polling",
+      "title": "Polling frequency and stop conditions",
+      "merchant_prompt": "Describe the reviewed storefront status-check strategy.",
+      "expected_agent_answer": "Client polls every 3 seconds and server-side polling runs every 15 seconds. Stop on paid status, timeout, or user cancel/close, with an additional short guard poll after cancellation. Lifetime must match the maximum checking duration.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "3 seconds",
+        "15 seconds",
+        "paid",
+        "timeout",
+        "lifetime"
+      ],
+      "source_message_ids": [
+        1561826,
+        1561836,
+        1561845
+      ],
+      "coverage_status": "implemented",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-011",
+      "category": "Source of truth",
+      "title": "Check API versus pushback",
+      "merchant_prompt": "Which should be treated as the current payment status: pushback or Check Transaction API?",
+      "expected_agent_answer": "Use Check Transaction API for the latest/accurate status. Pushback only notifies successful payments and may be missed due to connectivity. If both are used, reconcile idempotently and verify final status.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "Check Transaction API",
+        "pushback",
+        "success",
+        "idempotent"
+      ],
+      "source_message_ids": [
+        1554651,
+        1554659,
+        1563796
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-012",
+      "category": "Pushback",
+      "title": "Pushback payload",
+      "merchant_prompt": "What does a successful pushback contain and where is its URL supplied?",
+      "expected_agent_answer": "Supply the merchant webhook in return_url. The chat states successful payment pushback includes tran_id, apv, and status 0.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "return_url",
+        "tran_id",
+        "apv",
+        "status"
+      ],
+      "source_message_ids": [
+        1554161,
+        1554171
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-013",
+      "category": "Pushback",
+      "title": "Callback requirement",
+      "merchant_prompt": "Is pushback mandatory when Check Transaction API is implemented?",
+      "expected_agent_answer": "The later technical clarification says both pushback and callback can be skipped if Check Transaction API is implemented. However, earlier messages called callback mandatory for QR API. The agent should surface the contradiction and advise confirming against the current partner profile/spec.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "optional",
+        "Check Transaction API",
+        "contradiction",
+        "confirm"
+      ],
+      "source_message_ids": [
+        1563712,
+        1563713,
+        1563718
+      ],
+      "coverage_status": "contradictory",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-014",
+      "category": "Pushback",
+      "title": "Post-pushback verification delay",
+      "merchant_prompt": "If both webhook and status check are used, when should status be rechecked?",
+      "expected_agent_answer": "The guidance was to wait about 5 seconds after receiving pushback before calling Check Transaction API to reconfirm.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "5 seconds",
+        "pushback",
+        "Check Transaction API"
+      ],
+      "source_message_ids": [
+        1554554,
+        1554648
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-015",
+      "category": "Idempotency",
+      "title": "Polling and webhook race",
+      "merchant_prompt": "How should order creation handle polling success and a nearly simultaneous callback?",
+      "expected_agent_answer": "Use a database lock or idempotency guard keyed by transaction/order. Applying the paid event twice must not deduct inventory or create the order twice; duplicate success should return an acknowledged idempotent result.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "idempotency",
+        "database lock",
+        "duplicate",
+        "inventory"
+      ],
+      "source_message_ids": [
+        1563721,
+        1563723,
+        1563728
+      ],
+      "coverage_status": "merchant-identified",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-016",
+      "category": "Rate limits",
+      "title": "Check Transaction API rate limit",
+      "merchant_prompt": "What rate limit was communicated?",
+      "expected_agent_answer": "The chat states up to 600 requests per second per merchant IP. Exceeding it may cause blocking. Treat this as chat-derived and verify in current official documentation before production sizing.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "600",
+        "second",
+        "merchant",
+        "IP"
+      ],
+      "source_message_ids": [
+        1552902,
+        1552905,
+        1552970
+      ],
+      "coverage_status": "confirmed-in-chat",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-017",
+      "category": "Domains",
+      "title": "Root domain whitelisting",
+      "merchant_prompt": "What must be whitelisted for a standard merchant website?",
+      "expected_agent_answer": "Share the API request domain and callback domain. The main/root domain is whitelisted; subdomains under the approved root may be covered by a wildcard configuration.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "root domain",
+        "callback",
+        "subdomains",
+        "wildcard"
+      ],
+      "source_message_ids": [
+        1551476,
+        1551481,
+        1551489,
+        1561868
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-018",
+      "category": "Domains",
+      "title": "Custom merchant domain",
+      "merchant_prompt": "A tenant changes from store.myvelon.com to its own store.com. What is required?",
+      "expected_agent_answer": "Notify ABA commercial support. The custom domain must be added through a maintenance process and whitelisted against that merchant’s existing credentials. Without that update, payments on the new domain will not work.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "commercial",
+        "maintenance",
+        "whitelist",
+        "credentials"
+      ],
+      "source_message_ids": [
+        1561870,
+        1561907,
+        1562023
+      ],
+      "coverage_status": "manual-process",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-019",
+      "category": "Sandbox",
+      "title": "Simulator versus sandbox account",
+      "merchant_prompt": "What information creates a simulator account, and how is sandbox obtained?",
+      "expected_agent_answer": "The personal details request was for the simulator app. Sandbox registration starts through the PayWay developer page, while the technical sandbox may depend on payment-flow UI approval and commercial readiness. Do not expose credentials in the answer.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "simulator",
+        "developer page",
+        "UI approval"
+      ],
+      "source_message_ids": [
+        1531183,
+        1531184,
+        1531197,
+        1531212,
+        1531216
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-020",
+      "category": "Sandbox",
+      "title": "Sandbox expiry",
+      "merchant_prompt": "What should the agent suggest when sandbox credentials expire?",
+      "expected_agent_answer": "Ask ABA technical support to extend/reactivate the merchant profile and retry with the same credentials after confirmation. Do not ask for secrets in a public channel.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "extend",
+        "profile",
+        "same credentials",
+        "secrets"
+      ],
+      "source_message_ids": [
+        1554066,
+        1554071,
+        1554094,
+        1554095,
+        1554096
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-021",
+      "category": "Payments",
+      "title": "Supported methods by product",
+      "merchant_prompt": "What payment methods were selected for Koksin and Velon?",
+      "expected_agent_answer": "Koksin was planned for KHQR only. Velon was planned for KHQR plus Visa/Mastercard. JCB, UCB, Alipay and WeChat were not selected and should not be shown in the UI.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "Koksin",
+        "KHQR",
+        "Velon",
+        "Visa",
+        "Mastercard"
+      ],
+      "source_message_ids": [
+        1532322,
+        1561723,
+        1561726
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-022",
+      "category": "UI compliance",
+      "title": "Payment options and logos",
+      "merchant_prompt": "What should the checkout UI display?",
+      "expected_agent_answer": "Display only accepted payment options, use the approved labels and card logos, show the required “We Accept” footer branding, and ensure the Payment Method value reflects the selected option such as ABA KHQR or Credit/Debit Card.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "accepted",
+        "We Accept",
+        "Payment Method",
+        "ABA KHQR"
+      ],
+      "source_message_ids": [
+        1547762,
+        1561815,
+        1561820,
+        1561834
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-023",
+      "category": "Preauth",
+      "title": "Preauth review coverage",
+      "merchant_prompt": "Does a shared purchase/preauth endpoint remove the need to submit the preauth flow?",
+      "expected_agent_answer": "No. ABA asked for the pre-auth process flow to be submitted separately for review even if the merchant uses the same endpoint/UI.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "pre-auth",
+        "submit",
+        "review"
+      ],
+      "source_message_ids": [
+        1532302,
+        1532309,
+        1532331
+      ],
+      "coverage_status": "confirmed",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-024",
+      "category": "Refunds",
+      "title": "Orphan payment after dismissed checkout",
+      "merchant_prompt": "A user saves/scans a QR, dismisses checkout, then pays. There is a captured payment but no order. What should happen?",
+      "expected_agent_answer": "Do not assume dismissal cancels payment. Recheck transaction status. The merchant implemented a cron reconciliation and refund when payment was captured but no order existed, while ABA noted refund policy is merchant-specific.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "recheck",
+        "captured",
+        "no order",
+        "refund",
+        "merchant-specific"
+      ],
+      "source_message_ids": [
+        1580027,
+        1580122,
+        1580151,
+        1580157
+      ],
+      "coverage_status": "policy-dependent",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-025",
+      "category": "Callbacks",
+      "title": "Malformed callback URL",
+      "merchant_prompt": "Pushback logs show protocol “ https” not supported. What is the likely fix?",
+      "expected_agent_answer": "Remove leading whitespace before https in the callback URL, ensure the endpoint is public and stable, and retest with a new transaction. Avoid temporary tunnels for production.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "whitespace",
+        "https",
+        "public",
+        "stable"
+      ],
+      "source_message_ids": [
+        1563565,
+        1563588,
+        1563620
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-026",
+      "category": "POS",
+      "title": "POS checkout evidence",
+      "merchant_prompt": "What evidence was required for POS sign-off?",
+      "expected_agent_answer": "Provide the payment journey screens/recordings, including Android and iOS processing and the ABA Simulator payment screen. Amounts should match across QR and simulator evidence.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "Android",
+        "iOS",
+        "ABA Simulator",
+        "amount"
+      ],
+      "source_message_ids": [
+        1564356,
+        1564476,
+        1564830,
+        1565039
+      ],
+      "coverage_status": "signed-off",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-027",
+      "category": "Onboarding",
+      "title": "Production/client onboarding gate",
+      "merchant_prompt": "Can client onboarding start before profile sign-off?",
+      "expected_agent_answer": "No. Complete profile sign-off first. The chat also notes a profile expiry date, so check current validity before onboarding.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "sign-off",
+        "profile",
+        "expiry"
+      ],
+      "source_message_ids": [
+        1597867,
+        1597872
+      ],
+      "coverage_status": "confirmed",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    },
+    {
+      "id": "TC-028",
+      "category": "OTP",
+      "title": "Optional phone verification",
+      "merchant_prompt": "Must every merchant require OTP for customer phone verification?",
+      "expected_agent_answer": "No. OTP was described as merchant-configurable. Turning it on required UI/error-state review but did not necessarily change payment logic.",
+      "assertion_type": "must_include",
+      "required_concepts": [
+        "configurable",
+        "merchant",
+        "OTP",
+        "UI"
+      ],
+      "source_message_ids": [
+        1565533,
+        1565848,
+        1565854,
+        1566034
+      ],
+      "coverage_status": "resolved",
+      "negative_checks": [
+        "Do not expose API keys, hashes, PINs, phone numbers, emails, or sandbox credentials.",
+        "Do not present contradictory chat guidance as current official documentation without qualification."
+      ]
+    }
+  ]
+}

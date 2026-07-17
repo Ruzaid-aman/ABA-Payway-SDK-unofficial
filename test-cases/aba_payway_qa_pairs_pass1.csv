@@ -1,0 +1,59 @@
+﻿pair_id,topic,question,answer_or_solution,question_message_id,answer_message_id,question_date,answer_date,answer_author,confidence
+QA-001,sandbox,Is this for simulator or for sandbox account bong?,My bad. It is for the simulator app,1531184,1531197,4/30/2026,4/30/2026,CHHEANG Sithroth ABA,high
+QA-002,sandbox,"Hello bong, where do I get the simulator app? Did you add through test flight?",,1532073,1532099,5/4/2026,5/4/2026,CHHEANG Sithroth ABA,high
+QA-003,checkout,"This flow is only possible with hosted or popout I believe. We cannot get it working right now, all the purchase endpoints return qr code only, it never return html or hosted endpoint link for redirect+callback","explanation about payment_gate:
+
+What is payment_gate?
+It’s a parameter that tells PayWay which type of response/flow you want when your merchant has multiple services (e.g. Checkout vs QR).
+
+When to use it?
+Use it when you want to force Ecommerce Checkout (hosted HTML/redirect URL) instead of QR JSON.
+
+How to use it?
+In your /payments/purchase request, add:
+""payment_gate"": ""0""
+This tells PayWay: ""Return the normal Ecommerce Checkout page/URL"".
+
+If you don’t send payment_gate, and your merchant is also enabled for QR services, the API may return QR-style JSON instead.
+
+You can keep your payment_option (e.g. abapay_khqr) as needed; payment_gate = ""0"" just forces the checkout HTML behavior.",1532289,1551285,5/4/2026,5/22/2026,Sohail (@Ruzaid),high
+QA-004,security,"From the documentation, the hash is calculated using the api key. Can this part be return from server side?",this part must be on Serverside and return form data from your server to your client.,1551084,1551149,5/22/2026,5/22/2026,Sohail (@Ruzaid),high
+QA-005,checkout,"Our other issue is that the api/payment-gateway/v1/payments/purchase never returns a HTML response. It always return a json response, is this because we are firing the api call from the server and not the broswer or does our domain need to be whitelisted?","explanation about payment_gate:
+
+What is payment_gate?
+It’s a parameter that tells PayWay which type of response/flow you want when your merchant has multiple services (e.g. Checkout vs QR).
+
+When to use it?
+Use it when you want to force Ecommerce Checkout (hosted HTML/redirect URL) instead of QR JSON.
+
+How to use it?
+In your /payments/purchase request, add:
+""payment_gate"": ""0""
+This tells PayWay: ""Return the normal Ecommerce Checkout page/URL"".
+
+If you don’t send payment_gate, and your merchant is also enabled for QR services, the API may return QR-style JSON instead.
+
+You can keep your payment_option (e.g. abapay_khqr) as needed; payment_gate = ""0"" just forces the checkout HTML behavior.",1551188,1551285,5/22/2026,5/22/2026,Sohail (@Ruzaid),high
+QA-006,domains,Do I need to whitelist any domains on our side bong?,"Yes bong , please kindly share me your domain request to API and domain of your callback bong.",1551476,1551481,5/22/2026,5/22/2026,Dyna,high
+QA-007,domains,"I’ll share in a second bong, do you support wildcard domain?",Root domain please bong.,1551482,1551489,5/22/2026,5/22/2026,Dyna,high
+QA-008,checkout-ui,"As part of technical part bong, is it possible to override behaviour of the close modal button?
+
+We can an event listener right now to cancel the payment intent already but on close it causes the page to refresh. 
+
+Do you have a callback for us to hook onto?","Could you try with this URL : 
+https://checkout.payway.com.kh/plugins/checkout2-0.js?hide-close=2",1552060,1552726,5/25/2026,5/25/2026,Dyna,high
+QA-009,checkout-ui,"Hello bong @chungh , could you confirm you don't want the page being refresh after clicking on cross button, right ?","Could you try with this URL : 
+https://checkout.payway.com.kh/plugins/checkout2-0.js?hide-close=2",1552706,1552726,5/25/2026,5/25/2026,Dyna,high
+QA-010,rate-limit,"As for check transaction api, can you please confirm the rate limit bong? I believe it’s 600 per min or per second?",limit 600 reqeusts/second,1552902,1552905,5/25/2026,5/25/2026,Kriya,high
+QA-011,rate-limit,Is it 600 request per second for each merchant?,"I mean one merchant's IP can send up to 600 requests per second. If it exceeds that limit, we will block.",1552935,1552970,5/25/2026,5/25/2026,Kriya,high
+QA-012,rate-limit,"So if we have a cluster with 6 nodes, we can send 600 request per second per node?",Yes brother,1552975,1552977,5/25/2026,5/25/2026,Kriya,high
+QA-013,callback,Pushback is your webhook bong?,"This means that you need to submit the pushback URL to our API in the return_url. Then for every successful payment we will push back 3 data (tran_id, apv, and status 0) through your pushback URL.",1554161,1554171,5/26/2026,5/26/2026,Kriya,high
+QA-014,callback,"Between check transcation is finished and pushback url, how long can the delay be?","Normally, we suggest delaying the Check Transaction API for 5 seconds after receiving the pushback brother.",1554554,1554648,5/26/2026,5/27/2026,Kriya,high
+QA-015,status,"For this bong, check transaction is always source of truth? And pushback is for notification. Is that correct?","Check Transaction API we response every accurate status, but for pushback we push only the payment success. Besides that, we don't push brother. Also, sometimes there are some connection issues which make you unable to receive the status correctly. That's why we suggest implementing the Check Transaction API to get the latest status from us.",1554651,1554659,5/27/2026,5/27/2026,Kriya,high
+QA-016,domains,What happens in the case that the user want to use their own custom domain such as mystore.com?,If they have their own custom domain we will whitelist under their API credentials not ClickQlack partner API credential.,1561870,1561907,6/3/2026,6/3/2026,Makara ABA,high
+QA-017,domains,"So if they onboard with us through partner api and then say 3 months later, they want to use custom domain and they went to go buy one. 
+
+If they want to use it, they need to onboard again with ABA and sign new papers?","Since API credentials exist and onboarded through partner API  then 3 months later they wish to change to use their own domain, ClickQlack need to notify to our commercial team to do maintenance form for have that domain whitelist with credentials that they have registered otherwise, payment will not work with the new domain that they change.",1562009,1562023,6/3/2026,6/3/2026,Makara ABA,high
+QA-018,callback,"For QR api, is callback mandatory or not bong?",Both are optional if you implement the Check Transaction API.,1563712,1563718,6/4/2026,6/4/2026,Kriya,high
+QA-019,edge-case,"Hello bong @Sithroth @Kriya_BOUR, what happens in the case that the QR code is scan but the user closes the payment and then makes the payment? I tested this and even after calling transcation cancel, the payment still goes through with simulator app","Yes, it is based on the condition of each partner or merchant, brother. But normally, our partner and merchant rely on the Check Transaction Status. Even if the user checks out and then closes the checkout page, if before they close they have scanned and made the payment, whether the merchant will do the refund or not is based on the user request. Most of our merchants do not run to cancel once the user hits to close the checkout page.",1580027,1580157,6/22/2026,6/22/2026,Kriya,high
+QA-020,otp,"Good morning b, for web checkout. If I add OTP for phone field and delivery instruction under map. Need to go through payment flow again or not?","For OTP, it’s configurable by the merchant. If they don’t want OTP to verify customer number. That’s also okay, we can support",1565533,1566034,6/8/2026,6/8/2026,Chung Hak,medium

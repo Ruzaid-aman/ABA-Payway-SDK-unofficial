@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ABA PayWay QR POS</title></head><body>
+  <main><h1>QR-only POS</h1><label>Amount <input id="amount" type="number" min="0.01" step="0.01"></label><button id="create">Create KHQR</button><p id="status"></p><img id="qr" alt="PayWay QR" hidden></main>
+  <script>
+    const status = document.querySelector('#status'), qr = document.querySelector('#qr'); let poll;
+    document.querySelector('#create').onclick = async () => {
+      clearInterval(poll); const response = await fetch('/api/orders', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({amount:document.querySelector('#amount').value})});
+      const order = await response.json(); status.textContent = order.transactionId; if (order.qrImage) { qr.src = `data:image/png;base64,${order.qrImage}`; qr.hidden = false; }
+      const deadline = Date.now() + order.lifetimeSeconds * 1000;
+      poll = setInterval(async () => { const result = await fetch(`/api/orders/${order.transactionId}/status`).then(r => r.json()); if (result.terminal || Date.now() >= deadline) { clearInterval(poll); status.textContent = result.terminal ? result.paymentStatus : 'EXPIRED'; } }, 3000);
+    };
+  </script>
+</body></html>
