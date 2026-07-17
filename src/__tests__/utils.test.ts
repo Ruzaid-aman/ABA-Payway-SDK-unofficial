@@ -260,6 +260,8 @@ describe('validateBeneficiaries', () => {
 
   it('throws for beneficiaries with missing account', () => {
     // @ts-expect-error — testing runtime guard
-    expect(() => validateBeneficiaries([{ amount: 100 }], 100, 'USD')).toThrow('each beneficiary must have a non-empty account string');
+    expect(() => validateBeneficiaries([{ amount: 100 }], 100, 'USD')).toThrow(
+      'each beneficiary must have a non-empty account string',
+    );
   });
 });

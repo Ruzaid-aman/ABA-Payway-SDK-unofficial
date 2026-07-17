@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayWay Popup Checkout</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 520px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f7f7f8;
+      color: #0f0f10;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 24px; text-align: center; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-weight: 500; margin-bottom: 4px; font-size: 0.875rem; }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .payment-options {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .payment-option {
+      flex: 1;
+      padding: 12px 8px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 13px;
+      background: white;
+      transition: all 0.2s;
+    }
+    .payment-option.selected {
+      border-color: #111;
+      background: #f0f0f1;
+    }
+    .payment-option input[type="radio"] {
+      display: none;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: #111;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hidden { display: none !important; }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid white;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      text-align: center;
+    }
+    .status.info { background: #f0f5ff; color: #1a56db; }
+    .status.error { background: #fef2f2; color: #dc2626; }
+    .note {
+      font-size: 0.8rem;
+      color: #6b7280;
+      text-align: center;
+      margin-top: 20px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Complete Payment</h1>
+
+    <!-- ============================================================
+         PAYMENT OPTION SELECTION (radio buttons)
+         
+         The selected payment_option is appended to the form by JS
+         before triggering the PayWay popup.
+         ============================================================ -->
+    <div class="payment-options">
+      <label class="payment-option selected" data-value="abapay_khqr">
+        <input type="radio" name="payment_option" value="abapay_khqr" checked>
+        <strong>KHQR</strong><br><small>ABA / Bakong</small>
+      </label>
+      <label class="payment-option" data-value="cards">
+        <input type="radio" name="payment_option" value="cards">
+        <strong>Card</strong><br><small>Visa / Mastercard</small>
+      </label>
+      <label class="payment-option" data-value="abapay_khqr_deeplink">
+        <input type="radio" name="payment_option" value="abapay_khqr_deeplink">
+        <strong>Deep Link</strong><br><small>Open ABA Pay</small>
+      </label>
+    </div>
+
+    <!-- Customer fields -->
+    <div class="field">
+      <label for="amount">Amount (USD) <span style="color:#dc2626">*</span></label>
+      <input type="number" id="amount" value="15.00" step="0.01" min="0.01" required>
+    </div>
+    <div class="field">
+      <label for="firstName">First Name <span style="color:#dc2626">*</span></label>
+      <input type="text" id="firstName" value="John" required>
+    </div>
+    <div class="field">
+      <label for="lastName">Last Name <span style="color:#dc2626">*</span></label>
+      <input type="text" id="lastName" value="Doe" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone <span style="color:#dc2626">*</span></label>
+      <input type="tel" id="phone" value="012345678" required>
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="customer@example.com">
+    </div>
+
+    <!-- ============================================================
+         CHECKOUT BUTTON
+         
+         ID must match the selector used in the JS below:
+         $('#checkout_button')
+         ============================================================ -->
+    <button class="btn" id="checkout_button">
+      <span id="btnText">Pay Now</span>
+      <span id="btnSpinner" class="spinner hidden"></span>
+    </button>
+
+    <div id="status" class="status hidden"></div>
+  </div>
+
+  <!-- ============================================================
+       HIDDEN MERCHANT REQUEST FORM
+       
+       This form is submitted by AbaPayway.checkout().
+       
+       CRITICAL:
+         - The form's `target` MUST be "aba_webservice" for the popup
+           to open correctly.
+         - The form's `action` is set dynamically from the backend's
+           response (pointing to PayWay's checkout endpoint).
+       ============================================================ -->
+  <form
+    id="aba_merchant_request"
+    class="hidden"
+    method="POST"
+    target="aba_webservice"
+    style="display: none;"
+  >
+    <!-- Fields are populated dynamically by JavaScript -->
+  </form>
+
+  <!-- ============================================================
+       PAYWAY JS LIBRARY — REQUIRED FOR POPUP
+       
+       This library provides:
+         - AbaPayway.checkout()  → Opens the popup modal
+         - AbaPayway.onSuccess()  → Callback after successful payment
+         - AbaPayway.onError()    → Callback on payment error
+         
+       It MUST be loaded AFTER jQuery and BEFORE your checkout script.
+       ============================================================ -->
+  <script src="https://checkout.payway.com.kh/plugins/checkout2-0.js"></script>
+
+  <script>
+    // ================================================================
+    // PAYWAY POPUP CHECKOUT — Frontend Integration
+    //
+    // Architecture:
+    //   Frontend (this page)  →  Your Backend (creates signed payload)
+    //   →  PayWay (processes payment in popup)
+    //
+    // IMPORTANT:
+    //   - All hash calculations / sensitive data processing happen
+    //     server-side in your backend. NEVER expose your API key here.
+    //   - The frontend ONLY handles payment initiation and the
+    //     HTML response returned from PayWay.
+    // ================================================================
+
+    var API_BASE = '/api';       // ← Change to your backend URL
+    var selectedPaymentOption = 'abapay_khqr';
+
+    // ---------- Payment option UI ----------
+    document.querySelectorAll('.payment-option').forEach(function(el) {
+      el.addEventListener('click', function() {
+        document.querySelectorAll('.payment-option').forEach(function(o) {
+          o.classList.remove('selected');
+        });
+        el.classList.add('selected');
+        selectedPaymentOption = el.dataset.value;
+      });
+    });
+
+    // ---------- Backend API call ----------
+    async function createCheckoutPayload() {
+      var firstName = document.getElementById('firstName').value.trim();
+      var lastName  = document.getElementById('lastName').value.trim();
+      var phone     = document.getElementById('phone').value.trim();
+
+      if (!firstName || !lastName || !phone) {
+        throw new Error('Please fill in all required fields (marked with *)');
+      }
+
+      var response = await fetch(API_BASE + '/checkout/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: parseFloat(document.getElementById('amount').value),
+          currency: 'USD',
+          firstName: firstName,
+          lastName: lastName,
+          phone: phone,
+          email: document.getElementById('email').value.trim(),
+          paymentOption: selectedPaymentOption,
+          viewType: 'popup'    // ← CRITICAL: tells PayWay to render popup-compatible page
+        })
+      });
+
+      var data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create checkout');
+      }
+
+      return data;
+    }
+
+    // ================================================================
+    // CHECKOUT BUTTON CLICK HANDLER
+    //
+    // This is the entry point for the PayWay popup flow.
+    //
+    // Steps:
+    //   1. Call backend to get signed payload (all hash computation
+    //      happens server-side)
+    //   2. Populate the hidden form (#aba_merchant_request) with the
+    //      signed fields
+    //   3. Append the selected payment option radio to the form
+    //   4. Call AbaPayway.checkout() to open the popup modal
+    // ================================================================
+    document.addEventListener('DOMContentLoaded', function() {
+
+      // You can use either native DOM or jQuery — both work.
+      // jQuery syntax (as shown in PayWay docs):
+      $('#checkout_button').click(async function() {
+        var btn      = document.getElementById('checkout_button');
+        var btnText  = document.getElementById('btnText');
+        var btnSpinner = document.getElementById('btnSpinner');
+        var statusEl = document.getElementById('status');
+
+        // Show loading
+        btn.disabled = true;
+        btnText.classList.add('hidden');
+        btnSpinner.classList.remove('hidden');
+        statusEl.className = 'status hidden';
+
+        try {
+          // Step 1: Get signed payload from backend
+          //         (Backend computes HMAC, handles all crypto)
+          var data = await createCheckoutPayload();
+
+          // Step 2: Populate the hidden form fields
+          var form = document.getElementById('aba_merchant_request');
+          form.innerHTML = '';  // Clear previous fields
+
+          Object.keys(data.payload).forEach(function(key) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = data.payload[key];
+            form.appendChild(input);
+          });
+
+          // Set the form action to PayWay's checkout URL
+          form.action = data.checkoutUrl + '/api/payment-gateway/v1/payments/checkout';
+
+          // Step 3: Append the selected payment option to the form
+          //         This tells PayWay which payment method to show.
+          var selectedRadio = document.querySelector(
+            '.payment-option.selected input[type="radio"]'
+          );
+          if (selectedRadio) {
+            form.appendChild(selectedRadio.cloneNode());
+          }
+
+          // Hide loading
+          btnText.classList.remove('hidden');
+          btnSpinner.classList.add('hidden');
+
+          // Step 4: Trigger the PayWay popup
+          //         AbaPayway.checkout() will:
+          //           - Open a popup window
+          //           - Submit the form to PayWay
+          //           - Handle the payment flow
+          statusEl.textContent = 'Opening secure payment popup...';
+          statusEl.className = 'status info';
+          AbaPayway.checkout();
+
+        } catch (error) {
+          console.error('Checkout error:', error);
+          statusEl.textContent = 'Error: ' + (error.message || 'Failed to initiate payment.');
+          statusEl.className = 'status error';
+
+          // Reset button
+          btn.disabled = false;
+          btnText.classList.remove('hidden');
+          btnSpinner.classList.add('hidden');
+        }
+      });
+    });
+
+    // ================================================================
+    // OPTIONAL: Handle popup callbacks
+    //
+    // These are called by PayWay's checkout2-0.js after the popup
+    // flow completes. You can use them to show confirmation messages
+    // or redirect to a thank-you page.
+    // ================================================================
+    function onPayWaySuccess(data) {
+      // Called when payment is completed successfully in the popup.
+      // The user will be redirected to your return_url after this.
+      console.log('PayWay success:', data);
+    }
+
+    function onPayWayError(error) {
+      // Called if the popup encounters an error.
+      console.error('PayWay error:', error);
+    }
+  </script>
+
+  <p class="note">
+    <strong>Architecture Note:</strong><br>
+    <strong>Backend:</strong> All hash calculations and sensitive data
+    processing happen server-side. The backend never exposes the API key
+    to the frontend.<br><br>
+    <strong>Frontend:</strong> This page only handles payment initiation
+    and the HTML response returned from PayWay. No payment secrets are
+    present in the browser.
+  </p>
+</body>
+</html>

@@ -75,7 +75,8 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 ### Runnable Examples
 | Platform | Location |
 |---|---|
-| Web Checkout Page | [examples/web/checkout.html](./examples/web/checkout.html) |
+| Web Checkout Page (Redirect) | [examples/web/checkout.html](./examples/web/checkout.html) |
+| Web Checkout Page (Popup Modal) | [examples/web/checkout-popup.html](./examples/web/checkout-popup.html) |
 | Web QR Display | [examples/web/qr-display.html](./examples/web/qr-display.html) |
 | Node.js Webhook Receiver | [examples/backend/webhook-receiver.js](./examples/backend/webhook-receiver.js) |
 | PHP Webhook Receiver | [examples/backend/webhook-receiver.php](./examples/backend/webhook-receiver.php) |

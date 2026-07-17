@@ -56,3 +56,6 @@ __pycache__/
 # Misc
 .cache/
 .temp/
+
+# OpenAPI bundled output
+dist/openapi.bundled.yaml

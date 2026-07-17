@@ -46,6 +46,17 @@ All 7 API domains probed against `checkout-sandbox.payway.com.kh`:
 - **1 critical bug found** (see Task 1 below)
 - 3 high, 8 medium, 12 low severity items catalogued
 
+### Popup Modal Example (DONE)
+
+- Created [`docs/examples/web/checkout-popup.html`](./docs/examples/web/checkout-popup.html) — complete runnable implementation of the PayWay popup checkout flow
+- Updated [`docs/03-web-implementation.md`](./docs/03-web-implementation.md) — added "Option B: Popup Modal" section with code example and architecture notes
+- Updated [`docs/README.md`](./docs/README.md) — added popup example to the "Runnable Examples" table
+- **Three critical requirements verified in the example:**
+  1. `viewType: 'popup'` is passed to the backend for checkout initiation
+  2. Form `target="aba_webservice"` is set on the hidden form
+  3. `checkout2-0.js` and `AbaPayway.checkout()` are used to open the popup
+- Architecture clearly documented: **Backend** handles all hash calculations and crypto; **Frontend** only handles payment initiation and HTML response rendering
+
 ---
 
 ## 🚧 Remaining Work — Sequenced Task Breakdown

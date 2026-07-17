@@ -143,7 +143,20 @@ export default router;
 
 ## Step 2: Frontend Checkout Form
 
-The frontend renders a hidden form pre-filled with the signed payload from the backend, then auto-submits it to PayWay.
+The frontend renders a hidden form pre-filled with the signed payload from the backend, then submits it to PayWay.
+
+There are **two approaches** for the frontend checkout:
+
+| Approach | Description | When to Use |
+|---|---|---|
+| **Full-page Redirect** (default) | Auto-submit a hidden form that redirects the user to PayWay's hosted checkout page | Simple integration, best mobile UX |
+| **Popup Modal** | Open PayWay's checkout in a popup overlay using `checkout2-0.js` | Desktop-focused, feels more "in-app" |
+
+---
+
+### Option A: Full-Page Redirect (Default)
+
+The form auto-submits to PayWay, redirecting the user's browser to the hosted checkout page.
 
 ```html
 <!-- checkout.html -->
@@ -281,6 +294,208 @@ The frontend renders a hidden form pre-filled with the signed payload from the b
 </body>
 </html>
 ```
+
+### Option B: Popup Modal (Desktop-Focused)
+
+For a more "in-app" feel on desktop, use PayWay's `checkout2-0.js` library to open the checkout in a popup overlay. This approach keeps the customer on your page while they complete payment.
+
+> ⚠️ **Mobile note:** Popups may not work well on mobile. For mobile checkouts, use the full-page redirect (Option A) or a deep link approach.
+
+**How the popup flow works:**
+
+1. **Backend:** Include `viewType: 'popup'` in the `createTransaction` call. This tells PayWay to render a popup-compatible page.
+2. **Frontend:** Set `target="aba_webservice"` on your form — this is required for the popup to open correctly.
+3. **Frontend:** Load PayWay's `checkout2-0.js` library and call `AbaPayway.checkout()` when the user clicks "Pay Now".
+
+```html
+<!-- checkout-popup.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayWay Popup Checkout</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 520px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f7f7f8;
+      color: #0f0f10;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 24px; text-align: center; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-weight: 500; margin-bottom: 4px; font-size: 0.875rem; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: #111;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hidden { display: none !important; }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid white;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .note {
+      font-size: 0.8rem;
+      color: #6b7280;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Complete Payment</h1>
+
+    <div class="field">
+      <label for="amount">Amount (USD)</label>
+      <input type="number" id="amount" value="15.00" step="0.01">
+    </div>
+    <div class="field">
+      <label for="firstName">First Name</label>
+      <input type="text" id="firstName" value="John">
+    </div>
+    <div class="field">
+      <label for="phone">Phone</label>
+      <input type="tel" id="phone" value="012345678">
+    </div>
+
+    <!-- CHECKOUT BUTTON — ID must match $('#checkout_button') -->
+    <button class="btn" id="checkout_button">
+      <span id="btnText">Pay Now</span>
+      <span id="btnSpinner" class="spinner hidden"></span>
+    </button>
+  </div>
+
+  <!--
+    📌 CRITICAL: The form MUST have target="aba_webservice" for the
+    PayWay popup to open correctly. Without this, the popup will not
+    appear and the form will submit in the current page instead.
+  -->
+  <form
+    id="aba_merchant_request"
+    class="hidden"
+    method="POST"
+    target="aba_webservice"
+    style="display: none;"
+  >
+    <!-- Fields populated dynamically by JavaScript -->
+  </form>
+
+  <!-- PayWay JS Library — provides AbaPayway.checkout() -->
+  <script src="https://checkout.payway.com.kh/plugins/checkout2-0.js"></script>
+
+  <script>
+    // Backend API endpoint
+    var API_BASE = '/api';
+
+    // When the pay button is clicked, fetch the signed payload from
+    // the backend and trigger the PayWay popup.
+    document.addEventListener('DOMContentLoaded', function() {
+
+      // jQuery syntax used in PayWay's official docs:
+      $('#checkout_button').click(async function() {
+        var btn      = document.getElementById('checkout_button');
+        var btnText  = document.getElementById('btnText');
+        var btnSpinner = document.getElementById('btnSpinner');
+
+        // Show loading state
+        btn.disabled = true;
+        btnText.classList.add('hidden');
+        btnSpinner.classList.remove('hidden');
+
+        try {
+          // Step 1: Get signed payload from backend
+          var response = await fetch(API_BASE + '/checkout/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: parseFloat(document.getElementById('amount').value),
+              currency: 'USD',
+              firstName: document.getElementById('firstName').value.trim(),
+              phone: document.getElementById('phone').value.trim(),
+              paymentOption: 'abapay_khqr',
+              viewType: 'popup'    // ← Tells PayWay to render popup
+            })
+          });
+          var data = await response.json();
+          if (!data.success) throw new Error(data.error);
+
+          // Step 2: Populate the hidden form
+          var form = document.getElementById('aba_merchant_request');
+          form.innerHTML = '';
+          form.action = data.checkoutUrl +
+            '/api/payment-gateway/v1/payments/checkout';
+
+          Object.keys(data.payload).forEach(function(key) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = data.payload[key];
+            form.appendChild(input);
+          });
+
+          // Hide loading
+          btnText.classList.remove('hidden');
+          btnSpinner.classList.add('hidden');
+
+          // Step 3: Open the PayWay popup
+          // AbaPayway.checkout() submits the form to PayWay in a
+          // new popup window. The user completes payment there.
+          AbaPayway.checkout();
+
+        } catch (error) {
+          console.error('Checkout error:', error);
+          alert('Error: ' + error.message);
+          btn.disabled = false;
+          btnText.classList.remove('hidden');
+          btnSpinner.classList.add('hidden');
+        }
+      });
+    });
+  </script>
+
+  <p class="note">
+    <strong>Architecture:</strong> Backend handles all hash calculations
+    and sensitive data. Frontend only initiates payment and renders the
+    HTML response from PayWay.
+  </p>
+</body>
+</html>
+```
+
+> 📎 **Full runnable example:** See [`docs/examples/web/checkout-popup.html`](./examples/web/checkout-popup.html) for the complete implementation with payment method selection and error handling.
 
 ---
 

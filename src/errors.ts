@@ -24,7 +24,14 @@ export class PayWayAPIError extends PayWayError {
 
   constructor(
     message: string,
-    options?: { statusCode?: number; paywayCode?: string; rawBody?: unknown; endpoint?: string; retryable?: boolean; rateLimitInfo?: Record<string, unknown> },
+    options?: {
+      statusCode?: number;
+      paywayCode?: string;
+      rawBody?: unknown;
+      endpoint?: string;
+      retryable?: boolean;
+      rateLimitInfo?: Record<string, unknown>;
+    },
   ) {
     super(message);
     Object.setPrototypeOf(this, PayWayAPIError.prototype);

@@ -3,17 +3,25 @@
   "version": "1.0.0",
   "description": "Production-ready, fully-typed TypeScript SDK for the ABA PayWay payment gateway.",
   "license": "MIT",
-  "author": "Your Name <email@example.com> (https://yourwebsite.com)",
+  "author": "Antigravity <info@antigravity.dev> (https://antigravity.dev)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/antigravity-google/aba-payway-ts.git"
   },
+  "bugs": {
+    "url": "https://github.com/antigravity-google/aba-payway-ts/issues"
+  },
+  "homepage": "https://github.com/antigravity-google/aba-payway-ts#readme",
   "keywords": [
     "payway",
     "aba",
     "payment",
     "cambodia",
-    "khqr"
+    "khqr",
+    "fintech",
+    "ecommerce",
+    "typescript",
+    "sdk"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -33,14 +41,19 @@
     "dist"
   ],
   "scripts": {
-    "bundle": "npx @redocly/cli bundle payway-openapi/openapi.yaml -o dist/openapi.bundled.yaml",
-    "generate-types": "npx openapi-typescript dist/openapi.bundled.yaml -o src/types.ts",
-    "probe": "npx tsx scripts/sandbox-probe.ts",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint src",
+    "lint:fix": "biome lint src --write",
     "format": "biome format src --write",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "bundle": "npx @redocly/cli bundle payway-openapi/openapi.yaml -o dist/openapi.bundled.yaml",
+    "generate-types": "npx openapi-typescript dist/openapi.bundled.yaml -o src/types.ts",
+    "probe": "npx tsx scripts/sandbox-probe.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",

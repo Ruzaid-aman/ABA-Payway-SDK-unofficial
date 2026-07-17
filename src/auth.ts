@@ -53,7 +53,11 @@ export function encryptMerchantAuth(data: unknown, publicKeyPem: string): string
 /**
  * Verifies a webhook signature using PayWay's sorted-key signature validation algorithm.
  */
-export function verifyCallbackSignature(body: Record<string, unknown>, receivedSignature: string, apiKey: string): boolean {
+export function verifyCallbackSignature(
+  body: Record<string, unknown>,
+  receivedSignature: string,
+  apiKey: string,
+): boolean {
   // Sort response keys ascending
   const sortedKeys = Object.keys(body).sort();
 

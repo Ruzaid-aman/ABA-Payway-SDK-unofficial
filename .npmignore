@@ -2,8 +2,6 @@
 src/
 payway-openapi/
 scripts/
-scratch/
-scratch-consumer/
 
 # Test files
 tests/
@@ -16,7 +14,6 @@ coverage/
 examples/
 payway-boilerplate/
 docs/examples/
-New folder/
 
 # Build configuration
 tsconfig.json

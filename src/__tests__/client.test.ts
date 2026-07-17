@@ -42,7 +42,7 @@ function mockJsonResponse(body: unknown, status = 200, statusText = 'OK'): Respo
     redirected: false,
     type: 'basic',
     url: '',
-    clone: () => ({} as Response),
+    clone: () => ({}) as Response,
     body: null,
     bodyUsed: false,
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
@@ -121,9 +121,7 @@ describe('checkResponseError (via API calls)', () => {
       }),
     );
 
-    await expect(
-      payway.checkout.checkTransaction('TX-NOTFOUND'),
-    ).rejects.toThrow(PayWayAPIError);
+    await expect(payway.checkout.checkTransaction('TX-NOTFOUND')).rejects.toThrow(PayWayAPIError);
 
     await fetchSpy.mockResolvedValueOnce(
       mockJsonResponse({
@@ -163,33 +161,21 @@ describe('checkResponseError (via API calls)', () => {
   });
 
   it('throws PayWayAPIError for string status "FAILED"', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: 'FAILED', code: '99', message: 'System error' }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: 'FAILED', code: '99', message: 'System error' }));
 
-    await expect(
-      payway.checkout.checkTransaction('TX-FAIL'),
-    ).rejects.toThrow(PayWayAPIError);
+    await expect(payway.checkout.checkTransaction('TX-FAIL')).rejects.toThrow(PayWayAPIError);
   });
 
   it('throws PayWayAPIError for top-level non-zero code (no status object)', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ code: 1, message: 'Wrong Hash.' }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ code: 1, message: 'Wrong Hash.' }));
 
-    await expect(
-      payway.checkout.checkTransaction('TX-BADHASH'),
-    ).rejects.toThrow('Wrong Hash.');
+    await expect(payway.checkout.checkTransaction('TX-BADHASH')).rejects.toThrow('Wrong Hash.');
   });
 
   it('throws PayWayAPIError on HTTP non-2xx responses', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ error: 'Forbidden' }, 403, 'Forbidden'),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Forbidden' }, 403, 'Forbidden'));
 
-    await expect(
-      payway.checkout.checkTransaction('TX-403'),
-    ).rejects.toThrow(PayWayAPIError);
+    await expect(payway.checkout.checkTransaction('TX-403')).rejects.toThrow(PayWayAPIError);
   });
 
   it('throws PayWayAPIError on timeout (AbortError)', async () => {
@@ -210,9 +196,7 @@ describe('checkResponseError (via API calls)', () => {
         }),
     );
 
-    await expect(
-      pw.checkout.checkTransaction('TX-SLOW'),
-    ).rejects.toThrow(/timed out/);
+    await expect(pw.checkout.checkTransaction('TX-SLOW')).rejects.toThrow(/timed out/);
   });
 
   it('throws PayWayAPIError when response body is invalid JSON', async () => {
@@ -225,7 +209,7 @@ describe('checkResponseError (via API calls)', () => {
       redirected: false,
       type: 'basic',
       url: '',
-      clone: () => ({} as Response),
+      clone: () => ({}) as Response,
       body: null,
       bodyUsed: false,
       json: () => Promise.reject(new Error('Unexpected JSON parse')),
@@ -237,17 +221,13 @@ describe('checkResponseError (via API calls)', () => {
 
     fetchSpy.mockResolvedValueOnce(invalidResponse);
 
-    await expect(
-      payway.checkout.checkTransaction('TX-JSON'),
-    ).rejects.toThrow('Invalid JSON response from PayWay API');
+    await expect(payway.checkout.checkTransaction('TX-JSON')).rejects.toThrow('Invalid JSON response from PayWay API');
   });
 
   it('throws PayWayAPIError for non-fetch network errors', async () => {
     fetchSpy.mockRejectedValueOnce(new Error('Network unreachable'));
 
-    await expect(
-      payway.checkout.checkTransaction('TX-NETWORK'),
-    ).rejects.toThrow(/Network error/);
+    await expect(payway.checkout.checkTransaction('TX-NETWORK')).rejects.toThrow(/Network error/);
   });
 
   it('returns gateway error details from PayWayAPIError', async () => {
@@ -277,7 +257,7 @@ describe('checkResponseError (via API calls)', () => {
       redirected: false,
       type: 'basic',
       url: '',
-      clone: () => ({} as Response),
+      clone: () => ({}) as Response,
       body: null,
       bodyUsed: false,
       json: () => Promise.resolve(null),
@@ -303,7 +283,7 @@ describe('checkResponseError (via API calls)', () => {
       redirected: false,
       type: 'basic',
       url: '',
-      clone: () => ({} as Response),
+      clone: () => ({}) as Response,
       body: null,
       bodyUsed: false,
       json: () => Promise.resolve(null),
@@ -385,7 +365,9 @@ describe('checkout domain', () => {
         returnUrl: 'https://example.com/return',
       });
 
-      const expectedItems = Buffer.from(JSON.stringify([{ name: 'Widget', quantity: 1, price: 5.0 }]), 'utf8').toString('base64');
+      const expectedItems = Buffer.from(JSON.stringify([{ name: 'Widget', quantity: 1, price: 5.0 }]), 'utf8').toString(
+        'base64',
+      );
       const expectedReturnUrl = Buffer.from('https://example.com/return', 'utf8').toString('base64');
       const expectedConcat = [
         result.req_time,
@@ -448,21 +430,31 @@ describe('checkout domain', () => {
     });
 
     it('rejects non-positive amounts', () => {
-      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 0 })).toThrow('amount must be a positive number');
-      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: -5 })).toThrow('amount must be a positive number');
+      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 0 })).toThrow(
+        'amount must be a positive number',
+      );
+      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: -5 })).toThrow(
+        'amount must be a positive number',
+      );
     });
 
     it('rejects KHR amounts with decimal places', () => {
-      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 100.5, currency: 'KHR' })).toThrow('KHR amount must be an integer');
+      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 100.5, currency: 'KHR' })).toThrow(
+        'KHR amount must be an integer',
+      );
     });
 
     it('rejects unsupported currencies', () => {
       // @ts-expect-error — testing runtime validation
-      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 1, currency: 'EUR' })).toThrow('currency must be one of USD, KHR');
+      expect(() => payway.checkout.createTransaction({ transactionId: 'T', amount: 1, currency: 'EUR' })).toThrow(
+        'currency must be one of USD, KHR',
+      );
     });
 
     it('rejects empty transaction ids', () => {
-      expect(() => payway.checkout.createTransaction({ transactionId: '', amount: 1 })).toThrow('transactionId is required');
+      expect(() => payway.checkout.createTransaction({ transactionId: '', amount: 1 })).toThrow(
+        'transactionId is required',
+      );
     });
   });
 
@@ -492,9 +484,7 @@ describe('checkout domain', () => {
 
   describe('closeTransaction', () => {
     it('sends POST to close-transaction endpoint', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockJsonResponse({ status: { code: '00', message: 'Closed' } }),
-      );
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Closed' } }));
 
       await payway.checkout.closeTransaction('T001');
 
@@ -532,9 +522,7 @@ describe('checkout domain', () => {
     });
 
     it('accepts optional requestTime parameter', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockJsonResponse({ status: { code: 0 } }),
-      );
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 } }));
 
       await payway.checkout.getTransactionDetail('T002', '20260716120000');
 
@@ -543,7 +531,8 @@ describe('checkout domain', () => {
     });
 
     it('respects the documented rate-limit rule (10/60s)', () => {
-      const rule = (payway as unknown as { rateLimitRules: Record<string, { limit: number; intervalMs: number }> }).rateLimitRules?.[ENDPOINTS.getTransactionDetail];
+      const rule = (payway as unknown as { rateLimitRules: Record<string, { limit: number; intervalMs: number }> })
+        .rateLimitRules?.[ENDPOINTS.getTransactionDetail];
       expect(rule).toBeDefined();
       expect(rule?.limit).toBe(10);
       expect(rule?.intervalMs).toBe(60_000);
@@ -552,9 +541,7 @@ describe('checkout domain', () => {
 
   describe('getTransactionList', () => {
     it('uses standard HMAC string concatenation for all fields', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockJsonResponse({ status: { code: '00', message: 'Success' }, data: [] }),
-      );
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Success' }, data: [] }));
 
       await payway.checkout.getTransactionList({
         fromDate: '20260101',
@@ -617,11 +604,13 @@ describe('checkout domain', () => {
       await pw.checkout.getTransactionList({});
 
       expect(rateLimitSpy).toHaveBeenCalledTimes(1);
-      expect(rateLimitSpy).toHaveBeenCalledWith(expect.objectContaining({
-        limit: 50,
-        remaining: 49,
-        reset: 120,
-      }));
+      expect(rateLimitSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          limit: 50,
+          remaining: 49,
+          reset: 120,
+        }),
+      );
     });
 
     it('throttles requests to documented endpoints when the rate limit is exceeded', async () => {
@@ -668,9 +657,7 @@ describe('checkout domain', () => {
 
     it('sends form-encoded request with merchant_auth when RSA key is present', async () => {
       const pwRsa = new PayWay(CONFIG_WITH_RSA);
-      fetchSpy.mockResolvedValueOnce(
-        mockJsonResponse({ status: { code: '00', message: 'Refunded' } }),
-      );
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Refunded' } }));
 
       await pwRsa.checkout.refund('T001', 5.0);
 
@@ -689,9 +676,7 @@ describe('checkout domain', () => {
 
   describe('getExchangeRate', () => {
     it('sends POST to exchange-rate endpoint', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockJsonResponse({ status: { code: 0 }, data: { rate: 4100 } }),
-      );
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 }, data: { rate: 4100 } }));
 
       const result = await payway.checkout.getExchangeRate();
 
@@ -721,9 +706,7 @@ describe('credentialsOnFile domain', () => {
   });
 
   it('linkAccount sends POST with request_time field', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00', message: 'OK' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'OK' } }));
 
     await payway.credentialsOnFile.linkAccount({
       requestId: 'REQ-001',
@@ -740,9 +723,7 @@ describe('credentialsOnFile domain', () => {
   });
 
   it('linkCard sends POST with correct fields', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00', message: 'OK' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'OK' } }));
 
     await payway.credentialsOnFile.linkCard({
       requestId: 'REQ-002',
@@ -759,9 +740,7 @@ describe('credentialsOnFile domain', () => {
   });
 
   it('payment sends POST with amount formatted for currency', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00', message: 'OK' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'OK' } }));
 
     await payway.credentialsOnFile.payment({
       requestId: 'REQ-003',
@@ -779,9 +758,7 @@ describe('credentialsOnFile domain', () => {
   });
 
   it('renewToken sends POST to renew endpoint', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00', message: 'Renewed' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Renewed' } }));
 
     await payway.credentialsOnFile.renewToken({
       requestId: 'REQ-004',
@@ -809,9 +786,7 @@ describe('credentialsOnFile domain', () => {
   });
 
   it('removeToken sends POST to remove-token', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00', message: 'Removed' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Removed' } }));
 
     await payway.credentialsOnFile.removeToken({
       requestId: 'REQ-006',
@@ -843,9 +818,7 @@ describe('qr domain', () => {
   });
 
   it('generateQr sends the sandbox-verified QR API payload', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0 }, data: { qr_image: 'base64data' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 }, data: { qr_image: 'base64data' } }));
 
     await payway.qr.generateQr({
       transactionId: 'QR-001',
@@ -905,9 +878,7 @@ describe('paymentLink domain', () => {
   });
 
   it('getDetails sends form-encoded request with merchant_auth containing the id', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00' }, data: { title: 'My Link' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00' }, data: { title: 'My Link' } }));
 
     await payway.paymentLink.getDetails('PL-001');
 
@@ -940,9 +911,7 @@ describe('preAuth domain', () => {
   });
 
   it('complete sends the JSON pre-auth request contract', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00', message: 'Completed' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Completed' } }));
 
     await payway.preAuth.complete('T-PREAUTH-001', 100.0);
 
@@ -953,9 +922,7 @@ describe('preAuth domain', () => {
   });
 
   it('cancel sends the JSON pre-auth request contract', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00', message: 'Cancelled' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Cancelled' } }));
 
     await payway.preAuth.cancel('T-PREAUTH-001');
 
@@ -964,9 +931,7 @@ describe('preAuth domain', () => {
   });
 
   it('completeWithPayout uses the completion path with encrypted payout instructions', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00', message: 'Completed' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Completed' } }));
 
     await payway.preAuth.completeWithPayout('T-PREAUTH-002', 200.0, [{ acc: '000123456', amt: 200 }]);
 
@@ -996,9 +961,7 @@ describe('payout domain', () => {
   });
 
   it('payout sends the encrypted beneficiary instruction with a hexadecimal hash', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0, message: 'OK' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'OK' } }));
 
     await payway.payout.payout({
       transactionId: 'PO-001',
@@ -1017,9 +980,7 @@ describe('payout domain', () => {
   });
 
   it('updateBeneficiaryStatus sends POST with status', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0, message: 'Updated' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'Updated' } }));
 
     await payway.payout.updateBeneficiaryStatus({
       payee: '000123456',
@@ -1031,9 +992,7 @@ describe('payout domain', () => {
   });
 
   it('addBeneficiary sends an RSA-encrypted payee', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0, message: 'Added' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'Added' } }));
 
     await payway.payout.addBeneficiary({
       payee: '000123456',
@@ -1046,9 +1005,7 @@ describe('payout domain', () => {
   });
 
   it('JSON-stringifies object custom_fields in the request body', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0, message: 'OK' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'OK' } }));
 
     await payway.payout.payout({
       transactionId: 'PO-CF-001',
@@ -1105,9 +1062,7 @@ describe('khqr domain', () => {
   });
 
   it('getTransactionsByMerchantRef sends POST with merchant_ref', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0, message: 'OK' }, data: [] }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'OK' }, data: [] }));
 
     await payway.khqr.getTransactionsByMerchantRef('MCREF-001');
 
@@ -1130,10 +1085,7 @@ describe('PayWay.verifyCallback', () => {
     const body = { tran_id: 'T999', amount: '10.00', status: '0' };
     // Compute expected signature
     const sortedConcat = '10.000T999'; // amount, status, tran_id
-    const validSig = crypto
-      .createHmac('sha512', TEST_CONFIG.apiKey)
-      .update(sortedConcat)
-      .digest('base64');
+    const validSig = crypto.createHmac('sha512', TEST_CONFIG.apiKey).update(sortedConcat).digest('base64');
 
     expect(payway.verifyCallback(body, validSig)).toBe(true);
     expect(payway.verifyCallback(body, 'bad-sig')).toBe(false);
@@ -1158,9 +1110,7 @@ describe('request mechanics', () => {
 
   it('auto-fills req_time when not provided', async () => {
     const payway = new PayWay(TEST_CONFIG);
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0 } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 } }));
 
     await payway.checkout.checkTransaction('T001');
 
@@ -1170,9 +1120,7 @@ describe('request mechanics', () => {
 
   it('uses sandbox base URL by default', async () => {
     const payway = new PayWay(TEST_CONFIG);
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0 } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 } }));
 
     await payway.checkout.checkTransaction('T001');
 
@@ -1182,9 +1130,7 @@ describe('request mechanics', () => {
 
   it('uses production base URL when environment is production', async () => {
     const payway = new PayWay({ ...TEST_CONFIG, environment: 'production' });
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0 } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 } }));
 
     await payway.checkout.checkTransaction('T001');
 
@@ -1194,9 +1140,7 @@ describe('request mechanics', () => {
 
   it('uses custom baseUrl when provided', async () => {
     const payway = new PayWay({ ...TEST_CONFIG, baseUrl: 'https://custom.example.com' });
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0 } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 } }));
 
     await payway.checkout.checkTransaction('T001');
 
@@ -1206,9 +1150,7 @@ describe('request mechanics', () => {
 
   it('sends JSON content-type for HMAC-only endpoints', async () => {
     const payway = new PayWay(TEST_CONFIG);
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 0 } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 } }));
 
     await payway.checkout.checkTransaction('T001');
 
@@ -1218,9 +1160,7 @@ describe('request mechanics', () => {
 
   it('sends form-urlencoded content-type for merchant-auth endpoints', async () => {
     const payway = new PayWay(CONFIG_WITH_RSA);
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '00' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00' } }));
 
     await payway.checkout.refund('T001', 5.0);
 
