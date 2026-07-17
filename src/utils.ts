@@ -42,6 +42,27 @@ export function validateTransactionId(transactionId: string): void {
   }
 }
 
+export function validateLifetime(lifetime: number | undefined): void {
+  if (lifetime !== undefined && (!Number.isInteger(lifetime) || lifetime <= 0)) {
+    throw new PayWayConfigError('lifetime must be a positive whole number of seconds');
+  }
+}
+
+export function validatePublicHttpsUrl(url: string, fieldName: string): void {
+  if (typeof url !== 'string' || url.trim() !== url) {
+    throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.hostname === 'localhost') {
+      throw new Error('invalid public HTTPS URL');
+    }
+  } catch {
+    throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
+  }
+}
+
 export function validateBeneficiaries(
   beneficiaries: { account: string; amount: number }[],
   totalAmount: number,

@@ -29,6 +29,17 @@ interface ItemEntry {
     quantity: number;
     price: number;
 }
+interface RateLimitRule {
+    limit: number;
+    intervalMs: number;
+}
+interface RateLimitInfo {
+    limit?: number;
+    remaining?: number;
+    reset?: number;
+    retryAfterMs?: number;
+    rawHeaders?: Record<string, string>;
+}
 interface PayWayConfig {
     merchantId: string;
     apiKey: string;
@@ -38,8 +49,10 @@ interface PayWayConfig {
     baseUrl?: string;
     maxRetries?: number;
     retryDelayMs?: number;
+    rateLimitThrottling?: boolean;
+    rateLimitRules?: Record<string, RateLimitRule>;
     onRequest?: (endpoint: string, bodyPayload: string) => void;
-    onResponse?: (endpoint: string, statusCode: number, body: any) => void;
+    onResponse?: (endpoint: string, statusCode: number, body: any, rateLimitInfo?: RateLimitInfo) => void;
 }
 interface GatewayErrorDetails {
     code?: string | number;
@@ -176,6 +189,8 @@ interface GetTransactionListParams {
 declare class PayWay {
     private config;
     private baseUrl;
+    private rateLimitRules;
+    private rateLimitState;
     /**
      * Create a new PayWay SDK client instance.
      *
@@ -189,6 +204,9 @@ declare class PayWay {
      * @throws {PayWayConfigError} If the configuration is missing or invalid.
      */
     constructor(config: PayWayConfig);
+    private _getRateLimitRule;
+    private _refillRateLimitState;
+    private _acquireRateLimitToken;
     private _executeFetch;
     private request;
     private requestWithMerchantAuth;
@@ -484,13 +502,7 @@ declare class PayWay {
          */
         renewToken: (params: TokenParams) => Promise<{
             status?: {
-                code?: string | undefined; /**
-                 * Lookup and retrieve KHQR transaction history matching a specific merchant reference.
-                 *
-                 * @param merchantRef - The merchant reference number.
-                 * @param requestTime - Optional custom ISO/request timestamp.
-                 * @returns A promise resolving to the transaction retrieval response.
-                 */
+                code?: string | undefined;
                 message?: string | undefined;
             } | undefined;
             new_token?: string | undefined;
@@ -508,6 +520,12 @@ declare class PayWay {
         getTokenDetails: (params: TokenParams) => Promise<{
             status?: {
                 code?: string | undefined;
+                /**
+                 * Release/void a pre-authorized transaction to unlock customer funds.
+                 *
+                 * @param transactionId - The transaction ID of the pre-authorized transaction.
+                 * @returns A promise resolving to the cancellation/void status response.
+                 */
                 message?: string | undefined;
             } | undefined;
             data?: {
@@ -767,14 +785,16 @@ declare class PayWayAPIError extends PayWayError {
     readonly rawBody?: any;
     readonly endpoint?: string;
     readonly retryable?: boolean;
+    readonly rateLimitInfo?: Record<string, any>;
     constructor(message: string, options?: {
         statusCode?: number;
         paywayCode?: string;
         rawBody?: any;
         endpoint?: string;
         retryable?: boolean;
+        rateLimitInfo?: Record<string, any>;
     });
     toJSON(): Record<string, any>;
 }
 
-export { type AddBeneficiaryParams, type CofPaymentParams, type CreatePaymentLinkParams, type CreateTransactionParams, type Currency, type Environment, type GenerateQrParams, type GetTransactionListParams, type ItemEntry, type LinkAccountParams, type LinkCardParams, PayWay, PayWayAPIError, type PayWayConfig, PayWayConfigError, PayWayError, type PayoutParams, type TokenParams, type UpdateBeneficiaryStatusParams, verifyCallbackSignature };
+export { type AddBeneficiaryParams, type CofPaymentParams, type CreatePaymentLinkParams, type CreateTransactionParams, type Currency, type Environment, type GenerateQrParams, type GetTransactionListParams, type ItemEntry, type LinkAccountParams, type LinkCardParams, PayWay, PayWayAPIError, type PayWayConfig, PayWayConfigError, PayWayError, type PayoutParams, type RateLimitInfo, type RateLimitRule, type TokenParams, type UpdateBeneficiaryStatusParams, verifyCallbackSignature };

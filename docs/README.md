@@ -56,6 +56,8 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 |---|---|---|
 | 12. Error Handling & Debugging | [12-error-handling-and-debugging.md](./12-error-handling-and-debugging.md) | 15 min |
 | 13. Deployment Checklist | [13-deployment-checklist.md](./13-deployment-checklist.md) | 10 min |
+| 15. Merchant Scenario Requirements | [15-merchant-scenario-requirements.md](./15-merchant-scenario-requirements.md) | Reference |
+| Coverage Report | [aba-payway-test-case-coverage.md](./aba-payway-test-case-coverage.md) | Audit |
 
 ### Part 6 — Appendix
 | Chapter | File | Est. Read Time |

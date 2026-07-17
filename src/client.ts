@@ -10,6 +10,8 @@ import {
   validatePositiveAmount,
   validateTransactionId,
   validateBeneficiaries,
+  validateLifetime,
+  validatePublicHttpsUrl,
 } from './utils.js';
 import { generateOfflineQR, type GenerateOfflineQrParams } from './khqr-offline.js';
 import type { components } from './types.js';
@@ -663,6 +665,7 @@ export class PayWay {
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency || 'USD');
       validateCurrency(params.currency);
+      validateLifetime(params.lifetime);
 
       const time = formatRequestTime();
       const payload: Record<string, any> = filterParams({
@@ -1053,6 +1056,11 @@ export class PayWay {
      * @returns A promise resolving to the generated QR payload containing the QR code and image options.
      */
     generateQr: (params: GenerateQrParams) => {
+      validateTransactionId(params.transactionId);
+      validatePositiveAmount(params.amount, params.currency || 'USD');
+      validateCurrency(params.currency);
+      validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+
       return this.request<components['schemas']['GenerateQrResponse']>(
         ENDPOINTS.generateQr,
         filterParams({

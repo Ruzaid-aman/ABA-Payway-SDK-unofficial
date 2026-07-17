@@ -139,6 +139,7 @@ var PayWayAPIError = class _PayWayAPIError extends PayWayError {
   rawBody;
   endpoint;
   retryable;
+  rateLimitInfo;
   constructor(message, options) {
     super(message);
     Object.setPrototypeOf(this, _PayWayAPIError.prototype);
@@ -148,6 +149,7 @@ var PayWayAPIError = class _PayWayAPIError extends PayWayError {
     this.rawBody = options?.rawBody;
     this.endpoint = options?.endpoint;
     this.retryable = options?.retryable;
+    this.rateLimitInfo = options?.rateLimitInfo;
   }
   toJSON() {
     return {
@@ -157,6 +159,7 @@ var PayWayAPIError = class _PayWayAPIError extends PayWayError {
       paywayCode: this.paywayCode,
       endpoint: this.endpoint,
       retryable: this.retryable,
+      rateLimitInfo: this.rateLimitInfo,
       rawBody: this.rawBody
     };
   }
@@ -190,6 +193,24 @@ function validatePositiveAmount(amount, currency) {
 function validateTransactionId(transactionId) {
   if (typeof transactionId !== "string" || transactionId.length === 0) {
     throw new PayWayConfigError("transactionId is required and must be a non-empty string");
+  }
+}
+function validateLifetime(lifetime) {
+  if (lifetime !== void 0 && (!Number.isInteger(lifetime) || lifetime <= 0)) {
+    throw new PayWayConfigError("lifetime must be a positive whole number of seconds");
+  }
+}
+function validatePublicHttpsUrl(url, fieldName) {
+  if (typeof url !== "string" || url.trim() !== url) {
+    throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
+  }
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" || !parsed.hostname || parsed.hostname === "localhost") {
+      throw new Error("invalid public HTTPS URL");
+    }
+  } catch {
+    throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
   }
 }
 function validateBeneficiaries(beneficiaries, totalAmount, currency) {
@@ -341,11 +362,13 @@ async function parseResponseBody(response) {
     return text;
   }
 }
-function createHttpError(response, rawBody, endpoint) {
+function createHttpError(response, rawBody, endpoint, rateLimitInfo) {
   return new PayWayAPIError(`HTTP Error: ${response.status} ${response.statusText}`, {
     statusCode: response.status,
     rawBody,
-    endpoint
+    endpoint,
+    rateLimitInfo,
+    retryable: response.status === 429
   });
 }
 function createJsonParseError(rawBody, endpoint) {
@@ -368,12 +391,56 @@ function createNetworkError(error, timeoutMs, endpoint) {
     retryable: true
   });
 }
+function parseHeaderNumber(headers, names) {
+  for (const name of names) {
+    const value = headers.get(name);
+    if (!value) continue;
+    const normalized = value.trim();
+    const intVal = Number(normalized);
+    if (!Number.isNaN(intVal)) {
+      return intVal;
+    }
+    const date = Date.parse(normalized);
+    if (!Number.isNaN(date)) {
+      return Math.max(0, date - Date.now());
+    }
+  }
+  return void 0;
+}
+function parseRateLimitInfo(headers) {
+  if (!headers) {
+    return void 0;
+  }
+  const limit = parseHeaderNumber(headers, ["x-rate-limit-limit", "ratelimit-limit", "rate-limit-limit"]);
+  const remaining = parseHeaderNumber(headers, ["x-rate-limit-remaining", "ratelimit-remaining", "rate-limit-remaining"]);
+  const reset = parseHeaderNumber(headers, ["x-rate-limit-reset", "ratelimit-reset", "rate-limit-reset"]);
+  const retryAfter = parseHeaderNumber(headers, ["retry-after", "x-retry-after"]);
+  if (limit === void 0 && remaining === void 0 && reset === void 0 && retryAfter === void 0) {
+    return void 0;
+  }
+  const rawHeaders = {};
+  for (const key of ["x-rate-limit-limit", "x-rate-limit-remaining", "x-rate-limit-reset", "retry-after", "x-retry-after"]) {
+    const value = headers.get(key);
+    if (value !== null) {
+      rawHeaders[key] = value;
+    }
+  }
+  return {
+    limit,
+    remaining,
+    reset,
+    retryAfterMs: retryAfter,
+    rawHeaders
+  };
+}
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 var PayWay = class {
   config;
   baseUrl;
+  rateLimitRules;
+  rateLimitState = /* @__PURE__ */ new Map();
   /**
    * Create a new PayWay SDK client instance.
    *
@@ -403,12 +470,65 @@ var PayWay = class {
       const env = config.environment || "sandbox";
       this.baseUrl = BASE_URLS[env] || BASE_URLS.sandbox;
     }
+    const defaultRateLimitRules = {
+      [ENDPOINTS.checkTransaction]: { limit: 600, intervalMs: 1e3 },
+      [ENDPOINTS.getTransactionDetail]: { limit: 10, intervalMs: 6e4 },
+      [ENDPOINTS.getTransactionList]: { limit: 50, intervalMs: 6e4 },
+      [ENDPOINTS.refund]: { limit: 500, intervalMs: 1e3 }
+    };
+    this.rateLimitRules = {
+      ...defaultRateLimitRules,
+      ...config.rateLimitRules ?? {}
+    };
+  }
+  _getRateLimitRule(endpoint) {
+    if (this.config.rateLimitThrottling === false) {
+      return void 0;
+    }
+    return this.rateLimitRules[endpoint];
+  }
+  _refillRateLimitState(rule, state) {
+    const now = Date.now();
+    const elapsed = now - state.lastRefill;
+    if (elapsed <= 0) {
+      return;
+    }
+    const refillRate = rule.limit / rule.intervalMs;
+    const tokensToAdd = Math.floor(elapsed * refillRate);
+    if (tokensToAdd > 0) {
+      state.tokens = Math.min(rule.limit, state.tokens + tokensToAdd);
+      state.lastRefill = now;
+    }
+  }
+  async _acquireRateLimitToken(endpoint) {
+    const rule = this._getRateLimitRule(endpoint);
+    if (!rule) {
+      return;
+    }
+    let state = this.rateLimitState.get(endpoint);
+    if (!state) {
+      state = { tokens: rule.limit, lastRefill: Date.now() };
+      this.rateLimitState.set(endpoint, state);
+    }
+    this._refillRateLimitState(rule, state);
+    if (state.tokens >= 1) {
+      state.tokens -= 1;
+      this.rateLimitState.set(endpoint, state);
+      return;
+    }
+    const refillRate = rule.limit / rule.intervalMs;
+    const waitMs = Math.ceil((1 - state.tokens) / refillRate);
+    await delay(waitMs);
+    this._refillRateLimitState(rule, state);
+    state.tokens = Math.max(0, state.tokens - 1);
+    this.rateLimitState.set(endpoint, state);
   }
   async _executeFetch(endpoint, headers, bodyPayload) {
     const timeoutMs = this.config.timeout ?? 3e4;
     const maxRetries = this.config.maxRetries ?? 0;
     const retryDelayMs = this.config.retryDelayMs ?? 1e3;
     const url = `${this.baseUrl}${endpoint}`;
+    await this._acquireRateLimitToken(endpoint);
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -423,25 +543,28 @@ var PayWay = class {
           body: bodyPayload,
           signal: controller.signal
         });
+        const rateLimitInfo = parseRateLimitInfo(response.headers);
         const parsedBody = await parseResponseBody(response);
         if (typeof parsedBody === "string") {
           throw createJsonParseError(parsedBody, endpoint);
         }
         if (!response.ok) {
-          throw createHttpError(response, parsedBody, endpoint);
+          throw createHttpError(response, parsedBody, endpoint, rateLimitInfo);
         }
         checkResponseError(parsedBody, endpoint);
         try {
-          this.config.onResponse?.(endpoint, response.status, parsedBody);
+          this.config.onResponse?.(endpoint, response.status, parsedBody, rateLimitInfo);
         } catch {
         }
         return parsedBody;
       } catch (error) {
         clearTimeout(timeoutId);
         const paywayError = error instanceof PayWayAPIError ? error : createNetworkError(error, timeoutMs, endpoint);
-        const shouldRetry = attempt < maxRetries && (paywayError.statusCode === void 0 && !paywayError.paywayCode || paywayError.statusCode !== void 0 && paywayError.statusCode >= 500);
+        const isRateLimitError = paywayError.statusCode === 429 || paywayError.paywayCode === "429";
+        const shouldRetry = attempt < maxRetries && (isRateLimitError || paywayError.statusCode !== void 0 && paywayError.statusCode >= 500 || paywayError.retryable);
         if (shouldRetry) {
-          await delay(retryDelayMs * 2 ** attempt);
+          const waitMs = isRateLimitError && paywayError.rateLimitInfo?.retryAfterMs !== void 0 ? paywayError.rateLimitInfo.retryAfterMs : retryDelayMs * 2 ** attempt;
+          await delay(waitMs);
           continue;
         }
         throw paywayError;
@@ -574,6 +697,7 @@ var PayWay = class {
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency || "USD");
       validateCurrency(params.currency);
+      validateLifetime(params.lifetime);
       const time = formatRequestTime();
       const payload = filterParams({
         tran_id: params.transactionId,
@@ -948,6 +1072,10 @@ var PayWay = class {
      * @returns A promise resolving to the generated QR payload containing the QR code and image options.
      */
     generateQr: (params) => {
+      validateTransactionId(params.transactionId);
+      validatePositiveAmount(params.amount, params.currency || "USD");
+      validateCurrency(params.currency);
+      validatePublicHttpsUrl(params.callbackUrl, "callbackUrl");
       return this.request(
         ENDPOINTS.generateQr,
         filterParams({
