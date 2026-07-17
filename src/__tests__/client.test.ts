@@ -266,6 +266,58 @@ describe('checkResponseError (via API calls)', () => {
     });
   });
 
+  it('resolves successfully when response body is null (empty response)', async () => {
+    const nullBodyResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: () => Promise.resolve('null'),
+      headers: new Headers(),
+      redirected: false,
+      type: 'basic',
+      url: '',
+      clone: () => ({} as Response),
+      body: null,
+      bodyUsed: false,
+      json: () => Promise.resolve(null),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      blob: () => Promise.resolve(new Blob()),
+      formData: () => Promise.resolve(new FormData()),
+      bytes: () => Promise.resolve(new Uint8Array()),
+    } as Response;
+
+    fetchSpy.mockResolvedValueOnce(nullBodyResponse);
+
+    const result = await payway.checkout.checkTransaction('T-NULL');
+    expect(result).toBeNull();
+  });
+
+  it('resolves successfully when response body is empty string', async () => {
+    const emptyBodyResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: () => Promise.resolve(''),
+      headers: new Headers(),
+      redirected: false,
+      type: 'basic',
+      url: '',
+      clone: () => ({} as Response),
+      body: null,
+      bodyUsed: false,
+      json: () => Promise.resolve(null),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      blob: () => Promise.resolve(new Blob()),
+      formData: () => Promise.resolve(new FormData()),
+      bytes: () => Promise.resolve(new Uint8Array()),
+    } as Response;
+
+    fetchSpy.mockResolvedValueOnce(emptyBodyResponse);
+
+    const result = await payway.checkout.checkTransaction('T-EMPTY');
+    expect(result).toBeNull();
+  });
+
   it('returns gateway error details from plain object error shapes', async () => {
     const details = payway.getGatewayErrorDetails({
       status: { code: '6', message: 'Transaction not found' },
@@ -447,6 +499,53 @@ describe('checkout domain', () => {
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain(ENDPOINTS.closeTransaction);
+    });
+  });
+
+  describe('getTransactionDetail', () => {
+    it('sends POST to transaction-detail endpoint with correct HMAC fields', async () => {
+      const responseBody = {
+        status: { code: 0, message: 'Success' },
+        data: { tran_id: 'T001', amount: '15.00', status: '0' },
+      };
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse(responseBody));
+
+      const result = await payway.checkout.getTransactionDetail('T001');
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain(ENDPOINTS.getTransactionDetail);
+      expect(opts.method).toBe('POST');
+
+      const body = JSON.parse(opts.body);
+      expect(body).toHaveProperty('tran_id', 'T001');
+      expect(body).toHaveProperty('merchant_id', TEST_CONFIG.merchantId);
+      expect(body).toHaveProperty('req_time');
+      expect(body).toHaveProperty('hash');
+
+      const concat = `${body.req_time}${TEST_CONFIG.merchantId}T001`;
+      const expectedHash = crypto.createHmac('sha512', TEST_CONFIG.apiKey).update(concat).digest('base64');
+      expect(body.hash).toBe(expectedHash);
+
+      expect(result).toEqual(responseBody);
+    });
+
+    it('accepts optional requestTime parameter', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: 0 } }),
+      );
+
+      await payway.checkout.getTransactionDetail('T002', '20260716120000');
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(body.req_time).toBe('20260716120000');
+    });
+
+    it('respects the documented rate-limit rule (10/60s)', () => {
+      const rule = (payway as any).rateLimitRules?.[ENDPOINTS.getTransactionDetail];
+      expect(rule).toBeDefined();
+      expect(rule.limit).toBe(10);
+      expect(rule.intervalMs).toBe(60_000);
     });
   });
 
@@ -943,6 +1042,24 @@ describe('payout domain', () => {
     expect(url).toContain(ENDPOINTS.addBeneficiary);
     const body = JSON.parse(opts.body);
     expect(body).toHaveProperty('merchant_auth');
+  });
+
+  it('JSON-stringifies object custom_fields in the request body', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 0, message: 'OK' } }),
+    );
+
+    await payway.payout.payout({
+      transactionId: 'PO-CF-001',
+      amount: 100.0,
+      beneficiaries: [{ account: '000123456', amount: 100.0 }],
+      currency: 'USD',
+      customFields: { source: 'web', campaign: 'summer2026' },
+    });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body).toHaveProperty('custom_fields');
+    expect(body.custom_fields).toBe(JSON.stringify({ source: 'web', campaign: 'summer2026' }));
   });
 
   it('rejects payout when beneficiary amounts do not sum to total', async () => {

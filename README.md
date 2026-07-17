@@ -108,6 +108,20 @@ const paywayWithoutThrottling = new PayWay({
 });
 ```
 
+### Retry Configuration
+
+The SDK can automatically retry transient failures (HTTP 5xx and network errors) using exponential backoff. 4xx errors and PayWay business-logic errors are never retried.
+
+```typescript
+const paywayWithRetry = new PayWay({
+  merchantId: process.env.PAYWAY_MERCHANT_ID!,
+  apiKey: process.env.PAYWAY_API_KEY!,
+  environment: 'sandbox',
+  maxRetries: 3,         // Number of retry attempts (default: 0 = no retry)
+  retryDelayMs: 1000,    // Base delay in ms between retries (default: 1000, doubled each attempt)
+});
+```
+
 ### 2. Initiate Checkout (Server-Side)
 
 Prepare transaction parameters on the server to generate a secure transaction payload with an HMAC hash signature:

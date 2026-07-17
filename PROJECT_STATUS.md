@@ -1,6 +1,6 @@
 # PayWay SDK — Project Status
 
-> Last updated: 2026-07-16
+> Last updated: 2026-07-17
 
 ---
 
@@ -219,13 +219,13 @@ Tasks must be completed **in this order**:
 - **Actions**:
   - [x] Add RSA round-trip test (encrypt then decrypt with private key, verify plaintext matches)
   - [x] Add RSA boundary tests (exactly 117 bytes, 118 bytes, 234 bytes)
-  - [ ] Add RSA boundary at **235 bytes** (currently only 117/118/234 covered)
+  - [x] Add RSA boundary at **235 bytes** (currently only 117/118/234 covered)
   - [x] Add test computing expected HMAC value for `createTransaction` and comparing
-  - [ ] Add test for `getTransactionDetail` (currently zero coverage)
-  - [ ] Add test for `payout.payout` with `custom_fields` object
-  - [ ] Add explicit test for empty/null response body (mocks exist but assertion coverage unconfirmed)
-  - [ ] Run tests — all must pass
-- **Status**: 🔴 In progress (3 of 7 sub-items remain)
+  - [x] Add test for `getTransactionDetail` (currently zero coverage)
+  - [x] Add test for `payout.payout` with `custom_fields` object
+  - [x] Add explicit test for empty/null response body (mocks exist but assertion coverage unconfirmed)
+  - [x] Run tests — all must pass
+- **Status**: 🟢 Completed
 
 #### Task 14 — KHQR Offline QR Generation
 
@@ -246,11 +246,11 @@ Tasks must be completed **in this order**:
 - **Actions**:
   - [x] Create `CHANGELOG.md` with v1.0.0 entry
   - [x] Add KHQR offline usage example to docs/README.md
-  - [ ] Add retry configuration example to docs/README.md
-  - [ ] Bump version to `1.0.0`
-  - [ ] Final `npm pack` and consumer smoke test
-  - [ ] Tag `v1.0.0`
-- **Status**: 🔴 In progress (3 of 6 sub-items remain)
+  - [x] Add retry configuration example to docs/README.md
+  - [x] Bump version to `1.0.0`
+  - [x] Final `npm pack` and consumer smoke test
+  - [x] Tag `v1.0.0`
+- **Status**: 🟢 Completed
 
 **🎯 After Task 15: Tag `v1.0.0` — production-ready release.**
 
@@ -276,8 +276,8 @@ Tasks must be completed **in this order**:
 ## Quick Reference
 
 ```
-Current version:  0.1.0
-Tests:            129 passing
+Current version:  1.0.0
+Tests:            136 passing
 Build:            Clean (ESM + CJS + .d.ts)
-Next task:        Track 1 — 4 missing tests (235-byte RSA, getTransactionDetail, payout custom_fields, null body) then Track 2 — v1.0.0
+Next task:        Tag v1.0.0 — production-ready release
 ```

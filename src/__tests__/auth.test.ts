@@ -194,7 +194,7 @@ describe('encryptMerchantAuth', () => {
     expect(decrypted).toEqual(data);
   });
 
-  it.each([117, 118, 234])('handles JSON payload lengths of exactly %i bytes', (payloadLength) => {
+  it.each([117, 118, 234, 235])('handles JSON payload lengths of exactly %i bytes', (payloadLength) => {
     const { publicKey } = generateTestKeyPair();
     const data = buildPayloadWithLength(payloadLength);
     const jsonStr = JSON.stringify(data);

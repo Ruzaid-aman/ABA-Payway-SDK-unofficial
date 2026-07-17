@@ -1,6 +1,6 @@
 {
   "name": "aba-payway-ts",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Production-ready, fully-typed TypeScript SDK for the ABA PayWay payment gateway.",
   "license": "MIT",
   "author": "Your Name <email@example.com> (https://yourwebsite.com)",
