@@ -50,13 +50,13 @@ export interface PayWayConfig {
   rateLimitThrottling?: boolean; // Default: true for endpoints with documented limits
   rateLimitRules?: Record<string, RateLimitRule>;
   onRequest?: (endpoint: string, bodyPayload: string) => void;
-  onResponse?: (endpoint: string, statusCode: number, body: any, rateLimitInfo?: RateLimitInfo) => void;
+  onResponse?: (endpoint: string, statusCode: number, body: unknown, rateLimitInfo?: RateLimitInfo) => void;
 }
 
 export interface GatewayErrorDetails {
   code?: string | number;
   message?: string;
-  rawBody?: any;
+  rawBody?: unknown;
   statusCode?: number;
 }
 
@@ -77,12 +77,12 @@ export interface CreateTransactionParams {
   skipSuccessPage?: 0 | 1;
   continueSuccessUrl?: string;
   returnDeeplink?: string | { ios_scheme: string; android_scheme: string };
-  customFields?: string | Record<string, any>;
+  customFields?: string | Record<string, unknown>;
   returnParams?: string;
   viewType?: 'hosted_view' | 'popup';
   paymentGate?: number;
   payout?: string | { acc: string; amt: number }[];
-  additionalParams?: string | Record<string, any>;
+  additionalParams?: string | Record<string, unknown>;
   lifetime?: number;
   googlePayToken?: string;
 }
@@ -153,7 +153,7 @@ export interface PayoutParams {
   amount: number;
   beneficiaries: { account: string; amount: number }[];
   currency: Currency;
-  customFields?: string | Record<string, any>;
+  customFields?: string | Record<string, unknown>;
 }
 
 export interface UpdateBeneficiaryStatusParams {
@@ -176,14 +176,17 @@ export interface GetTransactionListParams {
   requestTime?: string;
 }
 
-function checkResponseError(body: any, endpoint?: string): void {
+function checkResponseError(body: unknown, endpoint?: string): void {
   if (!body || typeof body !== 'object') {
     return;
   }
 
-  if (body.status && typeof body.status === 'object') {
-    const code = String(body.status.code ?? '');
-    const message = body.status.message || 'Unknown PayWay API Error';
+  const resp = body as Record<string, unknown>;
+
+  if (resp.status && typeof resp.status === 'object') {
+    const statusObj = resp.status as Record<string, unknown>;
+    const code = String(statusObj.code ?? '');
+    const message = String(statusObj.message ?? 'Unknown PayWay API Error');
     if (code !== '0' && code !== '00' && code !== '') {
       throw new PayWayAPIError(message, {
         statusCode: 200,
@@ -194,11 +197,11 @@ function checkResponseError(body: any, endpoint?: string): void {
     }
   }
 
-  if (body.status && typeof body.status === 'string') {
-    const statusStr = body.status.toUpperCase();
+  if (typeof resp.status === 'string') {
+    const statusStr = resp.status.toUpperCase();
     if (statusStr === 'FAILED' || statusStr === 'ERROR') {
-      const code = body.code !== undefined ? String(body.code) : undefined;
-      const message = body.message || 'Unknown PayWay API Error';
+      const code = resp.code !== undefined ? String(resp.code) : undefined;
+      const message = String(resp.message ?? 'Unknown PayWay API Error');
       throw new PayWayAPIError(message, {
         statusCode: 200,
         paywayCode: code,
@@ -208,9 +211,9 @@ function checkResponseError(body: any, endpoint?: string): void {
     }
   }
 
-  if (body.code !== undefined && body.code !== null && typeof body.code !== 'object') {
-    const code = String(body.code);
-    const message = body.message || 'Unknown PayWay API Error';
+  if (resp.code !== undefined && resp.code !== null && typeof resp.code !== 'object') {
+    const code = String(resp.code);
+    const message = String(resp.message ?? 'Unknown PayWay API Error');
     if (code !== '0' && code !== '00') {
       throw new PayWayAPIError(message, {
         statusCode: 200,
@@ -222,11 +225,13 @@ function checkResponseError(body: any, endpoint?: string): void {
   }
 }
 
-function isAbortError(error: any): boolean {
-  return error?.name === 'AbortError' || error?.code === 'ABORT_ERR';
+function isAbortError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const e = error as { name?: string; code?: string };
+  return e.name === 'AbortError' || e.code === 'ABORT_ERR';
 }
 
-async function parseResponseBody(response: Response): Promise<any> {
+async function parseResponseBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) {
     return null;
@@ -239,12 +244,12 @@ async function parseResponseBody(response: Response): Promise<any> {
   }
 }
 
-function createHttpError(response: Response, rawBody: any, endpoint?: string, rateLimitInfo?: RateLimitInfo): PayWayAPIError {
+function createHttpError(response: Response, rawBody: unknown, endpoint?: string, rateLimitInfo?: RateLimitInfo): PayWayAPIError {
   return new PayWayAPIError(`HTTP Error: ${response.status} ${response.statusText}`, {
     statusCode: response.status,
     rawBody,
     endpoint,
-    rateLimitInfo,
+    rateLimitInfo: rateLimitInfo as Record<string, unknown>,
     retryable: response.status === 429,
   });
 }
@@ -256,7 +261,7 @@ function createJsonParseError(rawBody: string, endpoint?: string): PayWayAPIErro
   });
 }
 
-function createNetworkError(error: any, timeoutMs: number, endpoint?: string): PayWayAPIError {
+function createNetworkError(error: unknown, timeoutMs: number, endpoint?: string): PayWayAPIError {
   if (isAbortError(error)) {
     return new PayWayAPIError(`Request timed out after ${timeoutMs}ms`, {
       rawBody: error,
@@ -265,7 +270,10 @@ function createNetworkError(error: any, timeoutMs: number, endpoint?: string): P
     });
   }
 
-  return new PayWayAPIError(`Network error: ${error?.message ?? 'Unknown network failure'}`, {
+  const message = error !== null && typeof error === 'object'
+    ? String((error as { message?: unknown }).message ?? 'Unknown network failure')
+    : 'Unknown network failure';
+  return new PayWayAPIError(`Network error: ${message}`, {
     rawBody: error,
     endpoint,
     retryable: true,
@@ -481,7 +489,7 @@ export class PayWay {
         }
 
         return parsedBody as TResponse;
-      } catch (error: any) {
+      } catch (error) {
         clearTimeout(timeoutId);
 
         const paywayError = error instanceof PayWayAPIError ? error : createNetworkError(error, timeoutMs, endpoint);
@@ -491,9 +499,11 @@ export class PayWay {
           (isRateLimitError || (paywayError.statusCode !== undefined && paywayError.statusCode >= 500) || paywayError.retryable);
 
         if (shouldRetry) {
+          const rateLimitInfo = paywayError.rateLimitInfo as Record<string, unknown> | undefined;
+          const retryAfterMs = rateLimitInfo?.retryAfterMs;
           const waitMs =
-            (isRateLimitError && paywayError.rateLimitInfo?.retryAfterMs !== undefined)
-              ? paywayError.rateLimitInfo.retryAfterMs
+            (isRateLimitError && typeof retryAfterMs === 'number')
+              ? retryAfterMs
               : retryDelayMs * 2 ** attempt;
           await delay(waitMs);
           continue;
@@ -510,13 +520,13 @@ export class PayWay {
 
   private async request<TResponse>(
     path: string,
-    body: Record<string, any>,
+    body: Record<string, unknown>,
     hmacFields: string[],
     timeFieldName: 'req_time' | 'request_time' = 'req_time',
     contentType: 'application/json' | 'application/x-www-form-urlencoded' = 'application/json',
     hashEncoding: 'base64' | 'hex' = 'base64',
   ): Promise<TResponse> {
-    const fullBody: Record<string, any> = {
+    const fullBody: Record<string, unknown> = {
       ...body,
       merchant_id: this.config.merchantId,
     };
@@ -545,7 +555,7 @@ export class PayWay {
 
   private async requestWithMerchantAuth<TResponse>(
     path: string,
-    authPayload: Record<string, any>,
+    authPayload: Record<string, unknown>,
     options: {
       hmacFields?: string[];
       contentType?: 'application/json' | 'application/x-www-form-urlencoded';
@@ -564,7 +574,7 @@ export class PayWay {
       this.config.publicKeyPem,
     );
 
-    const body: Record<string, any> = {
+    const body: Record<string, unknown> = {
       merchant_id: this.config.merchantId,
       merchant_auth: merchantAuth,
       request_time: requestTime,
@@ -574,10 +584,18 @@ export class PayWay {
     body.hash = generateHmac(body, hmacFields, this.config.apiKey);
     const contentType = options.contentType ?? 'application/x-www-form-urlencoded';
 
-    const bodyPayload =
-      contentType === 'application/json'
-        ? JSON.stringify(body)
-        : new URLSearchParams(body).toString();
+    let bodyPayload: string;
+    if (contentType === 'application/json') {
+      bodyPayload = JSON.stringify(body);
+    } else {
+      const form = new URLSearchParams();
+      for (const [key, value] of Object.entries(body)) {
+        if (value !== undefined && value !== null) {
+          form.append(key, String(value));
+        }
+      }
+      bodyPayload = form.toString();
+    }
 
     return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload);
   }
@@ -589,7 +607,7 @@ export class PayWay {
    * @param signature - The signature/hash received from the PayWay callback headers/body.
    * @returns True if the signature is valid and authentic, false otherwise.
    */
-  public verifyCallback(body: Record<string, any>, signature: string): boolean {
+  public verifyCallback(body: Record<string, unknown>, signature: string): boolean {
     return verifyCallbackSignature(body, signature, this.config.apiKey);
   }
 
@@ -604,11 +622,12 @@ export class PayWay {
     }
 
     if (error && typeof error === 'object') {
-      const maybeError = error as Record<string, any>;
-      const rawBody = maybeError.rawBody ?? maybeError;
-      const code = rawBody?.status?.code ?? rawBody?.code ?? maybeError.paywayCode;
-      const message = rawBody?.status?.message ?? rawBody?.message ?? maybeError.message;
-      const statusCode = maybeError.statusCode;
+      const maybeError = error as Record<string, unknown>;
+      const rawBody = (maybeError.rawBody ?? maybeError) as Record<string, unknown>;
+      const statusObj = rawBody.status as Record<string, unknown> | undefined;
+      const code = statusObj?.code ?? rawBody.code ?? maybeError.paywayCode;
+      const message = statusObj?.message ?? rawBody.message ?? maybeError.message;
+      const statusCode = maybeError.statusCode as number | undefined;
 
       if (code !== undefined || message !== undefined || rawBody !== undefined) {
         return {
@@ -661,14 +680,14 @@ export class PayWay {
      * @param params.googlePayToken - Raw Google Pay authorization token.
      * @returns A signed object containing checkout transaction fields and a `hash` field.
      */
-    createTransaction: (params: CreateTransactionParams): Record<string, any> & { hash: string } => {
+    createTransaction: (params: CreateTransactionParams): Record<string, unknown> & { hash: string } => {
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency || 'USD');
       validateCurrency(params.currency);
       validateLifetime(params.lifetime);
 
       const time = formatRequestTime();
-      const payload: Record<string, any> = filterParams({
+      const payload: Record<string, unknown> = filterParams({
         tran_id: params.transactionId,
         amount: formatAmount(params.amount, params.currency || 'USD'),
         firstname: params.firstname,

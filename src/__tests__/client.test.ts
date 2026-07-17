@@ -32,7 +32,7 @@ const CONFIG_WITH_RSA = {
 };
 
 /** Create a mock Response that resolves to JSON. */
-function mockJsonResponse(body: any, status = 200, statusText = 'OK'): Response {
+function mockJsonResponse(body: unknown, status = 200, statusText = 'OK'): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -133,10 +133,11 @@ describe('checkResponseError (via API calls)', () => {
 
     try {
       await payway.checkout.checkTransaction('TX-NOTFOUND');
-    } catch (e: any) {
+    } catch (e) {
       expect(e).toBeInstanceOf(PayWayAPIError);
-      expect(e.message).toBe('Transaction not found');
-      expect(e.paywayCode).toBe('6');
+      const err = e as PayWayAPIError;
+      expect(err.message).toBe('Transaction not found');
+      expect(err.paywayCode).toBe('6');
     }
   });
 
@@ -542,10 +543,10 @@ describe('checkout domain', () => {
     });
 
     it('respects the documented rate-limit rule (10/60s)', () => {
-      const rule = (payway as any).rateLimitRules?.[ENDPOINTS.getTransactionDetail];
+      const rule = (payway as unknown as { rateLimitRules: Record<string, { limit: number; intervalMs: number }> }).rateLimitRules?.[ENDPOINTS.getTransactionDetail];
       expect(rule).toBeDefined();
-      expect(rule.limit).toBe(10);
-      expect(rule.intervalMs).toBe(60_000);
+      expect(rule?.limit).toBe(10);
+      expect(rule?.intervalMs).toBe(60_000);
     });
   });
 
@@ -696,7 +697,7 @@ describe('checkout domain', () => {
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain(ENDPOINTS.getExchangeRate);
-      expect((result as any).data.rate).toBe(4100);
+      expect((result as unknown as { data: { rate: number } }).data.rate).toBe(4100);
     });
   });
 });

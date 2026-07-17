@@ -130,7 +130,7 @@ function stripPkcs1Padding(buffer: Buffer): Buffer {
   return buffer.subarray(index + 1);
 }
 
-function decryptMerchantAuth(encryptedBase64: string, privateKey: string): any {
+function decryptMerchantAuth(encryptedBase64: string, privateKey: string): Record<string, unknown> {
   const encrypted = Buffer.from(encryptedBase64, 'base64');
   const chunkSize = 128;
   const decryptedChunks: Buffer[] = [];
@@ -249,7 +249,7 @@ describe('verifyCallbackSignature', () => {
   });
 
   it('handles null/undefined values as empty string', () => {
-    const body: Record<string, any> = { b: null, a: 'hello' };
+    const body: Record<string, unknown> = { b: null, a: 'hello' };
 
     // sorted keys: a, b → values: 'hello', '' → concat: 'hello'
     const expected = expectedHmac('hello', API_KEY);

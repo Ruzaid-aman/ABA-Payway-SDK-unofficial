@@ -17,14 +17,14 @@ export class PayWayConfigError extends PayWayError {
 export class PayWayAPIError extends PayWayError {
   public readonly statusCode?: number;
   public readonly paywayCode?: string;
-  public readonly rawBody?: any;
+  public readonly rawBody?: unknown;
   public readonly endpoint?: string;
   public readonly retryable?: boolean;
-  public readonly rateLimitInfo?: Record<string, any>;
+  public readonly rateLimitInfo?: Record<string, unknown>;
 
   constructor(
     message: string,
-    options?: { statusCode?: number; paywayCode?: string; rawBody?: any; endpoint?: string; retryable?: boolean; rateLimitInfo?: Record<string, any> },
+    options?: { statusCode?: number; paywayCode?: string; rawBody?: unknown; endpoint?: string; retryable?: boolean; rateLimitInfo?: Record<string, unknown> },
   ) {
     super(message);
     Object.setPrototypeOf(this, PayWayAPIError.prototype);
@@ -37,7 +37,7 @@ export class PayWayAPIError extends PayWayError {
     this.rateLimitInfo = options?.rateLimitInfo;
   }
 
-  public toJSON(): Record<string, any> {
+  public toJSON(): Record<string, unknown> {
     return {
       name: this.name,
       message: this.message,

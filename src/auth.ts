@@ -6,7 +6,7 @@ import * as crypto from 'node:crypto';
  * substituting empty string for undefined/null values.
  */
 export function generateHmac(
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   fieldList: string[],
   apiKey: string,
   encoding: 'base64' | 'hex' = 'base64',
@@ -29,7 +29,7 @@ export function generateHmac(
  * Plaintext is split into 117-byte chunks, each chunk is encrypted,
  * the encrypted chunks are concatenated, and the final buffer is Base64 encoded.
  */
-export function encryptMerchantAuth(data: Record<string, any>, publicKeyPem: string): string {
+export function encryptMerchantAuth(data: unknown, publicKeyPem: string): string {
   const jsonStr = JSON.stringify(data);
   const buffer = Buffer.from(jsonStr, 'utf8');
   const chunkSize = 117;
@@ -53,7 +53,7 @@ export function encryptMerchantAuth(data: Record<string, any>, publicKeyPem: str
 /**
  * Verifies a webhook signature using PayWay's sorted-key signature validation algorithm.
  */
-export function verifyCallbackSignature(body: Record<string, any>, receivedSignature: string, apiKey: string): boolean {
+export function verifyCallbackSignature(body: Record<string, unknown>, receivedSignature: string, apiKey: string): boolean {
   // Sort response keys ascending
   const sortedKeys = Object.keys(body).sort();
 

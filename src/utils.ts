@@ -97,7 +97,7 @@ export function toBase64(s: string): string {
   return Buffer.from(s, 'utf8').toString('base64');
 }
 
-export function encodeBase64IfNeeded(val: any): string {
+export function encodeBase64IfNeeded(val: unknown): string {
   if (typeof val === 'string') {
     if (val.startsWith('http://') || val.startsWith('https://')) {
       return toBase64(val);
@@ -107,8 +107,8 @@ export function encodeBase64IfNeeded(val: any): string {
   return toBase64(JSON.stringify(val));
 }
 
-export function filterParams<T extends Record<string, any>>(obj: T): Partial<T> {
-  const filtered: Record<string, any> = {};
+export function filterParams<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const filtered: Record<string, unknown> = {};
   for (const key of Object.keys(obj)) {
     if (obj[key] !== undefined && obj[key] !== null) {
       filtered[key] = obj[key];
