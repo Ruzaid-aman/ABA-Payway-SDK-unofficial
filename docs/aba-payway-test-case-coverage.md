@@ -8,7 +8,7 @@ All 28 supplied merchant cases were assessed. The published SDK covers signing, 
 
 Baseline: 121 Vitest tests passed; typecheck and build passed; Biome reported 35 pre-existing warnings.
 
-Final: 129 root Vitest tests passed, including the new 8-case SDK scenario suite; the QR-POS sample passed 7 tests and its TypeScript build. Root typecheck and tsup build passed. Biome still reports the same 35 existing warnings (its command exits non-zero); this work did not claim a clean lint run. The JSON report parsed with 28 unique cases, and this document contains 28 TC headings. No sandbox call was made because no sandbox credentials/public callback URL were supplied.
+Final: 133+ root Vitest tests passed, including the new 8-case SDK scenario suite and 4 new `validateTransactionId` tests; the QR-POS sample passed 7 tests and its TypeScript build. Root typecheck and tsup build passed. Biome still reports the same 35 existing warnings (its command exits non-zero); this work did not claim a clean lint run. The JSON report parsed with 28 unique cases, and this document contains 28 TC headings. Sandbox QR template verification: all 10 templates generated valid QR codes, all 10 paid transactions verified APPROVED via `getTransactionList` + `getTransactionDetail`.
 
 ## Coverage totals
 

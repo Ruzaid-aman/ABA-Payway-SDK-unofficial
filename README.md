@@ -61,14 +61,28 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 
 | Command | Description |
 |---|---|
+| `payway-sdk init` | Initialize PayWay integration in the current project |
+| `payway-sdk doctor` | Validate environment configuration and connectivity |
 | `payway-sdk test` | Run the sandbox test suite (default) |
 | `payway-sdk demo` | Run the test suite with pass/fail output |
+| `payway-sdk status` | Display payment status codes and refund error codes reference |
+| `payway-sdk validate` | Validate a refund amount or transaction ID locally |
+| `payway-sdk generate-qr` | Generate a QR code (online via PayWay API or offline) |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
 | `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |
 | `payway-sdk skills list` | Show installed skills per agent |
 | `payway-sdk skills doctor` | Verify installation health for all agents |
 | `payway-sdk --help` | Show usage guide |
 | `payway-sdk --version` | Print SDK version |
+
+### Sandbox test scripts
+
+| Script | Description |
+|---|---|
+| `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 10 PayWay templates at a given amount, save PNG images + QR strings to `test-logs/qr-images/` |
+| `npx tsx scripts/check-qr-transactions.ts` | Fetch recent transactions via `getTransactionList`, query detail for each via `getTransactionDetail`, save results to JSON |
+| `npx tsx scripts/sandbox-probe.ts` | Run full sandbox probe across all 7 API domains |
+| `npx tsx scripts/sandbox-probe-qr-api.ts` | Probe QR API endpoint specifically |
 
 ## Quick Start
 
@@ -395,9 +409,113 @@ const txs = await payway.khqr.getTransactionsByMerchantRef('mc-ref-9988');
 
 ---
 
+## Payment Status Codes
+
+The SDK exports named constants for the numeric payment status codes returned by `checkTransaction`, `getTransactionDetail`, and `getTransactionList`. Use these instead of raw numbers:
+
+```typescript
+import { PAYMENT_STATUS_CODES, PAYMENT_STATUS_LABELS } from 'aba-payway-ts';
+
+const result = await payway.checkout.checkTransaction('order-123');
+const code = result.data?.payment_status_code;
+
+if (code === PAYMENT_STATUS_CODES.APPROVED) {
+  console.log('Payment succeeded');
+} else if (code === PAYMENT_STATUS_CODES.PENDING) {
+  console.log('Payment still processing');
+} else if (code === PAYMENT_STATUS_CODES.DECLINED) {
+  console.log('Payment declined');
+} else if (code === PAYMENT_STATUS_CODES.REFUNDED) {
+  console.log('Payment was refunded');
+} else if (code === PAYMENT_STATUS_CODES.CANCELLED) {
+  console.log('Payment was cancelled');
+}
+
+// Get human-readable label from code
+const label = PAYMENT_STATUS_LABELS[code ?? -1]; // "APPROVED", "PENDING", etc.
+```
+
+| Code | Constant | Label |
+|---|---|---|
+| `0` | `PAYMENT_STATUS_CODES.APPROVED` | Approved |
+| `2` | `PAYMENT_STATUS_CODES.PENDING` | Pending |
+| `3` | `PAYMENT_STATUS_CODES.DECLINED` | Declined |
+| `4` | `PAYMENT_STATUS_CODES.REFUNDED` | Refunded |
+| `7` | `PAYMENT_STATUS_CODES.CANCELLED` | Cancelled |
+
+> ℹ️ Code `0` is shared by both `APPROVED` and `PRE_AUTH`. Distinguish via the `payment_status` string field or transaction context.
+
+You can also use the CLI to view all codes:
+
+```bash
+payway-sdk status
+```
+
+---
+
+## Refund Validation
+
+The SDK validates refund amounts client-side before making an API call. This prevents wasted network round-trips for amounts that PayWay will reject:
+
+```typescript
+import { validateRefundAmount } from 'aba-payway-ts';
+
+// USD — minimum $0.01, max 2 decimal places
+validateRefundAmount(0.005, 'USD'); // throws: "Refund amount must be at least $0.01 for USD"
+validateRefundAmount(0.01, 'USD');  // ok
+
+// KHR — minimum 1 KHR, integer only
+validateRefundAmount(0.5, 'KHR');   // throws: "Refund amount must be at least 1 KHR"
+validateRefundAmount(1, 'KHR');     // ok
+```
+
+The `refund()` method performs this validation automatically:
+
+```typescript
+const refund = await payway.checkout.refund('order-123', 0.01, 'USD');
+```
+
+You can also validate amounts from the CLI:
+
+```bash
+payway-sdk validate --amount 0.005 --currency USD
+# ✗ Refund amount: Refund amount must be at least $0.01 for USD
+
+payway-sdk validate --amount 0.01 --currency USD
+# ✓ Refund amount: 0.01 USD — valid
+```
+
+### Refund Error Codes
+
+The SDK exports named constants for refund-specific error codes returned by PayWay:
+
+```typescript
+import { REFUND_ERROR_CODES } from 'aba-payway-ts';
+
+if (error.paywayCode === REFUND_ERROR_CODES.PARAMETER_VALIDATION) {
+  console.error('Check refund amount constraints');
+} else if (error.paywayCode === REFUND_ERROR_CODES.REFUND_EXCEEDS_ORIGINAL) {
+  console.error('Refund amount is larger than original payment');
+} else if (error.paywayCode === REFUND_ERROR_CODES.INSUFFICIENT_BALANCE) {
+  console.error('Merchant account has insufficient balance');
+}
+```
+
+| Code | Constant | Meaning |
+|---|---|---|
+| `PTL02` | `REFUND_ERROR_CODES.INVALID_HASH` | Invalid HMAC signature |
+| `PTL04` | `REFUND_ERROR_CODES.PARAMETER_VALIDATION` | Refund amount below minimum or invalid format |
+| `PTL37` | `REFUND_ERROR_CODES.REFUND_EXCEEDS_ORIGINAL` | Refund amount exceeds original transaction |
+| `PTL57` | `REFUND_ERROR_CODES.UNABLE_TO_REFUND` | Refund cannot be processed |
+| `PTL58` | `REFUND_ERROR_CODES.REFUND_FAILED` | Refund failed |
+| `PTL168` | `REFUND_ERROR_CODES.CONCURRENT_REJECTED` | Concurrent refund request rejected |
+| `PTL181` | `REFUND_ERROR_CODES.INSUFFICIENT_BALANCE` | Insufficient merchant balance |
+
+---
+
 ## Error Handling
 
-All SDK API failures throw a structured `PayWayAPIError` (or `PayWayConfigError` for local configuration mistakes).
+All SDK API failures throw a structured error with a `type` field for easy discrimination:
 
 ```typescript
 import { PayWayAPIError, PayWayBusinessError, PayWayNetworkError, PayWayRateLimitError } from 'aba-payway-ts';
@@ -412,14 +530,27 @@ try {
   } else if (error instanceof PayWayBusinessError) {
     console.error('Business error from PayWay:', error.paywayCode, error.message);
   } else if (error instanceof PayWayAPIError) {
-    console.error('API Error Code:', error.paywayCode); // Internal PayWay code (e.g. "1" for wrong hash)
-    console.error('HTTP Status:', error.statusCode);    // HTTP Status code (e.g. 403)
-    console.error('Details:', error.rawBody);           // Complete JSON response body
+    console.error('API Error Code:', error.paywayCode); // PayWay code (e.g. "1", "PTL04")
+    console.error('HTTP Status:', error.statusCode);     // HTTP status (e.g. 400, 403)
+    console.error('Details:', error.rawBody);            // Complete JSON response body
   } else {
     console.error('System or unexpected failure:', error);
   }
 }
 ```
+
+> ℹ️ PayWay-specific error codes (like `PTL04` for refund validation) are extracted from HTTP error responses automatically. Previously these were buried in `rawBody`; now they appear in `error.paywayCode` for easy programmatic handling.
+
+### Error Type Reference
+
+| `instanceof` | `error.type` | When thrown | Retryable? |
+|---|---|---|---|
+| `PayWayConfigError` | `config_error` | Invalid constructor options or missing required fields | No — fix your config |
+| `PayWayBusinessError` | `business_error` | PayWay returned a business-logic error (wrong hash, invalid merchant, etc.) | No |
+| `PayWayRateLimitError` | `rate_limit_error` | HTTP 429 or PayWay rate limit hit | Yes — SDK retries automatically |
+| `PayWayNetworkError` | `network_error` | DNS failure, timeout, connection reset | Yes — SDK retries automatically |
+| `PayWaySignatureError` | `signature_error` | Webhook HMAC signature verification failed | No — check your API key |
+| `PayWayAPIError` | `api_error` | Catch-all for other API errors | Depends on `error.retryable` |
 
 ---
 

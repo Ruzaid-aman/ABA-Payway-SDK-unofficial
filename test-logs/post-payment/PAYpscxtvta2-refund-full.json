@@ -1,0 +1,11 @@
+{
+  "grand_total": 0.01,
+  "total_refunded": 0.01,
+  "currency": "USD",
+  "transaction_status": "REFUNDED",
+  "status": {
+    "code": "00",
+    "message": "Success!",
+    "tran_id": "PAYpscxtvta2"
+  }
+}

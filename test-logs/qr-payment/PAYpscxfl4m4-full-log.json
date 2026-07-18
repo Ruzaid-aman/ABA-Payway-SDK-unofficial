@@ -1,0 +1,1281 @@
+{
+  "test": {
+    "transactionId": "PAYpscxfl4m4",
+    "transactionId2": "PAYpscxtvta2",
+    "amount": 0.01,
+    "currency": "USD",
+    "template": "template2_color",
+    "lifetime": 600
+  },
+  "requests": [
+    {
+      "ts": "2026-07-18T03:07:00.036Z",
+      "endpoint": "/api/payment-gateway/v1/payments/generate-qr",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "amount": "0.01",
+        "purchase_type": "purchase",
+        "payment_option": "abapay_khqr",
+        "callback_url": "aHR0cHM6Ly93ZWJob29rLnNpdGUvNTFiYzIwMDQtOWZjZi00MjhiLTk3ZDQtNmVkNTRlMGJhNDBl",
+        "currency": "USD",
+        "qr_image_template": "template2_color",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030700",
+        "hash": "nkUS89xgvXMpbP0hrnnRDzSPR/2h6O2sC+O2171nRSKeGY/Pgy/6I4zn9QrYPkqlEPT6m3kj+xvrfqO4D1z/cw=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:00.547Z",
+      "endpoint": "/api/payment-gateway/v1/payments/purchase",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "amount": "0.01",
+        "type": "purchase",
+        "payment_option": "abapay_khqr",
+        "currency": "USD",
+        "lifetime": 600,
+        "req_time": "20260718030700",
+        "merchant_id": "ec476910",
+        "hash": "mqTUSdG8DwnSib/6oiZtC/XfjpJlGi+CeCaOpb1OUyV7pbUppdyGf0Yo/Xm7SRk6xc405DqgccGPyBgZvXTrVQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:00.716Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030700",
+        "hash": "Qz8LzkRsKw4jOwyoE84YcZPWKWtuF7ZrxcVndw9yAKgw+W4W/BGIuKgPakGiuHjxbZGgg6AqgnC3xLUoCXsjDQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:00.842Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030700",
+        "hash": "ZhgYgdwA1AeeRKNzr+ZzAn8H7qPFR8eQ34o2zy1PoMhrslGIqv5+OU8bKnziUOjYiP9t2OhDQaULVQ+4bzUnnA=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:05.972Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030705",
+        "hash": "9S+GS+cvGi5S0bYiCeRprmVINlUAhW+H6r/nswgbhmouwRfIQ+rERvk7hs9qwG7T4Eco2wAdaZqz/uK6zglMqA=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:06.207Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030706",
+        "hash": "ksbqQGb7P3XnZ1pkuRLSLd3rRnaHH3Sml92gXQ03rfJXs7dlF6kfspXvMoAPwnTSAWSYk92JX9/WQxeSU6aQGQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:11.339Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030711",
+        "hash": "9VfhH/lkMQgb+gzJWRxDx18q8H0Rjq1WbQkubUeiYCukcraItq7pY+sDnTFroyIuUCTEVqCL3Jl6iPFfuuQFPQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:11.575Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030711",
+        "hash": "Bz1tVZih3hcYd9930/EkTrt6I2C6AlGsIqThnxKeHmKGdRVo1UcmK0BwDODiG3zNNxE19wVHBUIGn3X1nFqbuQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:16.706Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030716",
+        "hash": "JdFK4LCq67wjkOK/7E+3k9Sny94wSnSLWo0jwpTe1A16YFYr4w4BPeGpb84o4ZCT8mGjq8xDXwdorWGeDd89pg=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:16.940Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030716",
+        "hash": "PlXJso0GQ7IOvvKpYu8yAVCr+156rfJlW4ztpGeuThvOLajCden7uFg7Uw7i14oXvwbuOX9OPCuTac7zHzH1Ow=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:22.070Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030722",
+        "hash": "wqrG1shqLNBV0H5wrIfq4ABT9akoGnm1lGKVyPsXUCs6AEFJfei6zSNJIxOtijdQv5/v6pSbPZNKrnNx+fE58A=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:22.309Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030722",
+        "hash": "dyXMEWnqFTejNVcMxi/HkoJmnsyqe/laIFzCm4Kn/tD/ONTj6+xflACSWhfiy8hoHpEyNEYrgdxPUPjoWz658A=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:27.437Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030727",
+        "hash": "uivXKWlRuZJczfe04nB/Nk4EyOOI/5zWYe9YfbRHzo6UINliiFx7fuj1Kqq2adxa02vBV56HMuxeGDT7ugtaBA=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:27.827Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030727",
+        "hash": "Y1n6a9/5RDa0JbX2NLgR5/bdfwqgxMREkO9yIzWJWSRPFISTA7/ifLr0G1EROPb0p6yOl+YlE8sObrznDejDpw=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:32.953Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030732",
+        "hash": "0X2uWJ+2k8Clk6jUzk87fK+dF4QmHBcRCW0dnbrZNqkajxWM58by/waU2DYan1K5TK5I2NAHMaB594GboII0Jg=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:33.197Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030733",
+        "hash": "zR3vT0h+avC+tRzIm1sy98Jhz1yPA/1gBaQz95ssJZeWr6VRig2TnzIGRUUvaB6v/BSGhbPtH0eiqjGi7HtUKQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:38.337Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030738",
+        "hash": "5HWwUqHue4qPfhyDX++c8Cz+eKz3zcRokhn925PPbxxYy3pWgXLmFcwHAAFyRjDnC5Y18FavyIGV/sN7nUgRVw=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:38.579Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030738",
+        "hash": "mIFuZdkECe835RcfROp13K64/zBTEfvLO50/8lkA6sSF7XM7gWjcRxC7e/QduYUBL9y15cUVrijVG/J7H0uh8Q=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:43.703Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030743",
+        "hash": "m5btAVxLz6+3yMVNApYLypZzw547Qd44VB2/jaIjMeRyjYfZi8vbrS3oWFNdheRgnHoz4OoGxv/RvVHrdUks4A=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:43.940Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030743",
+        "hash": "vyvkvQyxhSGqTMS6vUC2OfGRxu+nCb0cElF5HuCI7wTYC/DzBgCXYpJ5t6/LxaNhwfaQ3IlN6xXBeTg09g9jUA=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:49.060Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030749",
+        "hash": "u5xi2LXjZxPqxVLkSeCx9rzL25t6Hi4Lt+tY0jkPAMH6oLvlK50S2qXUEb8RE88WqiU1cbKd+rgdF1WMvm1BYQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:49.292Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030749",
+        "hash": "gjk1iOEx6RD9f+uw3jpl7vrzfx/ayFUt6GmeW1So2XhpZXq0n4oIVaf4MvwOSollPQn2KM2Hf/6HQDPsRpvNwA=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:54.420Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030754",
+        "hash": "FF/xmoLDTVvt3Sxd+XX0IfmteOVqkAhSaDxBLt2RcMXWncqiUna4/E/w08xYADqhd1Vt1VdZKG8JNTYcBpxDpw=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:54.659Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030754",
+        "hash": "OTkRc1ieDLKbFU+VcaREGWsmWpf9y1qsI8FrJeSwnDBhCh4WK9KjIbKvNGZZi1ZEmBNtKkMJX/LV976gi7I6yA=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:07:59.785Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030759",
+        "hash": "h06ND68u2iVI3h9CvovjD7wJOeisoQx9YSHhayEsJh5Yuw7T6mYI4SbSEA34ji1Y0zpPJ2L/nIn5V7hiDVfsQg=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:08:00.062Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030800",
+        "hash": "VQZTWBStjslk6L91z3LwDAnyS/F9GDPwBBcQbiRLrFPYGHjyBl5QBw+NUpfnSmRJbWrCXdy5w4aq6zxgqSz8Jg=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:08:05.203Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030805",
+        "hash": "Ruv3kwOMQ7lj+K9VPTqfZQKa4SaxMHzHuZrVcSNuy/8XR3I/30X73dvZJLk5HGQdBhtLtaV8xtokNI7Qh2cJSg=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:08:05.445Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030805",
+        "hash": "LZUgdQRqyVTV4+F/jfsU/IXDPYszjcWE0TPAT8818ZnTqQCX054NR7bggsAnUKKOhVk/BNsSE/SA6Au+Y4cqzQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:08:10.580Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030810",
+        "hash": "MgoHC4jKnEeBKB9K60+tMjEiEV74OUAEybd4T/OBUOUSi+GJ7uE1jpu5XfTUZKWeblYE/JPFSpHtA4TBCHpYnQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:08:15.830Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030815",
+        "hash": "DLzzA+czHkbbIGBLtFnyNL5Mp3/I9HmnhdGzEsKms6u7FzDiusjBmeGL0dXKmKOVuXnkwiJ9CN82owwIi8ZaCg=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:08:21.069Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718030821",
+        "hash": "mQtnYOIUfKEYvHxOvHOiR0X1No7jq1gCWmBkYgJ+Xski3GvjBd8R0vlrV5wov3U4MIyn0hVXETBui/4uFMwkpw=="
+      }
+    }
+  ],
+  "responses": [
+    {
+      "ts": "2026-07-18T03:07:00.540Z",
+      "endpoint": "/api/payment-gateway/v1/payments/generate-qr",
+      "status": 200,
+      "body": {
+        "qrString": "00020101021230510016abaakhppxxx@abaa01151111111111111110208ABA Bank52045999530384054040.015802KH5910ehanson25960006227050701276640712PAYpscxfl4m49975001317843440228910113178693602296967170013F1BF016411FDA6804PQRA6908purchase6304F773",
+        "qrImage": "data:image/png;base64,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",
+        "abapay_deeplink": "abamobilebank://ababank.com?type=payway&qrcode=00020101021230510016abaakhppxxx%40abaa01151111111111111110208ABA+Bank52045999530384054040.015802KH5910ehanson25960006227050701276640712PAYpscxfl4m49975001317843440228910113178693602296967170013F1BF016411FDA6804PQRA6908purchase6304F773",
+        "app_store": "https://itunes.apple.com/al/app/aba-mobile-bank/id968860649?mt=8",
+        "play_store": "https://play.google.com/store/apps/details?id=com.paygo24.ibank",
+        "amount": 0.01,
+        "currency": "USD",
+        "status": {
+          "code": "0",
+          "message": "Success.",
+          "tran_id": "PAYpscxfl4m4",
+          "lang": "en",
+          "trace_id": "1c36d9cc40eeec4a5599ddad097ff5a0"
+        }
+      },
+      "durationMs": 504
+    },
+    {
+      "ts": "2026-07-18T03:07:00.712Z",
+      "endpoint": "/api/payment-gateway/v1/payments/purchase",
+      "status": 200,
+      "body": {
+        "qrString": "00020101021230510016abaakhppxxx@abaa01151111111111111110208ABA Bank52045999530384054040.015802KH5910ehanson25960006227050701276640712PAYpscxtvta29975001317843440229010113178438002277967170013F1BF016411FDA6804PONL6908purchase6304FE60",
+        "qrImage": "data:image/png;base64,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",
+        "abapay_deeplink": "abamobilebank://ababank.com?type=payway&qrcode=00020101021230510016abaakhppxxx%40abaa01151111111111111110208ABA+Bank52045999530384054040.015802KH5910ehanson25960006227050701276640712PAYpscxtvta29975001317843440229010113178438002277967170013F1BF016411FDA6804PONL6908purchase6304FE60",
+        "app_store": "https://itunes.apple.com/al/app/aba-mobile-bank/id968860649?mt=8",
+        "play_store": "https://play.google.com/store/apps/details?id=com.paygo24.ibank",
+        "description": "success",
+        "status": {
+          "version": "v3",
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2",
+          "lang": "en",
+          "trace_id": "85aa2716e53f79950c0850f56430a52b"
+        }
+      },
+      "durationMs": 165
+    },
+    {
+      "ts": "2026-07-18T03:07:00.841Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 125
+    },
+    {
+      "ts": "2026-07-18T03:07:06.206Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 234
+    },
+    {
+      "ts": "2026-07-18T03:07:06.329Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 122
+    },
+    {
+      "ts": "2026-07-18T03:07:11.574Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 235
+    },
+    {
+      "ts": "2026-07-18T03:07:11.696Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 121
+    },
+    {
+      "ts": "2026-07-18T03:07:16.939Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 233
+    },
+    {
+      "ts": "2026-07-18T03:07:17.060Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 120
+    },
+    {
+      "ts": "2026-07-18T03:07:22.308Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 238
+    },
+    {
+      "ts": "2026-07-18T03:07:22.430Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 121
+    },
+    {
+      "ts": "2026-07-18T03:07:27.826Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 389
+    },
+    {
+      "ts": "2026-07-18T03:07:27.945Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 118
+    },
+    {
+      "ts": "2026-07-18T03:07:33.196Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 243
+    },
+    {
+      "ts": "2026-07-18T03:07:33.322Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 125
+    },
+    {
+      "ts": "2026-07-18T03:07:38.579Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 242
+    },
+    {
+      "ts": "2026-07-18T03:07:38.702Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 123
+    },
+    {
+      "ts": "2026-07-18T03:07:43.939Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 236
+    },
+    {
+      "ts": "2026-07-18T03:07:44.061Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 121
+    },
+    {
+      "ts": "2026-07-18T03:07:49.292Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 232
+    },
+    {
+      "ts": "2026-07-18T03:07:49.413Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 121
+    },
+    {
+      "ts": "2026-07-18T03:07:54.658Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 238
+    },
+    {
+      "ts": "2026-07-18T03:07:54.779Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 120
+    },
+    {
+      "ts": "2026-07-18T03:08:00.062Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 277
+    },
+    {
+      "ts": "2026-07-18T03:08:00.192Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 130
+    },
+    {
+      "ts": "2026-07-18T03:08:05.444Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 0,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "apv": "649450",
+          "payment_status": "APPROVED",
+          "transaction_date": "2026-07-18 10:08:06"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 241
+    },
+    {
+      "ts": "2026-07-18T03:08:05.570Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 125
+    },
+    {
+      "ts": "2026-07-18T03:08:10.823Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 243
+    },
+    {
+      "ts": "2026-07-18T03:08:16.059Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 2,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0,
+          "payment_currency": "",
+          "apv": "",
+          "payment_status": "PENDING",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 229
+    },
+    {
+      "ts": "2026-07-18T03:08:21.302Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 0,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "apv": "854283",
+          "payment_status": "APPROVED",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 233
+    }
+  ],
+  "polling": [
+    {
+      "txId": "PAYpscxfl4m4",
+      "source": "qr.generateQr",
+      "attempts": 13,
+      "finalStatus": "APPROVED",
+      "history": [
+        {
+          "attempt": 1,
+          "status": "PENDING",
+          "durationMs": 125,
+          "timestamp": "2026-07-18T03:07:00.841Z"
+        },
+        {
+          "attempt": 2,
+          "status": "PENDING",
+          "durationMs": 234,
+          "timestamp": "2026-07-18T03:07:06.207Z"
+        },
+        {
+          "attempt": 3,
+          "status": "PENDING",
+          "durationMs": 235,
+          "timestamp": "2026-07-18T03:07:11.575Z"
+        },
+        {
+          "attempt": 4,
+          "status": "PENDING",
+          "durationMs": 235,
+          "timestamp": "2026-07-18T03:07:16.940Z"
+        },
+        {
+          "attempt": 5,
+          "status": "PENDING",
+          "durationMs": 239,
+          "timestamp": "2026-07-18T03:07:22.309Z"
+        },
+        {
+          "attempt": 6,
+          "status": "PENDING",
+          "durationMs": 389,
+          "timestamp": "2026-07-18T03:07:27.827Z"
+        },
+        {
+          "attempt": 7,
+          "status": "PENDING",
+          "durationMs": 244,
+          "timestamp": "2026-07-18T03:07:33.197Z"
+        },
+        {
+          "attempt": 8,
+          "status": "PENDING",
+          "durationMs": 242,
+          "timestamp": "2026-07-18T03:07:38.579Z"
+        },
+        {
+          "attempt": 9,
+          "status": "PENDING",
+          "durationMs": 237,
+          "timestamp": "2026-07-18T03:07:43.939Z"
+        },
+        {
+          "attempt": 10,
+          "status": "PENDING",
+          "durationMs": 232,
+          "timestamp": "2026-07-18T03:07:49.292Z"
+        },
+        {
+          "attempt": 11,
+          "status": "PENDING",
+          "durationMs": 239,
+          "timestamp": "2026-07-18T03:07:54.659Z"
+        },
+        {
+          "attempt": 12,
+          "status": "PENDING",
+          "durationMs": 277,
+          "timestamp": "2026-07-18T03:08:00.062Z"
+        },
+        {
+          "attempt": 13,
+          "status": "APPROVED",
+          "durationMs": 242,
+          "timestamp": "2026-07-18T03:08:05.445Z"
+        }
+      ]
+    },
+    {
+      "txId": "PAYpscxtvta2",
+      "source": "checkout.purchase",
+      "attempts": 16,
+      "finalStatus": "APPROVED",
+      "history": [
+        {
+          "attempt": 2,
+          "status": "PENDING",
+          "durationMs": 122,
+          "timestamp": "2026-07-18T03:07:06.329Z"
+        },
+        {
+          "attempt": 3,
+          "status": "PENDING",
+          "durationMs": 121,
+          "timestamp": "2026-07-18T03:07:11.696Z"
+        },
+        {
+          "attempt": 4,
+          "status": "PENDING",
+          "durationMs": 120,
+          "timestamp": "2026-07-18T03:07:17.060Z"
+        },
+        {
+          "attempt": 5,
+          "status": "PENDING",
+          "durationMs": 121,
+          "timestamp": "2026-07-18T03:07:22.430Z"
+        },
+        {
+          "attempt": 6,
+          "status": "PENDING",
+          "durationMs": 119,
+          "timestamp": "2026-07-18T03:07:27.946Z"
+        },
+        {
+          "attempt": 7,
+          "status": "PENDING",
+          "durationMs": 126,
+          "timestamp": "2026-07-18T03:07:33.323Z"
+        },
+        {
+          "attempt": 8,
+          "status": "PENDING",
+          "durationMs": 124,
+          "timestamp": "2026-07-18T03:07:38.703Z"
+        },
+        {
+          "attempt": 9,
+          "status": "PENDING",
+          "durationMs": 122,
+          "timestamp": "2026-07-18T03:07:44.061Z"
+        },
+        {
+          "attempt": 10,
+          "status": "PENDING",
+          "durationMs": 121,
+          "timestamp": "2026-07-18T03:07:49.413Z"
+        },
+        {
+          "attempt": 11,
+          "status": "PENDING",
+          "durationMs": 120,
+          "timestamp": "2026-07-18T03:07:54.779Z"
+        },
+        {
+          "attempt": 12,
+          "status": "PENDING",
+          "durationMs": 130,
+          "timestamp": "2026-07-18T03:08:00.193Z"
+        },
+        {
+          "attempt": 13,
+          "status": "PENDING",
+          "durationMs": 125,
+          "timestamp": "2026-07-18T03:08:05.571Z"
+        },
+        {
+          "attempt": 14,
+          "status": "PENDING",
+          "durationMs": 244,
+          "timestamp": "2026-07-18T03:08:10.823Z"
+        },
+        {
+          "attempt": 15,
+          "status": "PENDING",
+          "durationMs": 230,
+          "timestamp": "2026-07-18T03:08:16.060Z"
+        },
+        {
+          "attempt": 16,
+          "status": "APPROVED",
+          "durationMs": 234,
+          "timestamp": "2026-07-18T03:08:21.302Z"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "elapsedSeconds": 80.6,
+    "pollAttempts": 16,
+    "finalStatuses": [
+      {
+        "txId": "PAYpscxfl4m4",
+        "source": "qr.generateQr",
+        "status": "APPROVED"
+      },
+      {
+        "txId": "PAYpscxtvta2",
+        "source": "checkout.purchase",
+        "status": "APPROVED"
+      }
+    ]
+  }
+}

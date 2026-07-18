@@ -33,6 +33,14 @@ export {
   PayWaySignatureError,
 } from './errors.js';
 
+export {
+  PAYMENT_STATUS_CODES,
+  PAYMENT_STATUS_LABELS,
+  REFUND_ERROR_CODES,
+} from './constants.js';
+
+export { validateRefundAmount } from './utils.js';
+
 export type { CheckoutDomain } from './domains/checkout.js';
 
 export type { CredentialsOnFileDomain } from './domains/credentials-on-file.js';

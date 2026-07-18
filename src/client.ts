@@ -269,9 +269,26 @@ function createHttpError(
   rateLimitInfo?: RateLimitInfo,
 ): PayWayAPIError {
   const message = `HTTP Error: ${response.status} ${response.statusText}`;
+
+  // Extract PayWay-specific error details from the response body.
+  // PayWay often wraps business errors in non-200 HTTP responses (e.g. HTTP 400
+  // with PTL04 for refund validation, HTTP 403 with PTL36 for permission errors).
+  // Without this extraction, the paywayCode and description are buried in rawBody.
+  let extractedCode: string | undefined;
+  let extractedMessage: string | undefined;
+  if (rawBody && typeof rawBody === 'object') {
+    const body = rawBody as Record<string, unknown>;
+    const status = body.status as Record<string, unknown> | undefined;
+    if (status && typeof status.code === 'string' && status.code !== '0' && status.code !== '00') {
+      extractedCode = status.code;
+      extractedMessage = typeof status.message === 'string' ? status.message : undefined;
+    }
+  }
+
   if (response.status === 429) {
-    return new PayWayRateLimitError(message, {
+    return new PayWayRateLimitError(extractedMessage ?? message, {
       statusCode: response.status,
+      paywayCode: extractedCode,
       rawBody,
       endpoint,
       rateLimitInfo: rateLimitInfo as Record<string, unknown>,
@@ -279,11 +296,11 @@ function createHttpError(
     });
   }
 
-  return new PayWayAPIError(message, {
+  return new PayWayAPIError(extractedMessage ? `${message}: ${extractedMessage}` : message, {
     statusCode: response.status,
+    paywayCode: extractedCode,
     rawBody,
     endpoint,
-    rateLimitInfo: rateLimitInfo as Record<string, unknown>,
     retryable: response.status >= 500,
   });
 }

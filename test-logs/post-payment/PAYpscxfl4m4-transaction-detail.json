@@ -1,0 +1,38 @@
+{
+  "data": {
+    "transaction_id": "PAYpscxfl4m4",
+    "payment_status_code": 0,
+    "payment_status": "APPROVED",
+    "original_amount": 0.01,
+    "original_currency": "USD",
+    "payment_amount": 0.01,
+    "payment_currency": "USD",
+    "total_amount": 0.01,
+    "refund_amount": 0,
+    "discount_amount": 0,
+    "apv": "649450",
+    "transaction_date": "2026-07-18 10:08:06",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "phone": "",
+    "bank_ref": "100SB1784344086",
+    "payment_type": "ABA Pay",
+    "payer_account": "*002",
+    "bank_name": "ABA Bank",
+    "card_source": "",
+    "transaction_operations": [
+      {
+        "status": "Completed",
+        "amount": 0.01,
+        "transaction_date": "2026-07-18 10:08:06",
+        "bank_ref": null
+      }
+    ]
+  },
+  "status": {
+    "code": "00",
+    "message": "Success!",
+    "tran_id": "PAYpscxfl4m4"
+  }
+}

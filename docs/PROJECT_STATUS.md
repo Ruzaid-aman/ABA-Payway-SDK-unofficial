@@ -1,8 +1,8 @@
 # PayWay SDK — Project Status
 
-> Last updated: 2026-07-17
+> Last updated: 2026-07-18
 
-> Implementation update (2026-07-18): AI skills distribution, `payway-sdk skills` CLI commands, environment configuration discovery, sanitized debug logging, and associated tests are complete. The full validation gate passes: 204 Vitest tests, Biome lint, TypeScript typecheck, build, and package dry run. See `.kilo/plans/1784335168528-sdk-audit-aba-payway-sdk-comparison.md` for final publication handoff.
+> Implementation update (2026-07-18): AI skills distribution, `payway-sdk skills` CLI commands, environment configuration discovery, sanitized debug logging, and associated tests are complete. The full validation gate passes: 204+ Vitest tests, Biome lint, TypeScript typecheck, build, and package dry run. See `.kilo/plans/1784335168528-sdk-audit-aba-payway-sdk-comparison.md` for final publication handoff.
 
 ---
 
@@ -35,6 +35,18 @@ All 7 API domains probed against `checkout-sandbox.payway.com.kh`:
 - **129 tests passing** across 4 test files
 - `auth.test.ts`, `utils.test.ts`, `client.test.ts`, `merchant-scenario-coverage.test.ts`
 
+### QR Template Verification & Transaction Status Check (DONE)
+
+- **All 10 sandbox QR templates** generate valid QR codes at $5.00 USD
+- **All 10 paid transactions** verified APPROVED via `getTransactionList` + `getTransactionDetail`
+- Discovered and documented: `tran_id` ≤ 20 chars (now enforced in SDK), list API uses `transaction_id` field, detail response wraps under `.data`, rate limit of 10 req/min on detail endpoint
+- Scripts: `scripts/test-all-qr-templates.ts`, `scripts/check-qr-transactions.ts`
+- Results saved to `test-logs/qr-images/` (10 PNGs, 10 QR strings, manifest.json, transaction-results.json)
+
+### SDK Hardening: `validateTransactionId` (DONE)
+
+- Enforces 20-character max and `[a-zA-Z0-9\-]` character set
+- Catches invalid transaction IDs before API calls (rather than relying on HTTP 400 responses)- 4 new unit tests added covering: valid IDs, empty/missing, > 20 chars, invalid charset
 ### Documentation & Reference App (DONE)
 
 - **15-chapter integration guide** in `docs/`, covering setup through deployment
@@ -289,8 +301,8 @@ Tasks must be completed **in this order**:
 ## Quick Reference
 
 ```
-Current version:  1.1.0
-Tests:            204 passing
+Current version:  1.1.1
+Tests:            204+ passing (204 + 4 new validateTransactionId tests)
 Build:            Clean (ESM + CJS + .d.ts)
-Next task:        Tag and publish v1.1.0 (AI skills CLI, env var auto-discovery, sanitized debug logging)
+Next task:        Tag and publish v1.1.1
 ```

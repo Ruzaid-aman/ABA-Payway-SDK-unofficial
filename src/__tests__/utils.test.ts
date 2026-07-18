@@ -8,6 +8,7 @@ import {
   sanitizeForLog,
   validateCurrency,
   validatePositiveAmount,
+  validateRefundAmount,
   validateTransactionId,
   validateBeneficiaries,
 } from '../utils.js';
@@ -253,14 +254,28 @@ describe('validatePositiveAmount', () => {
 });
 
 describe('validateTransactionId', () => {
-  it('accepts non-empty strings', () => {
+  it('accepts non-empty strings within 20 chars and valid charset', () => {
     expect(() => validateTransactionId('TX-123')).not.toThrow();
+    expect(() => validateTransactionId('QR-template1-mrpuke0')).not.toThrow();
+    expect(() => validateTransactionId('A'.repeat(20))).not.toThrow();
   });
 
   it('throws for empty or non-string values', () => {
     expect(() => validateTransactionId('')).toThrow('transactionId is required');
     // @ts-expect-error — testing runtime guard
     expect(() => validateTransactionId(undefined)).toThrow('transactionId is required');
+  });
+
+  it('throws for transaction IDs exceeding 20 characters (PayWay API limit)', () => {
+    expect(() => validateTransactionId('A'.repeat(21))).toThrow('≤ 20 characters');
+    expect(() => validateTransactionId('tpl-test-template1_color-1784347522507')).toThrow('≤ 20 characters');
+  });
+
+  it('throws for invalid characters (only letters, digits, hyphens allowed)', () => {
+    expect(() => validateTransactionId('TX 123')).toThrow('letters, digits, and hyphens');
+    expect(() => validateTransactionId('TX_123')).toThrow('letters, digits, and hyphens');
+    expect(() => validateTransactionId('TX.123')).toThrow('letters, digits, and hyphens');
+    expect(() => validateTransactionId('TX@123')).toThrow('letters, digits, and hyphens');
   });
 });
 
@@ -293,5 +308,64 @@ describe('validateBeneficiaries', () => {
     expect(() => validateBeneficiaries([{ amount: 100 }], 100, 'USD')).toThrow(
       'each beneficiary must have a non-empty account string',
     );
+  });
+});
+
+describe('validateRefundAmount', () => {
+  describe('USD refunds', () => {
+    it('accepts the minimum refund amount ($0.01)', () => {
+      expect(() => validateRefundAmount(0.01, 'USD')).not.toThrow();
+    });
+
+    it('accepts typical refund amounts', () => {
+      expect(() => validateRefundAmount(5.0, 'USD')).not.toThrow();
+      expect(() => validateRefundAmount(100.99, 'USD')).not.toThrow();
+      expect(() => validateRefundAmount(0.50, 'USD')).not.toThrow();
+    });
+
+    it('throws for amounts below $0.01 (PTL04 sandbox discovery)', () => {
+      expect(() => validateRefundAmount(0.005, 'USD')).toThrow('at least $0.01 USD');
+      expect(() => validateRefundAmount(0.001, 'USD')).toThrow('at least $0.01 USD');
+      expect(() => validateRefundAmount(0, 'USD')).toThrow('at least $0.01 USD');
+      expect(() => validateRefundAmount(-0.01, 'USD')).toThrow('at least $0.01 USD');
+    });
+
+    it('throws for NaN and Infinity', () => {
+      expect(() => validateRefundAmount(Number.NaN, 'USD')).toThrow('finite number');
+      expect(() => validateRefundAmount(Number.POSITIVE_INFINITY, 'USD')).toThrow('finite number');
+    });
+
+    it('throws for USD amounts with more than 2 decimal places', () => {
+      expect(() => validateRefundAmount(1.999, 'USD')).toThrow('at most 2 decimal places');
+      expect(() => validateRefundAmount(0.001, 'USD')).toThrow('at least $0.01 USD'); // also < 0.01
+    });
+  });
+
+  describe('KHR refunds', () => {
+    it('accepts the minimum KHR refund amount (1)', () => {
+      expect(() => validateRefundAmount(1, 'KHR')).not.toThrow();
+    });
+
+    it('accepts typical KHR refund amounts', () => {
+      expect(() => validateRefundAmount(1000, 'KHR')).not.toThrow();
+      expect(() => validateRefundAmount(50000, 'KHR')).not.toThrow();
+    });
+
+    it('throws for KHR amounts below 1', () => {
+      expect(() => validateRefundAmount(0, 'KHR')).toThrow('at least 1');
+      expect(() => validateRefundAmount(-1, 'KHR')).toThrow('at least 1');
+    });
+
+    it('throws for KHR amounts with decimals', () => {
+      expect(() => validateRefundAmount(100.5, 'KHR')).toThrow('must be an integer');
+      expect(() => validateRefundAmount(0.5, 'KHR')).toThrow('must be an integer');
+    });
+  });
+
+  describe('default currency', () => {
+    it('defaults to USD when currency is not provided', () => {
+      expect(() => validateRefundAmount(0.01)).not.toThrow();
+      expect(() => validateRefundAmount(0.005)).toThrow('at least $0.01 USD');
+    });
   });
 });

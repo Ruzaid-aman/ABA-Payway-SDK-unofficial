@@ -1,0 +1,88 @@
+{
+  "generated": "2026-07-18T04:08:48.288Z",
+  "amount": 5,
+  "currency": "USD",
+  "callbackUrl": "https://webhook.site/51bc2004-9fcf-428b-97d4-6ed54e0ba40e",
+  "templates": [
+    {
+      "template": "template1",
+      "ok": true,
+      "duration": 391,
+      "transactionId": "12",
+      "imageFile": "template1.png",
+      "qrStringFile": "template1-qr-string.txt"
+    },
+    {
+      "template": "template1_color",
+      "ok": true,
+      "duration": 179,
+      "transactionId": "12",
+      "imageFile": "template1_color.png",
+      "qrStringFile": "template1_color-qr-string.txt"
+    },
+    {
+      "template": "template2",
+      "ok": true,
+      "duration": 172,
+      "transactionId": "12",
+      "imageFile": "template2.png",
+      "qrStringFile": "template2-qr-string.txt"
+    },
+    {
+      "template": "template2_color",
+      "ok": true,
+      "duration": 174,
+      "transactionId": "12",
+      "imageFile": "template2_color.png",
+      "qrStringFile": "template2_color-qr-string.txt"
+    },
+    {
+      "template": "template3_color",
+      "ok": true,
+      "duration": 256,
+      "transactionId": "12",
+      "imageFile": "template3_color.png",
+      "qrStringFile": "template3_color-qr-string.txt"
+    },
+    {
+      "template": "template4",
+      "ok": true,
+      "duration": 185,
+      "transactionId": "12",
+      "imageFile": "template4.png",
+      "qrStringFile": "template4-qr-string.txt"
+    },
+    {
+      "template": "template4_color",
+      "ok": true,
+      "duration": 185,
+      "transactionId": "12",
+      "imageFile": "template4_color.png",
+      "qrStringFile": "template4_color-qr-string.txt"
+    },
+    {
+      "template": "template5",
+      "ok": true,
+      "duration": 182,
+      "transactionId": "12",
+      "imageFile": "template5.png",
+      "qrStringFile": "template5-qr-string.txt"
+    },
+    {
+      "template": "template5_color",
+      "ok": true,
+      "duration": 183,
+      "transactionId": "12",
+      "imageFile": "template5_color.png",
+      "qrStringFile": "template5_color-qr-string.txt"
+    },
+    {
+      "template": "template6_color",
+      "ok": true,
+      "duration": 195,
+      "transactionId": "12",
+      "imageFile": "template6_color.png",
+      "qrStringFile": "template6_color-qr-string.txt"
+    }
+  ]
+}

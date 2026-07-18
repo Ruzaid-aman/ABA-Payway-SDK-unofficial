@@ -7,6 +7,7 @@ import {
   filterParams,
   validateCurrency,
   validatePositiveAmount,
+  validateRefundAmount,
   validateTransactionId,
   validateLifetime,
 } from '../utils.js';
@@ -29,7 +30,15 @@ export interface CheckoutDomain {
     requestTime?: string,
   ) => Promise<components['schemas']['TransactionDetailResponse']>;
   getTransactionList: (params: GetTransactionListParams) => Promise<components['schemas']['TransactionListResponse']>;
-  refund: (transactionId: string, amount: number) => Promise<components['schemas']['RefundResponse']>;
+  /**
+   * Refund a completed transaction.
+   * @param transactionId - The original purchase transaction ID.
+   * @param amount - The refund amount. Must be ≥ 0.01 for USD, ≥ 1 for KHR.
+   * @param currency - The original transaction currency. Defaults to 'USD'.
+   *   Providing the correct currency enables client-side minimum-amount
+   *   validation (PayWay returns PTL04 if refund_amount < 0.01 USD).
+   */
+  refund: (transactionId: string, amount: number, currency?: 'USD' | 'KHR') => Promise<components['schemas']['RefundResponse']>;
   getExchangeRate: (requestTime?: string) => Promise<components['schemas']['ExchangeRateResponse']>;
 }
 
@@ -215,8 +224,15 @@ export function createCheckoutDomain(
     /**
      * Refund a completed transaction.
      * @rateLimit 500 requests per second.
+     *
+     * Validates the refund amount client-side before making the API call.
+     * PayWay rejects refund_amount < 0.01 USD with HTTP 400 / PTL04
+     * ("Parameter validation required — refund_amount must be ≥ 0.01").
      */
-    refund: (transactionId: string, amount: number) => {
+    refund: (transactionId: string, amount: number, currency: 'USD' | 'KHR' = 'USD') => {
+      validateTransactionId(transactionId);
+      validateRefundAmount(amount, currency);
+
       return requestWithMerchantAuth<components['schemas']['RefundResponse']>(ENDPOINTS.refund, {
         tran_id: transactionId,
         refund_amount: amount,

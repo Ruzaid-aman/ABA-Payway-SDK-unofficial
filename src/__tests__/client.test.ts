@@ -789,6 +789,54 @@ describe('checkout domain', () => {
       expect((result as unknown as { data: { rate: number } }).data.rate).toBe(4100);
     });
   });
+
+  describe('HTTP error paywayCode extraction', () => {
+    it('extracts paywayCode from non-200 response body (PTL04 refund discovery)', async () => {
+      // Sandbox discovered: refund returns HTTP 400 with PTL04 in body when
+      // the refund amount is invalid. Client-side validation now catches the
+      // most common case (< $0.01), but the server can still reject valid-looking
+      // amounts (e.g. refunding more than the original). Test with valid amount
+      // to exercise the HTTP error extraction path.
+      const paywayBody = {
+        tran_id: 'T001',
+        status: {
+          code: 'PTL04',
+          message: 'Parameter validation required',
+          description: { refund_amount: ['refund_amount must be greater than or equal to 0.01.'] },
+        },
+      };
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse(paywayBody, 400, 'Bad Request'));
+
+      const pwRsa = new PayWay(CONFIG_WITH_RSA);
+      try {
+        await pwRsa.checkout.refund('T001', 5.0);
+        expect.fail('Should have thrown');
+      } catch (err: unknown) {
+        const error = err as PayWayAPIError;
+        expect(error).toBeInstanceOf(PayWayAPIError);
+        expect(error.statusCode).toBe(400);
+        expect(error.paywayCode).toBe('PTL04');
+        expect(error.message).toContain('Parameter validation required');
+        expect(error.rawBody).toEqual(paywayBody);
+      }
+    });
+
+    it('extracts paywayCode from non-200 response without nested status', async () => {
+      const body = { code: 'ERR01', message: 'Something went wrong' };
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse(body, 500, 'Internal Server Error'));
+
+      try {
+        await payway.checkout.checkTransaction('T001');
+        expect.fail('Should have thrown');
+      } catch (err: unknown) {
+        const error = err as PayWayAPIError;
+        expect(error.statusCode).toBe(500);
+        // Should not extract paywayCode when status.code is in the flat body
+        // (only nested status.code is extracted)
+        expect(error.retryable).toBe(true);
+      }
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

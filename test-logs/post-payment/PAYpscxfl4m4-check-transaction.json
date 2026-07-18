@@ -1,0 +1,19 @@
+{
+  "data": {
+    "payment_status_code": 0,
+    "total_amount": 0.01,
+    "original_amount": 0.01,
+    "refund_amount": 0,
+    "discount_amount": 0,
+    "payment_amount": 0.01,
+    "payment_currency": "USD",
+    "apv": "649450",
+    "payment_status": "APPROVED",
+    "transaction_date": "2026-07-18 10:08:06"
+  },
+  "status": {
+    "code": "00",
+    "message": "Success!",
+    "tran_id": "PAYpscxfl4m4"
+  }
+}

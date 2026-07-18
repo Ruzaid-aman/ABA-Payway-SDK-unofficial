@@ -27,3 +27,67 @@ export const ENDPOINTS = {
   addBeneficiary: '/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout',
   getTransactionsByMerchantRef: '/api/payment-gateway/v1/payments/get-transactions-by-mc-ref',
 } as const;
+
+/**
+ * Payment status codes returned by checkTransaction, getTransactionDetail,
+ * and getTransactionList.
+ *
+ * Discovered via sandbox testing — these numeric codes are undocumented in
+ * the OpenAPI spec but confirmed against live sandbox responses:
+ *   - `payment_status_code: 0` → `payment_status: "APPROVED"`
+ *   - `payment_status_code: 2` → `payment_status: "PENDING"`
+ *   - `payment_status_code: 4` → `payment_status: "REFUNDED"`
+ *
+ * Use these constants instead of magic numbers:
+ * @example
+ * if (response.data?.payment_status_code === PAYMENT_STATUS_CODES.APPROVED) { ... }
+ */
+export const PAYMENT_STATUS_CODES = {
+  APPROVED: 0,
+  PRE_AUTH: 0, // same code as APPROVED; distinguish via payment_status string
+  PENDING: 2,
+  DECLINED: 3,
+  REFUNDED: 4,
+  CANCELLED: 7,
+} as const;
+
+/**
+ * Human-readable payment status strings returned alongside the numeric codes.
+ * Use this to build a reverse lookup or for display purposes.
+ *
+ * @example
+ * const status = PAYMENT_STATUS_LABELS[0]; // "APPROVED"
+ */
+export const PAYMENT_STATUS_LABELS: Record<number, string> = {
+  0: 'APPROVED',
+  2: 'PENDING',
+  3: 'DECLINED',
+  4: 'REFUNDED',
+  7: 'CANCELLED',
+};
+
+/**
+ * PayWay refund-specific error codes discovered via sandbox testing.
+ * These codes are returned in `status.code` on the refund endpoint.
+ * Not an exhaustive list — PayWay may add new codes without notice.
+ *
+ * @see RefundResponse type in types.ts for the full status block shape.
+ */
+export const REFUND_ERROR_CODES = {
+  /** Success */
+  SUCCESS: '00',
+  /** Invalid hash */
+  INVALID_HASH: 'PTL02',
+  /** Refund amount exceeds original transaction amount */
+  REFUND_EXCEEDS_ORIGINAL: 'PTL37',
+  /** Parameter validation required (e.g. refund_amount < 0.01) */
+  PARAMETER_VALIDATION: 'PTL04',
+  /** Unable to refund */
+  UNABLE_TO_REFUND: 'PTL57',
+  /** Refund failed */
+  REFUND_FAILED: 'PTL58',
+  /** Concurrent request rejected */
+  CONCURRENT_REJECTED: 'PTL168',
+  /** Insufficient available balance */
+  INSUFFICIENT_BALANCE: 'PTL181',
+} as const;

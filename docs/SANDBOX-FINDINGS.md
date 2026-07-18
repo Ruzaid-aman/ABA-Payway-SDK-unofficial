@@ -53,16 +53,90 @@ before this probe) that all business errors come back as 200 OK. It means:
 
 ## Still open
 
-- Whether `close-transaction` / `check-transaction-2` themselves return
-  hash-mismatch as HTTP 200 (as their docs examples show) or as a real
-  4xx (as `transaction-list-2` does) — worth a quick targeted probe with
-  a deliberately wrong hash before finalizing the client's error-handling
-  fix.
 - Production base URL is still unconfirmed (sandbox only, per earlier note).
-- The 5 non-Ecommerce-Checkout and non-CoF domains (QR API,
-  Payment Link, Pre-auth, Payout, KHQR) have not been probed against
-  sandbox at all yet — everything in those domains is still
-  spec-only/unverified.
+
+## 7. QR Template Generation & Transaction Status Verification (2026-07-18)
+
+End-to-end test of QR generation across all 10 sandbox templates, followed
+by payment and transaction status verification via the SDK.
+
+### 7a. QR Generation — all 10 templates pass
+
+Generated QR codes at $5.00 USD for every sandbox template using
+`scripts/test-all-qr-templates.ts`:
+
+| Template | `qrString` | `qrImage` (PNG) | Duration |
+|---|---|---|---|
+| `template1` | ✅ | ✅ | ~400ms |
+| `template1_color` | ✅ | ✅ | ~180ms |
+| `template2` | ✅ | ✅ | ~170ms |
+| `template2_color` | ✅ | ✅ | ~170ms |
+| `template3_color` | ✅ | ✅ | ~170ms |
+| `template4` | ✅ | ✅ | ~170ms |
+| `template4_color` | ✅ | ✅ | ~170ms |
+| `template5` | ✅ | ✅ | ~170ms |
+| `template5_color` | ✅ | ✅ | ~170ms |
+| `template6_color` | ✅ | ✅ | ~170ms |
+
+**Key findings:**
+- `qr_image_template` must be one of the 10 sandbox templates; any other
+  value returns HTTP 400.
+- `payment_option: 'abapay_khqr'` is required — omitting it produces a
+  400 "Parameter validation required" error.
+- `tran_id` (the `transactionId` param) must be ≤ 20 characters and may
+  only contain `[a-zA-Z0-9\-]`. The PayWay API rejects longer IDs with
+  HTTP 400. This constraint is now enforced by `validateTransactionId()`
+  in the SDK.
+- All templates return both `qrString` (MHR TLV payload) and `qrImage`
+  (Base64-encoded PNG).
+
+### 7b. Transaction Status Verification — all 10 APPROVED
+
+After paying each generated QR, used `scripts/check-qr-transactions.ts`
+to verify via `getTransactionList` + `getTransactionDetail`:
+
+| Template | Transaction ID | Status | Amount | APV |
+|---|---|---|---|---|
+| `template1` | `QR-template1-mrpukd3` | ✅ APPROVED | $5 USD | 876776 |
+| `template1_color` | `QR-template1color-mr` | ✅ APPROVED | $5 USD | 942818 |
+| `template2` | `QR-template2-mrpukdj` | ✅ APPROVED | $5 USD | 773857 |
+| `template2_color` | `QR-template2color-mr` | ✅ APPROVED | $5 USD | 401511 |
+| `template3_color` | `QR-template3color-mr` | ✅ APPROVED | $5 USD | 650677 |
+| `template4` | `QR-template4-mrpuke0` | ✅ APPROVED | $5 USD | 723978 |
+| `template4_color` | `QR-template4color-mr` | ✅ APPROVED | $5 USD | 801747 |
+| `template5` | `QR-template5-mrpukea` | ✅ APPROVED | $5 USD | 317286 |
+| `template5_color` | `QR-template5color-mr` | ✅ APPROVED | $5 USD | 711692 |
+| `template6_color` | `QR-template6color-mr` | ✅ APPROVED | $5 USD | 863477 |
+
+### 7c. API Response Structure Findings
+
+**`getTransactionList` response shape:**
+- Transaction array is the **direct top-level value** (not nested under
+  `.data` or `.transactions`).
+- Each entry uses `transaction_id` (not `tran_id`) as the ID field.
+- Amount field is `payment_amount` (not `amount` or `tran_amount`).
+- Other fields: `transaction_date`, `apv`, `payment_status`,
+  `payment_status_code`, `payment_type`, `original_amount`,
+  `total_amount`, `payment_currency`.
+
+**`getTransactionDetail` response shape:**
+- Response wraps actual data under `.data` key: `{ status: {…}, data: {…} }`.
+- `data.payment_status` is a string (`"APPROVED"`, `"PENDING"`, etc.).
+- `data.payment_status_code` is a number (0=APPROVED, 2=PENDING, etc.).
+- `status.code` is `"00"` for success (NOT `"0"` as in other endpoints).
+
+**Rate limits confirmed:**
+- `getTransactionDetail`: hard limit of **10 requests/minute** (per
+  endpoint docs). Returns HTTP 403 when exceeded.
+- `getTransactionList`: 50 requests/minute.
+- Recommendation: add 7-second delay between detail calls when querying
+  multiple transactions sequentially.
+
+### 7d. `status` filter parameter
+
+The `status` filter on `getTransactionList` expects a **string enum value**
+(`"APPROVED"`, `"PENDING"`, etc.), not the numeric code. Using `"0"`
+returns zero results.
 
 ## 5. QR API (`generate-qr`) probe findings
 

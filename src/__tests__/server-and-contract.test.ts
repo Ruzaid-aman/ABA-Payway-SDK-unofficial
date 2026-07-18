@@ -148,7 +148,7 @@ describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {
   it('routes tran_id "e2e-deeplink-*" to a deeplink response', async () => {
     const s = await server.initiateTransaction(
       {
-        transactionId: `e2e-deeplink-${Date.now()}`,
+        transactionId: `e2e-dl-${Date.now().toString(36)}`,
         amount: 10,
         paymentOption: 'abapay_khqr_deeplink',
       },
@@ -162,7 +162,7 @@ describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {
   it('routes tran_id "e2e-qr_string-*" to a qr_string response', async () => {
     const s = await server.initiateTransaction(
       {
-        transactionId: `e2e-qr_string-${Date.now()}`,
+        transactionId: `e2e-qs-${Date.now().toString(36)}`,
         amount: 10,
         paymentOption: 'abapay_khqr',
       },
@@ -175,7 +175,7 @@ describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {
   it('routes tran_id "e2e-qr_image-*" to a qr_image response', async () => {
     const s = await server.initiateTransaction(
       {
-        transactionId: `e2e-qr_image-${Date.now()}`,
+        transactionId: `e2e-qi-${Date.now().toString(36)}`,
         amount: 10,
         paymentOption: 'abapay_khqr',
       },
@@ -188,7 +188,7 @@ describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {
   it('routes tran_id "e2e-url-*" to a url response', async () => {
     const s = await server.initiateTransaction(
       {
-        transactionId: `e2e-url-${Date.now()}`,
+        transactionId: `e2e-url-${Date.now().toString(36)}`,
         amount: 10,
         paymentOption: 'abapay_khqr',
       },

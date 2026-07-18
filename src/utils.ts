@@ -40,6 +40,12 @@ export function validateTransactionId(transactionId: string): void {
   if (typeof transactionId !== 'string' || transactionId.length === 0) {
     throw new PayWayConfigError('transactionId is required and must be a non-empty string');
   }
+  if (transactionId.length > 20) {
+    throw new PayWayConfigError(`transactionId must be ≤ 20 characters, received ${transactionId.length}: "${transactionId}"`);
+  }
+  if (!/^[a-zA-Z0-9\-]+$/.test(transactionId)) {
+    throw new PayWayConfigError(`transactionId may only contain letters, digits, and hyphens, received: "${transactionId}"`);
+  }
 }
 
 export function validateLifetime(lifetime: number | undefined): void {
@@ -83,6 +89,43 @@ export function validateBeneficiaries(
 
   if (Math.abs(sum - totalAmount) > Number.EPSILON) {
     throw new PayWayConfigError(`beneficiary amounts (${sum}) must sum to total amount (${totalAmount})`);
+  }
+}
+
+/**
+ * Validate a refund amount before sending to the PayWay refund endpoint.
+ *
+ * Discovered via sandbox testing: PayWay rejects refund_amount < 0.01 with
+ * HTTP 400 / PTL04 ("refund_amount must be greater than or equal to 0.01").
+ * This validation catches the error client-side, saving a network round-trip.
+ *
+ * @param amount - The refund amount to validate.
+ * @param currency - The original transaction currency ('USD' or 'KHR').
+ * @throws {PayWayConfigError} If the amount is invalid or below the minimum.
+ */
+export function validateRefundAmount(amount: number, currency: 'USD' | 'KHR' = 'USD'): void {
+  if (!Number.isFinite(amount)) {
+    throw new PayWayConfigError(`refund amount must be a finite number, received: ${amount}`);
+  }
+
+  if (currency === 'USD') {
+    // PayWay minimum refund for USD is $0.01 (PTL04 confirmed via sandbox)
+    if (amount < 0.01) {
+      throw new PayWayConfigError(`refund amount must be at least $0.01 USD, received: ${amount}`);
+    }
+    // USD supports exactly 2 decimal places
+    const rounded = Math.round(amount * 100) / 100;
+    if (Math.abs(amount - rounded) > 1e-10) {
+      throw new PayWayConfigError(`refund USD amount must have at most 2 decimal places, received: ${amount}`);
+    }
+  } else if (currency === 'KHR') {
+    // KHR amounts must be integers (KHR 1 ≈ $0.0025)
+    if (!Number.isInteger(amount)) {
+      throw new PayWayConfigError(`refund KHR amount must be an integer, received: ${amount}`);
+    }
+    if (amount < 1) {
+      throw new PayWayConfigError(`refund KHR amount must be at least 1, received: ${amount}`);
+    }
   }
 }
 

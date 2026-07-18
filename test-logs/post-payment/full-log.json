@@ -1,0 +1,597 @@
+{
+  "transactions": {
+    "tx1": "PAYpscxfl4m4",
+    "tx2": "PAYpscxtvta2"
+  },
+  "results": [
+    {
+      "category": "checkTransaction(PAYpscxfl4m4)",
+      "passed": true,
+      "details": "APPROVED",
+      "durationMs": 713
+    },
+    {
+      "category": "checkTransaction(PAYpscxtvta2)",
+      "passed": true,
+      "details": "APPROVED",
+      "durationMs": 126
+    },
+    {
+      "category": "getTransactionDetail(PAYpscxfl4m4)",
+      "passed": true,
+      "details": "Retrieved — APPROVED",
+      "durationMs": 160
+    },
+    {
+      "category": "getTransactionDetail(PAYpscxtvta2)",
+      "passed": true,
+      "details": "Retrieved — APPROVED",
+      "durationMs": 153
+    },
+    {
+      "category": "refund(TX1, partial)",
+      "passed": false,
+      "details": "HTTP Error: 400 Bad Request",
+      "durationMs": 130
+    },
+    {
+      "category": "refund(TX1, partial)",
+      "passed": false,
+      "details": "HTTP Error: 400 Bad Request",
+      "durationMs": 0
+    },
+    {
+      "category": "refund(TX2, full)",
+      "passed": true,
+      "details": "Status 00",
+      "durationMs": 911
+    },
+    {
+      "category": "post-refund(PAYpscxfl4m4)",
+      "passed": true,
+      "details": "APPROVED",
+      "durationMs": 125
+    },
+    {
+      "category": "post-refund(PAYpscxtvta2)",
+      "passed": true,
+      "details": "REFUNDED",
+      "durationMs": 120
+    },
+    {
+      "category": "detail-post-refund(PAYpscxfl4m4)",
+      "passed": true,
+      "details": "refund_amount=0",
+      "durationMs": 151
+    },
+    {
+      "category": "detail-post-refund(PAYpscxtvta2)",
+      "passed": true,
+      "details": "refund_amount=0.01",
+      "durationMs": 154
+    },
+    {
+      "category": "getTransactionList(PAYpscxfl4m4)",
+      "passed": true,
+      "details": "APPROVED",
+      "durationMs": 742
+    },
+    {
+      "category": "getTransactionList(PAYpscxtvta2)",
+      "passed": true,
+      "details": "REFUNDED",
+      "durationMs": 742
+    }
+  ],
+  "requests": [
+    {
+      "ts": "2026-07-18T03:12:40.462Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718031240",
+        "hash": "LW9ETuHNA2GD8PTwTI8n65wABfIX1ru1sZnJt8TamXwgbAwXoob/9SlNqyn+53pbKWmghmjt2mLF3d8lIEDKww=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:12:41.175Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718031241",
+        "hash": "3gOMNa2BomulzUtTTHPoyEFpYbOeX/PSjjsksgJ96ThqgYQc4IzoKvPr/MUANNGqWsGwzIv2OShpKbpZm6AR8Q=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:12:41.303Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718031241",
+        "hash": "N9rybkI/WjRjoGYe7A/9ZZOBwmmIFIXJZhV/pYEawFekPrdqVa8xFFQOy7kAu/fVhetS5VuTEbBMyyAbr2mxsw=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:12:43.475Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718031243",
+        "hash": "jF6dsbYmAfvDakf10aoop+eY1qQvm3WE6qpQrnQf1aDTsbZNADyFJzKjv9F1WxMbaYqad5B52AlLnqcsUw731g=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:12:43.632Z",
+      "endpoint": "/api/merchant-portal/merchant-access/online-transaction/refund",
+      "payload": "merchant_id=ec476910&merchant_auth=IwH%2BogceGuolQWe74%2BzA4mUY1K9dzAB1wuhuu9glfCNnYm5C9HE55IMED4YOnWXqnDanPP0O9iBM%2B60s%2FvDY8uO6pWNsaqC%2BWbizzvpvA851QRbjwZPhu3yhAf3b0xKNBC%2FBLzWat6eYO%2FDLLqzoNglr5hprCc5qo8C%2BrKdzjvQ%3D&request_time=20260718031243&hash=tmJcXlwkEjLG9DYkwCO%2B5MbQb2k%2FN3qCj3gMK4Q%2FsLq7AKJ4wpe%2FKYwY3s4Ne8R%2Bb219%2B37SsXk9VPBLhbOX1g%3D%3D"
+    },
+    {
+      "ts": "2026-07-18T03:12:44.777Z",
+      "endpoint": "/api/merchant-portal/merchant-access/online-transaction/refund",
+      "payload": "merchant_id=ec476910&merchant_auth=VRtTi6jHz%2BGD7NXEbst6cxp2l8FQNXIBJEakWlEyPaD4U6iKBY9XXsx3%2BVITYtBA3Mby8U7UijGAYVw3gskIbJD9PGX8CZOYQp5kkCZ2ZbidvdFupJWmbYQX8rroD1hfNhMKPNdp42mUnNhvVcTfXq3CDZP2PVKmH1wLxRYf2XM%3D&request_time=20260718031244&hash=0q7PrZnBuxXgwZ1inFuQTVeokpAKk6sUKXSGypTCQQ8a023kMNxQA2JuyR4Jvp1y%2B9wmtkauiNUjMsWX3%2FEVMQ%3D%3D"
+    },
+    {
+      "ts": "2026-07-18T03:12:48.691Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718031248",
+        "hash": "cdHY44mapEZMH5I9lTPbiXwaNUAfqzGb6cQ1nQsTYbtZiaA0IFCaNKrD5cZaIXKrZaqanm3yAqcxbpcjrg8irQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:12:48.818Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718031248",
+        "hash": "mWGZ0QBr5d+mh4dU425QBdt8qYBuH5ClTBg8FUzxjMeeZQphTGzbGYDcEueZRRl1QJcsYMS58IQpDlCm6pFvgA=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:12:48.940Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "payload": {
+        "tran_id": "PAYpscxfl4m4",
+        "merchant_id": "ec476910",
+        "req_time": "20260718031248",
+        "hash": "cdHY44mapEZMH5I9lTPbiXwaNUAfqzGb6cQ1nQsTYbtZiaA0IFCaNKrD5cZaIXKrZaqanm3yAqcxbpcjrg8irQ=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:12:51.109Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "payload": {
+        "tran_id": "PAYpscxtvta2",
+        "merchant_id": "ec476910",
+        "req_time": "20260718031251",
+        "hash": "zilfVMLPWw+GMPlvLGPv5M8uUIL8Q4mgk+HxIfjPNLAH/zUESX+3B8rBI3ambL91iPnKy73k1DOCFKkUdKwppA=="
+      }
+    },
+    {
+      "ts": "2026-07-18T03:12:51.265Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-list-2",
+      "payload": {
+        "page": 1,
+        "pagination": 10,
+        "merchant_id": "ec476910",
+        "req_time": "20260718031251",
+        "hash": "xRJdEUrDsws4jwu0gKnxUGvwURTLLqNg2TDk7mRewc9t0SCTtwhBu1YDrM8aW9F1RS/p09dsu2oBMmleuXNWdQ=="
+      }
+    }
+  ],
+  "responses": [
+    {
+      "ts": "2026-07-18T03:12:41.173Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 0,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "apv": "649450",
+          "payment_status": "APPROVED",
+          "transaction_date": "2026-07-18 10:08:06"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 711
+    },
+    {
+      "ts": "2026-07-18T03:12:41.301Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 0,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "apv": "854283",
+          "payment_status": "APPROVED",
+          "transaction_date": "2026-07-18 10:07:02"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 126
+    },
+    {
+      "ts": "2026-07-18T03:12:41.463Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "status": 200,
+      "body": {
+        "data": {
+          "transaction_id": "PAYpscxfl4m4",
+          "payment_status_code": 0,
+          "payment_status": "APPROVED",
+          "original_amount": 0.01,
+          "original_currency": "USD",
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "total_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "apv": "649450",
+          "transaction_date": "2026-07-18 10:08:06",
+          "first_name": "",
+          "last_name": "",
+          "email": "",
+          "phone": "",
+          "bank_ref": "100SB1784344086",
+          "payment_type": "ABA Pay",
+          "payer_account": "*002",
+          "bank_name": "ABA Bank",
+          "card_source": "",
+          "transaction_operations": [
+            {
+              "status": "Completed",
+              "amount": 0.01,
+              "transaction_date": "2026-07-18 10:08:06",
+              "bank_ref": null
+            }
+          ]
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 160
+    },
+    {
+      "ts": "2026-07-18T03:12:43.627Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "status": 200,
+      "body": {
+        "data": {
+          "transaction_id": "PAYpscxtvta2",
+          "payment_status_code": 0,
+          "payment_status": "APPROVED",
+          "original_amount": 0.01,
+          "original_currency": "USD",
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "total_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "apv": "854283",
+          "transaction_date": "2026-07-18 10:07:02",
+          "first_name": "",
+          "last_name": "",
+          "email": "",
+          "phone": "",
+          "bank_ref": "100SB1784344100",
+          "payment_type": "ABA Pay",
+          "payer_account": "*002",
+          "bank_name": "ABA Bank",
+          "card_source": "",
+          "transaction_operations": [
+            {
+              "status": "Completed",
+              "amount": 0.01,
+              "transaction_date": "2026-07-18 10:08:20",
+              "bank_ref": "100SB1784344100"
+            }
+          ]
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 152
+    },
+    {
+      "ts": "2026-07-18T03:12:45.686Z",
+      "endpoint": "/api/merchant-portal/merchant-access/online-transaction/refund",
+      "status": 200,
+      "body": {
+        "grand_total": 0.01,
+        "total_refunded": 0.01,
+        "currency": "USD",
+        "transaction_status": "REFUNDED",
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 909
+    },
+    {
+      "ts": "2026-07-18T03:12:48.816Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 0,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "apv": "649450",
+          "payment_status": "APPROVED",
+          "transaction_date": "2026-07-18 10:08:06"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 125
+    },
+    {
+      "ts": "2026-07-18T03:12:48.938Z",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "status": 200,
+      "body": {
+        "data": {
+          "payment_status_code": 4,
+          "total_amount": 0.01,
+          "original_amount": 0.01,
+          "refund_amount": 0.01,
+          "discount_amount": 0,
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "apv": "854283",
+          "payment_status": "REFUNDED",
+          "transaction_date": "2026-07-18 10:12:47"
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 120
+    },
+    {
+      "ts": "2026-07-18T03:12:49.091Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "status": 200,
+      "body": {
+        "data": {
+          "transaction_id": "PAYpscxfl4m4",
+          "payment_status_code": 0,
+          "payment_status": "APPROVED",
+          "original_amount": 0.01,
+          "original_currency": "USD",
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "total_amount": 0.01,
+          "refund_amount": 0,
+          "discount_amount": 0,
+          "apv": "649450",
+          "transaction_date": "2026-07-18 10:08:06",
+          "first_name": "",
+          "last_name": "",
+          "email": "",
+          "phone": "",
+          "bank_ref": "100SB1784344086",
+          "payment_type": "ABA Pay",
+          "payer_account": "*002",
+          "bank_name": "ABA Bank",
+          "card_source": "",
+          "transaction_operations": [
+            {
+              "status": "Completed",
+              "amount": 0.01,
+              "transaction_date": "2026-07-18 10:08:06",
+              "bank_ref": null
+            }
+          ]
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxfl4m4"
+        }
+      },
+      "durationMs": 151
+    },
+    {
+      "ts": "2026-07-18T03:12:51.262Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "status": 200,
+      "body": {
+        "data": {
+          "transaction_id": "PAYpscxtvta2",
+          "payment_status_code": 4,
+          "payment_status": "REFUNDED",
+          "original_amount": 0.01,
+          "original_currency": "USD",
+          "payment_amount": 0.01,
+          "payment_currency": "USD",
+          "total_amount": 0.01,
+          "refund_amount": 0.01,
+          "discount_amount": 0,
+          "apv": "854283",
+          "transaction_date": "2026-07-18 10:12:47",
+          "first_name": "",
+          "last_name": "",
+          "email": "",
+          "phone": "",
+          "bank_ref": "100SB1784344367",
+          "payment_type": "ABA Pay",
+          "payer_account": "*002",
+          "bank_name": "ABA Bank",
+          "card_source": "",
+          "transaction_operations": [
+            {
+              "status": "Completed",
+              "amount": 0.01,
+              "transaction_date": "2026-07-18 10:08:20",
+              "bank_ref": "100SB1784344100"
+            },
+            {
+              "status": "Refunded",
+              "amount": 0.01,
+              "transaction_date": "2026-07-18 10:12:47",
+              "bank_ref": "100SB1784344367"
+            }
+          ]
+        },
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "PAYpscxtvta2"
+        }
+      },
+      "durationMs": 153
+    },
+    {
+      "ts": "2026-07-18T03:12:52.006Z",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-list-2",
+      "status": 200,
+      "body": {
+        "data": [
+          {
+            "transaction_id": "PAYpscxfl4m4",
+            "transaction_date": "2026-07-18 10:08:06",
+            "apv": "649450",
+            "payment_status": "APPROVED",
+            "payment_status_code": 0,
+            "payment_type": "ABA Pay",
+            "original_amount": 0.01,
+            "original_currency": "USD",
+            "total_amount": 0.01,
+            "discount_amount": 0,
+            "refund_amount": 0,
+            "payment_amount": 0.01,
+            "payment_currency": "USD"
+          },
+          {
+            "transaction_id": "PAYpscxtvta2",
+            "transaction_date": "2026-07-18 10:08:20",
+            "apv": "854283",
+            "payment_status": "REFUNDED",
+            "payment_status_code": 4,
+            "payment_type": "ABA Pay",
+            "original_amount": 0.01,
+            "original_currency": "USD",
+            "total_amount": 0.01,
+            "discount_amount": 0,
+            "refund_amount": 0.01,
+            "payment_amount": 0.01,
+            "payment_currency": "USD"
+          },
+          {
+            "transaction_id": "LIFps6ybumep",
+            "transaction_date": "2026-07-18 10:02:23",
+            "apv": "",
+            "payment_status": "PENDING",
+            "payment_status_code": 2,
+            "payment_type": "ABA Pay",
+            "original_amount": 0.01,
+            "original_currency": "USD",
+            "total_amount": 0.01,
+            "discount_amount": 0,
+            "refund_amount": 0,
+            "payment_amount": 0,
+            "payment_currency": ""
+          },
+          {
+            "transaction_id": "LIFps1kp4nmt",
+            "transaction_date": "2026-07-18 09:58:12",
+            "apv": "",
+            "payment_status": "PENDING",
+            "payment_status_code": 2,
+            "payment_type": "ABA Pay",
+            "original_amount": 0.01,
+            "original_currency": "USD",
+            "total_amount": 0.01,
+            "discount_amount": 0,
+            "refund_amount": 0,
+            "payment_amount": 0,
+            "payment_currency": ""
+          },
+          {
+            "transaction_id": "T004-SDK",
+            "transaction_date": "2026-07-18 01:23:42",
+            "apv": "",
+            "payment_status": "PENDING",
+            "payment_status_code": 2,
+            "payment_type": "ABA Pay",
+            "original_amount": 100,
+            "original_currency": "USD",
+            "total_amount": 100,
+            "discount_amount": 0,
+            "refund_amount": 0,
+            "payment_amount": 0,
+            "payment_currency": ""
+          },
+          {
+            "transaction_id": "T004",
+            "transaction_date": "2026-07-18 01:11:53",
+            "apv": "367546",
+            "payment_status": "APPROVED",
+            "payment_status_code": 0,
+            "payment_type": "ABA Pay",
+            "original_amount": 100,
+            "original_currency": "USD",
+            "total_amount": 100,
+            "discount_amount": 0,
+            "refund_amount": 0,
+            "payment_amount": 100,
+            "payment_currency": "USD"
+          }
+        ],
+        "page": 1,
+        "pagination": 10,
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "1784344373"
+        }
+      },
+      "durationMs": 741
+    }
+  ]
+}

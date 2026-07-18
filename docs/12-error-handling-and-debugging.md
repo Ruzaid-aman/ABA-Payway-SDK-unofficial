@@ -65,6 +65,52 @@ Thrown when PayWay's API returns an error (wrong hash, invalid merchant, etc.). 
 
 > 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema and verified against sandbox probe responses.
 
+### Refund-Specific Error Codes
+
+The refund endpoint uses its own set of error codes (prefixed with `PTL`). These are returned in `status.code` on HTTP 200 or HTTP 400 responses and are **automatically extracted into `error.paywayCode`** by the SDK:
+
+```typescript
+import { REFUND_ERROR_CODES } from 'aba-payway-ts';
+
+try {
+  await payway.checkout.refund('order-123', 0.005);
+} catch (error) {
+  if (error instanceof PayWayAPIError) {
+    switch (error.paywayCode) {
+      case REFUND_ERROR_CODES.PARAMETER_VALIDATION:
+        console.error('Refund amount is below minimum ($0.01 USD / 1 KHR)');
+        break;
+      case REFUND_ERROR_CODES.REFUND_EXCEEDS_ORIGINAL:
+        console.error('Refund amount is larger than the original payment');
+        break;
+      case REFUND_ERROR_CODES.INSUFFICIENT_BALANCE:
+        console.error('Merchant account has insufficient balance for this refund');
+        break;
+      case REFUND_ERROR_CODES.UNABLE_TO_REFUND:
+        console.error('Refund cannot be processed (transaction may not be refundable)');
+        break;
+      case REFUND_ERROR_CODES.CONCURRENT_REJECTED:
+        console.error('Another refund is in progress for this transaction');
+        break;
+      default:
+        console.error(`Refund failed: ${error.paywayCode} — ${error.message}`);
+    }
+  }
+}
+```
+
+| Code | Constant | Meaning | How to Fix |
+|---|---|---|---|
+| `PTL02` | `REFUND_ERROR_CODES.INVALID_HASH` | Invalid HMAC signature | Check API key and field ordering |
+| `PTL04` | `REFUND_ERROR_CODES.PARAMETER_VALIDATION` | Amount below minimum or invalid format | Ensure ≥ $0.01 USD or ≥ 1 KHR |
+| `PTL37` | `REFUND_ERROR_CODES.REFUND_EXCEEDS_ORIGINAL` | Refund > original payment | Reduce refund amount |
+| `PTL57` | `REFUND_ERROR_CODES.UNABLE_TO_REFUND` | Cannot process refund | Check transaction status |
+| `PTL58` | `REFUND_ERROR_CODES.REFUND_FAILED` | Refund processing failed | Contact PayWay support |
+| `PTL168` | `REFUND_ERROR_CODES.CONCURRENT_REJECTED` | Duplicate concurrent request | Retry after the first request completes |
+| `PTL181` | `REFUND_ERROR_CODES.INSUFFICIENT_BALANCE` | Insufficient merchant balance | Top up merchant account |
+
+> ℹ️ **Client-side validation:** The SDK validates refund amounts before making the API call. Use `validateRefundAmount(amount, currency)` to catch invalid amounts locally. The `refund()` method calls this automatically.
+
 ---
 
 ## Error Handling Patterns
@@ -208,8 +254,10 @@ async function getExchangeRateWithFallback(): Promise<any> {
 
 The SDK automatically handles two different error response styles that PayWay uses:
 
-1. **HTTP error status (4xx/5xx)** — returned by some endpoints such as `transaction-list-2` (400/403) and `check-transaction-2` (403 for invalid hash). The SDK maps these to `PayWayAPIError` with `statusCode` set to the HTTP status and `paywayCode` undefined unless the body also contains a code.
+1. **HTTP error status (4xx/5xx)** — returned by some endpoints such as `transaction-list-2` (400/403) and `check-transaction-2` (403 for invalid hash). The SDK extracts `paywayCode` from the response body's `status.code` field when present, and maps the response to the most specific error class (`PayWayBusinessError`, `PayWayRateLimitError`, etc.).
 2. **HTTP 200 with a wrapped error** — returned by most merchant-portal and payment-gateway endpoints. The SDK inspects the body for `status.code`, `status` string (`FAILED`/`ERROR`), or a top-level `code` field and throws `PayWayAPIError` with `statusCode: 200`.
+
+> ℹ️ **Important:** PayWay error codes like `PTL04` (refund validation) are returned inside the response body even on HTTP 400 responses. The SDK automatically extracts these into `error.paywayCode` so you can handle them programmatically without parsing `error.rawBody` yourself.
 
 ### Idempotency and duplicate protection
 
