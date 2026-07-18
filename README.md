@@ -57,6 +57,19 @@ npx payway-sdk skills add claude copilot
 
 Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use `npx payway-sdk skills list` to inspect installed guides and `npx payway-sdk skills remove claude` to remove the ABA PayWay guides for an agent.
 
+### CLI commands
+
+| Command | Description |
+|---|---|
+| `payway-sdk test` | Run the sandbox test suite (default) |
+| `payway-sdk demo` | Run the test suite with pass/fail output |
+| `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
+| `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |
+| `payway-sdk skills list` | Show installed skills per agent |
+| `payway-sdk skills doctor` | Verify installation health for all agents |
+| `payway-sdk --help` | Show usage guide |
+| `payway-sdk --version` | Print SDK version |
+
 ## Quick Start
 
 ### Full integration guide
