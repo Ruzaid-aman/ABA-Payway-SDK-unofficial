@@ -1,0 +1,64 @@
+skill_name: "test_transaction_executor"
+version: 2.0
+description: "Skill to automate a test transaction using the payway-boilerplate."
+
+# 1. Pre-requisites
+environment:
+  - Node version: ">=18.0.0"
+  - Env Variables needed: ["PAYWAY_MERCHANT_ID", "PAYWAY_API_KEY"]
+  - Dependencies to install: ["tsx", "vitest", "tsup", "openapi-typescript"]
+
+# 2. The Execution Flow (Step-by-step)
+workflow:
+  - step: 1
+    action: "Read sandbox credentials from payway-boilerplate/merchant-qr-pos/.env"
+    expected_output: "PAYWAY_MERCHANT_ID and PAYWAY_API_KEY values"
+    fallback: "If .env missing, verify path or request credentials from ABA PayWay sandbox portal"
+
+  - step: 2
+    action: "Create transaction using SDK: payway.checkout.purchase({ transactionId, amount, currency })"
+    expected_output: "JSON response with qrString, qrImage, status.code='00' (or HTML for hosted checkout)"
+    fallback: "If 403, merchant_id not found; if HTML response, check payment_option and content type"
+
+  - step: 3
+    action: "Check transaction status using SDK: payway.checkout.getTransactionDetail(transactionId)"
+    expected_output: "JSON response with payment_status='PENDING' or 'APPROVED'"
+    fallback: "If tran_id not found (code 6), retry step 2 with fresh transactionId"
+
+  - step: 4
+    action: "Complete test payment via sandbox payment method (e.g., ABA Pay)"
+    expected_output: "Transaction status changes to APPROVED with payment_status_code=0"
+    fallback: "If still PENDING after payment, verify webhook/callback configuration and sandbox payment completion"
+
+# 3. Troubleshooting (The "Lessons Learned" section)
+learnings:
+  - error: "HTTP 403 with code 8: merchant_id not found"
+    root_cause: "Using dummy/test merchant credentials that do not exist in PayWay sandbox"
+    resolution: "Use actual sandbox credentials from merchant-qr-pos/.env or ABA PayWay developer portal"
+    preventative_measure: "Always validate credentials exist before running transaction scripts; add credential presence check in automation"
+
+  - error: "tran_id not found (code 6) after creation"
+    root_cause: "Previous creation used invalid credentials so no transaction was actually persisted"
+    resolution: "Re-create transaction with valid merchant credentials, then immediately check details"
+    preventative_measure: "Use unique tran_id per test run; verify creation response contains JSON success before checking details"
+
+  - error: "createTransaction returns HTML instead of JSON"
+    root_cause: "Endpoint responded with hosted checkout page for invalid/unsigned request"
+    resolution: "Ensure SDK-generated hash is included in POST body and Content-Type is application/json"
+    preventative_measure: "Always inspect raw response body type; if HTML, treat as failure even if HTTP 200"
+
+  - error: "Transaction stuck in PENDING after payment"
+    root_cause: "Sandbox payment not completed or callback not configured"
+    resolution: "Verify PAYWAY_CALLBACK_URL is set to reachable HTTPS endpoint; complete payment flow fully"
+    preventative_measure: "Implement polling with getTransactionDetail after payment attempt; set reasonable timeout"
+
+  - error: "Typecheck fails with invalid character in test files"
+    root_cause: "Pre-existing invalid Unicode character in merchant-scenario-coverage.test.ts"
+    resolution: "Remove invalid character from test file"
+    preventative_measure: "Run lint/typecheck before committing; add pre-commit hook for vitest/tsc"
+
+# 4. Verification
+success_criteria: "Transaction detail API returns payment_status='APPROVED' with matching tran_id, original_amount, and payment_amount equal to requested amount"
+
+# 5. SDK Capability Note
+sdk_purchase_method: "payway.checkout.purchase(params) - added in version 2.0 to support end-to-end transaction creation without manual HTTP calls"

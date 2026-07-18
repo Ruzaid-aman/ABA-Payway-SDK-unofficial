@@ -1,7 +1,13 @@
 import { generateHmac, verifyCallbackSignature } from './auth.js';
 import { BASE_URLS, ENDPOINTS } from './constants.js';
-import { PayWayConfigError, PayWayAPIError } from './errors.js';
-import { formatRequestTime } from './utils.js';
+import {
+  PayWayConfigError,
+  PayWayAPIError,
+  PayWayBusinessError,
+  PayWayNetworkError,
+  PayWayRateLimitError,
+} from './errors.js';
+import { formatRequestTime, sanitizeForLog } from './utils.js';
 import {
   createCheckoutDomain,
   createCredentialsOnFileDomain,
@@ -42,8 +48,8 @@ export interface RateLimitInfo {
 }
 
 export interface PayWayConfig {
-  merchantId: string;
-  apiKey: string;
+  merchantId?: string;
+  apiKey?: string;
   publicKeyPem?: string;
   environment?: 'sandbox' | 'production';
   timeout?: number;
@@ -52,8 +58,14 @@ export interface PayWayConfig {
   retryDelayMs?: number; // Default: 1000
   rateLimitThrottling?: boolean; // Default: true for endpoints with documented limits
   rateLimitRules?: Record<string, RateLimitRule>;
+  debug?: boolean;
   onRequest?: (endpoint: string, bodyPayload: string) => void;
   onResponse?: (endpoint: string, statusCode: number, body: unknown, rateLimitInfo?: RateLimitInfo) => void;
+}
+
+interface ResolvedPayWayConfig extends PayWayConfig {
+  merchantId: string;
+  apiKey: string;
 }
 
 export interface GatewayErrorDetails {
@@ -191,11 +203,12 @@ function checkResponseError(body: unknown, endpoint?: string): void {
     const code = String(statusObj.code ?? '');
     const message = String(statusObj.message ?? 'Unknown PayWay API Error');
     if (code !== '0' && code !== '00' && code !== '') {
-      throw new PayWayAPIError(message, {
+      throw new PayWayBusinessError(message, {
         statusCode: 200,
         paywayCode: code,
         rawBody: body,
         endpoint,
+        retryable: false,
       });
     }
   }
@@ -205,11 +218,12 @@ function checkResponseError(body: unknown, endpoint?: string): void {
     if (statusStr === 'FAILED' || statusStr === 'ERROR') {
       const code = resp.code !== undefined ? String(resp.code) : undefined;
       const message = String(resp.message ?? 'Unknown PayWay API Error');
-      throw new PayWayAPIError(message, {
+      throw new PayWayBusinessError(message, {
         statusCode: 200,
         paywayCode: code,
         rawBody: body,
         endpoint,
+        retryable: false,
       });
     }
   }
@@ -218,11 +232,12 @@ function checkResponseError(body: unknown, endpoint?: string): void {
     const code = String(resp.code);
     const message = String(resp.message ?? 'Unknown PayWay API Error');
     if (code !== '0' && code !== '00') {
-      throw new PayWayAPIError(message, {
+      throw new PayWayBusinessError(message, {
         statusCode: 200,
         paywayCode: code,
         rawBody: body,
         endpoint,
+        retryable: false,
       });
     }
   }
@@ -253,12 +268,23 @@ function createHttpError(
   endpoint?: string,
   rateLimitInfo?: RateLimitInfo,
 ): PayWayAPIError {
-  return new PayWayAPIError(`HTTP Error: ${response.status} ${response.statusText}`, {
+  const message = `HTTP Error: ${response.status} ${response.statusText}`;
+  if (response.status === 429) {
+    return new PayWayRateLimitError(message, {
+      statusCode: response.status,
+      rawBody,
+      endpoint,
+      rateLimitInfo: rateLimitInfo as Record<string, unknown>,
+      retryable: true,
+    });
+  }
+
+  return new PayWayAPIError(message, {
     statusCode: response.status,
     rawBody,
     endpoint,
     rateLimitInfo: rateLimitInfo as Record<string, unknown>,
-    retryable: response.status === 429,
+    retryable: response.status >= 500,
   });
 }
 
@@ -266,12 +292,13 @@ function createJsonParseError(rawBody: string, endpoint?: string): PayWayAPIErro
   return new PayWayAPIError('Invalid JSON response from PayWay API', {
     rawBody,
     endpoint,
+    retryable: false,
   });
 }
 
 function createNetworkError(error: unknown, timeoutMs: number, endpoint?: string): PayWayAPIError {
   if (isAbortError(error)) {
-    return new PayWayAPIError(`Request timed out after ${timeoutMs}ms`, {
+    return new PayWayNetworkError(`Request timed out after ${timeoutMs}ms`, {
       rawBody: error,
       endpoint,
       retryable: true,
@@ -282,7 +309,7 @@ function createNetworkError(error: unknown, timeoutMs: number, endpoint?: string
     error !== null && typeof error === 'object'
       ? String((error as { message?: unknown }).message ?? 'Unknown network failure')
       : 'Unknown network failure';
-  return new PayWayAPIError(`Network error: ${message}`, {
+  return new PayWayNetworkError(`Network error: ${message}`, {
     rawBody: error,
     endpoint,
     retryable: true,
@@ -352,6 +379,17 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function parseDebugRequestBody(bodyPayload: string): unknown {
+  try {
+    return JSON.parse(bodyPayload) as unknown;
+  } catch {
+    if (bodyPayload.includes('=')) {
+      return Object.fromEntries(new URLSearchParams(bodyPayload));
+    }
+    return bodyPayload.slice(0, 200);
+  }
+}
+
 /**
  * PayWay SDK client.
  *
@@ -359,7 +397,7 @@ function delay(ms: number): Promise<void> {
  * const payway = new PayWay({ merchantId, apiKey, environment: 'sandbox' });
  */
 export class PayWay {
-  private config: PayWayConfig;
+  private config: ResolvedPayWayConfig;
   private baseUrl: string;
   private rateLimitRules: Record<string, RateLimitRule>;
   private rateLimitState = new Map<string, { tokens: number; lastRefill: number }>();
@@ -385,22 +423,13 @@ export class PayWay {
    * @param config.baseUrl - Optional override for the base API URL.
    * @throws {PayWayConfigError} If the configuration is missing or invalid.
    */
-  constructor(config: PayWayConfig) {
-    if (!config) {
-      throw new PayWayConfigError('Config object is required');
-    }
-    if (!config.merchantId) {
-      throw new PayWayConfigError('merchantId is required');
-    }
-    if (!config.apiKey) {
-      throw new PayWayConfigError('apiKey is required');
-    }
-    this.config = config;
+  constructor(config: Partial<PayWayConfig> = {}) {
+    this.config = PayWay.resolveConfig(config);
 
-    if (config.baseUrl) {
-      this.baseUrl = config.baseUrl;
+    if (this.config.baseUrl) {
+      this.baseUrl = this.config.baseUrl;
     } else {
-      const env = config.environment || 'sandbox';
+      const env = this.config.environment || 'sandbox';
       this.baseUrl = BASE_URLS[env] || BASE_URLS.sandbox;
     }
 
@@ -413,7 +442,7 @@ export class PayWay {
 
     this.rateLimitRules = {
       ...defaultRateLimitRules,
-      ...(config.rateLimitRules ?? {}),
+      ...(this.config.rateLimitRules ?? {}),
     };
 
     // Initialize domain sub-clients
@@ -424,6 +453,55 @@ export class PayWay {
     this.preAuth = createPreAuthDomain(this.requestWithMerchantAuth.bind(this));
     this.payout = createPayoutDomain(this.config, this.request.bind(this), this.requestWithMerchantAuth.bind(this));
     this.khqr = createKhqrDomain(this.config, this.request.bind(this));
+  }
+
+  private static resolveConfig(config: Partial<PayWayConfig> | null): ResolvedPayWayConfig {
+    if (config === null) {
+      throw new PayWayConfigError('Config object is required');
+    }
+
+    const environmentFromEnv =
+      process.env.PAYWAY_SANDBOX === 'true'
+        ? 'sandbox'
+        : process.env.PAYWAY_SANDBOX === 'false'
+          ? 'production'
+          : undefined;
+    const timeoutFromEnv = Number.parseInt(process.env.PAYWAY_TIMEOUT ?? '', 10);
+    const debugFromEnv = process.env.DEBUG_PAYWAY === 'true' || process.env.DEBUG_PAYWAY === '1';
+    const resolvedConfig: ResolvedPayWayConfig = {
+      ...config,
+      merchantId: config.merchantId ?? process.env.PAYWAY_MERCHANT_ID ?? '',
+      apiKey: config.apiKey ?? process.env.PAYWAY_API_KEY ?? '',
+      publicKeyPem: config.publicKeyPem ?? process.env.PAYWAY_RSA_PUBLIC_KEY,
+      environment: config.environment ?? environmentFromEnv,
+      baseUrl: config.baseUrl ?? process.env.PAYWAY_BASE_URL,
+      timeout: config.timeout ?? (Number.isNaN(timeoutFromEnv) ? undefined : timeoutFromEnv),
+      debug: config.debug ?? debugFromEnv,
+    };
+
+    if (!resolvedConfig.merchantId) {
+      throw new PayWayConfigError('merchantId is required');
+    }
+    if (!resolvedConfig.apiKey) {
+      throw new PayWayConfigError('apiKey is required');
+    }
+    if (!resolvedConfig.debug) {
+      return resolvedConfig;
+    }
+
+    const onRequest = resolvedConfig.onRequest;
+    const onResponse = resolvedConfig.onResponse;
+    return {
+      ...resolvedConfig,
+      onRequest: (endpoint, bodyPayload) => {
+        console.debug(`[payway] -> POST ${endpoint}`, sanitizeForLog(parseDebugRequestBody(bodyPayload)));
+        onRequest?.(endpoint, bodyPayload);
+      },
+      onResponse: (endpoint, statusCode, body, rateLimitInfo) => {
+        console.debug(`[payway] <- ${statusCode} ${endpoint}`, sanitizeForLog(body), rateLimitInfo);
+        onResponse?.(endpoint, statusCode, body, rateLimitInfo);
+      },
+    };
   }
 
   private _getRateLimitRule(endpoint: string): RateLimitRule | undefined {

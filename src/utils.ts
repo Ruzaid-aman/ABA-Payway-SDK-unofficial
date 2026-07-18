@@ -116,3 +116,36 @@ export function filterParams<T extends Record<string, unknown>>(obj: T): Partial
   }
   return filtered as Partial<T>;
 }
+
+const SENSITIVE_LOG_KEYS = new Set([
+  'api_key',
+  'apikey',
+  'hash',
+  'merchant_auth',
+  'password',
+  'pwt',
+  'payment_token',
+  'authorization',
+  'x-payway-hmac-sha512',
+  'publickeypem',
+  'card_number',
+  'cvv',
+  'google_pay_token',
+]);
+
+/** Return a JSON-safe copy of a value with secrets removed for diagnostic logging. */
+export function sanitizeForLog(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(sanitizeForLog);
+  }
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    sanitized[key] = SENSITIVE_LOG_KEYS.has(key.toLowerCase()) ? '***HIDDEN***' : sanitizeForLog(nestedValue);
+  }
+  return sanitized;
+}

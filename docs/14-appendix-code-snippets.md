@@ -134,10 +134,11 @@ app.post('/api/checkout/status', async (req, res) => {
  */
 app.post('/api/payway-webhook', (req, res) => {
   try {
-    // Extract and verify the HMAC signature
-    const receivedHash = req.body.hash;
+    // Extract the webhook signature from the standard callback header.
+    // PayWay sends the HMAC in X-PAYWAY-HMAC-SHA512, not from the request body.
+    const receivedHash = req.headers['x-payway-hmac-sha512'] as string | undefined;
     if (!receivedHash) {
-      return res.status(400).json({ error: 'Missing hash field' });
+      return res.status(400).json({ error: 'Missing signature header' });
     }
 
     const { hash, ...bodyWithoutHash } = req.body;

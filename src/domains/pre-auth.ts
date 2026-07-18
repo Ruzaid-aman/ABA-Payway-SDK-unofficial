@@ -1,5 +1,7 @@
 import { ENDPOINTS } from '../constants.js';
 import type { components } from '../types.js';
+import { validateTransactionId, validatePositiveAmount } from '../utils.js';
+import { PayWayConfigError } from '../errors.js';
 
 export interface PreAuthDomain {
   complete: (transactionId: string, amount: number) => Promise<components['schemas']['CompletePreAuthResponse']>;
@@ -20,6 +22,10 @@ export function createPreAuthDomain(
 ): PreAuthDomain {
   return {
     complete: (transactionId: string, amount: number) => {
+      // Validate inputs
+      validateTransactionId(transactionId);
+      validatePositiveAmount(amount, 'USD');
+
       return requestWithMerchantAuth<components['schemas']['CompletePreAuthResponse']>(
         ENDPOINTS.completePreAuth,
         {
@@ -34,6 +40,13 @@ export function createPreAuthDomain(
     },
 
     completeWithPayout: (transactionId: string, amount: number, payout: { acc: string; amt: number }[]) => {
+      // Validate inputs
+      validateTransactionId(transactionId);
+      validatePositiveAmount(amount, 'USD');
+      if (!Array.isArray(payout) || payout.length === 0) {
+        throw new PayWayConfigError('payout must be a non-empty array');
+      }
+
       return requestWithMerchantAuth<components['schemas']['CompletePreAuthResponse']>(
         ENDPOINTS.completePreAuth,
         {

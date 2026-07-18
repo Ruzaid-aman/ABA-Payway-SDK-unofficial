@@ -31,8 +31,8 @@ PayWay signs every callback with HMAC-SHA512 using your API key. The algorithm i
 
 ### Step-by-Step (What the SDK Does Internally)
 
-1. **Extract the `hash` field** from the request body
-2. **Remove `hash`** from the body (we don't include it in verification — that would be circular)
+1. **Extract the `X-PAYWAY-HMAC-SHA512` header** from the request
+2. **Remove `hash`** from the body if present — the header is the source of truth, not the request body
 3. **Sort remaining keys alphabetically** (not the same order as the request was sent)
 4. **Concatenate all values**, JSON-encoding any objects/arrays
 5. **Compute HMAC-SHA512** with your API key as the secret
@@ -60,8 +60,13 @@ const router = Router();
  * This is the ONLY endpoint that should update order status to "paid".
  */
 router.post('/', (req, res) => {
-  // Step 1: Extract the received hash
-  const receivedHash = req.body.hash;
+  // Step 1: Extract the received HMAC from the standard callback header
+  const receivedHash = req.headers['x-payway-hmac-sha512'] as string | undefined;
+
+  if (!receivedHash) {
+    console.error('❌ Webhook missing signature header');
+    return res.status(400).json({ error: 'Missing signature' });
+  }
 
   // Step 2: Remove hash from body for signature computation
   const { hash, ...bodyWithoutHash } = req.body;
@@ -147,10 +152,10 @@ router.post('/', async (req, res) => {
   // ============================================
   // 2. Extract and verify signature
   // ============================================
-  const receivedHash = req.body.hash;
+  const receivedHash = req.headers['x-payway-hmac-sha512'] as string | undefined;
 
   if (!receivedHash) {
-    console.error('❌ Webhook missing hash field');
+    console.error('❌ Webhook missing signature header');
     return res.status(400).json({ error: 'Missing signature' });
   }
 

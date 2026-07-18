@@ -1,0 +1,202 @@
+# PayWay SDK — 1-Pager Quick Start
+
+Take a PayWay payment in production with **3 SDK calls**. The SDK auto-detects PayWay's response type (deeplink, KHQR string, QR image URL, checkout URL, HTML page) and performs the correct UX action for you. **The merchant never writes `if deeplink do X, if HTML do Y`.**
+
+---
+
+## The whole flow
+
+```ts
+import { sdk } from 'aba-payway-ts';
+
+// 1. Server: initiate a purchase.
+const session = await sdk.initiate(
+  { transactionId: 'order-123', amount: 10, paymentOption: 'abapay_khqr_deeplink' },
+  { merchantId: process.env.PAYWAY_MERCHANT_ID!, apiKey: process.env.PAYWAY_API_KEY!, environment: 'sandbox' },
+);
+
+// 2. Client: hand the session to the SDK. It auto-renders whatever PayWay returned.
+await sdk.handle(session, { target: '#payway-container' });
+
+// 3. (optional) Verify wiring end-to-end with a real HTTP mock — zero merchant code.
+await sdk.runTestSuiteAndPrint();
+```
+
+That's it. No `switch` on `responseType`, no `fetch`, no HMAC hashing, no QR library wiring.
+
+---
+
+## Environment setup and diagnostics
+
+For the `PayWay` domain client, export credentials once and let the SDK discover them:
+
+```bash
+PAYWAY_MERCHANT_ID=your-merchant-id
+PAYWAY_API_KEY=your-api-key
+PAYWAY_SANDBOX=true
+```
+
+```ts
+import { PayWay } from 'aba-payway-ts';
+
+const payway = new PayWay({ debug: true });
+```
+
+Constructor options override environment variables. Debug output is written through `console.debug` with sensitive values redacted as `***HIDDEN***`.
+
+---
+
+## The contract
+
+Every PayWay purchase response is normalised into one shape — `TransactionSession`:
+
+```ts
+interface TransactionSession {
+  sessionId: string;                                       // SDK-generated
+  status: 'pending' | 'completed' | 'failed';
+  responseType: 'deeplink' | 'qr_string' | 'qr_image' | 'url' | 'html';
+  responsePayload: string;                                 // shape depends on responseType
+  expiresAt: string;                                       // ISO-8601
+  raw?: unknown;                                           // original PayWay body
+}
+```
+
+Every module in the SDK — server, client, test — communicates through this contract and nothing else. See [`src/schema.ts`](../src/schema.ts).
+
+---
+
+## What `sdk.handle()` does for each response type
+
+| `responseType` | What the SDK does | Merchant configures |
+|---|---|---|
+| `deeplink`   | `window.location.href = payload` (or `window.open` if `openInNewTab: true`, with same-tab fallback if popup is blocked). | `openInNewTab?` |
+| `qr_string`  | Renders a QR canvas into `target`. Falls back to a PNG download prompt when `target` is omitted. | `target` |
+| `qr_image`   | Renders an `<img>` into `target`. Opens the image URL in a new tab when `target` is omitted. | `target` |
+| `url`        | `window.location.href = payload` (or new tab). | `openInNewTab?` |
+| `html`       | Embeds the payload in a sandboxed `<iframe srcdoc>` inside `target`. **Refuses** to render without a `target` (never overwrites `document.body`). Sandbox tokens: `allow-scripts allow-forms allow-popups` — deliberately no `allow-same-origin`. | `target` (required) |
+
+All actions dispatch through a single function — [`client.handleResponse()`](../src/client-handler/index.ts). No merchant branching required.
+
+---
+
+## Architecture (why this is safe to trust)
+
+```
+┌────────────────────┐          ┌────────────────────┐          ┌────────────────────┐
+│  Module 1 — Server │          │  Module 2 — Client │          │  Module 3 — Test   │
+│  src/server/       │          │  src/client-handler│          │  src/test/         │
+│                    │          │                    │          │                    │
+│  initiateTransaction│  ──►    │  handleResponse    │   ◄──    │  runTestSuite      │
+│  test              │          │                    │          │  startMockServer   │
+│  normalizeResponse │          │                    │          │  validateContract  │
+└────────┬───────────┘          └──────────┬─────────┘          └──────────┬─────────┘
+         │                                 │                                │
+         └─────────────────► TransactionSession contract ◄──────────────────┘
+                                    (src/schema.ts)
+```
+
+- **No module imports another.** They communicate only via the `TransactionSession` contract or injected dependencies.
+- The **facade** [`src/sdk.ts`](../src/sdk.ts) is the only file that wires the three modules together.
+- The **test harness** accepts `initiate` and `handle` as injected dependencies (`TestHarnessDeps`), so you can plug in mocks or the real thing.
+
+---
+
+## Zero-code test suite
+
+```bash
+# CLI
+npx payway-sdk test
+
+# or programmatically
+await sdk.runTestSuiteAndPrint();
+```
+
+What it does:
+
+1. Spins up a real local HTTP mock PayWay server on an ephemeral port.
+2. Calls the **real** `server.initiateTransaction()` against it for 4 of the 5 response types (`deeplink`, `qr_string`, `qr_image`, `url`).
+3. Feeds a raw HTML body directly to `normalizePaywayResponse()` for the `html` case (bypasses the JSON-only PayWay HTTP client).
+4. Hands each resulting `TransactionSession` to the real `client.handleResponse()`.
+5. Prints a pass/fail table.
+
+Expected output:
+
+```
+  ✅ Deeplink redirect        deeplink_skipped_no_dom
+  ✅ QR string render         qr_download_prompted
+  ✅ QR image render          qr_image_skipped_no_dom
+  ✅ Checkout URL redirect    url_redirect_skipped_no_dom
+  ✅ HTML snippet embed       html_embed_skipped_no_dom
+  Result: ✅ ALL PASSED
+```
+
+(In Node, DOM-bound actions report `*_skipped_no_dom` — the correct branch was still taken. Browser-environment assertions live in [`src/__tests__/client-handler.test.ts`](../src/__tests__/client-handler.test.ts).)
+
+---
+
+## Advanced usage
+
+### Access the modules directly
+
+```ts
+import { server, client, runTestSuite } from 'aba-payway-ts';
+
+const session = await server.initiateTransaction(payload, config);
+await client.handleResponse(session, { target: myElement });
+```
+
+### Simulate responses without hitting PayWay
+
+```ts
+import { sdk } from 'aba-payway-ts';
+
+// Generate a mock session for any response type.
+const session = sdk.test('qr_string', { transactionId: 'demo', amount: 10 });
+await sdk.handle(session, { target: '#preview' });
+```
+
+### Callbacks
+
+```ts
+await sdk.handle(session, {
+  target: '#payway-container',
+  onHandled: (s, action) => console.log('rendered', action),
+  onError:   (err, s)    => console.error('failed', err),
+});
+```
+
+User-callback exceptions never break SDK execution.
+
+---
+
+## Full API surface
+
+| Function | Purpose |
+|---|---|
+| `sdk.initiate(payload, config)`         | Real purchase — hits PayWay. |
+| `sdk.handle(session, options?)`         | Render / redirect / embed based on `responseType`. |
+| `sdk.test(responseType, payload?)`      | Generate a mock session (no HTTP). |
+| `sdk.runTestSuite()`                    | Run the 5-case end-to-end suite. |
+| `sdk.runTestSuiteAndPrint()`            | Same, plus formatted console output. |
+| `sdk.server.initiateTransaction`        | Direct access to Module 1. |
+| `sdk.client.handleResponse`             | Direct access to Module 2. |
+
+Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOptions`, `HandleResponseResult`, `ResponseType`, `SessionStatus`, `TestSuiteReport`.
+
+---
+
+## Security notes
+
+- HTML embed uses a strict sandbox (`allow-scripts allow-forms allow-popups`) with **no** `allow-same-origin`, so PayWay's checkout scripts can never reach into your page's origin.
+- `sdk.handle()` never overwrites `document.body`. If you pass a `html` response with no `target`, the SDK returns `{ success: false, action: 'error' }` and invokes `onError`.
+- Signature verification for PayWay callbacks is available separately via `verifyCallbackSignature()`.
+
+---
+
+## Where to look next
+
+- [`src/schema.ts`](../src/schema.ts) — the `TransactionSession` contract.
+- [`src/sdk.ts`](../src/sdk.ts) — the facade.
+- [`src/__tests__/client-handler.test.ts`](../src/__tests__/client-handler.test.ts) — browser-environment assertions for each response type.
+- [`src/__tests__/server-and-contract.test.ts`](../src/__tests__/server-and-contract.test.ts) — end-to-end tests through the mock PayWay server.
+- [`scripts/zero-logic-purchase-flow.ts`](../scripts/zero-logic-purchase-flow.ts) — runnable demo (`npm run demo`).

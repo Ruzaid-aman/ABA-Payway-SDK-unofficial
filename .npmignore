@@ -1,4 +1,4 @@
-# Source files (only dist/ is published)
+# Source files (only dist/ is published; skills/ is shipped for AI agents)
 src/
 payway-openapi/
 scripts/

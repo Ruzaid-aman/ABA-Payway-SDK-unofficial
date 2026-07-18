@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as crypto from 'node:crypto';
 import * as utils from '../utils.js';
 import { PayWay } from '../client.js';
-import { PayWayConfigError, PayWayAPIError } from '../errors.js';
+import {
+  PayWayConfigError,
+  PayWayAPIError,
+  PayWayBusinessError,
+  PayWayNetworkError,
+  PayWayRateLimitError,
+} from '../errors.js';
 import { ENDPOINTS } from '../constants.js';
 
 // ---------------------------------------------------------------------------
@@ -64,16 +70,12 @@ describe('PayWay constructor', () => {
   });
 
   it('throws PayWayConfigError when merchantId is missing', () => {
-    // @ts-expect-error
     expect(() => new PayWay({ apiKey: 'key' })).toThrow(PayWayConfigError);
-    // @ts-expect-error
     expect(() => new PayWay({ apiKey: 'key' })).toThrow('merchantId is required');
   });
 
   it('throws PayWayConfigError when apiKey is missing', () => {
-    // @ts-expect-error
     expect(() => new PayWay({ merchantId: 'M001' })).toThrow(PayWayConfigError);
-    // @ts-expect-error
     expect(() => new PayWay({ merchantId: 'M001' })).toThrow('apiKey is required');
   });
 
@@ -96,6 +98,75 @@ describe('PayWay constructor', () => {
   });
 });
 
+describe('PayWay environment configuration', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('uses environment credentials when no constructor config is supplied', () => {
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'env-merchant');
+    vi.stubEnv('PAYWAY_API_KEY', 'env-api-key');
+
+    expect(() => new PayWay()).not.toThrow();
+  });
+
+  it('gives explicit credentials precedence over environment credentials', async () => {
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'env-merchant');
+    vi.stubEnv('PAYWAY_API_KEY', 'env-api-key');
+    const fetchSpy = vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0 } }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const payway = new PayWay({ merchantId: 'explicit-merchant', apiKey: 'explicit-api-key' });
+
+    await payway.checkout.checkTransaction('TX-EXPLICIT');
+
+    expect(JSON.parse(fetchSpy.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+      merchant_id: 'explicit-merchant',
+    });
+  });
+
+  it('uses PAYWAY_SANDBOX=false to select the production base URL', async () => {
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'env-merchant');
+    vi.stubEnv('PAYWAY_API_KEY', 'env-api-key');
+    vi.stubEnv('PAYWAY_SANDBOX', 'false');
+    const fetchSpy = vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0 } }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const payway = new PayWay();
+
+    await payway.checkout.checkTransaction('TX-PRODUCTION');
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toMatch(/^https:\/\/checkout\.payway\.com\.kh/);
+  });
+});
+
+describe('PayWay debug logging', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('sanitizes debug output and preserves user-provided hooks', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0 }, hash: 'response-hash' }));
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const onRequest = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const payway = new PayWay({ ...TEST_CONFIG, debug: true, onRequest });
+
+    await payway.checkout.checkTransaction('TX-DEBUG');
+
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[payway] -> POST'),
+      expect.objectContaining({ hash: '***HIDDEN***' }),
+    );
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[payway] <- 200'),
+      expect.objectContaining({ hash: '***HIDDEN***' }),
+      undefined,
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // checkResponseError (tested through the private request path)
 // ---------------------------------------------------------------------------
@@ -114,14 +185,14 @@ describe('checkResponseError (via API calls)', () => {
     vi.restoreAllMocks();
   });
 
-  it('throws PayWayAPIError for status object with non-zero code', async () => {
+  it('throws PayWayBusinessError for status object with non-zero code', async () => {
     fetchSpy.mockResolvedValueOnce(
       mockJsonResponse({
         status: { code: 6, message: 'Transaction not found' },
       }),
     );
 
-    await expect(payway.checkout.checkTransaction('TX-NOTFOUND')).rejects.toThrow(PayWayAPIError);
+    await expect(payway.checkout.checkTransaction('TX-NOTFOUND')).rejects.toThrow(PayWayBusinessError);
 
     await fetchSpy.mockResolvedValueOnce(
       mockJsonResponse({
@@ -132,10 +203,11 @@ describe('checkResponseError (via API calls)', () => {
     try {
       await payway.checkout.checkTransaction('TX-NOTFOUND');
     } catch (e) {
-      expect(e).toBeInstanceOf(PayWayAPIError);
-      const err = e as PayWayAPIError;
+      expect(e).toBeInstanceOf(PayWayBusinessError);
+      const err = e as PayWayBusinessError;
       expect(err.message).toBe('Transaction not found');
       expect(err.paywayCode).toBe('6');
+      expect(err.type).toBe('business_error');
     }
   });
 
@@ -172,10 +244,42 @@ describe('checkResponseError (via API calls)', () => {
     await expect(payway.checkout.checkTransaction('TX-BADHASH')).rejects.toThrow('Wrong Hash.');
   });
 
-  it('throws PayWayAPIError on HTTP non-2xx responses', async () => {
-    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Forbidden' }, 403, 'Forbidden'));
+  it('throws PayWayRateLimitError on HTTP 429 responses', async () => {
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Too Many Requests' }, 429, 'Too Many Requests'));
 
-    await expect(payway.checkout.checkTransaction('TX-403')).rejects.toThrow(PayWayAPIError);
+    await expect(payway.checkout.checkTransaction('TX-429')).rejects.toThrow(PayWayRateLimitError);
+
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Too Many Requests' }, 429, 'Too Many Requests'));
+    try {
+      await payway.checkout.checkTransaction('TX-429');
+    } catch (error) {
+      expect(error).toBeInstanceOf(PayWayRateLimitError);
+      if (error instanceof PayWayRateLimitError) {
+        expect(error.type).toBe('rate_limit_error');
+        expect(error.retryable).toBe(true);
+      }
+    }
+  });
+
+  it('throws PayWayNetworkError on timeout (AbortError)', async () => {
+    const pw = new PayWay({ ...TEST_CONFIG, timeout: 50 });
+
+    fetchSpy.mockImplementationOnce(
+      (_url: string, opts: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          const onAbort = () => {
+            const err = new DOMException('The operation was aborted.', 'AbortError');
+            reject(err);
+          };
+          if (opts?.signal?.aborted) {
+            onAbort();
+          } else {
+            opts?.signal?.addEventListener('abort', onAbort);
+          }
+        }),
+    );
+
+    await expect(pw.checkout.checkTransaction('TX-SLOW')).rejects.toThrow(PayWayNetworkError);
   });
 
   it('throws PayWayAPIError on timeout (AbortError)', async () => {

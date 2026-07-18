@@ -5,6 +5,7 @@ import {
   toBase64,
   encodeBase64IfNeeded,
   filterParams,
+  sanitizeForLog,
   validateCurrency,
   validatePositiveAmount,
   validateTransactionId,
@@ -175,6 +176,35 @@ describe('filterParams', () => {
   it('preserves nested objects', () => {
     const nested = { inner: 'value' };
     expect(filterParams({ a: nested, b: undefined })).toEqual({ a: nested });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sanitizeForLog
+// ---------------------------------------------------------------------------
+
+describe('sanitizeForLog', () => {
+  it('redacts known credentials without mutating the source object', () => {
+    const payload = {
+      api_key: 'api-secret',
+      nested: { merchant_auth: 'encrypted-credentials', normal: 'visible' },
+      items: [{ cvv: '123', amount: 10 }],
+    };
+
+    expect(sanitizeForLog(payload)).toEqual({
+      api_key: '***HIDDEN***',
+      nested: { merchant_auth: '***HIDDEN***', normal: 'visible' },
+      items: [{ cvv: '***HIDDEN***', amount: 10 }],
+    });
+    expect(payload.api_key).toBe('api-secret');
+    expect(payload.nested.merchant_auth).toBe('encrypted-credentials');
+  });
+
+  it('matches sensitive keys case-insensitively', () => {
+    expect(sanitizeForLog({ apiKey: 'secret', Authorization: 'Bearer token' })).toEqual({
+      apiKey: '***HIDDEN***',
+      Authorization: '***HIDDEN***',
+    });
   });
 });
 

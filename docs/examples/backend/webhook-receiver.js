@@ -72,11 +72,12 @@ router.post('/', function(req, res) {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
-  // Extract hash from body
-  var receivedHash = req.body.hash;
-  if (!receivedHash) {
-    console.error('[PayWay Webhook] Missing hash field');
-    return res.status(400).json({ error: 'Missing hash field' });
+  // Extract the signature from the standard callback header.
+  // PayWay sends the webhook HMAC in X-PAYWAY-HMAC-SHA512, per the callback schema.
+  var receivedHash = req.headers['x-payway-hmac-sha512'];
+  if (!receivedHash || typeof receivedHash !== 'string') {
+    console.error('[PayWay Webhook] Missing signature header');
+    return res.status(400).json({ error: 'Missing signature header' });
   }
 
   // Remove hash from body (we verify WITHOUT it)

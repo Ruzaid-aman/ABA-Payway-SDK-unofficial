@@ -1,5 +1,5 @@
 import { ENDPOINTS } from '../constants.js';
-import { filterParams } from '../utils.js';
+import { filterParams, validateTransactionId, validatePositiveAmount, validateCurrency } from '../utils.js';
 import type { components } from '../types.js';
 import type { PayWayConfig } from '../client.js';
 import { generateOfflineQR, type GenerateOfflineQrParams } from '../khqr-offline.js';
@@ -25,10 +25,22 @@ export function createKhqrDomain(
 ): KhqrDomain {
   return {
     generateOfflineQR: (params: GenerateOfflineQrParams) => {
+      // Basic validation for offline QR params
+      validateTransactionId(params.transactionId);
+      validatePositiveAmount(params.amount, params.currency);
+      validateCurrency(params.currency);
+      if (typeof params.merchantId !== 'string' || params.merchantId.length === 0) {
+        throw new Error('merchantId is required for offline QR generation');
+      }
+
       return generateOfflineQR(params);
     },
 
     getTransactionsByMerchantRef: (merchantRef: string, requestTime?: string) => {
+      if (typeof merchantRef !== 'string' || merchantRef.trim().length === 0) {
+        throw new Error('merchantRef is required and must be a non-empty string');
+      }
+
       return request<components['schemas']['GetTransactionsByMcRefResponse']>(
         ENDPOINTS.getTransactionsByMerchantRef,
         filterParams({ merchant_ref: merchantRef, req_time: requestTime }),

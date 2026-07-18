@@ -1,0 +1,87 @@
+/**
+ * Sample usage script — proves the merchant writes ZERO logic for
+ * "if deeplink do X, if HTML do Y". The SDK handles it internally.
+ *
+ * Run with: npx tsx examples/zero-logic-purchase-flow.ts
+ *
+ * This script demonstrates:
+ *  1. Simulating all 5 response types via `sdk.test()`.
+ *  2. Handling each via `sdk.handle()` — no branching in merchant code.
+ *  3. Running the full zero-code test suite via `sdk.runTestSuite()`.
+ */
+
+import { sdk } from '../src/index.js';
+import type { ResponseType } from '../src/schema.js';
+
+async function main(): Promise<void> {
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('  PayWay SDK — Zero-Logic Purchase Flow Demo');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('');
+
+  // ─── Part 1: Simulate each response type ───────────────────────────────
+  // The merchant calls sdk.test() to get a mock session for each type,
+  // then sdk.handle() processes it. Notice: NO if/switch on responseType.
+
+  const responseTypes: ResponseType[] = ['deeplink', 'qr_string', 'qr_image', 'url', 'html'];
+
+  console.log('▶ Part 1: Simulating all 5 response types (no API calls)\n');
+
+  for (const type of responseTypes) {
+    // 1 line: generate a mock session
+    const session = sdk.test(type, { transactionId: `demo-${type}`, amount: 10 });
+
+    // 1 line: handle it — SDK auto-detects the type. NO merchant branching.
+    const result = await sdk.handle(session, { target: undefined });
+
+    const icon = result.success ? '✅' : '❌';
+    console.log(`  ${icon} ${type.padEnd(10)} -> action="${result.action}"`);
+  }
+
+  console.log('');
+
+  // ─── Part 2: Run the full zero-code test suite ─────────────────────────
+  console.log('▶ Part 2: Running the zero-code test suite\n');
+
+  const report = await sdk.runTestSuite();
+
+  for (const r of report.results) {
+    const icon = r.passed ? '✅' : '❌';
+    console.log(`  ${icon} ${r.name} (${r.durationMs}ms)`);
+    console.log(`     ${r.message}`);
+  }
+
+  console.log('');
+  console.log(`  Total: ${report.total} | Passed: ${report.passed} | Failed: ${report.failed}`);
+  console.log(`  Result: ${report.success ? '✅ ALL PASSED' : '❌ FAILURES DETECTED'}`);
+  console.log('');
+
+  // ─── Part 3: Prove the "under 5 lines" promise ────────────────────────
+  console.log('▶ Part 3: The "under 5 lines" promise\n');
+  console.log('  Here is the COMPLETE merchant code for a real purchase flow:');
+  console.log('');
+  console.log('    // Server (2 lines):');
+  console.log('    const session = await sdk.initiate(');
+  console.log("      { transactionId: 'order-123', amount: 10, paymentOption: 'abapay_khqr_deeplink' },");
+  console.log('      { merchantId, apiKey, environment: "sandbox" },');
+  console.log('    );');
+  console.log('');
+  console.log('    // Client (1 line):');
+  console.log("    await sdk.handle(session, { target: '#payway-container' });");
+  console.log('');
+  console.log('    // Test (1 line):');
+  console.log('    await sdk.runTestSuiteAndPrint();');
+  console.log('');
+  console.log('  Total: 4 lines. No if/switch on responseType. No fetch/axios.');
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════');
+
+  if (!report.success) {
+    process.exitCode = 1;
+  }
+}
+
+main().catch((err) => {
+  console.error('Demo failed:', err);
+  process.exitCode = 1;
+});

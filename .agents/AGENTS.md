@@ -31,3 +31,33 @@
 - **Understand the API quirks**: Read `SANDBOX-FINDINGS.md` to understand API behaviors we have verified during our sandbox probes.
 - **When probing endpoints**: When tasked to probe a sandbox endpoint, write a script in the `scripts/` folder to execute and verify the endpoint exists and validates formatting correctly, similar to prior probes.
 - **Update status continuously**: Keep `PROJECT_STATUS.md` updated as tasks are completed.
+
+## SDK Usage Examples
+- Prefer the facade for a complete merchant flow: `const session = await sdk.initiate(payload, config);` followed by `await sdk.handle(session, { target: '#payway-container' });`.
+- Use `new PayWay()` for domain APIs when `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY` are configured in the environment.
+- Keep all SDK calls and credentials on the server. Browser code must receive only the data required to render or redirect payment experiences.
+
+## Error Handling Matrix
+| Error | Meaning | Retry guidance |
+|---|---|---|
+| `PayWayConfigError` | Missing or invalid local configuration/input | Correct configuration; do not retry unchanged. |
+| `PayWayBusinessError` | PayWay rejected a valid transport request | Resolve the business condition; do not retry blindly. |
+| `PayWayNetworkError` | Network failure or request timeout | Retry is supported by configured retry policy. |
+| `PayWayRateLimitError` | PayWay returned HTTP 429 | Honor retry delay and reduce request rate. |
+| `PayWayAPIError` | Other HTTP/API failure | Retry only when `retryable` is true. |
+| `PayWaySignatureError` | Signature-related verification failure | Reject the untrusted callback. |
+
+## Environment Variables
+| Variable | Purpose |
+|---|---|
+| `PAYWAY_MERCHANT_ID` | Required merchant identifier when not passed to `PayWay`. |
+| `PAYWAY_API_KEY` | Required signing key when not passed to `PayWay`. |
+| `PAYWAY_RSA_PUBLIC_KEY` | RSA public key for encrypted endpoints. |
+| `PAYWAY_BASE_URL` | Optional API base URL override. |
+| `PAYWAY_SANDBOX` | `true` selects sandbox; `false` selects production. |
+| `PAYWAY_TIMEOUT` | Optional request timeout in milliseconds. |
+| `DEBUG_PAYWAY` | `true` or `1` enables sanitized diagnostic logging. |
+
+## Skills Directory
+- The packaged `skills/` directory contains 20 focused `aba-payway-*` guides.
+- Install them with `npx payway-sdk skills add <agent>`, where agent is `claude`, `codex`, `opencode`, `cursor`, or `copilot`.

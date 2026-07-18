@@ -1,5 +1,6 @@
 import { ENDPOINTS } from '../constants.js';
-import { encodeBase64IfNeeded, filterParams } from '../utils.js';
+import { encodeBase64IfNeeded, filterParams, validatePublicHttpsUrl } from '../utils.js';
+import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
 import type { PayWayConfig, CreatePaymentLinkParams } from '../client.js';
 
@@ -18,6 +19,23 @@ export function createPaymentLinkDomain(
 ): PaymentLinkDomain {
   return {
     create: (params: CreatePaymentLinkParams) => {
+      // Basic parameter validation
+      if (typeof params.title !== 'string' || params.title.trim().length === 0) {
+        throw new PayWayConfigError('title is required and must be a non-empty string');
+      }
+
+      if (!Number.isFinite(params.amount) || params.amount <= 0) {
+        throw new PayWayConfigError('amount must be a positive number');
+      }
+
+      if (typeof params.merchantRefNo !== 'string' || params.merchantRefNo.trim().length === 0) {
+        throw new PayWayConfigError('merchantRefNo is required and must be a non-empty string');
+      }
+
+      if (params.returnUrl) {
+        validatePublicHttpsUrl(params.returnUrl, 'returnUrl');
+      }
+
       return requestWithMerchantAuth<components['schemas']['CreatePaymentLinkResponse']>(
         ENDPOINTS.createPaymentLink,
         filterParams({

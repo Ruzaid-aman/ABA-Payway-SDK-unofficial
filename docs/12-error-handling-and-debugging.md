@@ -211,6 +211,17 @@ The SDK automatically handles two different error response styles that PayWay us
 1. **HTTP error status (4xx/5xx)** — returned by some endpoints such as `transaction-list-2` (400/403) and `check-transaction-2` (403 for invalid hash). The SDK maps these to `PayWayAPIError` with `statusCode` set to the HTTP status and `paywayCode` undefined unless the body also contains a code.
 2. **HTTP 200 with a wrapped error** — returned by most merchant-portal and payment-gateway endpoints. The SDK inspects the body for `status.code`, `status` string (`FAILED`/`ERROR`), or a top-level `code` field and throws `PayWayAPIError` with `statusCode: 200`.
 
+### Idempotency and duplicate protection
+
+PayWay does not currently provide a Stripe-style `Idempotency-Key` mechanism for outbound SDK requests. This SDK therefore treats `tran_id` as the merchant's primary uniqueness key and expects the backend to handle duplicates by:
+
+- generating a unique `tran_id` per payment attempt,
+- persisting callback events or transaction outcomes durably,
+- using `ON CONFLICT` / `UPSERT` / equivalent duplicate-safe database logic,
+- treating webhook callbacks as the trusted final payment event.
+
+If you need exact once semantics, implement server-side deduplication on `tran_id` or request-level metadata, and do not assume retries are automatically safe.
+
 ### Retry behavior
 
 The SDK retries **only** transient failures by default (`maxRetries: 0`):

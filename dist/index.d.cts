@@ -1,3 +1,5 @@
+import { Server } from 'node:http';
+
 interface components {
     schemas: {
         PurchaseRequest: {
@@ -23,12 +25,12 @@ interface components {
              * @default purchase
              * @enum {string}
              */
-            type: "purchase" | "pre-auth";
+            type: 'purchase' | 'pre-auth';
             /**
              * @description Omit to let PayWay auto-display all payment options the merchant profile supports. abapay_khqr_deeplink changes the 200 response from HTML to a JSON object (qr_string, abapay_deeplink, checkout_qr_url) — see PurchaseQrResponse.
              * @enum {string}
              */
-            payment_option?: "cards" | "abapay_khqr" | "abapay_khqr_deeplink" | "alipay" | "wechat" | "google_pay";
+            payment_option?: 'cards' | 'abapay_khqr' | 'abapay_khqr_deeplink' | 'alipay' | 'wechat' | 'google_pay';
             /** @description Base64-encoded JSON array of {name, quantity, price}. Descriptive only — NOT used for amount validation or calculation; `amount` is the sole source of truth for what's charged. */
             items?: string;
             /**
@@ -42,7 +44,7 @@ interface components {
              * @description Defaults to the currency of the first account on the merchant profile if omitted.
              * @enum {string}
              */
-            currency?: "KHR" | "USD";
+            currency?: 'KHR' | 'USD';
             /** @description Base64-encoded callback URL. Custom return_url values must be pre-whitelisted on the merchant profile (error 6/81) or the request is rejected. */
             return_url?: string;
             /** @description Redirect target when the customer closes/cancels the payment dialog. */
@@ -64,7 +66,7 @@ interface components {
              * @description hosted_view opens a new tab; popup renders as a bottom sheet (mobile) or modal (desktop).
              * @enum {string}
              */
-            view_type?: "hosted_view" | "popup";
+            view_type?: 'hosted_view' | 'popup';
             /** @description Set to 0 to route through Checkout service when the profile also has QR Payment API enabled. */
             payment_gate?: number;
             /** @description Base64-encoded JSON array of {acc, amt} splitting the payment across up to 10 destination accounts (error 25 if exceeded). Accounts must be whitelisted first (error 37). */
@@ -140,7 +142,7 @@ interface components {
                 /** @description 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED */
                 payment_status_code?: number;
                 /** @enum {string} */
-                payment_status?: "APPROVED" | "PRE-AUTH" | "REFUNDED" | "PENDING" | "DECLINED" | "CANCELLED";
+                payment_status?: 'APPROVED' | 'PRE-AUTH' | 'REFUNDED' | 'PENDING' | 'DECLINED' | 'CANCELLED';
                 /** @description Amount due after discount. */
                 total_amount?: number;
                 original_amount?: number;
@@ -156,15 +158,15 @@ interface components {
                 /** @description Timestamp the transaction was created in the payment gateway. */
                 transaction_date?: string;
             };
-            status: components["schemas"]["StatusBlock"];
+            status: components['schemas']['StatusBlock'];
         };
         CloseTransactionResponse: {
-            status: components["schemas"]["StatusBlock"];
+            status: components['schemas']['StatusBlock'];
         };
         /** @description One entry in a transaction's operation history (capture, pre-auth completion/cancellation, refund). */
         TransactionOperation: {
             /** @enum {string} */
-            status?: "Completed" | "Pre-Auth" | "Completed Pre-Auth" | "Cancelled Pre-Auth" | "Refunded";
+            status?: 'Completed' | 'Pre-Auth' | 'Completed Pre-Auth' | 'Cancelled Pre-Auth' | 'Refunded';
             /** @description Amount associated with this specific operation, not the transaction total. */
             amount?: number;
             /** @description Timestamp this operation occurred. */
@@ -181,7 +183,7 @@ interface components {
                 /** @description 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED */
                 payment_status_code?: number;
                 /** @enum {string} */
-                payment_status?: "APPROVED" | "PRE-AUTH" | "PENDING" | "DECLINED" | "REFUNDED" | "CANCELLED";
+                payment_status?: 'APPROVED' | 'PRE-AUTH' | 'PENDING' | 'DECLINED' | 'REFUNDED' | 'CANCELLED';
                 /** @description Before discount. */
                 original_amount?: number;
                 original_currency?: string;
@@ -205,18 +207,18 @@ interface components {
                 /** @description ABA core-banking booking entry reference. */
                 bank_ref?: string;
                 /** @enum {string} */
-                payment_type?: "ABA Pay" | "Alipay" | "Wechat" | "KHQR" | "VISA" | "MC" | "JCB" | "CUP";
+                payment_type?: 'ABA Pay' | 'Alipay' | 'Wechat' | 'KHQR' | 'VISA' | 'MC' | 'JCB' | 'CUP';
                 /** @description Masked account number or card PAN. */
                 payer_account?: string;
                 /** @description ABA Bank for ABA PAY, or issuer bank for KHQR. */
                 bank_name?: string;
                 /** @enum {string} */
-                card_source?: "ONUS" | "OFFUS_DOMESTIC" | "OFFUS_INTERNATIONAL";
+                card_source?: 'ONUS' | 'OFFUS_DOMESTIC' | 'OFFUS_INTERNATIONAL';
                 /** @description Full operation history for this transaction. */
-                transaction_operations?: components["schemas"]["TransactionOperation"][];
+                transaction_operations?: components['schemas']['TransactionOperation'][];
             };
             /** @description code space for this endpoint: "00" success, "5" wrong hash (note: NOT "1" as in check/close-transaction — do not assume a shared numeric code space across endpoints), "6" transaction not found, "8" invalid merchant profile, "11" internal server error, "429" rate limit exceeded. */
-            status: components["schemas"]["StatusBlock"];
+            status: components['schemas']['StatusBlock'];
         };
         /** @description All filter fields are optional but each still occupies a fixed position in the HMAC input per x-hmac-fields on the operation — pass them as null/empty rather than omitting the key. */
         TransactionListRequest: {
@@ -246,11 +248,11 @@ interface components {
             transaction_date?: string;
             apv?: string;
             /** @enum {string} */
-            payment_status?: "APPROVED" | "PRE-AUTH" | "REFUNDED" | "PENDING" | "DECLINED" | "CANCELLED";
+            payment_status?: 'APPROVED' | 'PRE-AUTH' | 'REFUNDED' | 'PENDING' | 'DECLINED' | 'CANCELLED';
             payment_status_code?: number;
             original_amount?: number;
             /** @enum {string} */
-            original_currency?: "KHR" | "USD";
+            original_currency?: 'KHR' | 'USD';
             total_amount?: number;
             discount_amount?: number;
             refund_amount?: number;
@@ -269,21 +271,21 @@ interface components {
             payer_account?: string;
             bank_name?: string;
             /** @enum {string} */
-            card_source?: "ONUS" | "OFFUS_DOMESTIC" | "OFFUS_INTERNATIONAL";
+            card_source?: 'ONUS' | 'OFFUS_DOMESTIC' | 'OFFUS_INTERNATIONAL';
             /**
              * @description N/A for transactions still pending payment.
              * @enum {string}
              */
-            payment_type?: "N/A" | "ABA Pay" | "Alipay" | "Wechat" | "KHQR" | "VISA" | "MC" | "JCB" | "CUP";
+            payment_type?: 'N/A' | 'ABA Pay' | 'Alipay' | 'Wechat' | 'KHQR' | 'VISA' | 'MC' | 'JCB' | 'CUP';
         };
         TransactionListResponse: {
-            data?: components["schemas"]["TransactionListItem"][];
+            data?: components['schemas']['TransactionListItem'][];
             /** @description Current page index. */
             page?: string;
             /** @description Records per page (max 1000). */
             pagination?: string;
             /** @description code space: "00" success, "1" wrong hash, "8" invalid merchant profile, "11" internal server error, "429" rate limit exceeded (50 req/min on this endpoint). */
-            status: components["schemas"]["StatusBlock"];
+            status: components['schemas']['StatusBlock'];
         };
         /** @description NOTE the field name is `request_time`, not `req_time` as on every other endpoint in this spec — see info.description item 8. */
         RefundRequest: {
@@ -338,7 +340,7 @@ interface components {
             };
             /** @description Keyed by lowercase ISO currency code (observed: aud, sgd, eur, gbp, myr, thb, hkd, cny, cad, krw, jpy, vnd). Modeled with additionalProperties rather than enumerating every key as required, since PayWay could add/remove currencies. */
             exchange_rates: {
-                [key: string]: components["schemas"]["CurrencyRate"];
+                [key: string]: components['schemas']['CurrencyRate'];
             };
         };
         LinkAccountRequest: {
@@ -356,9 +358,9 @@ interface components {
              * @description Defines who triggers transactions and whether the amount is fixed or variable. CITR = Customer-Initiated Token Registration, MITR = Merchant-Initiated Token Registration.
              * @enum {string}
              */
-            token_flag?: "CITR_FIX" | "CITR_FLEX" | "MITR_FIX" | "MITR_FLEX" | "CITI_FIX" | "CITI_FLEX" | "MITU_FIX" | "MITU_FLEX";
+            token_flag?: 'CITR_FIX' | 'CITR_FLEX' | 'MITR_FIX' | 'MITR_FLEX' | 'CITI_FIX' | 'CITI_FLEX' | 'MITU_FIX' | 'MITU_FLEX';
             /** @enum {string} */
-            currency?: "KHR" | "USD";
+            currency?: 'KHR' | 'USD';
             /** @description URL where PayWay sends the account details and token after linking. */
             callback_url?: string;
             /** @description base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)). */
@@ -383,12 +385,12 @@ interface components {
             ctid?: string;
             return_deeplink?: string;
             /** @enum {string} */
-            token_flag?: "CITR_FIX" | "CITR_FLEX" | "MITR_FIX" | "MITR_FLEX" | "CITI_FIX" | "CITI_FLEX" | "MITU_FIX" | "MITU_FLEX";
+            token_flag?: 'CITR_FIX' | 'CITR_FLEX' | 'MITR_FIX' | 'MITR_FLEX' | 'CITI_FIX' | 'CITI_FLEX' | 'MITU_FIX' | 'MITU_FLEX';
             /**
              * @description Required for Link Card. Billing frequency.
              * @enum {string}
              */
-            frequency?: "1W" | "1M" | "2M";
+            frequency?: '1W' | '1M' | '2M';
             /** @description Base64-encoded callback URL. */
             return_url?: string;
             callback_url?: string;
@@ -414,9 +416,9 @@ interface components {
             /** @description Customer token identifier. */
             ctid?: string;
             /** @enum {string} */
-            token_flag?: "CITR_FIX" | "CITR_FLEX" | "MITR_FIX" | "MITR_FLEX" | "CITI_FIX" | "CITI_FLEX" | "MITU_FIX" | "MITU_FLEX";
+            token_flag?: 'CITR_FIX' | 'CITR_FLEX' | 'MITR_FIX' | 'MITR_FLEX' | 'CITI_FIX' | 'CITI_FLEX' | 'MITU_FIX' | 'MITU_FLEX';
             /** @enum {string} */
-            currency?: "KHR" | "USD";
+            currency?: 'KHR' | 'USD';
             callback_url?: string;
             hash: string;
         };
@@ -490,13 +492,13 @@ interface components {
             /** @description Payment amount. */
             amount: number;
             /** @enum {string} */
-            purchase_type: "purchase";
+            purchase_type: 'purchase';
             /** @example abapay_khqr */
             payment_option: string;
             /** @description Base64-encoded callback URL. */
             callback_url: string;
             /** @enum {string} */
-            currency: "KHR" | "USD";
+            currency: 'KHR' | 'USD';
             /** @example template2 */
             qr_image_template: string;
             /** @description base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)). */
@@ -598,7 +600,7 @@ interface components {
             /** @description Base64 of RSA-encrypted JSON array of {account, amount}. */
             beneficiaries: string;
             /** @enum {string} */
-            currency: "KHR" | "USD";
+            currency: 'KHR' | 'USD';
             /** @description JSON string associated with the payout. */
             custom_fields?: string;
             /** @description hex(HMAC-SHA512(merchant_id + tran_id + beneficiaries + amount + custom_fields + currency, api_key)). */
@@ -678,7 +680,7 @@ interface components {
         GetTransactionsByMcRefResponse: {
             /** @description 0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error. */
             status?: number;
-            transactions?: components["schemas"]["KhqrTransaction"][];
+            transactions?: components['schemas']['KhqrTransaction'][];
         };
         /** @description Body shape is NOT fixed — PayWay states additional fields may be present depending on payment method. Treat unknown keys as pass-through when computing the signature (item 3 in info.description sorts ALL present keys, not a fixed subset). */
         PaymentCallbackBody: {
@@ -703,6 +705,7 @@ interface CheckoutDomain {
     createTransaction: (params: CreateTransactionParams) => Record<string, unknown> & {
         hash: string;
     };
+    purchase: (params: CreateTransactionParams) => Promise<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>;
     checkTransaction: (transactionId: string, requestTime?: string) => Promise<components['schemas']['CheckTransactionResponse']>;
     closeTransaction: (transactionId: string, requestTime?: string) => Promise<components['schemas']['CloseTransactionResponse']>;
     getTransactionDetail: (transactionId: string, requestTime?: string) => Promise<components['schemas']['TransactionDetailResponse']>;
@@ -793,8 +796,8 @@ interface RateLimitInfo {
     rawHeaders?: Record<string, string>;
 }
 interface PayWayConfig {
-    merchantId: string;
-    apiKey: string;
+    merchantId?: string;
+    apiKey?: string;
     publicKeyPem?: string;
     environment?: 'sandbox' | 'production';
     timeout?: number;
@@ -803,6 +806,7 @@ interface PayWayConfig {
     retryDelayMs?: number;
     rateLimitThrottling?: boolean;
     rateLimitRules?: Record<string, RateLimitRule>;
+    debug?: boolean;
     onRequest?: (endpoint: string, bodyPayload: string) => void;
     onResponse?: (endpoint: string, statusCode: number, body: unknown, rateLimitInfo?: RateLimitInfo) => void;
 }
@@ -962,7 +966,8 @@ declare class PayWay {
      * @param config.baseUrl - Optional override for the base API URL.
      * @throws {PayWayConfigError} If the configuration is missing or invalid.
      */
-    constructor(config: PayWayConfig);
+    constructor(config?: Partial<PayWayConfig>);
+    private static resolveConfig;
     private _getRateLimitRule;
     private _refillRateLimitState;
     private _acquireRateLimitToken;
@@ -980,11 +985,21 @@ declare class PayWay {
     getGatewayErrorDetails(error: unknown): GatewayErrorDetails | null;
 }
 
+type PayWayErrorType = 'config_error' | 'api_error' | 'business_error' | 'network_error' | 'rate_limit_error' | 'signature_error';
 declare class PayWayError extends Error {
-    constructor(message: string);
+    readonly type: PayWayErrorType;
+    constructor(message: string, type: PayWayErrorType);
 }
 declare class PayWayConfigError extends PayWayError {
     constructor(message: string);
+}
+interface PayWayAPIErrorOptions {
+    statusCode?: number;
+    paywayCode?: string;
+    rawBody?: unknown;
+    endpoint?: string;
+    retryable?: boolean;
+    rateLimitInfo?: Record<string, unknown>;
 }
 declare class PayWayAPIError extends PayWayError {
     readonly statusCode?: number;
@@ -993,15 +1008,518 @@ declare class PayWayAPIError extends PayWayError {
     readonly endpoint?: string;
     readonly retryable?: boolean;
     readonly rateLimitInfo?: Record<string, unknown>;
-    constructor(message: string, options?: {
-        statusCode?: number;
-        paywayCode?: string;
-        rawBody?: unknown;
-        endpoint?: string;
-        retryable?: boolean;
-        rateLimitInfo?: Record<string, unknown>;
-    });
+    constructor(message: string, options?: PayWayAPIErrorOptions);
     toJSON(): Record<string, unknown>;
 }
+declare class PayWayBusinessError extends PayWayAPIError {
+    constructor(message: string, options?: PayWayAPIErrorOptions);
+}
+declare class PayWayNetworkError extends PayWayAPIError {
+    constructor(message: string, options?: PayWayAPIErrorOptions);
+}
+declare class PayWayRateLimitError extends PayWayAPIError {
+    constructor(message: string, options?: PayWayAPIErrorOptions);
+}
+declare class PayWaySignatureError extends PayWayAPIError {
+    constructor(message: string, options?: PayWayAPIErrorOptions);
+}
 
-export { type AddBeneficiaryParams, type CheckoutDomain, type CofPaymentParams, type CreatePaymentLinkParams, type CreateTransactionParams, type CredentialsOnFileDomain, type Currency, type Environment, type GenerateOfflineQrParams, type GenerateQrParams, type GetTransactionListParams, type ItemEntry, type KhqrDomain, type LinkAccountParams, type LinkCardParams, PayWay, PayWayAPIError, type PayWayConfig, PayWayConfigError, PayWayError, type PaymentLinkDomain, type PayoutDomain, type PayoutParams, type PreAuthDomain, type QrDomain, type RateLimitInfo, type RateLimitRule, type TokenParams, type UpdateBeneficiaryStatusParams, verifyCallbackSignature };
+/**
+ * TransactionSession — The strict JSON contract between Server (Module 1),
+ * Client (Module 2), and Test Harness (Module 3).
+ *
+ * No module imports another module directly. They communicate ONLY through
+ * this contract (or configuration objects). Changing this schema is a
+ * breaking change for all three modules.
+ *
+ * @example
+ * {
+ *   "sessionId": "tx_1719900000_abc123",
+ *   "status": "pending",
+ *   "responseType": "qr_string",
+ *   "responsePayload": "000201010212...",
+ *   "expiresAt": "2025-07-18T01:45:00.000Z",
+ *   "raw": { "qr_string": "000201010212..." }
+ * }
+ */
+/**
+ * The type of payload PayWay can return for a purchase initiation.
+ *
+ * - `deeplink`   : A URL scheme that launches a native app (e.g. ABA Mobile).
+ * - `qr_string`  : A raw KHQR payload string to be rendered as a QR code.
+ * - `qr_image`   : A URL pointing to a pre-rendered QR image.
+ * - `url`        : A hosted checkout URL to redirect/open.
+ * - `html`       : An HTML snippet (hosted checkout page) to embed.
+ */
+type ResponseType = 'deeplink' | 'qr_string' | 'qr_image' | 'url' | 'html';
+/**
+ * The lifecycle status of a transaction session.
+ *
+ * - `pending`   : Initiated, awaiting customer action.
+ * - `completed` : Customer has paid (confirmed via callback/check).
+ * - `failed`    : Rejected, expired, or cancelled.
+ */
+type SessionStatus = 'pending' | 'completed' | 'failed';
+/**
+ * The canonical contract object produced by the Server module and consumed
+ * by the Client module. The Test Harness generates mock variations of this
+ * object.
+ */
+interface TransactionSession {
+    /** Merchant/SDK-generated unique session identifier. */
+    sessionId: string;
+    /** Current lifecycle status of the session. */
+    status: SessionStatus;
+    /** Discriminator the client uses to pick the correct rendering strategy. */
+    responseType: ResponseType;
+    /**
+     * The payload to render. Shape depends on `responseType`:
+     * - `deeplink`  : string (the deeplink URL scheme)
+     * - `qr_string` : string (raw KHQR payload)
+     * - `qr_image`  : string (URL to the QR image)
+     * - `url`       : string (checkout URL)
+     * - `html`      : string (HTML snippet)
+     */
+    responsePayload: string;
+    /** ISO-8601 timestamp when this session expires. */
+    expiresAt: string;
+    /** The original, unmodified PayWay response for advanced/debug use. */
+    raw?: unknown;
+}
+/**
+ * Input payload accepted by `server.initiateTransaction()`.
+ * This is a merchant-friendly subset of PayWay's PurchaseRequest.
+ */
+interface InitiateTransactionPayload {
+    /** Merchant-generated unique transaction identifier. */
+    transactionId: string;
+    /** Payment amount in the given currency. */
+    amount: number;
+    /** Currency code. Defaults to 'USD'. */
+    currency?: 'USD' | 'KHR';
+    /** Optional buyer first name. */
+    firstname?: string;
+    /** Optional buyer last name. */
+    lastname?: string;
+    /** Optional buyer email. */
+    email?: string;
+    /** Optional buyer phone. */
+    phone?: string;
+    /**
+     * Payment option. When omitted, PayWay auto-displays all supported options
+     * and returns an HTML hosted checkout page. Use `abapay_khqr_deeplink` to
+     * receive a JSON payload with qr_string + deeplink.
+     */
+    paymentOption?: 'cards' | 'abapay_khqr' | 'abapay_khqr_deeplink' | 'alipay' | 'wechat' | 'google_pay' | string;
+    /** Optional shipping fee (additive to amount). */
+    shipping?: number;
+    /** Optional items list (descriptive only). */
+    items?: Array<{
+        name: string;
+        quantity: number;
+        price: number;
+    }>;
+    /** Optional base64-friendly return URL. */
+    returnUrl?: string;
+    /** Optional cancel URL. */
+    cancelUrl?: string;
+    /** Optional view type for hosted checkout. */
+    viewType?: 'hosted_view' | 'popup';
+    /** Optional lifetime in minutes (min 3, max 43200). */
+    lifetime?: number;
+}
+/**
+ * Options for the client response handler.
+ */
+interface HandleResponseOptions {
+    /**
+     * CSS selector or HTMLElement where QR/HTML should be rendered.
+     * If omitted for QR types, a download prompt is generated instead.
+     */
+    target?: string | HTMLElement;
+    /**
+     * If true, opens URL/deeplink in a new tab. If false (default for url),
+     * performs a same-tab redirect via `window.location.href`.
+     */
+    openInNewTab?: boolean;
+    /**
+     * Optional callback invoked after the handler performs its action.
+     * Receives the resolved `TransactionSession` and a description of the
+     * action taken.
+     */
+    onHandled?: (session: TransactionSession, action: string) => void;
+    /**
+     * Optional callback invoked if the handler cannot process the response.
+     */
+    onError?: (error: Error, session: TransactionSession) => void;
+}
+/**
+ * Result returned by `client.handleResponse()`.
+ */
+interface HandleResponseResult {
+    /** The action that was taken, e.g. "redirect", "qr_rendered", "html_embedded". */
+    action: string;
+    /** Whether the action succeeded. */
+    success: boolean;
+    /** The session that was processed. */
+    session: TransactionSession;
+}
+/**
+ * A test case definition used by the Test Harness (Module 3).
+ */
+interface TestCase {
+    /** Human-readable name of the scenario. */
+    name: string;
+    /** The response type this case simulates. */
+    responseType: ResponseType;
+    /** A human-readable description of what the test verifies. */
+    description: string;
+}
+/**
+ * The result of running a single test case.
+ */
+interface TestResult {
+    /** The test case that was run. */
+    name: string;
+    /** Whether the UX flow passed. */
+    passed: boolean;
+    /** A human-readable message describing the outcome. */
+    message: string;
+    /** Duration in milliseconds. */
+    durationMs: number;
+}
+/**
+ * The aggregate report produced by `runTestSuite()`.
+ */
+interface TestSuiteReport {
+    /** Total number of test cases run. */
+    total: number;
+    /** Number of tests that passed. */
+    passed: number;
+    /** Number of tests that failed. */
+    failed: number;
+    /** Per-case results. */
+    results: TestResult[];
+    /** Overall pass/fail. */
+    success: boolean;
+}
+
+/**
+ * Top-level SDK facade — wires the three decoupled modules together.
+ *
+ * This is the ONLY place that imports Module 1 (`src/server/`), Module 2
+ * (`src/client-handler/`), and Module 3 (`src/test/`). The modules themselves
+ * remain independently deployable and never import each other.
+ *
+ * Merchant usage (the "under 5 lines" promise):
+ *
+ *   import { sdk } from 'aba-payway-ts';
+ *
+ *   // 1. Server: initiate
+ *   const session = await sdk.initiate(
+ *     { transactionId: 'order-123', amount: 10, paymentOption: 'abapay_khqr_deeplink' },
+ *     { merchantId, apiKey, environment: 'sandbox' },
+ *   );
+ *
+ *   // 2. Client: render (SDK auto-detects deeplink/qr/url/html)
+ *   await sdk.handle(session, { target: '#payway-container' });
+ *
+ *   // 3. Test: zero-code suite
+ *   const report = await sdk.runTestSuite();
+ *   console.log(report.success ? 'All passed' : 'Failures detected');
+ */
+
+/**
+ * The top-level SDK namespace. This is the primary entry point for merchants.
+ *
+ * It exposes `initiate`, `handle`, `test`, and `runTestSuite` — the four
+ * functions required for a complete purchase flow with zero boilerplate.
+ */
+declare const sdk: {
+    /**
+     * Server-side module namespace (Module 1).
+     * Exposed for merchants who want direct access to the initiator.
+     */
+    server: {
+        /**
+         * Initiate a PayWay purchase transaction.
+         * @param payload - Merchant-friendly purchase parameters.
+         * @param config  - PayWay credentials and environment.
+         * @returns A standardized `TransactionSession` object.
+         */
+        initiateTransaction(payload: InitiateTransactionPayload, config: PayWayConfig): Promise<TransactionSession>;
+        /**
+         * Simulate a purchase without hitting the real PayWay API.
+         * @param responseType - Which mock response type to generate.
+         * @param payload      - Optional transaction details.
+         * @returns A mock `TransactionSession` object.
+         */
+        test(responseType?: ResponseType, payload?: Partial<InitiateTransactionPayload>): TransactionSession;
+    };
+    /**
+     * Client-side module namespace (Module 2).
+     * Exposed for merchants who want direct access to the response handler.
+     */
+    client: {
+        /**
+         * Handle a PayWay response. Auto-detects the response type and performs
+         * the correct UX action — no merchant logic required.
+         * @param session  - The `TransactionSession` from the server module.
+         * @param options  - Optional rendering/redirect options.
+         * @returns A `HandleResponseResult` describing the action taken.
+         */
+        handleResponse(session: TransactionSession, options?: HandleResponseOptions): Promise<HandleResponseResult>;
+    };
+    /**
+     * Initiate a PayWay purchase transaction (Server module).
+     *
+     * Convenience alias for `sdk.server.initiateTransaction()`.
+     *
+     * @param payload - Merchant-friendly purchase parameters.
+     * @param config  - PayWay credentials and environment.
+     * @returns A standardized `TransactionSession` object.
+     */
+    initiate(payload: InitiateTransactionPayload, config: PayWayConfig): Promise<TransactionSession>;
+    /**
+     * Handle a PayWay response (Client module). Auto-detects the response
+     * type and performs the correct UX action — no merchant logic required.
+     *
+     * @param session  - The `TransactionSession` from `sdk.initiate()`.
+     * @param options  - Optional rendering/redirect options.
+     * @returns A `HandleResponseResult` describing the action taken.
+     */
+    handle(session: TransactionSession, options?: HandleResponseOptions): Promise<HandleResponseResult>;
+    /**
+     * Simulate a purchase without hitting the real PayWay API (Server module).
+     * Generates a mock `TransactionSession` for any of the 5 response types.
+     *
+     * @param responseType - Which mock response type to generate.
+     * @param payload      - Optional transaction details.
+     * @returns A mock `TransactionSession` object.
+     */
+    test(responseType?: ResponseType, payload?: Partial<InitiateTransactionPayload>): TransactionSession;
+    /**
+     * Run the zero-code test suite (Test module). Wires Module 1 and Module 2
+     * into Module 3's harness and runs all 5 response-type scenarios.
+     *
+     * The suite spins up a real HTTP mock PayWay server, points the real
+     * `server.initiateTransaction()` at it via `baseUrl`, and drives four of
+     * the five response types through the full Module 1 pipeline (HTTP →
+     * PayWay client → normalise → contract). The `html` case bypasses the
+     * PayWay HTTP client (which only decodes JSON) and feeds a raw HTML body
+     * directly to `normalizePaywayResponse` — still exercising Module 1's
+     * normalisation code.
+     *
+     * @returns A `TestSuiteReport` with per-case pass/fail results.
+     */
+    runTestSuite(): Promise<TestSuiteReport>;
+    /**
+     * Convenience: run the test suite and print a formatted report to the
+     * console. Returns the report for programmatic inspection.
+     */
+    runTestSuiteAndPrint(): Promise<TestSuiteReport>;
+};
+type Sdk = typeof sdk;
+
+/**
+ * Module 1 — Server-Side Core (The "Initiator")
+ *
+ * Agent Focus: Backend / Infrastructure
+ *
+ * This module is independently deployable. It handles authentication,
+ * payload validation, and submission to PayWay's internal APIs, then
+ * normalizes the raw PayWay response into the standardized
+ * `TransactionSession` contract defined in `src/schema.ts`.
+ *
+ * It does NOT import Module 2 (client) or Module 3 (test). It only imports
+ * the shared contract (`../schema.js`) and the existing PayWay transport
+ * (`../client.js`), which is infrastructure — not another module.
+ */
+
+/**
+ * Normalizes a raw PayWay purchase response into a `TransactionSession`.
+ *
+ * PayWay returns one of:
+ *  - An HTML string (hosted checkout page) when payment_option is omitted or
+ *    is `cards`/`abapay_khqr`/`alipay`/`wechat`/`google_pay`.
+ *  - A JSON object (`PurchaseQrResponse`) when payment_option is
+ *    `abapay_khqr_deeplink`, containing `qr_string`, `abapay_deeplink`, and
+ *    `checkout_qr_url`.
+ *
+ * This function inspects the raw response and assigns the correct
+ * `responseType` discriminator so the client module knows how to render it.
+ */
+declare function normalizePaywayResponse(raw: unknown, sessionId: string, lifetimeMinutes?: number): TransactionSession;
+/**
+ * Server-side SDK namespace.
+ *
+ * @example
+ * import { server } from 'aba-payway-ts';
+ *
+ * const session = await server.initiateTransaction(
+ *   { transactionId: 'order-123', amount: 10, paymentOption: 'abapay_khqr_deeplink' },
+ *   { merchantId: process.env.PAYWAY_MERCHANT_ID!, apiKey: process.env.PAYWAY_API_KEY!, environment: 'sandbox' },
+ * );
+ */
+declare const server: {
+    /**
+     * Initiate a PayWay purchase transaction.
+     *
+     * This function is importable and callable by any server function
+     * (REST endpoints, GraphQL resolvers, webhook handlers). It handles
+     * authentication, payload validation, and submission to PayWay's API,
+     * returning a standardized `TransactionSession` for the client to process.
+     *
+     * @param payload - Merchant-friendly purchase parameters.
+     * @param config  - PayWay credentials and environment.
+     * @returns A standardized `TransactionSession` object.
+     */
+    initiateTransaction(payload: InitiateTransactionPayload, config: PayWayConfig): Promise<TransactionSession>;
+    /**
+     * Simulate a purchase without requiring the merchant to write fetch/axios
+     * boilerplate. This generates a mock `TransactionSession` for each of the
+     * 5 response types so the merchant can verify their server wiring and the
+     * client rendering without hitting the real PayWay API.
+     *
+     * @param responseType - Which mock response type to generate. Defaults to 'qr_string'.
+     * @param payload     - Optional transaction details to embed in the mock.
+     * @returns A mock `TransactionSession` object.
+     */
+    test(responseType?: ResponseType, payload?: Partial<InitiateTransactionPayload>): TransactionSession;
+};
+type ServerModule = typeof server;
+
+/**
+ * Module 2 — Client-Side Response Handler (The "Presenter")
+ *
+ * Agent Focus: Frontend / UI
+ *
+ * This module is independently deployable. It consumes the
+ * `TransactionSession` contract from `src/schema.ts` and dynamically handles
+ * all possible PayWay return types without manual intervention by the
+ * merchant:
+ *
+ * - Deeplink  : Trigger a native app redirect automatically.
+ * - QR String : Render the QR code directly into a target DOM element or
+ *               generate a download prompt.
+ * - QR Image  : Render the QR image URL into a target DOM element.
+ * - Checkout URL : Perform a window.location.href redirect or open a new tab.
+ * - HTML Snippet : Safely embed the HTML into the merchant's container.
+ *
+ * It does NOT import Module 1 (server) or Module 3 (test). It only imports
+ * the shared contract (`../schema.js`).
+ */
+
+/**
+ * Client-side SDK namespace.
+ *
+ * @example
+ * import { client } from 'aba-payway-ts';
+ *
+ * // session comes from server.initiateTransaction()
+ * client.handleResponse(session, { target: '#payway-container' });
+ */
+declare const client: {
+    /**
+     * Consume a `TransactionSession` and dynamically handle its response type
+     * without manual intervention by the merchant.
+     *
+     * @param session  - The `TransactionSession` from the server module.
+     * @param options  - Optional rendering/redirect options.
+     * @returns A `HandleResponseResult` describing the action taken.
+     */
+    handleResponse(session: TransactionSession, options?: HandleResponseOptions): Promise<HandleResponseResult>;
+};
+type ClientModule = typeof client;
+
+/**
+ * Module 3 — Automated Testing Harness (The "Simulator")
+ *
+ * Agent Focus: QA / DevEx
+ *
+ * This module is independently deployable. It provides a zero-code testing
+ * utility that:
+ *
+ *  1. Spins up a local mock server that mimics PayWay's behaviors.
+ *  2. Calls the Server-Side Initiator (Module 1) — injected as a dependency.
+ *  3. Feeds the mock responses to the Client Handler (Module 2) — injected as
+ *     a dependency.
+ *  4. Logs a pass/fail report on the UX flow.
+ *
+ * ISOLATION: This module does NOT import Module 1 (`src/server/`) or Module 2
+ * (`src/client-handler/`) directly. It accepts them as injected dependencies
+ * (configuration objects) and communicates only via the `TransactionSession`
+ * contract defined in `src/schema.ts`. The top-level `sdk.runTestSuite()`
+ * wires the modules together; the modules themselves remain decoupled.
+ */
+
+/**
+ * The injected dependencies for the test harness. These are the only
+ * connection to Module 1 and Module 2 — passed in, never imported.
+ */
+interface TestHarnessDeps {
+    /**
+     * Module 1's `initiateTransaction` function (or a mock that produces
+     * `TransactionSession` objects).
+     */
+    initiate: (payload: InitiateTransactionPayload, config?: unknown) => Promise<TransactionSession> | TransactionSession;
+    /**
+     * Module 2's `handleResponse` function (or a mock that processes
+     * `TransactionSession` objects).
+     */
+    handle: (session: TransactionSession, options?: unknown) => Promise<HandleResponseResult> | HandleResponseResult;
+}
+/**
+ * The default test cases covering all 5 response types.
+ */
+declare const DEFAULT_TEST_CASES: TestCase[];
+/**
+ * Generates a mock `TransactionSession` for a given response type. This is
+ * the contract variation generator that all agents agreed upon.
+ */
+declare function generateMockSession(responseType: ResponseType, transactionId?: string): TransactionSession;
+/**
+ * Validates that a `TransactionSession` conforms to the contract schema.
+ * Returns an error message string if invalid, or null if valid.
+ */
+declare function validateSessionContract(session: unknown): string | null;
+/**
+ * Starts a local mock HTTP server that mimics PayWay's purchase endpoint.
+ *
+ * The server inspects the incoming `tran_id` field (which the test harness
+ * encodes as `e2e-<responseType>-<...>`) to decide which response envelope
+ * to return, so the same endpoint can drive all four JSON-based response
+ * types (deeplink, qr_string, qr_image, url) through the real Module 1 path.
+ *
+ * For the `html` case (which the PayWay HTTP client cannot currently decode
+ * because `_executeFetch` rejects non-JSON responses), a separate
+ * `/mock/html` endpoint returns raw HTML text that the test harness feeds
+ * directly to `normalizePaywayResponse`.
+ *
+ * @param port - The port to listen on. Defaults to 0 (ephemeral).
+ * @returns The running `HttpServer` instance.
+ */
+declare function startMockPaywayServer(port?: number): Promise<Server>;
+/**
+ * Returns `http://127.0.0.1:<port>` for a running mock server. Throws if
+ * the server has not bound to a port yet.
+ */
+declare function getMockPaywayUrl(server: Server): string;
+/**
+ * Stops a mock HTTP server.
+ */
+declare function stopMockPaywayServer(server: Server): Promise<void>;
+/**
+ * Runs the full test suite against the injected Module 1 and Module 2.
+ *
+ * @param deps   - The injected `initiate` and `handle` functions.
+ * @param cases  - Optional custom test cases. Defaults to all 5 response types.
+ * @returns A `TestSuiteReport` with per-case pass/fail results.
+ */
+declare function runTestSuite(deps: TestHarnessDeps, cases?: TestCase[]): Promise<TestSuiteReport>;
+/**
+ * Formats a `TestSuiteReport` as a human-readable string for console output.
+ */
+declare function formatTestReport(report: TestSuiteReport): string;
+
+export { type AddBeneficiaryParams, type CheckoutDomain, type ClientModule, type CofPaymentParams, type CreatePaymentLinkParams, type CreateTransactionParams, type CredentialsOnFileDomain, type Currency, DEFAULT_TEST_CASES, type Environment, type GenerateOfflineQrParams, type GenerateQrParams, type GetTransactionListParams, type HandleResponseOptions, type HandleResponseResult, type InitiateTransactionPayload, type ItemEntry, type KhqrDomain, type LinkAccountParams, type LinkCardParams, PayWay, PayWayAPIError, PayWayBusinessError, type PayWayConfig, PayWayConfigError, PayWayError, PayWayNetworkError, PayWayRateLimitError, PayWaySignatureError, type PaymentLinkDomain, type PayoutDomain, type PayoutParams, type PreAuthDomain, type QrDomain, type RateLimitInfo, type RateLimitRule, type ResponseType, type Sdk, type ServerModule, type SessionStatus, type TestCase, type TestHarnessDeps, type TestResult, type TestSuiteReport, type TokenParams, type TransactionSession, type UpdateBeneficiaryStatusParams, client, formatTestReport, generateMockSession, getMockPaywayUrl, normalizePaywayResponse, runTestSuite, sdk, server, startMockPaywayServer, stopMockPaywayServer, validateSessionContract, verifyCallbackSignature };

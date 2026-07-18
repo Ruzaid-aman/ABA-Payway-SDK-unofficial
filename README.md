@@ -47,9 +47,46 @@ For a secure integration, separate your payment flow into distinct Backend and F
 npm install aba-payway-ts
 ```
 
+### Install AI skills
+
+Install the SDK's task-focused skill guides for supported coding agents:
+
+```bash
+npx payway-sdk skills add claude copilot
+```
+
+Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use `npx payway-sdk skills list` to inspect installed guides and `npx payway-sdk skills remove claude` to remove the ABA PayWay guides for an agent.
+
 ## Quick Start
 
+### Full integration guide
+
+For a complete 15-chapter integration guide, diagrams, and runnable examples, see [docs/README.md](./docs/README.md).
+
+> Note: The SDK also performs fast client-side validation per domain. See the validation behavior section in [docs/README.md](./docs/README.md) for details.
+
+### Documentation & examples
+
+- `README.md` for a quick getting started flow
+- `docs/README.md` for the full 15-chapter integration guide
+- `docs/examples/` for runnable webhook, checkout, QR, and backend samples
+- `CONTRIBUTING.md` for contribution and testing guidance
+- `SECURITY.md` for responsible vulnerability disclosure
+- `docs/VERSIONING.md` for SDK versioning policy
+- `docs/RELEASE_CHECKLIST.md` for release verification and sandbox gating
+- `docs/api/README.md` for the generated API reference
+
 ### 1. Initialize the Client
+
+Set `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY` to initialize with no constructor arguments. Optional environment variables are `PAYWAY_RSA_PUBLIC_KEY`, `PAYWAY_BASE_URL`, `PAYWAY_SANDBOX`, `PAYWAY_TIMEOUT`, and `DEBUG_PAYWAY`. Explicit constructor options always take precedence.
+
+```typescript
+import { PayWay } from 'aba-payway-ts';
+
+const payway = new PayWay();
+```
+
+Set `debug: true` or `DEBUG_PAYWAY=true` to log sanitized request and response diagnostics. Sensitive values such as API keys, HMAC hashes, merchant authorization, payment tokens, and CVVs are redacted.
 
 ```typescript
 import { PayWay } from 'aba-payway-ts';
@@ -148,11 +185,17 @@ PayWay notifies your backend server when payments are completed. Authenticate th
 
 ```typescript
 app.post('/api/payway-webhook', (req, res) => {
-  const receivedSig = req.body.hash;
-  const bodyWithoutHash = { ...req.body };
-  delete bodyWithoutHash.hash;
+  const receivedSig = req.headers['x-payway-hmac-sha512'] as string | undefined;
 
-  // Use timing-safe validation
+  if (!receivedSig) {
+    return res.status(400).send('Missing signature header');
+  }
+
+  const { hash, ...bodyWithoutHash } = req.body;
+
+  // Use timing-safe validation with the header-provided signature.
+  // The callback signature is sourced from the X-PAYWAY-HMAC-SHA512 header,
+  // not from the request body, per PayWay webhook schema.
   const isValid = payway.verifyCallback(bodyWithoutHash, receivedSig);
   
   if (!isValid) {
@@ -164,6 +207,16 @@ app.post('/api/payway-webhook', (req, res) => {
   res.status(200).send('OK');
 });
 ```
+
+### Idempotency and duplicate protection
+
+PayWay does not currently expose Stripe-style per-request `Idempotency-Key` support in its public API. Instead, use a unique `tran_id` for every checkout attempt, persist transaction events durably, and deduplicate duplicate webhook callbacks or repeated return URL checks on your backend.
+
+- Use `tran_id` as your primary duplicate-detection key.
+- Treat webhook callbacks as the trusted final source of truth.
+- Do not rely on client-side redirects alone for payment confirmation.
+
+> For sandbox verification, always supply `PAYWAY_MERCHANT_ID`, `PAYWAY_API_KEY`, and `PAYWAY_PUBLIC_KEY_PEM` from environment variables, never hardcode them in source.
 
 ---
 
@@ -334,17 +387,23 @@ const txs = await payway.khqr.getTransactionsByMerchantRef('mc-ref-9988');
 All SDK API failures throw a structured `PayWayAPIError` (or `PayWayConfigError` for local configuration mistakes).
 
 ```typescript
-import { PayWayAPIError } from 'aba-payway-ts';
+import { PayWayAPIError, PayWayBusinessError, PayWayNetworkError, PayWayRateLimitError } from 'aba-payway-ts';
 
 try {
   const status = await payway.checkout.checkTransaction('order-999');
 } catch (error) {
-  if (error instanceof PayWayAPIError) {
+  if (error instanceof PayWayRateLimitError) {
+    console.error('Rate limit error — retry later:', error.message);
+  } else if (error instanceof PayWayNetworkError) {
+    console.error('Network error — retry may help:', error.message);
+  } else if (error instanceof PayWayBusinessError) {
+    console.error('Business error from PayWay:', error.paywayCode, error.message);
+  } else if (error instanceof PayWayAPIError) {
     console.error('API Error Code:', error.paywayCode); // Internal PayWay code (e.g. "1" for wrong hash)
     console.error('HTTP Status:', error.statusCode);    // HTTP Status code (e.g. 403)
     console.error('Details:', error.rawBody);           // Complete JSON response body
   } else {
-    console.error('System/Network failure:', error.message);
+    console.error('System or unexpected failure:', error);
   }
 }
 ```

@@ -688,12 +688,16 @@ import { payway } from '../config/payway';
 const router = Router();
 
 router.post('/', (req, res) => {
-  const receivedHash = req.body.hash;
+  const receivedHash = req.headers['x-payway-hmac-sha512'] as string | undefined;
 
-  // Remove hash from body for verification
+  if (!receivedHash) {
+    console.warn('⚠️ Missing webhook signature header');
+    return res.status(400).json({ error: 'Missing signature header' });
+  }
+
+  // Remove hash from body for verification; the header is the source of truth.
   const { hash, ...bodyWithoutHash } = req.body;
 
-  // Verify the signature came from PayWay
   const isValid = payway.verifyCallback(bodyWithoutHash, receivedHash);
 
   if (!isValid) {

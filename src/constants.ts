@@ -13,6 +13,7 @@ export const ENDPOINTS = {
   linkAccount: '/api/payment-credential/v3/aof/link-account',
   linkCard: '/api/payment-credential/v3/cof/link-card',
   payment: '/api/payment-gateway/v3/purchase/payment-credential',
+  purchase: '/api/payment-gateway/v1/payments/purchase',
   renewToken: '/api/payment-credential/v3/token-management/renew-expired-account-token',
   getTokenDetails: '/api/payment-credential/v3/token-management/get-token-details',
   removeToken: '/api/payment-credential/v3/token-management/remove-token',

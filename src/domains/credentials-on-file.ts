@@ -1,5 +1,14 @@
 import { ENDPOINTS } from '../constants.js';
-import { formatAmount, encodeBase64IfNeeded, filterParams } from '../utils.js';
+import {
+  formatAmount,
+  encodeBase64IfNeeded,
+  filterParams,
+  validateCurrency,
+  validatePositiveAmount,
+  validateTransactionId,
+  validatePublicHttpsUrl,
+} from '../utils.js';
+import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
 import type { PayWayConfig, LinkAccountParams, LinkCardParams, CofPaymentParams, TokenParams } from '../client.js';
 
@@ -25,6 +34,18 @@ export function createCredentialsOnFileDomain(
 ): CredentialsOnFileDomain {
   return {
     linkAccount: (params: LinkAccountParams) => {
+      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
+        throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      }
+
+      if (params.currency) {
+        validateCurrency(params.currency);
+      }
+
+      if (params.callbackUrl) {
+        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+      }
+
       return request<components['schemas']['LinkAccountResponse']>(
         ENDPOINTS.linkAccount,
         filterParams({
@@ -51,6 +72,18 @@ export function createCredentialsOnFileDomain(
     },
 
     linkCard: (params: LinkCardParams) => {
+      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
+        throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      }
+
+      if (params.returnUrl) {
+        validatePublicHttpsUrl(params.returnUrl, 'returnUrl');
+      }
+
+      if (params.callbackUrl) {
+        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+      }
+
       return request<components['schemas']['LinkCardResponse']>(
         ENDPOINTS.linkCard,
         filterParams({
@@ -80,6 +113,22 @@ export function createCredentialsOnFileDomain(
     },
 
     payment: (params: CofPaymentParams) => {
+      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
+        throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      }
+
+      validateTransactionId(params.transactionId);
+      validatePositiveAmount(params.amount, params.currency || 'USD');
+      validateCurrency(params.currency);
+
+      if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
+        throw new PayWayConfigError('paymentToken is required for Cof payments');
+      }
+
+      if (params.callbackUrl) {
+        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+      }
+
       return request<components['schemas']['CofPaymentResponse']>(
         ENDPOINTS.payment,
         filterParams({
@@ -110,6 +159,16 @@ export function createCredentialsOnFileDomain(
     },
 
     renewToken: (params: TokenParams) => {
+      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
+        throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      }
+      if (typeof params.ctid !== 'string' || params.ctid.trim().length === 0) {
+        throw new PayWayConfigError('ctid is required and must be a non-empty string');
+      }
+      if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
+        throw new PayWayConfigError('paymentToken is required');
+      }
+
       return request<components['schemas']['RenewTokenResponse']>(
         ENDPOINTS.renewToken,
         filterParams({
@@ -124,6 +183,16 @@ export function createCredentialsOnFileDomain(
     },
 
     getTokenDetails: (params: TokenParams) => {
+      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
+        throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      }
+      if (typeof params.ctid !== 'string' || params.ctid.trim().length === 0) {
+        throw new PayWayConfigError('ctid is required and must be a non-empty string');
+      }
+      if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
+        throw new PayWayConfigError('paymentToken is required');
+      }
+
       return request<components['schemas']['GetTokenDetailsResponse']>(
         ENDPOINTS.getTokenDetails,
         filterParams({
@@ -138,6 +207,16 @@ export function createCredentialsOnFileDomain(
     },
 
     removeToken: (params: TokenParams) => {
+      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
+        throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      }
+      if (typeof params.ctid !== 'string' || params.ctid.trim().length === 0) {
+        throw new PayWayConfigError('ctid is required and must be a non-empty string');
+      }
+      if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
+        throw new PayWayConfigError('paymentToken is required');
+      }
+
       return request<components['schemas']['RemoveTokenResponse']>(
         ENDPOINTS.removeToken,
         filterParams({

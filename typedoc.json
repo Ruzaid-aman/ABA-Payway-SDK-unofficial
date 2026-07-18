@@ -1,0 +1,10 @@
+{
+  "entryPoints": ["src/index.ts"],
+  "out": "docs/api",
+  "tsconfig": "tsconfig.docs.json",
+  "exclude": ["**/__tests__/**", "**/docs/**", "**/payway-boilerplate/**"],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "gitRevision": "main",
+  "includeVersion": false
+}
