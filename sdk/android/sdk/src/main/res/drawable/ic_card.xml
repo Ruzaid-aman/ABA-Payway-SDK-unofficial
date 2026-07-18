@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Card icon placeholder -->
+    <path
+        android:fillColor="#333333"
+        android:pathData="M4,10C4,8.9 4.9,8 6,8L42,8C43.1,8 44,8.9 44,10L44,38C44,39.1 43.1,40 42,40L6,40C4.9,40 4,39.1 4,38z" />
+    <path
+        android:fillColor="#1A73E8"
+        android:pathData="M4,16L44,16L44,22L4,22z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,28L20,28L20,30L8,30z" />
+</vector>

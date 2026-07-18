@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- ABA icon placeholder - filled circle with "A" -->
+    <path
+        android:fillColor="#1A3C78"
+        android:pathData="M24,2C11.85,2 2,11.85 2,24s9.85,22 22,22 22,-9.85 22,-22S36.15,2 24,2z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,34L14,28L12,34L10,34L13,22L15.5,22L18.5,34L16,34z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,34L19,30L23,30L22.2,34L20,34z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M25,22L28,34L30.5,34L33,22L35.5,22L31.5,36L31,36L30.5,36L26.5,36L26,36L25.5,36L22,22L25,22z" />
+</vector>

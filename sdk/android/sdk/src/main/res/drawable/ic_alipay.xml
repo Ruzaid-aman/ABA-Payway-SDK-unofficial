@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Alipay icon placeholder - blue circle -->
+    <path
+        android:fillColor="#1677FF"
+        android:pathData="M24,2C11.85,2 2,11.85 2,24s9.85,22 22,22 22,-9.85 22,-22S36.15,2 24,2z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,18L34,18C34,18 34,30 24,34C14,30 14,18 14,18z" />
+</vector>

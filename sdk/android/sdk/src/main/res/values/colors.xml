@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary brand color (ABA green) -->
+    <color name="primary">#1A7340</color>
+    <color name="primary_dark">#145A30</color>
+    <color name="primary_light">#2E9E5A</color>
+
+    <!-- Background colors -->
+    <color name="payment_sheet_background">#FFFFFF</color>
+    <color name="surface">#F5F5F5</color>
+
+    <!-- Text colors -->
+    <color name="amount_text">#1A1A1A</color>
+    <color name="currency_text">#666666</color>
+    <color name="option_text">#1A1A1A</color>
+    <color name="expiry_text">#999999</color>
+    <color name="error_text">#D32F2F</color>
+
+    <!-- Status colors -->
+    <color name="success">#1A7340</color>
+    <color name="warning">#F57C00</color>
+    <color name="error">#D32F2F</color>
+
+    <!-- Divider -->
+    <color name="divider">#E0E0E0</color>
+
+    <!-- Payment option selection colors -->
+    <color name="option_selected_background">#E8F5E9</color>
+    <color name="option_default_background">#FFFFFF</color>
+    <color name="option_selected_stroke">#1A7340</color>
+    <color name="option_default_stroke">#E0E0E0</color>
+
+    <!-- White/Black -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>

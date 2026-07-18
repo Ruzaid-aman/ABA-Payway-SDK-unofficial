@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ABAPayWay SDK</string>
+
+    <!-- Payment sheet -->
+    <string name="pay_now">Pay Now</string>
+    <string name="cancel">Cancel</string>
+    <string name="processing">Processing…</string>
+    <string name="payment_options">Payment Options</string>
+
+    <!-- Payment options -->
+    <string name="aba_khqr">ABA KHQR</string>
+    <string name="aba_khqr_deeplink">ABA Pay (Recommended)</string>
+    <string name="cards">Credit/Debit Card</string>
+    <string name="alipay">Alipay</string>
+    <string name="wechat">WeChat Pay</string>
+    <string name="google_pay">Google Pay</string>
+
+    <!-- QR display -->
+    <string name="qr_code">QR Code</string>
+    <string name="scan_qr_code">Scan this QR code with ABA Mobile</string>
+    <string name="qr_expires_in">QR expires in %s</string>
+    <string name="qr_expired">QR code has expired</string>
+
+    <!-- Errors -->
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_payment_failed">Payment failed: %s</string>
+    <string name="error_aba_not_installed">ABA Mobile is not installed</string>
+    <string name="error_invalid_config">Invalid payment configuration</string>
+
+    <!-- Accessibility -->
+    <string name="payment_option_icon">Payment option icon</string>
+    <string name="selected">Selected</string>
+    <string name="close">Close</string>
+
+    <!-- App store -->
+    <string name="install_aba_mobile">Install ABA Mobile</string>
+    <string name="aba_not_installed_message">ABA Mobile is required for this payment method. Would you like to install it?</string>
+</resources>
