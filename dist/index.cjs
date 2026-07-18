@@ -333,6 +333,7 @@ var SENSITIVE_LOG_KEYS = /* @__PURE__ */ new Set([
   "merchant_auth",
   "password",
   "pwt",
+  "payment_token",
   "authorization",
   "x-payway-hmac-sha512",
   "publickeypem",
