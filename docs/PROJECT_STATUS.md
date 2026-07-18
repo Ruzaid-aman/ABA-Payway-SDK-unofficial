@@ -289,8 +289,8 @@ Tasks must be completed **in this order**:
 ## Quick Reference
 
 ```
-Current version:  1.0.0
-Tests:            136 passing
+Current version:  1.1.0
+Tests:            204 passing
 Build:            Clean (ESM + CJS + .d.ts)
-Next task:        Tag v1.0.0 — production-ready release
+Next task:        Tag and publish v1.1.0 (AI skills CLI, env var auto-discovery, sanitized debug logging)
 ```
