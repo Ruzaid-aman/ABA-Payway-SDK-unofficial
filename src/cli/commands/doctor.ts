@@ -1,8 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { validatePayWayEnv, hasBlockingIssues, type EnvIssue } from '../../config/envValidator.js';
+import { validatePayWayEnv, type EnvIssue } from '../../config/envValidator.js';
 import { detectFramework, type DetectedFramework } from '../../config/frameworkDetector.js';
-import { BASE_URLS } from '../../constants.js';
 
 export interface DoctorOptions {
   readonly cwd?: string;

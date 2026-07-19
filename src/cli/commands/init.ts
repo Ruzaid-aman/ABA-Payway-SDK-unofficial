@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { detectFramework, type DetectedFramework } from '../../config/frameworkDetector.js';
 import { validatePayWayEnv, type EnvIssue } from '../../config/envValidator.js';
@@ -31,7 +31,8 @@ export interface InitResult {
 
 function writeFileIfMissing(filePath: string, content: string): boolean {
   if (existsSync(filePath)) return false;
-  mkdirSync(path.dirname(filePath), { recursive: true });
+  const dir = path.dirname(filePath);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(filePath, content, { encoding: 'utf8' });
   return true;
 }

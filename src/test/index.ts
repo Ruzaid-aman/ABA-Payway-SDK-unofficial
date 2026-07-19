@@ -194,8 +194,23 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
             // Fall through — tranId stays ''.
           }
 
+          // Support both long-form (e2e-deeplink-*, e2e-qr_string-*, e2e-qr_image-*)
+          // and short-form (e2e-dl-*, e2e-qs-*, e2e-qi-*) transaction ID prefixes.
           const knownTypes: ResponseType[] = ['deeplink', 'qr_string', 'qr_image', 'url'];
-          const matched = knownTypes.find((t) => tranId.startsWith(`e2e-${t}-`));
+          const shortForm: Record<string, ResponseType> = {
+            dl: 'deeplink',
+            qs: 'qr_string',
+            qi: 'qr_image',
+            url: 'url',
+          };
+          // Use a non-greedy match so we capture only the short code (e.g. "qi")
+          // and not a suffix like "qi-1f4s3i" from the timestamp-embedded tran_id.
+          const matched =
+            knownTypes.find((t) => tranId.startsWith(`e2e-${t}-`)) ??
+            (() => {
+              const suffix = tranId.match(/^e2e-([a-z]+?)-/)?.[1] ?? '';
+              return shortForm[suffix] ?? null;
+            })();
           const responseType: ResponseType = matched ?? 'qr_string';
 
           const addr = server.address() as { port: number } | null;
@@ -291,9 +306,18 @@ export async function runTestSuite(
       //    performs a real HTTP request to the mock PayWay server; in unit
       //    mode it may return a stubbed `TransactionSession`. The harness
       //    doesn't care — it only sees the contract.
+      // Use short-form transaction ID prefixes (≤ 12 chars) so they
+      // pass the SDK's 20-char validateTransactionId constraint.
+      const shortForm: Record<ResponseType, string> = {
+        deeplink: 'dl',
+        qr_string: 'qs',
+        qr_image: 'qi',
+        url: 'url',
+        html: 'html',
+      };
       const initiated = await deps.initiate(
         {
-          transactionId: `e2e-${tc.responseType}-${Date.now()}`,
+          transactionId: `e2e-${shortForm[tc.responseType]}-${Date.now().toString(36)}`,
           amount: 10,
           paymentOption: tc.responseType === 'deeplink' ? 'abapay_khqr_deeplink' : undefined,
         },

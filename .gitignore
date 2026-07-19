@@ -48,6 +48,9 @@ PaywAySandboxkey.txt
 # Python (for scripts)
 __pycache__/
 *.pyc
+
+# Generated test artifacts
+test-logs/
 .venv/
 
 # Output logs

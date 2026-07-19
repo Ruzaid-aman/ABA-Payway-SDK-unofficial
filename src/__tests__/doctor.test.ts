@@ -68,7 +68,7 @@ describe('runDoctor', () => {
       [
         'PAYWAY_ENV=sandbox',
         'PAYWAY_MERCHANT_ID=test-merchant',
-        'PAYWAY_API_KEY=' + 'a'.repeat(32),
+        `PAYWAY_API_KEY=${'a'.repeat(32)}`,
         'PAYWAY_RETURN_URL=https://example.com/return',
       ].join('\n'),
     );

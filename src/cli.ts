@@ -14,13 +14,11 @@ import {
 } from './cli/commands/skills.js';
 import {
   PAYMENT_STATUS_CODES,
-  PAYMENT_STATUS_LABELS,
   REFUND_ERROR_CODES,
 } from './constants.js';
 import {
   validateRefundAmount,
   validateTransactionId,
-  validateCurrency,
   validatePositiveAmount,
 } from './utils.js';
 import { generateOfflineQR } from './khqr-offline.js';

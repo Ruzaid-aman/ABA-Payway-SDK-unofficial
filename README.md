@@ -79,10 +79,21 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 
 | Script | Description |
 |---|---|
-| `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 10 PayWay templates at a given amount, save PNG images + QR strings to `test-logs/qr-images/` |
-| `npx tsx scripts/check-qr-transactions.ts` | Fetch recent transactions via `getTransactionList`, query detail for each via `getTransactionDetail`, save results to JSON |
 | `npx tsx scripts/sandbox-probe.ts` | Run full sandbox probe across all 7 API domains |
 | `npx tsx scripts/sandbox-probe-qr-api.ts` | Probe QR API endpoint specifically |
+| `npx tsx scripts/sandbox-probe-checkout-errors.ts` | Probe checkout error handling |
+| `npx tsx scripts/sandbox-probe-cof.ts` | Probe credentials-on-file endpoints |
+| `npx tsx scripts/sandbox-probe-pre-auth.ts` | Probe pre-authorization endpoints |
+| `npx tsx scripts/sandbox-probe-payout.ts` | Probe payout/beneficiary endpoints |
+| `npx tsx scripts/sandbox-probe-khqr.ts` | Probe KHQR endpoints |
+| `npx tsx scripts/sandbox-integration-test.ts` | Full lifecycle test — QR → poll → refund → exchange rate |
+| `npx tsx scripts/post-payment-test.ts` | Post-payment operations (refund, close, check) |
+| `npx tsx scripts/qr-payment-test.ts` | QR payment flow with live transaction polling |
+| `npx tsx scripts/check-qr-transactions.ts` | Fetch transactions via `getTransactionList`, query detail for each |
+| `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 10 PayWay templates, save PNGs + QR strings to `test-logs/qr-images/` |
+| `npx tsx scripts/zero-logic-purchase-flow.ts` | End-to-end purchase flow with no business logic (demo) |
+
+Results from integration scripts are written to `test-logs/` with timestamps.
 
 ## Quick Start
 
