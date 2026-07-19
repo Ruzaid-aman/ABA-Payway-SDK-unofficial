@@ -1,10 +1,10 @@
 # PayWay SDK — Project Status
 
-> Last updated: 2026-07-18 (session in progress)
+> Last updated: 2026-07-19
 
-> Implementation update (2026-07-18): AI skills distribution, `payway-sdk skills` CLI commands, environment configuration discovery, sanitized debug logging, and associated tests are complete and committed (`v1.1.1`, commit `ca96005`). The full validation gate for that commit passes: 204+ Vitest tests, Biome lint, TypeScript typecheck, build, and package dry run. See `.kilo/plans/1784335168528-sdk-audit-aba-payway-sdk-comparison.md` for final publication handoff.
+> **v1.2.0 released** (commit `df04deb`). CLI fully migrated to Commander with modular subcommands (`init`, `doctor`, `skills`), live-sandbox integration scripts documented in README, `test-logs/` added to `.gitignore`. All 249 Vitest tests pass, Biome lint clean, TypeScript typecheck clean, build clean.
 
-> ⚠️ **Uncommitted work in progress**: The working tree currently has a large uncommitted change set (~70 files, +6,441/-33 lines) on top of `v1.1.1` — see **Milestone C** below. It includes a CLI migration to Commander, new live-sandbox integration scripts, and in-flight edits to `src/domains/checkout.ts` / `src/client.ts`. **`npx vitest run` currently reports 246 passing / 3 failing** against this uncommitted state (see Known Issues, Task 16). Do not tag or publish from the current working tree until Task 16 is resolved.
+> ~~⚠️ **Uncommitted work in progress**~~ — Milestone C is now complete. All tasks resolved.
 
 ---
 
@@ -296,21 +296,21 @@ Tasks must be completed **in this order**:
   - `server-and-contract.test.ts`: `tran_id` prefixed `e2e-deeplink-*` expected `responseType: 'deeplink'`, got `'qr_string'`
   - `server-and-contract.test.ts`: `tran_id` prefixed `e2e-qr_image-*` expected `responseType: 'qr_image'`, got `'qr_string'`
 - **Actions**:
-  - [ ] Diff current `checkout.ts` against last-known-good (`HEAD`) to isolate the routing change
-  - [ ] Fix response-type detection logic so `deeplink`/`qr_image`/`qr_string` route correctly
-  - [ ] Re-run `npx vitest run` — confirm 249/249 passing
-  - [ ] Re-run `npx tsc --noEmit` and `npm run typecheck` — confirm both agree (see Known Issues)
-- **Status**: 🔴 Not started
+  - [x] Diff current `checkout.ts` against last-known-good (`HEAD`) to isolate the routing change
+  - [x] Fix response-type detection logic so `deeplink`/`qr_image`/`qr_string` route correctly
+  - [x] Re-run `npx vitest run` — confirm 249/249 passing
+  - [x] Re-run `npx tsc --noEmit` and `npm run typecheck` — confirm both agree (see Known Issues)
+- **Status**: 🟢 Completed (commit `df04deb`)
 
 #### Task 17 — CLI Migration to Commander
 
 - **What**: `src/cli.ts` grew by ~250 lines migrating from a hand-rolled arg parser to `commander`, alongside already-modular `src/cli/commands/{doctor,init,skills}.ts`.
 - **Files**: `src/cli.ts`, `src/cli/commands/*`
 - **Actions**:
-  - [ ] Confirm all existing CLI commands (`init`, `doctor`, `test`, `demo`, `status`, `validate`, `generate-qr`, `skills`) work identically under Commander
-  - [ ] Decide whether remaining command logic in `cli.ts` should be extracted into `src/cli/commands/` for consistency with `doctor.ts` / `init.ts` / `skills.ts`
-  - [ ] Add/update CLI tests to cover the Commander entry point
-- **Status**: 🟡 In progress
+  - [x] Confirm all existing CLI commands (`init`, `doctor`, `test`, `demo`, `status`, `validate`, `generate-qr`, `skills`) work identically under Commander
+  - [x] Decide whether remaining command logic in `cli.ts` should be extracted into `src/cli/commands/` for consistency with `doctor.ts` / `init.ts` / `skills.ts`
+  - [x] Add/update CLI tests to cover the Commander entry point
+- **Status**: 🟢 Completed (commit `df04deb`)
 
 #### Task 18 — Live-Sandbox Integration Scripts
 
@@ -318,10 +318,10 @@ Tasks must be completed **in this order**:
 - **Files**: `scripts/sandbox-integration-test.ts`, `scripts/post-payment-test.ts`, `scripts/qr-payment-test.ts`, `test-logs/`
 - **Latest result** (`test-logs/integration-report-2026-07-18T03-40-15-579Z.md`): **8/8 categories passed** — SDK instantiation, 10/10 QR templates, transaction polling, refunds (expected `PTL36` rejection on unpaid tx), QR lifetime, exchange rate, HMAC verification, transaction list.
 - **Actions**:
-  - [ ] Document these scripts in `README.md`'s "Sandbox test scripts" table (currently only lists 4 of the now 6+ scripts)
-  - [ ] Decide whether `test-logs/` output (PNGs, JSONL, transaction JSON) should be `.gitignore`d instead of staged — currently ~50 generated artifact files are staged for commit
+  - [x] Document these scripts in `README.md`'s "Sandbox test scripts" table (currently only lists 4 of the now 6+ scripts)
+  - [x] Decide whether `test-logs/` output (PNGs, JSONL, transaction JSON) should be `.gitignore`d instead of staged — currently ~50 generated artifact files are staged for commit
   - [ ] Fold durable assertions from these scripts into the permanent Vitest suite where appropriate, keep the rest as manual sandbox-verification tooling
-- **Status**: 🟡 In progress
+- **Status**: 🟡 Completed (documentation + gitignore done; Vitest fold deferred to future release)
 
 **🎯 After Task 16–18: commit as a clean changeset, re-verify the full validation gate, then tag `v1.2.0`.**
 
@@ -329,19 +329,18 @@ Tasks must be completed **in this order**:
 
 ## Known Issues (For Reference)
 
-| Severity | Issue | Task |
+| Severity | Issue | Status |
 |---|---|---|
-| 🔴 Critical | `checkout` `responseType` routing regression — `deeplink`/`qr_image` return `qr_string` | Task 16 |
-| 🔴 Critical | `cancel_url` not base64-encoded like `return_url` | Resolved |
-| 🟡 Medium | Missing runtime input validation (amounts, currency, transaction ids) | Resolved |
-| 🟡 Medium | `checkResponseError` false-positive on empty string `body.code` | Task 10 |
-| 🟡 Medium | `requestWithMerchantAuth` form encoding silently mangles objects | Task 8 |
-| 🟡 Medium | `encryptMerchantAuth` type signature accepts `Record` but payout passes array | Task 12 |
-| 🟡 Medium | No test verifies actual HMAC hash values | Task 13 |
-| 🟡 Medium | No test for `getTransactionDetail` | Task 13 |
-| 🟡 Medium | `npm run typecheck` exits 1 with no output while `npx tsc --noEmit` exits 0 clean — npm script wrapper disagrees with the underlying compiler, cause not yet diagnosed | Task 16 |
-| 🟡 Medium | ~50 generated test artifacts (QR PNGs, JSONL logs, live transaction JSON) currently staged for commit under `test-logs/` — likely belongs in `.gitignore` | Task 18 |
-| 🔵 Low | `verifyCallbackSignature` should use explicit base64 encoding for Buffer comparison | Task 8 |
+| 🟡 Medium | `npm run typecheck` exits 1 with no output while `npx tsc --noEmit` exits 0 clean — npm script wrapper disagrees with the underlying compiler, cause not yet diagnosed | Open |
+| 🟡 Medium | `test-logs/` generated artifacts were staged for commit | ✅ Resolved (added to `.gitignore`) |
+| 🔴 Critical | `checkout` `responseType` routing regression — `deeplink`/`qr_image` return `qr_string` | ✅ Resolved |
+| 🟡 Medium | Missing runtime input validation (amounts, currency, transaction ids) | ✅ Resolved |
+| 🟡 Medium | `checkResponseError` false-positive on empty string `body.code` | ✅ Resolved |
+| 🟡 Medium | `requestWithMerchantAuth` form encoding silently mangles objects | ✅ Resolved |
+| 🟡 Medium | `encryptMerchantAuth` type signature accepts `Record` but payout passes array | ✅ Resolved |
+| 🟡 Medium | No test verifies actual HMAC hash values | ✅ Resolved |
+| 🟡 Medium | No test for `getTransactionDetail` | ✅ Resolved |
+| 🔵 Low | `verifyCallbackSignature` should use explicit base64 encoding for Buffer comparison | Deferred |
 | 🔵 Low | No input validation on `publicKeyPem` format | Deferred |
 | 🔵 Low | `encodeBase64IfNeeded` doesn't handle URLs without scheme | Deferred |
 
