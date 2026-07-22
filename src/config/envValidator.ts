@@ -106,3 +106,52 @@ export function validatePayWayEnv(env: NodeJS.ProcessEnv): EnvIssue[] {
 export function hasBlockingIssues(issues: ReadonlyArray<EnvIssue>): boolean {
   return issues.some((i) => i.severity === 'error');
 }
+
+// ---------------------------------------------------------------------------
+// QR-REQ-02  Credential-only validation for CLI startup
+// ---------------------------------------------------------------------------
+
+/**
+ * Lightweight credential check for CLI commands that call the PayWay API.
+ *
+ * Unlike `validatePayWayEnv()` which checks the full env (sandbox mode,
+ * return URLs, RSA keys, etc.), this function only checks the two
+ * credentials required for any API call: merchant ID and API key.
+ *
+ * Use this at CLI startup for commands that will call the PayWay API
+ * (e.g. generate-qr, generate-checkout) so users get a clear error
+ * message immediately rather than a cryptic PayWayConfigError later.
+ *
+ * @returns An array of blocking issues (length 0 = credentials are present).
+ */
+export function validateRequiredCredentials(
+  env: NodeJS.ProcessEnv,
+): EnvIssue[] {
+  const issues: EnvIssue[] = [];
+
+  if (!isNonEmpty(env.PAYWAY_MERCHANT_ID)) {
+    issues.push({
+      code: 'E-PAYWAY_MERCHANT_ID-MISSING',
+      severity: 'error',
+      varName: 'PAYWAY_MERCHANT_ID',
+      message:
+        'PAYWAY_MERCHANT_ID is missing or empty. ' +
+        'Add PAYWAY_MERCHANT_ID=<value> to your .env file, ' +
+        'or run `payway-sdk init` to create one.',
+    });
+  }
+
+  if (!isNonEmpty(env.PAYWAY_API_KEY)) {
+    issues.push({
+      code: 'E-PAYWAY_API_KEY-MISSING',
+      severity: 'error',
+      varName: 'PAYWAY_API_KEY',
+      message:
+        'PAYWAY_API_KEY is missing or empty. ' +
+        'Add PAYWAY_API_KEY=<value> to your .env file, ' +
+        'or run `payway-sdk init` to create one.',
+    });
+  }
+
+  return issues;
+}

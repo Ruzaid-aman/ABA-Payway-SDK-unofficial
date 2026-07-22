@@ -230,6 +230,7 @@ export const client = {
           action = await renderQrString(session.responsePayload, target);
           break;
         case 'qr_image':
+        case 'checkout_qr_url':
           action = renderQrImage(session.responsePayload, target);
           break;
         case 'url':

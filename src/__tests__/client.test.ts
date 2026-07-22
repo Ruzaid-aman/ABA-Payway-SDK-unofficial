@@ -8,7 +8,9 @@ import {
   PayWayBusinessError,
   PayWayNetworkError,
   PayWayRateLimitError,
+  PollingAbortedError,
 } from '../errors.js';
+import type { PollTransactionResult } from '../types.js';
 import { ENDPOINTS } from '../constants.js';
 
 // ---------------------------------------------------------------------------
@@ -178,7 +180,7 @@ describe('checkResponseError (via API calls)', () => {
   beforeEach(() => {
     fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
-    payway = new PayWay(TEST_CONFIG);
+    payway = new PayWay({ ...TEST_CONFIG, maxRetries: 0 });
   });
 
   afterEach(() => {
@@ -262,7 +264,7 @@ describe('checkResponseError (via API calls)', () => {
   });
 
   it('throws PayWayNetworkError on timeout (AbortError)', async () => {
-    const pw = new PayWay({ ...TEST_CONFIG, timeout: 50 });
+    const pw = new PayWay({ ...TEST_CONFIG, timeout: 50, maxRetries: 0 });
 
     fetchSpy.mockImplementationOnce(
       (_url: string, opts: { signal: AbortSignal }) =>
@@ -283,7 +285,7 @@ describe('checkResponseError (via API calls)', () => {
   });
 
   it('throws PayWayAPIError on timeout (AbortError)', async () => {
-    const pw = new PayWay({ ...TEST_CONFIG, timeout: 50 });
+    const pw = new PayWay({ ...TEST_CONFIG, timeout: 50, maxRetries: 0 });
 
     fetchSpy.mockImplementationOnce(
       (_url: string, opts: { signal: AbortSignal }) =>
@@ -428,7 +430,7 @@ describe('checkout domain', () => {
   beforeEach(() => {
     fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
-    payway = new PayWay(TEST_CONFIG);
+    payway = new PayWay({ ...TEST_CONFIG, maxRetries: 0 });
   });
 
   afterEach(() => {
@@ -669,6 +671,63 @@ describe('checkout domain', () => {
       const result = await pw.checkout.checkTransaction('T001');
 
       expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(result).toEqual({ status: { code: '00', message: 'Success' } });
+    });
+
+    // -------------------------------------------------------------------
+    // QR-REQ-11: Default retry configuration
+    // -------------------------------------------------------------------
+
+    it('uses default maxRetries=3 (QR-REQ-11) and retries on 503', async () => {
+      const pw = new PayWay({ ...TEST_CONFIG, retryDelayMs: 1 });
+      // Verify defaults are applied: maxRetries=3 → 4 total attempts (initial + 3 retries)
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Service unavailable' }, 503, 'Service Unavailable'));
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Service unavailable' }, 503, 'Service Unavailable'));
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ error: 'Service unavailable' }, 503, 'Service Unavailable'));
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Success' } }));
+
+      const result = await pw.checkout.checkTransaction('T001');
+
+      // Should have retried 3 times (4 total attempts) with default maxRetries=3
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
+      expect(result).toEqual({ status: { code: '00', message: 'Success' } });
+    });
+
+    it('exhausts default retries (3) and throws on persistent 503 (QR-REQ-11)', async () => {
+      const pw = new PayWay({ ...TEST_CONFIG, retryDelayMs: 1 });
+      // All 4 attempts (initial + 3 retries) fail with 503
+      fetchSpy.mockResolvedValue(mockJsonResponse({ error: 'Service unavailable' }, 503, 'Service Unavailable'));
+
+      await expect(pw.checkout.checkTransaction('T001')).rejects.toThrow(PayWayAPIError);
+
+      // 1 initial + 3 retries = 4 total attempts
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
+    });
+
+    it('retries on network errors (AbortError) with default maxRetries=3 (QR-REQ-11)', async () => {
+      const pw = new PayWay({ ...TEST_CONFIG, timeout: 50, retryDelayMs: 1 });
+
+      // First 3 attempts timeout, 4th succeeds
+      for (let i = 0; i < 3; i++) {
+        fetchSpy.mockImplementationOnce(
+          (_url: string, opts: { signal: AbortSignal }) =>
+            new Promise((_resolve, reject) => {
+              const onAbort = () => {
+                reject(new DOMException('The operation was aborted.', 'AbortError'));
+              };
+              if (opts?.signal?.aborted) {
+                onAbort();
+              } else {
+                opts?.signal?.addEventListener('abort', onAbort);
+              }
+            }),
+        );
+      }
+      fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Success' } }));
+
+      const result = await pw.checkout.checkTransaction('T001');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
       expect(result).toEqual({ status: { code: '00', message: 'Success' } });
     });
 
@@ -1318,5 +1377,309 @@ describe('request mechanics', () => {
 
     const opts = fetchSpy.mock.calls[0][1];
     expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkout.pollTransactionStatus — AsyncIterator-based polling
+// ---------------------------------------------------------------------------
+
+describe('checkout.pollTransactionStatus', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay({ ...TEST_CONFIG, maxRetries: 0 });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const pendingResponse = {
+    status: { code: 0, message: 'Success' },
+    data: { payment_status: 'PENDING', tran_id: 'T001' },
+  };
+
+  const approvedResponse = {
+    status: { code: 0, message: 'Success' },
+    data: { payment_status: 'APPROVED', tran_id: 'T001' },
+  };
+
+  it('yields PENDING then APPROVED and iterator completes', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockJsonResponse(pendingResponse))
+      .mockResolvedValueOnce(mockJsonResponse(pendingResponse))
+      .mockResolvedValueOnce(mockJsonResponse(approvedResponse));
+
+    const results: PollTransactionResult[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(3);
+    expect(results[0].paymentStatus).toBe('PENDING');
+    expect(results[0].isTerminal).toBe(false);
+    expect(results[1].paymentStatus).toBe('PENDING');
+    expect(results[2].paymentStatus).toBe('APPROVED');
+    expect(results[2].isTerminal).toBe(true);
+    expect(results[2].transactionId).toBe('T001');
+    expect(results[2].attempt).toBe(3);
+    expect(results[2].durationMs).toBeGreaterThanOrEqual(0);
+    expect(results[2].timestamp).toBeTruthy();
+  });
+
+  it('stops on DECLINED terminal status', async () => {
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({
+      status: { code: 0, message: 'Success' },
+      data: { payment_status: 'DECLINED', tran_id: 'T001' },
+    }));
+
+    const results: any[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(1);
+    expect(results[0].paymentStatus).toBe('DECLINED');
+    expect(results[0].isTerminal).toBe(true);
+  });
+
+  it('stops on CANCELLED terminal status', async () => {
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({
+      status: { code: 0, message: 'Success' },
+      data: { payment_status: 'CANCELLED', tran_id: 'T001' },
+    }));
+
+    const results: any[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(1);
+    expect(results[0].paymentStatus).toBe('CANCELLED');
+    expect(results[0].isTerminal).toBe(true);
+  });
+
+  it('stops on REFUNDED terminal status', async () => {
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({
+      status: { code: 0, message: 'Success' },
+      data: { payment_status: 'REFUNDED', tran_id: 'T001' },
+    }));
+
+    const results: any[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(1);
+    expect(results[0].paymentStatus).toBe('REFUNDED');
+    expect(results[0].isTerminal).toBe(true);
+  });
+
+  it('throws PollingAbortedError on maxDurationMs exceeded', async () => {
+    // Always return PENDING so it never hits terminal
+    fetchSpy.mockResolvedValue(mockJsonResponse(pendingResponse));
+
+    const iterator = payway.checkout.pollTransactionStatus('T001', {
+      intervalMs: 50,
+      maxDurationMs: 150,
+    });
+
+    const results: any[] = [];
+    let thrownError: unknown;
+    try {
+      for await (const result of iterator) {
+        results.push(result);
+      }
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expect(thrownError).toBeDefined();
+    expect(thrownError).toBeInstanceOf(PollingAbortedError);
+    const err = thrownError as InstanceType<typeof PollingAbortedError>;
+    expect(err.reason).toBe('max_duration_exceeded');
+    expect(err.transactionId).toBe('T001');
+    expect(err.totalAttempts).toBeGreaterThanOrEqual(1);
+    expect(results.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('throws PollingAbortedError on maxConsecutiveErrors', async () => {
+    fetchSpy
+      .mockRejectedValueOnce(new Error('Network error 1'))
+      .mockRejectedValueOnce(new Error('Network error 2'))
+      .mockRejectedValueOnce(new Error('Network error 3'));
+
+    const iterator = payway.checkout.pollTransactionStatus('T001', {
+      intervalMs: 1,
+      maxConsecutiveErrors: 3,
+    });
+
+    const results: any[] = [];
+    let thrownError: unknown;
+    try {
+      for await (const result of iterator) {
+        results.push(result);
+      }
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expect(thrownError).toBeDefined();
+    expect(thrownError).toBeInstanceOf(PollingAbortedError);
+    const err = thrownError as InstanceType<typeof PollingAbortedError>;
+    expect(err.reason).toBe('max_consecutive_errors');
+    expect(err.transactionId).toBe('T001');
+    expect(err.totalAttempts).toBe(3);
+    // Error results are yielded before abort
+    expect(results).toHaveLength(3);
+    expect(results[0].paymentStatus).toContain('ERROR');
+    expect(results[0].isTerminal).toBe(false);
+  });
+
+  it('resets consecutive error count on success', async () => {
+    fetchSpy
+      .mockRejectedValueOnce(new Error('err1'))
+      .mockRejectedValueOnce(new Error('err2'))
+      .mockResolvedValueOnce(mockJsonResponse(approvedResponse)); // success resets counter
+
+    const results: any[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', {
+      intervalMs: 1,
+      maxConsecutiveErrors: 3,
+    })) {
+      results.push(result);
+    }
+
+    // 2 error yields + 1 terminal yield = 3 results, no abort
+    expect(results).toHaveLength(3);
+    expect(results[0].paymentStatus).toContain('ERROR');
+    expect(results[1].paymentStatus).toContain('ERROR');
+    expect(results[2].paymentStatus).toBe('APPROVED');
+    expect(results[2].isTerminal).toBe(true);
+  });
+
+  it('empty iterator when transaction immediately returns terminal', async () => {
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse(approvedResponse));
+
+    const results: any[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(1);
+    expect(results[0].isTerminal).toBe(true);
+  });
+
+  it('respects custom intervalMs', async () => {
+    vi.useFakeTimers();
+
+    fetchSpy
+      .mockResolvedValue(mockJsonResponse(pendingResponse));
+
+    const iterator = payway.checkout.pollTransactionStatus('T001', {
+      intervalMs: 1000,
+      maxDurationMs: 3500,
+    });
+
+    const results: any[] = [];
+    const iterate = (async () => {
+      for await (const result of iterator) {
+        results.push(result);
+      }
+    })();
+
+    // Pre-attach rejection handler to prevent unhandled rejection during fake timer advancement
+    iterate.catch(() => {});
+
+    // First poll fires immediately
+    await vi.advanceTimersByTimeAsync(0);
+    expect(results).toHaveLength(1);
+
+    // Second poll after 1s
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(results).toHaveLength(2);
+
+    // Third poll after another 1s
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(results).toHaveLength(3);
+
+    // Let timeout hit
+    await vi.advanceTimersByTimeAsync(2000);
+
+    try {
+      await iterate;
+    } catch {
+      // Expected — PollingAbortedError from timeout
+    }
+
+    expect(results.length).toBeGreaterThanOrEqual(3);
+    vi.useRealTimers();
+  });
+
+  it('PollingAbortedError.toJSON() serializes correctly', () => {
+    const err = new PollingAbortedError({
+      transactionId: 'TX-JSON',
+      reason: 'max_consecutive_errors',
+      lastStatus: 'PENDING',
+      totalAttempts: 5,
+      message: 'Custom message',
+    });
+
+    const json = err.toJSON();
+    expect(json.name).toBe('PollingAbortedError');
+    expect(json.message).toBe('Custom message');
+    expect(json.transactionId).toBe('TX-JSON');
+    expect(json.reason).toBe('max_consecutive_errors');
+    expect(json.lastStatus).toBe('PENDING');
+    expect(json.totalAttempts).toBe(5);
+  });
+
+  it('yields error results with durationMs 0 and isTerminal false', async () => {
+    fetchSpy
+      .mockRejectedValueOnce(new Error('Timeout'))
+      .mockResolvedValueOnce(mockJsonResponse(approvedResponse));
+
+    const results: any[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', {
+      intervalMs: 1,
+      maxConsecutiveErrors: 3,
+    })) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(2);
+    // Error result
+    expect(results[0].durationMs).toBe(0);
+    expect(results[0].isTerminal).toBe(false);
+    expect(results[0].paymentStatus).toContain('ERROR');
+    expect(results[0].paymentStatus).toContain('Timeout');
+    expect(results[0].transactionId).toBe('T001');
+    expect(results[0].attempt).toBe(1);
+    // Success result (terminal — stops the loop)
+    expect(results[1].paymentStatus).toBe('APPROVED');
+    expect(results[1].isTerminal).toBe(true);
+  });
+
+  it('sends correct HMAC fields to checkTransaction endpoint', async () => {
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse(approvedResponse));
+
+    for await (const _result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
+      break;
+    }
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.checkTransaction);
+    expect(opts.method).toBe('POST');
+    const body = JSON.parse(opts.body);
+    expect(body).toHaveProperty('tran_id', 'T001');
+    expect(body).toHaveProperty('merchant_id', TEST_CONFIG.merchantId);
+    expect(body).toHaveProperty('hash');
+    expect(body).toHaveProperty('req_time');
   });
 });

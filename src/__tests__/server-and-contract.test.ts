@@ -48,13 +48,13 @@ describe('normalizePaywayResponse', () => {
     expect(s.responsePayload).toBe('00020101');
   });
 
-  it('classifies { checkout_qr_url } as `qr_image`', () => {
+  it('classifies { checkout_qr_url } as `checkout_qr_url`', () => {
     const s = normalizePaywayResponse(
-      { checkout_qr_url: 'https://p.example/qr.png' },
+      { checkout_qr_url: 'https://checkout-sandbox.payway.com.kh/eyJ...' },
       'tx_4',
     );
-    expect(s.responseType).toBe('qr_image');
-    expect(s.responsePayload).toBe('https://p.example/qr.png');
+    expect(s.responseType).toBe('checkout_qr_url');
+    expect(s.responsePayload).toBe('https://checkout-sandbox.payway.com.kh/eyJ...');
   });
 
   it('classifies { url } as `url`', () => {

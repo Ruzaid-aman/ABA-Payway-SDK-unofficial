@@ -302,11 +302,200 @@ QR codes generated via the API have a limited lifetime:
 | Phase | What Happens | SDK Action |
 |---|---|---|
 | **Generated** | QR is valid and displayable | `payway.qr.generateQr()` |
+| **Polling** | Server polls transaction status every 5s | `payway.checkout.pollTransactionStatus()` |
 | **Expired** | QR times out (PayWay-enforced expiry) | Generate new QR via `generateQr()` |
 | **Paid** | Customer scans and completes payment | Webhook callback notifies your server |
 | **Cancelled** | You close the transaction before payment | `payway.checkout.closeTransaction()` |
 
 > 💡 **Best practice:** Display a countdown timer on the QR page showing when the QR expires, and offer a "Refresh QR" button if the customer takes too long.
+
+---
+
+## Transaction Status Polling (On-Demand)
+
+After generating a QR code, you need to know when the customer completes payment. The SDK provides `checkout.pollTransactionStatus()` — an **async generator** that polls the PayWay check-transaction endpoint at regular intervals and yields results you can iterate over with `for await...of`.
+
+You have full control over **when to start**, **when to stop**, and **how to react** to each poll result.
+
+### Basic Usage — Start and Stop Polling
+
+```typescript
+import { PayWay, PollingAbortedError } from 'aba-payway-ts';
+
+const payway = new PayWay({
+  merchantId: process.env.PAYWAY_MERCHANT_ID!,
+  apiKey: process.env.PAYWAY_API_KEY!,
+  environment: 'sandbox',
+});
+
+async function monitorPayment(transactionId: string) {
+  // ─── Start polling ──────────────────────────────────────────────
+  // Each iteration yields a PollTransactionResult with the latest status.
+  // Polling runs ON DEMAND — nothing happens until you iterate.
+  try {
+    for await (const result of payway.checkout.pollTransactionStatus(transactionId)) {
+      console.log(
+        `[Poll #${result.attempt}] ${result.paymentStatus}` +
+        ` (${result.durationMs}ms)`
+      );
+
+      // ─── Stop polling manually ────────────────────────────────────
+      // Break out of the loop at any time to stop polling immediately.
+      if (result.paymentStatus === 'APPROVED') {
+        console.log('Payment confirmed!');
+        break; // ← Stops polling
+      }
+
+      if (result.paymentStatus === 'DECLINED') {
+        console.log('Payment was declined.');
+        break; // ← Stops polling
+      }
+    }
+  } catch (error) {
+    if (error instanceof PollingAbortedError) {
+      // Automatic stop — max duration or consecutive errors
+      console.error(`Polling stopped: ${error.reason} (after ${error.totalAttempts} attempts)`);
+    } else {
+      throw error;
+    }
+  }
+}
+```
+
+### How It Works
+
+| Behavior | Detail |
+|---|---|
+| **Start** | Polling starts when you begin iterating (`for await...of` or calling `.next()`) |
+| **Each poll** | Yields a `PollTransactionResult` with `paymentStatus`, `isTerminal`, `attempt`, `durationMs`, etc. |
+| **Auto-stop on terminal** | When status is `APPROVED`, `DECLINED`, `CANCELLED`, or `REFUNDED`, the generator completes — no more polls |
+| **Auto-stop on timeout** | After `maxDurationMs` (default: 10 minutes), throws `PollingAbortedError` |
+| **Auto-stop on errors** | After `maxConsecutiveErrors` (default: 3), throws `PollingAbortedError` |
+| **Manual stop** | `break` out of the `for await...of` loop at any time |
+
+### Custom Polling Options
+
+Override the defaults to match your use case:
+
+```typescript
+// Fast polling for time-sensitive flows
+for await (const result of payway.checkout.pollTransactionStatus(transactionId, {
+  intervalMs: 2_000,        // Poll every 2 seconds (default: 5000)
+  maxDurationMs: 120_000,   // Stop after 2 minutes (default: 600000)
+  maxConsecutiveErrors: 5,  // Allow 5 failures before aborting (default: 3)
+})) {
+  console.log(`[${result.paymentStatus}] attempt #${result.attempt}`);
+  if (result.isTerminal) break;
+}
+```
+
+```typescript
+// QR with 3-minute lifetime — match the lifetime as the polling ceiling
+const QR_LIFETIME_SECONDS = 180;
+for await (const result of payway.checkout.pollTransactionStatus(transactionId, {
+  intervalMs: 5_000,
+  maxDurationMs: QR_LIFETIME_SECONDS * 1_000, // Bound by QR lifetime
+})) {
+  if (result.isTerminal) {
+    await updateOrderStatus(transactionId, result.paymentStatus);
+    break;
+  }
+}
+```
+
+### Handling Errors During Polling
+
+Each poll attempt that fails (network timeout, API error) is **yielded as an error result** before potentially aborting. This lets you observe transient failures without losing visibility:
+
+```typescript
+for await (const result of payway.checkout.pollTransactionStatus(transactionId)) {
+  if (result.paymentStatus.startsWith('ERROR:')) {
+    console.warn(`Poll #${result.attempt} failed: ${result.paymentStatus}`);
+    // Continue — the next poll may succeed (consecutive error count resets on success)
+    continue;
+  }
+
+  console.log(`Poll #${result.attempt}: ${result.paymentStatus}`);
+  if (result.isTerminal) break;
+}
+```
+
+### Using with AbortController (External Cancel)
+
+If you need to cancel polling from outside the loop (e.g., user clicks "Cancel" or a parent request times out), use an `AbortController`:
+
+```typescript
+const controller = new AbortController();
+
+// Cancel from anywhere:
+// controller.abort();
+
+async function pollWithAbort(transactionId: string, signal: AbortSignal) {
+  try {
+    for await (const result of payway.checkout.pollTransactionStatus(transactionId)) {
+      if (signal.aborted) {
+        console.log('Polling cancelled by caller.');
+        break; // ← Manual stop via external signal
+      }
+
+      if (result.isTerminal) {
+        return result.paymentStatus;
+      }
+
+      console.log(`[Poll #${result.attempt}] ${result.paymentStatus}`);
+    }
+  } catch (error) {
+    if (error instanceof PollingAbortedError) {
+      console.error(`Polling aborted: ${error.reason}`);
+    }
+    throw error;
+  }
+}
+
+// Start polling
+const status = await pollWithAbort('TX-001', controller.signal);
+
+// Cancel from another code path:
+controller.abort();
+```
+
+### PollTransactionResult Reference
+
+Each yielded result contains:
+
+| Field | Type | Description |
+|---|---|---|
+| `transactionId` | `string` | The transaction ID being polled |
+| `attempt` | `number` | 1-based poll attempt number |
+| `response` | `CheckTransactionResponse` | Raw API response from PayWay |
+| `paymentStatus` | `string` | Extracted status (e.g. `'PENDING'`, `'APPROVED'`, `'ERROR: ...'`) |
+| `isTerminal` | `boolean` | `true` if this is a final status — polling stops after this yield |
+| `durationMs` | `number` | HTTP request duration in milliseconds |
+| `timestamp` | `string` | ISO-8601 timestamp when this poll completed |
+
+### PollingAbortedError Reference
+
+Thrown when polling is forcibly stopped (caught by `catch` around the `for await...of` loop):
+
+| Field | Type | Description |
+|---|---|---|
+| `transactionId` | `string` | The transaction ID being polled |
+| `reason` | `PollAbortReason` | `'max_duration_exceeded'` or `'max_consecutive_errors'` |
+| `lastStatus` | `string \| undefined` | The last observed payment status before abort |
+| `totalAttempts` | `number` | Total number of poll attempts made |
+| `toJSON()` | method | Serialize all fields for logging |
+
+### Polling vs. Webhook
+
+| Aspect | Polling (`pollTransactionStatus`) | Webhook (callback URL) |
+|---|---|---|
+| **Initiator** | Your server polls PayWay | PayWay pushes to your server |
+| **Latency** | Up to `intervalMs` delay | Near-instant |
+| **Reliability** | Depends on your server uptime | Depends on PayWay + your public URL |
+| **Best for** | Real-time UI updates, POS displays | Backend order finalization |
+| **Recommended** | ✅ Use both together | ✅ Webhook as source of truth, polling for UX |
+
+> 💡 **Recommended pattern:** Use the webhook as your **source of truth** for order completion. Use `pollTransactionStatus()` as a **real-time UX supplement** — update the customer's screen immediately while the webhook handles the durable state change.
 
 ---
 

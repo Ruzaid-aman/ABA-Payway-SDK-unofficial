@@ -7,6 +7,7 @@ import {
   validatePositiveAmount,
   validateCurrency,
   validatePublicHttpsUrl,
+  validateLifetime,
 } from '../utils.js';
 import type { components } from '../types.js';
 import type { PayWayConfig, GenerateQrParams } from '../client.js';
@@ -34,6 +35,7 @@ export function createQrDomain(
       validatePositiveAmount(params.amount, params.currency || 'USD');
       validateCurrency(params.currency);
       validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+      validateLifetime(params.lifetime);
 
       return request<components['schemas']['GenerateQrResponse']>(
         ENDPOINTS.generateQr,
@@ -44,6 +46,7 @@ export function createQrDomain(
           payment_option: params.paymentOption,
           callback_url: encodeBase64IfNeeded(params.callbackUrl),
           currency: params.currency || 'USD',
+          lifetime: params.lifetime ? Math.floor(params.lifetime / 60) : undefined,
           qr_image_template: params.qrImageTemplate || 'template2',
           req_time: params.requestTime,
         }),
@@ -56,6 +59,7 @@ export function createQrDomain(
           'payment_option',
           'callback_url',
           'currency',
+          'lifetime',
           'qr_image_template',
         ],
       );

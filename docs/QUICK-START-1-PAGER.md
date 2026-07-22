@@ -54,7 +54,7 @@ Every PayWay purchase response is normalised into one shape — `TransactionSess
 interface TransactionSession {
   sessionId: string;                                       // SDK-generated
   status: 'pending' | 'completed' | 'failed';
-  responseType: 'deeplink' | 'qr_string' | 'qr_image' | 'url' | 'html';
+  responseType: 'deeplink' | 'qr_string' | 'qr_image' | 'checkout_qr_url' | 'url' | 'html';
   responsePayload: string;                                 // shape depends on responseType
   expiresAt: string;                                       // ISO-8601
   raw?: unknown;                                           // original PayWay body
@@ -72,6 +72,7 @@ Every module in the SDK — server, client, test — communicates through this c
 | `deeplink`   | `window.location.href = payload` (or `window.open` if `openInNewTab: true`, with same-tab fallback if popup is blocked). | `openInNewTab?` |
 | `qr_string`  | Renders a QR canvas into `target`. Falls back to a PNG download prompt when `target` is omitted. | `target` |
 | `qr_image`   | Renders an `<img>` into `target`. Opens the image URL in a new tab when `target` is omitted. | `target` |
+| `checkout_qr_url` | Renders the hosted QR image into `target`. Opens it in a new tab when `target` is omitted. | `target` |
 | `url`        | `window.location.href = payload` (or new tab). | `openInNewTab?` |
 | `html`       | Embeds the payload in a sandboxed `<iframe srcdoc>` inside `target`. **Refuses** to render without a `target` (never overwrites `document.body`). Sandbox tokens: `allow-scripts allow-forms allow-popups` — deliberately no `allow-same-origin`. | `target` (required) |
 
@@ -114,7 +115,7 @@ await sdk.runTestSuiteAndPrint();
 What it does:
 
 1. Spins up a real local HTTP mock PayWay server on an ephemeral port.
-2. Calls the **real** `server.initiateTransaction()` against it for 4 of the 5 response types (`deeplink`, `qr_string`, `qr_image`, `url`).
+2. Calls the **real** `server.initiateTransaction()` against it for 4 of the 5 default response types (`deeplink`, `qr_string`, `qr_image`, `url`).
 3. Feeds a raw HTML body directly to `normalizePaywayResponse()` for the `html` case (bypasses the JSON-only PayWay HTTP client).
 4. Hands each resulting `TransactionSession` to the real `client.handleResponse()`.
 5. Prints a pass/fail table.
@@ -131,6 +132,8 @@ Expected output:
 ```
 
 (In Node, DOM-bound actions report `*_skipped_no_dom` — the correct branch was still taken. Browser-environment assertions live in [`src/__tests__/client-handler.test.ts`](../src/__tests__/client-handler.test.ts).)
+
+The default suite covers five core flows. To exercise a hosted `checkout_qr_url`, pass a custom `TestCase` with `responseType: 'checkout_qr_url'` to `runTestSuite()`.
 
 ---
 
@@ -200,3 +203,17 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 - [`src/__tests__/client-handler.test.ts`](../src/__tests__/client-handler.test.ts) — browser-environment assertions for each response type.
 - [`src/__tests__/server-and-contract.test.ts`](../src/__tests__/server-and-contract.test.ts) — end-to-end tests through the mock PayWay server.
 - [`scripts/zero-logic-purchase-flow.ts`](../scripts/zero-logic-purchase-flow.ts) — runnable demo (`npm run demo`).
+- [`docs/16-webhook-setup-guide.md`](./16-webhook-setup-guide.md) — CLI webhook setup for local development.
+
+---
+
+## CLI Commands
+
+| Command | Purpose |
+|---|---|
+| `payway-sdk init` | Initialize PayWay integration in your project |
+| `payway-sdk doctor` | Validate environment configuration |
+| `payway-sdk test` | Run the sandbox test suite |
+| `payway-sdk generate-qr` | Generate a QR code (online or offline) |
+| `payway-sdk generate-checkout` | Generate a checkout QR URL |
+| `payway-sdk setup-webhook` | Start a local webhook server for callback testing |

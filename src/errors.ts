@@ -78,6 +78,48 @@ export class PayWayBusinessError extends PayWayAPIError {
   }
 }
 
+// ─── Polling Errors ─────────────────────────────────────────────────────────
+
+export type PollAbortReason = 'max_consecutive_errors' | 'max_duration_exceeded' | 'caller_aborted';
+
+export class PollingAbortedError extends PayWayError {
+  public readonly transactionId: string;
+  public readonly reason: PollAbortReason;
+  public readonly lastStatus?: string;
+  public readonly totalAttempts: number;
+
+  constructor(options: {
+    transactionId: string;
+    reason: PollAbortReason;
+    lastStatus?: string;
+    totalAttempts: number;
+    message?: string;
+  }) {
+    super(
+      options.message ?? `Polling aborted for ${options.transactionId}: ${options.reason}`,
+      'config_error',
+    );
+    Object.setPrototypeOf(this, PollingAbortedError.prototype);
+    this.name = 'PollingAbortedError';
+    this.transactionId = options.transactionId;
+    this.reason = options.reason;
+    this.lastStatus = options.lastStatus;
+    this.totalAttempts = options.totalAttempts;
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      type: this.type,
+      transactionId: this.transactionId,
+      reason: this.reason,
+      lastStatus: this.lastStatus,
+      totalAttempts: this.totalAttempts,
+    };
+  }
+}
+
 export class PayWayNetworkError extends PayWayAPIError {
   constructor(message: string, options: PayWayAPIErrorOptions = {}) {
     super(message, { ...options, retryable: true });
@@ -102,5 +144,15 @@ export class PayWaySignatureError extends PayWayAPIError {
     Object.setPrototypeOf(this, PayWaySignatureError.prototype);
     this.name = 'PayWaySignatureError';
     (this as { type: PayWayErrorType }).type = 'signature_error';
+  }
+}
+
+// ─── Webhook Errors ─────────────────────────────────────────────────────
+
+export class PayWayWebhookError extends PayWayError {
+  constructor(message: string) {
+    super(message, 'config_error');
+    Object.setPrototypeOf(this, PayWayWebhookError.prototype);
+    this.name = 'PayWayWebhookError';
   }
 }

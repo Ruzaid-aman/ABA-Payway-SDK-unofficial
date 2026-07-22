@@ -76,7 +76,7 @@ export function normalizePaywayResponse(
       }
     }
 
-    // Prefer deeplink, then raw qr_string, then hosted qr image url.
+    // Prefer deeplink, then raw qr_string, then checkout_qr_url, then qr_image, then hosted qr image url.
     let responseType: ResponseType = 'html';
     let responsePayload = '';
 
@@ -87,8 +87,11 @@ export function normalizePaywayResponse(
       responseType = 'qr_string';
       responsePayload = obj.qr_string;
     } else if (typeof obj.checkout_qr_url === 'string' && obj.checkout_qr_url) {
-      responseType = 'qr_image';
+      responseType = 'checkout_qr_url';
       responsePayload = obj.checkout_qr_url;
+    } else if (typeof obj.qr_image === 'string' && obj.qr_image) {
+      responseType = 'qr_image';
+      responsePayload = obj.qr_image;
     } else if (typeof obj.qrString === 'string' && obj.qrString) {
       // generate-qr endpoint uses camelCase `qrString`.
       responseType = 'qr_string';
@@ -211,6 +214,7 @@ export const server = {
       deeplink: `ababank://pay?tran_id=${transactionId}&amount=${payload.amount ?? 10}`,
       qr_string: '00020101021226360016ABA PAYWAY5204599953038405802KH5910Test Merchant6009Phnom Penh6304ABCD',
       qr_image: `https://checkout-sandbox.payway.com.kh/qr/${transactionId}.png`,
+      checkout_qr_url: `https://checkout-sandbox.payway.com.kh/qr/${transactionId}`,
       url: `https://checkout-sandbox.payway.com.kh/pay/${transactionId}`,
       html: `<!DOCTYPE html><html><body><h1>PayWay Hosted Checkout</h1><p>Tran: ${transactionId}</p></body></html>`,
     };

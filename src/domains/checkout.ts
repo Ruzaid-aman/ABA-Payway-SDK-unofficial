@@ -11,8 +11,9 @@ import {
   validateTransactionId,
   validateLifetime,
 } from '../utils.js';
-import type { components } from '../types.js';
+import type { components, PollTransactionOptions, PollTransactionResult } from '../types.js';
 import type { PayWayConfig, CreateTransactionParams, GetTransactionListParams } from '../client.js';
+import { PollingAbortedError } from '../errors.js';
 
 export interface CheckoutDomain {
   createTransaction: (params: CreateTransactionParams) => Record<string, unknown> & { hash: string };
@@ -40,6 +41,31 @@ export interface CheckoutDomain {
    */
   refund: (transactionId: string, amount: number, currency?: 'USD' | 'KHR') => Promise<components['schemas']['RefundResponse']>;
   getExchangeRate: (requestTime?: string) => Promise<components['schemas']['ExchangeRateResponse']>;
+
+  /**
+   * Poll transaction status at regular intervals using an AsyncIterator.
+   *
+   * Yields a `PollTransactionResult` on each poll. Stops when:
+   * - A terminal status is reached (APPROVED, DECLINED, CANCELLED, REFUNDED), OR
+   * - `maxDurationMs` elapses (default 10 minutes), OR
+   * - `maxConsecutiveErrors` consecutive poll failures occur (default 3).
+   *
+   * @param transactionId - The transaction ID to poll.
+   * @param options - Polling configuration (interval, timeout, error tolerance).
+   * @yields PollTransactionResult on each poll.
+   * @throws PollingAbortedError when polling is stopped by timeout or too many errors.
+   * @example
+   * ```ts
+   * for await (const result of payway.checkout.pollTransactionStatus('TX-001')) {
+   *   console.log(`Poll #${result.attempt}: ${result.paymentStatus}`);
+   *   if (result.isTerminal) break;
+   * }
+   * ```
+   */
+  pollTransactionStatus: (
+    transactionId: string,
+    options?: PollTransactionOptions,
+  ) => AsyncGenerator<PollTransactionResult, void, undefined>;
 }
 
 export function createCheckoutDomain(
@@ -245,6 +271,131 @@ export function createCheckoutDomain(
         filterParams({ req_time: requestTime }),
         ['req_time', 'merchant_id'],
       );
+    },
+
+    /**
+     * Poll transaction status at regular intervals using an AsyncIterator.
+     *
+     * Yields a `PollTransactionResult` on each poll. Stops when:
+     * - A terminal status is reached (APPROVED, DECLINED, CANCELLED, REFUNDED), OR
+     * - `maxDurationMs` elapses (default 10 minutes — matching QR lifetime), OR
+     * - `maxConsecutiveErrors` consecutive poll failures occur (default 3).
+     *
+     * @example
+     * ```ts
+     * for await (const result of payway.checkout.pollTransactionStatus('TX-001')) {
+     *   console.log(`Poll #${result.attempt}: ${result.paymentStatus}`);
+     *   if (result.isTerminal) break;
+     * }
+     * ```
+     */
+    pollTransactionStatus: async function* (
+      transactionId: string,
+      options?: PollTransactionOptions,
+    ): AsyncGenerator<PollTransactionResult, void, undefined> {
+      const {
+        intervalMs = 5_000,
+        maxDurationMs = 600_000, // 10 minutes (QR lifetime)
+        maxConsecutiveErrors = 3,
+      } = options ?? {};
+
+      const TERMINAL_STATUSES: readonly string[] = ['APPROVED', 'DECLINED', 'CANCELLED', 'REFUNDED'];
+      const startTime = Date.now();
+      let attempt = 0;
+      let consecutiveErrors = 0;
+      let lastStatus: string | undefined;
+
+      while (true) {
+        // Check wall-clock timeout BEFORE making the next request
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= maxDurationMs) {
+          throw new PollingAbortedError({
+            transactionId,
+            reason: 'max_duration_exceeded',
+            lastStatus,
+            totalAttempts: attempt,
+            message: `Polling exceeded max duration of ${maxDurationMs}ms after ${attempt} attempts`,
+          });
+        }
+
+        attempt++;
+
+        try {
+          const start = Date.now();
+          const result = await request<components['schemas']['CheckTransactionResponse']>(
+            ENDPOINTS.checkTransaction,
+            filterParams({ tran_id: transactionId }),
+            ['req_time', 'merchant_id', 'tran_id'],
+          );
+          const durationMs = Date.now() - start;
+
+          // Extract payment status — consistent with scripts/qr-payment-test.ts pattern
+          const data = (result as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+          const paymentStatus = (data?.payment_status as string)
+            ?? (result as Record<string, unknown>)?.status as string
+            ?? 'UNKNOWN';
+          const statusStr = typeof paymentStatus === 'string' ? paymentStatus : String(paymentStatus);
+          const isTerminal = TERMINAL_STATUSES.includes(statusStr.toUpperCase());
+
+          consecutiveErrors = 0; // Reset on success
+          lastStatus = statusStr;
+
+          yield {
+            transactionId,
+            attempt,
+            response: result,
+            paymentStatus: statusStr,
+            isTerminal,
+            durationMs,
+            timestamp: new Date().toISOString(),
+          };
+
+          // Stop if terminal — iterator completes naturally
+          if (isTerminal) return;
+
+        } catch (error: unknown) {
+          consecutiveErrors++;
+
+          // Yield error result FIRST so caller can observe the failing attempt before abort
+          yield {
+            transactionId,
+            attempt,
+            response: {
+              status: {
+                code: String(consecutiveErrors),
+                message: error instanceof Error ? error.message : String(error),
+              },
+            },
+            paymentStatus: `ERROR: ${error instanceof Error ? error.message : String(error)}`,
+            isTerminal: false,
+            durationMs: 0,
+            timestamp: new Date().toISOString(),
+          };
+
+          if (consecutiveErrors >= maxConsecutiveErrors) {
+            throw new PollingAbortedError({
+              transactionId,
+              reason: 'max_consecutive_errors',
+              lastStatus,
+              totalAttempts: attempt,
+              message: `Polling aborted after ${consecutiveErrors} consecutive errors (last: ${error instanceof Error ? error.message : String(error)})`,
+            });
+          }
+        }
+
+        // Wait before next poll — respect remaining time
+        const remainingMs = maxDurationMs - (Date.now() - startTime);
+        if (remainingMs <= 0) {
+          throw new PollingAbortedError({
+            transactionId,
+            reason: 'max_duration_exceeded',
+            lastStatus,
+            totalAttempts: attempt,
+          });
+        }
+        const sleepMs = Math.min(intervalMs, remainingMs);
+        await new Promise<void>(resolve => setTimeout(resolve, sleepMs));
+      }
     },
   };
 }

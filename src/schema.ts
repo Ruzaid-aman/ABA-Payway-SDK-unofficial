@@ -20,13 +20,14 @@
 /**
  * The type of payload PayWay can return for a purchase initiation.
  *
- * - `deeplink`   : A URL scheme that launches a native app (e.g. ABA Mobile).
- * - `qr_string`  : A raw KHQR payload string to be rendered as a QR code.
- * - `qr_image`   : A URL pointing to a pre-rendered QR image.
- * - `url`        : A hosted checkout URL to redirect/open.
- * - `html`       : An HTML snippet (hosted checkout page) to embed.
+ * - `deeplink`        : A URL scheme that launches a native app (e.g. ABA Mobile).
+ * - `qr_string`       : A raw KHQR payload string to be rendered as a QR code.
+ * - `qr_image`        : A URL pointing to a pre-rendered QR image.
+ * - `checkout_qr_url` : A hosted URL that renders the QR code as an image/page (from payment_gate=0).
+ * - `url`             : A hosted checkout URL to redirect/open.
+ * - `html`            : An HTML snippet (hosted checkout page) to embed.
  */
-export type ResponseType = 'deeplink' | 'qr_string' | 'qr_image' | 'url' | 'html';
+export type ResponseType = 'deeplink' | 'qr_string' | 'qr_image' | 'checkout_qr_url' | 'url' | 'html';
 
 /**
  * The lifecycle status of a transaction session.

@@ -2,7 +2,7 @@
 
 GenerateQrRequest:
   type: object
-  required: [req_time, merchant_id, tran_id, amount, purchase_type, payment_option, callback_url, currency, qr_image_template, hash]
+  required: [req_time, merchant_id, tran_id, amount, purchase_type, payment_option, callback_url, currency, qr_image_template, hash, lifetime]
   properties:
     req_time:
       type: string
@@ -35,6 +35,11 @@ GenerateQrRequest:
     hash:
       type: string
       description: base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)).
+    lifetime:
+      type: integer
+      description: >-
+        Transaction lifetime in minutes. Default: 30 days.
+        Minimum: 3 mins. Maximum: 120 days (172800 mins).
 
 GenerateQrResponse:
   type: object

@@ -108,11 +108,11 @@ const payway = new PayWay({
   // Optional: HTTP request timeout in milliseconds (default: 30000)
   timeout: 30000,
 
-  // Optional: Maximum retry attempts for transient failures (default: 0)
-  maxRetries: 2,
+  // Optional: Maximum retry attempts for transient failures (default: 3)
+  maxRetries: 3,
 
-  // Optional: Base delay between retries in ms (default: 1000)
-  retryDelayMs: 1000,
+  // Optional: Base delay between retries in ms (default: 3000)
+  retryDelayMs: 3000,
 
   // Optional: Enable SDK rate limit throttling for documented PayWay endpoints
   rateLimitThrottling: true,

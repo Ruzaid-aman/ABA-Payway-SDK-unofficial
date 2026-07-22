@@ -106,11 +106,11 @@ This documentation is written for **junior to mid-level developers** who need to
 
 The SDK performs input validation in each domain to fail fast and give clear developer-facing errors (`PayWayConfigError`). This section summarizes the current, enforced checks so you know what the client will reject before any network call is made.
 
-- **`checkout`**: validates `transactionId` presence, `amount` positivity and currency rules (USD ≤ 2 decimals, KHR integer), `returnUrl`/`cancelUrl` are base64-encoded when URLs, and `lifetime` is a positive integer.
+- **`checkout`**: validates `transactionId` presence, max 20 characters, and charset `[a-zA-Z0-9\-]`; validates `amount` positivity and currency rules (USD ≤ 2 decimals, KHR integer); validates `returnUrl`/`cancelUrl` are base64-encoded when URLs; validates `lifetime` is a positive integer.
 - **`payment-link`**: requires non-empty `title` and `merchantRefNo`, `amount` > 0, and `returnUrl` must be a public HTTPS URL when provided.
 - **`pre-auth`**: validates `transactionId` and positive `amount`; `completeWithPayout` requires a non-empty payout array.
 - **`payout`**: validates `transactionId`, `amount`, `currency`, and that `beneficiaries` is a non-empty array summing to the total amount.
-- **`qr` / `khqr`**: validates `transactionId`, `amount`, `currency`, and `callbackUrl` as a public HTTPS URL; offline QR helper validates merchantId and amount.
+- **`qr` / `khqr`**: validates `transactionId` (max 20 chars, `[a-zA-Z0-9\-]` charset), `amount`, `currency`, and `callbackUrl` as a public HTTPS URL; offline QR helper validates merchantId and amount.
 - **`credentials-on-file`**: requires `requestId`/`ctid` where applicable, validates `paymentToken` presence for Cof payments, and validates any `returnUrl`/`callbackUrl` as public HTTPS URLs.
 
 If validation fails, the SDK throws `PayWayConfigError` with a descriptive message. For integrators, validate inputs client-side before calling SDK methods or catch `PayWayConfigError` to present a clear error to users.

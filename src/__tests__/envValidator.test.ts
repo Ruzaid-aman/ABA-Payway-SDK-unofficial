@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validatePayWayEnv, hasBlockingIssues } from '../config/envValidator.js';
+import { validatePayWayEnv, hasBlockingIssues, validateRequiredCredentials } from '../config/envValidator.js';
 
 describe('validatePayWayEnv', () => {
   it('returns no issues when all required vars are set correctly', () => {
@@ -152,5 +152,109 @@ describe('hasBlockingIssues', () => {
 
   it('returns false when no issues exist', () => {
     expect(hasBlockingIssues([])).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QR-REQ-02: validateRequiredCredentials
+// ---------------------------------------------------------------------------
+
+describe('validateRequiredCredentials', () => {
+  it('returns no issues when both PAYWAY_MERCHANT_ID and PAYWAY_API_KEY are set', () => {
+    const env = {
+      PAYWAY_MERCHANT_ID: 'merchant-123',
+      PAYWAY_API_KEY: 'a'.repeat(32),
+    };
+    const issues = validateRequiredCredentials(env);
+    expect(issues).toHaveLength(0);
+  });
+
+  it('returns error when PAYWAY_MERCHANT_ID is missing', () => {
+    const env = {
+      PAYWAY_API_KEY: 'a'.repeat(32),
+    };
+    const issues = validateRequiredCredentials(env);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].varName).toBe('PAYWAY_MERCHANT_ID');
+    expect(issues[0].severity).toBe('error');
+    expect(issues[0].code).toBe('E-PAYWAY_MERCHANT_ID-MISSING');
+    expect(issues[0].message).toContain('payway-sdk init');
+  });
+
+  it('returns error when PAYWAY_API_KEY is missing', () => {
+    const env = {
+      PAYWAY_MERCHANT_ID: 'merchant-123',
+    };
+    const issues = validateRequiredCredentials(env);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].varName).toBe('PAYWAY_API_KEY');
+    expect(issues[0].severity).toBe('error');
+    expect(issues[0].code).toBe('E-PAYWAY_API_KEY-MISSING');
+    expect(issues[0].message).toContain('payway-sdk init');
+  });
+
+  it('returns errors for both when both are missing', () => {
+    const env = {};
+    const issues = validateRequiredCredentials(env);
+    expect(issues).toHaveLength(2);
+    const varNames = issues.map((i) => i.varName);
+    expect(varNames).toContain('PAYWAY_MERCHANT_ID');
+    expect(varNames).toContain('PAYWAY_API_KEY');
+  });
+
+  it('treats empty string as missing', () => {
+    const env = {
+      PAYWAY_MERCHANT_ID: '',
+      PAYWAY_API_KEY: '   ',
+    };
+    const issues = validateRequiredCredentials(env);
+    expect(issues).toHaveLength(2);
+  });
+
+  it('treats whitespace-only values as missing', () => {
+    const env = {
+      PAYWAY_MERCHANT_ID: '   ',
+      PAYWAY_API_KEY: '\t\n',
+    };
+    const issues = validateRequiredCredentials(env);
+    expect(issues).toHaveLength(2);
+  });
+
+  it('does not check PAYWAY_ENV or other optional vars', () => {
+    const env = {
+      PAYWAY_MERCHANT_ID: 'merchant-123',
+      PAYWAY_API_KEY: 'a'.repeat(32),
+    };
+    const issues = validateRequiredCredentials(env);
+    expect(issues).toHaveLength(0);
+  });
+
+  it('all issues are severity error (never warn)', () => {
+    const env = {};
+    const issues = validateRequiredCredentials(env);
+    for (const issue of issues) {
+      expect(issue.severity).toBe('error');
+    }
+  });
+
+  it('all issues mention .env file in message', () => {
+    const env = {};
+    const issues = validateRequiredCredentials(env);
+    for (const issue of issues) {
+      expect(issue.message).toContain('.env');
+    }
+  });
+
+  it('issues are a strict subset of validatePayWayEnv errors for credentials', () => {
+    const env = { PAYWAY_ENV: 'sandbox' };
+    const requiredIssues = validateRequiredCredentials(env);
+    const fullIssues = validatePayWayEnv(env);
+
+    for (const ri of requiredIssues) {
+      const matching = fullIssues.find(
+        (fi) => fi.varName === ri.varName && fi.severity === 'error',
+      );
+      expect(matching).toBeDefined();
+    }
   });
 });

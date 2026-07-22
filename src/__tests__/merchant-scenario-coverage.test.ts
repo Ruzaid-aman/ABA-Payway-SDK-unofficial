@@ -45,6 +45,29 @@ describe('merchant scenario coverage', () => {
     expect(fields).not.toHaveProperty('api_key');
   });
 
+  it('TC-001a forwards payment_gate=1 in the signed checkout form payload', () => {
+    const fields = payway.checkout.createTransaction({
+      transactionId: 'TC001a-CHECKOUT',
+      amount: 15,
+      paymentOption: 'abapay_khqr_deeplink',
+      paymentGate: 1,
+    });
+
+    expect(fields).toMatchObject({ payment_gate: 1, payment_option: 'abapay_khqr_deeplink' });
+    expect(fields).toHaveProperty('hash');
+  });
+
+  it('TC-001b omits payment_gate when not specified', () => {
+    const fields = payway.checkout.createTransaction({
+      transactionId: 'TC001b-CHECKOUT',
+      amount: 20,
+      paymentOption: 'abapay_khqr',
+    });
+
+    expect(fields).not.toHaveProperty('payment_gate');
+    expect(fields).toHaveProperty('payment_option', 'abapay_khqr');
+  });
+
   it.each([0, -1, 1.5])('TC-008 rejects invalid checkout lifetime %s', (lifetime) => {
     expect(() => payway.checkout.createTransaction({ transactionId: 'TC008', amount: 1, lifetime })).toThrow(
       'lifetime must be a positive whole number of seconds',

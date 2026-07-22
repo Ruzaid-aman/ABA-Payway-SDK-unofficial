@@ -19,6 +19,7 @@
       - payment_option
       - callback_url
       - currency
+      - lifetime
       - qr_image_template
     requestBody:
       required: true

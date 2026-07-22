@@ -68,12 +68,84 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 | `payway-sdk status` | Display payment status codes and refund error codes reference |
 | `payway-sdk validate` | Validate a refund amount or transaction ID locally |
 | `payway-sdk generate-qr` | Generate a QR code (online via PayWay API or offline) |
+| `payway-sdk generate-checkout` | Generate a checkout QR URL, QR string, and ABA deeplink (requires credentials) |
+| `payway-sdk setup-webhook` | Start a local webhook server for receiving payment callbacks |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
 | `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |
 | `payway-sdk skills list` | Show installed skills per agent |
 | `payway-sdk skills doctor` | Verify installation health for all agents |
 | `payway-sdk --help` | Show usage guide |
 | `payway-sdk --version` | Print SDK version |
+
+#### Webhook Setup (Local Development)
+
+```bash
+# Start a local webhook server on port 8443
+payway-sdk setup-webhook
+
+# With Cloudflare Tunnel for a public URL
+payway-sdk setup-webhook --tunnel
+
+# Custom port and storage
+payway-sdk setup-webhook --port 3000 --storage json
+```
+
+See [docs/16-webhook-setup-guide.md](./docs/16-webhook-setup-guide.md) for the full guide.
+
+#### QR Code Generation Examples
+
+```bash
+# Offline QR (no credentials needed)
+payway-sdk generate-qr --amount 10.00 --offline --merchant-id YOUR_MERCHANT_ID --ref "Order-001"
+
+# Online QR (requires PAYWAY_MERCHANT_ID and PAYWAY_API_KEY in .env)
+payway-sdk generate-qr --amount 10.00 --callback-url https://your-webhook.com/hook
+
+# Online QR with custom template
+payway-sdk generate-qr --amount 10.00 --callback-url https://your-webhook.com/hook --template template3
+```
+
+#### Checkout QR URL Generation (CLI)
+
+The Checkout command reads credentials from the current directory's `.env` file:
+
+```dotenv
+PAYWAY_MERCHANT_ID=your-merchant-id
+PAYWAY_API_KEY=your-api-key
+PAYWAY_SANDBOX=true
+```
+
+Run a purchase with `payment_gate: 0` (set automatically by the CLI) to receive a QR string, ABA deeplink, and hosted checkout QR URL:
+
+```bash
+payway-sdk generate-checkout \
+  --amount 10.00 \
+  --currency USD \
+  --return-url https://merchant.example/payment/return \
+  --cancel-url https://merchant.example/payment/cancel
+```
+
+`--return-url` and `--cancel-url` are forwarded to the Checkout Purchase API. The command accepts `--callback-url` for compatibility, but Checkout Purchase does not send that field; configure any server-to-server callback in your PayWay merchant settings instead. A return URL is a customer-browser redirect, not payment confirmation—verify a callback signature or check the transaction before fulfilling an order.
+
+#### Checkout URL Generation (via SDK)
+
+```typescript
+import { PayWay } from 'aba-payway-ts';
+
+const payway = new PayWay();
+
+// Get checkout_qr_url (requires payment_gate: 0)
+const result = await payway.checkout.purchase({
+  transactionId: 'order-123',
+  amount: 15.00,
+  currency: 'USD',
+  paymentOption: 'abapay_khqr_deeplink',
+  paymentGate: 0,  // Required for checkout_qr_url
+});
+
+console.log(result.checkout_qr_url);
+// https://checkout-sandbox.payway.com.kh/eyJ...
+```
 
 ### Sandbox test scripts
 
@@ -326,6 +398,37 @@ const qrCode = await payway.qr.generateQr({
 });
 // Response includes "qrString" (for embedding/deep-linking) and "qrImage" (base64 image data)
 ```
+
+### 3.1 Purchase with QR + Checkout URL (`payway.checkout.purchase`)
+
+Use `payment_option: 'abapay_khqr_deeplink'` with `payment_gate: 0` to get `qr_string`, `abapay_deeplink`, and `checkout_qr_url`:
+
+```typescript
+const result = await payway.checkout.purchase({
+  transactionId: 'order-123',
+  amount: 15.00,
+  currency: 'USD',
+  paymentOption: 'abapay_khqr_deeplink',
+  paymentGate: 0,  // Required: routes through Checkout service
+});
+
+// Response:
+// {
+//   "qr_string": "000201010212...",
+//   "abapay_deeplink": "abamobilebank://ababank.com?...",
+//   "checkout_qr_url": "https://checkout-sandbox.payway.com.kh/eyJ...",
+//   "status": { "code": "00", "message": "Success!" }
+// }
+```
+
+**`payment_gate` Parameter:**
+
+| Value | Routes Through | Response Fields |
+|---|---|---|
+| `0` | Checkout service | `qr_string`, `abapay_deeplink`, `checkout_qr_url` |
+| `1` | QR Payment API | `qrString`, `qrImage`, `abapay_deeplink` |
+
+> ⚠️ **Important:** Use `payment_gate: 0` when you need `checkout_qr_url` for hosted checkout pages.
 
 ### 3.1 Offline QR Generation (`payway.khqr.generateOfflineQR`)
 

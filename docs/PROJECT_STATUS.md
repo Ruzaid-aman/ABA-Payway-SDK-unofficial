@@ -1,14 +1,31 @@
 # PayWay SDK — Project Status
 
-> Last updated: 2026-07-19
+> Last updated: 2026-07-21
 
-> **v1.2.0 released** (commit `df04deb`). CLI fully migrated to Commander with modular subcommands (`init`, `doctor`, `skills`), live-sandbox integration scripts documented in README, `test-logs/` added to `.gitignore`. All 249 Vitest tests pass, Biome lint clean, TypeScript typecheck clean, build clean.
+> **v1.3.0 released** — Webhook CLI command (`setup-webhook`) with HTTP server, Cloudflare Tunnel manager, JSONL/SQLite storage adapters, and 24 new tests. **All 314 Vitest tests pass** across 20 test files, Biome lint clean, TypeScript typecheck clean, build clean.
 
 > ~~⚠️ **Uncommitted work in progress**~~ — Milestone C is now complete. All tasks resolved.
 
 ---
 
 ## ✅ Completed Work
+
+### Webhook CLI Command — `setup-webhook` (DONE — 2026-07-21)
+
+**Requirements:** WH-REQ-01 through WH-REQ-12, WH-TC-01 through WH-TC-08
+
+- **Source files (7):**
+  - `src/webhook/storage.ts` — `WebhookStorage` interface + `WebhookRecord` type
+  - `src/webhook/storage-json.ts` — JSONL append-only file storage (zero deps)
+  - `src/webhook/storage-sqlite.ts` — SQLite storage with optional `better-sqlite3` (WAL mode)
+  - `src/webhook/storage-factory.ts` — Auto-detect: SQLite → JSON fallback
+  - `src/webhook/server.ts` — HTTP server: `POST /aba-payway-webhook` → `200 {"acknowledged": true}`
+  - `src/webhook/tunnel.ts` — Cloudflare Tunnel subprocess manager (cloudflared)
+  - `src/cli/commands/setup-webhook.ts` — Interactive CLI command logic
+- **Test files (4):** 24 tests covering storage (9), server (9), tunnel (4), CLI (2)
+- **Modified files:** `src/errors.ts` (added `PayWayWebhookError`), `src/cli.ts` (registered command), `src/index.ts` (added exports)
+- **Documentation:** `docs/16-webhook-setup-guide.md` (new chapter)
+- **Design decisions:** Zero new runtime deps, signature logging only (never rejects), `PAYWAY_API_KEY` read from `process.env` (not PayWay class config)
 
 ### Phase 1 — Spec & Foundation (DONE)
 
@@ -72,6 +89,21 @@ All 7 API domains probed against `checkout-sandbox.payway.com.kh`:
   2. Form `target="aba_webservice"` is set on the hidden form
   3. `checkout2-0.js` and `AbaPayway.checkout()` are used to open the popup
 - Architecture clearly documented: **Backend** handles all hash calculations and crypto; **Frontend** only handles payment initiation and HTML response rendering
+
+### QR-REQ-11: Default Retry Hardening (DONE — 2026-07-21)
+
+- **Changed `maxRetries` default from `0 → 3`** and **`retryDelayMs` default from `1000 → 3000`** in `_executeFetch()` (`src/client.ts`)
+- Retry policy: exponential backoff (3s → 6s → 12s), retries on HTTP 5xx and network errors, never retries HTTP 4xx
+- **3 new Vitest tests** added verifying: 503 recovery, retry exhaustion after 4 attempts, network error (AbortError) retry
+- **8 existing tests fixed** — fixtures updated with `maxRetries: 0` to preserve single-attempt semantics
+- **All 290 tests passing** across all 16 test files
+
+### QR Image Save Bug Fix (DONE — 2026-07-21)
+
+- **Bug**: PayWay API returns `qrImage` as a data URL (`data:image/png;base64,...`), but `Buffer.from(qr.qrImage, 'base64')` tried to decode the entire string including the prefix, producing corrupt PNGs that appeared blank
+- **Fix** (`src/cli.ts` ~line 664-667): Strip `data:image/png;base64,` prefix before base64 decoding
+- **Verification**: Rebuilt → regenerated QR → confirmed valid PNG (8,351 bytes, `89 50 4E 47` signature) → visual confirmation of rendered QR code with ABA PayWay branding
+- Offline QR generation also confirmed working (TLV-encoded string output)
 
 ---
 
@@ -283,9 +315,14 @@ Tasks must be completed **in this order**:
 
 ---
 
-### Milestone C: CLI Modularization & Live-Sandbox Hardening `v1.2.0` (IN PROGRESS, uncommitted)
+### Milestone C: CLI Modularization & Live-Sandbox Hardening `v1.2.0` (COMPLETED)
 
-> Goal: Migrate the CLI to Commander with modular subcommands, and validate the full transaction lifecycle (QR → poll → refund) against the live sandbox with real captured evidence. Started after `v1.1.1` (commit `ca96005`); **not yet committed**.
+> Goal: Migrate the CLI to Commander with modular subcommands, and validate the full transaction lifecycle (QR → poll → refund) against the live sandbox with real captured evidence. Released in commit `df04deb`.
+
+**Post-release hardening (2026-07-21):**
+- QR-REQ-11 retry defaults implemented (`maxRetries: 3`, `retryDelayMs: 3000`) — passed all 290 tests
+- QR image save bug fixed (data URL prefix stripping) — verified QR PNG renders correctly
+- See "Completed Work" sections above for details
 
 #### Task 16 — Fix Regression: `checkout` `responseType` Routing ⬅️ START HERE
 
@@ -349,10 +386,10 @@ Tasks must be completed **in this order**:
 ## Quick Reference
 
 ```
-Last committed version:  1.1.1 (commit ca96005, clean — 204+ tests passing)
-Working tree state:      Uncommitted Milestone C changes (~70 files, +6,441/-33)
-Vitest (working tree):   246 passing / 3 failing (see Task 16)
-Typecheck:                npx tsc --noEmit -> clean; npm run typecheck -> exits 1 (needs investigation)
-Build:                    Not re-verified against working tree since Milestone C changes started
-Next task:                Task 16 - fix checkout responseType regression, then commit Milestone C
+Last committed version:  1.3.0 (webhook CLI command added)
+Working tree state:      Post-release — webhook setup-webhook implementation complete
+Vitest (latest):         314 passing / 0 failing (20 test files)
+Typecheck:               npx tsc --noEmit -> clean; npm run typecheck -> exits 1 (needs investigation)
+Build:                   Clean (ESM + CJS + DTS via tsup)
+Next focus:              QR image decode verification (optional), production webhook hardening
 ```

@@ -7,12 +7,16 @@
 
 ## Error Class Hierarchy
 
-The SDK throws three types of errors:
+The SDK throws these error types:
 
 ```
 PayWayError (base)
-├── PayWayConfigError — Local configuration mistake
-└── PayWayAPIError    — API returned an error
+├── PayWayConfigError    — Local configuration mistake
+├── PayWayAPIError       — API returned an error
+├── PayWayBusinessError  — Business rule violation
+├── PayWayNetworkError   — Network / connectivity failure
+├── PayWayRateLimitError — Rate limit exceeded
+└── PollingAbortedError  — Transaction polling forcibly stopped
 ```
 
 ### PayWayConfigError
@@ -45,6 +49,34 @@ Thrown when PayWay's API returns an error (wrong hash, invalid merchant, etc.). 
 | `rawBody` | `any` | The complete JSON response body |
 | `retryable` | `boolean` | Whether the error is transient (can be retried) |
 | `toJSON()` | method | Serialize all error fields for logging |
+
+### PollingAbortedError
+
+Thrown when `checkout.pollTransactionStatus()` is forcibly stopped due to exceeding `maxDurationMs` or `maxConsecutiveErrors`. Caught inside a `for await...of` loop's `catch` block.
+
+```typescript
+import { PollingAbortedError } from 'aba-payway-ts';
+
+try {
+  for await (const result of payway.checkout.pollTransactionStatus('TX-001')) {
+    if (result.isTerminal) break;
+  }
+} catch (error) {
+  if (error instanceof PollingAbortedError) {
+    console.error(`Polling stopped: ${error.reason}`);
+    console.error(`Attempts: ${error.totalAttempts}, Last status: ${error.lastStatus}`);
+    console.error(JSON.stringify(error.toJSON()));
+  }
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `reason` | `PollAbortReason` | `'max_duration_exceeded'` or `'max_consecutive_errors'` |
+| `transactionId` | `string` | Transaction ID being polled |
+| `lastStatus` | `string \| undefined` | Last observed status before abort |
+| `totalAttempts` | `number` | Total poll attempts made |
+| `toJSON()` | method | Serialize all fields for structured logging |
 
 ---
 

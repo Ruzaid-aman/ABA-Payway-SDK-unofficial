@@ -24,8 +24,8 @@ const payway = new PayWay({
   apiKey: process.env.PAYWAY_API_KEY!,
   publicKeyPem: process.env.PAYWAY_PUBLIC_KEY,
   environment: (process.env.PAYWAY_ENVIRONMENT as 'sandbox' | 'production') || 'sandbox',
-  maxRetries: 2,
-  retryDelayMs: 1000,
+  maxRetries: 3,
+  retryDelayMs: 3000,
   onRequest: (endpoint, body) => {
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[PayWay] → ${endpoint}`);
@@ -486,6 +486,107 @@ curl -X POST "https://your-ngrok-url.ngrok.io/api/payway-webhook" \
   -H "Content-Type: application/json" \
   -d "{\"tran_id\":\"${TRAN_ID}\",\"amount\":\"15.00\",\"currency\":\"USD\",\"hash\":\"${HASH}\"}"
 ```
+
+---
+
+---
+
+## On-Demand Transaction Status Polling
+
+After generating a QR code or creating a purchase, poll the transaction status on demand. The `pollTransactionStatus()` method is an async generator — polling starts when you iterate and stops when you `break`, when a terminal status is reached, or when limits are hit.
+
+### QR Payment with Real-Time Status Updates
+
+```typescript
+import { PayWay, PollingAbortedError } from 'aba-payway-ts';
+
+const payway = new PayWay({
+  merchantId: process.env.PAYWAY_MERCHANT_ID!,
+  apiKey: process.env.PAYWAY_API_KEY!,
+  environment: 'sandbox',
+});
+
+async function processQrPayment(amount: number, currency: 'USD' | 'KHR') {
+  const transactionId = `qr-${Date.now()}`;
+
+  // 1. Generate QR
+  const qr = await payway.qr.generateQr({
+    transactionId,
+    amount,
+    currency,
+    paymentOption: 'abapay_khqr',
+  });
+
+  console.log(`QR generated: ${transactionId}`);
+  // Display qr.qrImage to customer...
+
+  // 2. Poll for payment — ON DEMAND, starts immediately
+  try {
+    for await (const result of payway.checkout.pollTransactionStatus(transactionId, {
+      intervalMs: 5_000,        // Poll every 5 seconds
+      maxDurationMs: 180_000,   // Stop after 3 minutes (QR lifetime)
+    })) {
+      console.log(`[Poll #${result.attempt}] ${result.paymentStatus} (${result.durationMs}ms)`);
+
+      if (result.isTerminal) {
+        console.log(`Terminal status reached: ${result.paymentStatus}`);
+        return { transactionId, status: result.paymentStatus };
+      }
+    }
+  } catch (error) {
+    if (error instanceof PollingAbortedError) {
+      console.error(`Polling aborted: ${error.reason} after ${error.totalAttempts} attempts`);
+      return { transactionId, status: 'TIMEOUT', lastKnown: error.lastStatus };
+    }
+    throw error;
+  }
+}
+```
+
+### Multi-Transaction Polling
+
+Poll multiple transactions concurrently — each `for await...of` loop is independent:
+
+```typescript
+async function monitorMultiplePayments(transactionIds: string[]) {
+  const controllers = transactionIds.map(() => new AbortController());
+
+  // Start independent polls for each transaction
+  const promises = transactionIds.map((id, i) =>
+    (async () => {
+      try {
+        for await (const result of payway.checkout.pollTransactionStatus(id)) {
+          console.log(`[${id}] Poll #${result.attempt}: ${result.paymentStatus}`);
+          if (result.isTerminal) return result;
+          if (controllers[i].signal.aborted) return null;
+        }
+      } catch (error) {
+        if (error instanceof PollingAbortedError) {
+          console.error(`[${id}] Aborted: ${error.reason}`);
+        }
+        return null;
+      }
+    })()
+  );
+
+  // Wait for ALL transactions to reach terminal state
+  const results = await Promise.all(promises);
+
+  // Cancel any still-polling iterators
+  controllers.forEach(c => c.abort());
+
+  return results;
+}
+```
+
+### Error Handling Reference
+
+| Error | When | How to Handle |
+|---|---|---| 
+| `PollingAbortedError` | `maxDurationMs` or `maxConsecutiveErrors` hit | Catch around `for await...of`, check `error.reason` |
+| `PollingAbortedError` with `reason: 'max_consecutive_errors'` | Network issues or API errors | Retry with fresh `pollTransactionStatus()` call |
+| `PollingAbortedError` with `reason: 'max_duration_exceeded'` | QR expired before payment | Generate new QR, notify customer |
+| Error results (yielded, not thrown) | Single poll failure within tolerance | Log warning, continue iterating — next poll may succeed |
 
 ---
 

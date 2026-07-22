@@ -31,7 +31,11 @@ export {
   PayWayNetworkError,
   PayWayRateLimitError,
   PayWaySignatureError,
+  PayWayWebhookError,
+  PollingAbortedError,
 } from './errors.js';
+
+export type { PollAbortReason } from './errors.js';
 
 export {
   PAYMENT_STATUS_CODES,
@@ -42,6 +46,13 @@ export {
 export { validateRefundAmount } from './utils.js';
 
 export type { CheckoutDomain } from './domains/checkout.js';
+
+export type {
+  PollTransactionResult,
+  PollTransactionOptions,
+  TerminalPaymentStatus,
+  PendingPaymentStatus,
+} from './types.js';
 
 export type { CredentialsOnFileDomain } from './domains/credentials-on-file.js';
 
@@ -91,3 +102,8 @@ export type {
   TestResult,
   TestSuiteReport,
 } from './schema.js';
+
+// ─── Webhook Storage ─────────────────────────────────────────────────────
+export { createStorage } from './webhook/storage-factory.js';
+export type { WebhookStorage, WebhookRecord } from './webhook/storage.js';
+export type { StorageType } from './webhook/storage-factory.js';

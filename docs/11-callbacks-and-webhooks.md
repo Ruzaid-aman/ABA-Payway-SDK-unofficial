@@ -400,6 +400,7 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 
 ## Next Steps
 
+- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](./16-webhook-setup-guide.md) — quick way to capture and inspect callbacks during development
 - **For error handling** → [Chapter 12 — Error Handling & Debugging](./12-error-handling-and-debugging.md)
 - **For deployment** → [Chapter 13 — Deployment Checklist](./13-deployment-checklist.md)
 - **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](./03-web-implementation.md)

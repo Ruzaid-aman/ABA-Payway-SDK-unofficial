@@ -54,8 +54,8 @@ export interface PayWayConfig {
   environment?: 'sandbox' | 'production';
   timeout?: number;
   baseUrl?: string;
-  maxRetries?: number; // Default: 0
-  retryDelayMs?: number; // Default: 1000
+  maxRetries?: number; // Default: 3 (QR-REQ-11: retry up to 3 times on transient failures)
+  retryDelayMs?: number; // Default: 3000 (3 seconds between retries)
   rateLimitThrottling?: boolean; // Default: true for endpoints with documented limits
   rateLimitRules?: Record<string, RateLimitRule>;
   debug?: boolean;
@@ -151,6 +151,7 @@ export interface GenerateQrParams {
   currency?: 'KHR' | 'USD';
   qrImageTemplate?: string;
   requestTime?: string;
+  lifetime?: number;
 }
 
 export interface CreatePaymentLinkParams {
@@ -438,6 +439,8 @@ export class PayWay {
    * @param config.environment - The target environment ('sandbox' or 'production'). Defaults to 'sandbox'.
    * @param config.timeout - The request timeout in milliseconds. Defaults to 30,000 (30 seconds).
    * @param config.baseUrl - Optional override for the base API URL.
+   * @param config.maxRetries - Number of retries on transient failures (429, 5xx, network). Defaults to 3.
+   * @param config.retryDelayMs - Base delay in milliseconds between retries (exponential backoff). Defaults to 3000.
    * @throws {PayWayConfigError} If the configuration is missing or invalid.
    */
   constructor(config: Partial<PayWayConfig> = {}) {
@@ -577,8 +580,8 @@ export class PayWay {
     bodyPayload: string,
   ): Promise<TResponse> {
     const timeoutMs = this.config.timeout ?? 30_000;
-    const maxRetries = this.config.maxRetries ?? 0;
-    const retryDelayMs = this.config.retryDelayMs ?? 1000;
+    const maxRetries = this.config.maxRetries ?? 3;
+    const retryDelayMs = this.config.retryDelayMs ?? 3000;
     const url = `${this.baseUrl}${endpoint}`;
 
     await this._acquireRateLimitToken(endpoint);

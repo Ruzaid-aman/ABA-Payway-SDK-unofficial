@@ -20,6 +20,12 @@ npm run typecheck
 - [ ] Verify documentation links and examples.
 
 - [ ] Confirm new or changed API behavior is documented in `README.md` and relevant `docs/` chapters.
+- [ ] If CLI commands were added or changed, rebuild the CLI and verify `--help` output:
+
+```bash
+npm run build
+npx payway-sdk --help
+```
 
 ## Sandbox Verification
 
