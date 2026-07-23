@@ -8,6 +8,8 @@
  * 4. Handle graceful shutdown on Ctrl+C
  */
 
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import readline from 'node:readline';
 import { createStorage, type StorageType } from '../../webhook/storage-factory.js';
 import { createWebhookServer, type WebhookServerResult } from '../../webhook/server.js';
@@ -137,11 +139,38 @@ export async function runSetupWebhook(opts: SetupWebhookOptions): Promise<void> 
     }
   }
 
-  // ── Step 4: Display webhook URL and instructions ─────────────────────
+  // ── Step 4: Compute webhook URL ──────────────────────────────────────
   const webhookUrl = publicUrl
     ? `${publicUrl}/aba-payway-webhook`
     : `http://localhost:${port}/aba-payway-webhook`;
 
+  // ── Step 5: Persist tunnel URL to .env as PAYWAY_CALLBACK_URL ──────
+  let previousCallbackUrl: string | null = null; // Save original value to restore on shutdown
+  if (publicUrl) {
+    const envPath = path.resolve(process.cwd(), '.env');
+    const existing = existsSync(envPath) ? readFileSync(envPath, 'utf-8') : '';
+    const lines = existing.split(/\r?\n/);
+    const key = 'PAYWAY_CALLBACK_URL';
+    const newLine = `${key}=${webhookUrl}`;
+    const idx = lines.findIndex((l) => l.trim().startsWith(`${key}=`));
+    if (idx !== -1) {
+      // Save the original value so we can restore it on shutdown
+      const existingVal = lines[idx].split('=').slice(1).join('=').trim();
+      if (existingVal && existingVal !== webhookUrl) {
+        previousCallbackUrl = existingVal;
+      }
+      lines[idx] = newLine;
+    } else {
+      lines.push(newLine);
+    }
+    writeFileSync(envPath, lines.join('\n'), 'utf-8');
+    // Also set in process.env so subsequent commands in the same session pick it up
+    process.env[key] = webhookUrl;
+    console.log(`  ${c.green('✓')} Saved callback URL to .env as ${c.cyan(`${key}=${webhookUrl}`)}`);
+    console.log();
+  }
+
+  // ── Step 6: Display webhook URL and instructions ─────────────────────
   console.log();
   console.log(`  ${c.bold('Webhook endpoint:')}`);
   console.log(`    ${c.cyan(webhookUrl)}`);
@@ -157,7 +186,7 @@ export async function runSetupWebhook(opts: SetupWebhookOptions): Promise<void> 
     console.log();
   }
 
-  // ── Step 5: Start webhook server ─────────────────────────────────────
+  // ── Step 7: Start webhook server ─────────────────────────────────────
   const storageType = opts.storage ?? 'auto';
   const storage = await createStorage(storageType);
   const webhookServer: WebhookServerResult = createWebhookServer(storage, {
@@ -165,7 +194,7 @@ export async function runSetupWebhook(opts: SetupWebhookOptions): Promise<void> 
     apiKey,
   });
 
-  // ── Step 6: Set up graceful shutdown (WH-REQ-08, WH-TC-06) ──────────
+  // ── Step 8: Set up graceful shutdown (WH-REQ-08, WH-TC-06) ──────────
   let shuttingDown = false;
 
   async function shutdown(): Promise<void> {
@@ -175,6 +204,36 @@ export async function runSetupWebhook(opts: SetupWebhookOptions): Promise<void> 
 
     if (tunnel?.isRunning) {
       await tunnel.stop();
+    }
+
+    // Restore the original callback URL (or remove if there was none)
+    if (previousCallbackUrl !== null) {
+      const envPath = path.resolve(process.cwd(), '.env');
+      if (existsSync(envPath)) {
+        const existing = readFileSync(envPath, 'utf-8');
+        const lines = existing.split(/\r?\n/);
+        const idx = lines.findIndex((l) => l.trim().startsWith('PAYWAY_CALLBACK_URL='));
+        if (idx !== -1) {
+          lines[idx] = `PAYWAY_CALLBACK_URL=${previousCallbackUrl}`;
+        } else {
+          lines.push(`PAYWAY_CALLBACK_URL=${previousCallbackUrl}`);
+        }
+        writeFileSync(envPath, lines.join('\n'), 'utf-8');
+        process.env.PAYWAY_CALLBACK_URL = previousCallbackUrl;
+        console.log(`  ${c.dim('○')} Restored original PAYWAY_CALLBACK_URL in .env`);
+      }
+    } else if (publicUrl) {
+      // We wrote the URL ourselves — remove it since the tunnel is dead
+      const envPath = path.resolve(process.cwd(), '.env');
+      if (existsSync(envPath)) {
+        const existing = readFileSync(envPath, 'utf-8');
+        const lines = existing.split(/\r?\n/).filter(
+          (l) => !l.trim().startsWith('PAYWAY_CALLBACK_URL='),
+        );
+        writeFileSync(envPath, lines.join('\n'), 'utf-8');
+        delete process.env.PAYWAY_CALLBACK_URL;
+        console.log(`  ${c.dim('○')} Removed PAYWAY_CALLBACK_URL from .env (tunnel stopped)`);
+      }
     }
 
     await webhookServer.stop();

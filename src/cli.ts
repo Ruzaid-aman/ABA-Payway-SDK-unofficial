@@ -581,12 +581,15 @@ program
       }
     } else {
       // ── Online mode ───────────────────────────────────────────────────
-      const callbackUrl = opts.callbackUrl;
+      const callbackUrl = opts.callbackUrl || process.env.PAYWAY_CALLBACK_URL?.trim();
 
       if (!callbackUrl) {
         console.log(`  ${c.red('✗')} --callback-url is required for online mode`);
         console.log(
           `  ${c.dim('Tip: use --offline for offline QR generation without credentials')}`,
+        );
+        console.log(
+          `  ${c.dim('Or run: payway-sdk setup-webhook --tunnel to set PAYWAY_CALLBACK_URL in .env')}`,
         );
         process.exitCode = 1;
         return;

@@ -20,7 +20,10 @@ export interface TunnelManager {
   readonly isRunning: boolean;
 }
 
-const URL_PATTERN = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+// Match tunnel URLs like https://random-name-123.trycloudflare.com
+// but NOT informational log messages like "api.trycloudflare.com"
+// Tunnel URLs have at least 6 chars in the subdomain (random hex/gibberish)
+const URL_PATTERN = /https:\/\/[a-z0-9-]{6,}\.trycloudflare\.com/;
 
 /**
  * Check if `cloudflared` is installed and available in PATH.
@@ -31,8 +34,28 @@ export async function findCloudflared(): Promise<string | null> {
     const isWindows = process.platform === 'win32';
     const cmd = isWindows ? 'where cloudflared' : 'which cloudflared';
     const { stdout } = await execAsync(cmd);
-    const result = stdout.trim().split('\n')[0]?.trim();
-    return result && result.length > 0 ? result : null;
+    // Split on newlines, strip \r, trim whitespace, remove empty lines
+    const lines = stdout
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (lines.length === 0) return null;
+
+    if (isWindows) {
+      // On Windows, `where` returns multiple results (shell script, .cmd, .ps1).
+      // The actual cloudflared.exe is typically buried inside node_modules and
+      // NOT on PATH — only the wrapper scripts (.cmd, shell script) are exposed.
+      // Node.js spawn() can run .cmd files natively on Windows (it auto-invokes cmd.exe).
+      // Prefer .cmd over .ps1 — skip the raw shell script (no extension) which
+      // cannot be spawned directly by Node.js child_process.spawn.
+      const cmdFile = lines.find((l) => /\.cmd$/i.test(l));
+      if (cmdFile) return cmdFile;
+      const ps1 = lines.find((l) => /\.ps1$/i.test(l));
+      if (ps1) return ps1;
+    }
+
+    return lines[0] ?? null;
   } catch {
     return null;
   }
@@ -42,6 +65,9 @@ export function createTunnelManager(binaryPath?: string): TunnelManager {
   let child: ChildProcess | null = null;
   let running = false;
   const binary = binaryPath || (process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared');
+  // On Windows, .cmd/.bat files must be spawned with `shell: true` because
+  // they are batch scripts interpreted by cmd.exe, not standalone executables.
+  const needsShell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(binary);
 
   return {
     get isRunning() {
@@ -53,6 +79,7 @@ export function createTunnelManager(binaryPath?: string): TunnelManager {
         child = spawn(binary, ['tunnel', '--url', `http://localhost:${localPort}`], {
           stdio: ['ignore', 'pipe', 'pipe'],
           env: { ...process.env },
+          shell: needsShell,
         });
 
         let urlResolved = false;
