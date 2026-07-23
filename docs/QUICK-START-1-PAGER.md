@@ -214,6 +214,6 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 | `payway-sdk init` | Initialize PayWay integration in your project |
 | `payway-sdk doctor` | Validate environment configuration |
 | `payway-sdk test` | Run the sandbox test suite |
-| `payway-sdk generate-qr` | Generate a QR code (online or offline) |
+| `payway-sdk generate-qr` | Generate a QR code (online or offline). Use `--non-interactive` (`-y`) to skip prompts for scripts/CI. |
 | `payway-sdk generate-checkout` | Generate a checkout QR URL |
 | `payway-sdk setup-webhook` | Start a local webhook server for callback testing |

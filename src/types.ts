@@ -3,7 +3,8 @@
  * Do not make direct changes to the file.
  */
 
-// ─── Transaction Polling Types ──────────────────────────────────────────────
+
+// ÔöÇÔöÇÔöÇ Transaction Polling Types ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
 /** Terminal payment statuses that stop the polling loop. */
 export type TerminalPaymentStatus = 'APPROVED' | 'DECLINED' | 'CANCELLED' | 'REFUNDED';
@@ -21,7 +22,7 @@ export interface PollTransactionResult {
   response: components['schemas']['CheckTransactionResponse'];
   /** The extracted payment_status string (e.g. 'PENDING', 'APPROVED'). */
   paymentStatus: string;
-  /** Whether this is a terminal status — polling will stop after this yield. */
+  /** Whether this is a terminal status ÔÇö polling will stop after this yield. */
   isTerminal: boolean;
   /** Duration of this specific poll HTTP request in milliseconds. */
   durationMs: number;
@@ -331,7 +332,7 @@ export interface paths {
         put?: never;
         /**
          * Create a payment link
-         * @description Generates a shareable payment link that can be sent to customers via SMS, email, chat, or any messaging platform. The link opens PayWay's hosted checkout page. Requires RSA-encrypted merchant_auth.
+         * @description Generates a shareable payment link that can be sent to customers via SMS, email, chat, or any messaging platform. The link opens PayWay's hosted checkout page. Requires RSA-encrypted merchant_auth. Sandbox-verified: `currency` and `return_url` are REQUIRED inside merchant_auth — the gateway responds PTL04 "Parameter validation required" when either is omitted (undocumented in official docs).
          */
         post: operations["createPaymentLink"];
         delete?: never;
@@ -351,7 +352,7 @@ export interface paths {
         put?: never;
         /**
          * Get payment link details
-         * @description Retrieves the status and details of a previously created payment link. Also uses RSA-encrypted merchant_auth.
+         * @description Retrieves the status and details of a previously created payment link. Also uses RSA-encrypted merchant_auth. The `id` is the `data.id` value returned by the create endpoint — NOT the slug in the payment_link URL.
          */
         post: operations["getPaymentLinkDetails"];
         delete?: never;
@@ -1015,25 +1016,67 @@ export interface components {
             /** @description Data URL containing the rendered QR PNG image. */
             qrImage?: string;
         };
-        /** @description Uses RSA-encrypted merchant_auth containing transaction details. See x-merchant-auth-encryption on the operation for encryption process. */
+        /** @description Uses RSA-encrypted merchant_auth containing transaction details. See x-merchant-auth-encryption on the operation for encryption process. Sandbox-verified: currency and return_url are REQUIRED inside merchant_auth (PTL04 "Parameter validation required" when omitted). */
         CreatePaymentLinkRequest: {
             /** @description UTC timestamp, YYYYMMDDHHmmss. */
             request_time: string;
             /** @description Merchant key issued by ABA Bank. */
             merchant_id: string;
-            /** @description Base64 of RSA-encrypted, chunked JSON containing transaction details (title, amount, description, payment_limit, return_url, merchant_ref_no, expired_date). */
+            /** @description Base64 of RSA-encrypted, chunked JSON containing transaction details (title, amount, currency, description, payment_limit, return_url, merchant_ref_no, expired_date). */
             merchant_auth: string;
             /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
             hash: string;
         };
-        CreatePaymentLinkResponse: {
-            status?: {
-                code?: string;
-                message?: string;
-            };
-            /** @description The generated payment link URL to share with customers. */
-            payment_link?: string;
+        PaymentLinkStatus: {
+            code?: string;
+            message?: string;
             tran_id?: string;
+            lang?: string;
+            trace_id?: string;
+        };
+        /** @description A payment link resource as returned by the create and detail endpoints (sandbox-verified shape). */
+        PaymentLink: {
+            /** @description Payment link id used with the detail endpoint (e.g. "zX71gfZgVme0juZANHfZMA=="). NOT the slug in the payment_link URL. */
+            id?: string;
+            title?: string;
+            image?: {
+                image?: string;
+                filename?: string;
+                size?: number;
+            };
+            /** @description Amount as a string (e.g. "0.02"). */
+            amount?: string;
+            /** @enum {string} */
+            currency?: "USD" | "KHR";
+            /** @description Link status (e.g. OPEN). */
+            status?: string;
+            description?: string;
+            payment_limit?: number;
+            total_amount_org?: number;
+            total_refund?: number;
+            total_amount?: number;
+            total_trxn?: number;
+            /** @description YYYY-MM-DD HH:mm:ss */
+            created_at?: string;
+            /** @description YYYY-MM-DD HH:mm:ss */
+            updated_at?: string;
+            /** @description Epoch seconds when set; empty string or "0" when unset. */
+            expired_date?: number | string;
+            /** @description Decoded callback URL. */
+            return_url?: string;
+            merchant_ref_no?: string;
+            outlet_id?: string;
+            outlet_name?: string;
+            /** @description Payout details (null when none). */
+            payout?: unknown;
+            /** @description Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N). */
+            payment_link?: string;
+        };
+        CreatePaymentLinkResponse: {
+            status?: components["schemas"]["PaymentLinkStatus"];
+            /** @description Numeric gateway transaction id (also present as a string in status.tran_id). */
+            tran_id?: number;
+            data?: components["schemas"]["PaymentLink"];
         };
         GetPaymentLinkDetailsRequest: {
             /** @description UTC timestamp, YYYYMMDDHHmmss. */
@@ -1045,19 +1088,10 @@ export interface components {
             hash: string;
         };
         GetPaymentLinkDetailsResponse: {
-            status?: {
-                code?: string;
-                message?: string;
-            };
-            data?: {
-                tran_id?: string;
-                amount?: number;
-                currency?: string;
-                payment_status?: string;
-                payment_link?: string;
-                created_date?: string;
-                expiry_date?: string;
-            };
+            status?: components["schemas"]["PaymentLinkStatus"];
+            /** @description Numeric gateway transaction id (also present as a string in status.tran_id). */
+            tran_id?: number;
+            data?: components["schemas"]["PaymentLink"];
         };
         /** @description Uses RSA-encrypted merchant_auth. NOTE: uses request_time (not req_time), same convention as the Refund endpoint. */
         CompletePreAuthRequest: {

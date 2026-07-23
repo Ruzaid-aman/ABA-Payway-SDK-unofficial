@@ -25,7 +25,7 @@ import {
 } from './utils.js';
 import { validateRequiredCredentials, hasBlockingIssues, validatePayWayEnv } from './config/envValidator.js';
 import { generateOfflineQR } from './khqr-offline.js';
-import { PollingAbortedError } from './errors.js';
+import { PayWayAPIError, PollingAbortedError } from './errors.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
 import { randomBytes } from 'node:crypto';
 
@@ -70,6 +70,36 @@ function assertCredentialsPresent(): boolean {
   console.log();
   return false;
 }
+
+// ---------------------------------------------------------------------------
+// Pre-flight RSA key check for merchant_auth-encrypted commands
+// ---------------------------------------------------------------------------
+function assertRsaKeyPresent(): boolean {
+  if (process.env.PAYWAY_RSA_PUBLIC_KEY?.trim()) return true;
+
+  console.log(`\n  ${c.red('✗')} ${c.bold('PAYWAY_RSA_PUBLIC_KEY is missing')}\n`);
+  console.log(`  ${c.dim('Payment Link APIs require the PayWay RSA public key for merchant_auth encryption.')}`);
+  console.log(`  ${c.dim('Add')} ${c.cyan('PAYWAY_RSA_PUBLIC_KEY=<pem>')} ${c.dim('to your .env file.')}\n`);
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Shared API error printer (includes PayWay code hints)
+// ---------------------------------------------------------------------------
+function printApiError(e: unknown): void {
+  if (e instanceof PayWayAPIError) {
+    console.log(`  ${c.red('✗')} ${e.message}`);
+    if (e.paywayCode) console.log(`  ${c.dim(`PayWay code: ${e.paywayCode}`)}`);
+    if (e.paywayCode === 'PTL04') {
+      console.log(`  ${c.dim('Hint: currency and return_url are required; description max 250 chars.')}`);
+    } else if (e.paywayCode === '96') {
+      console.log(`  ${c.dim('Hint: check the link id — use the data.id value returned by create.')}`);
+    }
+  } else {
+    console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // ANSI helpers (no external deps)
@@ -509,6 +539,7 @@ program
   .option('--fee <number>', 'Fee amount (offline only)')
   .option('--type <type>', 'Transaction type: purchase, refund, cash (offline only)', 'purchase')
   .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
+  .option('--non-interactive, -y', 'Skip interactive prompts (no confirmation, no lifetime override)')
   .option('--polling', 'Poll transaction status after QR generation (enabled by default)', true)
   .option('--no-polling', 'Disable automatic polling after QR generation')
   .option('--poll-interval <seconds>', 'Polling interval in seconds (default: 5)', '5')
@@ -609,34 +640,41 @@ program
       return;
     }
 
-      console.log();
-      console.log(`  ${c.bold('Parameters:')}`);
-      console.log(`    Amount:           ${c.cyan(`${amount} ${currency}`)}`);
-      console.log(`    Transaction ID:   ${c.cyan(transactionId)}`);
-      console.log(`    Payment Option:   ${c.cyan(opts.paymentOption ?? 'abapay_khqr')}`);
-      console.log(`    Callback URL:     ${c.cyan(callbackUrl)}`);
-      console.log(`    QR Template:      ${c.cyan(opts.template ?? 'template2')}`);
-      console.log(`    Lifetime:         ${c.cyan(`${lifetimeSeconds} seconds`)}`);
-      console.log();
+      let finalLifetime = lifetimeSeconds;
 
-      const rl = readline.createInterface({
-        input: process.stdin as any,
-        output: process.stdout as any,
-        terminal: false,
-      });
-      const lifetimeOverride = await promptLifetimeOverride(lifetimeSeconds, rl);
-      const finalLifetime = lifetimeOverride ?? lifetimeSeconds;
+      if (opts.nonInteractive) {
+        console.log(`  ${c.dim('(non-interactive mode — skipping prompts)')}`);
+        console.log();
+      } else {
+        console.log();
+        console.log(`  ${c.bold('Parameters:')}`);
+        console.log(`    Amount:           ${c.cyan(`${amount} ${currency}`)}`);
+        console.log(`    Transaction ID:   ${c.cyan(transactionId)}`);
+        console.log(`    Payment Option:   ${c.cyan(opts.paymentOption ?? 'abapay_khqr')}`);
+        console.log(`    Callback URL:     ${c.cyan(callbackUrl)}`);
+        console.log(`    QR Template:      ${c.cyan(opts.template ?? 'template2')}`);
+        console.log(`    Lifetime:         ${c.cyan(`${lifetimeSeconds} seconds`)}`);
+        console.log();
 
-      const confirmed = await promptConfirmation(`  Submit to PayWay? (y/n): `, rl);
-      rl.close();
-      if (!confirmed) {
-        console.log(`  ${c.yellow('Cancelled by user.')}\n`);
-        process.exitCode = 1;
+        const rl = readline.createInterface({
+          input: process.stdin as any,
+          output: process.stdout as any,
+          terminal: false,
+        });
+        const lifetimeOverride = await promptLifetimeOverride(lifetimeSeconds, rl);
+        finalLifetime = lifetimeOverride ?? lifetimeSeconds;
+
+        const confirmed = await promptConfirmation(`  Submit to PayWay? (y/n): `, rl);
         rl.close();
-        process.exit(1);
-      }
+        if (!confirmed) {
+          console.log(`  ${c.yellow('Cancelled by user.')}\n`);
+          process.exitCode = 1;
+          rl.close();
+          process.exit(1);
+        }
 
-      console.log();
+        console.log();
+      }
 
     try {
       const payway = new PayWay();
@@ -787,6 +825,145 @@ program
       }
     } catch (e) {
       console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
+      process.exitCode = 1;
+    }
+  });
+
+
+// --- payment-link ---
+const paymentLinkCmd = program
+  .command('payment-link')
+  .description('Create and inspect PayWay payment links (requires RSA credentials)');
+
+paymentLinkCmd
+  .command('create')
+  .description('Create a shareable payment link via the PayWay API')
+  .requiredOption('-t, --title <title>', 'Payment link title')
+  .requiredOption('-a, --amount <number>', 'Payment amount')
+  .requiredOption('-r, --merchant-ref-no <ref>', 'Unique merchant reference number')
+  .requiredOption('--return-url <url>', 'Public HTTPS callback URL after payment')
+  .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
+  .option('-d, --description <text>', 'Link description (max 250 chars)')
+  .option('--payment-limit <n>', 'Maximum number of payments accepted')
+  .option('--expired-date <epochSeconds>', 'Expiration timestamp (epoch seconds)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: Record<string, string | undefined>) => {
+    console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
+
+    const amount = Number(opts.amount);
+    const currency = (opts.currency ?? 'USD').toUpperCase();
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
+      process.exitCode = 1;
+      return;
+    }
+    if (currency !== 'USD' && currency !== 'KHR') {
+      console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${c.red(currency)}`);
+      process.exitCode = 1;
+      return;
+    }
+    if (opts.description && opts.description.length > 250) {
+      console.log(`  ${c.red('✗')} Description must be at most 250 characters, received: ${opts.description.length}`);
+      process.exitCode = 1;
+      return;
+    }
+    let expiredDate: number | undefined;
+    if (opts.expiredDate !== undefined) {
+      expiredDate = Number(opts.expiredDate);
+      if (!Number.isInteger(expiredDate) || expiredDate <= 0) {
+        console.log(`  ${c.red('✗')} --expired-date must be a positive whole number of epoch seconds`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+    let paymentLimit: number | undefined;
+    if (opts.paymentLimit !== undefined) {
+      paymentLimit = Number(opts.paymentLimit);
+      if (!Number.isInteger(paymentLimit) || paymentLimit < 0) {
+        console.log(`  ${c.red('✗')} --payment-limit must be a non-negative whole number`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+
+    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      const payway = new PayWay();
+      const result = await payway.paymentLink.create({
+        title: opts.title as string,
+        amount,
+        currency: currency as 'USD' | 'KHR',
+        merchantRefNo: opts.merchantRefNo as string,
+        returnUrl: opts.returnUrl as string,
+        description: opts.description,
+        paymentLimit,
+        expiredDate,
+      });
+
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      const data = result.data;
+      console.log(`  ${c.green('✓')} Payment link created\n`);
+      console.log(`  ${c.bold('Share this link:')}`);
+      console.log(`  ${c.cyan(data?.payment_link ?? '(not returned)')}\n`);
+      console.log(`  ${c.bold('Link ID:')}        ${data?.id ?? '(not returned)'}`);
+      console.log(`  ${c.dim('(save the Link ID — required for `payment-link detail`)')}`);
+      console.log(`  ${c.bold('Title:')}          ${data?.title ?? opts.title}`);
+      console.log(`  ${c.bold('Amount:')}         ${data?.amount ?? amount} ${data?.currency ?? currency}`);
+      console.log(`  ${c.bold('Status:')}         ${data?.status ?? '-'}`);
+      console.log(`  ${c.bold('Merchant Ref:')}   ${data?.merchant_ref_no ?? opts.merchantRefNo}`);
+      console.log(`  ${c.bold('Transaction:')}    ${result.tran_id ?? result.status?.tran_id ?? '-'}`);
+      console.log();
+    } catch (e) {
+      printApiError(e);
+      process.exitCode = 1;
+    }
+  });
+
+
+paymentLinkCmd
+  .command('detail')
+  .description('Get the status and details of a payment link')
+  .requiredOption('-i, --id <id>', 'Payment link id (data.id returned by create)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: { id: string; json?: boolean }) => {
+    console.log(`\n${c.bold('ABA PayWay SDK')} — payment link details\n`);
+
+    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      const payway = new PayWay();
+      const result = await payway.paymentLink.getDetails(opts.id);
+
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+
+      const data = result.data;
+      console.log(`  ${c.green('✓')} Payment link details\n`);
+      console.log(`  ${c.bold('Link ID:')}     ${data?.id ?? opts.id}`);
+      console.log(`  ${c.bold('Title:')}       ${data?.title ?? '-'}`);
+      console.log(`  ${c.bold('Amount:')}      ${data?.amount ?? '-'} ${data?.currency ?? ''}`);
+      console.log(`  ${c.bold('Status:')}      ${data?.status ?? '-'}`);
+      console.log(`  ${c.bold('Payments:')}    ${data?.total_trxn ?? 0} (total ${data?.total_amount ?? 0})`);
+      console.log(`  ${c.bold('Created:')}     ${data?.created_at ?? '-'}`);
+      console.log(`  ${c.bold('Expires:')}     ${data?.expired_date || '-'}`);
+      console.log(`  ${c.bold('Link:')}        ${c.cyan(data?.payment_link ?? '-')}`);
+      console.log();
+    } catch (e) {
+      printApiError(e);
       process.exitCode = 1;
     }
   });

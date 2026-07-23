@@ -7,7 +7,7 @@ import {
   PayWayNetworkError,
   PayWayRateLimitError,
 } from './errors.js';
-import { formatRequestTime, sanitizeForLog } from './utils.js';
+import { formatRequestTime, normalizePem, sanitizeForLog } from './utils.js';
 import {
   createCheckoutDomain,
   createCredentialsOnFileDomain,
@@ -159,9 +159,12 @@ export interface CreatePaymentLinkParams {
   amount: number;
   description?: string;
   paymentLimit?: number;
-  returnUrl?: string;
+  /** Public HTTPS callback URL. Required by PayWay - base64-encoded automatically. */
+  returnUrl: string;
   merchantRefNo: string;
   expiredDate?: number;
+  /** Payment currency. Required by PayWay; defaults to 'USD'. */
+  currency?: 'USD' | 'KHR';
 }
 
 export interface PayoutParams {
@@ -492,7 +495,7 @@ export class PayWay {
       ...config,
       merchantId: config.merchantId ?? process.env.PAYWAY_MERCHANT_ID ?? '',
       apiKey: config.apiKey ?? process.env.PAYWAY_API_KEY ?? '',
-      publicKeyPem: config.publicKeyPem ?? process.env.PAYWAY_RSA_PUBLIC_KEY,
+      publicKeyPem: normalizePem(config.publicKeyPem ?? process.env.PAYWAY_RSA_PUBLIC_KEY),
       environment: config.environment ?? environmentFromEnv,
       baseUrl: config.baseUrl ?? process.env.PAYWAY_BASE_URL,
       timeout: config.timeout ?? (Number.isNaN(timeoutFromEnv) ? undefined : timeoutFromEnv),

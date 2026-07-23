@@ -70,6 +70,8 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 | `payway-sdk generate-qr` | Generate a QR code (online via PayWay API or offline) |
 | `payway-sdk generate-checkout` | Generate a checkout QR URL, QR string, and ABA deeplink (requires credentials) |
 | `payway-sdk setup-webhook` | Start a local webhook server for receiving payment callbacks |
+| | `payway-sdk payment-link create [options]` | Create a shareable payment link (requires RSA credentials) |
+| | `payway-sdk payment-link detail -i <id>` | Get payment link status and details from the returned ID |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
 | `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |
 | `payway-sdk skills list` | Show installed skills per agent |
@@ -103,6 +105,12 @@ payway-sdk generate-qr --amount 10.00 --callback-url https://your-webhook.com/ho
 
 # Online QR with custom template
 payway-sdk generate-qr --amount 10.00 --callback-url https://your-webhook.com/hook --template template3
+
+# Non-interactive mode (skip prompts — useful for scripts and CI/CD)
+payway-sdk generate-qr --amount 10.00 --callback-url https://your-webhook.com/hook --non-interactive
+
+# Non-interactive with saved image
+payway-sdk generate-qr -a 10.00 --callback-url https://your-webhook.com/hook -y --save-image qr.png --no-polling
 ```
 
 #### Checkout QR URL Generation (CLI)
@@ -461,19 +469,27 @@ console.log(qrString);
 
 ### 4. Payment Link (`payway.paymentLink`)
 
-Create and manage shareable payment links.
+Create and manage shareable payment links.  
+> **Sandbox-verified:** `currency` and `returnUrl` are required (PTL04 when omitted); `description` max 250 chars.
 
 ```typescript
 // Create a payment link
-const link = await payway.paymentLink.create({
+const result = await payway.paymentLink.create({
   title: 'Invoice #1092',
   amount: 150.00,
   merchantRefNo: 'inv-1092',
   description: 'Design consultation services',
+  returnUrl: 'https://your-app.com/paid',  // Required — base64-encoded automatically
+  currency: 'USD',                          // Required — or 'KHR'
 });
 
-// Get payment link details
-const details = await payway.paymentLink.getDetails(link.id);
+// Share result.data.payment_link with customers
+console.log(result.data.payment_link);
+// → https://link-sandbox.payway.com.kh/ABAPAY...
+
+// Get payment link details via result.data.id
+const details = await payway.paymentLink.getDetails(result.data.id!);
+console.log(details.data?.status, details.data?.amount, details.data?.currency);
 ```
 
 ### 5. Pre-Authorization (`payway.preAuth`)

@@ -122,7 +122,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
 
   const envPath = path.join(cwd, '.env');
   const fileVars = loadDotEnv(envPath);
-  const mergedEnv = { ...fileVars, ...env } as NodeJS.ProcessEnv;
+  const mergedEnv = { ...env, ...fileVars } as NodeJS.ProcessEnv;
 
   const envFileCheck = checkEnvFile(cwd);
   const frameworkCheck = checkFramework(cwd);

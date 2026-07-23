@@ -6,6 +6,7 @@
  * On read, all lines are parsed and returned in insertion order.
  */
 
+// biome-ignore lint/correctness/noUnusedImports: used by getAll() and count()
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';

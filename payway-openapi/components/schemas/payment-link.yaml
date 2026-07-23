@@ -6,6 +6,8 @@ CreatePaymentLinkRequest:
   description: >
     Uses RSA-encrypted merchant_auth containing transaction details.
     See x-merchant-auth-encryption on the operation for encryption process.
+    Sandbox-verified: currency and return_url are REQUIRED inside
+    merchant_auth (PTL04 "Parameter validation required" when omitted).
   properties:
     request_time:
       type: string
@@ -17,24 +19,82 @@ CreatePaymentLinkRequest:
       type: string
       description: >
         Base64 of RSA-encrypted, chunked JSON containing transaction
-        details (title, amount, description, payment_limit, return_url, merchant_ref_no, expired_date).
+        details (title, amount, currency, description, payment_limit,
+        return_url, merchant_ref_no, expired_date).
     hash:
       type: string
       description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+
+PaymentLink:
+  type: object
+  description: A payment link resource as returned by the create and detail endpoints (sandbox-verified shape).
+  properties:
+    id:
+      type: string
+      description: Payment link id used with the detail endpoint (e.g. "zX71gfZgVme0juZANHfZMA=="). NOT the slug in the payment_link URL.
+    title: { type: string }
+    image:
+      type: object
+      properties:
+        image: { type: string }
+        filename: { type: string }
+        size: { type: integer }
+    amount:
+      type: string
+      description: 'Amount as a string (e.g. "0.02").'
+    currency:
+      type: string
+      enum: [USD, KHR]
+    status:
+      type: string
+      description: Link status (e.g. OPEN).
+    description: { type: string }
+    payment_limit: { type: integer }
+    total_amount_org: { type: number }
+    total_refund: { type: number }
+    total_amount: { type: number }
+    total_trxn: { type: integer }
+    created_at:
+      type: string
+      description: "YYYY-MM-DD HH:mm:ss"
+    updated_at:
+      type: string
+      description: "YYYY-MM-DD HH:mm:ss"
+    expired_date:
+      oneOf: [{ type: integer }, { type: string }]
+      description: Epoch seconds when set; empty string or "0" when unset.
+    return_url:
+      type: string
+      description: Decoded callback URL.
+    merchant_ref_no: { type: string }
+    outlet_id: { type: string }
+    outlet_name: { type: string }
+    payout:
+      nullable: true
+      description: Payout details (null when none).
+    payment_link:
+      type: string
+      description: Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N).
+
+PaymentLinkStatus:
+  type: object
+  properties:
+    code: { type: string }
+    message: { type: string }
+    tran_id: { type: string }
+    lang: { type: string }
+    trace_id: { type: string }
 
 CreatePaymentLinkResponse:
   type: object
   properties:
     status:
-      type: object
-      properties:
-        code: { type: string }
-        message: { type: string }
-    payment_link:
-      type: string
-      description: The generated payment link URL to share with customers.
+      $ref: '#/PaymentLinkStatus'
     tran_id:
-      type: string
+      type: integer
+      description: Numeric gateway transaction id (also present as a string in status.tran_id).
+    data:
+      $ref: '#/PaymentLink'
 
 GetPaymentLinkDetailsRequest:
   type: object
@@ -53,17 +113,9 @@ GetPaymentLinkDetailsResponse:
   type: object
   properties:
     status:
-      type: object
-      properties:
-        code: { type: string }
-        message: { type: string }
+      $ref: '#/PaymentLinkStatus'
+    tran_id:
+      type: integer
+      description: Numeric gateway transaction id (also present as a string in status.tran_id).
     data:
-      type: object
-      properties:
-        tran_id: { type: string }
-        amount: { type: number }
-        currency: { type: string }
-        payment_status: { type: string }
-        payment_link: { type: string }
-        created_date: { type: string }
-        expiry_date: { type: string }
+      $ref: '#/PaymentLink'

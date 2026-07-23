@@ -43,31 +43,65 @@ const DUMMY_CONFIG = {} as unknown as PayWayConfig;
 describe('Validation: payment-link', () => {
   const paymentLink = createPaymentLinkDomain(DUMMY_CONFIG, dummyRequestWithAuth);
   const paymentLinkPos = createPaymentLinkDomain(DUMMY_CONFIG, spyRequestWithAuth);
+  const validParams: CreatePaymentLinkParams = {
+    title: 'T',
+    amount: 1.5,
+    merchantRefNo: 'r1',
+    returnUrl: 'https://example.com/return',
+  };
 
   it('throws when title is empty', () => {
-    expect(() =>
-      paymentLink.create({ title: '', amount: 10, merchantRefNo: 'ref' }),
-    ).toThrow(PayWayConfigError);
+    expect(() => paymentLink.create({ ...validParams, title: '' })).toThrow(PayWayConfigError);
   });
 
   it('throws when amount is non-positive', () => {
-    expect(() =>
-      paymentLink.create({ title: 'T', amount: 0, merchantRefNo: 'ref' }),
-    ).toThrow(PayWayConfigError);
+    expect(() => paymentLink.create({ ...validParams, amount: 0 })).toThrow(PayWayConfigError);
+  });
+
+  it('throws when USD amount has more than 2 decimals', () => {
+    expect(() => paymentLink.create({ ...validParams, amount: 1.005 })).toThrow(PayWayConfigError);
+  });
+
+  it('throws when currency is invalid', () => {
+    expect(() => paymentLink.create({ ...validParams, currency: 'EUR' as 'USD' })).toThrow(PayWayConfigError);
   });
 
   it('throws when merchantRefNo is empty', () => {
+    expect(() => paymentLink.create({ ...validParams, merchantRefNo: '' })).toThrow(PayWayConfigError);
+  });
+
+  it('throws when description exceeds 250 characters', async () => {
+    expect(() => paymentLink.create({ ...validParams, description: 'x'.repeat(251) })).toThrow(PayWayConfigError);
+    rawAuthSpy.mockClear();
+    await paymentLinkPos.create({ ...validParams, description: 'x'.repeat(250) });
+    expect(rawAuthSpy).toHaveBeenCalled();
+  });
+
+  it('throws when returnUrl is missing', () => {
     expect(() =>
-      paymentLink.create({ title: 'T', amount: 1, merchantRefNo: '' }),
+      paymentLink.create({ title: 'T', amount: 1, merchantRefNo: 'r1' } as unknown as CreatePaymentLinkParams),
     ).toThrow(PayWayConfigError);
+  });
+
+  it('throws when returnUrl is not a public HTTPS URL', () => {
+    expect(() => paymentLink.create({ ...validParams, returnUrl: 'http://localhost/webhook' })).toThrow(PayWayConfigError);
   });
 
   it('calls requestWithMerchantAuth when inputs are valid', async () => {
     rawAuthSpy.mockClear();
-    await paymentLinkPos.create({ title: 'T', amount: 1.5, merchantRefNo: 'r1' } as unknown as CreatePaymentLinkParams);
+    await paymentLinkPos.create(validParams);
     expect(rawAuthSpy).toHaveBeenCalled();
   });
+
+  it('sends currency and base64-encoded return_url in the auth payload', async () => {
+    rawAuthSpy.mockClear();
+    await paymentLinkPos.create({ ...validParams, currency: 'KHR', amount: 100 });
+    const payload = rawAuthSpy.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(payload.currency).toBe('KHR');
+    expect(payload.return_url).toBe(Buffer.from('https://example.com/return', 'utf8').toString('base64'));
+  });
 });
+
 
 describe('Validation: pre-auth', () => {
   const preAuth = createPreAuthDomain(dummyRequestWithAuth);

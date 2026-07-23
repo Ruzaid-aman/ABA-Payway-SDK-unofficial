@@ -8,7 +8,7 @@ version: 1.1.0
 
 ## Quick Start
 ```ts
-const link = await payway.paymentLink.create({ title: 'Invoice 123', amount: 10, merchantRefNo: 'invoice-123', returnUrl: 'https://merchant.example/paid' });
+const link = await payway.paymentLink.create({ title: 'Invoice 123', amount: 10, merchantRefNo: 'invoice-123', returnUrl: 'https://merchant.example/paid', currency: 'USD' });
 ```
 
 Payment Link APIs require `publicKeyPem` for RSA-encrypted merchant authorization.

@@ -9,6 +9,9 @@
       Generates a shareable payment link that can be sent to customers
       via SMS, email, chat, or any messaging platform. The link opens
       PayWay's hosted checkout page. Requires RSA-encrypted merchant_auth.
+      Sandbox-verified: `currency` and `return_url` are REQUIRED inside
+      merchant_auth — the gateway responds PTL04 "Parameter validation
+      required" when either is omitted (undocumented in official docs).
     x-hmac-fields:
       - request_time
       - merchant_id
@@ -20,9 +23,10 @@
         mc_id: "same value as merchant_id"
         title: "title of the payment link"
         amount: "payment amount"
-        description: "optional description of the payment link"
+        currency: "USD or KHR — REQUIRED (PTL04 when omitted)"
+        description: "optional description of the payment link (max 250 characters — PTL04 when exceeded)"
         payment_limit: "optional limit on payments"
-        return_url: "base64-encoded callback URL"
+        return_url: "base64-encoded callback URL — REQUIRED (PTL04 when omitted)"
         merchant_ref_no: "unique reference number"
         expired_date: "optional expiration timestamp in seconds"
       process: >
@@ -50,7 +54,8 @@
     tags: [Payment Link]
     description: >
       Retrieves the status and details of a previously created payment link.
-      Also uses RSA-encrypted merchant_auth.
+      Also uses RSA-encrypted merchant_auth. The `id` is the `data.id` value
+      returned by the create endpoint — NOT the slug in the payment_link URL.
     x-hmac-fields:
       - request_time
       - merchant_id
@@ -77,4 +82,3 @@
           application/json:
             schema:
               $ref: '../components/schemas/payment-link.yaml#/GetPaymentLinkDetailsResponse'
-

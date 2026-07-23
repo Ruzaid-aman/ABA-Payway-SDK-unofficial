@@ -286,6 +286,51 @@ describe('built CLI', () => {
   });
 
   // -----------------------------------------------------------------------
+  // QR-REQ-03: --non-interactive flag tests
+  // -----------------------------------------------------------------------
+
+  it('skips all prompts when --non-interactive is provided', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    writeFileSync(
+      path.join(cwd, '.env'),
+      'PAYWAY_MERCHANT_ID=test-merchant-001\nPAYWAY_API_KEY=test-api-key-123456789012\n',
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(process.cwd(), 'dist', 'cli.js'),
+        'generate-qr',
+        '--amount',
+        '1.00',
+        '--currency',
+        'USD',
+        '--callback-url',
+        'https://example.com/cb',
+        '--non-interactive',
+      ],
+      {
+        cwd,
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH ?? '',
+          SystemRoot: process.env.SystemRoot ?? '',
+        },
+        // No input — non-interactive should not prompt for anything
+      },
+    );
+
+    const output = `${result.stdout}\n${result.stderr}`;
+    // Should NOT show any interactive prompts
+    expect(stripAnsi(output)).not.toContain('Submit to PayWay? (y/n)');
+    expect(stripAnsi(output)).not.toContain('Modify lifetime?');
+    // Should show non-interactive notice
+    expect(stripAnsi(output)).toContain('non-interactive mode');
+  });
+
+  // -----------------------------------------------------------------------
   // QR-REQ-04/05: Lifetime parameter tests
   // -----------------------------------------------------------------------
 
@@ -533,4 +578,96 @@ describe('built CLI', () => {
     expect(output).toContain('••••••••');
     expect(result.status).toBe(0);
   });
+
+  // -----------------------------------------------------------------------
+  // payment-link command validation
+  // -----------------------------------------------------------------------
+
+  it('payment-link create exits with validation error for invalid amount', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(process.cwd(), 'dist', 'cli.js'),
+        'payment-link', 'create',
+        '--title', 'Test',
+        '--amount', 'abc',
+        '--merchant-ref-no', 'ref-001',
+        '--return-url', 'https://example.com/ret',
+      ],
+      {
+        cwd,
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH ?? '',
+          SystemRoot: process.env.SystemRoot ?? '',
+        },
+      },
+    );
+
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+    expect(result.status).toBe(1);
+    expect(output).toContain('Amount must be a positive number');
+  });
+
+  it('payment-link detail exits when --id is missing', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(process.cwd(), 'dist', 'cli.js'),
+        'payment-link', 'detail',
+      ],
+      {
+        cwd,
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH ?? '',
+          SystemRoot: process.env.SystemRoot ?? '',
+        },
+      },
+    );
+
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+    expect(result.status).toBe(1);
+    expect(output).toContain('required option');
+    expect(output).toContain('--id');
+  });
+
+  it('payment-link create exits with RSA error when PAYWAY_RSA_PUBLIC_KEY is missing', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(process.cwd(), 'dist', 'cli.js'),
+        'payment-link', 'create',
+        '--title', 'Test',
+        '--amount', '1',
+        '--merchant-ref-no', 'ref-001',
+        '--return-url', 'https://example.com/ret',
+      ],
+      {
+        cwd,
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH ?? '',
+          SystemRoot: process.env.SystemRoot ?? '',
+          PAYWAY_MERCHANT_ID: 'test-merchant',
+          PAYWAY_API_KEY: 'test-api-key',
+          // Intentionally omitting PAYWAY_RSA_PUBLIC_KEY
+        },
+      },
+    );
+
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+    expect(result.status).toBe(1);
+    expect(output).toContain('PAYWAY_RSA_PUBLIC_KEY is missing');
+  });
+
 });

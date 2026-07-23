@@ -66,17 +66,23 @@ function mockJsonResponse(body: unknown, status = 200, statusText = 'OK'): Respo
 // ---------------------------------------------------------------------------
 
 describe('PayWay constructor', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('throws PayWayConfigError when config is missing', () => {
     // @ts-expect-error — intentionally testing runtime guard
     expect(() => new PayWay(null)).toThrow(PayWayConfigError);
   });
 
   it('throws PayWayConfigError when merchantId is missing', () => {
+    vi.stubEnv('PAYWAY_MERCHANT_ID', '');
     expect(() => new PayWay({ apiKey: 'key' })).toThrow(PayWayConfigError);
     expect(() => new PayWay({ apiKey: 'key' })).toThrow('merchantId is required');
   });
 
   it('throws PayWayConfigError when apiKey is missing', () => {
+    vi.stubEnv('PAYWAY_API_KEY', '');
     expect(() => new PayWay({ merchantId: 'M001' })).toThrow(PayWayConfigError);
     expect(() => new PayWay({ merchantId: 'M001' })).toThrow('apiKey is required');
   });
@@ -434,6 +440,7 @@ describe('checkout domain', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -813,9 +820,11 @@ describe('checkout domain', () => {
 
   describe('refund', () => {
     it('throws PayWayConfigError if publicKeyPem is not configured', async () => {
+      vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '');
       // payway was created without publicKeyPem
-      await expect(payway.checkout.refund('T001', 5.0)).rejects.toThrow(PayWayConfigError);
-      await expect(payway.checkout.refund('T001', 5.0)).rejects.toThrow('publicKeyPem');
+      const pw = new PayWay({ ...TEST_CONFIG, maxRetries: 0 });
+      await expect(pw.checkout.refund('T001', 5.0)).rejects.toThrow(PayWayConfigError);
+      await expect(pw.checkout.refund('T001', 5.0)).rejects.toThrow('publicKeyPem');
     });
 
     it('sends form-encoded request with merchant_auth when RSA key is present', async () => {
@@ -1079,6 +1088,7 @@ describe('paymentLink domain', () => {
       title: 'Test Payment Link',
       amount: 50.0,
       merchantRefNo: 'REF-001',
+      returnUrl: 'https://example.com/return',
     });
 
     const [url, opts] = fetchSpy.mock.calls[0];
@@ -1102,6 +1112,52 @@ describe('paymentLink domain', () => {
     expect(params.has('hash')).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// publicKeyPem normalization (literal \n sequences from .env files)
+// ---------------------------------------------------------------------------
+
+describe('publicKeyPem normalization', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('accepts a config publicKeyPem containing literal \\n sequences', async () => {
+    const escapedPem = TEST_RSA.publicKey.replace(/\n/g, '\\n');
+    const pw = new PayWay({ ...TEST_CONFIG, publicKeyPem: escapedPem, maxRetries: 0 });
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00' }, data: { id: 'PL-1' } }));
+
+    await pw.paymentLink.create({
+      title: 'T',
+      amount: 1,
+      merchantRefNo: 'r1',
+      returnUrl: 'https://example.com/return',
+    });
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it('accepts an env PAYWAY_RSA_PUBLIC_KEY containing literal \\n sequences', async () => {
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'env-merchant');
+    vi.stubEnv('PAYWAY_API_KEY', 'env-api-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', TEST_RSA.publicKey.replace(/\n/g, '\\n'));
+    const pw = new PayWay({ maxRetries: 0 });
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00' }, data: { title: 'T' } }));
+
+    await pw.paymentLink.getDetails('PL-1');
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+});
+
 
 // ---------------------------------------------------------------------------
 // preAuth domain — happy path
@@ -1438,7 +1494,7 @@ describe('checkout.pollTransactionStatus', () => {
       data: { payment_status: 'DECLINED', tran_id: 'T001' },
     }));
 
-    const results: any[] = [];
+    const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
       results.push(result);
     }
@@ -1454,7 +1510,7 @@ describe('checkout.pollTransactionStatus', () => {
       data: { payment_status: 'CANCELLED', tran_id: 'T001' },
     }));
 
-    const results: any[] = [];
+    const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
       results.push(result);
     }
@@ -1470,7 +1526,7 @@ describe('checkout.pollTransactionStatus', () => {
       data: { payment_status: 'REFUNDED', tran_id: 'T001' },
     }));
 
-    const results: any[] = [];
+    const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
       results.push(result);
     }
@@ -1489,7 +1545,7 @@ describe('checkout.pollTransactionStatus', () => {
       maxDurationMs: 150,
     });
 
-    const results: any[] = [];
+    const results: unknown[] = [];
     let thrownError: unknown;
     try {
       for await (const result of iterator) {
@@ -1519,7 +1575,7 @@ describe('checkout.pollTransactionStatus', () => {
       maxConsecutiveErrors: 3,
     });
 
-    const results: any[] = [];
+    const results: PollTransactionResult[] = [];
     let thrownError: unknown;
     try {
       for await (const result of iterator) {
@@ -1547,7 +1603,7 @@ describe('checkout.pollTransactionStatus', () => {
       .mockRejectedValueOnce(new Error('err2'))
       .mockResolvedValueOnce(mockJsonResponse(approvedResponse)); // success resets counter
 
-    const results: any[] = [];
+    const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', {
       intervalMs: 1,
       maxConsecutiveErrors: 3,
@@ -1566,7 +1622,7 @@ describe('checkout.pollTransactionStatus', () => {
   it('empty iterator when transaction immediately returns terminal', async () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse(approvedResponse));
 
-    const results: any[] = [];
+    const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
       results.push(result);
     }
@@ -1586,7 +1642,7 @@ describe('checkout.pollTransactionStatus', () => {
       maxDurationMs: 3500,
     });
 
-    const results: any[] = [];
+    const results: unknown[] = [];
     const iterate = (async () => {
       for await (const result of iterator) {
         results.push(result);
@@ -1644,7 +1700,7 @@ describe('checkout.pollTransactionStatus', () => {
       .mockRejectedValueOnce(new Error('Timeout'))
       .mockResolvedValueOnce(mockJsonResponse(approvedResponse));
 
-    const results: any[] = [];
+    const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', {
       intervalMs: 1,
       maxConsecutiveErrors: 3,

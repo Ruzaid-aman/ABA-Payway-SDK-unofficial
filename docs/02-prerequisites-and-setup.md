@@ -65,6 +65,9 @@ MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC...
 -----END PUBLIC KEY-----"
 ```
 
+> **Note:** The SDK accepts both `PAYWAY_PUBLIC_KEY` and `PAYWAY_RSA_PUBLIC_KEY`. If your `.env` stores the PEM as a single line with literal `\n` escapes, the SDK normalizes them automatically.
+
+
 ```bash
 # Add .env to your .gitignore to prevent accidental commits
 echo ".env" >> .gitignore

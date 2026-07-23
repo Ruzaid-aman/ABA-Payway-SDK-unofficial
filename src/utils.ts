@@ -140,6 +140,16 @@ export function toBase64(s: string): string {
   return Buffer.from(s, 'utf8').toString('base64');
 }
 
+/**
+ * Normalize a PEM string supplied via config or environment variables.
+ * `.env` files commonly store multi-line PEMs on one line with literal "\n"
+ * sequences, which Node's crypto rejects (ERR_OSSL_UNSUPPORTED) — convert
+ * them to real newlines. Returns undefined when no key is provided.
+ */
+export function normalizePem(pem: string | undefined): string | undefined {
+  return pem?.replace(/\\n/g, '\n');
+}
+
 export function encodeBase64IfNeeded(val: unknown): string {
   if (typeof val === 'string') {
     if (val.startsWith('http://') || val.startsWith('https://')) {
