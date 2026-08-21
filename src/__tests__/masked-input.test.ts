@@ -47,4 +47,20 @@ describe('readMaskedInput', () => {
     expect(fallback).toHaveBeenCalledWith('PayWay data: ');
     expect(output.writes).toEqual([]);
   });
+
+  it('keeps terminal input masked when stdout is redirected', async () => {
+    const input = new FakeInput();
+    const output = new FakeOutput();
+    output.isTTY = false;
+    const fallback = vi.fn(async () => 'unmasked-fallback');
+    const value = readMaskedInput('API key: ', { input: input as never, output: output as never, fallback });
+
+    input.emit('data', Buffer.from('secret\r'));
+
+    await expect(value).resolves.toBe('secret');
+    expect(fallback).not.toHaveBeenCalled();
+    expect(output.writes).toEqual([]);
+    expect(input.setRawMode).toHaveBeenNthCalledWith(1, true);
+    expect(input.setRawMode).toHaveBeenLastCalledWith(false);
+  });
 });

@@ -14,9 +14,10 @@ interface MaskedInputOptions {
 export function readMaskedInput(prompt: string, options: MaskedInputOptions): Promise<string> {
   const input = options.input ?? process.stdin;
   const output = options.output ?? process.stdout;
-  if (!input.isTTY || !output.isTTY || typeof input.setRawMode !== 'function') {
+  if (!input.isTTY || typeof input.setRawMode !== 'function') {
     return options.fallback(prompt);
   }
+  const renderFeedback = output.isTTY === true;
 
   return new Promise((resolve, reject) => {
     let value = '';
@@ -24,7 +25,7 @@ export function readMaskedInput(prompt: string, options: MaskedInputOptions): Pr
       input.removeListener('data', onData);
       input.setRawMode(false);
       input.pause();
-      output.write('\n');
+      if (renderFeedback) output.write('\n');
       if (error) reject(error);
       else resolve(value);
     };
@@ -41,16 +42,16 @@ export function readMaskedInput(prompt: string, options: MaskedInputOptions): Pr
         if (character === '\u007f' || character === '\b') {
           if (value.length > 0) {
             value = value.slice(0, -1);
-            output.write('\b \b');
+            if (renderFeedback) output.write('\b \b');
           }
           continue;
         }
         value += character;
-        output.write('*');
+        if (renderFeedback) output.write('*');
       }
     };
 
-    output.write(prompt);
+    if (renderFeedback) output.write(prompt);
     input.setRawMode(true);
     input.resume();
     input.on('data', onData);
