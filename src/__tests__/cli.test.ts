@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -72,8 +72,6 @@ describe('built CLI', () => {
       [
         path.join(process.cwd(), 'dist', 'cli.js'),
         'generate-qr',
-        '--amount',
-        '1.00',
         '--currency',
         'USD',
         '--callback-url',
@@ -113,8 +111,6 @@ describe('built CLI', () => {
       [
         path.join(process.cwd(), 'dist', 'cli.js'),
         'generate-qr',
-        '--amount',
-        '1.00',
         '--currency',
         'USD',
         '--callback-url',
@@ -171,9 +167,25 @@ describe('built CLI', () => {
     expect(output).toContain('PAYWAY_API_KEY');
   });
 
-  it('does NOT require credentials for offline QR generation', () => {
+  it('generates an official offline ABA KHQR payload from the selected profile', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    const appData = mkdtempSync(path.join(tmpdir(), 'payway-appdata-'));
     temporaryDirectories.push(cwd);
+    temporaryDirectories.push(appData);
+    mkdirSync(path.join(appData, 'aba-payway-sdk'));
+    writeFileSync(
+      path.join(appData, 'aba-payway-sdk', 'profiles.json'),
+      JSON.stringify({
+        activeProfile: 'offline',
+        profiles: [{
+          name: 'offline',
+          khqr: {
+            bakongId: 'merchant@bakong', abaMerchantId: '123456789012345', acquirerName: 'ABA Bank',
+            merchantCategoryCode: '5999', merchantName: 'Example Merchant', merchantCity: 'Phnom Penh', paywayData: 'aba-template',
+          },
+        }],
+      }),
+    );
 
     const result = spawnSync(
       process.execPath,
@@ -185,8 +197,6 @@ describe('built CLI', () => {
         '--currency',
         'USD',
         '--offline',
-        '--merchant-id',
-        'merchant-001',
         '--ref',
         'REF001',
       ],
@@ -196,14 +206,62 @@ describe('built CLI', () => {
         env: {
           PATH: process.env.PATH ?? '',
           SystemRoot: process.env.SystemRoot ?? '',
+          APPDATA: appData,
         },
       },
     );
 
     const output = `${result.stdout}\n${result.stderr}`;
     expect(result.status).toBe(0);
-    expect(output).toContain('Offline QR generated');
+    expect(output).toContain('Offline ABA KHQR generated');
     expect(output).not.toContain('Missing merchant credentials');
+  });
+
+  it('redacts API and ABA KHQR values from profile status', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    const appData = mkdtempSync(path.join(tmpdir(), 'payway-appdata-'));
+    temporaryDirectories.push(cwd, appData);
+    mkdirSync(path.join(appData, 'aba-payway-sdk'));
+    writeFileSync(
+      path.join(appData, 'aba-payway-sdk', 'profiles.json'),
+      JSON.stringify({
+        activeProfile: 'private',
+        profiles: [{
+          name: 'private', merchantId: 'merchant-secret', apiKey: 'api-key-secret',
+          khqr: {
+            bakongId: 'bakong-secret', abaMerchantId: '123456789012345', acquirerName: 'ABA Bank',
+            merchantCategoryCode: '5999', merchantName: 'Example Merchant', merchantCity: 'Phnom Penh', paywayData: 'payway-data-secret',
+          },
+        }],
+      }),
+    );
+
+    for (const command of ['list', 'current']) {
+      const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'profiles', command], {
+        cwd,
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', APPDATA: appData },
+      });
+      const output = `${result.stdout}\n${result.stderr}`;
+      expect(result.status).toBe(0);
+      expect(output).not.toContain('api-key-secret');
+      expect(output).not.toContain('123456789012345');
+      expect(output).not.toContain('payway-data-secret');
+    }
+  });
+
+  it('reports stable KHQR readiness issue codes instead of emitting an offline payload', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+    const result = spawnSync(
+      process.execPath,
+      [path.join(process.cwd(), 'dist', 'cli.js'), 'generate-qr', '--offline', '--ref', 'REF001'],
+      { cwd, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } },
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(output).toContain('KHQR_BAKONG_ID_REQUIRED');
+    expect(output).not.toContain('QR String:');
   });
 
   // -----------------------------------------------------------------------
