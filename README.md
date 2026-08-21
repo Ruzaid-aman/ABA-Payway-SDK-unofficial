@@ -67,11 +67,9 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 | `payway-sdk demo` | Run the test suite with pass/fail output |
 | `payway-sdk status` | Display payment status codes and refund error codes reference |
 | `payway-sdk validate` | Validate a refund amount or transaction ID locally |
+| `payway-sdk get-transactions-by-ref --merchant-ref <reference>` | Retrieve transactions for a merchant reference |
+| `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
 | `payway-sdk generate-qr` | Generate a QR code (online via PayWay API or offline) |
-| `payway-sdk generate-checkout` | Generate a checkout QR URL, QR string, and ABA deeplink (requires credentials) |
-| `payway-sdk setup-webhook` | Start a local webhook server for receiving payment callbacks |
-| | `payway-sdk payment-link create [options]` | Create a shareable payment link (requires RSA credentials) |
-| | `payway-sdk payment-link detail -i <id>` | Get payment link status and details from the returned ID |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
 | `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |
 | `payway-sdk skills list` | Show installed skills per agent |
@@ -79,81 +77,30 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 | `payway-sdk --help` | Show usage guide |
 | `payway-sdk --version` | Print SDK version |
 
-#### Webhook Setup (Local Development)
+### Get transactions by merchant reference
+
+Set `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`, then run:
 
 ```bash
-# Start a local webhook server on port 8443
-payway-sdk setup-webhook
-
-# With Cloudflare Tunnel for a public URL
-payway-sdk setup-webhook --tunnel
-
-# Custom port and storage
-payway-sdk setup-webhook --port 3000 --storage json
+payway-sdk get-transactions-by-ref --merchant-ref INV-12345678
 ```
 
-See [docs/16-webhook-setup-guide.md](./docs/16-webhook-setup-guide.md) for the full guide.
+The command sends the signed request to PayWay and prints the JSON response. PayWay returns at most 50 matching historical transactions and limits this endpoint to 10 requests per minute.
 
-#### QR Code Generation Examples
+### Credential profiles and environments
+
+Use profiles to keep up to eight sandbox and production credential sets on one machine:
 
 ```bash
-# Offline QR (no credentials needed)
-payway-sdk generate-qr --amount 10.00 --offline --merchant-id YOUR_MERCHANT_ID --ref "Order-001"
-
-# Online QR (requires PAYWAY_MERCHANT_ID and PAYWAY_API_KEY in .env)
-payway-sdk generate-qr --amount 10.00 --callback-url https://your-webhook.com/hook
-
-# Online QR with custom template
-payway-sdk generate-qr --amount 10.00 --callback-url https://your-webhook.com/hook --template template3
-
-# Non-interactive mode (skip prompts — useful for scripts and CI/CD)
-payway-sdk generate-qr --amount 10.00 --callback-url https://your-webhook.com/hook --non-interactive
-
-# Non-interactive with saved image
-payway-sdk generate-qr -a 10.00 --callback-url https://your-webhook.com/hook -y --save-image qr.png --no-polling
+payway-sdk profiles add
+payway-sdk profiles list
+payway-sdk profiles use sandbox-main
+payway-sdk --profile production-main get-transactions-by-ref --merchant-ref INV-12345678
 ```
 
-#### Checkout QR URL Generation (CLI)
+`profiles add` prompts for a unique name, environment, merchant ID, API key, optional RSA public key/base URL, and an optional note of up to 300 characters. The first profile becomes the default. The active profile is printed before every API request and secrets are never displayed.
 
-The Checkout command reads credentials from the current directory's `.env` file:
-
-```dotenv
-PAYWAY_MERCHANT_ID=your-merchant-id
-PAYWAY_API_KEY=your-api-key
-PAYWAY_SANDBOX=true
-```
-
-Run a purchase with `payment_gate: 0` (set automatically by the CLI) to receive a QR string, ABA deeplink, and hosted checkout QR URL:
-
-```bash
-payway-sdk generate-checkout \
-  --amount 10.00 \
-  --currency USD \
-  --return-url https://merchant.example/payment/return \
-  --cancel-url https://merchant.example/payment/cancel
-```
-
-`--return-url` and `--cancel-url` are forwarded to the Checkout Purchase API. The command accepts `--callback-url` for compatibility, but Checkout Purchase does not send that field; configure any server-to-server callback in your PayWay merchant settings instead. A return URL is a customer-browser redirect, not payment confirmation—verify a callback signature or check the transaction before fulfilling an order.
-
-#### Checkout URL Generation (via SDK)
-
-```typescript
-import { PayWay } from 'aba-payway-ts';
-
-const payway = new PayWay();
-
-// Get checkout_qr_url (requires payment_gate: 0)
-const result = await payway.checkout.purchase({
-  transactionId: 'order-123',
-  amount: 15.00,
-  currency: 'USD',
-  paymentOption: 'abapay_khqr_deeplink',
-  paymentGate: 0,  // Required for checkout_qr_url
-});
-
-console.log(result.checkout_qr_url);
-// https://checkout-sandbox.payway.com.kh/eyJ...
-```
+Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or `~/.config/aba-payway-sdk/profiles.json` when `APPDATA` is unavailable). Keep that file out of source control and restrict local access. For deployed SDK applications, use an OS secret manager, a cloud secret manager, or CI/CD secret storage; never put PayWay keys in browser/mobile-client code or commit them to `.env` files.
 
 ### Sandbox test scripts
 
@@ -407,37 +354,6 @@ const qrCode = await payway.qr.generateQr({
 // Response includes "qrString" (for embedding/deep-linking) and "qrImage" (base64 image data)
 ```
 
-### 3.1 Purchase with QR + Checkout URL (`payway.checkout.purchase`)
-
-Use `payment_option: 'abapay_khqr_deeplink'` with `payment_gate: 0` to get `qr_string`, `abapay_deeplink`, and `checkout_qr_url`:
-
-```typescript
-const result = await payway.checkout.purchase({
-  transactionId: 'order-123',
-  amount: 15.00,
-  currency: 'USD',
-  paymentOption: 'abapay_khqr_deeplink',
-  paymentGate: 0,  // Required: routes through Checkout service
-});
-
-// Response:
-// {
-//   "qr_string": "000201010212...",
-//   "abapay_deeplink": "abamobilebank://ababank.com?...",
-//   "checkout_qr_url": "https://checkout-sandbox.payway.com.kh/eyJ...",
-//   "status": { "code": "00", "message": "Success!" }
-// }
-```
-
-**`payment_gate` Parameter:**
-
-| Value | Routes Through | Response Fields |
-|---|---|---|
-| `0` | Checkout service | `qr_string`, `abapay_deeplink`, `checkout_qr_url` |
-| `1` | QR Payment API | `qrString`, `qrImage`, `abapay_deeplink` |
-
-> ⚠️ **Important:** Use `payment_gate: 0` when you need `checkout_qr_url` for hosted checkout pages.
-
 ### 3.1 Offline QR Generation (`payway.khqr.generateOfflineQR`)
 
 Generate a merchant-scannable QR string entirely offline without calling PayWay. This is useful when you need a local QR payload for QR rendering or deep linking without an API request.
@@ -469,27 +385,19 @@ console.log(qrString);
 
 ### 4. Payment Link (`payway.paymentLink`)
 
-Create and manage shareable payment links.  
-> **Sandbox-verified:** `currency` and `returnUrl` are required (PTL04 when omitted); `description` max 250 chars.
+Create and manage shareable payment links.
 
 ```typescript
 // Create a payment link
-const result = await payway.paymentLink.create({
+const link = await payway.paymentLink.create({
   title: 'Invoice #1092',
   amount: 150.00,
   merchantRefNo: 'inv-1092',
   description: 'Design consultation services',
-  returnUrl: 'https://your-app.com/paid',  // Required — base64-encoded automatically
-  currency: 'USD',                          // Required — or 'KHR'
 });
 
-// Share result.data.payment_link with customers
-console.log(result.data.payment_link);
-// → https://link-sandbox.payway.com.kh/ABAPAY...
-
-// Get payment link details via result.data.id
-const details = await payway.paymentLink.getDetails(result.data.id!);
-console.log(details.data?.status, details.data?.amount, details.data?.currency);
+// Get payment link details
+const details = await payway.paymentLink.getDetails(link.id);
 ```
 
 ### 5. Pre-Authorization (`payway.preAuth`)

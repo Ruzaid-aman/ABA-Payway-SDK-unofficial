@@ -483,12 +483,15 @@ export class PayWay {
       throw new PayWayConfigError('Config object is required');
     }
 
+    const namedEnvironment = process.env.PAYWAY_ENV?.trim();
     const environmentFromEnv =
-      process.env.PAYWAY_SANDBOX === 'true'
-        ? 'sandbox'
-        : process.env.PAYWAY_SANDBOX === 'false'
-          ? 'production'
-          : undefined;
+      namedEnvironment === 'sandbox' || namedEnvironment === 'production'
+        ? namedEnvironment
+        : process.env.PAYWAY_SANDBOX === 'true'
+          ? 'sandbox'
+          : process.env.PAYWAY_SANDBOX === 'false'
+            ? 'production'
+            : undefined;
     const timeoutFromEnv = Number.parseInt(process.env.PAYWAY_TIMEOUT ?? '', 10);
     const debugFromEnv = process.env.DEBUG_PAYWAY === 'true' || process.env.DEBUG_PAYWAY === '1';
     const resolvedConfig: ResolvedPayWayConfig = {

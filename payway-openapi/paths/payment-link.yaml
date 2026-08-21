@@ -36,7 +36,7 @@
     requestBody:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
             $ref: '../components/schemas/payment-link.yaml#/CreatePaymentLinkRequest'
     responses:
@@ -46,6 +46,12 @@
           application/json:
             schema:
               $ref: '../components/schemas/payment-link.yaml#/CreatePaymentLinkResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/merchant-portal/merchant-access/payment-link/detail:
   post:
@@ -82,3 +88,9 @@
           application/json:
             schema:
               $ref: '../components/schemas/payment-link.yaml#/GetPaymentLinkDetailsResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'

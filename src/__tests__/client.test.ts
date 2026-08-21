@@ -1405,6 +1405,21 @@ describe('request mechanics', () => {
     expect(url).toMatch(/^https:\/\/checkout\.payway\.com\.kh/);
   });
 
+  it('uses PAYWAY_ENV before the legacy PAYWAY_SANDBOX flag', async () => {
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'env-merchant');
+    vi.stubEnv('PAYWAY_API_KEY', 'env-api-key');
+    vi.stubEnv('PAYWAY_ENV', 'sandbox');
+    vi.stubEnv('PAYWAY_SANDBOX', 'false');
+    const fetchSpy = vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0 } }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const payway = new PayWay();
+
+    await payway.checkout.checkTransaction('T001');
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toMatch(/^https:\/\/checkout-sandbox\.payway\.com\.kh/);
+  });
+
   it('uses custom baseUrl when provided', async () => {
     const payway = new PayWay({ ...TEST_CONFIG, baseUrl: 'https://custom.example.com' });
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0 } }));

@@ -27,7 +27,7 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 | Chapter | File | Est. Read Time |
 |---|---|---|
 | 1. Overview & Core Concepts | [01-overview-and-concepts.md](./01-overview-and-concepts.md) | 15 min |
-| 2. Prerequisites & Setup | [02-prerequisites-and-setup.md](./02-prerequisites-and-setup.md) | 15 min |
+| 2. Prerequisites, Setup & Credential Profiles | [02-prerequisites-and-setup.md](./02-prerequisites-and-setup.md) | 15 min |
 | Glossary | [glossary.md](./glossary.md) | Reference |
 
 ### Part 2 — Core Integration

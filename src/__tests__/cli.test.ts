@@ -53,6 +53,34 @@ describe('built CLI', () => {
     expect(output).not.toContain('PayWay is not defined');
   });
 
+  it('accepts a merchant reference for transaction lookup before loading credentials', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(process.cwd(), 'dist', 'cli.js'),
+        'get-transactions-by-ref',
+        '--merchant-ref',
+        'INV-12345678',
+      ],
+      {
+        cwd,
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH ?? '',
+          SystemRoot: process.env.SystemRoot ?? '',
+        },
+      },
+    );
+
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(output).toContain('Missing merchant credentials');
+    expect(output).not.toContain("unknown command 'get-transactions-by-ref'");
+  });
+
   // -----------------------------------------------------------------------
   // QR-REQ-02: Early credential validation tests
   // -----------------------------------------------------------------------

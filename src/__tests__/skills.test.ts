@@ -12,7 +12,8 @@ describe('packaged AI skills', () => {
       .filter((entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'))
       .map((entry) => entry.name);
 
-    expect(skillDirectories).toHaveLength(20);
+    expect(skillDirectories).toHaveLength(21);
+    expect(skillDirectories).toContain('aba-payway-transaction-by-merchant-ref');
 
     for (const skillDirectory of skillDirectories) {
       const content = await readFile(path.join(skillsDirectory, skillDirectory, 'SKILL.md'), 'utf8');

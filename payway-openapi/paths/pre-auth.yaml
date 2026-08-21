@@ -36,6 +36,12 @@
           application/json:
             schema:
               $ref: '../components/schemas/pre-auth.yaml#/CompletePreAuthResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation:
   post:
@@ -71,3 +77,9 @@
           application/json:
             schema:
               $ref: '../components/schemas/pre-auth.yaml#/CancelPreAuthResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'

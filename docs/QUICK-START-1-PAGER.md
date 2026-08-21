@@ -214,6 +214,24 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 | `payway-sdk init` | Initialize PayWay integration in your project |
 | `payway-sdk doctor` | Validate environment configuration |
 | `payway-sdk test` | Run the sandbox test suite |
+| `payway-sdk get-transactions-by-ref --merchant-ref <reference>` | Retrieve up to 50 transactions for a merchant reference |
+| `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
 | `payway-sdk generate-qr` | Generate a QR code (online or offline). Use `--non-interactive` (`-y`) to skip prompts for scripts/CI. |
 | `payway-sdk generate-checkout` | Generate a checkout QR URL |
 | `payway-sdk setup-webhook` | Start a local webhook server for callback testing |
+
+### Get transactions by merchant reference
+
+With `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY` configured, retrieve the matching PayWay transaction records as JSON:
+
+```bash
+payway-sdk get-transactions-by-ref --merchant-ref INV-12345678
+```
+
+PayWay returns at most 50 matching historical transactions and limits this endpoint to 10 requests per minute.
+
+### Credential profiles
+
+Run `payway-sdk profiles add` to create a named `sandbox` or `production` profile. Each profile accepts an optional note up to 300 characters; the CLI supports a maximum of eight profiles total. Set the default with `payway-sdk profiles use <name>` or override it once with `payway-sdk --profile <name> <command>`. The CLI announces the selected profile and environment before an API request, while masking secrets.
+
+Profile storage is plaintext at `%APPDATA%\aba-payway-sdk\profiles.json`; do not commit it, and restrict access to it. Use an OS or cloud secret manager for production SDK deployments.

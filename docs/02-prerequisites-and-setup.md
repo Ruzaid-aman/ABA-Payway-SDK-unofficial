@@ -85,6 +85,29 @@ Load the environment variables at the top of your application:
 import 'dotenv/config';
 ```
 
+### Credential Profiles for the CLI
+
+The CLI can store up to **eight** named credential profiles in total. Each profile is independently tagged `sandbox` or `production` and can include an optional note of up to 300 characters. This lets you keep several sandbox merchants and production merchants without replacing credentials between commands.
+
+Create a profile interactively, inspect the saved names, and select a default:
+
+```bash
+payway-sdk profiles add
+payway-sdk profiles list
+payway-sdk profiles use sandbox-main
+payway-sdk profiles current
+```
+
+Use a saved default profile automatically, or override it only for one command:
+
+```bash
+payway-sdk --profile production-main get-transactions-by-ref --merchant-ref INV-12345678
+```
+
+For API-calling commands, the CLI resolves credentials in this order: explicit `--profile`, `PAYWAY_PROFILE`, the saved default profile, then the current directory's `.env` file. It prints the selected profile name and environment before the request, but never prints secrets.
+
+The profile file is plaintext at `%APPDATA%\aba-payway-sdk\profiles.json` on Windows, or `~/.config/aba-payway-sdk/profiles.json` when `APPDATA` is unavailable. Do not commit it, do not share it, and restrict local filesystem access. Plaintext profiles are a CLI convenience only: deployed SDK applications should load keys from an OS secret manager, a cloud secret manager, or CI/CD secret storage. Never put PayWay credentials in browser or mobile application code.
+
 ---
 
 ## Initializing the SDK
@@ -346,7 +369,7 @@ export const payway = new PayWay({
   merchantId: process.env.PAYWAY_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_API_KEY!,
   publicKeyPem: process.env.PAYWAY_PUBLIC_KEY,
-  environment: (process.env.PAYWAY_ENVIRONMENT as 'sandbox' | 'production') || 'sandbox',
+  environment: (process.env.PAYWAY_ENV as 'sandbox' | 'production') || 'sandbox',
   maxRetries: 2,
   onRequest: (endpoint, body) => {
     console.log(`[PayWay] → ${endpoint}`);
@@ -386,6 +409,8 @@ const payway = new PayWay({
   environment: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
 });
 ```
+
+When the SDK is initialized from environment variables without an explicit `environment` option, set `PAYWAY_ENV=sandbox` or `PAYWAY_ENV=production`. `PAYWAY_ENV` is authoritative; `PAYWAY_SANDBOX=true|false` remains supported only for compatibility with older integrations.
 
 ---
 

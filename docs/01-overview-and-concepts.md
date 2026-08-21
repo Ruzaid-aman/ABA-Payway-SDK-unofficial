@@ -113,6 +113,8 @@ Tokens allow **Credentials-on-File (CoF)** — charging a customer without them 
 | **Test Cards** | Uses PayWay's test card numbers | Real customer cards only |
 | **Behavior Quirks** | Some endpoints behave slightly differently (see sandbox findings) | Full production behavior |
 
+When you use the CLI, save each distinct credential set as a named profile rather than overwriting one `.env` file. A profile is explicitly tagged `sandbox` or `production`; see [Chapter 2 — Credential Profiles](./02-prerequisites-and-setup.md#credential-profiles-for-the-cli) for setup, selection, and storage guidance.
+
 ### Test Card Numbers
 
 For sandbox testing, PayWay provides test card numbers that simulate different payment outcomes:

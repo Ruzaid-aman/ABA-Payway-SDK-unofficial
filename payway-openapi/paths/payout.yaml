@@ -9,6 +9,12 @@
       Transfers funds from the merchant's settlement account to a
       whitelisted beneficiary ABA account. Beneficiaries must be added
       to the whitelist and approved before payouts can be made.
+      
+      NOTE: Per the official PayWay docs (developer.payway.com.kh),
+      the payout hash uses hex-encoded HMAC (NOT base64):
+      `hash_hmac('sha512', ..., api_key)` returns hex string directly.
+      This differs from all other endpoints which use base64 encoding.
+      The SDK should handle this accordingly.
     x-hmac-fields:
       - merchant_id
       - tran_id
@@ -29,6 +35,12 @@
           application/json:
             schema:
               $ref: '../components/schemas/payout.yaml#/PayoutResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status:
   post:
@@ -54,6 +66,12 @@
           application/json:
             schema:
               $ref: '../components/schemas/payout.yaml#/BeneficiaryResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout:
   post:
@@ -80,3 +98,9 @@
           application/json:
             schema:
               $ref: '../components/schemas/payout.yaml#/BeneficiaryResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'

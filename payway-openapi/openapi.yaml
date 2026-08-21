@@ -187,6 +187,22 @@ paths:
 webhooks:
   $ref: './components/webhooks.yaml'
 
+security:
+  - bodyFieldHmac: []
+
 components:
+  securitySchemes:
+    bodyFieldHmac:
+      type: apiKey
+      in: query
+      name: hash
+      description: >
+        PayWay uses body-field HMAC signing — not a transport-level
+        header. Every request carries a `hash` field inside the request
+        body, computed as base64(HMAC-SHA512(concat(fields...), api_key)).
+        See the `x-hmac-fields` extension on each operation for the
+        ordered field list. This security scheme is a spec-level marker
+        only; SDK codegen tooling must read `x-hmac-fields` explicitly.
   schemas:
     $ref: './components/schemas/ecommerce-checkout.yaml'
+    $ref: './components/schemas/shared.yaml'

@@ -381,18 +381,15 @@ TransactionListRequest:
     req_time: { type: string, description: "UTC timestamp, YYYYMMDDHHmmss." }
     merchant_id: { type: string }
     from_date:
-      type: string
-      nullable: true
+      type: [string, 'null']
       description: "Format YYYY-MM-DD HH:mm:ss. Defaults to today 00:00:00 if omitted."
     to_date:
-      type: string
-      nullable: true
+      type: [string, 'null']
       description: "Format YYYY-MM-DD HH:mm:ss. Defaults to today 23:59:59 if omitted. Date range capped at 3 days total."
-    from_amount: { type: number, nullable: true }
-    to_amount: { type: number, nullable: true }
+    from_amount: { type: [number, 'null'] }
+    to_amount: { type: [number, 'null'] }
     status:
-      type: string
-      nullable: true
+      type: [string, 'null']
       description: "Comma-separated for multiple values. Case-insensitive. One of APPROVED, PRE-AUTH, REFUNDED, PENDING, DECLINED, CANCELLED."
     page:
       type: string

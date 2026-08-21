@@ -58,6 +58,12 @@
               oneOf:
                 - $ref: '../components/schemas/ecommerce-checkout.yaml#/PurchaseQrResponse'
                 - $ref: '../components/schemas/ecommerce-checkout.yaml#/ErrorStatus'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/payment-gateway/v1/payments/check-transaction-2:
   post:
@@ -92,6 +98,12 @@
           application/json:
             schema:
               $ref: '../components/schemas/ecommerce-checkout.yaml#/CheckTransactionResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/payment-gateway/v1/payments/close-transaction:
   post:
@@ -133,6 +145,12 @@
                 summary: Hash mismatch
                 value:
                   status: { code: "1", message: "Wrong hash" }
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/payment-gateway/v1/payments/transaction-detail:
   post:
@@ -169,6 +187,12 @@
           application/json:
             schema:
               $ref: '../components/schemas/ecommerce-checkout.yaml#/TransactionDetailResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/payment-gateway/v1/payments/transaction-list-2:
   post:
@@ -221,6 +245,12 @@
           application/json:
             schema:
               $ref: '../components/schemas/ecommerce-checkout.yaml#/TransactionListResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/merchant-portal/merchant-access/online-transaction/refund:
   post:
@@ -285,6 +315,12 @@
                 summary: Hash mismatch (note the alphanumeric code — distinct code space from other endpoints)
                 value:
                   status: { code: "PTL02", message: "Wrong Hash" }
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
 /api/payment-gateway/v1/exchange-rate:
   post:
@@ -314,4 +350,10 @@
           application/json:
             schema:
               $ref: '../components/schemas/ecommerce-checkout.yaml#/ExchangeRateResponse'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 

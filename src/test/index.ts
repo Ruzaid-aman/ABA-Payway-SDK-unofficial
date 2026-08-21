@@ -100,7 +100,7 @@ export function generateMockSession(
     deeplink: `ababank://pay?tran_id=${transactionId}&amount=10`,
     qr_string: '00020101021226360016ABA PAYWAY5204599953038405802KH5910Test Merchant6009Phnom Penh6304ABCD',
     qr_image: `https://checkout-sandbox.payway.com.kh/qr/${transactionId}.png`,
-    checkout_qr_url: `https://checkout-sandbox.payway.com.kh/eyJ...`,
+    checkout_qr_url: `https://checkout-sandbox.payway.com.kh/qr/${transactionId}`,
     url: `https://checkout-sandbox.payway.com.kh/pay/${transactionId}`,
     html: `<!DOCTYPE html><html><body><h1>PayWay Hosted Checkout</h1><p>Tran: ${transactionId}</p></body></html>`,
   };
@@ -131,7 +131,7 @@ export function validateSessionContract(session: unknown): string | null {
   if (s.status !== 'pending' && s.status !== 'completed' && s.status !== 'failed') {
     return `status must be 'pending' | 'completed' | 'failed', got: ${String(s.status)}`;
   }
-  const validTypes = ['deeplink', 'qr_string', 'qr_image', 'checkout_qr_url', 'url', 'html'];
+  const validTypes = ['deeplink', 'qr_string', 'qr_image', 'url', 'html'];
   if (typeof s.responseType !== 'string' || !validTypes.includes(s.responseType)) {
     return `responseType must be one of ${validTypes.join(', ')}, got: ${String(s.responseType)}`;
   }
@@ -195,8 +195,8 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
             // Fall through — tranId stays ''.
           }
 
-          // Support both long-form (e2e-deeplink-*, e2e-qr_string-*, e2e-qr_image-*, e2e-checkout_qr_url-*)
-          // and short-form (e2e-dl-*, e2e-qs-*, e2e-qi-*, e2e-cqr-*) transaction ID prefixes.
+          // Support both long-form (e2e-deeplink-*, e2e-qr_string-*, e2e-qr_image-*)
+          // and short-form (e2e-dl-*, e2e-qs-*, e2e-qi-*) transaction ID prefixes.
           const knownTypes: ResponseType[] = ['deeplink', 'qr_string', 'qr_image', 'checkout_qr_url', 'url'];
           const shortForm: Record<string, ResponseType> = {
             dl: 'deeplink',
@@ -235,7 +235,7 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
               envelope.qr_image = `http://127.0.0.1:${port}/mock/qr.png`;
               break;
             case 'checkout_qr_url':
-              envelope.checkout_qr_url = `http://127.0.0.1:${port}/mock/qr.png`;
+              envelope.checkout_qr_url = `http://127.0.0.1:${port}/mock/qr/${tranId}`;
               break;
             case 'url':
               envelope.url = `http://127.0.0.1:${port}/mock/checkout/${tranId}`;
@@ -358,7 +358,7 @@ export async function runTestSuite(
         deeplink: ['deeplink_redirect', 'deeplink_opened_new_tab', 'deeplink_redirect_same_tab', 'deeplink_skipped_no_dom'],
         qr_string: ['qr_rendered', 'qr_download_prompted'],
         qr_image: ['qr_image_rendered', 'qr_image_download_prompted', 'qr_image_skipped_no_dom'],
-        checkout_qr_url: ['qr_image_rendered', 'qr_image_download_prompted', 'qr_image_skipped_no_dom'],
+        checkout_qr_url: ['checkout_qr_url_rendered', 'checkout_qr_url_skipped_no_dom'],
         url: ['url_redirect', 'url_opened_new_tab', 'url_redirect_same_tab', 'url_redirect_skipped_no_dom'],
         html: ['html_embedded', 'html_embed_skipped_no_dom'],
       };

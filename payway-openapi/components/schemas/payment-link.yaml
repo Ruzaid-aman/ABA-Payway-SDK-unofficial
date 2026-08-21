@@ -70,7 +70,7 @@ PaymentLink:
     outlet_id: { type: string }
     outlet_name: { type: string }
     payout:
-      nullable: true
+      type: ['object', 'null']
       description: Payout details (null when none).
     payment_link:
       type: string

@@ -27,6 +27,14 @@ import { validateRequiredCredentials, hasBlockingIssues, validatePayWayEnv } fro
 import { generateOfflineQR } from './khqr-offline.js';
 import { PayWayAPIError, PollingAbortedError } from './errors.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
+import {
+  addProfile,
+  getProfileByName,
+  loadProfileStore,
+  removeProfile,
+  saveProfileStore,
+  setDefaultProfile,
+} from './config/profiles.js';
 import { randomBytes } from 'node:crypto';
 
 // ---------------------------------------------------------------------------
@@ -186,6 +194,10 @@ async function promptConfirmation(message: string, rl?: readline.Interface): Pro
   }
 }
 
+function promptInput(rl: readline.Interface, message: string): Promise<string> {
+  return new Promise((resolve) => rl.question(message, resolve));
+}
+
 async function promptLifetimeOverride(current: number, rl?: readline.Interface): Promise<number | null> {
   const rlInstance = rl ?? readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
   try {
@@ -231,7 +243,39 @@ const program = new Command();
 program
   .name('payway-sdk')
   .description('CLI for the ABA PayWay TypeScript SDK')
-  .version(readPackageVersion());
+  .version(readPackageVersion())
+  .option('--profile <name>', 'Use a saved credential profile for this command');
+
+function isProfilesCommand(command: Command): boolean {
+  let current: Command | null = command;
+  while (current) {
+    if (current.name() === 'profiles') return true;
+    current = current.parent ?? null;
+  }
+  return false;
+}
+
+function activateSelectedProfile(command: Command): void {
+  if (isProfilesCommand(command)) return;
+  const selectedName = program.opts<{ profile?: string }>().profile
+    ?? process.env.PAYWAY_PROFILE
+    ?? loadProfileStore().defaultProfile;
+  if (!selectedName) return;
+
+  const profile = getProfileByName(loadProfileStore(), selectedName);
+  if (!profile) throw new Error(`Credential profile "${selectedName}" does not exist`);
+  process.env.PAYWAY_MERCHANT_ID = profile.merchantId;
+  process.env.PAYWAY_API_KEY = profile.apiKey;
+  process.env.PAYWAY_RSA_PUBLIC_KEY = profile.publicKeyPem ?? '';
+  process.env.PAYWAY_BASE_URL = profile.baseUrl ?? '';
+  process.env.PAYWAY_ENV = profile.environment;
+  process.env.PAYWAY_SANDBOX = profile.environment === 'sandbox' ? 'true' : 'false';
+  console.log(`  ${c.dim(`Using profile: ${profile.name} (${profile.environment})`)}`);
+}
+
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  activateSelectedProfile(actionCommand);
+});
 
 // --- init ---
 program
@@ -453,6 +497,31 @@ program
       console.log(`    ${c.cyan(code.padEnd(12))} ${label}`);
     }
     console.log();
+  });
+
+// --- get-transactions-by-ref ---
+program
+  .command('get-transactions-by-ref')
+  .description('Get up to 50 transactions by merchant reference')
+  .requiredOption('-r, --merchant-ref <reference>', 'Merchant reference to look up')
+  .option('--request-time <YYYYMMDDHHmmss>', 'Optional PayWay request timestamp')
+  .action(async (opts: { merchantRef: string; requestTime?: string }) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      const payway = new PayWay();
+      const result = await payway.khqr.getTransactionsByMerchantRef(
+        opts.merchantRef,
+        opts.requestTime,
+      );
+      console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      printApiError(error);
+      process.exitCode = 1;
+    }
   });
 
 // --- validate ---
@@ -966,6 +1035,91 @@ paymentLinkCmd
       printApiError(e);
       process.exitCode = 1;
     }
+  });
+
+// --- profiles ---
+const profilesCmd = program
+  .command('profiles')
+  .description('Manage saved sandbox and production credential profiles');
+
+profilesCmd
+  .command('add')
+  .description('Interactively add a credential profile (maximum 8 profiles)')
+  .action(async () => {
+    const rl = readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: true });
+    try {
+      const name = (await promptInput(rl, 'Profile name: ')).trim();
+      const environment = (await promptInput(rl, 'Environment (sandbox/production): ')).trim().toLowerCase() as 'sandbox' | 'production';
+      const merchantId = (await promptInput(rl, 'Merchant ID: ')).trim();
+      const apiKey = (await promptInput(rl, 'API key: ')).trim();
+      const publicKeyPem = (await promptInput(rl, 'RSA public key PEM (optional): ')).trim() || undefined;
+      const baseUrl = (await promptInput(rl, 'Base URL override (optional): ')).trim() || undefined;
+      const note = (await promptInput(rl, 'Note (optional, max 300 characters): ')).trim() || undefined;
+      const store = loadProfileStore();
+      addProfile(store, { name, environment, merchantId, apiKey, publicKeyPem, baseUrl, note });
+      if (!store.defaultProfile) setDefaultProfile(store, name);
+      saveProfileStore(store);
+      console.log(`\n${c.green('✓')} Saved profile ${c.cyan(name)} (${environment})`);
+    } catch (error) {
+      console.log(`\n${c.red('✗')} ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    } finally {
+      rl.close();
+    }
+  });
+
+profilesCmd
+  .command('list')
+  .description('List saved profiles without exposing secrets')
+  .action(() => {
+    const store = loadProfileStore();
+    if (store.profiles.length === 0) {
+      console.log('No saved profiles. Run `payway-sdk profiles add`.');
+      return;
+    }
+    for (const profile of store.profiles) {
+      const marker = profile.name === store.defaultProfile ? '*' : ' ';
+      const merchant = profile.merchantId.length > 6 ? `${profile.merchantId.slice(0, 4)}•••` : '••••••';
+      console.log(`${marker} ${profile.name} (${profile.environment})  merchant: ${merchant}${profile.note ? `  note: ${profile.note}` : ''}`);
+    }
+  });
+
+profilesCmd
+  .command('use')
+  .description('Set the default profile')
+  .argument('<name>', 'Saved profile name')
+  .action((name: string) => {
+    const store = loadProfileStore();
+    setDefaultProfile(store, name);
+    saveProfileStore(store);
+    const profile = getProfileByName(store, name);
+    if (!profile) throw new Error(`Profile "${name}" does not exist`);
+    console.log(`${c.green('✓')} Default profile: ${profile.name} (${profile.environment})`);
+  });
+
+profilesCmd
+  .command('current')
+  .description('Show the selected default profile without exposing secrets')
+  .action(() => {
+    const store = loadProfileStore();
+    if (!store.defaultProfile) {
+      console.log('No default profile is selected.');
+      return;
+    }
+    const profile = getProfileByName(store, store.defaultProfile);
+    if (!profile) throw new Error(`Profile "${store.defaultProfile}" does not exist`);
+    console.log(`Default profile: ${profile.name} (${profile.environment})${profile.note ? `\nNote: ${profile.note}` : ''}`);
+  });
+
+profilesCmd
+  .command('remove')
+  .description('Remove a saved profile')
+  .argument('<name>', 'Saved profile name')
+  .action((name: string) => {
+    const store = loadProfileStore();
+    removeProfile(store, name);
+    saveProfileStore(store);
+    console.log(`${c.green('✓')} Removed profile ${name}`);
   });
 
 // --- skills ---

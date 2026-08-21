@@ -2,51 +2,135 @@
 
 GenerateQrRequest:
   type: object
-  required: [req_time, merchant_id, tran_id, amount, purchase_type, payment_option, callback_url, currency, qr_image_template, hash, lifetime]
+  required: [req_time, merchant_id, tran_id, payment_option, amount, lifetime, qr_image_template, hash, currency]
   properties:
     req_time:
       type: string
       description: UTC request timestamp, format YYYYMMDDHHmmss.
     merchant_id:
       type: string
+      maxLength: 30
       description: Merchant key issued by ABA Bank.
     tran_id:
       type: string
       maxLength: 20
       description: Merchant-generated unique transaction identifier.
+    first_name:
+      type: string
+      maxLength: 20
+      description: Payer's first name.
+    last_name:
+      type: string
+      maxLength: 20
+      description: Payer's last name.
+    email:
+      type: string
+      maxLength: 50
+      description: Payer's email address.
+    phone:
+      type: string
+      maxLength: 20
+      description: Payer's phone number.
     amount:
       type: number
-      description: Payment amount.
+      description: >-
+        Payment amount. Minimum: 100 KHR or 0.01 USD.
     purchase_type:
       type: string
-      enum: [purchase]
+      maxLength: 20
+      enum: [purchase, pre-auth]
+      description: >-
+        Supported values: `pre-auth` and `purchase`. Default: `purchase`.
+        Note: Alipay & WeChat do not support pre-auth.
     payment_option:
       type: string
-      example: abapay_khqr
+      maxLength: 20
+      description: >-
+        Supported payment options:
+        - `abapay_khqr`: ABA KHQR
+        - `wechat`: WeChat QR (USD only)
+        - `alipay`: Alipay QR (USD only)
+    items:
+      type: string
+      maxLength: 500
+      description: >-
+        Item list description in Base64-encoded JSON format. Maximum of 10 items.
+        Note: This is only description/remark — price/quantity not used for validation.
     callback_url:
       type: string
+      maxLength: 255
       description: Base64-encoded callback URL.
+    return_deeplink:
+      type: string
+      maxLength: 255
+      description: >-
+        Base64-encoded JSON with `android_scheme` and `ios_scheme` keys.
+    custom_fields:
+      type: string
+      maxLength: 255
+      description: Base64-encoded additional custom fields.
+    return_params:
+      type: string
+      description: Additional information to include in the pushback.
+    payout:
+      type: string
+      maxLength: 255
+      description: Payout instructions in a Base64-encoded JSON string.
     currency:
       type: string
       enum: [KHR, USD]
     qr_image_template:
       type: string
-      example: template2
-    hash:
-      type: string
-      description: base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)).
+      maxLength: 20
+      description: QR image template option.
     lifetime:
       type: integer
       description: >-
         Transaction lifetime in minutes. Default: 30 days.
-        Minimum: 3 mins. Maximum: 120 days (172800 mins).
+        Minimum: 3 mins. Maximum: 120 days.
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)).
 
 GenerateQrResponse:
   type: object
   properties:
+    status:
+      type: object
+      properties:
+        code:
+          type: string
+          description: >-
+            Response code:
+            - `0`: Success
+            - `1`: Wrong Hash
+            - `6`: Domain not in whitelist
+            - `12`: Currency not allowed
+            - `23`: Payment option not enabled
+            - `429`: Rate limit exceeded
+        message:
+          type: string
+        trace_id:
+          type: string
+          description: Unique request trace identifier.
+    amount:
+      type: number
+      description: Transaction amount.
+    currency:
+      type: string
+      description: Transaction currency.
     qrString:
       type: string
       description: Raw KHQR payload string, scannable by any KHQR-member banking app.
     qrImage:
       type: string
-      description: Data URL containing the rendered QR PNG image.
+      description: Data URL containing the rendered QR PNG image (base64).
+    abapay_deeplink:
+      type: string
+      description: ABA Mobile deeplink to open ABA Mobile for payment confirmation.
+    app_store:
+      type: string
+      description: App Store URL for ABA Mobile (fallback if deeplink fails).
+    play_store:
+      type: string
+      description: Play Store URL for ABA Mobile (fallback if deeplink fails).

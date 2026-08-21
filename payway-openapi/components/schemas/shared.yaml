@@ -71,3 +71,16 @@ ErrorStatus:
           type: string
       required: [code, message]
   required: [status]
+
+ErrorResponse:
+  type: object
+  description: >
+    Standard error response returned by PayWay on validation failures,
+    authentication errors, or business-logic rejections. The `status.code`
+    field contains an endpoint-specific error code (e.g. "1" for wrong hash,
+    "49" for invalid date). The `status.message` provides a human-readable
+    explanation.
+  properties:
+    status:
+      $ref: '#/StatusBlock'
+  required: [status]
