@@ -59,6 +59,7 @@ test-logs/
 # Misc
 .cache/
 .temp/
+.worktrees/
 
 # OpenAPI bundled output
 dist/openapi.bundled.yaml
