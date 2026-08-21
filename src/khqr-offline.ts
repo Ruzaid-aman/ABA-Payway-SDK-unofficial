@@ -68,6 +68,9 @@ export function generateOfflineQR(
   if (!readiness.ready) throw new PayWayConfigError(readiness.issues.map(({ code }) => code).join(', '));
   const resolvedConfiguration = configuration as Required<KhqrMerchantConfiguration>;
 
+  if (params.currency !== 'KHR' && params.currency !== 'USD') {
+    throw new PayWayConfigError('currency must be KHR or USD for an ABA KHQR payload');
+  }
   assertMerchantRef(params.merchantRef);
   const createdAt = timestamp(params.createdAt ?? clock(), 'createdAt');
   const expiresAt = timestamp(params.expiresAt ?? createdAt + DEFAULT_EXPIRY_MILLISECONDS, 'expiresAt');

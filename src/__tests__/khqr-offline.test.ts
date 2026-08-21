@@ -76,6 +76,15 @@ describe('generateOfflineQR', () => {
     expect(() => generateOfflineQR({ currency: 'USD', merchantRef: 'ORDER', createdAt: 1_700_000_900_000, expiresAt: 1_700_000_000_000 }, configuration)).toThrow(/expiresAt/);
   });
 
+  it('rejects an unsupported runtime currency instead of serializing it as USD', () => {
+    expect(() =>
+      generateOfflineQR(
+        { currency: 'EUR', merchantRef: 'ORDER', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 } as never,
+        configuration,
+      ),
+    ).toThrow(/currency/);
+  });
+
   it('does not call fetch', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     generateOfflineQR({ currency: 'USD', merchantRef: 'ORDER', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 }, configuration);
