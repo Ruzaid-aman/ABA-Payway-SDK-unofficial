@@ -40,6 +40,7 @@ import {
   type KhqrCallbackEnrollment,
   type KhqrCallbackVerification,
 } from './khqr-config.js';
+import { readMaskedInput } from './cli/masked-input.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (no dotenv dependency needed)
@@ -606,7 +607,9 @@ profilesCommand
     const rl = readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
     try {
       const merchantId = (await askQuestion('  PayWay merchant ID (optional): ', rl)).trim();
-      const apiKey = (await askQuestion('  PayWay API key (optional): ', rl)).trim();
+      const apiKey = (await readMaskedInput('  PayWay API key (optional): ', {
+        fallback: (prompt) => askQuestion(prompt, rl),
+      })).trim();
       const configureKhqr = (await askQuestion('  Configure ABA KHQR offline generation? (y/n): ', rl)).trim().toLowerCase();
       let khqr: CredentialProfile['khqr'];
       if (configureKhqr === 'y' || configureKhqr === 'yes') {
@@ -617,7 +620,9 @@ profilesCommand
           merchantCategoryCode: (await askQuestion('  Merchant category code: ', rl)).trim(),
           merchantName: (await askQuestion('  Merchant name: ', rl)).trim(),
           merchantCity: (await askQuestion('  Merchant city: ', rl)).trim(),
-          paywayData: (await askQuestion('  ABA PayWay data: ', rl)).trim(),
+          paywayData: (await readMaskedInput('  ABA PayWay data: ', {
+            fallback: (prompt) => askQuestion(prompt, rl),
+          })).trim(),
         };
         const callbackUrl = (await askQuestion('  Callback URL (optional): ', rl)).trim();
         if (callbackUrl) {

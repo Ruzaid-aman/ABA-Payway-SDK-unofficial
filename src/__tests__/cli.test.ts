@@ -72,6 +72,8 @@ describe('built CLI', () => {
       [
         path.join(process.cwd(), 'dist', 'cli.js'),
         'generate-qr',
+        '--amount',
+        '1.00',
         '--currency',
         'USD',
         '--callback-url',
@@ -111,6 +113,8 @@ describe('built CLI', () => {
       [
         path.join(process.cwd(), 'dist', 'cli.js'),
         'generate-qr',
+        '--amount',
+        '1.00',
         '--currency',
         'USD',
         '--callback-url',
