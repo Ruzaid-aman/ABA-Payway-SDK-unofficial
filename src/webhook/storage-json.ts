@@ -6,11 +6,10 @@
  * On read, all lines are parsed and returned in insertion order.
  */
 
-// biome-ignore lint/correctness/noUnusedImports: used by getAll() and count()
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import type { WebhookStorage, WebhookRecord } from './storage.js';
+import type { KhqrWebhookMetadata, WebhookStorage, WebhookRecord } from './storage.js';
 
 const DEFAULT_PATH = './webhook_data/callbacks.jsonl';
 
@@ -35,6 +34,17 @@ export class JsonWebhookStorage implements WebhookStorage {
     const line = `${JSON.stringify(entry)}\n`;
     appendFileSync(this.filePath, line, 'utf-8');
     return entry;
+  }
+
+  updateKhqrMetadata(id: string, khqr: KhqrWebhookMetadata): WebhookRecord {
+    const records = this.getAll();
+    const index = records.findIndex((record) => record.id === id);
+    if (index === -1) throw new Error(`Webhook record ${id} was not found`);
+
+    const updated: WebhookRecord = { ...records[index], khqr };
+    records[index] = updated;
+    writeFileSync(this.filePath, `${records.map((record) => JSON.stringify(record)).join('\n')}\n`, 'utf-8');
+    return updated;
   }
 
   getAll(): WebhookRecord[] {

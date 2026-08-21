@@ -123,4 +123,7 @@ export type {
 // ─── Webhook Storage ─────────────────────────────────────────────────────
 export { createStorage } from './webhook/storage-factory.js';
 export type { WebhookStorage, WebhookRecord } from './webhook/storage.js';
+export type { KhqrWebhookMetadata } from './webhook/storage.js';
 export type { StorageType } from './webhook/storage-factory.js';
+export { parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
+export type { KhqrPaymentNotification, ParsedKhqrPaymentNotification } from './webhook/khqr-notification.js';

@@ -1,3 +1,5 @@
+import type { ParsedKhqrPaymentNotification } from './khqr-notification.js';
+
 /**
  * Webhook storage interface and types.
  *
@@ -16,6 +18,15 @@ export interface WebhookRecord {
   readonly body: string;
   /** Source IP address of the client, if available. */
   readonly sourceIp?: string;
+  /** Offline KHQR parsing metadata. The raw body remains the audit source. */
+  readonly khqr?: KhqrWebhookMetadata;
+}
+
+export interface KhqrWebhookMetadata {
+  readonly parsed?: ParsedKhqrPaymentNotification;
+  readonly parseError?: string;
+  /** A prior captured notification had the same ABA transaction ID. */
+  readonly duplicateTransactionId?: boolean;
 }
 
 export interface WebhookStorage {
@@ -24,6 +35,9 @@ export interface WebhookStorage {
    * The `receivedAt` and `id` fields are populated by the implementation.
    */
   save(record: Omit<WebhookRecord, 'id' | 'receivedAt'>): WebhookRecord;
+
+  /** Attach offline-KHQR parse metadata after the raw delivery is durable. */
+  updateKhqrMetadata(id: string, khqr: KhqrWebhookMetadata): WebhookRecord;
 
   /** Retrieve all stored records, ordered by insertion time. */
   getAll(): WebhookRecord[];

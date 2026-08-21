@@ -104,6 +104,55 @@ describe('WebhookServer', () => {
     expect(records[0].body).toBe(malformedPayload);
   });
 
+  it('receives an offline KHQR notification without an online HMAC and stores parsed metadata', async () => {
+    const payload = JSON.stringify({
+      transaction_id: 'KHQR-001',
+      transaction_date: '2026-08-21 10:15:30',
+      original_currency: 'USD',
+      original_amount: 12.5,
+      bank_ref: 'BANK-REF-1',
+      apv: '123456',
+      payment_status_code: 0,
+      payment_status: 'APPROVED',
+      payment_currency: 'USD',
+      payment_amount: 12.5,
+      payment_type: 'KHQR',
+      payer_account: 'payer@example.com',
+      bank_name: 'Example Bank',
+      merchant_ref: 'ORDER-100',
+      future_field: 'retained',
+    });
+
+    const res = await httpRequest(port, 'POST', '/aba-payway-khqr-webhook', payload);
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toMatchObject({ acknowledged: true });
+    const [record] = storage.getAll();
+    expect(record.body).toBe(payload);
+    expect(record.khqr?.parsed?.kind).toBe('khqr-offline');
+    expect(record.khqr?.parsed?.verification).toBe('unverified');
+    expect(record.khqr?.parsed?.unknownFields).toEqual({ future_field: 'retained' });
+  });
+
+  it('stores an offline KHQR parse error and marks duplicate transaction metadata', async () => {
+    const validPayload = JSON.stringify({
+      transaction_id: 'KHQR-duplicate', transaction_date: '2026-08-21 10:15:30',
+      original_currency: 'USD', original_amount: 12.5, bank_ref: 'BANK-REF-1', apv: '123456',
+      payment_status_code: 0, payment_status: 'APPROVED', payment_currency: 'USD',
+      payment_amount: 12.5, payment_type: 'KHQR', payer_account: 'payer@example.com',
+      bank_name: 'Example Bank', merchant_ref: 'ORDER-100',
+    });
+
+    await httpRequest(port, 'POST', '/aba-payway-khqr-webhook', validPayload);
+    await httpRequest(port, 'POST', '/aba-payway-khqr-webhook', validPayload);
+    await httpRequest(port, 'POST', '/aba-payway-khqr-webhook', '{not json');
+
+    const records = storage.getAll();
+    expect(records[1].khqr?.duplicateTransactionId).toBe(true);
+    expect(records[2].body).toBe('{not json');
+    expect(records[2].khqr?.parseError).toBeTruthy();
+  });
+
   it('returns 404 for non-webhook paths', async () => {
     const res = await httpRequest(port, 'POST', '/other-path', '{}');
     expect(res.statusCode).toBe(404);
