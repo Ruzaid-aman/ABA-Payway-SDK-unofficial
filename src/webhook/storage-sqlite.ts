@@ -39,6 +39,17 @@ async function loadBetterSqlite3(): Promise<new (path: string) => BetterSqlite3D
   }
 }
 
+/** Add parse metadata to callback databases created before offline KHQR support. */
+export function ensureKhqrMetadataColumn(db: Pick<BetterSqlite3Database, 'exec'>): void {
+  try {
+    db.exec('ALTER TABLE callbacks ADD COLUMN khqr_json TEXT');
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    if (message.includes('duplicate column name') && message.includes('khqr_json')) return;
+    throw error;
+  }
+}
+
 export class SqliteWebhookStorage implements WebhookStorage {
   private db: BetterSqlite3Database;
 
@@ -78,12 +89,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
         khqr_json TEXT
       )
     `);
-    // Upgrade capture databases created before KHQR notification metadata.
-    try {
-      db.exec('ALTER TABLE callbacks ADD COLUMN khqr_json TEXT');
-    } catch {
-      // The column already exists for newly-created and previously-upgraded databases.
-    }
+    ensureKhqrMetadataColumn(db);
 
     return new SqliteWebhookStorage(db);
   }

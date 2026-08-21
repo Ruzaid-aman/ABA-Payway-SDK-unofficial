@@ -47,6 +47,9 @@ export function createWebhookServer(
   const apiKey = options.apiKey;
   const quiet = options.quiet ?? false;
   const khqrPath = options.khqr?.path ?? KHQR_WEBHOOK_PATH;
+  if (khqrPath === WEBHOOK_PATH) {
+    throw new Error(`KHQR webhook path must differ from the legacy ${WEBHOOK_PATH} route`);
+  }
 
   let server: Server | null = null;
   let running = false;

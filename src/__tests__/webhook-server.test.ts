@@ -221,3 +221,15 @@ describe('WebhookServer port conflict (WH-TC-08)', () => {
     }
   });
 });
+
+describe('WebhookServer KHQR route configuration', () => {
+  it('rejects configuring the KHQR listener on the legacy online webhook route', () => {
+    const storage = new JsonWebhookStorage(join(mkdtempSync(join(tmpdir(), 'webhook-route-test-')), 'callbacks.jsonl'));
+
+    try {
+      expect(() => createWebhookServer(storage, { khqr: { path: '/aba-payway-webhook' } })).toThrow('must differ');
+    } finally {
+      storage.close();
+    }
+  });
+});

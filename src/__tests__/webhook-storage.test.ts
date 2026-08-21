@@ -2,11 +2,12 @@
  * Tests for webhook storage adapters (JSON and SQLite).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { JsonWebhookStorage } from '../webhook/storage-json.js';
+import { ensureKhqrMetadataColumn } from '../webhook/storage-sqlite.js';
 
 // ─── JSON Storage Tests ──────────────────────────────────────────────────
 
@@ -117,5 +118,31 @@ describe('JsonWebhookStorage', () => {
     const saved = storage.save({ headers: {}, body: 'test', sourceIp: undefined });
     const date = new Date(saved.receivedAt);
     expect(date.toISOString()).toBe(saved.receivedAt);
+  });
+
+  it('keeps the raw JSONL record durable when atomic metadata replacement fails', () => {
+    const failedRenameStorage = new JsonWebhookStorage(join(tempDir, 'failed-rename.jsonl'), {
+      renameFile: () => { throw new Error('simulated rename failure'); },
+    });
+    const saved = failedRenameStorage.save({ headers: {}, body: 'raw delivery', sourceIp: undefined });
+
+    expect(() => failedRenameStorage.updateKhqrMetadata(saved.id, { parseError: 'invalid JSON' })).toThrow('simulated rename failure');
+    expect(failedRenameStorage.getAll()).toEqual([saved]);
+    expect(readFileSync(join(tempDir, 'failed-rename.jsonl'), 'utf-8')).toContain('raw delivery');
+    failedRenameStorage.close();
+  });
+});
+
+describe('ensureKhqrMetadataColumn', () => {
+  it('ignores only an existing khqr_json column', () => {
+    const db = { exec: vi.fn(() => { throw new Error('duplicate column name: khqr_json'); }) };
+
+    expect(() => ensureKhqrMetadataColumn(db)).not.toThrow();
+  });
+
+  it('propagates a SQLite migration error unrelated to an existing column', () => {
+    const db = { exec: vi.fn(() => { throw new Error('database is locked'); }) };
+
+    expect(() => ensureKhqrMetadataColumn(db)).toThrow('database is locked');
   });
 });
