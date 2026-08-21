@@ -9,6 +9,13 @@ describe('Documentation examples', () => {
   const currentDir = dirname(fileURLToPath(import.meta.url));
   const repoRoot = join(currentDir, '..', '..');
 
+  const khqrDocs = [
+    'README.md',
+    'docs/07-qr-code-handling.md',
+    'docs/11-callbacks-and-webhooks.md',
+    'docs/16-webhook-setup-guide.md',
+  ].map((path) => readFileSync(join(repoRoot, path), 'utf8'));
+
   it('documents webhook verification using X-PAYWAY-HMAC-SHA512 header', () => {
     const webhookExample = readFileSync(
       join(repoRoot, 'docs', 'examples', 'backend', 'webhook-receiver.js'),
@@ -53,5 +60,26 @@ describe('Documentation examples', () => {
     expect(payload).toHaveProperty('hash');
     expect(typeof payload.hash).toBe('string');
     expect(payload).toHaveProperty('merchant_id', 'SANDBOX_MERCHANT');
+  });
+
+  it('documents official offline ABA KHQR configuration and its dedicated callback route', () => {
+    const documentation = khqrDocs.join('\n');
+
+    expect(documentation).toContain('payway.khqr.validateConfiguration()');
+    expect(documentation).toContain('62.68');
+    expect(documentation).toContain('/aba-payway-khqr-webhook');
+    expect(documentation).not.toContain('Not official Bakong KHQR');
+  });
+
+  it('does not copy supplied ABA merchant values into published documentation', () => {
+    const suppliedConfig = JSON.parse(
+      readFileSync(join(repoRoot, 'payway-boilerplate', 'ABA KHQR onsite generation', 'khqr-config.json'), 'utf8'),
+    ) as Record<string, string>;
+    const documentation = khqrDocs.join('\n');
+
+    for (const key of ['t30_00', 't30_01', 't30_02', 't52', 't59', 't60', 't62_68']) {
+      const value = suppliedConfig[key];
+      expect(documentation).not.toContain(value);
+    }
   });
 });

@@ -8,12 +8,12 @@ This chapter explains how to receive ABA PayWay payment callbacks using the buil
 
 ## Overview
 
-When a payment is completed, PayWay sends a server-to-server HTTP POST callback to the URL you configured in your merchant settings (or passed via `callbackUrl` in QR API requests). The `setup-webhook` command:
+When a payment is completed, PayWay can send a server-to-server HTTP POST callback to a URL configured for your merchant. The `setup-webhook` command:
 
 1. **Starts a local HTTP server** on a configurable port (default `8443`)
 2. **Logs every incoming callback** with timestamp, source IP, headers, and body
 3. **Verifies the HMAC-SHA512 signature** and logs the result (never rejects — you always see the payload)
-4. **Persists callbacks** to disk in JSONL format (or SQLite if available)
+4. **Persists callbacks** to disk in JSONL format (or SQLite if available), including raw ABA KHQR notifications
 5. **Optionally starts a Cloudflare Tunnel** to expose the local server via a public `trycloudflare.com` URL
 
 ---
@@ -60,7 +60,7 @@ npx payway-sdk setup-webhook
 
 ---
 
-## Webhook URL
+## Webhook URLs and ABA Provisioning
 
 By default, callbacks are expected at:
 
@@ -74,7 +74,15 @@ When using the `--tunnel` option, a public URL is generated:
 https://random-name.trycloudflare.com/aba-payway-webhook
 ```
 
-Copy this URL into your PayWay merchant dashboard or pass it as the `callbackUrl` in QR API requests.
+Copy this URL into your PayWay merchant dashboard or pass it as the `callbackUrl` in QR API requests for the online checkout flow.
+
+For offline ABA KHQR notifications, use the distinct route instead:
+
+```
+POST https://your-public-host/aba-payway-khqr-webhook
+```
+
+Publish a stable HTTPS URL, then ask ABA to configure and whitelist that exact route for your merchant. The CLI and SDK cannot perform or prove this external ABA operation. Declare the result in the optional KHQR callback configuration only after your merchant has confirmed it, and use `payway.khqr.validateCallbackSetup()` as a local readiness check—not as evidence of provisioning.
 
 ---
 
@@ -147,7 +155,12 @@ npx payway-sdk setup-webhook --tunnel
 
 ### Callback Endpoint
 
-Only `POST /aba-payway-webhook` is accepted. All other routes return `404`. Non-POST methods return `405`.
+The listener accepts two independent POST routes. All other routes return `404`; non-POST methods return `405`.
+
+| Route | Purpose | Handling |
+|---|---|---|
+| `/aba-payway-webhook` | Existing online checkout callback | Logs optional online HMAC verification and stores the delivery. |
+| `/aba-payway-khqr-webhook` | Offline ABA KHQR notification | Stores raw data first, then best-effort parses metadata; it does not require or verify the online HMAC. |
 
 ### Response
 
@@ -160,7 +173,7 @@ Content-Type: application/json
 { "acknowledged": true }
 ```
 
-### Signature Verification
+### Signature Verification and Offline KHQR Notifications
 
 The server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then verifies the HMAC-SHA512 signature using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../src/auth.ts)).
 
@@ -169,6 +182,8 @@ The server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from 
 - ⏭️ **No API key** → logs `⊘ Signature verification skipped (no API key)`
 
 > **Important:** The server never rejects callbacks based on signature verification. This allows you to inspect all payloads during development, including malformed or tampered ones.
+
+The offline KHQR route has no assumed online HMAC contract. The listener retains its raw body, headers, source IP, parsed `transaction_id`, unknown fields, and parse errors. Receiving or parsing it does not mean a payment is verified or an order is paid. Deduplicate on `transaction_id`, reconcile against your own `merchant_ref`, and only fulfil after implementing the verification mechanism ABA actually supplies for your merchant.
 
 ### Error Handling
 
@@ -276,13 +291,20 @@ npx payway-sdk generate-qr \
 
 The callback will appear in your terminal and be saved to disk.
 
+### Offline ABA KHQR notification setup
+
+1. Configure the ABA-issued offline KHQR merchant fields through explicit `PayWay` configuration, `PAYWAY_KHQR_*` environment variables, or a local CLI profile. `payway.khqr.validateConfiguration()` reports missing or invalid fields without exposing their values.
+2. Publish `https://your-public-host/aba-payway-khqr-webhook` and request ABA provisioning/whitelisting for that route.
+3. Keep raw notification records, deduplicate `transaction_id`, and reconcile with `merchant_ref` before any fulfilment decision.
+4. Do not assume online HMAC authentication; implement only the verification strategy ABA confirms for this notification.
+
 ---
 
 ## Security Checklist
 
-- [ ] Never expose the webhook server to production traffic without proper signature verification
+- [ ] Never expose the webhook server to production traffic without the verification contract ABA confirmed for that callback type
 - [ ] The `setup-webhook` command is for **development and testing only**
-- [ ] In production, implement signature verification that **rejects** invalid callbacks (see [Chapter 11 — Callbacks & Webhooks](./11-callbacks-and-webhooks.md))
+- [ ] For online callbacks, implement HMAC verification that **rejects** invalid callbacks; for offline KHQR, use only the verification ABA actually provides (see [Chapter 11 — Callbacks & Webhooks](./11-callbacks-and-webhooks.md))
 - [ ] Rotate your `PAYWAY_API_KEY` if it has been exposed in logs
 
 ---

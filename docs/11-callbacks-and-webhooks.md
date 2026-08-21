@@ -5,11 +5,16 @@
 
 ---
 
-## What Is a Callback?
+## Callback Types and Trust Boundaries
 
-A **callback** (also called a **webhook**) is a server-to-server HTTP POST request sent by PayWay to your backend when a payment is confirmed, completed, or encounters an error. This is the **only reliable source of truth** for payment status.
+A **callback** (also called a **webhook**) is a server-to-server HTTP POST request sent by PayWay to your backend. This chapter distinguishes the existing online checkout callback from an offline ABA KHQR notification. They do not have the same published authentication contract.
 
-> ⚠️ **Golden Rule:** Never mark an order as "Paid" based on the client-side return URL alone. Only the callback is cryptographically signed and trustworthy.
+| Delivery | Route | Authentication and fulfilment rule |
+|---|---|---|
+| Online checkout callback | Your checkout callback route | Verify the documented `X-PAYWAY-HMAC-SHA512` signature before trusting it. |
+| Offline ABA KHQR notification | `/aba-payway-khqr-webhook` | Capture the raw delivery and reconcile it; do **not** assume it has the online HMAC contract or mark an order paid until ABA supplies and you implement its actual verification contract. |
+
+> ⚠️ **Golden Rule:** Never mark an order as "Paid" based on a client-side return URL. For offline KHQR notifications, parsing or receiving a payload is not payment verification.
 
 ---
 
@@ -333,6 +338,22 @@ router.post('/', (req, res) => {
 
 ---
 
+## Offline ABA KHQR Notification Operations
+
+The SDK listener keeps the offline route distinct from the online checkout webhook:
+
+```text
+POST /aba-payway-khqr-webhook
+```
+
+Before relying on it, publish a stable HTTPS URL and ask ABA to configure and whitelist that exact URL for the merchant. Record that request separately from local SDK configuration: `confirmed-by-merchant` is an operator declaration, not proof that ABA completed provisioning. `payway.khqr.validateCallbackSetup()` checks an HTTPS URL, the declaration, and a non-`unknown` verification strategy, but cannot contact ABA or prove whitelisting.
+
+The listener persists headers, source IP, and the raw body before parsing. It preserves unknown fields and records parse errors so future ABA schema changes remain auditable. It intentionally accepts the published offline shape without requiring the online HMAC header. Treat the parsed `transaction_id` only as a deduplication key; reconcile it with your own `merchant_ref` and a verified ABA process before fulfilment. Do not use `tran_id`, online `status`, or `verifyCallback()` as assumptions for this offline notification.
+
+For a production receiver, apply the verification method ABA actually provides (for example, a confirmed HMAC, mTLS, or an IP allowlist), store the evidence with the raw delivery, and keep the decision to mark an order paid in your application—not in the capture listener.
+
+---
+
 ## Local Testing with curl
 
 You can simulate a PayWay callback for testing:
@@ -383,6 +404,8 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 | ❌ | Never log the full API key |
 | ❌ | Never trust the `returnUrl` redirect as payment confirmation |
 | ❌ | Never update order status based on query parameters alone |
+| ❌ | Never assume offline KHQR notifications use the online HMAC header or schema |
+| ❌ | Never treat local callback configuration as ABA whitelisting confirmation |
 
 ---
 
