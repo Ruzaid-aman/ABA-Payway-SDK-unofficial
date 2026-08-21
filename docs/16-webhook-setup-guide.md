@@ -1,6 +1,6 @@
 # Chapter 16 — Webhook Setup with the CLI
 
-This chapter explains how to receive ABA PayWay payment callbacks using the built-in `setup-webhook` CLI command. It starts a local HTTP server that logs and persists every incoming callback, with optional Cloudflare Tunnel integration for exposing the server to the public internet during development.
+This chapter explains how to receive ABA PayWay online checkout callbacks and offline ABA KHQR notifications using the built-in `setup-webhook` CLI command. It starts a local HTTP server that logs and persists every incoming delivery, with optional Cloudflare Tunnel integration for exposing the server to the public internet during development.
 
 > **When to use this guide:** You are a developer who wants to test webhook callbacks locally during development, or you need a quick way to capture and inspect callback payloads without setting up your own Express/Node.js server from scratch.
 
@@ -12,7 +12,7 @@ When a payment is completed, PayWay can send a server-to-server HTTP POST callba
 
 1. **Starts a local HTTP server** on a configurable port (default `8443`)
 2. **Logs every incoming callback** with timestamp, source IP, headers, and body
-3. **Verifies the HMAC-SHA512 signature** and logs the result (never rejects — you always see the payload)
+3. **For online checkout only, verifies the HMAC-SHA512 signature** and logs the result (never rejects — you always see the payload)
 4. **Persists callbacks** to disk in JSONL format (or SQLite if available), including raw ABA KHQR notifications
 5. **Optionally starts a Cloudflare Tunnel** to expose the local server via a public `trycloudflare.com` URL
 
@@ -47,16 +47,16 @@ npx payway-sdk setup-webhook --url https://your-tunnel-url.ngrok.io
 
 ---
 
-## Authentication
+## Online Checkout Authentication
 
-The command reads your API key from the `PAYWAY_API_KEY` environment variable. This is used to log HMAC signature verification results.
+For the online checkout route only, the command reads your API key from the `PAYWAY_API_KEY` environment variable to log HMAC signature verification results.
 
 ```bash
 export PAYWAY_API_KEY="your-api-key"
 npx payway-sdk setup-webhook
 ```
 
-> **Note:** If `PAYWAY_API_KEY` is not set, the server still accepts and logs all callbacks — signature verification is logged as "skipped" rather than "verified".
+> **Note:** If `PAYWAY_API_KEY` is not set, the server still accepts and logs all deliveries. Online HMAC verification is logged as "skipped" rather than "verified"; this says nothing about offline KHQR notification authenticity.
 
 ---
 
@@ -96,7 +96,7 @@ Appends each callback as a JSONL (JSON Lines) record to `./webhook_data/callback
 npx payway-sdk setup-webhook --storage json
 ```
 
-**Record format:**
+**Online checkout record format:**
 
 ```json
 {
@@ -173,15 +173,15 @@ Content-Type: application/json
 { "acknowledged": true }
 ```
 
-### Signature Verification and Offline KHQR Notifications
+### Online Checkout Signature Logging and Offline KHQR Notifications
 
-The server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then verifies the HMAC-SHA512 signature using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../src/auth.ts)).
+For the **online checkout route**, the server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then logs HMAC-SHA512 verification using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../src/auth.ts)).
 
 - ✅ **Signature valid** → logs `✓ Signature verified`
 - ❌ **Signature invalid** → logs `✗ Signature mismatch (expected: ...)` but still saves the record
 - ⏭️ **No API key** → logs `⊘ Signature verification skipped (no API key)`
 
-> **Important:** The server never rejects callbacks based on signature verification. This allows you to inspect all payloads during development, including malformed or tampered ones.
+> **Important:** This development listener never rejects either route based on its capture processing. Production online checkout handling must reject invalid HMACs; offline KHQR handling must use only an ABA-confirmed verification contract.
 
 The offline KHQR route has no assumed online HMAC contract. The listener retains its raw body, headers, source IP, parsed `transaction_id`, unknown fields, and parse errors. Receiving or parsing it does not mean a payment is verified or an order is paid. Deduplicate on `transaction_id`, reconcile against your own `merchant_ref`, and only fulfil after implementing the verification mechanism ABA actually supplies for your merchant.
 
@@ -191,7 +191,7 @@ The offline KHQR route has no assumed online HMAC contract. The listener retains
 |---|---|
 | Malformed JSON body | Logged as warning, saved as raw text, server returns 200 |
 | Port already in use (EADDRINUSE) | Prints clear error with port number and exits |
-| Missing `PAYWAY_API_KEY` | Signature verification skipped, callbacks still saved |
+| Missing `PAYWAY_API_KEY` | Online HMAC verification skipped; both routes are still saved |
 | SIGINT / SIGTERM | Graceful shutdown — finishes processing current request, stops server |
 
 ---
@@ -209,13 +209,13 @@ $ npx payway-sdk setup-webhook --tunnel
   ✓ Webhook server listening on http://localhost:8443
   ✓ Cloudflare Tunnel active
 
-    Public webhook URL:  https://abc-123.trycloudflare.com/aba-payway-webhook
-    Local endpoint:      http://localhost:8443/aba-payway-webhook
+    Online callback URL: https://abc-123.trycloudflare.com/aba-payway-webhook
+    Local online route:  http://localhost:8443/aba-payway-webhook
     Callbacks directory: ./webhook_data/
 
     Press Ctrl+C to stop.
 
-  [10:30:15] POST /aba-payway-webhook from 203.0.113.42
+   [10:30:15] POST /aba-payway-webhook (online checkout) from 203.0.113.42
              ✓ Signature verified
              Body: { "status": "APPROVED", "transaction_id": "order-001", "amount": 10.00 }
              Saved (id: a1b2c3d4)
@@ -263,7 +263,7 @@ cat ./webhook_data/callbacks.jsonl | jq -s '.'
 # Count callbacks
 wc -l ./webhook_data/callbacks.jsonl
 
-# Filter approved transactions
+# Filter approved online checkout transactions
 cat ./webhook_data/callbacks.jsonl | jq -s '.[] | select(.body.status == "APPROVED")'
 ```
 

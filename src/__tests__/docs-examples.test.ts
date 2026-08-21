@@ -15,6 +15,7 @@ describe('Documentation examples', () => {
     'docs/11-callbacks-and-webhooks.md',
     'docs/16-webhook-setup-guide.md',
   ].map((path) => readFileSync(join(repoRoot, path), 'utf8'));
+  const readDoc = (path: string) => readFileSync(join(repoRoot, path), 'utf8');
 
   it('documents webhook verification using X-PAYWAY-HMAC-SHA512 header', () => {
     const webhookExample = readFileSync(
@@ -81,5 +82,57 @@ describe('Documentation examples', () => {
       const value = suppliedConfig[key];
       expect(documentation).not.toContain(value);
     }
+  });
+
+  it('documents official offline KHQR format, configuration, local-only behavior, and migration in README', () => {
+    const readme = readDoc('README.md');
+
+    expect(readme).toContain('payway.khqr.validateConfiguration()');
+    expect(readme).toContain('62.68');
+    expect(readme).toContain('dynamic (`01=12`');
+    expect(readme).toContain('static (`01=11`)');
+    expect(readme).toContain('without a PayWay API call');
+    expect(readme).toContain('Earlier SDK releases emitted a private offline TLV format');
+  });
+
+  it('documents official offline KHQR configuration, static/dynamic modes, no-network limit, and migration in the QR guide', () => {
+    const qrGuide = readDoc('docs/07-qr-code-handling.md');
+
+    expect(qrGuide).toContain('PAYWAY_KHQR_PAYWAY_DATA');
+    expect(qrGuide).toContain('62.68');
+    expect(qrGuide).toContain('static QR (`01=11`)');
+    expect(qrGuide).toContain('dynamic QR (`01=12`');
+    expect(qrGuide).toContain('no HTTP request');
+    expect(qrGuide).toContain('Earlier SDK versions used a private offline format');
+  });
+
+  it('scopes online HMAC guidance and documents offline KHQR callback provisioning and reconciliation', () => {
+    const callbacks = readDoc('docs/11-callbacks-and-webhooks.md');
+
+    expect(callbacks).toContain('Online checkout callback');
+    expect(callbacks).toContain('Offline ABA KHQR notification');
+    expect(callbacks).toContain('/aba-payway-khqr-webhook');
+    expect(callbacks).toContain('configure and whitelist');
+    expect(callbacks).toContain('raw body');
+    expect(callbacks).toContain('`transaction_id` only as a deduplication key');
+    expect(callbacks).toContain('`merchant_ref`');
+    expect(callbacks).toContain('do **not** assume it has the online HMAC contract');
+    expect(callbacks).toContain('must never decide that an order is paid');
+    expect(callbacks).not.toContain('PayWay signs every callback');
+    expect(callbacks).not.toContain('Only the callback is cryptographically signed and trustworthy');
+  });
+
+  it('scopes the CLI listener documentation by callback type and preserves offline KHQR safety constraints', () => {
+    const setupGuide = readDoc('docs/16-webhook-setup-guide.md');
+
+    expect(setupGuide).toContain('/aba-payway-khqr-webhook');
+    expect(setupGuide).toContain('configure and whitelist');
+    expect(setupGuide).toContain('raw body');
+    expect(setupGuide).toContain('Deduplicate on `transaction_id`');
+    expect(setupGuide).toContain('`merchant_ref`');
+    expect(setupGuide).toContain('no assumed online HMAC contract');
+    expect(setupGuide).toContain('does not mean a payment is verified or an order is paid');
+    expect(setupGuide).toContain('online checkout callback');
+    expect(setupGuide).not.toContain('The server extracts the `X-PAYWAY-HMAC-SHA512` header');
   });
 });
