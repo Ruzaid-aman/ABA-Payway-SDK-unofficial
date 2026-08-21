@@ -3,9 +3,19 @@ import { filterParams } from '../utils.js';
 import type { components } from '../types.js';
 import type { PayWayConfig } from '../client.js';
 import { generateOfflineQR, type GenerateOfflineQrParams } from '../khqr-offline.js';
+import {
+  validateKhqrCallbackSetup,
+  validateKhqrConfiguration,
+  type KhqrCallbackReadiness,
+  type KhqrCallbackValidationOptions,
+  type KhqrConfigurationReadiness,
+  type KhqrMerchantConfiguration,
+} from '../khqr-config.js';
 
 export interface KhqrDomain {
   generateOfflineQR: (params: GenerateOfflineQrParams) => string;
+  validateConfiguration: () => KhqrConfigurationReadiness;
+  validateCallbackSetup: (options?: KhqrCallbackValidationOptions) => KhqrCallbackReadiness;
   getTransactionsByMerchantRef: (
     merchantRef: string,
     requestTime?: string,
@@ -23,10 +33,17 @@ export function createKhqrDomain(
     hashEncoding?: 'base64' | 'hex',
   ) => Promise<TResponse>,
 ): KhqrDomain {
+  const configuration: KhqrMerchantConfiguration | undefined = config.khqr;
+
   return {
     generateOfflineQR: (params: GenerateOfflineQrParams) => {
-      return generateOfflineQR(params, config.khqr);
+      return generateOfflineQR(params, configuration);
     },
+
+    validateConfiguration: () => validateKhqrConfiguration(configuration),
+
+    validateCallbackSetup: (options: KhqrCallbackValidationOptions = {}) =>
+      validateKhqrCallbackSetup(configuration?.callback, options),
 
     getTransactionsByMerchantRef: (merchantRef: string, requestTime?: string) => {
       if (typeof merchantRef !== 'string' || merchantRef.trim().length === 0) {

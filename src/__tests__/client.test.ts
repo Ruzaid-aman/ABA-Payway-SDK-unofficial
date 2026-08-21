@@ -23,6 +23,16 @@ const TEST_CONFIG = {
   environment: 'sandbox' as const,
 };
 
+const TEST_KHQR_CONFIG = {
+  bakongId: 'merchant@abakong',
+  abaMerchantId: '123456789012345',
+  acquirerName: 'ABA',
+  merchantCategoryCode: '5411',
+  merchantName: 'Test Merchant',
+  merchantCity: 'Phnom Penh',
+  paywayData: 'ABA-PAYWAY-DATA',
+};
+
 /** Generate a 1024-bit RSA key pair for endpoints that need publicKeyPem. */
 function generateTestKeyPair() {
   return crypto.generateKeyPairSync('rsa', {
@@ -1338,6 +1348,39 @@ describe('khqr domain', () => {
     const body = JSON.parse(opts.body);
     expect(body).toHaveProperty('merchant_ref', 'MCREF-001');
     expect(body).toHaveProperty('hash');
+  });
+
+  it('generates an official offline KHQR payload from the captured configuration without fetching', () => {
+    const configuredPayway = new PayWay({ ...TEST_CONFIG, khqr: TEST_KHQR_CONFIG });
+
+    expect(configuredPayway.khqr.validateConfiguration()).toEqual({ ready: true, issues: [] });
+    expect(
+      configuredPayway.khqr.generateOfflineQR({ amount: 1.5, currency: 'USD', merchantRef: 'INV-1' }),
+    ).toMatch(/^000201010212/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports credentials-only clients as unready and rejects offline generation', () => {
+    expect(payway.khqr.validateConfiguration().ready).toBe(false);
+    expect(() => payway.khqr.generateOfflineQR({ amount: 1.5, currency: 'USD', merchantRef: 'INV-1' })).toThrow(
+      PayWayConfigError,
+    );
+  });
+
+  it('reports callback setup readiness through the KHQR domain', () => {
+    const configuredPayway = new PayWay({
+      ...TEST_CONFIG,
+      khqr: {
+        ...TEST_KHQR_CONFIG,
+        callback: {
+          url: 'https://merchant.example/khqr',
+          enrollment: 'confirmed-by-merchant',
+          verification: 'mTLS',
+        },
+      },
+    });
+
+    expect(configuredPayway.khqr.validateCallbackSetup()).toEqual({ ready: true, issues: [] });
   });
 });
 
