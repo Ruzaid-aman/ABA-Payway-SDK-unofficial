@@ -30,3 +30,22 @@
 
 - No `PROJECT_STATUS.md` or `SANDBOX-FINDINGS.md` exists in this worktree despite the repository guidance referencing them.
 - Existing lint warnings above were deliberately left untouched to preserve the manual CLI and avoid unrelated edits.
+
+## Review remediation — round 1 of 5
+
+- Implementation commit: `05fdcce fix(agent): block unsafe plan urls and secrets`
+- `src/agent/planning.ts` now accepts HTTPS only for public DNS hosts or globally-routable IP literals. It rejects IPv4 loopback, private, shared, link-local, documentation, multicast/reserved ranges and non-global IPv6 (including loopback, ULA, link-local, mapped, multicast, and documentation addresses).
+- Checkout `returnUrl` and `cancelUrl` now use the same public-HTTPS gate before ledger creation or SDK execution.
+- `src/agent/orchestrator.ts` blocks any action whose executable fields contain a resolved profile/provider/signing secret. The blocked plan is scrubbed for output/session persistence and never reaches the ledger, SDK, or artifact writer. Non-executable rationale remains output-scrubbed without altering execution semantics.
+- Resolved `merchantId` is included among secret values; the executor’s stale materialized-union comment was updated.
+
+### TDD and focused verification
+
+- RED: `npx vitest run src/__tests__/agent-r1-hardening.test.ts` — 9 failures before remediation: seven non-public callback literals, private checkout return/cancel URLs, and provider-echoed profile values in executable fields.
+- GREEN: `npx vitest run src/__tests__/agent-r1-hardening.test.ts src/__tests__/agent-planning-risk.test.ts src/__tests__/agent-orchestrator.test.ts src/__tests__/agent-tools.test.ts` — 76/76 passed.
+- Typecheck: `npm run typecheck` — passed.
+- Build: `npm run build` — passed.
+
+### Follow-up concerns
+
+- Verification was intentionally limited to focused regressions plus build/typecheck, as requested; the full test suite was not rerun in this round.
