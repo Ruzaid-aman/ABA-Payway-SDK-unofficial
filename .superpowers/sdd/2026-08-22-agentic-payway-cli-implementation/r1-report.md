@@ -49,3 +49,20 @@
 ### Follow-up concerns
 
 - Verification was intentionally limited to focused regressions plus build/typecheck, as requested; the full test suite was not rerun in this round.
+
+## Review remediation — round 2 of 5
+
+- Implementation commit: `2c68728 fix(agent): reject IPv6 special-use callback hosts`
+- `src/agent/planning.ts` now expands IPv6 literals and excludes special-use ranges that lie inside `2000::/3`: IETF protocol-assignment/benchmarking/AMT prefixes, ORCHID allocation blocks, documentation/AS112, deprecated 6to4, and `3fff::/20` documentation space. Non-global IPv6 remains rejected.
+- The same validator protects online callbacks and checkout `returnUrl`/`cancelUrl` before ledger creation or SDK activity.
+
+### TDD and focused verification
+
+- RED: `npx vitest run src/__tests__/agent-r1-hardening.test.ts` — 5 failures before remediation for callback hosts `[2001:1::1]`, `[2001:2::1]`, `[2001:20::1]`, `[3fff::1]`, and checkout special-use return/cancel URLs.
+- GREEN: `npx vitest run src/__tests__/agent-r1-hardening.test.ts src/__tests__/agent-planning-risk.test.ts src/__tests__/agent-orchestrator.test.ts src/__tests__/agent-tools.test.ts` — 81/81 passed.
+- Typecheck: `npm run typecheck` — passed.
+- Build: `npm run build` — passed.
+
+### Follow-up concerns
+
+- Per instruction, verification remains focused; the full suite was not rerun in this round.
