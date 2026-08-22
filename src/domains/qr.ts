@@ -19,7 +19,7 @@ export interface QrDomain {
 }
 
 export function createQrDomain(
-  _config: PayWayConfig,
+  config: PayWayConfig,
   request: <TResponse>(
     path: string,
     body: Record<string, unknown>,
@@ -66,7 +66,7 @@ export function createQrDomain(
     },
 
     generateOfflineQR: (params: GenerateOfflineQrParams) => {
-      return generateOfflineQR(params);
+      return generateOfflineQR(params, config.khqr);
     },
   };
 }

@@ -64,6 +64,45 @@ describe('generateOfflineQR', () => {
     expect(parseTlv(dynamicQr.slice(0, -8)).get('54')).toBe('1000');
   });
 
+  it.each([
+    [0.29, '0.29'],
+    [10.12, '10.12'],
+  ])('formats valid USD amount %s without binary floating-point rejection', (amount, expected) => {
+    const qr = generateOfflineQR(
+      { amount, currency: 'USD', merchantRef: 'USD', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 },
+      configuration,
+    );
+
+    expect(parseTlv(qr.slice(0, -8)).get('54')).toBe(expected);
+  });
+
+  it('enforces the 13-character ABA amount limit and rejects exponent notation', () => {
+    expect(() =>
+      generateOfflineQR(
+        { amount: 10_000_000_000, currency: 'USD', merchantRef: 'USD', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 },
+        configuration,
+      ),
+    ).toThrow(/13/);
+    expect(() =>
+      generateOfflineQR(
+        { amount: 1e21, currency: 'USD', merchantRef: 'USD', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 },
+        configuration,
+      ),
+    ).toThrow(/exponent/i);
+
+    const maximumKhqr = generateOfflineQR(
+      { amount: 9_999_999_999_999, currency: 'KHR', merchantRef: 'KHR', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 },
+      configuration,
+    );
+    expect(parseTlv(maximumKhqr.slice(0, -8)).get('54')).toBe('9999999999999');
+    expect(() =>
+      generateOfflineQR(
+        { amount: 10_000_000_000_000, currency: 'KHR', merchantRef: 'KHR', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 },
+        configuration,
+      ),
+    ).toThrow(/13/);
+  });
+
   it('measures non-ASCII values in UTF-8 bytes', () => {
     const qr = generateOfflineQR({ currency: 'USD', merchantRef: 'អក្សរ', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 }, configuration);
     expect(parseTlv(parseTlv(qr.slice(0, -8)).get('62') ?? '').get('01')).toBe('អក្សរ');

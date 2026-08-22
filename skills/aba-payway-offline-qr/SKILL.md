@@ -8,7 +8,7 @@ version: 1.1.0
 
 ## Quick Start
 ```ts
-const payload = payway.khqr.generateOfflineQR({ merchantId: 'M001', transactionId: 'order-123', amount: 10, currency: 'USD', merchantRef: 'invoice-123' });
+const payload = payway.khqr.generateOfflineQR({ amount: 10, currency: 'USD', merchantRef: 'invoice-123' });
 ```
 
 Offline QR uses EMVCo TLV plus CRC-16 CCITT. It does not use online HMAC signing, never reaches PayWay, and has no webhook or automatic reconciliation.

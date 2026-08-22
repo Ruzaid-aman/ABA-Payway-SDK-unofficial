@@ -14,6 +14,7 @@ export interface GenerateOfflineQrParams {
 export type KhqrClock = () => Date;
 
 const DEFAULT_EXPIRY_MILLISECONDS = 15 * 60 * 1000;
+const MAX_AMOUNT_LENGTH = 13;
 
 function encodeTlv(tag: string, value: string): string {
   const length = Buffer.byteLength(value, 'utf8');
@@ -36,12 +37,27 @@ function crc16Ccitt(input: string): string {
 
 function formatAmount(amount: number, currency: 'KHR' | 'USD'): string {
   if (!Number.isFinite(amount) || amount <= 0) throw new PayWayConfigError('amount must be a positive finite number for a dynamic ABA KHQR payload');
+  const source = String(amount);
+  if (/e/i.test(source)) throw new PayWayConfigError('amount must not use exponent notation');
+
+  let formatted: string;
   if (currency === 'KHR') {
     if (!Number.isInteger(amount)) throw new PayWayConfigError('KHR amount must be an integer');
-    return String(amount);
+    formatted = source;
+  } else {
+    const scaled = amount * 100;
+    const nearestInteger = Math.round(scaled);
+    const tolerance = Number.EPSILON * Math.max(1, Math.abs(scaled)) * 4;
+    if (Math.abs(scaled - nearestInteger) > tolerance) {
+      throw new PayWayConfigError('USD amount must have at most two decimal places');
+    }
+    formatted = amount.toFixed(2);
   }
-  if (Math.round(amount * 100) !== amount * 100) throw new PayWayConfigError('USD amount must have at most two decimal places');
-  return amount.toFixed(2);
+
+  if (formatted.length > MAX_AMOUNT_LENGTH) {
+    throw new PayWayConfigError(`amount must be at most ${MAX_AMOUNT_LENGTH} characters for ABA KHQR tag 54`);
+  }
+  return formatted;
 }
 
 function timestamp(value: Date | number, field: 'createdAt' | 'expiresAt'): number {

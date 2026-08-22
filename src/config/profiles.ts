@@ -56,13 +56,13 @@ export function saveProfileStore(store: CredentialProfileStore, appData = proces
   writeFileSync(getProfilePath(appData), `${JSON.stringify(store, null, 2)}\n`, 'utf8');
 }
 
-/** Activates a profile for this process, clearing stale optional KHQR data first. */
+/** Supplies profile values only when a higher-priority environment value is absent. */
 export function activateProfile(profile: CredentialProfile, environment: NodeJS.ProcessEnv = process.env): void {
-  setOrClear(environment, 'PAYWAY_MERCHANT_ID', profile.merchantId);
-  setOrClear(environment, 'PAYWAY_API_KEY', profile.apiKey);
-  setOrClear(environment, 'PAYWAY_ENV', profile.environment);
+  setIfMissing(environment, 'PAYWAY_MERCHANT_ID', profile.merchantId);
+  setIfMissing(environment, 'PAYWAY_API_KEY', profile.apiKey);
+  setIfMissing(environment, 'PAYWAY_ENV', profile.environment);
   for (const field of Object.keys(KHQR_ENVIRONMENT_FIELDS) as KhqrEnvironmentField[]) {
-    setOrClear(environment, KHQR_ENVIRONMENT_FIELDS[field], profile.khqr?.[field]);
+    setIfMissing(environment, KHQR_ENVIRONMENT_FIELDS[field], profile.khqr?.[field]);
   }
 }
 
@@ -75,7 +75,8 @@ export function maskProfileValue(value: string | undefined, visibleCharacters = 
   return `${value.slice(0, visibleCharacters)}…`;
 }
 
-function setOrClear(environment: NodeJS.ProcessEnv, key: string, value: string | undefined): void {
-  if (typeof value === 'string' && value.trim().length > 0) environment[key] = value;
-  else delete environment[key];
+function setIfMissing(environment: NodeJS.ProcessEnv, key: string, value: string | undefined): void {
+  if (environment[key] === undefined && typeof value === 'string' && value.trim().length > 0) {
+    environment[key] = value;
+  }
 }

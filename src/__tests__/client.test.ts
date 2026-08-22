@@ -1360,6 +1360,14 @@ describe('khqr domain', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('keeps the documented payway.qr offline alias wired to resolved KHQR configuration', () => {
+    const configuredPayway = new PayWay({ ...TEST_CONFIG, khqr: TEST_KHQR_CONFIG });
+
+    expect(configuredPayway.qr.generateOfflineQR({ amount: 10.12, currency: 'USD', merchantRef: 'INV-QR' }))
+      .toMatch(/^000201010212/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('reports credentials-only clients as unready and rejects offline generation', () => {
     expect(payway.khqr.validateConfiguration().ready).toBe(false);
     expect(() => payway.khqr.generateOfflineQR({ amount: 1.5, currency: 'USD', merchantRef: 'INV-1' })).toThrow(

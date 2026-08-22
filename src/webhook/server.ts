@@ -105,10 +105,12 @@ export function createWebhookServer(
             khqr = { parseError: error instanceof Error ? error.message : String(error) };
           }
 
-          try {
-            storage.updateKhqrMetadata(record.id, khqr);
-          } catch (error) {
-            log(`  Unable to store KHQR parse metadata: ${error instanceof Error ? error.message : String(error)}`);
+          if (storage.updateKhqrMetadata) {
+            try {
+              storage.updateKhqrMetadata(record.id, khqr);
+            } catch (error) {
+              log(`  Unable to store KHQR parse metadata: ${error instanceof Error ? error.message : String(error)}`);
+            }
           }
           log(`  Received offline KHQR notification [${record.id}] at ${record.receivedAt}`);
           res.writeHead(200, { 'Content-Type': 'application/json' });

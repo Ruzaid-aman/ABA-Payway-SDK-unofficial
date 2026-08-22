@@ -357,7 +357,17 @@ describe('built CLI', () => {
 
     writeFileSync(
       path.join(cwd, '.env'),
-      'PAYWAY_MERCHANT_ID=test-merchant-001\nPAYWAY_API_KEY=test-api-key-123456789012\n',
+      [
+        'PAYWAY_MERCHANT_ID=test-merchant-001',
+        'PAYWAY_API_KEY=test-api-key-123456789012',
+        'PAYWAY_KHQR_BAKONG_ID=merchant@bakong',
+        'PAYWAY_KHQR_ABA_MERCHANT_ID=123456789012345',
+        'PAYWAY_KHQR_ACQUIRER_NAME=ABA Bank',
+        'PAYWAY_KHQR_MERCHANT_CATEGORY_CODE=5999',
+        'PAYWAY_KHQR_MERCHANT_NAME=Example Merchant',
+        'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh',
+        'PAYWAY_KHQR_PAYWAY_DATA=synthetic-template',
+      ].join('\n'),
     );
 
     const result = spawnSync(
@@ -369,8 +379,9 @@ describe('built CLI', () => {
         '1.00',
         '--currency',
         'USD',
-        '--callback-url',
-        'https://example.com/cb',
+        '--offline',
+        '--ref',
+        'NONINTERACTIVE-1',
         '--non-interactive',
       ],
       {

@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import http from 'node:http';
 import { JsonWebhookStorage } from '../webhook/storage-json.js';
 import { createWebhookServer, type WebhookServerResult } from '../webhook/server.js';
+import type { WebhookRecord, WebhookStorage } from '../webhook/storage.js';
 
 function httpRequest(
   port: number,
@@ -151,6 +152,34 @@ describe('WebhookServer', () => {
     expect(records[1].khqr?.duplicateTransactionId).toBe(true);
     expect(records[2].body).toBe('{not json');
     expect(records[2].khqr?.parseError).toBeTruthy();
+  });
+
+  it('acknowledges KHQR notifications with a legacy custom storage implementation', async () => {
+    const records: WebhookRecord[] = [];
+    const legacyStorage: WebhookStorage = {
+      save(record) {
+        const saved = { ...record, id: `legacy-${records.length + 1}`, receivedAt: new Date().toISOString() };
+        records.push(saved);
+        return saved;
+      },
+      getAll: () => records,
+      count: () => records.length,
+      close: () => undefined,
+    };
+    const legacyPort = await getFreePort();
+    const legacyServer = createWebhookServer(legacyStorage, { port: legacyPort, quiet: true });
+    await legacyServer.start();
+
+    try {
+      const payload = JSON.stringify({ transaction_id: 'legacy-store' });
+      const response = await httpRequest(legacyPort, 'POST', '/aba-payway-khqr-webhook', payload);
+
+      expect(response.statusCode).toBe(200);
+      expect(records).toHaveLength(1);
+      expect(records[0].body).toBe(payload);
+    } finally {
+      await legacyServer.stop();
+    }
   });
 
   it('returns 404 for non-webhook paths', async () => {

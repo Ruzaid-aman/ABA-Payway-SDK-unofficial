@@ -448,6 +448,8 @@ Configure those values explicitly in `new PayWay({ khqr: ... })`, through the se
 import { PayWay } from 'aba-payway-ts';
 
 const payway = new PayWay({
+  merchantId: process.env.PAYWAY_MERCHANT_ID!,
+  apiKey: process.env.PAYWAY_API_KEY!,
   khqr: {
     bakongId: process.env.PAYWAY_KHQR_BAKONG_ID,
     abaMerchantId: process.env.PAYWAY_KHQR_ABA_MERCHANT_ID,

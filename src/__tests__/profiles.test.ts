@@ -36,15 +36,25 @@ describe('credential profiles', () => {
     expect(loadProfileStore(directory)).toEqual({ profiles: [profile], activeProfile: 'offline' });
   });
 
-  it('clears every KHQR environment variable when the next activated profile omits KHQR configuration', () => {
-    const withKhqr: CredentialProfile = { name: 'configured', merchantId: 'merchant-1', apiKey: 'api-key', khqr };
-    const apiOnly: CredentialProfile = { name: 'api-only', merchantId: 'merchant-2', apiKey: 'api-key-2' };
-    const env: NodeJS.ProcessEnv = {};
+  it('uses a selected profile only as fallback without overwriting or clearing environment values', () => {
+    const profile: CredentialProfile = {
+      name: 'selected',
+      merchantId: 'profile-merchant',
+      apiKey: 'profile-api-key',
+      khqr: { ...khqr, merchantCity: undefined },
+    };
+    const env: NodeJS.ProcessEnv = {
+      PAYWAY_MERCHANT_ID: 'environment-merchant',
+      PAYWAY_KHQR_BAKONG_ID: 'environment@bakong',
+      PAYWAY_KHQR_MERCHANT_CITY: 'Environment City',
+    };
 
-    activateProfile(withKhqr, env);
-    expect(env.PAYWAY_KHQR_PAYWAY_DATA).toBe(khqr.paywayData);
-    activateProfile(apiOnly, env);
+    activateProfile(profile, env);
 
-    expect(Object.keys(env).filter((key) => key.startsWith('PAYWAY_KHQR_'))).toEqual([]);
+    expect(env.PAYWAY_MERCHANT_ID).toBe('environment-merchant');
+    expect(env.PAYWAY_API_KEY).toBe('profile-api-key');
+    expect(env.PAYWAY_KHQR_BAKONG_ID).toBe('environment@bakong');
+    expect(env.PAYWAY_KHQR_ACQUIRER_NAME).toBe(khqr.acquirerName);
+    expect(env.PAYWAY_KHQR_MERCHANT_CITY).toBe('Environment City');
   });
 });

@@ -694,6 +694,11 @@ program
       return;
     }
 
+    if (opts.nonInteractive) {
+      console.log(`  ${c.dim('(non-interactive mode — skipping prompts)')}`);
+      console.log();
+    }
+
     if (opts.offline) {
       // ── Offline mode ──────────────────────────────────────────────────
       const ref = opts.ref;
@@ -772,10 +777,7 @@ program
 
       let finalLifetime = lifetimeSeconds;
 
-      if (opts.nonInteractive) {
-        console.log(`  ${c.dim('(non-interactive mode — skipping prompts)')}`);
-        console.log();
-      } else {
+      if (!opts.nonInteractive) {
         console.log();
         console.log(`  ${c.bold('Parameters:')}`);
         console.log(`    Amount:           ${c.cyan(`${amount} ${currency}`)}`);

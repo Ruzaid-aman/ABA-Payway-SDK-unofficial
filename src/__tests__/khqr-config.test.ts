@@ -106,6 +106,35 @@ describe('KHQR merchant configuration', () => {
       ]),
     );
   });
+
+  it('validates Bakong and acquirer limits plus the complete nested tag 30 size', () => {
+    const readiness = validateKhqrConfiguration({
+      ...completeConfiguration,
+      bakongId: 'b'.repeat(33),
+      acquirerName: 'a'.repeat(40),
+    });
+
+    expect(readiness.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'KHQR_BAKONG_ID_TOO_LONG', path: 'khqr.bakongId' }),
+        expect.objectContaining({ code: 'KHQR_ACQUIRER_NAME_TOO_LONG', path: 'khqr.acquirerName' }),
+        expect.objectContaining({ code: 'KHQR_TAG_30_TOO_LONG', path: 'khqr' }),
+      ]),
+    );
+  });
+
+  it('reserves enough tag 62 space for every valid 25-byte merchant reference', () => {
+    const maximumReadyConfiguration = { ...completeConfiguration, paywayData: 'p'.repeat(66) };
+    expect(validateKhqrConfiguration(maximumReadyConfiguration)).toEqual({ ready: true, issues: [] });
+
+    const tooLarge = validateKhqrConfiguration({ ...completeConfiguration, paywayData: 'p'.repeat(67) });
+    expect(tooLarge).toMatchObject({
+      ready: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({ code: 'KHQR_TAG_62_TOO_LONG', path: 'khqr.paywayData' }),
+      ]),
+    });
+  });
 });
 
 describe('KHQR callback setup', () => {
@@ -134,5 +163,21 @@ describe('KHQR callback setup', () => {
         verification: 'mTLS',
       }),
     ).toEqual({ ready: true, issues: [] });
+  });
+
+  it('rejects arbitrary runtime enrollment and verification strings', () => {
+    const readiness = validateKhqrCallbackSetup({
+      url: 'https://merchant.example/aba-payway-khqr-webhook',
+      enrollment: 'approved-by-aba' as never,
+      verification: 'signed-somehow' as never,
+    });
+
+    expect(readiness).toMatchObject({
+      ready: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({ code: 'KHQR_CALLBACK_ENROLLMENT_INVALID', path: 'khqr.callback.enrollment' }),
+        expect.objectContaining({ code: 'KHQR_CALLBACK_VERIFICATION_INVALID', path: 'khqr.callback.verification' }),
+      ]),
+    });
   });
 });

@@ -70,6 +70,12 @@ const fieldLabels: Record<MerchantField, string> = {
   paywayData: 'PayWay data',
 };
 
+const MAX_BAKONG_ID_BYTES = 32;
+const MAX_ACQUIRER_NAME_BYTES = 32;
+const MAX_TEMPLATE_BYTES = 99;
+const MAX_MERCHANT_REFERENCE_BYTES = 25;
+const NESTED_TLV_HEADER_BYTES = 4;
+
 function issue(code: string, path: string, message: string): KhqrConfigurationIssue {
   return { code, path, message };
 }
@@ -127,6 +133,29 @@ export function validateKhqrConfiguration(
     );
   }
 
+  if (isPresent(resolved.bakongId) && Buffer.byteLength(resolved.bakongId, 'utf8') > MAX_BAKONG_ID_BYTES) {
+    issues.push(
+      issue(
+        'KHQR_BAKONG_ID_TOO_LONG',
+        'khqr.bakongId',
+        `Bakong ID must be at most ${MAX_BAKONG_ID_BYTES} UTF-8 bytes`,
+      ),
+    );
+  }
+
+  if (
+    isPresent(resolved.acquirerName) &&
+    Buffer.byteLength(resolved.acquirerName, 'utf8') > MAX_ACQUIRER_NAME_BYTES
+  ) {
+    issues.push(
+      issue(
+        'KHQR_ACQUIRER_NAME_TOO_LONG',
+        'khqr.acquirerName',
+        `acquirer name must be at most ${MAX_ACQUIRER_NAME_BYTES} UTF-8 bytes`,
+      ),
+    );
+  }
+
   if (isPresent(resolved.merchantCategoryCode) && !/^\d{4}$/.test(resolved.merchantCategoryCode)) {
     issues.push(
       issue(
@@ -149,8 +178,47 @@ export function validateKhqrConfiguration(
     );
   }
 
-  if (isPresent(resolved.paywayData) && Buffer.byteLength(resolved.paywayData, 'utf8') > 99) {
-    issues.push(issue('KHQR_PAYWAY_DATA_TOO_LONG', 'khqr.paywayData', 'PayWay data must be at most 99 UTF-8 bytes'));
+  if (isPresent(resolved.paywayData) && Buffer.byteLength(resolved.paywayData, 'utf8') > MAX_TEMPLATE_BYTES) {
+    issues.push(
+      issue(
+        'KHQR_PAYWAY_DATA_TOO_LONG',
+        'khqr.paywayData',
+        `PayWay data must be at most ${MAX_TEMPLATE_BYTES} UTF-8 bytes`,
+      ),
+    );
+  }
+
+  if (isPresent(resolved.bakongId) && isPresent(resolved.abaMerchantId) && isPresent(resolved.acquirerName)) {
+    const tag30Bytes =
+      NESTED_TLV_HEADER_BYTES * 3 +
+      Buffer.byteLength(resolved.bakongId, 'utf8') +
+      Buffer.byteLength(resolved.abaMerchantId, 'utf8') +
+      Buffer.byteLength(resolved.acquirerName, 'utf8');
+    if (tag30Bytes > MAX_TEMPLATE_BYTES) {
+      issues.push(
+        issue(
+          'KHQR_TAG_30_TOO_LONG',
+          'khqr',
+          `nested merchant account template must be at most ${MAX_TEMPLATE_BYTES} UTF-8 bytes`,
+        ),
+      );
+    }
+  }
+
+  if (isPresent(resolved.paywayData)) {
+    const maximumTag62Bytes =
+      NESTED_TLV_HEADER_BYTES * 2 +
+      MAX_MERCHANT_REFERENCE_BYTES +
+      Buffer.byteLength(resolved.paywayData, 'utf8');
+    if (maximumTag62Bytes > MAX_TEMPLATE_BYTES) {
+      issues.push(
+        issue(
+          'KHQR_TAG_62_TOO_LONG',
+          'khqr.paywayData',
+          `PayWay data leaves insufficient space for a ${MAX_MERCHANT_REFERENCE_BYTES}-byte merchant reference`,
+        ),
+      );
+    }
   }
 
   return { ready: issues.length === 0, issues };
@@ -181,7 +249,19 @@ export function validateKhqrCallbackSetup(
     );
   }
 
-  if (callback?.enrollment !== 'confirmed-by-merchant') {
+  const enrollment = callback?.enrollment;
+  if (
+    enrollment !== undefined &&
+    !(['not-requested', 'requested', 'confirmed-by-merchant'] as readonly unknown[]).includes(enrollment)
+  ) {
+    issues.push(
+      issue(
+        'KHQR_CALLBACK_ENROLLMENT_INVALID',
+        'khqr.callback.enrollment',
+        'callback enrollment must use a supported declaration',
+      ),
+    );
+  } else if (enrollment !== 'confirmed-by-merchant') {
     issues.push(
       issue(
         'KHQR_CALLBACK_ENROLLMENT_UNCONFIRMED',
@@ -191,7 +271,19 @@ export function validateKhqrCallbackSetup(
     );
   }
 
-  if (callback?.verification === undefined || callback.verification === 'unknown') {
+  const verification = callback?.verification;
+  if (
+    verification !== undefined &&
+    !(['unknown', 'aba-confirmed-hmac', 'mTLS', 'ip-allowlist'] as readonly unknown[]).includes(verification)
+  ) {
+    issues.push(
+      issue(
+        'KHQR_CALLBACK_VERIFICATION_INVALID',
+        'khqr.callback.verification',
+        'callback verification must use a supported strategy',
+      ),
+    );
+  } else if (verification === undefined || verification === 'unknown') {
     issues.push(
       issue(
         'KHQR_CALLBACK_VERIFICATION_UNKNOWN',
