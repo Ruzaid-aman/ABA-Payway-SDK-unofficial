@@ -89,14 +89,26 @@ class FakeProvider implements ProviderAdapter {
   }
 }
 
-function makePayWay(): { payway: PayWay; calls: { generateQr: number } } {
-  const calls = { generateQr: 0 };
+function makePayWay(): { payway: PayWay; calls: { generateQr: number; generateOfflineQr: number; checkout: number } } {
+  const calls = { generateQr: 0, generateOfflineQr: 0, checkout: 0 };
   return {
     payway: {
       qr: {
         generateQr: async () => {
           calls.generateQr++;
           return { qrString: 'R1-QR' };
+        },
+      },
+      khqr: {
+        generateOfflineQR: async () => {
+          calls.generateOfflineQr++;
+          return 'R1-KHQR';
+        },
+      },
+      checkout: {
+        createTransaction: async () => {
+          calls.checkout++;
+          return {};
         },
       },
     } as unknown as PayWay,
@@ -182,6 +194,53 @@ describe('R1 pre-authorization risk gate', () => {
     expect(calls.generateQr).toBe(0);
     expect(existsSync(getAgentDataPaths().ledgerDir)).toBe(false);
   });
+
+  it.each([
+    'https://127.0.0.2/callback',
+    'https://10.0.0.1/callback',
+    'https://172.16.0.1/callback',
+    'https://192.168.0.1/callback',
+    'https://169.254.1.1/callback',
+    'https://[::1]/callback',
+    'https://[fc00::1]/callback',
+  ])('blocks non-public literal callback URL %s before ledger or SDK activity', async (callbackUrl) => {
+    const provider = new FakeProvider(onlineQrPlan({ callbackUrl }));
+    const { payway, calls } = makePayWay();
+    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
+      'make payment',
+      approvedOptions(payway),
+    );
+
+    expect(result.status).toBe('blocked');
+    expect(calls.generateQr).toBe(0);
+    expect(existsSync(getAgentDataPaths().ledgerDir)).toBe(false);
+  });
+
+  it('blocks private checkout return and cancel URLs before ledger or SDK activity', async () => {
+    const provider = new FakeProvider({
+      version: 'agent-plan/v1',
+      request: 'checkout',
+      actions: [
+        {
+          tool: 'create_checkout_payload',
+          amount: 3,
+          currency: 'USD',
+          transactionId: null,
+          returnUrl: 'https://10.1.2.3/return',
+          cancelUrl: 'https://192.168.2.3/cancel',
+        },
+      ],
+    });
+    const { payway, calls } = makePayWay();
+    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
+      'checkout',
+      approvedOptions(payway),
+    );
+
+    expect(result.status).toBe('blocked');
+    expect(calls.checkout).toBe(0);
+    expect(existsSync(getAgentDataPaths().ledgerDir)).toBe(false);
+  });
 });
 
 describe('R1 materialized plan validation', () => {
@@ -199,6 +258,56 @@ describe('R1 materialized plan validation', () => {
 });
 
 describe('R1 privacy and provider context boundaries', () => {
+  it('blocks echoed profile secrets in transactionId or merchantRef before ledger or SDK execution', async () => {
+    const apiKey = 'api-key-canary-17';
+    const merchantId = 'merchant-id-canary-17';
+    const onlineProvider = new FakeProvider(onlineQrPlan({ transactionId: apiKey, rationale: merchantId }));
+    const onlinePayWay = makePayWay();
+    const onlineResult = await createOrchestrator({
+      context: makeContext({ apiKey, merchantId }),
+      provider: onlineProvider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('make payment', approvedOptions(onlinePayWay.payway));
+
+    const offlineProvider = new FakeProvider({
+      version: 'agent-plan/v1',
+      request: 'make khqr',
+      actions: [{ tool: 'generate_offline_khqr', currency: 'KHR', merchantRef: apiKey }],
+    });
+    const offlinePayWay = makePayWay();
+    const offlineResult = await createOrchestrator({
+      context: makeContext({
+        apiKey,
+        merchantId,
+        khqr: {
+          bakongId: 'merchant@aba',
+          abaMerchantId: '123456789012345',
+          acquirerName: 'ABA',
+          merchantCategoryCode: '1234',
+          merchantName: 'Merchant',
+          merchantCity: 'Phnom Penh',
+          paywayData: 'x'.repeat(20),
+        },
+      }),
+      provider: offlineProvider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('make khqr', approvedOptions(offlinePayWay.payway));
+
+    for (const result of [onlineResult, offlineResult]) {
+      expect(result).toMatchObject({ status: 'blocked', error: { code: 'UNTRUSTED_ACTION_VALUE' } });
+      expect(JSON.stringify(result)).not.toContain(apiKey);
+      expect(JSON.stringify(result)).not.toContain(merchantId);
+      expect(JSON.stringify(loadSession(result.sessionId!))).not.toContain(apiKey);
+      expect(JSON.stringify(loadSession(result.sessionId!))).not.toContain(merchantId);
+      expect(existsSync(artifactRoot)).toBe(false);
+    }
+    expect(onlinePayWay.calls.generateQr).toBe(0);
+    expect(offlinePayWay.calls.generateOfflineQr).toBe(0);
+    expect(onlineProvider.lastRequest).not.toContain(apiKey);
+    expect(onlineProvider.lastContext).not.toContain(apiKey);
+    expect(existsSync(getAgentDataPaths().ledgerDir)).toBe(false);
+  });
+
   it('scrubs action and nested-plan canaries from provider input, session, command result, and artifact metadata', async () => {
     process.env.PAYWAY_AGENT_API_KEY = 'PROVIDER-API-CANARY';
     const provider = new FakeProvider({

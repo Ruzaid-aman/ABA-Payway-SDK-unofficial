@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import type { ResolvedPayWayContext } from './context.js';
 import type { AgentActionDraft, AgentPlanV1, Currency, Environment, ProviderConfigV1 } from './contracts.js';
 import { evaluateReadiness } from './readiness.js';
@@ -48,12 +49,48 @@ function amountViolation(currency: Currency, amount: number): string | null {
   return null;
 }
 
+function isPrivateOrReservedIpv4(hostname: string): boolean {
+  const octets = hostname.split('.').map(Number);
+  const [first, second, third] = octets;
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    first >= 224 ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && (second === 0 || second === 2 || second === 168)) ||
+    (first === 192 && second === 88 && third === 99) ||
+    (first === 198 && (second === 18 || second === 19 || second === 51)) ||
+    (first === 203 && second === 0)
+  );
+}
+
+function isPublicIpLiteral(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const family = isIP(host);
+  if (family === 4) return !isPrivateOrReservedIpv4(host);
+  if (family !== 6) return true;
+
+  // Global IPv6 unicast is 2000::/3. This excludes unspecified, loopback,
+  // IPv4-mapped, link-local, unique-local, multicast, and other reserved space.
+  const firstHextet = Number.parseInt(host.split(':')[0] || '0', 16);
+  return (
+    firstHextet >= 0x2000 &&
+    firstHextet < 0x4000 &&
+    !host.startsWith('2001:db8:') &&
+    host !== '2001:db8::'
+  );
+}
+
 function isPublicHttps(value: unknown): boolean {
   if (typeof value !== 'string' || value.length === 0) return false;
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== 'https:') return false;
-    return !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+    if (parsed.hostname.toLowerCase() === 'localhost') return false;
+    return isPublicIpLiteral(parsed.hostname);
   } catch {
     return false;
   }
@@ -132,6 +169,12 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
       if (checkout.amount !== undefined) {
         const violation = amountViolation(checkout.currency, checkout.amount);
         if (violation) warnings.push(violation);
+      }
+      if (checkout.returnUrl !== undefined && !isPublicHttps(checkout.returnUrl)) {
+        warnings.push('checkout returnUrl must be a public https URL');
+      }
+      if (checkout.cancelUrl !== undefined && !isPublicHttps(checkout.cancelUrl)) {
+        warnings.push('checkout cancelUrl must be a public https URL');
       }
       if (readiness.checkout !== 'ready') {
         needsClarification = true;

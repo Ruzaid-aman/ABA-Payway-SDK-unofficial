@@ -62,11 +62,8 @@ export async function executeAction(
   action: MaterializedAgentAction,
   executionContext: ExecutionContext,
 ): Promise<ToolExecutionResult> {
-  // NOTE: The merged `MaterializedAgentAction` contract collapses to the
-  // `AgentToolName` string union (a non-distributive `keyof`), so at the type
-  // level `action` is the tool name. At runtime it is the discriminated object
-  // produced upstream; we recover the discriminant here and re-cast when
-  // delegating to the typed tool functions.
+  // Runtime registry lookup uses the discriminant shared by every materialized
+  // action; each registry handler receives the original discriminated object.
   const tool = (action as unknown as { tool: AgentToolName }).tool;
   const create = isCreateAction(tool);
 

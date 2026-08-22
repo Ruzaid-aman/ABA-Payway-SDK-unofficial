@@ -227,6 +227,18 @@ export class AgentOrchestrator {
       });
     }
 
+    const taintedActions = normalized.plan.actions.filter((action) => this.actionContainsSecret(action));
+    if (taintedActions.length > 0) {
+      return this.failure(
+        'blocked',
+        {
+          code: 'UNTRUSTED_ACTION_VALUE',
+          message: 'Provider plan contained a resolved sensitive value in an executable action field; no action was executed.',
+        },
+        { sessionId, plan: normalized.plan, request },
+      );
+    }
+
     const riskDecisions = normalized.plan.actions.map((action) => classifyRisk(action, this.context));
     const riskBlockers = [
       ...normalized.warnings,
@@ -423,7 +435,12 @@ export class AgentOrchestrator {
   }
 
   private secretValues(): string[] {
-    const values: string[] = [this.context.apiKey, this.context.publicKeyPem ?? '', process.env.PAYWAY_AGENT_API_KEY ?? ''];
+    const values: string[] = [
+      this.context.merchantId,
+      this.context.apiKey,
+      this.context.publicKeyPem ?? '',
+      process.env.PAYWAY_AGENT_API_KEY ?? '',
+    ];
     const collect = (value: unknown): void => {
       if (typeof value === 'string') values.push(value);
       else if (Array.isArray(value)) value.forEach(collect);
@@ -436,6 +453,11 @@ export class AgentOrchestrator {
 
   private scrub(value: unknown): unknown {
     return scrubSensitive(value, this.secretValues());
+  }
+
+  private actionContainsSecret(action: AgentActionDraft): boolean {
+    const { rationale: _rationale, ...executableFields } = action as AgentActionDraft & Record<string, unknown>;
+    return JSON.stringify(this.scrub(executableFields)) !== JSON.stringify(executableFields);
   }
 
   private appendEvent(
