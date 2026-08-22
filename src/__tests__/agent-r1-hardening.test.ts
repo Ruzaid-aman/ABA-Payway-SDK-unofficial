@@ -203,6 +203,10 @@ describe('R1 pre-authorization risk gate', () => {
     'https://169.254.1.1/callback',
     'https://[::1]/callback',
     'https://[fc00::1]/callback',
+    'https://[2001:1::1]/callback',
+    'https://[2001:2::1]/callback',
+    'https://[2001:20::1]/callback',
+    'https://[3fff::1]/callback',
   ])('blocks non-public literal callback URL %s before ledger or SDK activity', async (callbackUrl) => {
     const provider = new FakeProvider(onlineQrPlan({ callbackUrl }));
     const { payway, calls } = makePayWay();
@@ -228,6 +232,32 @@ describe('R1 pre-authorization risk gate', () => {
           transactionId: null,
           returnUrl: 'https://10.1.2.3/return',
           cancelUrl: 'https://192.168.2.3/cancel',
+        },
+      ],
+    });
+    const { payway, calls } = makePayWay();
+    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
+      'checkout',
+      approvedOptions(payway),
+    );
+
+    expect(result.status).toBe('blocked');
+    expect(calls.checkout).toBe(0);
+    expect(existsSync(getAgentDataPaths().ledgerDir)).toBe(false);
+  });
+
+  it('blocks IPv6 special-use checkout return and cancel URLs before ledger or SDK activity', async () => {
+    const provider = new FakeProvider({
+      version: 'agent-plan/v1',
+      request: 'checkout',
+      actions: [
+        {
+          tool: 'create_checkout_payload',
+          amount: 3,
+          currency: 'USD',
+          transactionId: null,
+          returnUrl: 'https://[2001:1::1]/return',
+          cancelUrl: 'https://[3fff::1]/cancel',
         },
       ],
     });

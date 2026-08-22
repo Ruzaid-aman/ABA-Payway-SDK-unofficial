@@ -67,6 +67,38 @@ function isPrivateOrReservedIpv4(hostname: string): boolean {
   );
 }
 
+function ipv6Hextets(hostname: string): number[] | null {
+  // IPv4-embedded IPv6 literals are rejected rather than normalized into a
+  // separate address family; they are not needed for public callback URLs.
+  if (hostname.includes('.')) return null;
+  const [left = '', right = ''] = hostname.split('::');
+  const leftParts = left === '' ? [] : left.split(':');
+  const rightParts = right === '' ? [] : right.split(':');
+  if (leftParts.length + rightParts.length > 8) return null;
+  const parts = [...leftParts, ...Array(8 - leftParts.length - rightParts.length).fill('0'), ...rightParts];
+  const hextets = parts.map((part) => Number.parseInt(part, 16));
+  return hextets.length === 8 && hextets.every((part) => Number.isInteger(part) && part >= 0 && part <= 0xffff)
+    ? hextets
+    : null;
+}
+
+function isSpecialUseIpv6(hextets: number[]): boolean {
+  const [first, second, third] = hextets;
+  return (
+    // 2001::/23 (IETF protocol assignments, including 2001:1::/32),
+    // 2001:2::/48 benchmarking, and 2001:3::/32 AMT.
+    (first === 0x2001 && (second <= 0x0003 || second === 0x0002)) ||
+    // ORCHIDv1/v2 and adjacent special-use allocation blocks.
+    (first === 0x2001 && second >= 0x0010 && second <= 0x002f) ||
+    // Documentation and AS112 special-use prefixes.
+    (first === 0x2001 && second === 0x0db8) ||
+    (first === 0x2001 && second === 0x0004 && third === 0x0112) ||
+    // Deprecated 6to4 plus IPv6 documentation 3fff::/20.
+    first === 0x2002 ||
+    (first === 0x3fff && second < 0x0010)
+  );
+}
+
 function isPublicIpLiteral(hostname: string): boolean {
   const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
   const family = isIP(host);
@@ -76,11 +108,12 @@ function isPublicIpLiteral(hostname: string): boolean {
   // Global IPv6 unicast is 2000::/3. This excludes unspecified, loopback,
   // IPv4-mapped, link-local, unique-local, multicast, and other reserved space.
   const firstHextet = Number.parseInt(host.split(':')[0] || '0', 16);
+  const hextets = ipv6Hextets(host);
   return (
     firstHextet >= 0x2000 &&
     firstHextet < 0x4000 &&
-    !host.startsWith('2001:db8:') &&
-    host !== '2001:db8::'
+    hextets !== null &&
+    !isSpecialUseIpv6(hextets)
   );
 }
 
