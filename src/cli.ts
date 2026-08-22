@@ -26,6 +26,7 @@ import {
 import { validateRequiredCredentials, hasBlockingIssues, validatePayWayEnv } from './config/envValidator.js';
 import { PayWayAPIError, PollingAbortedError } from './errors.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
+import { registerAgentCommands } from './cli/commands/agent.js';
 import {
   addProfile,
   activateProfile,
@@ -1198,6 +1199,9 @@ program
       url: opts.url,
     });
   });
+
+// --- agentic command tree ---
+registerAgentCommands(program);
 
 // --- parse ---
 program.parseAsync().catch((err: unknown) => {
