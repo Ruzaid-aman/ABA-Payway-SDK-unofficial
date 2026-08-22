@@ -208,6 +208,11 @@ export function registerAgentCommands(program: Command): void {
           patch.timeoutMs = Math.floor(ms);
         }
         if (opts.acknowledgePrivacy) {
+          if (opts.provider === 'custom' && (!opts.baseUrl || opts.baseUrl.trim() === '')) {
+            console.log(`\n  ${c.red('✗')} Custom provider requires --base-url.\n`);
+            process.exitCode = 1;
+            return;
+          }
           patch.privacyAcknowledgedAt = new Date().toISOString();
         }
 
@@ -274,6 +279,11 @@ export function registerAgentCommands(program: Command): void {
         console.log(
           `  Run ${c.cyan('payway-sdk agent setup --provider <p> --model <m> --acknowledge-privacy')} first,\n  or run ${c.cyan('agent ack')} after ${c.cyan('agent setup')}.\n`,
         );
+        process.exitCode = 1;
+        return;
+      }
+      if (existing.provider === 'custom' && (!existing.baseUrl || existing.baseUrl.trim() === '')) {
+        console.log(`\n  ${c.red('✗')} Custom provider requires a baseUrl in the config.\n`);
         process.exitCode = 1;
         return;
       }
