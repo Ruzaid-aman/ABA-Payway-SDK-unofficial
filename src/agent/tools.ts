@@ -17,33 +17,33 @@
  */
 
 import type { PayWay } from '../client.js';
-import type { ExecutionContext, ToolExecutionResult } from './executor.js';
-import type {
-  AgentToolName,
-  AgentSessionV1,
-  MaterializedAgentAction,
-  GenerateOnlineQrParams,
-  GenerateOfflineKhqrParams,
-  CreateCheckoutPayloadParams,
-  CreateCheckoutPurchaseParams,
-  CreatePaymentLinkParams,
-  CheckTransactionParams,
-  CheckTransactionByMerchantRefParams,
-  PollTransactionParams,
-  SaveArtifactParams,
-  OpenArtifactParams,
-  CopyToClipboardParams,
-} from './contracts.js';
-import { saveQrArtifact } from './artifacts.js';
-import { openArtifact, copyToClipboard } from './local-tools.js';
 import {
+  PayWayAPIError,
   PayWayBusinessError,
   PayWayConfigError,
   PayWayNetworkError,
   PayWayRateLimitError,
-  PayWayAPIError,
   PollingAbortedError,
 } from '../errors.js';
+import { saveQrArtifact } from './artifacts.js';
+import type {
+  AgentSessionV1,
+  AgentToolName,
+  CheckTransactionByMerchantRefParams,
+  CheckTransactionParams,
+  CopyToClipboardParams,
+  CreateCheckoutPayloadParams,
+  CreateCheckoutPurchaseParams,
+  CreatePaymentLinkParams,
+  GenerateOfflineKhqrParams,
+  GenerateOnlineQrParams,
+  MaterializedAgentAction,
+  OpenArtifactParams,
+  PollTransactionParams,
+  SaveArtifactParams,
+} from './contracts.js';
+import type { ExecutionContext, ToolExecutionResult } from './executor.js';
+import { copyToClipboard, openArtifact } from './local-tools.js';
 
 /** Builds a minimal session object sufficient for the local open utility. */
 function minimalSession(sessionId: string): AgentSessionV1 {
@@ -96,10 +96,7 @@ function classifyError(tool: AgentToolName, error: unknown): ToolExecutionResult
 
 // ─── Create tools ───────────────────────────────────────────────────────────
 
-async function runGenerateOnlineQr(
-  action: MaterializedAgentAction,
-  client: PayWay,
-): Promise<ToolExecutionResult> {
+async function runGenerateOnlineQr(action: MaterializedAgentAction, client: PayWay): Promise<ToolExecutionResult> {
   try {
     const params = action as unknown as GenerateOnlineQrParams;
     const response = await client.qr.generateQr({
@@ -126,10 +123,7 @@ async function runGenerateOnlineQr(
   }
 }
 
-async function runGenerateOfflineKhqr(
-  action: MaterializedAgentAction,
-  client: PayWay,
-): Promise<ToolExecutionResult> {
+async function runGenerateOfflineKhqr(action: MaterializedAgentAction, client: PayWay): Promise<ToolExecutionResult> {
   try {
     const params = action as unknown as GenerateOfflineKhqrParams;
     const qrString = client.khqr.generateOfflineQR({
@@ -147,10 +141,7 @@ async function runGenerateOfflineKhqr(
   }
 }
 
-async function runCreateCheckoutPayload(
-  action: MaterializedAgentAction,
-  client: PayWay,
-): Promise<ToolExecutionResult> {
+async function runCreateCheckoutPayload(action: MaterializedAgentAction, client: PayWay): Promise<ToolExecutionResult> {
   try {
     const params = action as unknown as CreateCheckoutPayloadParams;
     const payload = client.checkout.createTransaction({
@@ -212,10 +203,7 @@ async function runCreateCheckoutPurchase(
   }
 }
 
-async function runCreatePaymentLink(
-  action: MaterializedAgentAction,
-  client: PayWay,
-): Promise<ToolExecutionResult> {
+async function runCreatePaymentLink(action: MaterializedAgentAction, client: PayWay): Promise<ToolExecutionResult> {
   try {
     const params = action as unknown as CreatePaymentLinkParams;
     const response = await client.paymentLink.create({
@@ -256,10 +244,7 @@ async function runCreatePaymentLink(
 
 // ─── Read (non-create) tools ────────────────────────────────────────────────
 
-async function runCheckTransaction(
-  action: MaterializedAgentAction,
-  client: PayWay,
-): Promise<ToolExecutionResult> {
+async function runCheckTransaction(action: MaterializedAgentAction, client: PayWay): Promise<ToolExecutionResult> {
   const params = action as unknown as CheckTransactionParams;
   const response = await client.checkout.checkTransaction(params.transactionId);
   return {
@@ -282,10 +267,7 @@ async function runCheckTransactionByMerchantRef(
   };
 }
 
-async function runPollTransaction(
-  action: MaterializedAgentAction,
-  client: PayWay,
-): Promise<ToolExecutionResult> {
+async function runPollTransaction(action: MaterializedAgentAction, client: PayWay): Promise<ToolExecutionResult> {
   const params = action as unknown as PollTransactionParams;
   const iterator = client.checkout.pollTransactionStatus(params.transactionId, {
     intervalMs: params.interval,
@@ -368,10 +350,7 @@ async function runOpenArtifact(
   return { ok: true, tool: 'open_artifact', data: { reference: params.reference } };
 }
 
-async function runCopyToClipboard(
-  action: MaterializedAgentAction,
-  _client: PayWay,
-): Promise<ToolExecutionResult> {
+async function runCopyToClipboard(action: MaterializedAgentAction, _client: PayWay): Promise<ToolExecutionResult> {
   const params = action as unknown as CopyToClipboardParams;
   await copyToClipboard(params.text);
   return { ok: true, tool: 'copy_to_clipboard', data: { length: params.text.length } };

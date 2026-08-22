@@ -23,24 +23,24 @@
  *   console.log(report.success ? 'All passed' : 'Failures detected');
  */
 
-import { server, normalizePaywayResponse } from './server/index.js';
-import { client } from './client-handler/index.js';
-import {
-  runTestSuite,
-  formatTestReport,
-  startMockPaywayServer,
-  stopMockPaywayServer,
-  getMockPaywayUrl,
-} from './test/index.js';
 import type { PayWayConfig } from './client.js';
+import { client } from './client-handler/index.js';
 import type {
-  TransactionSession,
-  InitiateTransactionPayload,
   HandleResponseOptions,
   HandleResponseResult,
+  InitiateTransactionPayload,
   ResponseType,
   TestSuiteReport,
+  TransactionSession,
 } from './schema.js';
+import { normalizePaywayResponse, server } from './server/index.js';
+import {
+  formatTestReport,
+  getMockPaywayUrl,
+  runTestSuite,
+  startMockPaywayServer,
+  stopMockPaywayServer,
+} from './test/index.js';
 
 /**
  * The top-level SDK namespace. This is the primary entry point for merchants.
@@ -60,10 +60,7 @@ export const sdk = {
      * @param config  - PayWay credentials and environment.
      * @returns A standardized `TransactionSession` object.
      */
-    initiateTransaction(
-      payload: InitiateTransactionPayload,
-      config: PayWayConfig,
-    ): Promise<TransactionSession> {
+    initiateTransaction(payload: InitiateTransactionPayload, config: PayWayConfig): Promise<TransactionSession> {
       return server.initiateTransaction(payload, config);
     },
 
@@ -73,10 +70,7 @@ export const sdk = {
      * @param payload      - Optional transaction details.
      * @returns A mock `TransactionSession` object.
      */
-    test(
-      responseType: ResponseType = 'qr_string',
-      payload?: Partial<InitiateTransactionPayload>,
-    ): TransactionSession {
+    test(responseType: ResponseType = 'qr_string', payload?: Partial<InitiateTransactionPayload>): TransactionSession {
       return server.test(responseType, payload);
     },
   },
@@ -93,10 +87,7 @@ export const sdk = {
      * @param options  - Optional rendering/redirect options.
      * @returns A `HandleResponseResult` describing the action taken.
      */
-    handleResponse(
-      session: TransactionSession,
-      options?: HandleResponseOptions,
-    ): Promise<HandleResponseResult> {
+    handleResponse(session: TransactionSession, options?: HandleResponseOptions): Promise<HandleResponseResult> {
       return client.handleResponse(session, options);
     },
   },
@@ -110,10 +101,7 @@ export const sdk = {
    * @param config  - PayWay credentials and environment.
    * @returns A standardized `TransactionSession` object.
    */
-  initiate(
-    payload: InitiateTransactionPayload,
-    config: PayWayConfig,
-  ): Promise<TransactionSession> {
+  initiate(payload: InitiateTransactionPayload, config: PayWayConfig): Promise<TransactionSession> {
     return server.initiateTransaction(payload, config);
   },
 
@@ -125,10 +113,7 @@ export const sdk = {
    * @param options  - Optional rendering/redirect options.
    * @returns A `HandleResponseResult` describing the action taken.
    */
-  handle(
-    session: TransactionSession,
-    options?: HandleResponseOptions,
-  ): Promise<HandleResponseResult> {
+  handle(session: TransactionSession, options?: HandleResponseOptions): Promise<HandleResponseResult> {
     return client.handleResponse(session, options);
   },
 
@@ -140,10 +125,7 @@ export const sdk = {
    * @param payload      - Optional transaction details.
    * @returns A mock `TransactionSession` object.
    */
-  test(
-    responseType: ResponseType = 'qr_string',
-    payload?: Partial<InitiateTransactionPayload>,
-  ): TransactionSession {
+  test(responseType: ResponseType = 'qr_string', payload?: Partial<InitiateTransactionPayload>): TransactionSession {
     return server.test(responseType, payload);
   },
 
@@ -194,17 +176,12 @@ export const sdk = {
           // mock server understands. The mock uses `tran_id` as the router,
           // so `payment_option` mostly just needs to be non-empty for the
           // deeplink case (the SDK forwards it verbatim).
-          const paymentOption =
-            type === 'deeplink' ? 'abapay_khqr_deeplink' : (payload.paymentOption ?? 'abapay_khqr');
+          const paymentOption = type === 'deeplink' ? 'abapay_khqr_deeplink' : (payload.paymentOption ?? 'abapay_khqr');
 
-          return server.initiateTransaction(
-            { ...payload, paymentOption },
-            mockConfig,
-          );
+          return server.initiateTransaction({ ...payload, paymentOption }, mockConfig);
         },
         // Module 2: the real client handler.
-        handle: (session, options) =>
-          client.handleResponse(session, options as HandleResponseOptions),
+        handle: (session, options) => client.handleResponse(session, options as HandleResponseOptions),
       });
     } finally {
       await stopMockPaywayServer(mockServer);

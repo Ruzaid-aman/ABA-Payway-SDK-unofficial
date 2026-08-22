@@ -41,10 +41,14 @@ export function validateTransactionId(transactionId: string): void {
     throw new PayWayConfigError('transactionId is required and must be a non-empty string');
   }
   if (transactionId.length > 20) {
-    throw new PayWayConfigError(`transactionId must be ≤ 20 characters, received ${transactionId.length}: "${transactionId}"`);
+    throw new PayWayConfigError(
+      `transactionId must be ≤ 20 characters, received ${transactionId.length}: "${transactionId}"`,
+    );
   }
   if (!/^[a-zA-Z0-9-]+$/.test(transactionId)) {
-    throw new PayWayConfigError(`transactionId may only contain letters, digits, and hyphens, received: "${transactionId}"`);
+    throw new PayWayConfigError(
+      `transactionId may only contain letters, digits, and hyphens, received: "${transactionId}"`,
+    );
   }
 }
 

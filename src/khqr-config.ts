@@ -135,18 +135,11 @@ export function validateKhqrConfiguration(
 
   if (isPresent(resolved.bakongId) && Buffer.byteLength(resolved.bakongId, 'utf8') > MAX_BAKONG_ID_BYTES) {
     issues.push(
-      issue(
-        'KHQR_BAKONG_ID_TOO_LONG',
-        'khqr.bakongId',
-        `Bakong ID must be at most ${MAX_BAKONG_ID_BYTES} UTF-8 bytes`,
-      ),
+      issue('KHQR_BAKONG_ID_TOO_LONG', 'khqr.bakongId', `Bakong ID must be at most ${MAX_BAKONG_ID_BYTES} UTF-8 bytes`),
     );
   }
 
-  if (
-    isPresent(resolved.acquirerName) &&
-    Buffer.byteLength(resolved.acquirerName, 'utf8') > MAX_ACQUIRER_NAME_BYTES
-  ) {
+  if (isPresent(resolved.acquirerName) && Buffer.byteLength(resolved.acquirerName, 'utf8') > MAX_ACQUIRER_NAME_BYTES) {
     issues.push(
       issue(
         'KHQR_ACQUIRER_NAME_TOO_LONG',
@@ -207,9 +200,7 @@ export function validateKhqrConfiguration(
 
   if (isPresent(resolved.paywayData)) {
     const maximumTag62Bytes =
-      NESTED_TLV_HEADER_BYTES * 2 +
-      MAX_MERCHANT_REFERENCE_BYTES +
-      Buffer.byteLength(resolved.paywayData, 'utf8');
+      NESTED_TLV_HEADER_BYTES * 2 + MAX_MERCHANT_REFERENCE_BYTES + Buffer.byteLength(resolved.paywayData, 'utf8');
     if (maximumTag62Bytes > MAX_TEMPLATE_BYTES) {
       issues.push(
         issue(

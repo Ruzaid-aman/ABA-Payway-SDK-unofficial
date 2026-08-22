@@ -11,8 +11,8 @@
 
 import readline from 'node:readline';
 import type { Command } from 'commander';
-import { resolvePayWayContext } from './context.js';
 import { readAgentConfig } from './config.js';
+import { resolvePayWayContext } from './context.js';
 import { AgentOrchestrator, renderHumanResult, serializeCommandResult } from './orchestrator.js';
 import { createProviderAdapter } from './provider.js';
 
@@ -71,8 +71,8 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
   const context = resolvePayWayContext({ profile });
 
   const rl = readline.createInterface({
-    input: process.stdin as any,
-    output: process.stdout as any,
+    input: process.stdin as unknown as NodeJS.ReadableStream,
+    output: process.stdout as unknown as NodeJS.WritableStream,
     terminal: Boolean(process.stdin.isTTY),
   });
 
@@ -93,7 +93,11 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
     }
     const name = tokens[0];
 
-    if (FORBIDDEN_DISPATCH.has(name) || !dispatchProgram || !dispatchProgram.commands.some((cmd) => cmd.name() === name)) {
+    if (
+      FORBIDDEN_DISPATCH.has(name) ||
+      !dispatchProgram ||
+      !dispatchProgram.commands.some((cmd) => cmd.name() === name)
+    ) {
       console.log(
         `  ${c.red('✗')} Rejected: '${name}' is not a dispatchable PayWay command (agent-management commands are blocked)`,
       );
@@ -147,7 +151,9 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
       if (history.length === 0) {
         console.log(`  ${c.dim('(no history yet)')}`);
       } else {
-        history.forEach((h, i) => console.log(`  ${c.dim(`${i + 1}.`)} ${h}`));
+        history.forEach((h, i) => {
+          console.log(`  ${c.dim(`${i + 1}.`)} ${h}`);
+        });
       }
       return;
     }

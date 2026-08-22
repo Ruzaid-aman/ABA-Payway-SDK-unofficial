@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { validatePayWayEnv, hasBlockingIssues, validateRequiredCredentials } from '../config/envValidator.js';
+import { describe, expect, it } from 'vitest';
+import { hasBlockingIssues, validatePayWayEnv, validateRequiredCredentials } from '../config/envValidator.js';
 
 describe('validatePayWayEnv', () => {
   it('returns no issues when all required vars are set correctly', () => {
@@ -137,16 +137,12 @@ describe('validatePayWayEnv', () => {
 
 describe('hasBlockingIssues', () => {
   it('returns true when there are error-severity issues', () => {
-    const issues = [
-      { code: 'E-TEST', severity: 'error' as const, varName: 'TEST', message: 'test' },
-    ];
+    const issues = [{ code: 'E-TEST', severity: 'error' as const, varName: 'TEST', message: 'test' }];
     expect(hasBlockingIssues(issues)).toBe(true);
   });
 
   it('returns false when only warn-severity issues exist', () => {
-    const issues = [
-      { code: 'W-TEST', severity: 'warn' as const, varName: 'TEST', message: 'test' },
-    ];
+    const issues = [{ code: 'W-TEST', severity: 'warn' as const, varName: 'TEST', message: 'test' }];
     expect(hasBlockingIssues(issues)).toBe(false);
   });
 
@@ -251,9 +247,7 @@ describe('validateRequiredCredentials', () => {
     const fullIssues = validatePayWayEnv(env);
 
     for (const ri of requiredIssues) {
-      const matching = fullIssues.find(
-        (fi) => fi.varName === ri.varName && fi.severity === 'error',
-      );
+      const matching = fullIssues.find((fi) => fi.varName === ri.varName && fi.severity === 'error');
       expect(matching).toBeDefined();
     }
   });

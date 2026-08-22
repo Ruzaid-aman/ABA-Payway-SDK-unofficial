@@ -1,7 +1,7 @@
-import type { AgentActionDraft, Environment, ProviderConfigV1 } from './contracts.js';
-import { evaluateReadiness } from './readiness.js';
 import type { ResolvedPayWayContext } from './context.js';
+import type { AgentActionDraft, Environment, ProviderConfigV1 } from './contracts.js';
 import { isReadOnlyTool } from './planning.js';
+import { evaluateReadiness } from './readiness.js';
 
 export type RiskLevel = 'safe' | 'sandbox' | 'production' | 'blocked';
 
@@ -124,7 +124,10 @@ function hasCreateAction(plan: { actions: AgentActionDraft[] }): boolean {
  * Ambiguous/invalid/unavailable/out-of-scope actions are blocked earlier at the
  * risk gate and are never authorized by this function.
  */
-export function authorizePlan(plan: { actions: AgentActionDraft[] }, approvalInput: AuthorizationInput): AuthorizationResult {
+export function authorizePlan(
+  plan: { actions: AgentActionDraft[] },
+  approvalInput: AuthorizationInput,
+): AuthorizationResult {
   if (!hasCreateAction(plan)) {
     return {
       authorized: true,

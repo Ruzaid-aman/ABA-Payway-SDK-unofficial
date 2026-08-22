@@ -7,12 +7,12 @@
  * `save_artifact` agent tool; the executor wires API success/failure onto it.
  */
 
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import * as QRCode from 'qrcode';
-import { atomicWriteJson } from './storage.js';
 import type { ArtifactKind, ArtifactMetadataV1, Currency } from './contracts.js';
+import { atomicWriteJson } from './storage.js';
 
 /**
  * The default artifact root: `<cwd>/payway-output`. Resolved lazily so that
@@ -50,7 +50,9 @@ export interface SaveQrArtifactInput {
 function normalizeName(requested: string | undefined, fallback: string): string {
   const base = requested ? path.basename(requested) : fallback;
   const sanitized = base
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .split('')
+    .map((ch) => (ch < ' ' || /[<>:"/\\|?*]/.test(ch) ? '_' : ch))
+    .join('')
     .replace(/\.+/g, '.')
     .toLowerCase();
   const trimmed = sanitized.replace(/^\.+|\.+$/g, '').slice(0, 120);
@@ -65,15 +67,10 @@ function normalizeName(requested: string | undefined, fallback: string): string 
  * unless `overrideApproval` is explicitly `true` — that flag represents a
  * human-confirmed override and is the ONLY way to leave the sandbox.
  */
-export function resolveArtifactPath(
-  root: string,
-  requestedName: string,
-  overrideApproval: boolean,
-): string {
+export function resolveArtifactPath(root: string, requestedName: string, overrideApproval: boolean): string {
   const normalizedRoot = path.resolve(root);
   const candidate = path.resolve(normalizedRoot, requestedName);
-  const insideRoot =
-    candidate === normalizedRoot || candidate.startsWith(normalizedRoot + path.sep);
+  const insideRoot = candidate === normalizedRoot || candidate.startsWith(normalizedRoot + path.sep);
 
   if (!insideRoot && !overrideApproval) {
     throw new Error(
@@ -135,11 +132,7 @@ export async function saveQrArtifact(input: SaveQrArtifactInput): Promise<Artifa
     try {
       imageBuffer = await QRCode.toBuffer(qrString, { width: 512, margin: 2 });
     } catch (error) {
-      throw new Error(
-        `failed to render QR image locally: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      throw new Error(`failed to render QR image locally: ${error instanceof Error ? error.message : String(error)}`);
     }
     dataUrl = `data:image/png;base64,${imageBuffer.toString('base64')}`;
   }

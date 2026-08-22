@@ -9,20 +9,15 @@
  */
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { atomicWriteJson, getAgentDataPaths } from './storage.js';
-import { validateLedger } from './schemas.js';
 import type { AgentToolName, ExecutionRecordV1, ExecutionStatus } from './contracts.js';
+import { validateLedger } from './schemas.js';
+import { atomicWriteJson, getAgentDataPaths } from './storage.js';
 
 const LEDGER_VERSION = 'agent-ledger/v1' as const;
 
-const UNFINISHED_STATUSES: readonly ExecutionStatus[] = [
-  'planned',
-  'confirmed',
-  'submitted',
-  'outcome_unknown',
-];
+const UNFINISHED_STATUSES: readonly ExecutionStatus[] = ['planned', 'confirmed', 'submitted', 'outcome_unknown'];
 
 export class LedgerError extends Error {
   constructor(message: string) {
@@ -177,10 +172,7 @@ export function markFailed(id: string, error: { code?: string; message: string }
  * submitted -> outcome_unknown (timeout/abort/network/ambiguous). Rejects if
  * the record is not 'submitted'.
  */
-export function markOutcomeUnknown(
-  id: string,
-  error: { code?: string; message: string },
-): ExecutionRecordV1 {
+export function markOutcomeUnknown(id: string, error: { code?: string; message: string }): ExecutionRecordV1 {
   return advance(id, 'submitted', 'outcome_unknown', (record) => {
     record.error = { code: error.code, message: error.message };
   });

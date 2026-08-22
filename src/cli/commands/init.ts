@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { detectFramework, type DetectedFramework } from '../../config/frameworkDetector.js';
-import { validatePayWayEnv, type EnvIssue } from '../../config/envValidator.js';
+import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
+import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
 import { selectTemplateFiles, type TemplateModule } from '../../config/templates/index.js';
 
 const ENV_TEMPLATE =

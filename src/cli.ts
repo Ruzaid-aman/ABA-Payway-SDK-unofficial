@@ -1,44 +1,32 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
-import { readFileSync, existsSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import { sdk } from './sdk.js';
-import { PayWay } from './client.js';
-import { formatTestReport } from './test/index.js';
-import { runInit } from './cli/commands/init.js';
-import { runDoctor } from './cli/commands/doctor.js';
-import {
-  addSkills,
-  removeSkills,
-  listSkills,
-  doctorSkills,
-} from './cli/commands/skills.js';
-import {
-  PAYMENT_STATUS_CODES,
-  REFUND_ERROR_CODES,
-} from './constants.js';
-import {
-  validateRefundAmount,
-  validateTransactionId,
-  validatePositiveAmount,
-} from './utils.js';
-import { validateRequiredCredentials, hasBlockingIssues, validatePayWayEnv } from './config/envValidator.js';
-import { PayWayAPIError, PollingAbortedError } from './errors.js';
-import { runSetupWebhook } from './cli/commands/setup-webhook.js';
+import { Command } from 'commander';
 import { registerAgentCommands } from './cli/commands/agent.js';
+import { runDoctor } from './cli/commands/doctor.js';
+import { runInit } from './cli/commands/init.js';
+import { runSetupWebhook } from './cli/commands/setup-webhook.js';
+import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/commands/skills.js';
+import { readMaskedInput } from './cli/masked-input.js';
+import { PayWay } from './client.js';
+import { hasBlockingIssues, validatePayWayEnv, validateRequiredCredentials } from './config/envValidator.js';
 import {
-  addProfile,
   activateProfile,
+  addProfile,
   getProfileByName,
   loadProfileStore,
   removeProfile,
   saveProfileStore,
   setDefaultProfile,
 } from './config/profiles.js';
-import { randomBytes } from 'node:crypto';
+import { PAYMENT_STATUS_CODES, REFUND_ERROR_CODES } from './constants.js';
+import { PayWayAPIError, PollingAbortedError } from './errors.js';
 import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConfiguration } from './khqr-config.js';
-import { readMaskedInput } from './cli/masked-input.js';
+import { sdk } from './sdk.js';
+import { formatTestReport } from './test/index.js';
+import { validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (no dotenv dependency needed)
@@ -111,7 +99,6 @@ function printApiError(e: unknown): void {
   }
 }
 
-
 // ---------------------------------------------------------------------------
 // ANSI helpers (no external deps)
 // ---------------------------------------------------------------------------
@@ -152,26 +139,34 @@ async function runPolling(
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
       if (result.paymentStatus.startsWith('ERROR:')) {
-        console.log(`  ${c.yellow('⚠')} [${elapsed}s] Poll #${result.attempt}: ${c.yellow(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`);
+        console.log(
+          `  ${c.yellow('⚠')} [${elapsed}s] Poll #${result.attempt}: ${c.yellow(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`,
+        );
         continue;
       }
 
       if (result.isTerminal) {
         const icon = result.paymentStatus === 'APPROVED' ? c.green('✓') : c.red('✗');
-        console.log(`  ${icon} [${elapsed}s] Poll #${result.attempt}: ${c.bold(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`);
+        console.log(
+          `  ${icon} [${elapsed}s] Poll #${result.attempt}: ${c.bold(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`,
+        );
         console.log();
         console.log(`  ${c.green(`Payment ${result.paymentStatus.toLowerCase()}.`)}`);
         console.log();
         return;
       }
 
-      console.log(`  ${c.dim('○')} [${elapsed}s] Poll #${result.attempt}: ${c.dim(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`);
+      console.log(
+        `  ${c.dim('○')} [${elapsed}s] Poll #${result.attempt}: ${c.dim(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`,
+      );
     }
   } catch (error) {
     if (error instanceof PollingAbortedError) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log();
-      console.log(`  ${c.yellow('⚠')} Polling stopped: ${c.yellow(error.reason)} after ${c.bold(String(error.totalAttempts))} attempts (${elapsed}s elapsed)`);
+      console.log(
+        `  ${c.yellow('⚠')} Polling stopped: ${c.yellow(error.reason)} after ${c.bold(String(error.totalAttempts))} attempts (${elapsed}s elapsed)`,
+      );
       if (error.lastStatus) {
         console.log(`  ${c.dim(`Last status: ${error.lastStatus}`)}`);
       }
@@ -183,7 +178,8 @@ async function runPolling(
 }
 
 async function promptConfirmation(message: string, rl?: readline.Interface): Promise<boolean> {
-  const rlInstance = rl ?? readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
+  const rlInstance =
+    rl ?? readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
   try {
     const answer = await new Promise<string>((resolve) => {
       rlInstance.question(message, (ans) => {
@@ -202,13 +198,17 @@ function promptInput(rl: readline.Interface, message: string): Promise<string> {
 }
 
 async function promptLifetimeOverride(current: number, rl?: readline.Interface): Promise<number | null> {
-  const rlInstance = rl ?? readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
+  const rlInstance =
+    rl ?? readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
   try {
     const answer = await new Promise<string>((resolve) => {
-      rlInstance.question(`  Modify lifetime? Current: ${current}s. Enter new value (or press Enter to skip): `, (ans) => {
-        if (!rl) rlInstance.close();
-        resolve(ans);
-      });
+      rlInstance.question(
+        `  Modify lifetime? Current: ${current}s. Enter new value (or press Enter to skip): `,
+        (ans) => {
+          if (!rl) rlInstance.close();
+          resolve(ans);
+        },
+      );
     });
     const trimmed = answer.trim();
     if (!trimmed) return null;
@@ -225,9 +225,7 @@ async function promptLifetimeOverride(current: number, rl?: readline.Interface):
 
 function readPackageVersion(): string {
   try {
-    const pkg = JSON.parse(
-      readFileSync(path.join(executableDirectory, '..', 'package.json'), 'utf8'),
-    );
+    const pkg = JSON.parse(readFileSync(path.join(executableDirectory, '..', 'package.json'), 'utf8'));
     return pkg.version ?? 'unknown';
   } catch {
     return 'unknown';
@@ -260,10 +258,11 @@ function isProfilesCommand(command: Command): boolean {
 
 function activateSelectedProfile(command: Command): void {
   if (isProfilesCommand(command)) return;
-  const selectedName = program.opts<{ profile?: string }>().profile
-    ?? process.env.PAYWAY_PROFILE
-    ?? loadProfileStore().defaultProfile
-    ?? loadProfileStore().activeProfile;
+  const selectedName =
+    program.opts<{ profile?: string }>().profile ??
+    process.env.PAYWAY_PROFILE ??
+    loadProfileStore().defaultProfile ??
+    loadProfileStore().activeProfile;
   if (!selectedName) return;
 
   const profile = getProfileByName(loadProfileStore(), selectedName);
@@ -395,9 +394,7 @@ program
       }
       let display: string;
       if (secrets.has(v.name)) {
-        display = val.length > 12
-          ? `${val.slice(0, 8)}${'•'.repeat(Math.min(val.length - 8, 16))}`
-          : '••••••••';
+        display = val.length > 12 ? `${val.slice(0, 8)}${'•'.repeat(Math.min(val.length - 8, 16))}` : '••••••••';
       } else {
         display = val;
       }
@@ -512,10 +509,7 @@ program
 
     try {
       const payway = new PayWay();
-      const result = await payway.khqr.getTransactionsByMerchantRef(
-        opts.merchantRef,
-        opts.requestTime,
-      );
+      const result = await payway.khqr.getTransactionsByMerchantRef(opts.merchantRef, opts.requestTime);
       console.log(JSON.stringify(result, null, 2));
     } catch (error) {
       printApiError(error);
@@ -554,25 +548,17 @@ program
       } else {
         try {
           validateRefundAmount(num, currency as 'USD' | 'KHR');
-          console.log(
-            `  ${c.green('✓')} Refund amount: ${c.cyan(opts.amount)} ${currency} — valid`,
-          );
+          console.log(`  ${c.green('✓')} Refund amount: ${c.cyan(opts.amount)} ${currency} — valid`);
         } catch (e) {
-          console.log(
-            `  ${c.red('✗')} Refund amount: ${c.red(String(e instanceof Error ? e.message : e))}`,
-          );
+          console.log(`  ${c.red('✗')} Refund amount: ${c.red(String(e instanceof Error ? e.message : e))}`);
           hasError = true;
         }
 
         try {
           validatePositiveAmount(num, currency as 'USD' | 'KHR');
-          console.log(
-            `  ${c.green('✓')} Purchase amount: ${c.cyan(opts.amount)} ${currency} — valid`,
-          );
+          console.log(`  ${c.green('✓')} Purchase amount: ${c.cyan(opts.amount)} ${currency} — valid`);
         } catch (e) {
-          console.log(
-            `  ${c.red('✗')} Purchase amount: ${c.red(String(e instanceof Error ? e.message : e))}`,
-          );
+          console.log(`  ${c.red('✗')} Purchase amount: ${c.red(String(e instanceof Error ? e.message : e))}`);
           hasError = true;
         }
       }
@@ -613,8 +599,7 @@ program
 
     const amount = opts.amount === undefined ? undefined : Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
-    const transactionId =
-      opts.transactionId ?? `qr${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    const transactionId = opts.transactionId ?? `qr${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
 
     if (!opts.offline && amount === undefined) {
       console.log(`  ${c.red('✗')} --amount is required for online mode`);
@@ -623,9 +608,7 @@ program
     }
 
     if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
-      console.log(
-        `  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`,
-      );
+      console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
       process.exitCode = 1;
       return;
     }
@@ -672,7 +655,9 @@ program
         });
 
         console.log(`  ${c.green('✓')} Offline ABA KHQR generated\n`);
-        console.log(`  ${c.bold('Amount:')}           ${c.cyan(amount === undefined ? `Static ${currency}` : `${amount} ${currency}`)}`);
+        console.log(
+          `  ${c.bold('Amount:')}           ${c.cyan(amount === undefined ? `Static ${currency}` : `${amount} ${currency}`)}`,
+        );
         console.log(`  ${c.bold('Reference:')}        ${ref}`);
         console.log();
         console.log(`  ${c.bold('QR String:')}`);
@@ -693,12 +678,8 @@ program
 
       if (!callbackUrl) {
         console.log(`  ${c.red('✗')} --callback-url is required for online mode`);
-        console.log(
-          `  ${c.dim('Tip: use --offline for offline QR generation without credentials')}`,
-        );
-        console.log(
-          `  ${c.dim('Or run: payway-sdk setup-webhook --tunnel to set PAYWAY_CALLBACK_URL in .env')}`,
-        );
+        console.log(`  ${c.dim('Tip: use --offline for offline QR generation without credentials')}`);
+        console.log(`  ${c.dim('Or run: payway-sdk setup-webhook --tunnel to set PAYWAY_CALLBACK_URL in .env')}`);
         process.exitCode = 1;
         return;
       }
@@ -712,10 +693,10 @@ program
         return;
       }
 
-    if (!assertCredentialsPresent()) {
-      process.exitCode = 1;
-      return;
-    }
+      if (!assertCredentialsPresent()) {
+        process.exitCode = 1;
+        return;
+      }
 
       let finalLifetime = lifetimeSeconds;
 
@@ -750,9 +731,9 @@ program
         console.log();
       }
 
-    try {
-      const payway = new PayWay();
-      const qr = await payway.qr.generateQr({
+      try {
+        const payway = new PayWay();
+        const qr = await payway.qr.generateQr({
           transactionId,
           amount,
           currency,
@@ -781,9 +762,7 @@ program
           const imgDir = path.dirname(opts.saveImage);
           mkdirSync(imgDir, { recursive: true });
           // qrImage is a data URL: "data:image/png;base64,iVBOR..."
-          const base64Data = qr.qrImage.includes('base64,')
-            ? qr.qrImage.split('base64,')[1]
-            : qr.qrImage;
+          const base64Data = qr.qrImage.includes('base64,') ? qr.qrImage.split('base64,')[1] : qr.qrImage;
           const imgBuffer = Buffer.from(base64Data, 'base64');
           writeFileSync(opts.saveImage, imgBuffer);
           console.log(`  ${c.green('✓')} Image saved to ${c.cyan(opts.saveImage)}`);
@@ -825,13 +804,10 @@ program
 
     const amount = Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
-    const transactionId =
-      opts.transactionId ?? `ck${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    const transactionId = opts.transactionId ?? `ck${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      console.log(
-        `  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`,
-      );
+      console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
       process.exitCode = 1;
       return;
     }
@@ -902,7 +878,6 @@ program
       process.exitCode = 1;
     }
   });
-
 
 // --- payment-link ---
 const paymentLinkCmd = program
@@ -1002,7 +977,6 @@ paymentLinkCmd
     }
   });
 
-
 paymentLinkCmd
   .command('detail')
   .description('Get the status and details of a payment link')
@@ -1043,9 +1017,7 @@ paymentLinkCmd
   });
 
 // --- profiles ---
-const profilesCmd = program
-  .command('profiles')
-  .description('Manage saved sandbox and production credential profiles');
+const profilesCmd = program.command('profiles').description('Manage saved sandbox and production credential profiles');
 
 profilesCmd
   .command('add')
@@ -1054,13 +1026,17 @@ profilesCmd
     const rl = readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: true });
     try {
       const name = (await promptInput(rl, 'Profile name: ')).trim();
-      const environment = (await promptInput(rl, 'Environment (sandbox/production): ')).trim().toLowerCase() as 'sandbox' | 'production';
+      const environment = (await promptInput(rl, 'Environment (sandbox/production): ')).trim().toLowerCase() as
+        | 'sandbox'
+        | 'production';
       const merchantId = (await promptInput(rl, 'Merchant ID: ')).trim();
       const apiKey = (await readMaskedInput('API key: ', { fallback: (prompt) => promptInput(rl, prompt) })).trim();
       const publicKeyPem = (await promptInput(rl, 'RSA public key PEM (optional): ')).trim() || undefined;
       const baseUrl = (await promptInput(rl, 'Base URL override (optional): ')).trim() || undefined;
       const note = (await promptInput(rl, 'Note (optional, max 300 characters): ')).trim() || undefined;
-      const configureKhqr = (await promptInput(rl, 'Configure ABA KHQR offline generation? (y/n): ')).trim().toLowerCase();
+      const configureKhqr = (await promptInput(rl, 'Configure ABA KHQR offline generation? (y/n): '))
+        .trim()
+        .toLowerCase();
       let khqr: KhqrMerchantConfiguration | undefined;
       if (configureKhqr === 'y' || configureKhqr === 'yes') {
         khqr = {
@@ -1070,14 +1046,20 @@ profilesCmd
           merchantCategoryCode: (await promptInput(rl, 'Merchant category code: ')).trim(),
           merchantName: (await promptInput(rl, 'Merchant name: ')).trim(),
           merchantCity: (await promptInput(rl, 'Merchant city: ')).trim(),
-          paywayData: (await readMaskedInput('ABA PayWay data: ', { fallback: (prompt) => promptInput(rl, prompt) })).trim(),
+          paywayData: (
+            await readMaskedInput('ABA PayWay data: ', { fallback: (prompt) => promptInput(rl, prompt) })
+          ).trim(),
         };
         const callbackUrl = (await promptInput(rl, 'KHQR callback URL (optional): ')).trim();
         if (callbackUrl) {
           khqr.callback = {
             url: callbackUrl,
-            enrollment: (await promptInput(rl, 'Callback enrollment (not-requested/requested/confirmed-by-merchant): ')).trim() as KhqrCallbackEnrollment,
-            verification: (await promptInput(rl, 'Callback verification (unknown/aba-confirmed-hmac/mTLS/ip-allowlist): ')).trim() as KhqrCallbackVerification,
+            enrollment: (
+              await promptInput(rl, 'Callback enrollment (not-requested/requested/confirmed-by-merchant): ')
+            ).trim() as KhqrCallbackEnrollment,
+            verification: (
+              await promptInput(rl, 'Callback verification (unknown/aba-confirmed-hmac/mTLS/ip-allowlist): ')
+            ).trim() as KhqrCallbackVerification,
           };
         }
       }
@@ -1106,7 +1088,9 @@ profilesCmd
     for (const profile of store.profiles) {
       const marker = profile.name === store.defaultProfile ? '*' : ' ';
       const merchant = profile.merchantId.length > 6 ? `${profile.merchantId.slice(0, 4)}•••` : '••••••';
-      console.log(`${marker} ${profile.name} (${profile.environment})  merchant: ${merchant}${profile.note ? `  note: ${profile.note}` : ''}`);
+      console.log(
+        `${marker} ${profile.name} (${profile.environment})  merchant: ${merchant}${profile.note ? `  note: ${profile.note}` : ''}`,
+      );
     }
   });
 
@@ -1134,7 +1118,9 @@ profilesCmd
     }
     const profile = getProfileByName(store, store.defaultProfile);
     if (!profile) throw new Error(`Profile "${store.defaultProfile}" does not exist`);
-    console.log(`Default profile: ${profile.name} (${profile.environment})${profile.note ? `\nNote: ${profile.note}` : ''}`);
+    console.log(
+      `Default profile: ${profile.name} (${profile.environment})${profile.note ? `\nNote: ${profile.note}` : ''}`,
+    );
   });
 
 profilesCmd
@@ -1149,9 +1135,7 @@ profilesCmd
   });
 
 // --- skills ---
-const skillsCmd = program
-  .command('skills')
-  .description('Manage AI skill guides for coding agents');
+const skillsCmd = program.command('skills').description('Manage AI skill guides for coding agents');
 
 skillsCmd
   .command('add')

@@ -1,11 +1,17 @@
-import { describe, it, expect } from 'vitest';
-import { validateAgentPlan, validateMaterializedPlan } from '../agent/schemas.js';
+import { describe, expect, it } from 'vitest';
 import type { AgentActionDraft } from '../agent/contracts.js';
+import { validateAgentPlan, validateMaterializedPlan } from '../agent/schemas.js';
 
 function validAction(tool: string): AgentActionDraft {
   switch (tool) {
     case 'generate_online_qr':
-      return { tool: 'generate_online_qr', amount: 3, currency: 'USD', transactionId: null, callbackUrl: 'https://example.com/cb' };
+      return {
+        tool: 'generate_online_qr',
+        amount: 3,
+        currency: 'USD',
+        transactionId: null,
+        callbackUrl: 'https://example.com/cb',
+      };
     case 'generate_offline_khqr':
       return { tool: 'generate_offline_khqr', currency: 'KHR', merchantRef: 'ref-1' };
     case 'create_checkout_payload':
@@ -13,7 +19,14 @@ function validAction(tool: string): AgentActionDraft {
     case 'create_checkout_purchase':
       return { tool: 'create_checkout_purchase', amount: 3, currency: 'USD', transactionId: null };
     case 'create_payment_link':
-      return { tool: 'create_payment_link', title: 'T', amount: 3, currency: 'USD', merchantRefNo: 'm-1', returnUrl: 'https://example.com/r' };
+      return {
+        tool: 'create_payment_link',
+        title: 'T',
+        amount: 3,
+        currency: 'USD',
+        merchantRefNo: 'm-1',
+        returnUrl: 'https://example.com/r',
+      };
     case 'check_transaction':
       return { tool: 'check_transaction', transactionId: 'tx-123' };
     case 'check_transaction_by_merchant_ref':
@@ -62,7 +75,9 @@ describe('validateAgentPlan — valid actions', () => {
     const plan = {
       version: 'agent-plan/v1',
       request: 'x',
-      actions: [{ tool: 'generate_online_qr', amount: 3, currency: 'USD', transactionId: null, callbackUrl: 'https://e.com/c' }],
+      actions: [
+        { tool: 'generate_online_qr', amount: 3, currency: 'USD', transactionId: null, callbackUrl: 'https://e.com/c' },
+      ],
     };
     expect(validateAgentPlan(plan)).toBe(true);
   });
@@ -97,7 +112,9 @@ describe('validateAgentPlan — rejects invalid input', () => {
     const plan = {
       version: 'agent-plan/v1',
       request: 'x',
-      actions: [{ tool: 'generate_online_qr', amount: 3, currency: 'EUR', transactionId: null, callbackUrl: 'https://e.com/c' }],
+      actions: [
+        { tool: 'generate_online_qr', amount: 3, currency: 'EUR', transactionId: null, callbackUrl: 'https://e.com/c' },
+      ],
     };
     expect(validateAgentPlan(plan)).toBe(false);
   });
@@ -106,7 +123,9 @@ describe('validateAgentPlan — rejects invalid input', () => {
     const plan = {
       version: 'agent-plan/v1',
       request: 'x',
-      actions: [{ tool: 'generate_online_qr', amount: 3, currency: 'USD', transactionId: null, callbackUrl: 'http://e.com/c' }],
+      actions: [
+        { tool: 'generate_online_qr', amount: 3, currency: 'USD', transactionId: null, callbackUrl: 'http://e.com/c' },
+      ],
     };
     expect(validateAgentPlan(plan)).toBe(false);
   });
@@ -136,7 +155,15 @@ describe('validateMaterializedPlan — transactionId required', () => {
     const plan = {
       version: 'agent-plan/v1',
       request: 'x',
-      actions: [{ tool: 'generate_online_qr', amount: 3, currency: 'USD', transactionId: 'tx-123', callbackUrl: 'https://e.com/c' }],
+      actions: [
+        {
+          tool: 'generate_online_qr',
+          amount: 3,
+          currency: 'USD',
+          transactionId: 'tx-123',
+          callbackUrl: 'https://e.com/c',
+        },
+      ],
     };
     expect(validateMaterializedPlan(plan)).toBe(true);
   });
@@ -145,7 +172,9 @@ describe('validateMaterializedPlan — transactionId required', () => {
     const plan = {
       version: 'agent-plan/v1',
       request: 'x',
-      actions: [{ tool: 'generate_online_qr', amount: 3, currency: 'USD', transactionId: null, callbackUrl: 'https://e.com/c' }],
+      actions: [
+        { tool: 'generate_online_qr', amount: 3, currency: 'USD', transactionId: null, callbackUrl: 'https://e.com/c' },
+      ],
     };
     expect(validateMaterializedPlan(plan)).toBe(false);
   });

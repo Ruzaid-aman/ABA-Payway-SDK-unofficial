@@ -6,7 +6,7 @@
  * and manages the subprocess lifecycle.
  */
 
-import { spawn, exec, type ChildProcess } from 'node:child_process';
+import { type ChildProcess, exec, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
@@ -126,11 +126,7 @@ export function createTunnelManager(binaryPath?: string): TunnelManager {
           running = false;
           child = null;
           if (!urlResolved) {
-            reject(
-              new Error(
-                `cloudflared exited with code ${code}. Output:\n${stderrData.slice(0, 500)}`,
-              ),
-            );
+            reject(new Error(`cloudflared exited with code ${code}. Output:\n${stderrData.slice(0, 500)}`));
           }
         });
 

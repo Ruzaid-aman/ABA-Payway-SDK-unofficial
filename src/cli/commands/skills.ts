@@ -1,5 +1,5 @@
-import { cp, mkdir, readdir, rm } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
+import { cp, mkdir, readdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -106,9 +106,7 @@ export async function listSkills(): Promise<void> {
           console.log(`    ${c.dim('├')} ${name}`);
         }
       } else {
-        console.log(
-          `  ${c.dim('○')} ${c.bold(agent)}  ${c.dim('no skills installed')}  ${c.dim(directory)}`,
-        );
+        console.log(`  ${c.dim('○')} ${c.bold(agent)}  ${c.dim('no skills installed')}  ${c.dim(directory)}`);
       }
     } catch {
       console.log(`  ${c.dim('○')} ${c.bold(agent)}  ${c.dim('directory not found')}`);

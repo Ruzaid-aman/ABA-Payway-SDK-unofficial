@@ -1,4 +1,7 @@
+import type { CreatePaymentLinkParams, PayWayConfig } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
+import { PayWayConfigError } from '../errors.js';
+import type { components } from '../types.js';
 import {
   encodeBase64IfNeeded,
   filterParams,
@@ -6,9 +9,6 @@ import {
   validatePositiveAmount,
   validatePublicHttpsUrl,
 } from '../utils.js';
-import { PayWayConfigError } from '../errors.js';
-import type { components } from '../types.js';
-import type { PayWayConfig, CreatePaymentLinkParams } from '../client.js';
 
 export interface PaymentLinkDomain {
   create: (params: CreatePaymentLinkParams) => Promise<components['schemas']['CreatePaymentLinkResponse']>;
@@ -41,7 +41,9 @@ export function createPaymentLinkDomain(
 
       // Sandbox-verified: PayWay rejects descriptions over 250 characters (PTL04).
       if (params.description !== undefined && params.description.length > 250) {
-        throw new PayWayConfigError(`description must be at most 250 characters, received: ${params.description.length}`);
+        throw new PayWayConfigError(
+          `description must be at most 250 characters, received: ${params.description.length}`,
+        );
       }
 
       // Sandbox-verified: PayWay rejects requests without return_url

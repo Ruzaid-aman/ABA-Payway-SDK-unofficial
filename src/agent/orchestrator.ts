@@ -16,33 +16,28 @@
  */
 
 import type { PayWay } from '../client.js';
+import { saveQrArtifact } from './artifacts.js';
 import type { ResolvedPayWayContext } from './context.js';
-import type { ProviderAdapter } from './provider.js';
-import { ProviderProposalError } from './provider.js';
 import type {
   AgentActionDraft,
   AgentCommandResultV1,
   AgentPlanV1,
   AgentToolName,
+  ExecutionRecordV1,
   MaterializedAgentAction,
   MaterializedAgentPlanV1,
   ProviderConfigV1,
 } from './contracts.js';
-import { validateAgentPlan, validateCommandResult } from './schemas.js';
-import { normalizePlan } from './planning.js';
-import { authorizePlan } from './risk.js';
-import { createExecutionRecord, confirmExecution } from './ledger.js';
-import type { ExecutionRecordV1 } from './contracts.js';
-import { executeAction, type ExecutionContext, type ToolExecutionResult } from './executor.js';
-import {
-  appendSessionEvent,
-  buildDeterministicSummary,
-  createSession,
-  loadSession,
-} from './sessions.js';
-import { saveQrArtifact } from './artifacts.js';
-import { scrubSensitive } from './privacy.js';
+import { type ExecutionContext, executeAction, type ToolExecutionResult } from './executor.js';
+import { confirmExecution, createExecutionRecord } from './ledger.js';
 import { renderHumanResult, serializeCommandResult } from './output.js';
+import { normalizePlan } from './planning.js';
+import { scrubSensitive } from './privacy.js';
+import type { ProviderAdapter } from './provider.js';
+import { ProviderProposalError } from './provider.js';
+import { authorizePlan } from './risk.js';
+import { validateAgentPlan, validateCommandResult } from './schemas.js';
+import { appendSessionEvent, buildDeterministicSummary, createSession, loadSession } from './sessions.js';
 
 export interface OrchestratorOptions {
   tty: boolean;
@@ -80,8 +75,6 @@ export class AgentOrchestrator {
   private readonly provider: ProviderAdapter;
   private readonly baseSessionId?: string;
   private readonly providerConfig?: ProviderConfigV1;
-
-  /** In-memory write approval. NEVER restored from a stored session. */
   private writeApproved = false;
 
   constructor(deps: OrchestratorDeps) {
@@ -94,8 +87,7 @@ export class AgentOrchestrator {
   // ─── Public entry points ──────────────────────────────────────────────────
 
   async runOneShot(request: string, options: OrchestratorOptions): Promise<AgentCommandResultV1> {
-    const sessionId =
-      this.baseSessionId ?? createSession(this.context.displayLabel).sessionId;
+    const sessionId = this.baseSessionId ?? createSession(this.context.displayLabel).sessionId;
     return this.runPipeline(sessionId, request, options);
   }
 
@@ -113,10 +105,14 @@ export class AgentOrchestrator {
 
     const session = loadSession(sessionId);
     if (!session) {
-      return this.failure('blocked', {
-        code: 'SESSION_NOT_FOUND',
-        message: `No session found for id '${sessionId}'.`,
-      }, { sessionId });
+      return this.failure(
+        'blocked',
+        {
+          code: 'SESSION_NOT_FOUND',
+          message: `No session found for id '${sessionId}'.`,
+        },
+        { sessionId },
+      );
     }
 
     const summary = buildDeterministicSummary(session, []);
@@ -138,14 +134,21 @@ export class AgentOrchestrator {
   ): Promise<AgentCommandResultV1> {
     // 1. Cancellation: record and leave the session usable; never call PayWay.
     if (this.looksLikeCancellation(request)) {
-      appendSessionEvent(sessionId, { type: 'cancellation', data: { request } });
+      const sanitized = scrubSensitive(request, []) as string;
+      appendSessionEvent(sessionId, { type: 'cancellation', data: { request: sanitized } });
       return this.result({
         status: 'needs_confirmation',
         sessionId,
         message: 'Cancellation recorded. The session remains usable and no payment was created.',
-        request,
+        request: sanitized,
       });
     }
+
+    // 1b. Scrub free-text secrets from the request before it is transmitted to
+    //     the provider or persisted into session/result output. A selected
+    //     profile never contributes credential material here; only user-supplied
+    //     free text that may contain an accidental secret is redacted.
+    request = scrubSensitive(request, []) as string;
 
     // 2. Privacy acknowledgement gate (provider config only; no PayWay/propose).
     if (this.providerConfig && !this.providerConfig.privacyAcknowledgedAt) {
@@ -169,25 +172,42 @@ export class AgentOrchestrator {
       plan = await this.provider.propose(request);
     } catch (error) {
       if (error instanceof ProviderProposalError) {
-        return this.failure('failed', {
-          code: 'PROVIDER_PROPOSAL_FAILED',
-          message: error.message,
-        }, { sessionId, request });
+        return this.failure(
+          'failed',
+          {
+            code: 'PROVIDER_PROPOSAL_FAILED',
+            message: error.message,
+          },
+          { sessionId, request },
+        );
       }
-      return this.failure('failed', {
-        code: 'PROVIDER_ERROR',
-        message: error instanceof Error ? error.message : String(error),
-      }, { sessionId, request });
+      return this.failure(
+        'failed',
+        {
+          code: 'PROVIDER_ERROR',
+          message: error instanceof Error ? error.message : String(error),
+        },
+        { sessionId, request },
+      );
     }
 
     if (!validateAgentPlan(plan)) {
-      return this.failure('failed', {
-        code: 'INVALID_PLAN',
-        message: 'Provider returned a plan that failed validation; no action taken.',
-      }, { sessionId, request });
+      return this.failure(
+        'failed',
+        {
+          code: 'INVALID_PLAN',
+          message: 'Provider returned a plan that failed validation; no action taken.',
+        },
+        { sessionId, request },
+      );
     }
 
-    appendSessionEvent(sessionId, { type: 'plan', data: { plan, scrubbedContext } });
+    const storedPlan: AgentPlanV1 = {
+      ...plan,
+      request: scrubSensitive(plan.request, []) as string,
+      ...(plan.context ? { context: scrubSensitive(plan.context, []) as Record<string, unknown> } : {}),
+    };
+    appendSessionEvent(sessionId, { type: 'plan', data: { plan: storedPlan, scrubbedContext } });
 
     // 5. Clarification (normalize). If clarification needed, STOP — no writes.
     const normalized = normalizePlan(plan, this.context);
@@ -241,9 +261,7 @@ export class AgentOrchestrator {
 
     // 8. Materialize IDs: confirm each create record (planned -> confirmed) and
     //    bind the generated transactionId into a materialized plan.
-    const materializedActions = plan.actions.map(
-      (action) => ({ ...action }) as unknown as MaterializedAgentAction,
-    );
+    const materializedActions = plan.actions.map((action) => ({ ...action }) as unknown as MaterializedAgentAction);
     for (const entry of created) {
       const confirmed = confirmExecution(entry.record.executionId);
       entry.record = confirmed;
@@ -254,9 +272,10 @@ export class AgentOrchestrator {
     }
     const materializedPlan: MaterializedAgentPlanV1 = {
       version: 'agent-plan/v1',
-      request: plan.request,
+      request: scrubSensitive(plan.request, []) as string,
       actions: materializedActions,
       ...(plan.assumptions ? { assumptions: plan.assumptions } : {}),
+      ...(plan.context ? { context: scrubSensitive(plan.context, []) as Record<string, unknown> } : {}),
     };
 
     // 9. Execute each action (executor owns the submitted -> outcome transition
@@ -332,9 +351,7 @@ export class AgentOrchestrator {
           } catch (error) {
             console.warn(
               `Audit: failed to save QR artifact for execution ${record.executionId}; ` +
-                `the payment was still created. Cause: ${
-                  error instanceof Error ? error.message : String(error)
-                }`,
+                `the payment was still created. Cause: ${error instanceof Error ? error.message : String(error)}`,
             );
           }
         }
@@ -402,5 +419,4 @@ export class AgentOrchestrator {
   }
 }
 
-export { ProviderProposalError };
-export { renderHumanResult, serializeCommandResult };
+export { ProviderProposalError, renderHumanResult, serializeCommandResult };

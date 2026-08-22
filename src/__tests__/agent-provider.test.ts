@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProviderConfigV1 } from '../agent/contracts.js';
-import {
-  createProviderAdapter,
-  ProviderProposalError,
-  type ProviderConnectivity,
-} from '../agent/provider.js';
+import { createProviderAdapter, type ProviderConnectivity, ProviderProposalError } from '../agent/provider.js';
 
 const API_KEY_ENV = 'PAYWAY_AGENT_API_KEY';
 
@@ -62,9 +58,11 @@ describe('provider adapter - propose (strict-json-plan)', () => {
   it('parses an OpenAI-shaped completion (choices[0].message.content)', async () => {
     process.env[API_KEY_ENV] = 'sk-test';
     const request = 'make me a 10 USD QR';
-    const fetchImpl = vi.fn().mockResolvedValue(
-      mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
-    );
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
+      );
     const adapter = createProviderAdapter(strictConfig(), fetchImpl);
 
     const plan = await adapter.propose(request);
@@ -81,9 +79,11 @@ describe('provider adapter - propose (strict-json-plan)', () => {
   it('parses an OpenRouter-shaped completion (same envelope, different base url)', async () => {
     process.env[API_KEY_ENV] = 'sk-test';
     const request = 'make me a 10 USD QR';
-    const fetchImpl = vi.fn().mockResolvedValue(
-      mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
-    );
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
+      );
     const adapter = createProviderAdapter(
       strictConfig({ provider: 'openrouter', model: 'openai/gpt-4o-mini' }),
       fetchImpl,
@@ -92,38 +92,33 @@ describe('provider adapter - propose (strict-json-plan)', () => {
     const plan = await adapter.propose(request);
 
     expect(plan.actions[0].tool).toBe('generate_online_qr');
-    expect(fetchImpl).toHaveBeenCalledWith(
-      'https://openrouter.ai/api/v1/chat/completions',
-      expect.any(Object),
-    );
+    expect(fetchImpl).toHaveBeenCalledWith('https://openrouter.ai/api/v1/chat/completions', expect.any(Object));
   });
 
   it('parses an NVIDIA-shaped completion', async () => {
     process.env[API_KEY_ENV] = 'sk-test';
     const request = 'make me a 10 USD QR';
-    const fetchImpl = vi.fn().mockResolvedValue(
-      mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
-    );
-    const adapter = createProviderAdapter(
-      strictConfig({ provider: 'nvidia', model: 'meta/llama-3.1-8b' }),
-      fetchImpl,
-    );
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
+      );
+    const adapter = createProviderAdapter(strictConfig({ provider: 'nvidia', model: 'meta/llama-3.1-8b' }), fetchImpl);
 
     const plan = await adapter.propose(request);
 
     expect(plan.actions[0].tool).toBe('generate_online_qr');
-    expect(fetchImpl).toHaveBeenCalledWith(
-      'https://integrate.api.nvidia.com/v1/chat/completions',
-      expect.any(Object),
-    );
+    expect(fetchImpl).toHaveBeenCalledWith('https://integrate.api.nvidia.com/v1/chat/completions', expect.any(Object));
   });
 
   it('parses a custom baseUrl-shaped completion', async () => {
     process.env[API_KEY_ENV] = 'sk-test';
     const request = 'make me a 10 USD QR';
-    const fetchImpl = vi.fn().mockResolvedValue(
-      mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
-    );
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
+      );
     const adapter = createProviderAdapter(
       strictConfig({ provider: 'custom', baseUrl: 'https://llm.example.test/v1', model: 'local' }),
       fetchImpl,
@@ -132,19 +127,13 @@ describe('provider adapter - propose (strict-json-plan)', () => {
     const plan = await adapter.propose(request);
 
     expect(plan.actions[0].tool).toBe('generate_online_qr');
-    expect(fetchImpl).toHaveBeenCalledWith(
-      'https://llm.example.test/v1/chat/completions',
-      expect.any(Object),
-    );
+    expect(fetchImpl).toHaveBeenCalledWith('https://llm.example.test/v1/chat/completions', expect.any(Object));
   });
 
   it('throws when custom provider has no baseUrl', async () => {
     process.env[API_KEY_ENV] = 'sk-test';
     const fetchImpl = vi.fn();
-    const adapter = createProviderAdapter(
-      strictConfig({ provider: 'custom', model: 'local' }),
-      fetchImpl,
-    );
+    const adapter = createProviderAdapter(strictConfig({ provider: 'custom', model: 'local' }), fetchImpl);
 
     await expect(adapter.propose('x')).rejects.toBeInstanceOf(ProviderProposalError);
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -164,10 +153,10 @@ describe('provider adapter - propose (strict-json-plan)', () => {
 
   it('rejects markdown-fenced output', async () => {
     process.env[API_KEY_ENV] = 'sk-test';
-    const fenced = '```json\n' + validPlanJson('x') + '\n```';
-    const fetchImpl = vi.fn().mockResolvedValue(
-      mockResponse({ choices: [{ message: { role: 'assistant', content: fenced } }] }),
-    );
+    const fenced = `\`\`\`json\n${validPlanJson('x')}\n\`\`\``;
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(mockResponse({ choices: [{ message: { role: 'assistant', content: fenced } }] }));
     const adapter = createProviderAdapter(strictConfig(), fetchImpl);
 
     await expect(adapter.propose('x')).rejects.toBeInstanceOf(ProviderProposalError);
@@ -177,7 +166,7 @@ describe('provider adapter - propose (strict-json-plan)', () => {
     process.env[API_KEY_ENV] = 'sk-test';
     const fetchImpl = vi.fn().mockResolvedValue(
       mockResponse({
-        choices: [{ message: { role: 'assistant', content: 'here: ' + validPlanJson('x') } }],
+        choices: [{ message: { role: 'assistant', content: `here: ${validPlanJson('x')}` } }],
       }),
     );
     const adapter = createProviderAdapter(strictConfig(), fetchImpl);
@@ -189,7 +178,7 @@ describe('provider adapter - propose (strict-json-plan)', () => {
     process.env[API_KEY_ENV] = 'sk-test';
     const fetchImpl = vi.fn().mockResolvedValue(
       mockResponse({
-        choices: [{ message: { role: 'assistant', content: validPlanJson('x') + ' thanks!' } }],
+        choices: [{ message: { role: 'assistant', content: `${validPlanJson('x')} thanks!` } }],
       }),
     );
     const adapter = createProviderAdapter(strictConfig(), fetchImpl);
@@ -204,9 +193,9 @@ describe('provider adapter - propose (strict-json-plan)', () => {
       request: 'x',
       actions: [{ tool: 'not_a_real_tool', amount: 1 }],
     });
-    const fetchImpl = vi.fn().mockResolvedValue(
-      mockResponse({ choices: [{ message: { role: 'assistant', content: bad } }] }),
-    );
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(mockResponse({ choices: [{ message: { role: 'assistant', content: bad } }] }));
     const adapter = createProviderAdapter(strictConfig(), fetchImpl);
 
     await expect(adapter.propose('x')).rejects.toBeInstanceOf(ProviderProposalError);
@@ -255,10 +244,7 @@ describe('provider adapter - propose (native-tools)', () => {
         ],
       }),
     );
-    const adapter = createProviderAdapter(
-      strictConfig({ capabilityMode: 'native-tools' }),
-      fetchImpl,
-    );
+    const adapter = createProviderAdapter(strictConfig({ capabilityMode: 'native-tools' }), fetchImpl);
 
     const plan = await adapter.propose('make a 10 USD QR');
 
@@ -290,10 +276,7 @@ describe('provider adapter - propose (native-tools)', () => {
         ],
       }),
     );
-    const adapter = createProviderAdapter(
-      strictConfig({ capabilityMode: 'native-tools' }),
-      fetchImpl,
-    );
+    const adapter = createProviderAdapter(strictConfig({ capabilityMode: 'native-tools' }), fetchImpl);
 
     await expect(adapter.propose('x')).rejects.toBeInstanceOf(ProviderProposalError);
   });

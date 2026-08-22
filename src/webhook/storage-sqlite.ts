@@ -6,10 +6,10 @@
  * without this optional peer dependency.
  */
 
-import { mkdirSync, existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import type { KhqrWebhookMetadata, WebhookStorage, WebhookRecord } from './storage.js';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import type { KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './storage.js';
 
 const DEFAULT_PATH = './webhook_data/callbacks.db';
 
@@ -35,7 +35,9 @@ async function loadBetterSqlite3(): Promise<new (path: string) => BetterSqlite3D
     // biome-ignore lint/suspicious/noExplicitAny: dynamic import of optional peer dependency
     return (mod.default ?? mod) as any;
   } catch {
-    return null as unknown as new (path: string) => BetterSqlite3Database;
+    return null as unknown as new (
+      path: string,
+    ) => BetterSqlite3Database;
   }
 }
 
@@ -66,7 +68,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
     if (!Sqlite3) {
       throw new Error(
         'better-sqlite3 is not installed. Install it with: npm install better-sqlite3\n' +
-        'Or use --storage json for file-based storage.',
+          'Or use --storage json for file-based storage.',
       );
     }
 
@@ -126,7 +128,9 @@ export class SqliteWebhookStorage implements WebhookStorage {
 
   getAll(): WebhookRecord[] {
     const rows = this.db
-      .prepare('SELECT record_id, received_at, headers_json, body, source_ip, khqr_json FROM callbacks ORDER BY rowid ASC')
+      .prepare(
+        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json FROM callbacks ORDER BY rowid ASC',
+      )
       .all() as Array<{
       record_id: string;
       received_at: string;

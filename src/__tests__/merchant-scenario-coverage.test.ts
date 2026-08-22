@@ -101,18 +101,21 @@ describe('merchant scenario coverage', () => {
 
   it('TC-026 successfully generates QR code for abapay_khqr payment option', async () => {
     const mockResponse = {
-      qrString: '00020101021226aba01kh0002ABA BANK KHQR0103000000000000102abaakhppxxx@abaa01151250212145328460208ABA Bank52048249530384054040.015802KH5925OLD ME 25 CHAR WINNER IP6009www.aba.com.kh62070703www.tlr.gov.kh63040D37',
-      qrImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAOC0lEQVR4nO2deahV1RfHl6ZlaaZ',
-      abapay_deeplink: 'abamobilebank://ababank.com?type=payway&qrcode=00020101021226aba01kh0002ABA BANK KHQR0103000000000000102abaakhppxxx@abaa01151250212145328460208ABA+Bank52048249530384054040.015802KH5925OLD ME 25 CHAR WINNER IP6009www.aba.com.kh62070703www.tlr.gov.kh63040D37',
+      qrString:
+        '00020101021226aba01kh0002ABA BANK KHQR0103000000000000102abaakhppxxx@abaa01151250212145328460208ABA Bank52048249530384054040.015802KH5925OLD ME 25 CHAR WINNER IP6009www.aba.com.kh62070703www.tlr.gov.kh63040D37',
+      qrImage:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAOC0lEQVR4nO2deahV1RfHl6ZlaaZ',
+      abapay_deeplink:
+        'abamobilebank://ababank.com?type=payway&qrcode=00020101021226aba01kh0002ABA BANK KHQR0103000000000000102abaakhppxxx@abaa01151250212145328460208ABA+Bank52048249530384054040.015802KH5925OLD ME 25 CHAR WINNER IP6009www.aba.com.kh62070703www.tlr.gov.kh63040D37',
       app_store: 'https://itunes.apple.com/al/app/aba-mobile-bank/id968860649?mt=8',
       play_store: 'https://play.google.com/store/apps/details?id=com.paygo24.ibank',
       amount: 0.01,
       currency: 'USD',
       status: { code: '0', message: 'Success.', trace_id: 'b9f93f45b49f08e26dfcfb8c2da396c6' },
     };
-    
+
     fetchSpy.mockResolvedValueOnce(mockJsonResponse(mockResponse));
-    
+
     const result = await payway.qr.generateQr({
       transactionId: 'TC026-QR-GEN',
       amount: 100,

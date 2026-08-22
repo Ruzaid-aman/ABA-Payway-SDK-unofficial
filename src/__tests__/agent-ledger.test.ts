@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { AgentToolName, ExecutionRecordV1 } from '../agent/contracts.js';
 import {
   confirmExecution,
   createExecutionRecord,
@@ -14,7 +15,6 @@ import {
   markSucceeded,
 } from '../agent/ledger.js';
 import { getAgentDataPaths } from '../agent/storage.js';
-import type { AgentToolName, ExecutionRecordV1 } from '../agent/contracts.js';
 
 const temporaryDirectories: string[] = [];
 const originalAppData = process.env.APPDATA;
@@ -56,10 +56,7 @@ describe('createExecutionRecord', () => {
     expect(record.correlation).toBe('c-1');
 
     const onDisk = JSON.parse(
-      readFileSync(
-        path.join(getAgentDataPaths().ledgerDir, `${record.executionId}.json`),
-        'utf8',
-      ),
+      readFileSync(path.join(getAgentDataPaths().ledgerDir, `${record.executionId}.json`), 'utf8'),
     ) as ExecutionRecordV1;
     expect(onDisk.executionId).toBe(record.executionId);
     expect(onDisk.status).toBe('planned');

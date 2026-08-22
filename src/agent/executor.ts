@@ -16,18 +16,9 @@
 
 import type { PayWay } from '../client.js';
 import type { ResolvedPayWayContext } from './context.js';
-import type {
-  MaterializedAgentAction,
-  AgentToolName,
-  ExecutionRecordV1,
-} from './contracts.js';
 import { createAgentPayWay } from './context.js';
-import {
-  markSubmitted,
-  markSucceeded,
-  markFailed,
-  markOutcomeUnknown,
-} from './ledger.js';
+import type { AgentToolName, ExecutionRecordV1, MaterializedAgentAction } from './contracts.js';
+import { markFailed, markOutcomeUnknown, markSubmitted, markSucceeded } from './ledger.js';
 import { toolRegistry } from './tools.js';
 
 export interface ExecutionContext {
@@ -56,11 +47,7 @@ function isCreateAction(tool: AgentToolName): boolean {
   return CREATE_ACTIONS.has(tool);
 }
 
-function resolveClient(
-  context: ResolvedPayWayContext,
-  payway: PayWay | undefined,
-  create: boolean,
-): PayWay {
+function resolveClient(context: ResolvedPayWayContext, payway: PayWay | undefined, create: boolean): PayWay {
   if (payway) return payway;
   return createAgentPayWay(context, create ? 'create' : 'read');
 }

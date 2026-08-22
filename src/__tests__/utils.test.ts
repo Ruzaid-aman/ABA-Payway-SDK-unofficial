@@ -1,16 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  formatRequestTime,
-  formatAmount,
-  toBase64,
   encodeBase64IfNeeded,
   filterParams,
+  formatAmount,
+  formatRequestTime,
   sanitizeForLog,
+  toBase64,
+  validateBeneficiaries,
   validateCurrency,
   validatePositiveAmount,
   validateRefundAmount,
   validateTransactionId,
-  validateBeneficiaries,
 } from '../utils.js';
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ describe('validateRefundAmount', () => {
     it('accepts typical refund amounts', () => {
       expect(() => validateRefundAmount(5.0, 'USD')).not.toThrow();
       expect(() => validateRefundAmount(100.99, 'USD')).not.toThrow();
-      expect(() => validateRefundAmount(0.50, 'USD')).not.toThrow();
+      expect(() => validateRefundAmount(0.5, 'USD')).not.toThrow();
     });
 
     it('throws for amounts below $0.01 (PTL04 sandbox discovery)', () => {

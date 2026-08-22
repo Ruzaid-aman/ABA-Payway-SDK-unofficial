@@ -9,27 +9,17 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
-import {
-  type AgentSessionEvent,
-  type AgentSessionEventType,
-  type AgentSessionV1,
-} from './contracts.js';
+import type { AgentSessionEvent, AgentSessionEventType, AgentSessionV1 } from './contracts.js';
+import { scrubSensitive } from './privacy.js';
 import { validateSession } from './schemas.js';
 import { atomicWriteJson, getAgentDataPaths } from './storage.js';
-import { scrubSensitive } from './privacy.js';
 
 const SESSION_VERSION = 'agent-session/v1' as const;
 const SUMMARY_MAX_BYTES = 32 * 1024;
 const SUMMARY_EVENT_LIMIT = 12;
-const SUMMARY_EVENT_TYPES: AgentSessionEventType[] = [
-  'prompt',
-  'summary',
-  'tool_result',
-  'tool_call',
-  'plan',
-];
+const SUMMARY_EVENT_TYPES: AgentSessionEventType[] = ['prompt', 'summary', 'tool_result', 'tool_call', 'plan'];
 
 function sessionFile(id: string): string {
   return path.join(getAgentDataPaths().sessionsDir, `${id}.json`);
@@ -175,10 +165,7 @@ export function clearSessions(idOrAll: string): void {
  * `JSON.stringify` of already-normalized structures). Secrets are redacted via
  * `scrubSensitive`.
  */
-export function buildDeterministicSummary(
-  session: AgentSessionV1,
-  secrets: string[] = [],
-): string {
+export function buildDeterministicSummary(session: AgentSessionV1, secrets: string[] = []): string {
   const relevant = session.events
     .filter((event) => SUMMARY_EVENT_TYPES.includes(event.type))
     .slice(-SUMMARY_EVENT_LIMIT);

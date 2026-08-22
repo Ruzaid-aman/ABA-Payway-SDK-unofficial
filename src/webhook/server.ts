@@ -6,10 +6,10 @@
  * Signature verification is logged but never causes rejection (WH-TC-05).
  */
 
-import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
-import type { WebhookStorage } from './storage.js';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { verifyCallbackSignature } from '../auth.js';
 import { parseKhqrPaymentNotification } from './khqr-notification.js';
+import type { WebhookStorage } from './storage.js';
 
 export interface WebhookServerOptions {
   /** Port to listen on (default: 8443). */
@@ -39,10 +39,7 @@ export interface WebhookServerResult {
 const WEBHOOK_PATH = '/aba-payway-webhook';
 const KHQR_WEBHOOK_PATH = '/aba-payway-khqr-webhook';
 
-export function createWebhookServer(
-  storage: WebhookStorage,
-  options: WebhookServerOptions = {},
-): WebhookServerResult {
+export function createWebhookServer(storage: WebhookStorage, options: WebhookServerOptions = {}): WebhookServerResult {
   const port = options.port ?? 8443;
   const apiKey = options.apiKey;
   const quiet = options.quiet ?? false;
@@ -97,9 +94,9 @@ export function createWebhookServer(
           let khqr: import('./storage.js').KhqrWebhookMetadata;
           try {
             const parsed = parseKhqrPaymentNotification(JSON.parse(body));
-            const duplicateTransactionId = storage.getAll().some(
-              (record) => record.khqr?.parsed?.notification.transactionId === parsed.notification.transactionId,
-            );
+            const duplicateTransactionId = storage
+              .getAll()
+              .some((record) => record.khqr?.parsed?.notification.transactionId === parsed.notification.transactionId);
             khqr = { parsed, duplicateTransactionId };
           } catch (error) {
             khqr = { parseError: error instanceof Error ? error.message : String(error) };

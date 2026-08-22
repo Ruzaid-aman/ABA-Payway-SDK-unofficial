@@ -11,17 +11,17 @@
  *  - The mock PayWay server routes response types by tran_id.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Server as HttpServer } from 'node:http';
-import { server, normalizePaywayResponse } from '../server/index.js';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { PayWayConfig } from '../client.js';
+import { normalizePaywayResponse, server } from '../server/index.js';
 import {
+  generateMockSession,
+  getMockPaywayUrl,
   startMockPaywayServer,
   stopMockPaywayServer,
-  getMockPaywayUrl,
   validateSessionContract,
-  generateMockSession,
 } from '../test/index.js';
-import type { PayWayConfig } from '../client.js';
 
 describe('normalizePaywayResponse', () => {
   it('classifies HTML string as `html`', () => {
@@ -34,10 +34,7 @@ describe('normalizePaywayResponse', () => {
   });
 
   it('classifies { abapay_deeplink } as `deeplink`', () => {
-    const s = normalizePaywayResponse(
-      { abapay_deeplink: 'ababank://pay?x=1', qr_string: '00' },
-      'tx_2',
-    );
+    const s = normalizePaywayResponse({ abapay_deeplink: 'ababank://pay?x=1', qr_string: '00' }, 'tx_2');
     expect(s.responseType).toBe('deeplink');
     expect(s.responsePayload).toBe('ababank://pay?x=1');
   });
@@ -49,10 +46,7 @@ describe('normalizePaywayResponse', () => {
   });
 
   it('classifies { checkout_qr_url } as `checkout_qr_url`', () => {
-    const s = normalizePaywayResponse(
-      { checkout_qr_url: 'https://checkout-sandbox.payway.com.kh/eyJ...' },
-      'tx_4',
-    );
+    const s = normalizePaywayResponse({ checkout_qr_url: 'https://checkout-sandbox.payway.com.kh/eyJ...' }, 'tx_4');
     expect(s.responseType).toBe('checkout_qr_url');
     expect(s.responsePayload).toBe('https://checkout-sandbox.payway.com.kh/eyJ...');
   });

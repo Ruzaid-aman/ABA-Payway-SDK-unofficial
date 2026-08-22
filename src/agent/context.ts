@@ -1,5 +1,5 @@
-import { loadProfileStore, KHQR_ENVIRONMENT_FIELDS } from '../config/profiles.js';
 import { PayWay } from '../client.js';
+import { KHQR_ENVIRONMENT_FIELDS, loadProfileStore } from '../config/profiles.js';
 
 /**
  * Resolved, explicit PayWay context for agentic operations.
@@ -72,9 +72,7 @@ function readKhqrFromEnv(env: NodeJS.ProcessEnv): import('../khqr-config.js').Kh
  * PAYWAY_MERCHANT_ID / PAYWAY_API_KEY values MUST NOT override a selected
  * profile. This function never mutates `process.env`.
  */
-export function resolvePayWayContext(
-  options: ResolvePayWayContextOptions = {},
-): ResolvedPayWayContext {
+export function resolvePayWayContext(options: ResolvePayWayContextOptions = {}): ResolvedPayWayContext {
   const env = options.env ?? process.env;
   const store = loadProfileStore();
 
@@ -163,10 +161,7 @@ export function resolvePayWayContext(
  * The client is constructed entirely from the resolved values; it does not
  * rely on ambient environment variables.
  */
-export function createAgentPayWay(
-  context: ResolvedPayWayContext,
-  operationKind: 'create' | 'read',
-): PayWay {
+export function createAgentPayWay(context: ResolvedPayWayContext, operationKind: 'create' | 'read'): PayWay {
   const maxRetries = operationKind === 'create' ? 0 : undefined;
   return new PayWay({
     maxRetries,

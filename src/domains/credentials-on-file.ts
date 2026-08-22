@@ -1,16 +1,16 @@
+import type { CofPaymentParams, LinkAccountParams, LinkCardParams, PayWayConfig, TokenParams } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
-import {
-  formatAmount,
-  encodeBase64IfNeeded,
-  filterParams,
-  validateCurrency,
-  validatePositiveAmount,
-  validateTransactionId,
-  validatePublicHttpsUrl,
-} from '../utils.js';
 import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
-import type { PayWayConfig, LinkAccountParams, LinkCardParams, CofPaymentParams, TokenParams } from '../client.js';
+import {
+  encodeBase64IfNeeded,
+  filterParams,
+  formatAmount,
+  validateCurrency,
+  validatePositiveAmount,
+  validatePublicHttpsUrl,
+  validateTransactionId,
+} from '../utils.js';
 
 export interface CredentialsOnFileDomain {
   linkAccount: (params: LinkAccountParams) => Promise<components['schemas']['LinkAccountResponse']>;

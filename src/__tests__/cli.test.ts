@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -91,12 +91,7 @@ describe('built CLI', () => {
 
     const result = spawnSync(
       process.execPath,
-      [
-        path.join(process.cwd(), 'dist', 'cli.js'),
-        'get-transactions-by-ref',
-        '--merchant-ref',
-        'INV-12345678',
-      ],
+      [path.join(process.cwd(), 'dist', 'cli.js'), 'get-transactions-by-ref', '--merchant-ref', 'INV-12345678'],
       {
         cwd,
         encoding: 'utf8',
@@ -122,10 +117,7 @@ describe('built CLI', () => {
     temporaryDirectories.push(cwd);
 
     // Create a .env with only API key, missing merchant ID
-    writeFileSync(
-      path.join(cwd, '.env'),
-      'PAYWAY_API_KEY=test-api-key-123456789012\n',
-    );
+    writeFileSync(path.join(cwd, '.env'), 'PAYWAY_API_KEY=test-api-key-123456789012\n');
 
     const result = spawnSync(
       process.execPath,
@@ -163,10 +155,7 @@ describe('built CLI', () => {
     temporaryDirectories.push(cwd);
 
     // Create a .env with only merchant ID, missing API key
-    writeFileSync(
-      path.join(cwd, '.env'),
-      'PAYWAY_MERCHANT_ID=test-merchant-001\n',
-    );
+    writeFileSync(path.join(cwd, '.env'), 'PAYWAY_MERCHANT_ID=test-merchant-001\n');
 
     const result = spawnSync(
       process.execPath,
@@ -241,13 +230,20 @@ describe('built CLI', () => {
       path.join(appData, 'aba-payway-sdk', 'profiles.json'),
       JSON.stringify({
         activeProfile: 'offline',
-        profiles: [{
-          name: 'offline',
-          khqr: {
-            bakongId: 'merchant@bakong', abaMerchantId: '123456789012345', acquirerName: 'ABA Bank',
-            merchantCategoryCode: '5999', merchantName: 'Example Merchant', merchantCity: 'Phnom Penh', paywayData: 'aba-template',
+        profiles: [
+          {
+            name: 'offline',
+            khqr: {
+              bakongId: 'merchant@bakong',
+              abaMerchantId: '123456789012345',
+              acquirerName: 'ABA Bank',
+              merchantCategoryCode: '5999',
+              merchantName: 'Example Merchant',
+              merchantCity: 'Phnom Penh',
+              paywayData: 'aba-template',
+            },
           },
-        }],
+        ],
       }),
     );
 
@@ -290,13 +286,22 @@ describe('built CLI', () => {
       path.join(appData, 'aba-payway-sdk', 'profiles.json'),
       JSON.stringify({
         activeProfile: 'private',
-        profiles: [{
-          name: 'private', merchantId: 'merchant-secret', apiKey: 'api-key-secret',
-          khqr: {
-            bakongId: 'bakong-secret', abaMerchantId: '123456789012345', acquirerName: 'ABA Bank',
-            merchantCategoryCode: '5999', merchantName: 'Example Merchant', merchantCity: 'Phnom Penh', paywayData: 'payway-data-secret',
+        profiles: [
+          {
+            name: 'private',
+            merchantId: 'merchant-secret',
+            apiKey: 'api-key-secret',
+            khqr: {
+              bakongId: 'bakong-secret',
+              abaMerchantId: '123456789012345',
+              acquirerName: 'ABA Bank',
+              merchantCategoryCode: '5999',
+              merchantName: 'Example Merchant',
+              merchantCity: 'Phnom Penh',
+              paywayData: 'payway-data-secret',
+            },
           },
-        }],
+        ],
       }),
     );
 
@@ -527,9 +532,7 @@ describe('built CLI', () => {
       expect(output).not.toContain('Modify lifetime?');
       expect(output).not.toContain('Cancelled by user');
     } finally {
-      await new Promise<void>((resolve, reject) =>
-        mockServer.close((error) => (error ? reject(error) : resolve())),
-      );
+      await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
     }
   });
 
@@ -658,18 +661,14 @@ describe('built CLI', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);
 
-    const result = spawnSync(
-      process.execPath,
-      [path.join(process.cwd(), 'dist', 'cli.js'), 'config'],
-      {
-        cwd,
-        encoding: 'utf8',
-        env: {
-          PATH: process.env.PATH ?? '',
-          SystemRoot: process.env.SystemRoot ?? '',
-        },
+    const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'config'], {
+      cwd,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
       },
-    );
+    });
 
     const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
     expect(output).toContain('configuration');
@@ -695,18 +694,14 @@ describe('built CLI', () => {
       ].join('\n'),
     );
 
-    const result = spawnSync(
-      process.execPath,
-      [path.join(process.cwd(), 'dist', 'cli.js'), 'config'],
-      {
-        cwd,
-        encoding: 'utf8',
-        env: {
-          PATH: process.env.PATH ?? '',
-          SystemRoot: process.env.SystemRoot ?? '',
-        },
+    const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'config'], {
+      cwd,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
       },
-    );
+    });
 
     const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
     expect(output).toContain('.env file found');
@@ -724,23 +719,16 @@ describe('built CLI', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);
 
-    writeFileSync(
-      path.join(cwd, '.env'),
-      'PAYWAY_ENV=sandbox\n',
-    );
+    writeFileSync(path.join(cwd, '.env'), 'PAYWAY_ENV=sandbox\n');
 
-    const result = spawnSync(
-      process.execPath,
-      [path.join(process.cwd(), 'dist', 'cli.js'), 'config'],
-      {
-        cwd,
-        encoding: 'utf8',
-        env: {
-          PATH: process.env.PATH ?? '',
-          SystemRoot: process.env.SystemRoot ?? '',
-        },
+    const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'config'], {
+      cwd,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
       },
-    );
+    });
 
     const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
     expect(output).toContain('error(s)');
@@ -763,18 +751,14 @@ describe('built CLI', () => {
       ].join('\n'),
     );
 
-    const result = spawnSync(
-      process.execPath,
-      [path.join(process.cwd(), 'dist', 'cli.js'), 'config'],
-      {
-        cwd,
-        encoding: 'utf8',
-        env: {
-          PATH: process.env.PATH ?? '',
-          SystemRoot: process.env.SystemRoot ?? '',
-        },
+    const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'config'], {
+      cwd,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
       },
-    );
+    });
 
     const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
     // Short keys get fully masked
@@ -794,11 +778,16 @@ describe('built CLI', () => {
       process.execPath,
       [
         path.join(process.cwd(), 'dist', 'cli.js'),
-        'payment-link', 'create',
-        '--title', 'Test',
-        '--amount', 'abc',
-        '--merchant-ref-no', 'ref-001',
-        '--return-url', 'https://example.com/ret',
+        'payment-link',
+        'create',
+        '--title',
+        'Test',
+        '--amount',
+        'abc',
+        '--merchant-ref-no',
+        'ref-001',
+        '--return-url',
+        'https://example.com/ret',
       ],
       {
         cwd,
@@ -819,21 +808,14 @@ describe('built CLI', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);
 
-    const result = spawnSync(
-      process.execPath,
-      [
-        path.join(process.cwd(), 'dist', 'cli.js'),
-        'payment-link', 'detail',
-      ],
-      {
-        cwd,
-        encoding: 'utf8',
-        env: {
-          PATH: process.env.PATH ?? '',
-          SystemRoot: process.env.SystemRoot ?? '',
-        },
+    const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'payment-link', 'detail'], {
+      cwd,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
       },
-    );
+    });
 
     const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
     expect(result.status).toBe(1);
@@ -849,11 +831,16 @@ describe('built CLI', () => {
       process.execPath,
       [
         path.join(process.cwd(), 'dist', 'cli.js'),
-        'payment-link', 'create',
-        '--title', 'Test',
-        '--amount', '1',
-        '--merchant-ref-no', 'ref-001',
-        '--return-url', 'https://example.com/ret',
+        'payment-link',
+        'create',
+        '--title',
+        'Test',
+        '--amount',
+        '1',
+        '--merchant-ref-no',
+        'ref-001',
+        '--return-url',
+        'https://example.com/ret',
       ],
       {
         cwd,
@@ -872,5 +859,4 @@ describe('built CLI', () => {
     expect(result.status).toBe(1);
     expect(output).toContain('PAYWAY_RSA_PUBLIC_KEY is missing');
   });
-
 });

@@ -9,8 +9,8 @@
  */
 
 import type { AgentPlanV1, ProviderConfigV1, ProviderPreset } from './contracts.js';
-import { validateAgentPlan } from './schemas.js';
 import { buildStrictJsonSystemPrompt, buildToolSchemas } from './provider-prompts.js';
+import { validateAgentPlan } from './schemas.js';
 
 /** Connectivity classification for a provider endpoint. */
 export interface ProviderConnectivity {
@@ -126,10 +126,7 @@ function buildHeaders(config: ProviderConfigV1, apiKey: string): Record<string, 
   return headers;
 }
 
-function assemblePlanFromToolCalls(
-  request: string,
-  toolCalls: NonNullable<ChatMessage['tool_calls']>,
-): AgentPlanV1 {
+function assemblePlanFromToolCalls(request: string, toolCalls: NonNullable<ChatMessage['tool_calls']>): AgentPlanV1 {
   const actions = toolCalls.map((call) => {
     let args: Record<string, unknown>;
     try {
@@ -143,10 +140,7 @@ function assemblePlanFromToolCalls(
   return { version: 'agent-plan/v1', request, actions };
 }
 
-export function createProviderAdapter(
-  config: ProviderConfigV1,
-  fetchImpl: typeof fetch = fetch,
-): ProviderAdapter {
+export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeof fetch = fetch): ProviderAdapter {
   const timeoutMs = config.timeoutMs ?? 30000;
 
   async function postChatCompletions(body: unknown, apiKey: string): Promise<ChatCompletionResponse> {

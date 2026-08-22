@@ -19,11 +19,7 @@
  * the shared contract (`../schema.js`).
  */
 
-import type {
-  TransactionSession,
-  HandleResponseOptions,
-  HandleResponseResult,
-} from '../schema.js';
+import type { HandleResponseOptions, HandleResponseResult, TransactionSession } from '../schema.js';
 
 /**
  * Resolves a target option into an HTMLElement, if available.
@@ -50,10 +46,7 @@ function isBrowser(): boolean {
  * Renders a QR code from a raw payload string into a target element.
  * Uses the `qrcode` library (browser-safe) to draw onto a canvas.
  */
-async function renderQrString(
-  payload: string,
-  target: HTMLElement | null,
-): Promise<string> {
+async function renderQrString(payload: string, target: HTMLElement | null): Promise<string> {
   // Dynamically import qrcode so this module remains tree-shakeable for
   // merchants who only use deeplink/url/html flows.
   const QRCode = (await import('qrcode')).default;
@@ -176,8 +169,7 @@ function embedHtml(payload: string, target: HTMLElement | null): string {
 
   if (!target) {
     throw new Error(
-      'PayWay SDK: an HTML response requires an explicit `target` element. ' +
-        'Refusing to overwrite document.body.',
+      'PayWay SDK: an HTML response requires an explicit `target` element. ' + 'Refusing to overwrite document.body.',
     );
   }
 

@@ -208,12 +208,7 @@ export interface ProviderConfigV1 {
 // Command result (non-TTY structured output)
 // ---------------------------------------------------------------------------
 
-export type AgentCommandStatus =
-  | 'succeeded'
-  | 'needs_confirmation'
-  | 'needs_clarification'
-  | 'blocked'
-  | 'failed';
+export type AgentCommandStatus = 'succeeded' | 'needs_confirmation' | 'needs_clarification' | 'blocked' | 'failed';
 
 export interface AgentCommandResultV1 {
   version: AgentCommandResultVersion;
@@ -262,13 +257,7 @@ export interface AgentSessionV1 {
 // Execution ledger
 // ---------------------------------------------------------------------------
 
-export type ExecutionStatus =
-  | 'planned'
-  | 'confirmed'
-  | 'submitted'
-  | 'succeeded'
-  | 'failed'
-  | 'outcome_unknown';
+export type ExecutionStatus = 'planned' | 'confirmed' | 'submitted' | 'succeeded' | 'failed' | 'outcome_unknown';
 
 export interface ExecutionRecordV1 {
   version: ExecutionRecordVersion;

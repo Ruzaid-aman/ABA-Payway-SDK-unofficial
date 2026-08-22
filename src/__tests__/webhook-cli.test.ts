@@ -4,10 +4,10 @@
  * Verifies the command registration and help output via the built CLI binary.
  */
 
-import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 const CLI_PATH = path.resolve(__dirname, '../../dist/cli.js');
 

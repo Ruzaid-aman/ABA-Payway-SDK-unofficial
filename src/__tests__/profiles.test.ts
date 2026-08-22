@@ -6,8 +6,8 @@ import {
   addProfile,
   createEmptyProfileStore,
   getProfileByName,
-  saveProfileStore,
   loadProfileStore,
+  saveProfileStore,
   setDefaultProfile,
 } from '../config/profiles.js';
 
@@ -27,10 +27,17 @@ describe('credential profiles', () => {
     const store = createEmptyProfileStore();
 
     addProfile(store, {
-      name: 'sandbox-main', environment: 'sandbox', merchantId: 'sandbox-merchant', apiKey: 'sandbox-key', note: 'Test merchant',
+      name: 'sandbox-main',
+      environment: 'sandbox',
+      merchantId: 'sandbox-merchant',
+      apiKey: 'sandbox-key',
+      note: 'Test merchant',
     });
     addProfile(store, {
-      name: 'production-main', environment: 'production', merchantId: 'production-merchant', apiKey: 'production-key',
+      name: 'production-main',
+      environment: 'production',
+      merchantId: 'production-merchant',
+      apiKey: 'production-key',
     });
     setDefaultProfile(store, 'sandbox-main');
     saveProfileStore(store, profilePath);
@@ -45,12 +52,25 @@ describe('credential profiles', () => {
   it('rejects a ninth profile and notes longer than 300 characters', () => {
     const store = createEmptyProfileStore();
     for (let index = 1; index <= 8; index++) {
-      addProfile(store, { name: `profile-${index}`, environment: 'sandbox', merchantId: `merchant-${index}`, apiKey: `key-${index}` });
+      addProfile(store, {
+        name: `profile-${index}`,
+        environment: 'sandbox',
+        merchantId: `merchant-${index}`,
+        apiKey: `key-${index}`,
+      });
     }
 
-    expect(() => addProfile(store, { name: 'profile-9', environment: 'production', merchantId: 'merchant-9', apiKey: 'key-9' }))
-      .toThrow('maximum of 8 profiles');
-    expect(() => addProfile(createEmptyProfileStore(), { name: 'long-note', environment: 'sandbox', merchantId: 'merchant', apiKey: 'key', note: 'a'.repeat(301) }))
-      .toThrow('300 characters');
+    expect(() =>
+      addProfile(store, { name: 'profile-9', environment: 'production', merchantId: 'merchant-9', apiKey: 'key-9' }),
+    ).toThrow('maximum of 8 profiles');
+    expect(() =>
+      addProfile(createEmptyProfileStore(), {
+        name: 'long-note',
+        environment: 'sandbox',
+        merchantId: 'merchant',
+        apiKey: 'key',
+        note: 'a'.repeat(301),
+      }),
+    ).toThrow('300 characters');
   });
 });

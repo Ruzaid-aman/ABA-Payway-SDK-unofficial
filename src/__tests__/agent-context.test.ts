@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createAgentPayWay, resolvePayWayContext } from '../agent/context.js';
-import { evaluateReadiness } from '../agent/readiness.js';
 import type { ResolvedPayWayContext } from '../agent/context.js';
+import { createAgentPayWay, resolvePayWayContext } from '../agent/context.js';
 import type { ProviderConfigV1 } from '../agent/contracts.js';
+import { evaluateReadiness } from '../agent/readiness.js';
 
 const { khqrFields, storeRef } = vi.hoisted(() => ({
   khqrFields: {
@@ -14,7 +14,12 @@ const { khqrFields, storeRef } = vi.hoisted(() => ({
     merchantCity: 'PAYWAY_KHQR_MERCHANT_CITY',
     paywayData: 'PAYWAY_KHQR_PAYWAY_DATA',
   } as const,
-  storeRef: { current: { version: 1, profiles: [] as any[], defaultProfile: undefined, activeProfile: undefined } as Record<string, any> },
+  storeRef: {
+    current: { version: 1, profiles: [] as any[], defaultProfile: undefined, activeProfile: undefined } as Record<
+      string,
+      any
+    >,
+  },
 }));
 
 vi.mock('../config/profiles.js', () => ({
@@ -65,7 +70,11 @@ describe('resolvePayWayContext — profile precedence', () => {
   });
 
   it('prefers --profile option over PAYWAY_PROFILE env and default profile', () => {
-    storeRef.current = { version: 1, defaultProfile: 'def', profiles: [makeProfile('option'), makeProfile('def', 'sandbox')] };
+    storeRef.current = {
+      version: 1,
+      defaultProfile: 'def',
+      profiles: [makeProfile('option'), makeProfile('def', 'sandbox')],
+    };
     const ctx = resolvePayWayContext({ profile: 'option', env: { PAYWAY_PROFILE: 'def' } as NodeJS.ProcessEnv });
     expect(ctx.source).toBe('option');
     expect(ctx.profileName).toBe('option');
@@ -94,7 +103,13 @@ describe('resolvePayWayContext — profile precedence', () => {
   });
 
   it('resolves from .env (no profile) using ambient credentials', () => {
-    const ctx = resolvePayWayContext({ env: { PAYWAY_MERCHANT_ID: 'env-merchant', PAYWAY_API_KEY: 'env-key', PAYWAY_ENV: 'sandbox' } as NodeJS.ProcessEnv });
+    const ctx = resolvePayWayContext({
+      env: {
+        PAYWAY_MERCHANT_ID: 'env-merchant',
+        PAYWAY_API_KEY: 'env-key',
+        PAYWAY_ENV: 'sandbox',
+      } as NodeJS.ProcessEnv,
+    });
     expect(ctx.source).toBe('none');
     expect(ctx.merchantId).toBe('env-merchant');
     expect(ctx.apiKey).toBe('env-key');
@@ -105,7 +120,10 @@ describe('resolvePayWayContext — profile precedence', () => {
 describe('resolvePayWayContext — authority and safety', () => {
   it('does NOT let a stale ambient PAYWAY_MERCHANT_ID override a selected profile', () => {
     storeRef.current = { version: 1, profiles: [makeProfile('prod')] };
-    const ctx = resolvePayWayContext({ profile: 'prod', env: { PAYWAY_MERCHANT_ID: 'stale-merchant', PAYWAY_API_KEY: 'stale-key' } as NodeJS.ProcessEnv });
+    const ctx = resolvePayWayContext({
+      profile: 'prod',
+      env: { PAYWAY_MERCHANT_ID: 'stale-merchant', PAYWAY_API_KEY: 'stale-key' } as NodeJS.ProcessEnv,
+    });
     expect(ctx.merchantId).toBe('merchant-prod');
     expect(ctx.apiKey).toBe('key-prod');
   });
@@ -113,12 +131,26 @@ describe('resolvePayWayContext — authority and safety', () => {
   it('does NOT mutate process.env', () => {
     storeRef.current = { version: 1, profiles: [makeProfile('prod')] };
     const snapshot = { ...process.env };
-    resolvePayWayContext({ profile: 'prod', env: { PAYWAY_PROFILE: 'other', PAYWAY_MERCHANT_ID: 'stale', PAYWAY_API_KEY: 'stale', PAYWAY_CALLBACK_URL: 'https://cb.example.test' } as NodeJS.ProcessEnv });
+    resolvePayWayContext({
+      profile: 'prod',
+      env: {
+        PAYWAY_PROFILE: 'other',
+        PAYWAY_MERCHANT_ID: 'stale',
+        PAYWAY_API_KEY: 'stale',
+        PAYWAY_CALLBACK_URL: 'https://cb.example.test',
+      } as NodeJS.ProcessEnv,
+    });
     expect(process.env).toEqual(snapshot);
   });
 
   it('displayLabel contains no secret material', () => {
-    const ctx = resolvePayWayContext({ env: { PAYWAY_MERCHANT_ID: 'SECRET-MERCHANT-123', PAYWAY_API_KEY: 'SUPERSECRETKEY', PAYWAY_ENV: 'production' } as NodeJS.ProcessEnv });
+    const ctx = resolvePayWayContext({
+      env: {
+        PAYWAY_MERCHANT_ID: 'SECRET-MERCHANT-123',
+        PAYWAY_API_KEY: 'SUPERSECRETKEY',
+        PAYWAY_ENV: 'production',
+      } as NodeJS.ProcessEnv,
+    });
     expect(ctx.displayLabel).not.toContain('SECRET-MERCHANT-123');
     expect(ctx.displayLabel).not.toContain('SUPERSECRETKEY');
     expect(ctx.displayLabel).toContain('production');

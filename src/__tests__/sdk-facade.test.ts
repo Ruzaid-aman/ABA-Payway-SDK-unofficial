@@ -15,7 +15,7 @@
  * behaviour is verified in `client-handler.test.ts` with happy-dom.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { sdk } from '../sdk.js';
 
 describe('sdk.runTestSuite (end-to-end via mock server)', () => {

@@ -1,7 +1,7 @@
 import { ENDPOINTS } from '../constants.js';
-import type { components } from '../types.js';
-import { validateTransactionId, validatePositiveAmount } from '../utils.js';
 import { PayWayConfigError } from '../errors.js';
+import type { components } from '../types.js';
+import { validatePositiveAmount, validateTransactionId } from '../utils.js';
 
 export interface PreAuthDomain {
   complete: (transactionId: string, amount: number) => Promise<components['schemas']['CompletePreAuthResponse']>;

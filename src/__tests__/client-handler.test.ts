@@ -9,7 +9,7 @@
  * this suite closes that gap.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { client } from '../client-handler/index.js';
 import type { TransactionSession } from '../schema.js';
 
@@ -179,11 +179,7 @@ describe('client.handleResponse (browser environment)', () => {
 
     const result = await client.handleResponse(session, { openInNewTab: true });
 
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://checkout.example.com/pay/999',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    expect(openSpy).toHaveBeenCalledWith('https://checkout.example.com/pay/999', '_blank', 'noopener,noreferrer');
     expect(result.action).toBe('url_opened_new_tab');
   });
 
@@ -202,9 +198,7 @@ describe('client.handleResponse (browser environment)', () => {
     // Critical security assertion: allow-same-origin must NOT be present,
     // because combined with allow-scripts it would defeat the sandbox.
     const sandbox = iframe?.getAttribute('sandbox') ?? '';
-    expect(sandbox.split(/\s+/)).toEqual(
-      expect.arrayContaining(['allow-scripts', 'allow-forms', 'allow-popups']),
-    );
+    expect(sandbox.split(/\s+/)).toEqual(expect.arrayContaining(['allow-scripts', 'allow-forms', 'allow-popups']));
     expect(sandbox).not.toContain('allow-same-origin');
     expect(iframe?.getAttribute('title')).toBe('PayWay hosted checkout');
     expect(iframe?.srcdoc).toBe('<h1>Hosted Checkout</h1>');

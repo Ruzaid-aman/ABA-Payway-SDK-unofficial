@@ -5,14 +5,14 @@
  * WH-TC-08 (port conflict), and general server behavior.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import http from 'node:http';
-import { JsonWebhookStorage } from '../webhook/storage-json.js';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createWebhookServer, type WebhookServerResult } from '../webhook/server.js';
 import type { WebhookRecord, WebhookStorage } from '../webhook/storage.js';
+import { JsonWebhookStorage } from '../webhook/storage-json.js';
 
 function httpRequest(
   port: number,
@@ -137,11 +137,20 @@ describe('WebhookServer', () => {
 
   it('stores an offline KHQR parse error and marks duplicate transaction metadata', async () => {
     const validPayload = JSON.stringify({
-      transaction_id: 'KHQR-duplicate', transaction_date: '2026-08-21 10:15:30',
-      original_currency: 'USD', original_amount: 12.5, bank_ref: 'BANK-REF-1', apv: '123456',
-      payment_status_code: 0, payment_status: 'APPROVED', payment_currency: 'USD',
-      payment_amount: 12.5, payment_type: 'KHQR', payer_account: 'payer@example.com',
-      bank_name: 'Example Bank', merchant_ref: 'ORDER-100',
+      transaction_id: 'KHQR-duplicate',
+      transaction_date: '2026-08-21 10:15:30',
+      original_currency: 'USD',
+      original_amount: 12.5,
+      bank_ref: 'BANK-REF-1',
+      apv: '123456',
+      payment_status_code: 0,
+      payment_status: 'APPROVED',
+      payment_currency: 'USD',
+      payment_amount: 12.5,
+      payment_type: 'KHQR',
+      payer_account: 'payer@example.com',
+      bank_name: 'Example Bank',
+      merchant_ref: 'ORDER-100',
     });
 
     await httpRequest(port, 'POST', '/aba-payway-khqr-webhook', validPayload);

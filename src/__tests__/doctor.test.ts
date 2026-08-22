@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runDoctor } from '../cli/commands/doctor.js';
 
 const TEST_DIR = path.join(process.cwd(), '.test-doctor-temp');
@@ -40,10 +40,7 @@ describe('runDoctor', () => {
   });
 
   it('reads .env file and merges with process.env', () => {
-    writeFileSync(
-      path.join(TEST_DIR, '.env'),
-      'PAYWAY_ENV=sandbox\nPAYWAY_MERCHANT_ID=test-merchant\n',
-    );
+    writeFileSync(path.join(TEST_DIR, '.env'), 'PAYWAY_ENV=sandbox\nPAYWAY_MERCHANT_ID=test-merchant\n');
     const result = runDoctor({ cwd: TEST_DIR, env: {} });
     const merchantCheck = result.checks.find((c) => c.id === 'env-PAYWAY_MERCHANT_ID');
     expect(merchantCheck?.ok).toBe(true);
@@ -59,10 +56,7 @@ describe('runDoctor', () => {
   });
 
   it('reports all healthy when everything is configured', () => {
-    writeFileSync(
-      path.join(TEST_DIR, 'package.json'),
-      JSON.stringify({ dependencies: { express: '^4.18.0' } }),
-    );
+    writeFileSync(path.join(TEST_DIR, 'package.json'), JSON.stringify({ dependencies: { express: '^4.18.0' } }));
     writeFileSync(
       path.join(TEST_DIR, '.env'),
       [
@@ -92,10 +86,7 @@ describe('runDoctor', () => {
   });
 
   it('detects framework from package.json', () => {
-    writeFileSync(
-      path.join(TEST_DIR, 'package.json'),
-      JSON.stringify({ dependencies: { next: '14.0.0' } }),
-    );
+    writeFileSync(path.join(TEST_DIR, 'package.json'), JSON.stringify({ dependencies: { next: '14.0.0' } }));
     const result = runDoctor({ cwd: TEST_DIR });
     expect(result.framework).toBe('next-app');
   });

@@ -1,16 +1,16 @@
-import { ENDPOINTS } from '../constants.js';
-import { filterParams } from '../utils.js';
-import type { components } from '../types.js';
 import type { PayWayConfig } from '../client.js';
-import { generateOfflineQR, type GenerateOfflineQrParams } from '../khqr-offline.js';
+import { ENDPOINTS } from '../constants.js';
 import {
-  validateKhqrCallbackSetup,
-  validateKhqrConfiguration,
   type KhqrCallbackReadiness,
   type KhqrCallbackValidationOptions,
   type KhqrConfigurationReadiness,
   type KhqrMerchantConfiguration,
+  validateKhqrCallbackSetup,
+  validateKhqrConfiguration,
 } from '../khqr-config.js';
+import { type GenerateOfflineQrParams, generateOfflineQR } from '../khqr-offline.js';
+import type { components } from '../types.js';
+import { filterParams } from '../utils.js';
 
 export interface KhqrDomain {
   generateOfflineQR: (params: GenerateOfflineQrParams) => string;

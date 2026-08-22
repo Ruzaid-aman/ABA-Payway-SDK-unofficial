@@ -1,17 +1,17 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as crypto from 'node:crypto';
-import * as utils from '../utils.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayWay } from '../client.js';
+import { ENDPOINTS } from '../constants.js';
 import {
-  PayWayConfigError,
   PayWayAPIError,
   PayWayBusinessError,
+  PayWayConfigError,
   PayWayNetworkError,
   PayWayRateLimitError,
   PollingAbortedError,
 } from '../errors.js';
 import type { PollTransactionResult } from '../types.js';
-import { ENDPOINTS } from '../constants.js';
+import * as utils from '../utils.js';
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -1168,7 +1168,6 @@ describe('publicKeyPem normalization', () => {
   });
 });
 
-
 // ---------------------------------------------------------------------------
 // preAuth domain — happy path
 // ---------------------------------------------------------------------------
@@ -1354,17 +1353,18 @@ describe('khqr domain', () => {
     const configuredPayway = new PayWay({ ...TEST_CONFIG, khqr: TEST_KHQR_CONFIG });
 
     expect(configuredPayway.khqr.validateConfiguration()).toEqual({ ready: true, issues: [] });
-    expect(
-      configuredPayway.khqr.generateOfflineQR({ amount: 1.5, currency: 'USD', merchantRef: 'INV-1' }),
-    ).toMatch(/^000201010212/);
+    expect(configuredPayway.khqr.generateOfflineQR({ amount: 1.5, currency: 'USD', merchantRef: 'INV-1' })).toMatch(
+      /^000201010212/,
+    );
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('keeps the documented payway.qr offline alias wired to resolved KHQR configuration', () => {
     const configuredPayway = new PayWay({ ...TEST_CONFIG, khqr: TEST_KHQR_CONFIG });
 
-    expect(configuredPayway.qr.generateOfflineQR({ amount: 10.12, currency: 'USD', merchantRef: 'INV-QR' }))
-      .toMatch(/^000201010212/);
+    expect(configuredPayway.qr.generateOfflineQR({ amount: 10.12, currency: 'USD', merchantRef: 'INV-QR' })).toMatch(
+      /^000201010212/,
+    );
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -1555,10 +1555,12 @@ describe('checkout.pollTransactionStatus', () => {
   });
 
   it('stops on DECLINED terminal status', async () => {
-    fetchSpy.mockResolvedValueOnce(mockJsonResponse({
-      status: { code: 0, message: 'Success' },
-      data: { payment_status: 'DECLINED', tran_id: 'T001' },
-    }));
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({
+        status: { code: 0, message: 'Success' },
+        data: { payment_status: 'DECLINED', tran_id: 'T001' },
+      }),
+    );
 
     const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
@@ -1571,10 +1573,12 @@ describe('checkout.pollTransactionStatus', () => {
   });
 
   it('stops on CANCELLED terminal status', async () => {
-    fetchSpy.mockResolvedValueOnce(mockJsonResponse({
-      status: { code: 0, message: 'Success' },
-      data: { payment_status: 'CANCELLED', tran_id: 'T001' },
-    }));
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({
+        status: { code: 0, message: 'Success' },
+        data: { payment_status: 'CANCELLED', tran_id: 'T001' },
+      }),
+    );
 
     const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
@@ -1587,10 +1591,12 @@ describe('checkout.pollTransactionStatus', () => {
   });
 
   it('stops on REFUNDED terminal status', async () => {
-    fetchSpy.mockResolvedValueOnce(mockJsonResponse({
-      status: { code: 0, message: 'Success' },
-      data: { payment_status: 'REFUNDED', tran_id: 'T001' },
-    }));
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({
+        status: { code: 0, message: 'Success' },
+        data: { payment_status: 'REFUNDED', tran_id: 'T001' },
+      }),
+    );
 
     const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', { intervalMs: 1 })) {
@@ -1700,8 +1706,7 @@ describe('checkout.pollTransactionStatus', () => {
   it('respects custom intervalMs', async () => {
     vi.useFakeTimers();
 
-    fetchSpy
-      .mockResolvedValue(mockJsonResponse(pendingResponse));
+    fetchSpy.mockResolvedValue(mockJsonResponse(pendingResponse));
 
     const iterator = payway.checkout.pollTransactionStatus('T001', {
       intervalMs: 1000,
@@ -1762,9 +1767,7 @@ describe('checkout.pollTransactionStatus', () => {
   });
 
   it('yields error results with durationMs 0 and isTerminal false', async () => {
-    fetchSpy
-      .mockRejectedValueOnce(new Error('Timeout'))
-      .mockResolvedValueOnce(mockJsonResponse(approvedResponse));
+    fetchSpy.mockRejectedValueOnce(new Error('Timeout')).mockResolvedValueOnce(mockJsonResponse(approvedResponse));
 
     const results: PollTransactionResult[] = [];
     for await (const result of payway.checkout.pollTransactionStatus('T001', {

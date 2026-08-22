@@ -1,14 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentActionDraft, AgentPlanV1 } from '../agent/contracts.js';
 import type { ResolvedPayWayContext } from '../agent/context.js';
-import {
-  defaultGenericOnlineQr,
-  normalizePlan,
-  GENERIC_QR_EXPLANATION,
-  isReadOnlyTool,
-} from '../agent/planning.js';
+import type { AgentActionDraft, AgentPlanV1 } from '../agent/contracts.js';
+import { defaultGenericOnlineQr, GENERIC_QR_EXPLANATION, isReadOnlyTool, normalizePlan } from '../agent/planning.js';
 import { authorizePlan, classifyRisk } from '../agent/risk.js';
-import type { RiskLevel } from '../agent/risk.js';
 
 function makeContext(overrides: Partial<ResolvedPayWayContext> = {}): ResolvedPayWayContext {
   return {
@@ -65,9 +59,7 @@ describe('normalizePlan — explicit routes accepted', () => {
       },
     ]);
     const res = normalizePlan(plan, ctx);
-    expect(res.defaultsApplied).not.toContain(
-      expect.stringContaining('lifetime defaulted'),
-    );
+    expect(res.defaultsApplied).not.toContain(expect.stringContaining('lifetime defaulted'));
     expect((res.plan.actions[0] as { lifetime?: number }).lifetime).toBe(600);
     expect(res.needsClarification).toBe(false);
   });
@@ -183,10 +175,7 @@ describe('normalizePlan — currency validation', () => {
 describe('classifyRisk', () => {
   it('marks read-only tools as safe', () => {
     const ctx = makeContext();
-    const decision = classifyRisk(
-      { tool: 'check_transaction', transactionId: 'abc-1' } as AgentActionDraft,
-      ctx,
-    );
+    const decision = classifyRisk({ tool: 'check_transaction', transactionId: 'abc-1' } as AgentActionDraft, ctx);
     expect(decision.level).toBe('safe');
   });
 

@@ -14,19 +14,14 @@
 import { writeFileSync } from 'node:fs';
 import readline from 'node:readline';
 import type { Command } from 'commander';
-import { resolvePayWayContext } from '../../agent/context.js';
 import { readAgentConfig, updateAgentConfig } from '../../agent/config.js';
-import { evaluateReadiness } from '../../agent/readiness.js';
-import {
-  type AgentCommandResultV1,
-  type CapabilityMode,
-  type ProviderConfigV1,
-  type ProviderPreset,
-} from '../../agent/contracts.js';
+import { resolvePayWayContext } from '../../agent/context.js';
+import type { AgentCommandResultV1, CapabilityMode, ProviderConfigV1, ProviderPreset } from '../../agent/contracts.js';
 import { AgentOrchestrator, renderHumanResult, serializeCommandResult } from '../../agent/orchestrator.js';
 import { createProviderAdapter, type ProviderConnectivity } from '../../agent/provider.js';
+import { evaluateReadiness } from '../../agent/readiness.js';
+import { setAgentProgram, startRepl } from '../../agent/repl.js';
 import { clearSessions, exportSession, listSessions } from '../../agent/sessions.js';
-import { startRepl, setAgentProgram } from '../../agent/repl.js';
 
 // Local ANSI helpers (cli.ts keeps its own copy; no shared dependency needed).
 const c = {
@@ -70,7 +65,7 @@ function marker(state: CapabilityState | 'blocked'): string {
 }
 
 function promptConfirm(message: string): Promise<boolean> {
-  const rl = readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
+  const rl = readline.createInterface({ input: process.stdin as unknown as NodeJS.ReadableStream, output: process.stdout as unknown as NodeJS.WritableStream, terminal: false });
   return new Promise<boolean>((resolve) => {
     rl.question(message, (answer) => {
       rl.close();
@@ -101,8 +96,7 @@ export function registerAgentCommands(program: Command): void {
             version: 'agent-command/v1',
             status: 'blocked',
             request,
-            message:
-              'Agent is not configured. Run `payway-sdk agent setup` to configure a provider, then retry.',
+            message: 'Agent is not configured. Run `payway-sdk agent setup` to configure a provider, then retry.',
             error: { code: 'AGENT_NOT_CONFIGURED', message: 'No agent provider configuration found.' },
           };
           console.log(serializeCommandResult(blocked));
@@ -173,56 +167,58 @@ export function registerAgentCommands(program: Command): void {
     .option('--base-url <url>', 'Custom provider base URL (for provider=custom)')
     .option('--capability-mode <mode>', 'native-tools | strict-json-plan')
     .option('--timeout <ms>', 'Provider request timeout in milliseconds')
-    .action(async (opts: {
-      provider?: string;
-      model?: string;
-      baseUrl?: string;
-      capabilityMode?: string;
-      timeout?: string;
-    }) => {
-      const patch: Partial<ProviderConfigV1> = {};
-      if (opts.provider) {
-        const preset = opts.provider as ProviderPreset;
-        if (!['openai', 'openrouter', 'nvidia', 'custom'].includes(preset)) {
-          console.log(`\n  ${c.red('✗')} Invalid --provider '${opts.provider}'.\n`);
-          process.exitCode = 1;
-          return;
+    .action(
+      async (opts: {
+        provider?: string;
+        model?: string;
+        baseUrl?: string;
+        capabilityMode?: string;
+        timeout?: string;
+      }) => {
+        const patch: Partial<ProviderConfigV1> = {};
+        if (opts.provider) {
+          const preset = opts.provider as ProviderPreset;
+          if (!['openai', 'openrouter', 'nvidia', 'custom'].includes(preset)) {
+            console.log(`\n  ${c.red('✗')} Invalid --provider '${opts.provider}'.\n`);
+            process.exitCode = 1;
+            return;
+          }
+          patch.provider = preset;
         }
-        patch.provider = preset;
-      }
-      if (opts.model !== undefined) patch.model = opts.model;
-      if (opts.baseUrl !== undefined) patch.baseUrl = opts.baseUrl;
-      if (opts.capabilityMode) {
-        const mode = opts.capabilityMode as CapabilityMode;
-        if (!['native-tools', 'strict-json-plan'].includes(mode)) {
-          console.log(`\n  ${c.red('✗')} Invalid --capability-mode '${opts.capabilityMode}'.\n`);
-          process.exitCode = 1;
-          return;
+        if (opts.model !== undefined) patch.model = opts.model;
+        if (opts.baseUrl !== undefined) patch.baseUrl = opts.baseUrl;
+        if (opts.capabilityMode) {
+          const mode = opts.capabilityMode as CapabilityMode;
+          if (!['native-tools', 'strict-json-plan'].includes(mode)) {
+            console.log(`\n  ${c.red('✗')} Invalid --capability-mode '${opts.capabilityMode}'.\n`);
+            process.exitCode = 1;
+            return;
+          }
+          patch.capabilityMode = mode;
         }
-        patch.capabilityMode = mode;
-      }
-      if (opts.timeout !== undefined) {
-        const ms = Number(opts.timeout);
-        if (!Number.isFinite(ms) || ms <= 0) {
-          console.log(`\n  ${c.red('✗')} --timeout must be a positive number of milliseconds.\n`);
-          process.exitCode = 1;
-          return;
+        if (opts.timeout !== undefined) {
+          const ms = Number(opts.timeout);
+          if (!Number.isFinite(ms) || ms <= 0) {
+            console.log(`\n  ${c.red('✗')} --timeout must be a positive number of milliseconds.\n`);
+            process.exitCode = 1;
+            return;
+          }
+          patch.timeoutMs = Math.floor(ms);
         }
-        patch.timeoutMs = Math.floor(ms);
-      }
 
-      const config = updateAgentConfig(patch);
-      console.log(`\n  ${c.green('✓')} ${c.bold('Agent provider configured')}\n`);
-      console.log(`    Provider:        ${c.cyan(config.provider)}`);
-      console.log(`    Model:           ${c.cyan(config.model || '(empty)')}`);
-      console.log(`    Capability mode: ${c.cyan(config.capabilityMode)}`);
-      if (config.baseUrl) console.log(`    Base URL:        ${c.cyan(config.baseUrl)}`);
-      console.log(`    Timeout:         ${c.cyan(`${config.timeoutMs ?? 30000}ms`)}`);
-      console.log();
-      console.log(
-        `  ${c.dim('API key is read from the PAYWAY_AGENT_API_KEY environment variable; it is never stored.')}\n`,
-      );
-    });
+        const config = updateAgentConfig(patch);
+        console.log(`\n  ${c.green('✓')} ${c.bold('Agent provider configured')}\n`);
+        console.log(`    Provider:        ${c.cyan(config.provider)}`);
+        console.log(`    Model:           ${c.cyan(config.model || '(empty)')}`);
+        console.log(`    Capability mode: ${c.cyan(config.capabilityMode)}`);
+        if (config.baseUrl) console.log(`    Base URL:        ${c.cyan(config.baseUrl)}`);
+        console.log(`    Timeout:         ${c.cyan(`${config.timeoutMs ?? 30000}ms`)}`);
+        console.log();
+        console.log(
+          `  ${c.dim('API key is read from the PAYWAY_AGENT_API_KEY environment variable; it is never stored.')}\n`,
+        );
+      },
+    );
 
   // agent doctor
   agentCmd
@@ -240,7 +236,9 @@ export function registerAgentCommands(program: Command): void {
       }
 
       console.log(`\n${c.bold('Agent Capability Matrix')}\n`);
-      console.log(`  ${marker(connectivity.status === 'ready' ? 'ready' : connectivity.status === 'blocked' ? 'blocked' : 'unverified')}  Provider connectivity`);
+      console.log(
+        `  ${marker(connectivity.status === 'ready' ? 'ready' : connectivity.status === 'blocked' ? 'blocked' : 'unverified')}  Provider connectivity`,
+      );
       console.log(`  ${marker(matrix.context)}  PayWay context (${context.displayLabel})`);
       console.log(`  ${marker(matrix.onlineQr)}  Online QR callback`);
       console.log(`  ${marker(matrix.offlineKhqr)}  Offline KHQR`);
@@ -305,9 +303,7 @@ export function registerAgentCommands(program: Command): void {
           return;
         }
       } else if (!opts.approve) {
-        console.log(
-          `\n  ${c.red('✗')} Refusing to clear sessions without --approve in non-interactive mode.\n`,
-        );
+        console.log(`\n  ${c.red('✗')} Refusing to clear sessions without --approve in non-interactive mode.\n`);
         process.exitCode = 1;
         return;
       }

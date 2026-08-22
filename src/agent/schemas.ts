@@ -9,15 +9,13 @@
 
 import { Ajv, type ValidateFunction } from 'ajv';
 import type {
+  AgentCommandResultV1,
   AgentPlanV1,
+  AgentSessionV1,
+  ArtifactMetadataV1,
+  ExecutionRecordV1,
   MaterializedAgentPlanV1,
   ProviderConfigV1,
-  AgentCommandResultV1,
-  AgentSessionV1,
-  ExecutionRecordV1,
-  ArtifactMetadataV1,
-  AgentActionDraft,
-  MaterializedAgentAction,
 } from './contracts.js';
 
 const CURRENCY = { enum: ['USD', 'KHR'] };
@@ -25,9 +23,7 @@ const HTTPS = { type: 'string', pattern: '^https://' };
 const TXID = { type: 'string', minLength: 1, maxLength: 20, pattern: '^[A-Za-z0-9-]+$' };
 
 function txIdProp(materialized: boolean): Record<string, unknown> {
-  return materialized
-    ? { transactionId: { ...TXID } }
-    : { transactionId: { type: ['string', 'null'] } };
+  return materialized ? { transactionId: { ...TXID } } : { transactionId: { type: ['string', 'null'] } };
 }
 
 function buildActionSchemas(materialized: boolean): Array<Record<string, unknown>> {
@@ -355,13 +351,13 @@ const validateLedger = ajv.compile(ledgerSchema) as ValidateFunction<ExecutionRe
 const validateArtifact = ajv.compile(artifactSchema) as ValidateFunction<ArtifactMetadataV1>;
 
 export {
-  validatePlan as validateAgentPlan,
-  validateMaterialized as validateMaterializedPlan,
-  validateProviderConfig,
-  validateCommandResult,
-  validateSession,
-  validateLedger,
   validateArtifact,
+  validateCommandResult,
+  validateLedger,
+  validateMaterialized as validateMaterializedPlan,
+  validatePlan as validateAgentPlan,
+  validateProviderConfig,
+  validateSession,
 };
 
 export function isValidAgentPlan(value: unknown): value is AgentPlanV1 {

@@ -40,10 +40,6 @@ function isSecretValue(value: unknown): boolean {
   return SECRET_KEY_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /**
  * Recursively scrub a value, redacting by secret key name and by exact secret
  * value. Returns a brand-new structure; the input is never mutated.

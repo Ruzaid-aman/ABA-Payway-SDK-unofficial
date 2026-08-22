@@ -1,14 +1,10 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  readAgentConfig,
-  updateAgentConfig,
-  writeAgentConfig,
-} from '../agent/config.js';
-import { getAgentDataPaths } from '../agent/storage.js';
+import { readAgentConfig, updateAgentConfig, writeAgentConfig } from '../agent/config.js';
 import type { ProviderConfigV1 } from '../agent/contracts.js';
+import { getAgentDataPaths } from '../agent/storage.js';
 
 const { fsState } = vi.hoisted(() => ({ fsState: { failRename: false } }));
 
@@ -71,15 +67,17 @@ describe('agent config storage', () => {
   it('rejects an unknown config version', () => {
     const { root, configFile } = getAgentDataPaths();
     mkdirSync(root, { recursive: true });
-    writeFileSync(configFile, JSON.stringify({ version: 'agent-config/v2', provider: 'openai', model: 'x', capabilityMode: 'native-tools' }), 'utf8');
+    writeFileSync(
+      configFile,
+      JSON.stringify({ version: 'agent-config/v2', provider: 'openai', model: 'x', capabilityMode: 'native-tools' }),
+      'utf8',
+    );
     expect(() => readAgentConfig()).toThrow(/Invalid agent config/);
   });
 
   it('rejects forbidden custom headers on write', () => {
-    expect(() => writeAgentConfig(validConfig({ headers: { authorization: 'Bearer x' } })))
-      .toThrow(/Forbidden header/);
-    expect(() => writeAgentConfig(validConfig({ headers: { 'X-API-Key': 'secret' } })))
-      .toThrow(/Forbidden header/);
+    expect(() => writeAgentConfig(validConfig({ headers: { authorization: 'Bearer x' } }))).toThrow(/Forbidden header/);
+    expect(() => writeAgentConfig(validConfig({ headers: { 'X-API-Key': 'secret' } }))).toThrow(/Forbidden header/);
   });
 
   it('updateAgentConfig seeds, applies the patch, defaults timeout and persists', () => {

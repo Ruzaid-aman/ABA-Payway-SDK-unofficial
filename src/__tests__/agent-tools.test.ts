@@ -7,14 +7,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AgentToolName, ExecutionRecordV1, MaterializedAgentAction } from '../agent/contracts.js';
+import { type ExecutionContext, executeAction } from '../agent/executor.js';
 import type { PayWay } from '../client.js';
 import { PayWayNetworkError } from '../errors.js';
-import type {
-  AgentToolName,
-  ExecutionRecordV1,
-  MaterializedAgentAction,
-} from '../agent/contracts.js';
-import { executeAction, type ExecutionContext } from '../agent/executor.js';
 
 vi.mock('../agent/ledger.js', () => ({
   markSubmitted: vi.fn(),
@@ -42,14 +38,9 @@ vi.mock('../agent/local-tools.js', async () => {
   };
 });
 
-import {
-  markSubmitted,
-  markSucceeded,
-  markFailed,
-  markOutcomeUnknown,
-} from '../agent/ledger.js';
 import { saveQrArtifact } from '../agent/artifacts.js';
-import { openArtifact, copyToClipboard } from '../agent/local-tools.js';
+import { markFailed, markOutcomeUnknown, markSubmitted, markSucceeded } from '../agent/ledger.js';
+import { copyToClipboard, openArtifact } from '../agent/local-tools.js';
 
 function makePayWay(): PayWay {
   const fn = (impl: (...args: unknown[]) => unknown) => vi.fn(impl);
@@ -87,7 +78,10 @@ function makePayWay(): PayWay {
   } as unknown as PayWay;
 }
 
-function makeRecord(status: ExecutionRecordV1['status'], overrides: Partial<ExecutionRecordV1> = {}): ExecutionRecordV1 {
+function makeRecord(
+  status: ExecutionRecordV1['status'],
+  overrides: Partial<ExecutionRecordV1> = {},
+): ExecutionRecordV1 {
   return {
     version: 'agent-ledger/v1',
     executionId: 'exec-1',
@@ -119,24 +113,76 @@ function makeExecContext(payway: PayWay, record: ExecutionRecordV1): ExecutionCo
 function createAction(tool: AgentToolName): MaterializedAgentAction {
   switch (tool) {
     case 'generate_online_qr':
-      return { tool, amount: 10, currency: 'USD', transactionId: 'tx1', callbackUrl: 'https://cb', lifetime: 300, paymentOption: 'abapay_khqr', template: 'template2' } as unknown as MaterializedAgentAction;
+      return {
+        tool,
+        amount: 10,
+        currency: 'USD',
+        transactionId: 'tx1',
+        callbackUrl: 'https://cb',
+        lifetime: 300,
+        paymentOption: 'abapay_khqr',
+        template: 'template2',
+      } as unknown as MaterializedAgentAction;
     case 'generate_offline_khqr':
       return { tool, amount: 5, currency: 'KHR', merchantRef: 'ref1' } as unknown as MaterializedAgentAction;
     case 'create_checkout_payload':
-      return { tool, amount: 10, currency: 'USD', transactionId: 'tx2', paymentOption: 'cards', returnUrl: 'https://r', cancelUrl: 'https://c' } as unknown as MaterializedAgentAction;
+      return {
+        tool,
+        amount: 10,
+        currency: 'USD',
+        transactionId: 'tx2',
+        paymentOption: 'cards',
+        returnUrl: 'https://r',
+        cancelUrl: 'https://c',
+      } as unknown as MaterializedAgentAction;
     case 'create_checkout_purchase':
-      return { tool, amount: 10, currency: 'USD', transactionId: 'tx3', paymentOption: 'cards', returnUrl: 'https://r', cancelUrl: 'https://c' } as unknown as MaterializedAgentAction;
+      return {
+        tool,
+        amount: 10,
+        currency: 'USD',
+        transactionId: 'tx3',
+        paymentOption: 'cards',
+        returnUrl: 'https://r',
+        cancelUrl: 'https://c',
+      } as unknown as MaterializedAgentAction;
     case 'create_payment_link':
-      return { tool, title: 'T', amount: 20, currency: 'USD', merchantRefNo: 'mref', returnUrl: 'https://ret' } as unknown as MaterializedAgentAction;
+      return {
+        tool,
+        title: 'T',
+        amount: 20,
+        currency: 'USD',
+        merchantRefNo: 'mref',
+        returnUrl: 'https://ret',
+      } as unknown as MaterializedAgentAction;
     default:
       throw new Error('not a create tool');
   }
 }
 
 const READ_ACTIONS: Array<[AgentToolName, () => MaterializedAgentAction]> = [
-  ['check_transaction', () => ({ tool: 'check_transaction', transactionId: 'tx9' }) as unknown as MaterializedAgentAction],
-  ['check_transaction_by_merchant_ref', () => ({ tool: 'check_transaction_by_merchant_ref', merchantRef: 'mref', requestTime: '20240101' }) as unknown as MaterializedAgentAction],
-  ['poll_transaction', () => ({ tool: 'poll_transaction', transactionId: 'tx1', interval: 1000, timeout: 5000 }) as unknown as MaterializedAgentAction],
+  [
+    'check_transaction',
+    () => ({ tool: 'check_transaction', transactionId: 'tx9' }) as unknown as MaterializedAgentAction,
+  ],
+  [
+    'check_transaction_by_merchant_ref',
+    () =>
+      ({
+        tool: 'check_transaction_by_merchant_ref',
+        merchantRef: 'mref',
+        requestTime: '20240101',
+      }) as unknown as MaterializedAgentAction,
+  ],
+  [
+    'poll_transaction',
+    () =>
+      ({
+        tool: 'poll_transaction',
+        transactionId: 'tx1',
+        interval: 1000,
+        timeout: 5000,
+      }) as unknown as MaterializedAgentAction,
+  ],
   ['save_artifact', () => ({ tool: 'save_artifact', qrString: 'QR', name: 'n' }) as unknown as MaterializedAgentAction],
   ['open_artifact', () => ({ tool: 'open_artifact', reference: 'https://x' }) as unknown as MaterializedAgentAction],
   ['copy_to_clipboard', () => ({ tool: 'copy_to_clipboard', text: 'T' }) as unknown as MaterializedAgentAction],
@@ -253,9 +299,7 @@ describe('TASK-009 tool registry + executor', () => {
   });
 
   it('outcome_unknown on simulated network timeout', async () => {
-    (payway.qr.generateQr as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-      new PayWayNetworkError('timed out'),
-    );
+    (payway.qr.generateQr as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new PayWayNetworkError('timed out'));
     const ctx = makeExecContext(payway, makeRecord('confirmed', { tool: 'generate_online_qr' }));
     const result = await executeAction(createAction('generate_online_qr'), ctx);
     expect(result.ok).toBe(false);
@@ -288,25 +332,46 @@ describe('TASK-009 tool registry + executor', () => {
   }
 
   it('check_transaction passes transactionId', async () => {
-    await executeAction({ tool: 'check_transaction', transactionId: 'tx9' } as unknown as MaterializedAgentAction, makeExecContext(payway, makeRecord('confirmed', { tool: 'check_transaction' })));
+    await executeAction(
+      { tool: 'check_transaction', transactionId: 'tx9' } as unknown as MaterializedAgentAction,
+      makeExecContext(payway, makeRecord('confirmed', { tool: 'check_transaction' })),
+    );
     expect((payway.checkout.checkTransaction as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('tx9');
   });
 
   it('check_transaction_by_merchant_ref passes ref + requestTime', async () => {
-    await executeAction({ tool: 'check_transaction_by_merchant_ref', merchantRef: 'mref', requestTime: '20240101' } as unknown as MaterializedAgentAction, makeExecContext(payway, makeRecord('confirmed', { tool: 'check_transaction_by_merchant_ref' })));
+    await executeAction(
+      {
+        tool: 'check_transaction_by_merchant_ref',
+        merchantRef: 'mref',
+        requestTime: '20240101',
+      } as unknown as MaterializedAgentAction,
+      makeExecContext(payway, makeRecord('confirmed', { tool: 'check_transaction_by_merchant_ref' })),
+    );
     const call = (payway.khqr.getTransactionsByMerchantRef as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[0]).toBe('mref');
     expect(call[1]).toBe('20240101');
   });
 
   it('poll_transaction bounds via intervalMs/maxDurationMs', async () => {
-    await executeAction({ tool: 'poll_transaction', transactionId: 'tx1', interval: 1000, timeout: 5000 } as unknown as MaterializedAgentAction, makeExecContext(payway, makeRecord('confirmed', { tool: 'poll_transaction' })));
+    await executeAction(
+      {
+        tool: 'poll_transaction',
+        transactionId: 'tx1',
+        interval: 1000,
+        timeout: 5000,
+      } as unknown as MaterializedAgentAction,
+      makeExecContext(payway, makeRecord('confirmed', { tool: 'poll_transaction' })),
+    );
     const opts = (payway.checkout.pollTransactionStatus as ReturnType<typeof vi.fn>).mock.calls[0][1];
     expect(opts).toMatchObject({ intervalMs: 1000, maxDurationMs: 5000 });
   });
 
   it('save_artifact wired to saveQrArtifact with sessionId', async () => {
-    await executeAction({ tool: 'save_artifact', qrString: 'QR', name: 'n' } as unknown as MaterializedAgentAction, makeExecContext(payway, makeRecord('confirmed', { tool: 'save_artifact' })));
+    await executeAction(
+      { tool: 'save_artifact', qrString: 'QR', name: 'n' } as unknown as MaterializedAgentAction,
+      makeExecContext(payway, makeRecord('confirmed', { tool: 'save_artifact' })),
+    );
     expect(saveQrArtifact).toHaveBeenCalledTimes(1);
     const input = (saveQrArtifact as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(input.sessionId).toBe('sess-1');
@@ -314,13 +379,19 @@ describe('TASK-009 tool registry + executor', () => {
   });
 
   it('open_artifact wired to openArtifact', async () => {
-    await executeAction({ tool: 'open_artifact', reference: 'https://x' } as unknown as MaterializedAgentAction, makeExecContext(payway, makeRecord('confirmed', { tool: 'open_artifact' })));
+    await executeAction(
+      { tool: 'open_artifact', reference: 'https://x' } as unknown as MaterializedAgentAction,
+      makeExecContext(payway, makeRecord('confirmed', { tool: 'open_artifact' })),
+    );
     expect(openArtifact).toHaveBeenCalledTimes(1);
     expect((openArtifact as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('https://x');
   });
 
   it('copy_to_clipboard wired to copyToClipboard', async () => {
-    await executeAction({ tool: 'copy_to_clipboard', text: 'T' } as unknown as MaterializedAgentAction, makeExecContext(payway, makeRecord('confirmed', { tool: 'copy_to_clipboard' })));
+    await executeAction(
+      { tool: 'copy_to_clipboard', text: 'T' } as unknown as MaterializedAgentAction,
+      makeExecContext(payway, makeRecord('confirmed', { tool: 'copy_to_clipboard' })),
+    );
     expect(copyToClipboard).toHaveBeenCalledTimes(1);
     expect((copyToClipboard as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('T');
   });

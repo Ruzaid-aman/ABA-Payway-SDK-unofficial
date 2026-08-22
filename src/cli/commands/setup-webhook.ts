@@ -11,8 +11,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import { createStorage, type StorageType } from '../../webhook/storage-factory.js';
 import { createWebhookServer, type WebhookServerResult } from '../../webhook/server.js';
+import { createStorage, type StorageType } from '../../webhook/storage-factory.js';
 import { createTunnelManager, findCloudflared, type TunnelManager } from '../../webhook/tunnel.js';
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,9 @@ export async function runSetupWebhook(opts: SetupWebhookOptions): Promise<void> 
           if (!cloudflaredPath) {
             console.log(`\n  ${c.red('✗')} ${c.bold('cloudflared not found.')}`);
             console.log(`  Please install it or provide a public URL.`);
-            console.log(`  Install: ${c.cyan('https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/')}`);
+            console.log(
+              `  Install: ${c.cyan('https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/')}`,
+            );
             console.log(`  Or use:  ${c.cyan('payway-sdk setup-webhook --url <your-public-url>')}\n`);
             process.exitCode = 1;
             return;
@@ -117,7 +119,9 @@ export async function runSetupWebhook(opts: SetupWebhookOptions): Promise<void> 
     if (!cloudflaredPath) {
       console.log(`\n  ${c.red('✗')} ${c.bold('cloudflared not found.')}`);
       console.log(`  Please install it or provide a public URL.`);
-      console.log(`  Install: ${c.cyan('https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/')}`);
+      console.log(
+        `  Install: ${c.cyan('https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/')}`,
+      );
       console.log(`  Or use:  ${c.cyan('payway-sdk setup-webhook --url <your-public-url>')}\n`);
       process.exitCode = 1;
       return;
@@ -140,9 +144,7 @@ export async function runSetupWebhook(opts: SetupWebhookOptions): Promise<void> 
   }
 
   // ── Step 4: Compute webhook URL ──────────────────────────────────────
-  const webhookUrl = publicUrl
-    ? `${publicUrl}/aba-payway-webhook`
-    : `http://localhost:${port}/aba-payway-webhook`;
+  const webhookUrl = publicUrl ? `${publicUrl}/aba-payway-webhook` : `http://localhost:${port}/aba-payway-webhook`;
 
   // ── Step 5: Persist tunnel URL to .env as PAYWAY_CALLBACK_URL ──────
   let previousCallbackUrl: string | null = null; // Save original value to restore on shutdown
@@ -227,9 +229,7 @@ export async function runSetupWebhook(opts: SetupWebhookOptions): Promise<void> 
       const envPath = path.resolve(process.cwd(), '.env');
       if (existsSync(envPath)) {
         const existing = readFileSync(envPath, 'utf-8');
-        const lines = existing.split(/\r?\n/).filter(
-          (l) => !l.trim().startsWith('PAYWAY_CALLBACK_URL='),
-        );
+        const lines = existing.split(/\r?\n/).filter((l) => !l.trim().startsWith('PAYWAY_CALLBACK_URL='));
         writeFileSync(envPath, lines.join('\n'), 'utf-8');
         delete process.env.PAYWAY_CALLBACK_URL;
         console.log(`  ${c.dim('○')} Removed PAYWAY_CALLBACK_URL from .env (tunnel stopped)`);

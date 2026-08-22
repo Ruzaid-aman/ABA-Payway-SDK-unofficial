@@ -1,15 +1,15 @@
 import { encryptMerchantAuth } from '../auth.js';
+import type { AddBeneficiaryParams, PayoutParams, PayWayConfig, UpdateBeneficiaryStatusParams } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
+import type { components } from '../types.js';
 import {
   filterParams,
-  validateTransactionId,
-  validatePositiveAmount,
-  validateCurrency,
   validateBeneficiaries,
+  validateCurrency,
+  validatePositiveAmount,
+  validateTransactionId,
 } from '../utils.js';
-import type { components } from '../types.js';
-import type { PayWayConfig, PayoutParams, UpdateBeneficiaryStatusParams, AddBeneficiaryParams } from '../client.js';
 
 export interface PayoutDomain {
   payout: (params: PayoutParams) => Promise<components['schemas']['PayoutResponse']>;

@@ -1,0 +1,21 @@
+# TASK-013: End-to-End Verification and Architecture Review
+
+- **Task ID:** TASK-013
+- **Agent:** task(TASK-013)
+- **Status:** Completed
+- **Commit:** (owned by orchestrator)
+- **Files changed:** src/__tests__/agent-e2e.test.ts (new), src/agent/orchestrator.ts (minimal fix, see Issues), docs/superpowers/plans/agentic-payway-cli-status/TASK-013.md (new)
+- **Tests with results:** src/__tests__/agent-e2e.test.ts — 18 passed (scenarios 1-8, see below); full suite 578 passed (560 prior + 18 new). `npm run build`, `npm run typecheck`, `npm test` all green. `node dist/cli.js --help`, `agent --help`, and `agent doctor` all succeed. `git diff --check` exits 0 (one pre-existing CRLF whitespace warning, no errors). `npm run lint` reports 30 pre-existing errors confined to prior-task files (agent-artifacts/-provider/-cli/-context/-planning-risk/-privacy-session tests and src/agent/{local-tools,artifacts}.ts); no lint errors are introduced by TASK-013.
+- **Issues:** One verified gap fixed in `src/agent/orchestrator.ts` only: canary secrets supplied in the free-text `request` and in `plan.context` were being transmitted to the provider (`provider.propose`) and persisted into the session plan event, the materialized result `plan`, and `result.request` without scrubbing. This violated the design guarantee "Secrets cannot reach provider payloads or session files" (TASK-004 acceptance) and scenario 8. Fix: scrub the request before `propose` and before storing/returning it, and scrub `plan.request`/`plan.context` in both the session plan event and the materialized result plan (via the existing `scrubSensitive`). No other files, package.json/lockfile, or manual CLI commands were changed.
+- **Handoff notes:** Design-to-test coverage summary (all 8 TASK-013 e2e scenarios mapped to passing assertions in `src/__tests__/agent-e2e.test.ts`):
+
+  1. **Generic $3 online QR e2e** — proposal -> sandbox `--approve` -> ledger (planned/confirmed/submitted/succeeded) -> mocked `generateQr` called exactly once -> QR artifact saved under `payway-output` -> polling offered. `findUnfinishedExecutions` empty (terminal).
+  2. **Non-TTY without approval** — returns structured `needs_confirmation` JSON, zero API requests (ledger planned record only).
+  3. **Production authorization matrix** — `--yolo` in production rejected (`needs_confirmation`, zero API); `--approve` in production succeeds (mocked create).
+  4. **Missing callback / explicit offline KHQR** — generic payment with missing callback returns `needs_clarification` and never falls back to offline KHQR (zero `generateQr` and zero `generateOfflineQR`); explicit offline KHQR succeeds and offers no polling.
+  5. **Checkout / payment-link / lookups** — `create_checkout_payload` calls local `createTransaction` (distinct from remote `purchase`); `create_payment_link` requires RSA readiness and calls `paymentLink.create`; `check_transaction` vs `check_transaction_by_merchant_ref` hit distinct client methods (`checkTransaction` vs `getTransactionsByMerchantRef`).
+  6. **outcome_unknown & no replay** — simulated `PayWayNetworkError` marks `outcome_unknown`, reports failure with `OUTCOME_UNKNOWN`; `findUnfinishedExecutions` recovers the correlation (read-only, no replay).
+  7. **Resume without approval & malicious attempts** — `resume()` returns `needs_confirmation`, restores no write approval, zero API; provider path traversal (`../../../etc/passwd`), `file://` and `http://` URI schemes in `open_artifact`, and an out-of-scope `exec_shell` tool are all rejected (no crash, no API).
+  8. **Canary secrets isolation** — unit assert `scrubSensitive` redacts API keys / bearer tokens / PEM across structured channels; integration assert canaries in `request` + `plan.context` are absent from provider payload (`propose` arg), serialized command result, console output, persisted session files, ledger records, and artifact metadata.
+
+  Manual verification records: `node dist/cli.js --help` and `agent --help` list the `ask`/`agent` surfaces; `agent doctor` prints the capability matrix. No create API is invoked more than once per approved execution record (asserted in every success scenario). No manual CLI regression (full suite 578 passed). The worktree contains no real credentials, payment artifacts, or session data — all tests use a temp `APPDATA` and an isolated `cwd` for artifacts.

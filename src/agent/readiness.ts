@@ -1,8 +1,8 @@
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { validateKhqrConfiguration } from '../khqr-config.js';
-import type { ProviderConfigV1 } from './contracts.js';
 import type { ResolvedPayWayContext } from './context.js';
+import type { ProviderConfigV1 } from './contracts.js';
 
 export type CapabilityState = 'ready' | 'missing' | 'invalid' | 'unverified';
 
@@ -57,10 +57,7 @@ function resolveDataDir(): string | undefined {
  * is checked elsewhere. Generic payment readiness (online QR) FAILS when the
  * online callback URL is missing and MUST NOT fall back to offline KHQR.
  */
-export function evaluateReadiness(
-  context: ResolvedPayWayContext,
-  _providerConfig: ProviderConfigV1,
-): CapabilityMatrix {
+export function evaluateReadiness(context: ResolvedPayWayContext, _providerConfig: ProviderConfigV1): CapabilityMatrix {
   const provider: CapabilityState = 'unverified';
   const contextState: CapabilityState = context.source !== 'none' ? 'ready' : 'missing';
 

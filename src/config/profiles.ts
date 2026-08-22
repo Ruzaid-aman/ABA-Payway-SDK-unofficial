@@ -70,9 +70,11 @@ export function getProfileByName(store: CredentialProfileStore, name: string): C
 
 export function addProfile(store: CredentialProfileStore, profile: CredentialProfile): void {
   if (!profile.name.trim()) throw new Error('Profile name is required');
-  if (!['sandbox', 'production'].includes(profile.environment)) throw new Error('Profile environment must be sandbox or production');
+  if (!['sandbox', 'production'].includes(profile.environment))
+    throw new Error('Profile environment must be sandbox or production');
   if (!profile.merchantId.trim() || !profile.apiKey.trim()) throw new Error('Merchant ID and API key are required');
-  if (profile.note && profile.note.length > MAX_PROFILE_NOTE_LENGTH) throw new Error('Profile note must be at most 300 characters');
+  if (profile.note && profile.note.length > MAX_PROFILE_NOTE_LENGTH)
+    throw new Error('Profile note must be at most 300 characters');
   if (getProfileByName(store, profile.name)) throw new Error(`Profile "${profile.name}" already exists`);
   if (store.profiles.length >= MAX_CREDENTIAL_PROFILES) throw new Error('A maximum of 8 profiles is allowed');
   store.profiles.push({ ...profile, name: profile.name.trim(), note: profile.note?.trim() || undefined });

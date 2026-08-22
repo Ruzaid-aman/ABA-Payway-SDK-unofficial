@@ -1,23 +1,25 @@
 import { generateHmac } from '../auth.js';
+import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
+import { PollingAbortedError } from '../errors.js';
+import type { components, PollTransactionOptions, PollTransactionResult } from '../types.js';
 import {
-  formatRequestTime,
-  formatAmount,
   encodeBase64IfNeeded,
   filterParams,
+  formatAmount,
+  formatRequestTime,
   validateCurrency,
+  validateLifetime,
   validatePositiveAmount,
   validateRefundAmount,
   validateTransactionId,
-  validateLifetime,
 } from '../utils.js';
-import type { components, PollTransactionOptions, PollTransactionResult } from '../types.js';
-import type { PayWayConfig, CreateTransactionParams, GetTransactionListParams } from '../client.js';
-import { PollingAbortedError } from '../errors.js';
 
 export interface CheckoutDomain {
   createTransaction: (params: CreateTransactionParams) => Record<string, unknown> & { hash: string };
-  purchase: (params: CreateTransactionParams) => Promise<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>;
+  purchase: (
+    params: CreateTransactionParams,
+  ) => Promise<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>;
   checkTransaction: (
     transactionId: string,
     requestTime?: string,
@@ -39,7 +41,11 @@ export interface CheckoutDomain {
    *   Providing the correct currency enables client-side minimum-amount
    *   validation (PayWay returns PTL04 if refund_amount < 0.01 USD).
    */
-  refund: (transactionId: string, amount: number, currency?: 'USD' | 'KHR') => Promise<components['schemas']['RefundResponse']>;
+  refund: (
+    transactionId: string,
+    amount: number,
+    currency?: 'USD' | 'KHR',
+  ) => Promise<components['schemas']['RefundResponse']>;
   getExchangeRate: (requestTime?: string) => Promise<components['schemas']['ExchangeRateResponse']>;
 
   /**
@@ -331,9 +337,8 @@ export function createCheckoutDomain(
 
           // Extract payment status — consistent with scripts/qr-payment-test.ts pattern
           const data = (result as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-          const paymentStatus = (data?.payment_status as string)
-            ?? (result as Record<string, unknown>)?.status as string
-            ?? 'UNKNOWN';
+          const paymentStatus =
+            (data?.payment_status as string) ?? ((result as Record<string, unknown>)?.status as string) ?? 'UNKNOWN';
           const statusStr = typeof paymentStatus === 'string' ? paymentStatus : String(paymentStatus);
           const isTerminal = TERMINAL_STATUSES.includes(statusStr.toUpperCase());
 
@@ -352,7 +357,6 @@ export function createCheckoutDomain(
 
           // Stop if terminal — iterator completes naturally
           if (isTerminal) return;
-
         } catch (error: unknown) {
           consecutiveErrors++;
 
@@ -394,7 +398,7 @@ export function createCheckoutDomain(
           });
         }
         const sleepMs = Math.min(intervalMs, remainingMs);
-        await new Promise<void>(resolve => setTimeout(resolve, sleepMs));
+        await new Promise<void>((resolve) => setTimeout(resolve, sleepMs));
       }
     },
   };

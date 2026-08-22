@@ -43,7 +43,9 @@ describe('readMaskedInput', () => {
     const output = new FakeOutput();
     const fallback = vi.fn(async () => 'from-pipe');
 
-    await expect(readMaskedInput('PayWay data: ', { input: input as never, output: output as never, fallback })).resolves.toBe('from-pipe');
+    await expect(
+      readMaskedInput('PayWay data: ', { input: input as never, output: output as never, fallback }),
+    ).resolves.toBe('from-pipe');
     expect(fallback).toHaveBeenCalledWith('PayWay data: ');
     expect(output.writes).toEqual([]);
   });

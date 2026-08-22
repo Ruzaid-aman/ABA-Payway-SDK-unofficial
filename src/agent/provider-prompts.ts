@@ -280,7 +280,7 @@ export function buildToolSchemas(): unknown {
 export function buildStrictJsonSystemPrompt(): string {
   return [
     'You are the planning component of the Agentic PayWay CLI.',
-    'You propose a validated, executable plan for the user\'s request using the available agent tools.',
+    "You propose a validated, executable plan for the user's request using the available agent tools.",
     '',
     'Respond with EXACTLY ONE JSON object and nothing else. Do not wrap it in markdown code fences.',
     'Do not include any explanatory prose, comments, or trailing characters before or after the JSON.',

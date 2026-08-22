@@ -124,9 +124,7 @@ export function hasBlockingIssues(issues: ReadonlyArray<EnvIssue>): boolean {
  *
  * @returns An array of blocking issues (length 0 = credentials are present).
  */
-export function validateRequiredCredentials(
-  env: NodeJS.ProcessEnv,
-): EnvIssue[] {
+export function validateRequiredCredentials(env: NodeJS.ProcessEnv): EnvIssue[] {
   const issues: EnvIssue[] = [];
 
   if (!isNonEmpty(env.PAYWAY_MERCHANT_ID)) {

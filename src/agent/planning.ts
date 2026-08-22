@@ -1,12 +1,6 @@
-import type {
-  AgentActionDraft,
-  AgentPlanV1,
-  Currency,
-  Environment,
-  ProviderConfigV1,
-} from './contracts.js';
-import { evaluateReadiness } from './readiness.js';
 import type { ResolvedPayWayContext } from './context.js';
+import type { AgentActionDraft, AgentPlanV1, Currency, Environment, ProviderConfigV1 } from './contracts.js';
+import { evaluateReadiness } from './readiness.js';
 
 export interface NormalizedPlanResult {
   plan: AgentPlanV1;
@@ -21,14 +15,6 @@ const ONLINE_QR_DEFAULT_LIFETIME = 900;
 const GENERIC_QR_EXPLANATION =
   "You didn't specify a payment interface, so I went ahead with the quick and easy online QR payment approach. If you prefer checkout or a payment link, just ask again.";
 
-const CREATE_TOOLS = new Set([
-  'generate_online_qr',
-  'generate_offline_khqr',
-  'create_checkout_payload',
-  'create_checkout_purchase',
-  'create_payment_link',
-]);
-
 const READONLY_TOOLS = new Set([
   'check_transaction',
   'check_transaction_by_merchant_ref',
@@ -37,10 +23,6 @@ const READONLY_TOOLS = new Set([
   'open_artifact',
   'copy_to_clipboard',
 ]);
-
-function isCreateTool(tool: string): boolean {
-  return CREATE_TOOLS.has(tool);
-}
 
 function dummyProvider(): ProviderConfigV1 {
   return {
@@ -102,7 +84,7 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
   const readiness = evaluateReadiness(context, dummyProvider());
 
   for (const action of actions) {
-    const tool = (action as { tool?: string }).tool;
+    const _tool = (action as { tool?: string }).tool;
 
     if (actionHasRoute(action, 'generate_online_qr')) {
       const qr = action as Extract<AgentActionDraft, { tool: 'generate_online_qr' }>;
@@ -115,8 +97,9 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
         clarification = clarification ?? 'Specify a payment amount before I can generate a QR.';
         warnings.push('online QR is missing a required amount');
       }
-      if (qr.amount !== undefined && amountViolation(qr.currency, qr.amount)) {
-        warnings.push(amountViolation(qr.currency, qr.amount)!);
+      if (qr.amount !== undefined) {
+        const violation = amountViolation(qr.currency, qr.amount);
+        if (violation) warnings.push(violation);
       }
       if (qr.callbackUrl !== undefined && !isPublicHttps(qr.callbackUrl)) {
         warnings.push('online QR callbackUrl must be a public https URL');
@@ -129,8 +112,9 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
       }
     } else if (actionHasRoute(action, 'generate_offline_khqr')) {
       const khqr = action as Extract<AgentActionDraft, { tool: 'generate_offline_khqr' }>;
-      if (khqr.amount !== undefined && amountViolation(khqr.currency, khqr.amount)) {
-        warnings.push(amountViolation(khqr.currency, khqr.amount)!);
+      if (khqr.amount !== undefined) {
+        const violation = amountViolation(khqr.currency, khqr.amount);
+        if (violation) warnings.push(violation);
       }
       if (readiness.offlineKhqr !== 'ready') {
         needsClarification = true;
@@ -145,8 +129,9 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
         AgentActionDraft,
         { tool: 'create_checkout_payload' | 'create_checkout_purchase' }
       >;
-      if (checkout.amount !== undefined && amountViolation(checkout.currency, checkout.amount)) {
-        warnings.push(amountViolation(checkout.currency, checkout.amount)!);
+      if (checkout.amount !== undefined) {
+        const violation = amountViolation(checkout.currency, checkout.amount);
+        if (violation) warnings.push(violation);
       }
       if (readiness.checkout !== 'ready') {
         needsClarification = true;
@@ -154,8 +139,9 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
       }
     } else if (actionHasRoute(action, 'create_payment_link')) {
       const link = action as Extract<AgentActionDraft, { tool: 'create_payment_link' }>;
-      if (amountViolation(link.currency, link.amount)) {
-        warnings.push(amountViolation(link.currency, link.amount)!);
+      {
+        const violation = amountViolation(link.currency, link.amount);
+        if (violation) warnings.push(violation);
       }
       if (!isPublicHttps(link.returnUrl)) {
         warnings.push('payment link returnUrl must be a public https URL');
@@ -189,10 +175,7 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
  * when none is detected. The default 900-second lifetime is applied and the
  * documented explanation is attached as the action rationale.
  */
-export function defaultGenericOnlineQr(
-  request: string,
-  context: ResolvedPayWayContext,
-): AgentActionDraft {
+export function defaultGenericOnlineQr(request: string, context: ResolvedPayWayContext): AgentActionDraft {
   const { amount, currency } = parseRequestAmount(request);
 
   const draft: AgentActionDraft = {

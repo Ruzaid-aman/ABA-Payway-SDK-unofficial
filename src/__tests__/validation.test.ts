@@ -1,12 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
-import { PayWayConfigError } from '../errors.js';
-import type { PayWayConfig, CreatePaymentLinkParams } from '../client.js';
-
+import { describe, expect, it, vi } from 'vitest';
+import type {
+  CofPaymentParams,
+  CreatePaymentLinkParams,
+  LinkAccountParams,
+  LinkCardParams,
+  PayWayConfig,
+  TokenParams,
+} from '../client.js';
+import { createCredentialsOnFileDomain } from '../domains/credentials-on-file.js';
+import { createKhqrDomain } from '../domains/khqr.js';
 import { createPaymentLinkDomain } from '../domains/payment-link.js';
 import { createPreAuthDomain } from '../domains/pre-auth.js';
-import { createKhqrDomain } from '../domains/khqr.js';
-import { createCredentialsOnFileDomain } from '../domains/credentials-on-file.js';
-import type { LinkAccountParams, LinkCardParams, CofPaymentParams, TokenParams } from '../client.js';
+import { PayWayConfigError } from '../errors.js';
 
 // Dummy request functions that should not be called when validation fails
 const dummyRequest = <TResponse>(_path: string, _body: Record<string, unknown>): Promise<TResponse> => {
@@ -84,7 +89,9 @@ describe('Validation: payment-link', () => {
   });
 
   it('throws when returnUrl is not a public HTTPS URL', () => {
-    expect(() => paymentLink.create({ ...validParams, returnUrl: 'http://localhost/webhook' })).toThrow(PayWayConfigError);
+    expect(() => paymentLink.create({ ...validParams, returnUrl: 'http://localhost/webhook' })).toThrow(
+      PayWayConfigError,
+    );
   });
 
   it('calls requestWithMerchantAuth when inputs are valid', async () => {
@@ -101,7 +108,6 @@ describe('Validation: payment-link', () => {
     expect(payload.return_url).toBe(Buffer.from('https://example.com/return', 'utf8').toString('base64'));
   });
 });
-
 
 describe('Validation: pre-auth', () => {
   const preAuth = createPreAuthDomain(dummyRequestWithAuth);
@@ -150,9 +156,7 @@ describe('Validation: credentials-on-file', () => {
   const cofPos = createCredentialsOnFileDomain(DUMMY_CONFIG, spyRequest);
 
   it('throws when linkAccount requestId is missing', () => {
-    expect(() => cof.linkAccount({ requestId: '' } as unknown as LinkAccountParams)).toThrow(
-      PayWayConfigError,
-    );
+    expect(() => cof.linkAccount({ requestId: '' } as unknown as LinkAccountParams)).toThrow(PayWayConfigError);
   });
 
   it('throws when linkCard returnUrl is invalid', () => {
@@ -163,7 +167,12 @@ describe('Validation: credentials-on-file', () => {
 
   it('throws when payment missing paymentToken', () => {
     expect(() =>
-      cof.payment({ requestId: 'r1', transactionId: 't1', amount: 10, paymentToken: '' } as unknown as CofPaymentParams),
+      cof.payment({
+        requestId: 'r1',
+        transactionId: 't1',
+        amount: 10,
+        paymentToken: '',
+      } as unknown as CofPaymentParams),
     ).toThrow(PayWayConfigError);
   });
 
@@ -175,7 +184,12 @@ describe('Validation: credentials-on-file', () => {
 
   it('calls request for valid payment', async () => {
     rawSpy.mockClear();
-    await cofPos.payment({ requestId: 'r1', transactionId: 't1', amount: 10, paymentToken: 'pt' } as unknown as CofPaymentParams);
+    await cofPos.payment({
+      requestId: 'r1',
+      transactionId: 't1',
+      amount: 10,
+      paymentToken: 'pt',
+    } as unknown as CofPaymentParams);
     expect(rawSpy).toHaveBeenCalled();
   });
 });

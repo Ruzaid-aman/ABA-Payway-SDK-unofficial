@@ -5,7 +5,7 @@
  * The actual `cloudflared` binary is NOT required — we mock spawn behavior.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock child_process before importing the tunnel module
 vi.mock('node:child_process', () => {
@@ -16,8 +16,8 @@ vi.mock('node:child_process', () => {
   };
 });
 
-import { findCloudflared, createTunnelManager } from '../webhook/tunnel.js';
 import { exec } from 'node:child_process';
+import { createTunnelManager, findCloudflared } from '../webhook/tunnel.js';
 
 const mockExec = vi.mocked(exec);
 
@@ -44,7 +44,10 @@ describe('findCloudflared', () => {
     mockExec.mockImplementation(((_cmd: string, _optsOrCb: unknown, maybeCb?: unknown) => {
       const cb = typeof _optsOrCb === 'function' ? _optsOrCb : maybeCb;
       if (typeof cb === 'function') {
-        (cb as (err: null, result: { stdout: string; stderr: string }) => void)(null, { stdout: '/usr/local/bin/cloudflared\n', stderr: '' });
+        (cb as (err: null, result: { stdout: string; stderr: string }) => void)(null, {
+          stdout: '/usr/local/bin/cloudflared\n',
+          stderr: '',
+        });
       }
       return {} as ReturnType<typeof exec>;
     }) as unknown as typeof exec);

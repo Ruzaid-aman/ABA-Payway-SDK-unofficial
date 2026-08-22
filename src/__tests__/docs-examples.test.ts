@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { extractWebhookSignature, removeHashField } from '../../docs/examples/backend/webhook-verification.ts';
 import { createCheckoutPayload } from '../../docs/examples/backend/checkout-signing.ts';
+import { extractWebhookSignature, removeHashField } from '../../docs/examples/backend/webhook-verification.ts';
 
 describe('Documentation examples', () => {
   const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -19,10 +19,7 @@ describe('Documentation examples', () => {
   const readDoc = (path: string) => readFileSync(join(repoRoot, path), 'utf8');
 
   it('documents webhook verification using X-PAYWAY-HMAC-SHA512 header', () => {
-    const webhookExample = readFileSync(
-      join(repoRoot, 'docs', 'examples', 'backend', 'webhook-receiver.js'),
-      'utf8',
-    );
+    const webhookExample = readFileSync(join(repoRoot, 'docs', 'examples', 'backend', 'webhook-receiver.js'), 'utf8');
 
     expect(webhookExample).toContain('x-payway-hmac-sha512');
     expect(webhookExample).toContain('crypto');
@@ -30,10 +27,7 @@ describe('Documentation examples', () => {
   });
 
   it('documents webhook verification correctly in the appendix snippets', () => {
-    const appendix = readFileSync(
-      join(repoRoot, 'docs', '14-appendix-code-snippets.md'),
-      'utf8',
-    );
+    const appendix = readFileSync(join(repoRoot, 'docs', '14-appendix-code-snippets.md'), 'utf8');
 
     expect(appendix).toContain('x-payway-hmac-sha512');
     expect(appendix).toContain('verifyCallback');
@@ -87,7 +81,10 @@ describe('Documentation examples', () => {
 
   it('documents official offline KHQR format, configuration, local-only behavior, and migration in README', () => {
     const readme = readDoc('README.md');
-    const offlineSection = readme.slice(readme.indexOf('### 3.1 Offline QR Generation'), readme.indexOf('### 4. Payment Link'));
+    const offlineSection = readme.slice(
+      readme.indexOf('### 3.1 Offline QR Generation'),
+      readme.indexOf('### 4. Payment Link'),
+    );
 
     expect(readme).toContain('payway.khqr.validateConfiguration()');
     expect(readme).toContain('62.68');
@@ -101,7 +98,10 @@ describe('Documentation examples', () => {
 
   it('documents official offline KHQR configuration, static/dynamic modes, no-network limit, and migration in the QR guide', () => {
     const qrGuide = readDoc('docs/07-qr-code-handling.md');
-    const offlineSection = qrGuide.slice(qrGuide.indexOf('## Official ABA KHQR Offline Generation'), qrGuide.indexOf('## QR Lifecycle'));
+    const offlineSection = qrGuide.slice(
+      qrGuide.indexOf('## Official ABA KHQR Offline Generation'),
+      qrGuide.indexOf('## QR Lifecycle'),
+    );
 
     expect(qrGuide).toContain('PAYWAY_KHQR_PAYWAY_DATA');
     expect(qrGuide).toContain('62.68');

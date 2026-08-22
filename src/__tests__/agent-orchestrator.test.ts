@@ -13,17 +13,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ResolvedPayWayContext } from '../agent/context.js';
+import type { AgentPlanV1, ProviderConfigV1 } from '../agent/contracts.js';
+import { AgentOrchestrator, type OrchestratorOptions } from '../agent/orchestrator.js';
+import { type ProviderAdapter, ProviderProposalError } from '../agent/provider.js';
+import { validateCommandResult } from '../agent/schemas.js';
 import type { PayWay } from '../client.js';
 import { PayWayNetworkError } from '../errors.js';
-import type {
-  AgentCommandResultV1,
-  AgentPlanV1,
-  ProviderConfigV1,
-} from '../agent/contracts.js';
-import type { ResolvedPayWayContext } from '../agent/context.js';
-import { validateCommandResult } from '../agent/schemas.js';
-import { ProviderProposalError, type ProviderAdapter } from '../agent/provider.js';
-import { AgentOrchestrator, type OrchestratorOptions } from '../agent/orchestrator.js';
 
 const tempDirs: string[] = [];
 const originalAppData = process.env.APPDATA;

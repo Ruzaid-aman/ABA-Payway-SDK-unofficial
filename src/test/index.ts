@@ -21,13 +21,13 @@
 
 import { createServer, type Server as HttpServer } from 'node:http';
 import type {
-  TransactionSession,
+  HandleResponseResult,
+  InitiateTransactionPayload,
   ResponseType,
   TestCase,
   TestResult,
   TestSuiteReport,
-  HandleResponseResult,
-  InitiateTransactionPayload,
+  TransactionSession,
 } from '../schema.js';
 
 /**
@@ -39,19 +39,13 @@ export interface TestHarnessDeps {
    * Module 1's `initiateTransaction` function (or a mock that produces
    * `TransactionSession` objects).
    */
-  initiate: (
-    payload: InitiateTransactionPayload,
-    config?: unknown,
-  ) => Promise<TransactionSession> | TransactionSession;
+  initiate: (payload: InitiateTransactionPayload, config?: unknown) => Promise<TransactionSession> | TransactionSession;
 
   /**
    * Module 2's `handleResponse` function (or a mock that processes
    * `TransactionSession` objects).
    */
-  handle: (
-    session: TransactionSession,
-    options?: unknown,
-  ) => Promise<HandleResponseResult> | HandleResponseResult;
+  handle: (session: TransactionSession, options?: unknown) => Promise<HandleResponseResult> | HandleResponseResult;
 }
 
 /**
@@ -173,8 +167,7 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
       // Raw-HTML endpoint used for the `html` end-to-end case.
       if (req.url === '/mock/html') {
         const html =
-          '<!DOCTYPE html><html><body><h1>PayWay Hosted Checkout</h1>' +
-          '<p>Mock html response.</p></body></html>';
+          '<!DOCTYPE html><html><body><h1>PayWay Hosted Checkout</h1>' + '<p>Mock html response.</p></body></html>';
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html);
         return;
@@ -355,7 +348,12 @@ export async function runTestSuite(
       // 6. Verify the handler action matches the expected response type.
       const action = handled.action;
       const expectedActions: Record<ResponseType, string[]> = {
-        deeplink: ['deeplink_redirect', 'deeplink_opened_new_tab', 'deeplink_redirect_same_tab', 'deeplink_skipped_no_dom'],
+        deeplink: [
+          'deeplink_redirect',
+          'deeplink_opened_new_tab',
+          'deeplink_redirect_same_tab',
+          'deeplink_skipped_no_dom',
+        ],
         qr_string: ['qr_rendered', 'qr_download_prompted'],
         qr_image: ['qr_image_rendered', 'qr_image_download_prompted', 'qr_image_skipped_no_dom'],
         checkout_qr_url: ['checkout_qr_url_rendered', 'checkout_qr_url_skipped_no_dom'],

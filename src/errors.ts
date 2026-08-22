@@ -95,10 +95,7 @@ export class PollingAbortedError extends PayWayError {
     totalAttempts: number;
     message?: string;
   }) {
-    super(
-      options.message ?? `Polling aborted for ${options.transactionId}: ${options.reason}`,
-      'config_error',
-    );
+    super(options.message ?? `Polling aborted for ${options.transactionId}: ${options.reason}`, 'config_error');
     Object.setPrototypeOf(this, PollingAbortedError.prototype);
     this.name = 'PollingAbortedError';
     this.transactionId = options.transactionId;

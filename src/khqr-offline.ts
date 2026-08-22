@@ -30,13 +30,15 @@ function crc16Ccitt(input: string): string {
   let crc = 0xffff;
   for (const byte of Buffer.from(input, 'utf8')) {
     crc ^= byte << 8;
-    for (let bit = 0; bit < 8; bit += 1) crc = (crc & 0x8000) !== 0 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+    for (let bit = 0; bit < 8; bit += 1)
+      crc = (crc & 0x8000) !== 0 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
   }
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
 function formatAmount(amount: number, currency: 'KHR' | 'USD'): string {
-  if (!Number.isFinite(amount) || amount <= 0) throw new PayWayConfigError('amount must be a positive finite number for a dynamic ABA KHQR payload');
+  if (!Number.isFinite(amount) || amount <= 0)
+    throw new PayWayConfigError('amount must be a positive finite number for a dynamic ABA KHQR payload');
   const source = String(amount);
   if (/e/i.test(source)) throw new PayWayConfigError('amount must not use exponent notation');
 
@@ -69,7 +71,11 @@ function timestamp(value: Date | number, field: 'createdAt' | 'expiresAt'): numb
 }
 
 function assertMerchantRef(merchantRef: string): void {
-  if (typeof merchantRef !== 'string' || merchantRef.trim().length === 0 || Buffer.byteLength(merchantRef, 'utf8') > 25) {
+  if (
+    typeof merchantRef !== 'string' ||
+    merchantRef.trim().length === 0 ||
+    Buffer.byteLength(merchantRef, 'utf8') > 25
+  ) {
     throw new PayWayConfigError('merchantRef must be a non-empty value of at most 25 UTF-8 bytes');
   }
 }
@@ -95,15 +101,25 @@ export function generateOfflineQR(
   const payload = [
     encodeTlv('00', '01'),
     encodeTlv('01', params.amount === undefined ? '11' : '12'),
-    encodeTemplate('30', [['00', resolvedConfiguration.bakongId], ['01', resolvedConfiguration.abaMerchantId], ['02', resolvedConfiguration.acquirerName]]),
+    encodeTemplate('30', [
+      ['00', resolvedConfiguration.bakongId],
+      ['01', resolvedConfiguration.abaMerchantId],
+      ['02', resolvedConfiguration.acquirerName],
+    ]),
     encodeTlv('52', resolvedConfiguration.merchantCategoryCode),
     encodeTlv('53', params.currency === 'KHR' ? '116' : '840'),
     ...(params.amount === undefined ? [] : [encodeTlv('54', formatAmount(params.amount, params.currency))]),
     encodeTlv('58', 'KH'),
     encodeTlv('59', resolvedConfiguration.merchantName),
     encodeTlv('60', resolvedConfiguration.merchantCity),
-    encodeTemplate('62', [['01', params.merchantRef], ['68', resolvedConfiguration.paywayData]]),
-    encodeTemplate('99', [['00', String(createdAt)], ['01', String(expiresAt)]]),
+    encodeTemplate('62', [
+      ['01', params.merchantRef],
+      ['68', resolvedConfiguration.paywayData],
+    ]),
+    encodeTemplate('99', [
+      ['00', String(createdAt)],
+      ['01', String(expiresAt)],
+    ]),
   ].join('');
   const crcBoundary = `${payload}6304`;
   return `${crcBoundary}${crc16Ccitt(crcBoundary)}`;

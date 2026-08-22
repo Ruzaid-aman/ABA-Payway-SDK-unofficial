@@ -92,9 +92,7 @@ export function parseKhqrPaymentNotification(payload: unknown): ParsedKhqrPaymen
   for (const field of STRING_FIELDS) requireString(raw, field);
   for (const field of NUMBER_FIELDS) requireNumber(raw, field);
 
-  const unknownFields = Object.fromEntries(
-    Object.entries(raw).filter(([field]) => !PUBLISHED_FIELDS.has(field)),
-  );
+  const unknownFields = Object.fromEntries(Object.entries(raw).filter(([field]) => !PUBLISHED_FIELDS.has(field)));
 
   return {
     kind: 'khqr-offline',

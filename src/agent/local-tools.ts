@@ -9,9 +9,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import path from 'node:path';
-import type { AgentSessionV1 } from './contracts.js';
 import { defaultArtifactRoot, resolveArtifactPath } from './artifacts.js';
+import type { AgentSessionV1 } from './contracts.js';
 
 export function sessionArtifactRoot(): string {
   return defaultArtifactRoot();
@@ -82,11 +81,7 @@ function runAllowed(allowed: AllowedCommand, stdinText?: string): Promise<void> 
       if (code === 0) {
         resolve();
       } else {
-        reject(
-          new Error(
-            `"${allowed.command}" exited with code ${code}${stderr ? `: ${stderr.trim()}` : ''}`,
-          ),
-        );
+        reject(new Error(`"${allowed.command}" exited with code ${code}${stderr ? `: ${stderr.trim()}` : ''}`));
       }
     });
 
@@ -108,11 +103,8 @@ function runAllowed(allowed: AllowedCommand, stdinText?: string): Promise<void> 
  *
  * Any other URI scheme (http, ftp, file, …) or out-of-root path is rejected.
  */
-export async function openArtifact(
-  reference: string,
-  session: AgentSessionV1,
-): Promise<void> {
-  if (!session || !session.sessionId) {
+export async function openArtifact(reference: string, session: AgentSessionV1): Promise<void> {
+  if (!session?.sessionId) {
     throw new Error('openArtifact requires a valid session');
   }
 
@@ -124,9 +116,7 @@ export async function openArtifact(
 
   // A URI scheme other than https (e.g. http://, ftp://, file://) is rejected.
   if (SCHEME_PATTERN.test(reference)) {
-    throw new Error(
-      `openArtifact only allows https URLs or in-root artifact paths; rejected scheme in "${reference}"`,
-    );
+    throw new Error(`openArtifact only allows https URLs or in-root artifact paths; rejected scheme in "${reference}"`);
   }
 
   // Case 2: a current-session artifact path confined to the session root.

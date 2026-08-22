@@ -89,14 +89,7 @@ export interface InitiateTransactionPayload {
    * and returns an HTML hosted checkout page. Use `abapay_khqr_deeplink` to
    * receive a JSON payload with qr_string + deeplink.
    */
-  paymentOption?:
-    | 'cards'
-    | 'abapay_khqr'
-    | 'abapay_khqr_deeplink'
-    | 'alipay'
-    | 'wechat'
-    | 'google_pay'
-    | string;
+  paymentOption?: 'cards' | 'abapay_khqr' | 'abapay_khqr_deeplink' | 'alipay' | 'wechat' | 'google_pay' | string;
   /** Optional shipping fee (additive to amount). */
   shipping?: number;
   /** Optional items list (descriptive only). */

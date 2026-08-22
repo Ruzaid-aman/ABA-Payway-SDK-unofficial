@@ -13,14 +13,10 @@
  * (`../client.js`), which is infrastructure — not another module.
  */
 
-import { PayWay } from '../client.js';
 import type { PayWayConfig } from '../client.js';
-import type {
-  TransactionSession,
-  InitiateTransactionPayload,
-  ResponseType,
-} from '../schema.js';
+import { PayWay } from '../client.js';
 import { PayWayConfigError } from '../errors.js';
+import type { InitiateTransactionPayload, ResponseType, TransactionSession } from '../schema.js';
 
 /**
  * Normalizes a raw PayWay purchase response into a `TransactionSession`.
@@ -35,14 +31,8 @@ import { PayWayConfigError } from '../errors.js';
  * This function inspects the raw response and assigns the correct
  * `responseType` discriminator so the client module knows how to render it.
  */
-export function normalizePaywayResponse(
-  raw: unknown,
-  sessionId: string,
-  lifetimeMinutes?: number,
-): TransactionSession {
-  const expiresAt = new Date(
-    Date.now() + (lifetimeMinutes ?? 60) * 60 * 1000,
-  ).toISOString();
+export function normalizePaywayResponse(raw: unknown, sessionId: string, lifetimeMinutes?: number): TransactionSession {
+  const expiresAt = new Date(Date.now() + (lifetimeMinutes ?? 60) * 60 * 1000).toISOString();
 
   // HTML hosted checkout page.
   if (typeof raw === 'string') {
@@ -155,10 +145,7 @@ export const server = {
    * @param config  - PayWay credentials and environment.
    * @returns A standardized `TransactionSession` object.
    */
-  async initiateTransaction(
-    payload: InitiateTransactionPayload,
-    config: PayWayConfig,
-  ): Promise<TransactionSession> {
+  async initiateTransaction(payload: InitiateTransactionPayload, config: PayWayConfig): Promise<TransactionSession> {
     if (!payload || typeof payload !== 'object') {
       throw new PayWayConfigError('payload is required');
     }

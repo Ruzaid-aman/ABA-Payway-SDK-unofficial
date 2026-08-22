@@ -8,24 +8,16 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { atomicWriteJson, getAgentDataPaths } from './storage.js';
 import { validateProviderConfig } from './schemas.js';
+import { atomicWriteJson, getAgentDataPaths } from './storage.js';
 
-const FORBIDDEN_HEADERS = [
-  'authorization',
-  'api-key',
-  'x-api-key',
-  'cookie',
-  'proxy-authorization',
-];
+const FORBIDDEN_HEADERS = ['authorization', 'api-key', 'x-api-key', 'cookie', 'proxy-authorization'];
 
 function guardForbiddenHeaders(headers?: Record<string, string>): void {
   if (!headers) return;
   for (const key of Object.keys(headers)) {
     if (FORBIDDEN_HEADERS.includes(key.toLowerCase())) {
-      throw new Error(
-        `Forbidden header "${key}" is not allowed in agent provider config`,
-      );
+      throw new Error(`Forbidden header "${key}" is not allowed in agent provider config`);
     }
   }
 }
@@ -49,9 +41,7 @@ export function readAgentConfig(): import('./contracts.js').ProviderConfigV1 | n
   try {
     raw = readFileSync(configFile, 'utf8');
   } catch (error) {
-    throw new Error(
-      `Unable to read agent config at ${configFile}: ${(error as Error).message}`,
-    );
+    throw new Error(`Unable to read agent config at ${configFile}: ${(error as Error).message}`);
   }
 
   let parsed: unknown;
@@ -73,9 +63,7 @@ export function readAgentConfig(): import('./contracts.js').ProviderConfigV1 | n
  *
  * Rejects invalid configs (including forbidden headers) before touching disk.
  */
-export function writeAgentConfig(
-  config: import('./contracts.js').ProviderConfigV1,
-): void {
+export function writeAgentConfig(config: import('./contracts.js').ProviderConfigV1): void {
   guardForbiddenHeaders(config.headers);
   if (!validateProviderConfig(config)) {
     throw new Error(`Invalid agent provider config: ${describeErrors()}`);
@@ -95,7 +83,8 @@ export function updateAgentConfig(
   patch: Partial<import('./contracts.js').ProviderConfigV1>,
 ): import('./contracts.js').ProviderConfigV1 {
   const existing =
-    readAgentConfig() ?? ({
+    readAgentConfig() ??
+    ({
       version: 'agent-config/v1',
       provider: 'openai',
       model: '',

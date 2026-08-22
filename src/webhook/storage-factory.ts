@@ -18,10 +18,7 @@ export type StorageType = 'json' | 'sqlite';
  * @param type - Explicit storage type. If `'auto'` (default), tries SQLite first.
  * @param filePath - Optional custom path for the storage file.
  */
-export async function createStorage(
-  type: StorageType | 'auto' = 'auto',
-  filePath?: string,
-): Promise<WebhookStorage> {
+export async function createStorage(type: StorageType | 'auto' = 'auto', filePath?: string): Promise<WebhookStorage> {
   if (type === 'json') {
     return new JsonWebhookStorage(filePath);
   }

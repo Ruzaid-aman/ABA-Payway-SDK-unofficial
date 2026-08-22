@@ -6,25 +6,22 @@
  * open/clipboard allowlist guards.
  */
 
+import { EventEmitter } from 'node:events';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveArtifactPath, saveQrArtifact } from '../agent/artifacts.js';
 import type { AgentSessionV1 } from '../agent/contracts.js';
-import {
-  resolveArtifactPath,
-  saveQrArtifact,
-} from '../agent/artifacts.js';
 import { copyToClipboard, openArtifact } from '../agent/local-tools.js';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
 const fsWriteSpy = vi.hoisted(() => vi.fn());
 const spawnSpy = vi.hoisted(() => vi.fn());
-const realWrite = vi.hoisted(
-  () => ({ writeFileSync: ((...args: unknown[]) => undefined) as (...args: unknown[]) => unknown }),
-);
+const realWrite = vi.hoisted(() => ({
+  writeFileSync: ((..._args: unknown[]) => undefined) as (...args: unknown[]) => unknown,
+}));
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -162,9 +159,7 @@ describe('saveQrArtifact', () => {
   });
 
   it('throws a clear error and never retries a payment on failure', async () => {
-    await expect(
-      saveQrArtifact({ root, sessionId: '' } as never),
-    ).rejects.toThrow(/requires a sessionId/);
+    await expect(saveQrArtifact({ root, sessionId: '' } as never)).rejects.toThrow(/requires a sessionId/);
   });
 });
 
@@ -221,7 +216,7 @@ describe('copyToClipboard', () => {
     await copyToClipboard('pay-abc-123');
     expect(spawned.length).toBe(1);
     // No shell; the text is piped, never concatenated into a command line.
-    const joined = spawned[0].command + ' ' + spawned[0].args.join(' ');
+    const joined = `${spawned[0].command} ${spawned[0].args.join(' ')}`;
     expect(joined).not.toContain('pay-abc-123');
   });
 });

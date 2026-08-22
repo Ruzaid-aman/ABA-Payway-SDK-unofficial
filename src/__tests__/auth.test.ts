@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
 import * as crypto from 'node:crypto';
-import { generateHmac, encryptMerchantAuth, verifyCallbackSignature } from '../auth.js';
+import { describe, expect, it } from 'vitest';
+import { encryptMerchantAuth, generateHmac, verifyCallbackSignature } from '../auth.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
