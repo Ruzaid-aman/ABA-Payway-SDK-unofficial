@@ -2,140 +2,151 @@
 
 ## Status
 
-Design approved in conversation; implementation has not started.
+Revised after architecture review; implementation has not started.
 
-## Goal
+## Goal and scope
 
-Add an agentic natural-language layer to the existing ABA PayWay TypeScript CLI while preserving manual command behavior. The layer supports one-shot requests and a conversational REPL for broad, multi-step PayWay workflows, beginning with the first-payment journey.
+Add an agentic natural-language layer to the ABA PayWay TypeScript CLI while preserving every existing manual command. It offers one-shot requests and a conversational REPL for broad, multi-step workflows, beginning with the first-payment journey.
+
+The LLM proposes typed actions. It never executes shell commands, bypasses SDK validation, or becomes the authority for credentials, execution, artifacts, or persistence.
+
+First-milestone scope is online QR, explicitly requested offline KHQR, checkout, payment links, transaction lookup/polling, and safe local utilities. Payouts, refunds, beneficiary management, callback administration, and arbitrary shell access remain out of scope.
 
 ## Product surfaces
 
 ```text
 payway-sdk ask "generate a QR code for $3"
 payway-sdk agent
+payway-sdk agent setup
+payway-sdk agent doctor
+payway-sdk agent sessions list|export|clear
 ```
 
-Manual Commander commands remain available and unchanged. The agent is an additive orchestration layer, not a replacement for the existing CLI.
+`ask` is a one-shot request. `agent` starts a REPL. Manual Commander commands continue to work unchanged. REPL directives provide predictable control without a shell: `:help`, `:profile`, `:history`, `:clear`, `:session`, `:run <allowlisted command>`, and `:exit`. `:run` accepts only recognized PayWay commands and uses the same local command/tool boundary.
 
 ## Architecture
 
-The agent uses a local orchestrator with typed tools:
-
 ```text
-CLI entrypoint
-  -> conversation/session manager
-  -> OpenAI-compatible provider adapter
-  -> validated agent plan
-  -> risk policy and confirmation gate
-  -> typed tool registry
-  -> PayWay SDK and local utility execution
+ask / agent command
+  -> resolved PayWay context
+  -> capability readiness check
+  -> conversation and provider adapter
+  -> strict plan validator
+  -> risk gate
+  -> execution ledger
+  -> typed PayWay and local-tool executor
+  -> artifact and session stores
 ```
 
-The LLM may plan workflows and select declared tools, but it cannot execute shell commands directly. Local code remains authoritative for validation, profile resolution, defaults, risk decisions, SDK invocation, artifact handling, and session persistence.
+The resolved context selects actual credentials, environment, callback URLs, and feature readiness. The readiness check determines the operations available. The provider proposes a plan; a local validator accepts only declared tools and schemas. The risk gate controls consent. The execution ledger makes uncertain writes recoverable without replay. Executors invoke the SDK and a small local-tool allowlist.
 
-## Provider boundary
+## Resolved PayWay context and readiness
 
-The provider adapter supports any OpenAI-compatible endpoint, including OpenAI, OpenRouter, OpenCode-compatible gateways, NVIDIA NIM, company gateways, and other compatible services. Configuration includes:
+Resolve PayWay configuration once at session start and whenever the user changes profile. Instantiate `PayWay` with those explicit resolved values; do not rely on mutable `process.env` after planning begins.
 
-- endpoint/base URL;
-- model;
-- API key;
-- request timeout; and
-- optional provider-specific headers.
+`ResolvedPayWayContext` records the selected source (`--profile`, `PAYWAY_PROFILE`, saved default profile, or `.env`), actual merchant credential source and environment, RSA-key availability, online QR callback URL, offline KHQR configuration, and a redacted display label. The profile/environment displayed in a confirmation must be the actual SDK context. A selected profile must not be silently overridden by pre-existing environment variables. Existing manual CLI behavior is not changed by this milestone.
 
-The model receives full non-secret tool results, including customer and transaction data, after an explicit privacy warning is shown. Credentials, private keys, authorization headers, and profile secret fields must never be included in provider requests.
+`agent doctor` reports a capability matrix for provider connectivity, selected context, online QR callback, offline KHQR, checkout, payment-link RSA readiness, and writable artifact/session storage.
+
+## Provider configuration and privacy
+
+Support OpenAI-compatible providers, including OpenAI, OpenRouter, OpenCode-compatible gateways, NVIDIA NIM, company gateways, and compatible self-hosted services.
+
+Store non-secret provider settings in a versioned agent configuration file in the OS application-data directory: provider preset or endpoint, model, timeout, optional headers, and capability mode (`native-tools` or `strict-json-plan`). Keep the provider API key in an environment variable, never with PayWay profiles, artifacts, or sessions.
+
+OpenAI compatibility does not imply equivalent tool calling. Native tool calls and strict JSON plans both undergo local schema validation. Unknown tools, malformed output, or extra action fields stop execution.
+
+The model may receive full non-secret tool results, including customer and transaction data, after an explicit privacy warning and recorded acknowledgement. A non-bypassable scrubber removes API keys, private keys, authorization headers, profile secrets, and signing material before provider requests and session writes. Provider context is bounded to the active window plus a deterministic state summary; the local session retains the complete history.
 
 ## First-payment typed tools
 
-The initial tool registry includes:
-
-- `generate_qr`: amount, currency, transaction ID/reference, lifetime, callback configuration, and QR output;
-- `create_checkout`: amount, currency, transaction ID, return/cancel URLs, and payment option;
-- `create_payment_link`: amount, currency, description, payment limit, and expiration;
-- `check_transaction`: transaction ID or merchant reference;
-- `poll_transaction`: transaction ID, interval, timeout, and explicit user approval;
-- `save_artifact`: normalized artifact type, content, and optional filename;
-- `open_artifact`: validated local path or HTTPS URL; and
-- `copy_to_clipboard`: text payload.
-
-Payouts, refunds, beneficiary management, callback administration, and other high-impact domains are outside the first milestone.
+- `generate_online_qr`: requires amount, currency, transaction ID, public HTTPS callback URL, and optional lifetime. It creates a dynamic PayWay QR that can be status-polled.
+- `generate_offline_khqr`: is explicit only; it requires ABA-issued KHQR merchant configuration and a merchant reference. It may be static, has no PayWay transaction polling, and has no online-QR lifetime.
+- `create_checkout_payload`: creates a signed local checkout payload for a server-side form. It makes no PayWay network request.
+- `create_checkout_purchase`: calls the checkout purchase API and returns its actual response type, such as QR string, deeplink, hosted checkout QR URL, or HTML.
+- `create_payment_link`: requires RSA credentials, title, amount, currency, unique merchant reference, and public HTTPS return URL; description, payment limit, and expiry are optional.
+- `check_transaction`: accepts transaction ID. Merchant-reference lookup is a separate tool.
+- `poll_transaction`: accepts transaction ID, interval, and a timeout bounded by remaining online-QR lifetime. It starts only after the post-payment offer is accepted.
+- `save_artifact`, `open_artifact`, and `copy_to_clipboard`: execute only validated local actions.
 
 ## Defaults and clarification
 
-Route selection follows this order:
+Explicit wording selects the route: `offline QR`, `checkout payload`, `checkout`, or `payment link`. A generic payment request defaults to an **online QR** only when readiness succeeds:
 
-1. Explicit user wording wins.
-2. A generic payment request defaults to QR payment.
-3. The agent explains the assumption:
+> You didn’t specify a payment interface, so I went ahead with the quick and easy online QR payment approach. If you prefer checkout or a payment link, just ask again.
 
-   > You didn’t specify a payment interface, so I went ahead with the quick and easy QR payment approach. If you prefer checkout or a payment link, just ask again.
+If online QR is not ready, explain the missing callback requirement and offer setup guidance. Never silently fall back to offline KHQR.
 
-4. Missing amount, ambiguous currency, invalid lifetime, or missing required callback details pauses for clarification.
+The default online QR lifetime is 15 minutes (900 seconds). `$3` and `3 USD` mean USD; `3,000 KHR` means KHR; a bare amount requires clarification unless the resolved context has a deliberate currency default. Validate before confirmation: USD has at most two decimals, KHR is an integer, transaction IDs are non-empty/20 characters or fewer/alphanumeric-hyphen only, and callback or return URLs are public HTTPS URLs.
 
-The default QR lifetime is 15 minutes (900 seconds). Explicit currency symbols and codes are interpreted directly: `$3` means USD, `3 USD` means USD, and `3,000 KHR` means KHR. A bare amount requires clarification unless a deliberate profile currency default exists.
+Generate a transaction ID only after create-action approval, persist it in the execution ledger before the request, and show it in the proposed action.
 
-The existing active profile and environment are used. The proposed action displays the selected profile name and environment, never credentials.
+## Confirmation, YOLO, and non-interactive behavior
 
-## Confirmation and YOLO behavior
-
-Risk is classified per tool and action:
-
-- low-risk local utilities may run without confirmation;
-- payment creation requires ordinary confirmation;
-- production actions, invalid or incomplete requests, and materially ambiguous actions are hard-gated; and
+- Read-only status checks and validated presentation utilities may run without confirmation.
+- Sandbox payment creation requires ordinary confirmation.
+- Production payment creation, incomplete or materially ambiguous requests, and actions outside the tool scope are hard-gated.
 - YOLO skips ordinary confirmations but cannot bypass hard gates.
 
-Each proposed action states the route, amount, currency, lifetime, selected profile/environment, and risk-relevant assumptions.
+`--approve` is the explicit non-interactive approval flag. `--yolo` is its user-facing alias. In a non-TTY invocation without `--approve`, return structured `needs_confirmation` output and do not create a payment.
 
-After QR creation, the agent saves and presents the result, then offers payment monitoring. Polling does not start automatically; it begins only after the user accepts the offer.
+Every create proposal states route, amount, currency, transaction ID, lifetime, selected profile/environment, callback or return URL, artifacts, and assumptions. After a successful online QR, save and show the result, then offer polling. A polled `APPROVED` result is an observed status only; webhook verification and merchant reconciliation remain the fulfillment source of truth.
+
+## Execution ledger and uncertain outcomes
+
+Every create operation has a persisted execution record:
+
+```text
+planned -> confirmed -> submitted -> succeeded | failed | outcome_unknown
+```
+
+Write the record before the network call. Create tools have no agent-level automatic retry. If a timeout, network failure, or ambiguous response occurs, mark `outcome_unknown`. First query the persisted transaction ID or merchant reference where supported; then ask before creating a new payment. Never replay an unfinished create action automatically, including after resuming a session. Local artifact failure never causes a new PayWay request.
 
 ## Artifacts and local utilities
 
-The agent’s default artifact directory is:
+Default artifact root:
 
 ```text
 ./payway-output/
 ```
 
-The directory is created on demand. QR results produce:
+Create the directory on demand. An online QR produces a QR PNG and normalized JSON metadata containing route, amount, currency, IDs/references, actual context label, timestamps, expiry, status, execution-record ID, and artifact paths. Exclude credentials, private keys, authorization headers, and signing material.
 
-- a QR image file; and
-- a safe normalized JSON metadata file containing amount, currency, route, transaction ID, merchant reference, profile name/environment, creation time, expiration time, artifact paths, and status.
+Write artifacts atomically. Normalize requested filenames and reject paths escaping the output root unless the user explicitly supplies and confirms an override. If PayWay returns only a QR string, render the PNG locally rather than treating the missing image as a payment failure. Print absolute clickable paths where supported and plain paths otherwise.
 
-Metadata excludes credentials and private keys. Users may request explicit filenames or output paths.
-
-The agent prints absolute paths as clickable terminal links where supported, falls back to plain paths otherwise, and can open saved files or HTTPS links with the platform default application. Clipboard copying is an explicit local utility.
-
-The current manual `generate-qr --save-image <path>` behavior remains unchanged. The existing CLI has no predefined artifact directory; repository `test-logs/` paths are test-script conventions, not user-facing storage.
+Opening the local generated QR image is part of the confirmed create plan. Other open actions accept only an artifact created in the active session or a validated HTTPS URL explicitly selected by the user. Never open arbitrary model-provided paths or URI schemes. The existing manual `generate-qr --save-image <path>` behavior remains unchanged.
 
 ## Sessions
 
-Every agent session is persisted as plaintext JSON in the OS application-data directory, separate from `./payway-output/` and credential profiles. On Windows this is under the existing PayWay application-data area, with platform-appropriate application-data locations elsewhere.
+Persist every agent session as plaintext, versioned JSON in the OS application-data directory, separate from artifacts and credential profiles. Retain sessions indefinitely until explicitly cleared. They contain prompts, deterministic summaries, plans, confirmations, execution records, tool calls, results, errors, and timestamps.
 
-Sessions are retained indefinitely until explicitly cleared. They include prompts, plans, confirmations, tool calls, results, errors, and timestamps. The CLI provides session listing, export, and explicit clearing commands. The CLI warns that session files may contain sensitive customer and transaction data and are not encrypted at rest.
+Use atomic writes and restrictive permissions where supported. Provide list, export, and explicit clear commands. Warn that session files can contain sensitive customer and transaction data and are not encrypted at rest. Resuming restores context but never restores approval for a write action.
 
 ## Failure behavior
 
-- LLM provider failure, timeout, malformed output, or unsupported tool call: no PayWay action runs.
-- Missing or ambiguous information: pause for clarification without execution.
-- Confirmation cancellation: record cancellation and await a revised request.
-- PayWay failure: preserve the local provider error while presenting a safe actionable summary.
-- Artifact failure after a successful API action: report the API success separately and do not retry payment creation automatically.
-- Polling failure: distinguish transient from terminal failures and allow the user to stop.
-- Session-write failure: warn that the action proceeded but the audit record was not persisted.
+- Provider failure, timeout, malformed output, unavailable capability, or invalid schema: no PayWay action runs.
+- Missing or ambiguous information: pause for clarification.
+- Capability not ready: name the exact missing configuration and offer `agent doctor`; do not substitute a route.
+- Confirmation cancellation: record cancellation and await revision.
+- PayWay error: preserve local error detail and present a safe actionable summary.
+- Unknown create outcome: persist, query, then require new consent before another creation.
+- Artifact failure after API success: report success separately and offer recovery.
+- Polling failure: distinguish transient errors from terminal states, stop at remaining lifetime, and allow cancellation.
+- Session-write failure: warn that the action proceeded without a durable audit record.
 
 ## Verification strategy
 
-Verification must cover:
+Verify resolved-context precedence and display accuracy; capability readiness; no online-to-offline fallback; money/ID/URL/lifetime validation; native-tool and strict-JSON provider modes; secret scrubbing; bounded provider context; risk, `--approve`, YOLO, and TTY behavior; execution-ledger unknown outcomes and no replay; SDK-tool contracts; QR-string-only rendering; artifact containment/open/copy; polling bounded by QR lifetime; session versioning and atomicity; skills/docs links; build, typecheck, lint, and CLI tests against rebuilt `dist/cli.js`.
 
-- intent parsing, defaults, route selection, currency handling, risk classification, hard gates, and metadata redaction;
-- typed-tool contract tests with mocked PayWay SDK responses;
-- OpenAI-compatible tool-call formats and malformed provider output;
-- `ask`, `agent`, confirmation, YOLO, session, clickable-path, and manual-command regression behavior;
-- QR creation to artifact save/open/copy and optional polling;
-- proof that credentials and private keys never reach provider payloads or session metadata; and
-- build, typecheck, lint, and CLI tests against rebuilt `dist/cli.js`.
+## Skill and documentation improvements
+
+Keep endpoint-focused skills and add:
+
+- `aba-payway-first-payment`: QR/checkout/payment-link decision matrix, readiness, required inputs, result handling, polling/webhook distinction, and user-facing explanations.
+- `aba-payway-agent`: provider capability modes, tool schemas, resolved context, risk gates, execution ledger, local utilities, and redaction.
+
+Clarify `aba-payway-purchase`: `createTransaction()` creates a local signed payload; `purchase()` makes a remote request. Update the README, quick-start, overview/setup guide, and documentation index with agent setup, privacy, first-payment decisions, artifact/session locations, and manual-mode escape paths.
 
 ## Scope boundary
 
-This design covers the agentic first-payment milestone only. It does not authorize implementation, provider-specific SDK integration, broad CLI refactoring, payout/refund/callback-agent work, or arbitrary shell execution.
+This document does not authorize implementation, provider-specific SDK dependencies, broad manual-CLI refactoring, payout/refund/callback-agent work, arbitrary shell execution, automatic callback provisioning, or changes to existing manual command behavior.
