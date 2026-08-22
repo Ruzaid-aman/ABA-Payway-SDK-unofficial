@@ -3,6 +3,7 @@ import path from 'node:path';
 import { validateKhqrConfiguration } from '../khqr-config.js';
 import type { ResolvedPayWayContext } from './context.js';
 import type { ProviderConfigV1 } from './contracts.js';
+import { isPublicHttpsUrl } from './url-policy.js';
 
 export type CapabilityState = 'ready' | 'missing' | 'invalid' | 'unverified';
 
@@ -15,24 +16,6 @@ export interface CapabilityMatrix {
   paymentLinkRsa: CapabilityState;
   artifactStorage: CapabilityState;
   sessionStorage: CapabilityState;
-}
-
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
-
-/**
- * A callback URL is only usable for online QR when it is a public HTTPS URL.
- * Localhost/loopback URLs are rejected because they are not reachable by the
- * PayWay gateway and must not silently fall back to offline KHQR generation.
- */
-function isPublicHttpsUrl(value: string | undefined): boolean {
-  if (!value) return false;
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'https:') return false;
-    return !LOCAL_HOSTS.has(parsed.hostname);
-  } catch {
-    return false;
-  }
 }
 
 /**

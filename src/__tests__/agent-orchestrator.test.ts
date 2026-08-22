@@ -292,11 +292,12 @@ describe('AgentOrchestrator — consent', () => {
     expect(calls.generateQr).toBe(1);
     expect(proposal).toMatchObject({
       context: 'profile: test (sandbox)',
+      environment: 'sandbox',
       actions: [
         {
           route: 'generate_online_qr',
           money: '3 USD',
-          transactionIdStrategy: 'generated after confirmation',
+          transactionIdStrategy: expect.stringMatching(/^generated: tx[0-9a-f]+$/),
           lifetime: 900,
           urls: ['callback: https://pay.example.com/cb'],
         },

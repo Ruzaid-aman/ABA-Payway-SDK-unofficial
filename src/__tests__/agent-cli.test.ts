@@ -59,9 +59,10 @@ type PromptConfirmForTest = (
 
 type CreateInteractivePlanConfirmationForTest = (
   prompt: (message: string) => Promise<boolean>,
-) => (proposal: {
-  request: string;
-  context: string;
+  ) => (proposal: {
+    request: string;
+    context: string;
+    environment: 'sandbox' | 'production';
   actions: Array<{
     route: string;
     money: string;
@@ -90,6 +91,7 @@ describe('agentic payway CLI (TASK-011)', () => {
     const proposal = {
       request: 'pay $3',
       context: 'profile: demo (sandbox)',
+      environment: 'sandbox' as const,
       actions: [
         {
           route: 'generate_online_qr',
@@ -264,19 +266,30 @@ describe('agentic payway CLI (TASK-011)', () => {
     expect(after.status).toBe(0);
   });
 
-  it('ask without approval in non-TTY returns needs_confirmation and makes no network call', () => {
+  it('ask without approval in non-TTY attempts planning before deciding whether confirmation is needed', () => {
     const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
     temporaryDirectories.push(appData);
-    // Configure the provider so we reach the authorization gate (no config would
-    // return 'blocked' instead). Point the provider at an unreachable URL to
-    // prove the short-circuit never contacts the network.
-    runCli(['agent', 'setup', '--provider', 'openai', '--model', 'gpt-4o'], baseEnv(appData));
+    // Point the provider at an unreachable URL. A provider failure proves the
+    // non-TTY path attempted planning instead of pre-emptively short-circuiting.
+    runCli(
+      [
+        'agent',
+        'setup',
+        '--provider',
+        'custom',
+        '--model',
+        'gpt-4o',
+        '--base-url',
+        'http://127.0.0.1:1',
+        '--acknowledge-privacy',
+      ],
+      baseEnv(appData),
+    );
     const env = baseEnv(appData);
     env.PAYWAY_BASE_URL = 'http://127.0.0.1:1'; // unreachable
     const result = runCli(['ask', 'generate a QR for $3'], env);
     expect(result.status).toBe(1);
     const output = stripAnsi(result.stdout).trim();
-    expect(output).not.toContain('provider request failed');
     let parsed: any;
     try {
       parsed = JSON.parse(output);
@@ -284,7 +297,9 @@ describe('agentic payway CLI (TASK-011)', () => {
       throw new Error(`expected JSON output, got: ${output}`);
     }
     expect(parsed.version).toBe('agent-command/v1');
-    expect(parsed.status).toBe('needs_confirmation');
+    expect(parsed.status).toBe('failed');
+    expect(parsed.error.code).toBe('PROVIDER_PROPOSAL_FAILED');
+    expect(parsed.error.message).toContain('provider request failed');
     expect(parsed.request).toContain('generate a QR');
   });
 

@@ -21,6 +21,7 @@ import {
   type CreatePlanConfirmation,
 } from './orchestrator.js';
 import { createProviderAdapter } from './provider.js';
+import { isInteractiveTerminal, PRODUCTION_CONFIRMATION_PHRASE } from './terminal.js';
 
 // The REPL re-dispatches recognized commands through the shared Commander
 // program. It is injected at registration time (see registerAgentCommands) so
@@ -76,11 +77,12 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
   let profile = options.profile ?? process.env.PAYWAY_PROFILE ?? undefined;
   let context = resolvePayWayContext({ profile });
   profile = context.profileName ?? profile;
+  const interactive = isInteractiveTerminal();
 
   const rl = readline.createInterface({
     input: process.stdin as unknown as NodeJS.ReadableStream,
     output: process.stdout as unknown as NodeJS.WritableStream,
-    terminal: Boolean(process.stdin.isTTY),
+    terminal: interactive,
   });
 
   const history: string[] = [];
@@ -88,7 +90,7 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
   let running = true;
 
   console.log(`\n${c.bold('Agentic PayWay REPL')} ${c.dim('(type :help for directives, :exit to quit)')}\n`);
-  if (!process.stdout.isTTY) {
+  if (!interactive) {
     console.log(`${c.dim('(non-interactive: reading directives from stdin)')}\n`);
   }
 
@@ -165,7 +167,7 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
       return;
     }
     if (trimmed === ':clear') {
-      if (process.stdout.isTTY) process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+      if (interactive) process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
       return;
     }
     if (trimmed === ':profile') {
@@ -214,14 +216,14 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
     const provider = createProviderAdapter(config);
     const orchestrator = new AgentOrchestrator({ context, provider, sessionId, providerConfig: config });
     const runOptions = {
-      tty: Boolean(process.stdout.isTTY),
+      tty: interactive,
       environment: context.environment,
-      ...(process.stdout.isTTY ? { confirmCreatePlan } : {}),
+      ...(interactive ? { confirmCreatePlan } : {}),
     };
     const result = sessionId
       ? await orchestrator.runTurn(sessionId, trimmed, runOptions)
       : await orchestrator.runOneShot(trimmed, runOptions);
-    if (!process.stdout.isTTY) {
+    if (!interactive) {
       console.log(serializeCommandResult(result));
     } else {
       console.log(renderHumanResult(result));
@@ -263,13 +265,19 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
 
   async function confirmCreatePlan(proposal: CreatePlanConfirmation): Promise<boolean> {
     console.log(`\n${renderCreatePlanConfirmation(proposal)}`);
-    process.stdout.write('Execute this create plan? (y/N): ');
+    process.stdout.write(
+      proposal.environment === 'production'
+        ? `Type ${PRODUCTION_CONFIRMATION_PHRASE} to execute this production create plan: `
+        : 'Execute this create plan? (y/N): ',
+    );
     const answer = await nextLine();
-    return answer?.trim().toLowerCase() === 'y';
+    return proposal.environment === 'production'
+      ? answer?.trim() === PRODUCTION_CONFIRMATION_PHRASE
+      : answer?.trim().toLowerCase() === 'y';
   }
 
   while (running) {
-    if (process.stdout.isTTY) process.stdout.write(PROMPT);
+    if (interactive) process.stdout.write(PROMPT);
     const line = await nextLine();
     if (line === null) break;
     await handleLine(line);

@@ -39,7 +39,7 @@ function makeContext(overrides: Partial<ResolvedPayWayContext> = {}): ResolvedPa
     merchantId: 'MID-R1',
     apiKey: 'PAYWAY-API-CANARY',
     publicKeyPem: 'PAYWAY-SIGNING-CANARY',
-    callbackUrl: 'https://pay.example.test/callback',
+    callbackUrl: 'https://pay.example.com/callback',
     displayLabel: 'profile: test (sandbox)',
     ...overrides,
   };
@@ -65,7 +65,7 @@ function onlineQrPlan(overrides: Record<string, unknown> = {}): AgentPlanV1 {
         amount: 3,
         currency: 'USD',
         transactionId: null,
-        callbackUrl: 'https://pay.example.test/callback',
+        callbackUrl: 'https://pay.example.com/callback',
         ...overrides,
       },
     ],
@@ -141,7 +141,7 @@ describe('R1 ledger replay guard', () => {
         amount: 3,
         currency: 'USD',
         transactionId: confirmed.transactionId!,
-        callbackUrl: 'https://pay.example.test/callback',
+        callbackUrl: 'https://pay.example.com/callback',
       },
       { context: makeContext(), sessionId: submitted.sessionId, execution: submitted, payway },
     );

@@ -9,14 +9,16 @@
  */
 
 import { spawn } from 'node:child_process';
+import { existsSync, lstatSync, realpathSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { defaultArtifactRoot, resolveArtifactPath } from './artifacts.js';
-import type { AgentSessionV1 } from './contracts.js';
+import type { AgentSessionV1, MaterializedAgentAction, OpenArtifactParams } from './contracts.js';
+import { isPublicHttpsUrl } from './url-policy.js';
 
 export function sessionArtifactRoot(): string {
   return defaultArtifactRoot();
 }
 
-const HTTPS_PATTERN = /^https:\/\//i;
 const SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
 
 interface AllowedCommand {
@@ -33,8 +35,7 @@ interface AllowedCommand {
 function openCommandFor(target: string): AllowedCommand {
   switch (process.platform) {
     case 'win32':
-      // `cmd /c start "" <target>` — empty title arg prevents mis-parsing.
-      return { command: 'cmd', args: ['/c', 'start', '', target] };
+      return { command: 'rundll32.exe', args: ['url.dll,FileProtocolHandler', target] };
     case 'darwin':
       return { command: 'open', args: [target] };
     case 'linux':
@@ -42,6 +43,80 @@ function openCommandFor(target: string): AllowedCommand {
     default:
       throw new Error(`unsupported platform for openArtifact: ${process.platform}`);
   }
+}
+
+function activeArtifactPath(reference: string, session: AgentSessionV1): string {
+  const artifacts = session.events
+    .filter((event) => event.type === 'artifact')
+    .map((event) => event.data);
+  const selected = artifacts.find(
+    (artifact) => artifact.artifactId === reference || artifact.path === reference,
+  );
+  if (!selected || typeof selected.path !== 'string') {
+    throw new Error('openArtifact local reference does not belong to the active session');
+  }
+  return selected.path;
+}
+
+function isInsideRoot(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+/** Resolve and validate an opener reference without launching a host process. */
+export function validateOpenArtifactReference(reference: string, session: AgentSessionV1): string {
+  if (!session?.sessionId) throw new Error('openArtifact requires a valid session');
+
+  if (/^https:/i.test(reference)) {
+    if (!isPublicHttpsUrl(reference)) {
+      throw new Error('openArtifact HTTPS reference must be a public https URL');
+    }
+    return reference;
+  }
+
+  // Windows drive paths are absolute file paths, not URI schemes.
+  if (!path.isAbsolute(reference) && SCHEME_PATTERN.test(reference)) {
+    throw new Error(`openArtifact only allows public https URLs or active-session artifacts; rejected scheme in "${reference}"`);
+  }
+
+  const trackedPath = activeArtifactPath(reference, session);
+  const root = sessionArtifactRoot();
+  const lexical = resolveArtifactPath(root, trackedPath, false);
+  if (!existsSync(root) || !existsSync(lexical)) {
+    throw new Error('openArtifact active-session artifact does not exist');
+  }
+  if (lstatSync(root).isSymbolicLink()) {
+    throw new Error('openArtifact artifact root must not be a symlink or junction');
+  }
+  const realRoot = realpathSync.native(root);
+  const realTarget = realpathSync.native(lexical);
+  if (!isInsideRoot(realRoot, realTarget)) {
+    throw new Error('openArtifact resolved target escapes the artifact root');
+  }
+  if (!statSync(realTarget).isFile()) {
+    throw new Error('openArtifact active-session artifact is not a file');
+  }
+  return realTarget;
+}
+
+/** Validate local-only actions before any create action is authorized or ledgered. */
+export function prevalidateLocalAction(
+  action: MaterializedAgentAction,
+  session: AgentSessionV1,
+): MaterializedAgentAction {
+  const tool = (action as { tool: string }).tool;
+  if (tool === 'open_artifact') {
+    const params = action as unknown as OpenArtifactParams;
+    validateOpenArtifactReference(params.reference, session);
+    return action;
+  }
+  if (tool === 'save_artifact') {
+    const params = action as unknown as { qrString?: string; content?: string };
+    if (!params.qrString && !params.content) {
+      throw new Error('save_artifact requires qrString or content');
+    }
+  }
+  return action;
 }
 
 function clipboardCommandFor(): AllowedCommand {
@@ -97,31 +172,14 @@ function runAllowed(allowed: AllowedCommand, stdinText?: string): Promise<void> 
  *
  * Permits exactly two kinds of references:
  *  1. An explicitly selected `https://` URL.
- *  2. A path to a current-session artifact, which must resolve inside the
- *     session artifact root (no traversal / absolute escape without an
- *     explicit confirmed override).
+ *  2. A reference recorded by the active session, whose real filesystem target
+ *     must remain inside the non-linked session artifact root.
  *
  * Any other URI scheme (http, ftp, file, …) or out-of-root path is rejected.
  */
 export async function openArtifact(reference: string, session: AgentSessionV1): Promise<void> {
-  if (!session?.sessionId) {
-    throw new Error('openArtifact requires a valid session');
-  }
-
-  // Case 1: explicitly selected https URL.
-  if (HTTPS_PATTERN.test(reference)) {
-    await runAllowed(openCommandFor(reference));
-    return;
-  }
-
-  // A URI scheme other than https (e.g. http://, ftp://, file://) is rejected.
-  if (SCHEME_PATTERN.test(reference)) {
-    throw new Error(`openArtifact only allows https URLs or in-root artifact paths; rejected scheme in "${reference}"`);
-  }
-
-  // Case 2: a current-session artifact path confined to the session root.
-  const resolved = resolveArtifactPath(sessionArtifactRoot(), reference, false);
-  await runAllowed(openCommandFor(resolved));
+  const validated = validateOpenArtifactReference(reference, session);
+  await runAllowed(openCommandFor(validated));
 }
 
 /**

@@ -263,7 +263,7 @@ describe('TASK-013 (2) non-TTY without approval', () => {
     expect(result.status).toBe('needs_confirmation');
     expect(validateCommandResult(result)).toBe(true);
     expect(calls.generateQr).toBe(0);
-    expect(result.executionIds).toBeDefined();
+    expect(result.executionIds).toBeUndefined();
   });
 });
 
@@ -607,8 +607,9 @@ describe('TASK-013 (7) resume without approval and malicious provider attempts',
 
     const result = await orch.runOneShot('open', baseOptions({ flag: 'approve', payway }));
 
-    expect(result.status).toBe('failed');
-    expect((result.actions![0] as { ok: boolean }).ok).toBe(false);
+    expect(result.status).toBe('blocked');
+    expect(result.error?.code).toBe('INVALID_LOCAL_ACTION');
+    expect(result.actions).toBeUndefined();
     expect(validateCommandResult(result)).toBe(true);
   });
 

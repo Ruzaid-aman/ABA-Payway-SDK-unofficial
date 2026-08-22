@@ -16,14 +16,16 @@
 
 import type { PayWay } from '../client.js';
 import type { ResolvedPayWayContext } from './context.js';
-import { createAgentPayWay } from './context.js';
-import type { AgentToolName, ExecutionRecordV1, MaterializedAgentAction } from './contracts.js';
+import { createAgentPayWay, resolvedSensitiveValues } from './context.js';
+import type { AgentSessionV1, AgentToolName, ExecutionRecordV1, MaterializedAgentAction } from './contracts.js';
 import { markFailed, markOutcomeUnknown, markSubmitted, markSucceeded } from './ledger.js';
 import { toolRegistry } from './tools.js';
+import { scrubSensitive } from './privacy.js';
 
 export interface ExecutionContext {
   context: ResolvedPayWayContext;
   sessionId: string;
+  session?: AgentSessionV1;
   execution: ExecutionRecordV1;
   payway?: PayWay;
 }
@@ -97,6 +99,7 @@ export async function executeAction(
   }
 
   const executionId = execution.executionId;
+  const sensitiveValues = resolvedSensitiveValues(executionContext.context);
 
   // Advance confirmed -> submitted exactly once. Submitted/outcome-unknown
   // records are recovery-only and were rejected above before any SDK client use.
@@ -107,14 +110,28 @@ export async function executeAction(
   try {
     result = await toolFn(action, client, executionContext);
   } catch (error) {
+    const safeError = scrubSensitive(
+      {
+        code: error instanceof Error ? error.name : undefined,
+        message: error instanceof Error ? error.message : String(error),
+      },
+      sensitiveValues,
+    ) as { code?: string; message: string };
     markOutcomeUnknown(executionId, {
-      code: error instanceof Error ? error.name : undefined,
-      message: error instanceof Error ? error.message : String(error),
-    });
+      code: safeError.code,
+      message: safeError.message,
+    }, sensitiveValues);
     return {
       ok: false,
       tool,
-      error: { code: 'OUTCOME_UNKNOWN', message: error instanceof Error ? error.message : String(error) },
+      error: { code: 'OUTCOME_UNKNOWN', message: safeError.message },
+    };
+  }
+
+  if (result.error) {
+    result = {
+      ...result,
+      error: scrubSensitive(result.error, sensitiveValues) as { code?: string; message: string },
     };
   }
 
@@ -124,12 +141,12 @@ export async function executeAction(
     markOutcomeUnknown(executionId, {
       code: result.error.code,
       message: result.error.message,
-    });
+    }, sensitiveValues);
   } else {
     markFailed(executionId, {
       code: result.error?.code,
       message: result.error?.message ?? 'Tool reported failure',
-    });
+    }, sensitiveValues);
   }
 
   return result;

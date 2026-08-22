@@ -203,8 +203,15 @@ describe('openArtifact', () => {
   it('opens a current-session artifact path inside the root', async () => {
     const safeName = 'ok.json';
     mkdirSync(path.join(root, 'payway-output'), { recursive: true });
-    writeFileSync(path.join(root, 'payway-output', safeName), '{}');
-    await openArtifact(safeName, makeSession());
+    const artifactPath = path.join(root, 'payway-output', safeName);
+    writeFileSync(artifactPath, '{}');
+    const activeSession = makeSession();
+    activeSession.events.push({
+      type: 'artifact',
+      at: new Date().toISOString(),
+      data: { artifactId: 'artifact-task-008', path: artifactPath },
+    });
+    await openArtifact(artifactPath, activeSession);
     expect(spawned.length).toBe(1);
   });
 });

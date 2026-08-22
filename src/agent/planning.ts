@@ -1,7 +1,7 @@
-import { isIP } from 'node:net';
 import type { ResolvedPayWayContext } from './context.js';
 import type { AgentActionDraft, AgentPlanV1, Currency, Environment, ProviderConfigV1 } from './contracts.js';
 import { evaluateReadiness } from './readiness.js';
+import { isPublicHttpsUrl } from './url-policy.js';
 
 export interface NormalizedPlanResult {
   plan: AgentPlanV1;
@@ -49,46 +49,6 @@ function amountViolation(currency: Currency, amount: number): string | null {
   return null;
 }
 
-function isPrivateOrReservedIpv4(hostname: string): boolean {
-  const octets = hostname.split('.').map(Number);
-  const [first, second, third] = octets;
-  return (
-    first === 0 ||
-    first === 10 ||
-    first === 127 ||
-    first >= 224 ||
-    (first === 100 && second >= 64 && second <= 127) ||
-    (first === 169 && second === 254) ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && (second === 0 || second === 2 || second === 168)) ||
-    (first === 192 && second === 88 && third === 99) ||
-    (first === 198 && (second === 18 || second === 19 || second === 51)) ||
-    (first === 203 && second === 0)
-  );
-}
-
-function isPublicIpLiteral(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  const family = isIP(host);
-  if (family === 4) return !isPrivateOrReservedIpv4(host);
-  // Public callbacks use DNS names or public IPv4 literals. Reject every IPv6
-  // literal instead of tracking the changing special-use registry.
-  if (family === 6) return false;
-  return true;
-}
-
-function isPublicHttps(value: unknown): boolean {
-  if (typeof value !== 'string' || value.length === 0) return false;
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'https:') return false;
-    if (parsed.hostname.toLowerCase() === 'localhost') return false;
-    return isPublicIpLiteral(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
-
 function actionHasRoute(action: AgentActionDraft, route: string): boolean {
   return (action as { tool?: string }).tool === route;
 }
@@ -131,7 +91,7 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
         const violation = amountViolation(qr.currency, qr.amount);
         if (violation) warnings.push(violation);
       }
-      if (qr.callbackUrl !== undefined && !isPublicHttps(qr.callbackUrl)) {
+      if (qr.callbackUrl !== undefined && !isPublicHttpsUrl(qr.callbackUrl)) {
         warnings.push('online QR callbackUrl must be a public https URL');
       }
       if (readiness.onlineQr !== 'ready') {
@@ -163,10 +123,10 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
         const violation = amountViolation(checkout.currency, checkout.amount);
         if (violation) warnings.push(violation);
       }
-      if (checkout.returnUrl !== undefined && !isPublicHttps(checkout.returnUrl)) {
+      if (checkout.returnUrl !== undefined && !isPublicHttpsUrl(checkout.returnUrl)) {
         warnings.push('checkout returnUrl must be a public https URL');
       }
-      if (checkout.cancelUrl !== undefined && !isPublicHttps(checkout.cancelUrl)) {
+      if (checkout.cancelUrl !== undefined && !isPublicHttpsUrl(checkout.cancelUrl)) {
         warnings.push('checkout cancelUrl must be a public https URL');
       }
       if (readiness.checkout !== 'ready') {
@@ -179,7 +139,7 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
         const violation = amountViolation(link.currency, link.amount);
         if (violation) warnings.push(violation);
       }
-      if (!isPublicHttps(link.returnUrl)) {
+      if (!isPublicHttpsUrl(link.returnUrl)) {
         warnings.push('payment link returnUrl must be a public https URL');
       }
       if (readiness.paymentLinkRsa !== 'ready') {

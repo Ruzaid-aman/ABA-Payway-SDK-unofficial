@@ -28,6 +28,9 @@ import { createProviderAdapter, type ProviderConnectivity } from '../../agent/pr
 import { evaluateReadiness } from '../../agent/readiness.js';
 import { setAgentProgram, startRepl } from '../../agent/repl.js';
 import { clearSessions, exportSession, listSessions } from '../../agent/sessions.js';
+import { isInteractiveTerminal, PRODUCTION_CONFIRMATION_PHRASE } from '../../agent/terminal.js';
+
+export { isInteractiveTerminal } from '../../agent/terminal.js';
 
 // Local ANSI helpers (cli.ts keeps its own copy; no shared dependency needed).
 const c = {
@@ -73,6 +76,24 @@ function marker(state: CapabilityState | 'blocked'): string {
 type ConfirmationReadline = Pick<readline.Interface, 'question' | 'close'>;
 type CreateConfirmationReadline = () => ConfirmationReadline;
 
+export function promptInput(
+  message: string,
+  createReadline: CreateConfirmationReadline = () =>
+    readline.createInterface({
+      input: process.stdin as unknown as NodeJS.ReadableStream,
+      output: process.stdout as unknown as NodeJS.WritableStream,
+      terminal: false,
+    }),
+): Promise<string | undefined> {
+  const rl = createReadline();
+  return new Promise<string | undefined>((resolve) => {
+    rl.question(message, (answer) => {
+      rl.close();
+      resolve(typeof answer === 'string' ? answer : undefined);
+    });
+  });
+}
+
 export function promptConfirm(
   message: string,
   createReadline: CreateConfirmationReadline = () =>
@@ -82,19 +103,22 @@ export function promptConfirm(
       terminal: false,
     }),
 ): Promise<boolean> {
-  const rl = createReadline();
-  return new Promise<boolean>((resolve) => {
-    rl.question(message, (answer) => {
-      rl.close();
-      resolve(typeof answer === 'string' && answer.trim().toLowerCase() === 'y');
-    });
-  });
+  return promptInput(message, createReadline).then((answer) => answer?.trim().toLowerCase() === 'y');
 }
 
 export function createInteractivePlanConfirmation(
-  prompt: (message: string) => Promise<boolean> = promptConfirm,
+  prompt: (message: string) => Promise<string | boolean | undefined> = promptInput,
 ): (proposal: CreatePlanConfirmation) => Promise<boolean> {
-  return (proposal) => prompt(`${renderCreatePlanConfirmation(proposal)}\n\nExecute this create plan? (y/N): `);
+  return async (proposal) => {
+    if (proposal.environment === 'production') {
+      const answer = await prompt(
+        `${renderCreatePlanConfirmation(proposal)}\n\nType ${PRODUCTION_CONFIRMATION_PHRASE} to execute this production create plan: `,
+      );
+      return typeof answer === 'string' && answer.trim() === PRODUCTION_CONFIRMATION_PHRASE;
+    }
+    const answer = await prompt(`${renderCreatePlanConfirmation(proposal)}\n\nExecute this create plan? (y/N): `);
+    return answer === true || (typeof answer === 'string' && answer.trim().toLowerCase() === 'y');
+  };
 }
 
 /** Register the agentic command tree on the given Commander program. */
@@ -114,7 +138,7 @@ export function registerAgentCommands(program: Command): void {
       const config = readAgentConfig();
 
       if (!config) {
-        if (!process.stdout.isTTY) {
+        if (!isInteractiveTerminal()) {
           const blocked: AgentCommandResultV1 = {
             version: 'agent-command/v1',
             status: 'blocked',
@@ -133,23 +157,8 @@ export function registerAgentCommands(program: Command): void {
         return;
       }
 
-      const tty = Boolean(process.stdout.isTTY);
+      const tty = isInteractiveTerminal();
       const flag: 'approve' | 'yolo' | undefined = opts.approve ? 'approve' : opts.yolo ? 'yolo' : undefined;
-
-      // Non-TTY without explicit approval: never contact the provider; report
-      // that confirmation is required. This guarantees no network call.
-      if (!tty && !flag) {
-        const needs: AgentCommandResultV1 = {
-          version: 'agent-command/v1',
-          status: 'needs_confirmation',
-          request,
-          message:
-            'Approval required: provide --approve (or --yolo for sandbox) or run interactively (TTY) before a plan is proposed.',
-        };
-        console.log(serializeCommandResult(needs));
-        process.exitCode = 1;
-        return;
-      }
 
       const provider = createProviderAdapter(config);
       const orchestrator = new AgentOrchestrator({

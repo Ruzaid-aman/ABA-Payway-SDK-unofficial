@@ -105,6 +105,14 @@ function makeExecContext(payway: PayWay, record: ExecutionRecordV1): ExecutionCo
       displayLabel: 'l',
     },
     sessionId: 'sess-1',
+    session: {
+      version: 'agent-session/v1',
+      sessionId: 'sess-1',
+      createdAt: '',
+      updatedAt: '',
+      contextLabel: 'test',
+      events: [],
+    },
     execution: record,
     payway,
   };
@@ -380,12 +388,31 @@ describe('TASK-009 tool registry + executor', () => {
   });
 
   it('open_artifact wired to openArtifact', async () => {
+    const activeSession = {
+      version: 'agent-session/v1' as const,
+      sessionId: 'sess-1',
+      createdAt: '2026-08-22T00:00:00.000Z',
+      updatedAt: '2026-08-22T00:00:00.000Z',
+      contextLabel: 'r3',
+      events: [
+        {
+          type: 'artifact' as const,
+          at: '2026-08-22T00:00:00.000Z',
+          data: { artifactId: 'artifact-r3', path: 'payway-output/receipt.json' },
+        },
+      ],
+    };
+    const executionContext = {
+      ...makeExecContext(payway, makeRecord('confirmed', { tool: 'open_artifact' })),
+      session: activeSession,
+    } as ExecutionContext & { session: typeof activeSession };
     await executeAction(
       { tool: 'open_artifact', reference: 'https://x' } as unknown as MaterializedAgentAction,
-      makeExecContext(payway, makeRecord('confirmed', { tool: 'open_artifact' })),
+      executionContext,
     );
     expect(openArtifact).toHaveBeenCalledTimes(1);
     expect((openArtifact as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('https://x');
+    expect((openArtifact as ReturnType<typeof vi.fn>).mock.calls[0][1]).toBe(activeSession);
   });
 
   it('copy_to_clipboard wired to copyToClipboard', async () => {
