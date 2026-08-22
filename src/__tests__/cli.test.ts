@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -10,6 +11,37 @@ const temporaryDirectories: string[] = [];
 function stripAnsi(s: string): string {
   const esc = String.fromCharCode(27);
   return s.replace(new RegExp(`${esc}\\[[0-9;]*m`, 'g'), '');
+}
+
+function runBuiltCli(
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), ...args], {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => (stdout += chunk));
+    child.stderr.on('data', (chunk: string) => (stderr += chunk));
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error('built CLI did not exit within 4 seconds'));
+    }, 4_000);
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on('close', (status) => {
+      clearTimeout(timeout);
+      resolve({ status, stdout, stderr });
+    });
+  });
 }
 
 afterEach(() => {
@@ -351,7 +383,7 @@ describe('built CLI', () => {
   // QR-REQ-03: --non-interactive flag tests
   // -----------------------------------------------------------------------
 
-  it('skips all prompts when --non-interactive is provided', () => {
+  it('generates offline without prompts when --non-interactive is provided', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);
 
@@ -399,8 +431,78 @@ describe('built CLI', () => {
     // Should NOT show any interactive prompts
     expect(stripAnsi(output)).not.toContain('Submit to PayWay? (y/n)');
     expect(stripAnsi(output)).not.toContain('Modify lifetime?');
-    // Should show non-interactive notice
+    expect(result.status).toBe(0);
     expect(stripAnsi(output)).toContain('non-interactive mode');
+    expect(stripAnsi(output)).toContain('Offline ABA KHQR generated');
+    expect(stripAnsi(output)).toContain('QR String:');
+    expect(stripAnsi(output)).toMatch(/000201010212/);
+  });
+
+  it('generates online through a local API without prompts in non-interactive mode', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+    let requestedPath = '';
+    let requestedBody = '';
+    const mockServer = createServer((request, response) => {
+      requestedPath = request.url ?? '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => (requestedBody += chunk));
+      request.on('end', () => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            status: { code: 0, message: 'OK' },
+            qrString: 'ONLINE-MOCK-KHQR',
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
+    const address = mockServer.address();
+    if (!address || typeof address === 'string') throw new Error('mock server did not bind to a TCP port');
+
+    try {
+      const result = await runBuiltCli(
+        [
+          'generate-qr',
+          '--amount',
+          '1.00',
+          '--currency',
+          'USD',
+          '--transaction-id',
+          'ONLINE-NONINT',
+          '--callback-url',
+          'https://example.com/cb',
+          '--non-interactive',
+          '--no-polling',
+        ],
+        {
+          cwd,
+          env: {
+            PATH: process.env.PATH ?? '',
+            SystemRoot: process.env.SystemRoot ?? '',
+            PAYWAY_MERCHANT_ID: 'test-merchant-001',
+            PAYWAY_API_KEY: 'test-api-key-123456789012',
+            PAYWAY_BASE_URL: `http://127.0.0.1:${address.port}`,
+          },
+        },
+      );
+      const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+
+      expect(result.status, JSON.stringify({ output, requestedPath, requestedBody })).toBe(0);
+      expect(requestedPath).toBe('/api/payment-gateway/v1/payments/generate-qr');
+      expect(JSON.parse(requestedBody)).toMatchObject({ tran_id: 'ONLINE-NONINT', amount: '1.00' });
+      expect(output).toContain('non-interactive mode');
+      expect(output).toContain('Online QR generated via PayWay API');
+      expect(output).toContain('ONLINE-MOCK-KHQR');
+      expect(output).not.toContain('Submit to PayWay? (y/n)');
+      expect(output).not.toContain('Modify lifetime?');
+      expect(output).not.toContain('Cancelled by user');
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        mockServer.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   // -----------------------------------------------------------------------
