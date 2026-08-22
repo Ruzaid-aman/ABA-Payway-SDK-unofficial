@@ -109,6 +109,65 @@ describe('agentic payway CLI (TASK-011)', () => {
     expect(JSON.stringify(config)).not.toContain('dummy-agent-key');
   });
 
+  it('agent setup --acknowledge-privacy records the privacy timestamp', () => {
+    const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
+    temporaryDirectories.push(appData);
+    const result = runCli(
+      ['agent', 'setup', '--provider', 'openai', '--model', 'gpt-4o', '--acknowledge-privacy'],
+      baseEnv(appData),
+    );
+    expect(result.status).toBe(0);
+    const config = JSON.parse(
+      readFileSync(path.join(appData, 'aba-payway-sdk', 'agent', 'agent-config.json'), 'utf8'),
+    );
+    expect(typeof config.privacyAcknowledgedAt).toBe('string');
+    expect(Number.isNaN(Date.parse(config.privacyAcknowledgedAt))).toBe(false);
+  });
+
+  it('agent ack records a privacy acknowledgment after setup, then updates it', () => {
+    const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
+    temporaryDirectories.push(appData);
+    const configPath = path.join(appData, 'aba-payway-sdk', 'agent', 'agent-config.json');
+
+    // Ack before setup is refused with guidance (never writes a partial config).
+    const refused = runCli(['agent', 'ack'], baseEnv(appData));
+    expect(refused.status).not.toBe(0);
+    expect(stripAnsi(refused.stdout)).toContain('requires a configured provider');
+    expect(existsSync(configPath)).toBe(false);
+
+    // After setup, the first ack records the timestamp.
+    runCli(['agent', 'setup', '--provider', 'openai', '--model', 'gpt-4o'], baseEnv(appData));
+    const first = runCli(['agent', 'ack'], baseEnv(appData));
+    expect(first.status).toBe(0);
+    const seeded = JSON.parse(readFileSync(configPath, 'utf8'));
+    expect(typeof seeded.privacyAcknowledgedAt).toBe('string');
+    expect(Number.isNaN(Date.parse(seeded.privacyAcknowledgedAt))).toBe(false);
+
+    // A second ack updates the existing timestamp instead of failing.
+    const second = runCli(['agent', 'ack'], baseEnv(appData));
+    expect(second.status).toBe(0);
+    const updated = JSON.parse(readFileSync(configPath, 'utf8')) as { privacyAcknowledgedAt: string };
+    expect(Date.parse(updated.privacyAcknowledgedAt)).toBeGreaterThanOrEqual(
+      Date.parse(seeded.privacyAcknowledgedAt),
+    );
+
+    // Never persists the provider API key.
+    expect(readFileSync(configPath, 'utf8')).not.toContain('dummy-agent-key');
+  });
+
+  it('agent doctor reports the privacy acknowledgment status', () => {
+    const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
+    temporaryDirectories.push(appData);
+
+    runCli(['agent', 'setup', '--provider', 'openai', '--model', 'gpt-4o'], baseEnv(appData));
+    const before = stripAnsi(runCli(['agent', 'doctor'], baseEnv(appData)).stdout);
+    expect(before).toContain('Privacy acknowledgment');
+
+    runCli(['agent', 'ack'], baseEnv(appData));
+    const after = stripAnsi(runCli(['agent', 'doctor'], baseEnv(appData)).stdout);
+    expect(after).toContain('Privacy acknowledgment');
+  });
+
   it('agent sessions list works (empty then after a session export)', () => {
     const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
     temporaryDirectories.push(appData);

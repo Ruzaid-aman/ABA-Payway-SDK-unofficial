@@ -167,6 +167,7 @@ export function registerAgentCommands(program: Command): void {
     .option('--base-url <url>', 'Custom provider base URL (for provider=custom)')
     .option('--capability-mode <mode>', 'native-tools | strict-json-plan')
     .option('--timeout <ms>', 'Provider request timeout in milliseconds')
+    .option('--acknowledge-privacy', 'Acknowledge the provider privacy notice (required before plans are proposed)')
     .action(
       async (opts: {
         provider?: string;
@@ -174,6 +175,7 @@ export function registerAgentCommands(program: Command): void {
         baseUrl?: string;
         capabilityMode?: string;
         timeout?: string;
+        acknowledgePrivacy?: boolean;
       }) => {
         const patch: Partial<ProviderConfigV1> = {};
         if (opts.provider) {
@@ -204,6 +206,9 @@ export function registerAgentCommands(program: Command): void {
             return;
           }
           patch.timeoutMs = Math.floor(ms);
+        }
+        if (opts.acknowledgePrivacy) {
+          patch.privacyAcknowledgedAt = new Date().toISOString();
         }
 
         const config = updateAgentConfig(patch);
@@ -239,6 +244,11 @@ export function registerAgentCommands(program: Command): void {
       console.log(
         `  ${marker(connectivity.status === 'ready' ? 'ready' : connectivity.status === 'blocked' ? 'blocked' : 'unverified')}  Provider connectivity`,
       );
+      console.log(
+        `  ${marker(config?.privacyAcknowledgedAt ? 'ready' : 'missing')}  Privacy acknowledgment${
+          config?.privacyAcknowledgedAt ? ` (${config.privacyAcknowledgedAt})` : ''
+        }`,
+      );
       console.log(`  ${marker(matrix.context)}  PayWay context (${context.displayLabel})`);
       console.log(`  ${marker(matrix.onlineQr)}  Online QR callback`);
       console.log(`  ${marker(matrix.offlineKhqr)}  Offline KHQR`);
@@ -251,6 +261,34 @@ export function registerAgentCommands(program: Command): void {
         console.log(`  ${c.dim(`Provider: ${connectivity.detail}`)}`);
         console.log();
       }
+    });
+
+  // agent ack
+  agentCmd
+    .command('ack')
+    .description('Acknowledge the provider privacy notice (required before plans are proposed)')
+    .action(() => {
+      const existing = readAgentConfig();
+      if (!existing || !existing.model) {
+        console.log(`\n  ${c.red('✗')} Privacy acknowledgment requires a configured provider.\n`);
+        console.log(
+          `  Run ${c.cyan('payway-sdk agent setup --provider <p> --model <m> --acknowledge-privacy')} first,\n  or run ${c.cyan('agent ack')} after ${c.cyan('agent setup')}.\n`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+      const config = updateAgentConfig({ privacyAcknowledgedAt: new Date().toISOString() });
+      if (existing.privacyAcknowledgedAt) {
+        console.log(`\n  ${c.cyan('·')} Privacy acknowledgment updated.`);
+        console.log(`  ${c.dim(`Previous: ${existing.privacyAcknowledgedAt}`)}`);
+        console.log(`  ${c.dim(`Now:      ${config.privacyAcknowledgedAt ?? ''}`)}\n`);
+        return;
+      }
+      console.log(`\n  ${c.green('✓')} ${c.bold('Privacy acknowledged')}\n`);
+      console.log(`    Recorded at: ${c.cyan(config.privacyAcknowledgedAt ?? '')}`);
+      console.log(`    Provider:    ${c.cyan(config.provider)}`);
+      console.log(`    Model:       ${c.cyan(config.model)}`);
+      console.log();
     });
 
   // agent sessions
