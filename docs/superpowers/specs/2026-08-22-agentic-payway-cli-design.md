@@ -88,7 +88,7 @@ Generate a transaction ID only after create-action approval, persist it in the e
 - Production payment creation, incomplete or materially ambiguous requests, and actions outside the tool scope are hard-gated.
 - YOLO skips ordinary confirmations but cannot bypass hard gates.
 
-`--approve` is the explicit non-interactive approval flag. `--yolo` is its user-facing alias. In a non-TTY invocation without `--approve`, return structured `needs_confirmation` output and do not create a payment.
+`--approve` is the explicit non-interactive approval flag; it authorizes both sandbox and production create actions. `--yolo` is a separate flag that skips only ordinary (sandbox) confirmation prompts and cannot authorize production create actions. In a non-TTY invocation without `--approve`, return structured `needs_confirmation` output and do not create a payment.
 
 Every create proposal states route, amount, currency, transaction ID, lifetime, selected profile/environment, callback or return URL, artifacts, and assumptions. After a successful online QR, save and show the result, then offer polling. A polled `APPROVED` result is an observed status only; webhook verification and merchant reconciliation remain the fulfillment source of truth.
 
