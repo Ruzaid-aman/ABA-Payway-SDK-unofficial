@@ -1,0 +1,88 @@
+# Review package: a51ccd7..a927124## Commitsa927124 fix(agent): complete interactive CLI and REPL safety
+
+## Files changed
+ .../r2-report.md                                      | 19 ++++++++++++++++++-
+ src/__tests__/agent-orchestrator.test.ts              | 19 +++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+
+## Diff
+diff --git a/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r2-report.md b/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r2-report.md
+index a8f5ded..a089a49 100644
+--- a/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r2-report.md
++++ b/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r2-report.md
+@@ -104,13 +104,30 @@ passed
+ npm run lint
+ exit 0; 4 pre-existing warnings only
+ git diff --check
+ passed
+ ```
+ 
+ The confirmation-callback exception warning is now intentionally generic and cannot include an exception message or secret-derived text.
+ 
+ The final pre-commit run additionally included `src/__tests__/agent-r1-hardening.test.ts`: **74 tests passed across 4 files**.
+ 
++## Review correction round 2
++
++Added the missing real-boundary rejection integration test. It constructs the exact `createInteractivePlanConfirmation` callback used by the CLI, injects a deterministic readline that answers `n`, and supplies that callback to `AgentOrchestrator.runOneShot` for a TTY online-QR plan. The assertions prove all required effects:
++
++- result status is `needs_confirmation`;
++- a `cancellation` event is persisted in the actual returned session;
++- the fake PayWay `generateQr` counter remains zero.
++
++This is intentionally distinct from the prompt-helper rejection check and the real-boundary EOF integration check. The pre-existing implementation already fulfilled this behavior, so the new executable regression test passed on its first run and did not require a production change.
++
++```text
++npx vitest run src/__tests__/agent-orchestrator.test.ts
++18 passed (1 file)
++npx tsc --noEmit
++passed
++```
++
+ ## Commit
+ 
+-Correction-round amendment: `fix(agent): complete interactive CLI and REPL safety`.
++Final amendment: `fix(agent): complete interactive CLI and REPL safety`.
+diff --git a/src/__tests__/agent-orchestrator.test.ts b/src/__tests__/agent-orchestrator.test.ts
+index 7fcdc41..7bb8c04 100644
+--- a/src/__tests__/agent-orchestrator.test.ts
++++ b/src/__tests__/agent-orchestrator.test.ts
+@@ -339,20 +339,39 @@ describe('AgentOrchestrator — consent', () => {
+         close: () => undefined,
+       })),
+     );
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ tty: true, payway, confirmCreatePlan: confirmation }));
+ 
+     expect(result.status).toBe('needs_confirmation');
+     expect(calls.generateQr).toBe(0);
+   });
+ 
++  it('records cancellation and makes no PayWay call when the real confirmation prompt answers n', async () => {
++    const provider = new FakeProvider(async () => onlineQrPlan());
++    const { payway, calls } = makePayWay();
++    const orch = createOrchestrator({ context: makeContext(), provider });
++    const confirmation = createInteractivePlanConfirmation((message) =>
++      promptConfirm(message, () => ({
++        question: (_prompt, callback) => (callback as (answer: string) => void)('n'),
++        close: () => undefined,
++      })),
++    );
++
++    const result = await orch.runOneShot('pay $3', baseOptions({ tty: true, payway, confirmCreatePlan: confirmation }));
++
++    expect(result.status).toBe('needs_confirmation');
++    expect(calls.generateQr).toBe(0);
++    const { loadSession } = await import('../agent/sessions.js');
++    expect(loadSession(result.sessionId ?? '')?.events.some((event) => event.type === 'cancellation')).toBe(true);
++  });
++
+   it('uses a generic warning when an interactive confirmation callback fails', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay();
+     const orch = createOrchestrator({ context: makeContext(), provider });
+     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+ 
+     const result = await orch.runOneShot(
+       'pay $3',
+       baseOptions({
+         tty: true,

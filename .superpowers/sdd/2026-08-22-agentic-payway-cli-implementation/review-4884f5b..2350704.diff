@@ -1,0 +1,171 @@
+# Review package: 4884f5b..2350704## Commits2350704 docs(agent): append IPv6 policy evidence
+0bd0606 fix(agent): reject IPv6 literal callback hosts
+
+## Files changed
+ .../r1-report.md                                   | 16 ++++++++
+ src/__tests__/agent-r1-hardening.test.ts           |  6 ++-
+ src/agent/planning.ts                              | 48 ++--------------------
+ 3 files changed, 24 insertions(+), 46 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r1-report.md b/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r1-report.md
+index 7cbac68..1fb05d0 100644
+--- a/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r1-report.md
++++ b/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r1-report.md
+@@ -59,10 +59,26 @@
+ ### TDD and focused verification
+ 
+ - RED: `npx vitest run src/__tests__/agent-r1-hardening.test.ts` — 5 failures before remediation for callback hosts `[2001:1::1]`, `[2001:2::1]`, `[2001:20::1]`, `[3fff::1]`, and checkout special-use return/cancel URLs.
+ - GREEN: `npx vitest run src/__tests__/agent-r1-hardening.test.ts src/__tests__/agent-planning-risk.test.ts src/__tests__/agent-orchestrator.test.ts src/__tests__/agent-tools.test.ts` — 81/81 passed.
+ - Typecheck: `npm run typecheck` — passed.
+ - Build: `npm run build` — passed.
+ 
+ ### Follow-up concerns
+ 
+ - Per instruction, verification remains focused; the full suite was not rerun in this round.
++
++## Review remediation — round 3 of 5
++
++- Implementation commit: `0bd0606 fix(agent): reject IPv6 literal callback hosts`
++- The URL policy no longer tracks IPv6 special-use ranges. Every IPv6 literal is rejected for online callbacks and checkout return/cancel URLs; DNS names and validated public IPv4 literals remain supported.
++
++### TDD and focused verification
++
++- RED: `npx vitest run src/__tests__/agent-r1-hardening.test.ts` — 3 failures before remediation: callback literals `[2001:30::1]`, `[2606:4700:4700::1111]`, and checkout return/cancel coverage using those same literals.
++- GREEN: `npx vitest run src/__tests__/agent-r1-hardening.test.ts src/__tests__/agent-planning-risk.test.ts src/__tests__/agent-orchestrator.test.ts src/__tests__/agent-tools.test.ts` — 83/83 passed.
++- Typecheck: `npm run typecheck` — passed.
++- Build: `npm run build` — passed.
++
++### Follow-up concerns
++
++- Per instruction, verification remains focused; the full suite was not rerun in this round.
+diff --git a/src/__tests__/agent-r1-hardening.test.ts b/src/__tests__/agent-r1-hardening.test.ts
+index 6ba48c3..2dfc538 100644
+--- a/src/__tests__/agent-r1-hardening.test.ts
++++ b/src/__tests__/agent-r1-hardening.test.ts
+@@ -199,21 +199,23 @@ describe('R1 pre-authorization risk gate', () => {
+     'https://127.0.0.2/callback',
+     'https://10.0.0.1/callback',
+     'https://172.16.0.1/callback',
+     'https://192.168.0.1/callback',
+     'https://169.254.1.1/callback',
+     'https://[::1]/callback',
+     'https://[fc00::1]/callback',
+     'https://[2001:1::1]/callback',
+     'https://[2001:2::1]/callback',
+     'https://[2001:20::1]/callback',
++    'https://[2001:30::1]/callback',
+     'https://[3fff::1]/callback',
++    'https://[2606:4700:4700::1111]/callback',
+   ])('blocks non-public literal callback URL %s before ledger or SDK activity', async (callbackUrl) => {
+     const provider = new FakeProvider(onlineQrPlan({ callbackUrl }));
+     const { payway, calls } = makePayWay();
+     const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
+       'make payment',
+       approvedOptions(payway),
+     );
+ 
+     expect(result.status).toBe('blocked');
+     expect(calls.generateQr).toBe(0);
+@@ -249,22 +251,22 @@ describe('R1 pre-authorization risk gate', () => {
+   it('blocks IPv6 special-use checkout return and cancel URLs before ledger or SDK activity', async () => {
+     const provider = new FakeProvider({
+       version: 'agent-plan/v1',
+       request: 'checkout',
+       actions: [
+         {
+           tool: 'create_checkout_payload',
+           amount: 3,
+           currency: 'USD',
+           transactionId: null,
+-          returnUrl: 'https://[2001:1::1]/return',
+-          cancelUrl: 'https://[3fff::1]/cancel',
++          returnUrl: 'https://[2001:30::1]/return',
++          cancelUrl: 'https://[2606:4700:4700::1111]/cancel',
+         },
+       ],
+     });
+     const { payway, calls } = makePayWay();
+     const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
+       'checkout',
+       approvedOptions(payway),
+     );
+ 
+     expect(result.status).toBe('blocked');
+diff --git a/src/agent/planning.ts b/src/agent/planning.ts
+index 477781d..f8515aa 100644
+--- a/src/agent/planning.ts
++++ b/src/agent/planning.ts
+@@ -60,68 +60,28 @@ function isPrivateOrReservedIpv4(hostname: string): boolean {
+     (first === 100 && second >= 64 && second <= 127) ||
+     (first === 169 && second === 254) ||
+     (first === 172 && second >= 16 && second <= 31) ||
+     (first === 192 && (second === 0 || second === 2 || second === 168)) ||
+     (first === 192 && second === 88 && third === 99) ||
+     (first === 198 && (second === 18 || second === 19 || second === 51)) ||
+     (first === 203 && second === 0)
+   );
+ }
+ 
+-function ipv6Hextets(hostname: string): number[] | null {
+-  // IPv4-embedded IPv6 literals are rejected rather than normalized into a
+-  // separate address family; they are not needed for public callback URLs.
+-  if (hostname.includes('.')) return null;
+-  const [left = '', right = ''] = hostname.split('::');
+-  const leftParts = left === '' ? [] : left.split(':');
+-  const rightParts = right === '' ? [] : right.split(':');
+-  if (leftParts.length + rightParts.length > 8) return null;
+-  const parts = [...leftParts, ...Array(8 - leftParts.length - rightParts.length).fill('0'), ...rightParts];
+-  const hextets = parts.map((part) => Number.parseInt(part, 16));
+-  return hextets.length === 8 && hextets.every((part) => Number.isInteger(part) && part >= 0 && part <= 0xffff)
+-    ? hextets
+-    : null;
+-}
+-
+-function isSpecialUseIpv6(hextets: number[]): boolean {
+-  const [first, second, third] = hextets;
+-  return (
+-    // 2001::/23 (IETF protocol assignments, including 2001:1::/32),
+-    // 2001:2::/48 benchmarking, and 2001:3::/32 AMT.
+-    (first === 0x2001 && (second <= 0x0003 || second === 0x0002)) ||
+-    // ORCHIDv1/v2 and adjacent special-use allocation blocks.
+-    (first === 0x2001 && second >= 0x0010 && second <= 0x002f) ||
+-    // Documentation and AS112 special-use prefixes.
+-    (first === 0x2001 && second === 0x0db8) ||
+-    (first === 0x2001 && second === 0x0004 && third === 0x0112) ||
+-    // Deprecated 6to4 plus IPv6 documentation 3fff::/20.
+-    first === 0x2002 ||
+-    (first === 0x3fff && second < 0x0010)
+-  );
+-}
+-
+ function isPublicIpLiteral(hostname: string): boolean {
+   const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+   const family = isIP(host);
+   if (family === 4) return !isPrivateOrReservedIpv4(host);
+-  if (family !== 6) return true;
+-
+-  // Global IPv6 unicast is 2000::/3. This excludes unspecified, loopback,
+-  // IPv4-mapped, link-local, unique-local, multicast, and other reserved space.
+-  const firstHextet = Number.parseInt(host.split(':')[0] || '0', 16);
+-  const hextets = ipv6Hextets(host);
+-  return (
+-    firstHextet >= 0x2000 &&
+-    firstHextet < 0x4000 &&
+-    hextets !== null &&
+-    !isSpecialUseIpv6(hextets)
+-  );
++  // Public callbacks use DNS names or public IPv4 literals. Reject every IPv6
++  // literal instead of tracking the changing special-use registry.
++  if (family === 6) return false;
++  return true;
+ }
+ 
+ function isPublicHttps(value: unknown): boolean {
+   if (typeof value !== 'string' || value.length === 0) return false;
+   try {
+     const parsed = new URL(value);
+     if (parsed.protocol !== 'https:') return false;
+     if (parsed.hostname.toLowerCase() === 'localhost') return false;
+     return isPublicIpLiteral(parsed.hostname);
+   } catch {

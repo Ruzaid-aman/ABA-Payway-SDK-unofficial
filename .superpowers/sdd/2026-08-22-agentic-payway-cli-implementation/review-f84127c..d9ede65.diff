@@ -1,0 +1,1626 @@
+# Review package: f84127c..d9ede65## Commitsd9ede65 docs(agent): record r1 hardening verification
+5194e1b fix(agent): harden create execution boundaries
+
+## Files changed
+ .../r1-report.md                                   |  32 +++
+ src/__tests__/agent-artifacts.test.ts              |   3 +
+ src/__tests__/agent-e2e.test.ts                    |  20 +-
+ src/__tests__/agent-orchestrator.test.ts           |  36 +--
+ src/__tests__/agent-r1-hardening.test.ts           | 246 +++++++++++++++++++++
+ src/__tests__/agent-tools.test.ts                  |  11 +-
+ src/agent/artifacts.ts                             |  11 +-
+ src/agent/contracts.ts                             |  14 +-
+ src/agent/executor.ts                              |  20 +-
+ src/agent/orchestrator.ts                          | 128 +++++++----
+ src/agent/privacy.ts                               |  12 +-
+ src/agent/provider.ts                              |  10 +-
+ src/agent/schemas.ts                               |   1 -
+ src/agent/sessions.ts                              |   2 +-
+ src/agent/tools.ts                                 |   1 -
+ 15 files changed, 452 insertions(+), 95 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r1-report.md b/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r1-report.md
+new file mode 100644
+index 0000000..03ff454
+--- /dev/null
++++ b/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r1-report.md
+@@ -0,0 +1,32 @@
++# R1 — Agentic payment safety hardening report
++
++## Commit
++
++- Implementation commit: `5194e1b fix(agent): harden create execution boundaries`
++
++## Changed files
++
++- `src/agent/executor.ts`: creates run only from `confirmed`; all other ledger states, including `submitted` and `outcome_unknown`, are recovery-only and make no SDK call.
++- `src/agent/orchestrator.ts`: passes bounded session context to the provider, applies normalization warnings and per-action risk decisions before ledger creation/authorization, validates materialized plans immediately before execution, and scrubs session/result/artifact boundaries using resolved secret values.
++- `src/agent/provider.ts`: provider adapter accepts the bounded deterministic session context and sends it as a system message.
++- `src/agent/privacy.ts`, `src/agent/sessions.ts`: known secret values are redacted even inside longer strings; persisted session events are scrubbed.
++- `src/agent/contracts.ts`, `src/agent/schemas.ts`, `src/agent/tools.ts`, `src/agent/artifacts.ts`: the agent plan cannot represent an artifact root; non-default local roots require an explicit caller confirmation outside the plan; the materialized action union is distributive and correct.
++- `src/__tests__/agent-r1-hardening.test.ts`: R1 regressions for replay prevention, path confinement, invalid currency/URL risk stops, secret canaries, materialized validation, and bounded provider context.
++- `src/__tests__/agent-artifacts.test.ts`, `src/__tests__/agent-e2e.test.ts`, `src/__tests__/agent-orchestrator.test.ts`, `src/__tests__/agent-tools.test.ts`: explicit artifact-root confirmation/isolation and revised no-replay assertions.
++
++## TDD and verification evidence
++
++- RED: `npx vitest run src/__tests__/agent-r1-hardening.test.ts` — 8/8 failed before implementation, covering every requested R1 behavior.
++- RED: after adding the explicit root-confirmation regression, the same command reported 1/9 failing (`requires an explicit confirmed override...`) before the final artifact guard.
++- GREEN focused: `npx vitest run src/__tests__/agent-r1-hardening.test.ts src/__tests__/agent-artifacts.test.ts src/__tests__/agent-orchestrator.test.ts src/__tests__/agent-e2e.test.ts` — 52/52 passed.
++- Agent suite: `npx vitest run src/__tests__/agent-r1-hardening.test.ts src/__tests__/agent-orchestrator.test.ts src/__tests__/agent-e2e.test.ts src/__tests__/agent-provider.test.ts src/__tests__/agent-artifacts.test.ts src/__tests__/agent-contracts.test.ts src/__tests__/agent-privacy-session.test.ts src/__tests__/agent-tools.test.ts src/__tests__/agent-planning-risk.test.ts src/__tests__/agent-ledger.test.ts src/__tests__/agent-context.test.ts src/__tests__/agent-cli.test.ts src/__tests__/agent-config.test.ts` — 211/211 passed.
++- Typecheck: `npm run typecheck` — passed.
++- Build: `npm run build` — passed.
++- Full suite: `npm test` — 37 files, 590 tests passed.
++- Lint: `npm run lint` — exits successfully; four pre-existing warnings remain in `src/__tests__/client-handler.test.ts`, `src/__tests__/server-and-contract.test.ts`, and `src/cli/commands/agent.ts`. No R1 lint warnings remain.
++- Diff check: `git diff --check` and cached diff check passed.
++
++## Concerns
++
++- No `PROJECT_STATUS.md` or `SANDBOX-FINDINGS.md` exists in this worktree despite the repository guidance referencing them.
++- Existing lint warnings above were deliberately left untouched to preserve the manual CLI and avoid unrelated edits.
+diff --git a/src/__tests__/agent-artifacts.test.ts b/src/__tests__/agent-artifacts.test.ts
+index cb670ca..82a3fe6 100644
+--- a/src/__tests__/agent-artifacts.test.ts
++++ b/src/__tests__/agent-artifacts.test.ts
+@@ -99,20 +99,21 @@ describe('saveQrArtifact', () => {
+   });
+   afterEach(() => {
+     fsWriteSpy.mockImplementation((...args: unknown[]) => realWrite.writeFileSync(...args));
+     rmSync(root, { recursive: true, force: true });
+   });
+ 
+   it('produces a PNG + metadata from a QR-string-only input', async () => {
+     const bundle = await saveQrArtifact({
+       qrString: '00020101021226aba01kh',
+       root,
++      overrideApproval: true,
+       name: 'pay-123',
+       sessionId: 'sess_test_008',
+       amount: 1.5,
+       currency: 'USD',
+       transactionId: 'tx_abc',
+     });
+ 
+     expect(bundle.imagePath).toBeDefined();
+     const image = readFileSync(bundle.imagePath!);
+     expect(image.subarray(0, 4).equals(PNG_SIGNATURE)).toBe(true);
+@@ -127,35 +128,37 @@ describe('saveQrArtifact', () => {
+     expect(metadata.currency).toBe('USD');
+     expect(metadata.transactionId).toBe('tx_abc');
+     // No credentials leak into metadata.
+     expect(JSON.stringify(metadata)).not.toMatch(/apiKey|secret|authorization|password/i);
+   });
+ 
+   it('renders a local PNG when the QR image is missing from an API response', async () => {
+     const bundle = await saveQrArtifact({
+       qrString: 'khqr-content',
+       root,
++      overrideApproval: true,
+       sessionId: 'sess_test_008',
+     });
+     expect(existsSync(bundle.imagePath!)).toBe(true);
+   });
+ 
+   it('leaves no partial file when the disk fails (atomicity)', async () => {
+     const target = path.join(root, 'fail.json');
+     fsWriteSpy.mockImplementation(() => {
+       throw new Error('disk full');
+     });
+ 
+     await expect(
+       saveQrArtifact({
+         qrString: 'will-fail',
+         root,
++        overrideApproval: true,
+         name: 'fail',
+         sessionId: 'sess_test_008',
+       }),
+     ).rejects.toThrow(/artifact save failed/);
+ 
+     expect(existsSync(target)).toBe(false);
+     expect(existsSync(path.join(root, 'fail.png'))).toBe(false);
+   });
+ 
+   it('throws a clear error and never retries a payment on failure', async () => {
+diff --git a/src/__tests__/agent-e2e.test.ts b/src/__tests__/agent-e2e.test.ts
+index 1f63d43..025d3e0 100644
+--- a/src/__tests__/agent-e2e.test.ts
++++ b/src/__tests__/agent-e2e.test.ts
+@@ -6,21 +6,25 @@
+  * APPDATA are used. Covers the eight e2e scenarios from the plan's TASK-013.
+  */
+ 
+ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import path from 'node:path';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import type { ResolvedPayWayContext } from '../agent/context.js';
+ import type { AgentPlanV1, ExecutionRecordV1, ProviderConfigV1 } from '../agent/contracts.js';
+ import { findUnfinishedExecutions } from '../agent/ledger.js';
+-import { AgentOrchestrator, type OrchestratorOptions } from '../agent/orchestrator.js';
++import {
++  AgentOrchestrator as AgentOrchestratorBase,
++  type OrchestratorDeps,
++  type OrchestratorOptions,
++} from '../agent/orchestrator.js';
+ import { serializeCommandResult } from '../agent/output.js';
+ import { scrubSensitive } from '../agent/privacy.js';
+ import type { ProviderAdapter, } from '../agent/provider.js';
+ import { validateCommandResult } from '../agent/schemas.js';
+ import { getAgentDataPaths } from '../agent/storage.js';
+ import type { PayWay } from '../client.js';
+ import { PayWayNetworkError } from '../errors.js';
+ 
+ /** Reads a persisted ledger record from disk by its execution id. */
+ function loadExecutionRecordForTest(executionId: string): ExecutionRecordV1 {
+@@ -41,41 +45,43 @@ function allLedgerRecords(): ExecutionRecordV1[] {
+   const dir = getAgentDataPaths().ledgerDir;
+   const names = readdirSync(dir);
+   if (names.length === 0) return [];
+   return names
+     .filter((n) => n.endsWith('.json'))
+     .map((n) => JSON.parse(readFileSync(path.join(dir, n), 'utf8')) as ExecutionRecordV1);
+ }
+ 
+ const tempDirs: string[] = [];
+ const originalAppData = process.env.APPDATA;
+-const originalCwd = process.cwd();
++let artifactRoot = '';
+ 
+ beforeEach(() => {
+   const directory = mkdtempSync(path.join(tmpdir(), 'payway-e2e-'));
+   tempDirs.push(directory);
+   process.env.APPDATA = directory;
+-  // Isolate the shared cwd/payway-output artifact root from other test files
+-  // that also write there, to avoid concurrent rmdir collisions.
+-  process.chdir(directory);
++  artifactRoot = path.join(directory, 'payway-output');
+ });
+ 
+ afterEach(() => {
+-  process.chdir(originalCwd);
+   process.env.APPDATA = originalAppData;
+   for (const directory of tempDirs.splice(0)) {
+     rmSync(directory, { recursive: true, force: true });
+   }
+-  rmSync(path.resolve(process.cwd(), 'payway-output'), { recursive: true, force: true });
+   vi.restoreAllMocks();
+ });
+ 
++class AgentOrchestrator extends AgentOrchestratorBase {
++  constructor(deps: OrchestratorDeps) {
++    super({ ...deps, artifactRoot, artifactRootOverrideConfirmed: true });
++  }
++}
++
+ class FakeProvider implements ProviderAdapter {
+   public lastRequest: string | null = null;
+   constructor(private readonly impl: (request: string) => Promise<AgentPlanV1>) {}
+   propose(request: string): Promise<AgentPlanV1> {
+     this.lastRequest = request;
+     return this.impl(request);
+   }
+   async checkConnectivity() {
+     return { status: 'ready' as const };
+   }
+diff --git a/src/__tests__/agent-orchestrator.test.ts b/src/__tests__/agent-orchestrator.test.ts
+index 225b2a0..7f438f8 100644
+--- a/src/__tests__/agent-orchestrator.test.ts
++++ b/src/__tests__/agent-orchestrator.test.ts
+@@ -8,42 +8,42 @@
+  * (non-TTY without --approve => needs_confirmation, zero PayWay calls),
+  * unknown outcome, resume (no write approval restored), polling offer.
+  */
+ 
+ import { mkdtempSync, rmSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import path from 'node:path';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import type { ResolvedPayWayContext } from '../agent/context.js';
+ import type { AgentPlanV1, ProviderConfigV1 } from '../agent/contracts.js';
+-import { AgentOrchestrator, type OrchestratorOptions } from '../agent/orchestrator.js';
++import { AgentOrchestrator, type OrchestratorDeps, type OrchestratorOptions } from '../agent/orchestrator.js';
+ import { type ProviderAdapter, ProviderProposalError } from '../agent/provider.js';
+ import { validateCommandResult } from '../agent/schemas.js';
+ import type { PayWay } from '../client.js';
+ import { PayWayNetworkError } from '../errors.js';
+ 
+ const tempDirs: string[] = [];
+ const originalAppData = process.env.APPDATA;
++let artifactRoot = '';
+ 
+ beforeEach(() => {
+   const directory = mkdtempSync(path.join(tmpdir(), 'payway-orch-'));
+   tempDirs.push(directory);
+   process.env.APPDATA = directory;
++  artifactRoot = path.join(directory, 'payway-output');
+ });
+ 
+ afterEach(() => {
+   process.env.APPDATA = originalAppData;
+   for (const directory of tempDirs.splice(0)) {
+     rmSync(directory, { recursive: true, force: true });
+   }
+-  // The success path writes a QR artifact under cwd/payway-output.
+-  rmSync(path.resolve(process.cwd(), 'payway-output'), { recursive: true, force: true });
+   vi.restoreAllMocks();
+ });
+ 
+ // ─── Builders ────────────────────────────────────────────────────────────────
+ 
+ class FakeProvider implements ProviderAdapter {
+   constructor(private readonly impl: (request: string) => Promise<AgentPlanV1>) {}
+   propose(request: string): Promise<AgentPlanV1> {
+     return this.impl(request);
+   }
+@@ -131,64 +131,68 @@ function baseOptions(overrides: Partial<OrchestratorOptions> = {}): Orchestrator
+ function privacyConfig(ack: boolean): ProviderConfigV1 {
+   return {
+     version: 'agent-config/v1',
+     provider: 'openai',
+     model: 'gpt-4o',
+     capabilityMode: 'strict-json-plan',
+     ...(ack ? { privacyAcknowledgedAt: new Date().toISOString() } : {}),
+   };
+ }
+ 
++function createOrchestrator(deps: OrchestratorDeps): AgentOrchestrator {
++  return new AgentOrchestrator({ ...deps, artifactRoot, artifactRootOverrideConfirmed: true });
++}
++
+ // ─── Tests ─────────────────────────────────────────────────────────────────────
+ 
+ describe('AgentOrchestrator — one-shot success', () => {
+   it('generates an online QR in sandbox with --approve, saves artifact, offers polling', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({ context: makeContext(), provider });
++    const orch = createOrchestrator({ context: makeContext(), provider });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(result.status).toBe('succeeded');
+     expect(calls.generateQr).toBe(1);
+     expect(result.actions?.[0].ok).toBe(true);
+     expect(result.actions?.[0].artifact).toBeTruthy();
+     expect((result.actions?.[0].artifact as { path?: string }).path).toMatch(/payway-output/);
+     expect(result.message).toMatch(/poll/i);
+     expect(result.executionIds?.length).toBe(1);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ });
+ 
+ describe('AgentOrchestrator — clarification', () => {
+   it('returns needs_clarification and makes zero PayWay calls when route is unavailable', async () => {
+     // No public callback => online QR readiness fails => clarification.
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({
++    const orch = createOrchestrator({
+       context: makeContext({ callbackUrl: undefined }),
+       provider,
+     });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(result.status).toBe('needs_clarification');
+     expect(calls.generateQr).toBe(0);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ });
+ 
+ describe('AgentOrchestrator — cancellation', () => {
+   it('records a cancellation event, leaves session usable, zero PayWay calls', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({ context: makeContext(), provider });
++    const orch = createOrchestrator({ context: makeContext(), provider });
+     const sessionId = 'cancel-session-id';
+ 
+     const result = await orch.runTurn(sessionId, 'cancel', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(result.status).toBe('needs_confirmation');
+     expect(calls.generateQr).toBe(0);
+     expect(result.message).toMatch(/cancel/i);
+     // Session remains usable (cancellation event persisted, loadable).
+     const { loadSession } = await import('../agent/sessions.js');
+     const session = loadSession(sessionId);
+@@ -196,119 +200,119 @@ describe('AgentOrchestrator — cancellation', () => {
+     expect(session!.events.some((e) => e.type === 'cancellation')).toBe(true);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ });
+ 
+ describe('AgentOrchestrator — privacy refusal', () => {
+   it('blocks without acknowledgement and never calls the provider/PayWay', async () => {
+     const propose = vi.fn(async () => onlineQrPlan());
+     const provider = new FakeProvider(propose);
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({
++    const orch = createOrchestrator({
+       context: makeContext(),
+       provider,
+       providerConfig: privacyConfig(false),
+     });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(result.status).toBe('blocked');
+     expect(result.error?.code).toBe('PRIVACY_ACK_REQUIRED');
+     expect(propose).not.toHaveBeenCalled();
+     expect(calls.generateQr).toBe(0);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ 
+   it('proceeds when privacyAcknowledgedAt is present', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({
++    const orch = createOrchestrator({
+       context: makeContext(),
+       provider,
+       providerConfig: privacyConfig(true),
+     });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(result.status).toBe('succeeded');
+     expect(calls.generateQr).toBe(1);
+   });
+ });
+ 
+ describe('AgentOrchestrator — provider failure / invalid plan', () => {
+   it('returns failed on ProviderProposalError with zero PayWay calls', async () => {
+     const provider = new FakeProvider(async () => {
+       throw new ProviderProposalError('model refused');
+     });
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({ context: makeContext(), provider });
++    const orch = createOrchestrator({ context: makeContext(), provider });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(result.status).toBe('failed');
+     expect(calls.generateQr).toBe(0);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ 
+   it('returns failed when propose returns an invalid (garbage) plan', async () => {
+     const provider = new FakeProvider(async () => {
+       return { version: 'agent-plan/v1', request: 'x', actions: [{ tool: 'not_a_tool' }] } as unknown as AgentPlanV1;
+     });
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({ context: makeContext(), provider });
++    const orch = createOrchestrator({ context: makeContext(), provider });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(result.status).toBe('failed');
+     expect(result.error?.code).toBe('INVALID_PLAN');
+     expect(calls.generateQr).toBe(0);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ });
+ 
+ describe('AgentOrchestrator — consent', () => {
+   it('non-TTY without --approve => needs_confirmation and zero PayWay calls', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({ context: makeContext(), provider });
++    const orch = createOrchestrator({ context: makeContext(), provider });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ tty: false, payway }));
+ 
+     expect(result.status).toBe('needs_confirmation');
+     expect(calls.generateQr).toBe(0);
+     // A planned ledger record is local only; no SDK call occurred.
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ 
+   it('non-TTY with --yolo in production => needs_confirmation, zero PayWay calls', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay();
+-    const orch = new AgentOrchestrator({
++    const orch = createOrchestrator({
+       context: makeContext({ environment: 'production' }),
+       provider,
+     });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'yolo', environment: 'production', payway }));
+ 
+     expect(result.status).toBe('needs_confirmation');
+     expect(calls.generateQr).toBe(0);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ });
+ 
+ describe('AgentOrchestrator — unknown outcome', () => {
+   it('records outcome_unknown and reports failure after a network error', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay({
+       generateQrError: new PayWayNetworkError('connection reset'),
+     });
+-    const orch = new AgentOrchestrator({ context: makeContext(), provider });
++    const orch = createOrchestrator({ context: makeContext(), provider });
+     const sessionId = 'unknown-session-id';
+ 
+     const result = await orch.runTurn(sessionId, 'pay $3', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(calls.generateQr).toBe(1);
+     expect(result.status).toBe('failed');
+     expect(result.actions?.[0].error).toMatchObject({ code: 'OUTCOME_UNKNOWN' });
+     expect(result.message).toMatch(/unknown outcome/i);
+     expect(validateCommandResult(result)).toBe(true);
+ 
+@@ -319,40 +323,40 @@ describe('AgentOrchestrator — unknown outcome', () => {
+   });
+ });
+ 
+ describe('AgentOrchestrator — resume', () => {
+   it('resumes with needs_confirmation and never auto-approves a create', async () => {
+     const propose = vi.fn(async () => onlineQrPlan());
+     const provider = new FakeProvider(propose);
+     const { payway, calls } = makePayWay();
+     const sessionId = 'resume-session-id';
+     // Seed a prior session.
+-    await new AgentOrchestrator({ context: makeContext(), provider }).runTurn(
++    await createOrchestrator({ context: makeContext(), provider }).runTurn(
+       sessionId,
+       'pay $3',
+       baseOptions({ flag: 'approve', payway }),
+     );
+     propose.mockClear();
+     calls.generateQr = 0;
+ 
+-    const orch = new AgentOrchestrator({ context: makeContext(), provider });
++    const orch = createOrchestrator({ context: makeContext(), provider });
+     const result = await orch.resume(sessionId);
+ 
+     expect(result.status).toBe('needs_confirmation');
+     expect(propose).not.toHaveBeenCalled();
+     expect(calls.generateQr).toBe(0);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ });
+ 
+ describe('AgentOrchestrator — polling offer', () => {
+   it('mentions polling in the success message for an online QR', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway } = makePayWay();
+-    const orch = new AgentOrchestrator({ context: makeContext(), provider });
++    const orch = createOrchestrator({ context: makeContext(), provider });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+ 
+     expect(result.status).toBe('succeeded');
+     expect(result.message).toMatch(/poll/i);
+   });
+ });
+diff --git a/src/__tests__/agent-r1-hardening.test.ts b/src/__tests__/agent-r1-hardening.test.ts
+new file mode 100644
+index 0000000..4b8f652
+--- /dev/null
++++ b/src/__tests__/agent-r1-hardening.test.ts
+@@ -0,0 +1,246 @@
++import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import path from 'node:path';
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import type { ResolvedPayWayContext } from '../agent/context.js';
++import type { AgentPlanV1, ProviderConfigV1 } from '../agent/contracts.js';
++import { saveQrArtifact } from '../agent/artifacts.js';
++import { executeAction } from '../agent/executor.js';
++import { confirmExecution, createExecutionRecord, markSubmitted } from '../agent/ledger.js';
++import { AgentOrchestrator, type OrchestratorDeps, type OrchestratorOptions } from '../agent/orchestrator.js';
++import type { ProviderAdapter } from '../agent/provider.js';
++import { appendSessionEvent, createSession, loadSession } from '../agent/sessions.js';
++import { getAgentDataPaths } from '../agent/storage.js';
++import type { PayWay } from '../client.js';
++
++const tempDirs: string[] = [];
++const originalAppData = process.env.APPDATA;
++let artifactRoot = '';
++
++beforeEach(() => {
++  const directory = mkdtempSync(path.join(tmpdir(), 'payway-r1-'));
++  tempDirs.push(directory);
++  process.env.APPDATA = directory;
++  artifactRoot = path.join(directory, 'payway-output');
++});
++
++afterEach(() => {
++  process.env.APPDATA = originalAppData;
++  for (const directory of tempDirs.splice(0)) {
++    rmSync(directory, { recursive: true, force: true });
++  }
++});
++
++function makeContext(overrides: Partial<ResolvedPayWayContext> = {}): ResolvedPayWayContext {
++  return {
++    source: 'option',
++    profileName: 'test',
++    environment: 'sandbox',
++    merchantId: 'MID-R1',
++    apiKey: 'PAYWAY-API-CANARY',
++    publicKeyPem: 'PAYWAY-SIGNING-CANARY',
++    callbackUrl: 'https://pay.example.test/callback',
++    displayLabel: 'profile: test (sandbox)',
++    ...overrides,
++  };
++}
++
++function privacyConfig(): ProviderConfigV1 {
++  return {
++    version: 'agent-config/v1',
++    provider: 'openai',
++    model: 'test-model',
++    capabilityMode: 'strict-json-plan',
++    privacyAcknowledgedAt: '2026-08-22T00:00:00.000Z',
++  };
++}
++
++function onlineQrPlan(overrides: Record<string, unknown> = {}): AgentPlanV1 {
++  return {
++    version: 'agent-plan/v1',
++    request: 'make a payment',
++    actions: [
++      {
++        tool: 'generate_online_qr',
++        amount: 3,
++        currency: 'USD',
++        transactionId: null,
++        callbackUrl: 'https://pay.example.test/callback',
++        ...overrides,
++      },
++    ],
++  } as AgentPlanV1;
++}
++
++class FakeProvider implements ProviderAdapter {
++  public lastRequest: string | undefined;
++  public lastContext: string | undefined;
++
++  constructor(private readonly plan: AgentPlanV1) {}
++
++  async propose(request: string, context?: string): Promise<AgentPlanV1> {
++    this.lastRequest = request;
++    this.lastContext = context;
++    return this.plan;
++  }
++
++  async checkConnectivity() {
++    return { status: 'ready' as const };
++  }
++}
++
++function makePayWay(): { payway: PayWay; calls: { generateQr: number } } {
++  const calls = { generateQr: 0 };
++  return {
++    payway: {
++      qr: {
++        generateQr: async () => {
++          calls.generateQr++;
++          return { qrString: 'R1-QR' };
++        },
++      },
++    } as unknown as PayWay,
++    calls,
++  };
++}
++
++function approvedOptions(payway: PayWay): OrchestratorOptions {
++  return { tty: false, environment: 'sandbox', flag: 'approve', payway };
++}
++
++function createOrchestrator(deps: OrchestratorDeps): AgentOrchestrator {
++  return new AgentOrchestrator({ ...deps, artifactRoot, artifactRootOverrideConfirmed: true });
++}
++
++describe('R1 ledger replay guard', () => {
++  it('rejects a submitted create record without another SDK create call', async () => {
++    const record = createExecutionRecord({
++      sessionId: 'submitted-session',
++      tool: 'generate_online_qr',
++      transactionId: null,
++    });
++    const confirmed = confirmExecution(record.executionId);
++    const submitted = markSubmitted(confirmed.executionId);
++    const { payway, calls } = makePayWay();
++
++    const result = await executeAction(
++      {
++        tool: 'generate_online_qr',
++        amount: 3,
++        currency: 'USD',
++        transactionId: confirmed.transactionId!,
++        callbackUrl: 'https://pay.example.test/callback',
++      },
++      { context: makeContext(), sessionId: submitted.sessionId, execution: submitted, payway },
++    );
++
++    expect(result).toMatchObject({ ok: false, error: { code: 'RECOVERY_REQUIRED' } });
++    expect(calls.generateQr).toBe(0);
++  });
++});
++
++describe('R1 model path confinement', () => {
++  it('requires an explicit confirmed override before a caller can use a non-default artifact root', async () => {
++    await expect(
++      saveQrArtifact({ content: 'receipt', root: artifactRoot, sessionId: 'human-confirmation-required' }),
++    ).rejects.toThrow(/confirmed root override/);
++  });
++
++  it('does not allow a provider save_artifact action to write to an external root', async () => {
++    const externalRoot = path.join(path.dirname(artifactRoot), 'external-artifacts');
++    const provider = new FakeProvider({
++      version: 'agent-plan/v1',
++      request: 'save the receipt',
++      actions: [{ tool: 'save_artifact', content: 'receipt', root: externalRoot }],
++    } as unknown as AgentPlanV1);
++    const { payway } = makePayWay();
++    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
++      'save the receipt',
++      approvedOptions(payway),
++    );
++
++    expect(result.status).toBe('failed');
++    expect(existsSync(externalRoot)).toBe(false);
++    expect(existsSync(artifactRoot)).toBe(false);
++  });
++});
++
++describe('R1 pre-authorization risk gate', () => {
++  it.each([
++    ['fractional KHR amount', onlineQrPlan({ amount: 1.5, currency: 'KHR' })],
++    ['over-precise USD amount', onlineQrPlan({ amount: 1.234, currency: 'USD' })],
++    ['private callback URL', onlineQrPlan({ callbackUrl: 'https://127.0.0.1/callback' })],
++  ])('blocks %s before creating a ledger record or calling the SDK', async (_name, plan) => {
++    const provider = new FakeProvider(plan);
++    const { payway, calls } = makePayWay();
++    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
++      'make payment',
++      approvedOptions(payway),
++    );
++
++    expect(result.status).toBe('blocked');
++    expect(calls.generateQr).toBe(0);
++    expect(existsSync(getAgentDataPaths().ledgerDir)).toBe(false);
++  });
++});
++
++describe('R1 materialized plan validation', () => {
++  it('rejects an invalid materialized plan before invoking the executor', async () => {
++    const provider = new FakeProvider(onlineQrPlan({ transactionId: 'tx-id-too-long-for-materialized-plan' }));
++    const { payway, calls } = makePayWay();
++    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
++      'make payment',
++      approvedOptions(payway),
++    );
++
++    expect(result).toMatchObject({ status: 'failed', error: { code: 'INVALID_MATERIALIZED_PLAN' } });
++    expect(calls.generateQr).toBe(0);
++  });
++});
++
++describe('R1 privacy and provider context boundaries', () => {
++  it('scrubs action and nested-plan canaries from provider input, session, command result, and artifact metadata', async () => {
++    process.env.PAYWAY_AGENT_API_KEY = 'PROVIDER-API-CANARY';
++    const provider = new FakeProvider({
++      ...onlineQrPlan({ rationale: 'PAYWAY-API-CANARY' }),
++      context: { optional: { signingMaterial: 'PAYWAY-SIGNING-CANARY', providerKey: 'PROVIDER-API-CANARY' } },
++    });
++    const { payway } = makePayWay();
++    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
++      'make payment',
++      approvedOptions(payway),
++    );
++    delete process.env.PAYWAY_AGENT_API_KEY;
++
++    const session = loadSession(result.sessionId!);
++    const serialized = JSON.stringify(result);
++    const sessionSerialized = JSON.stringify(session);
++    const artifact = result.actions?.[0].artifact as { path: string };
++    const metadata = readFileSync(artifact.path.replace(/\.png$/, '.json'), 'utf8');
++    for (const channel of [provider.lastRequest, provider.lastContext, serialized, sessionSerialized, metadata]) {
++      expect(channel).not.toContain('PAYWAY-API-CANARY');
++      expect(channel).not.toContain('PAYWAY-SIGNING-CANARY');
++      expect(channel).not.toContain('PROVIDER-API-CANARY');
++    }
++  });
++
++  it('passes a deterministic bounded summary to the provider instead of raw session history', async () => {
++    const session = createSession('history-context');
++    for (let index = 0; index < 20; index++) {
++      appendSessionEvent(session.sessionId, { type: 'prompt', data: { text: `history-${index}` } });
++    }
++    const provider = new FakeProvider(onlineQrPlan());
++    const { payway } = makePayWay();
++    await createOrchestrator({
++      context: makeContext(),
++      provider,
++      sessionId: session.sessionId,
++      providerConfig: privacyConfig(),
++    }).runOneShot('make payment', approvedOptions(payway));
++
++    const summary = JSON.parse(provider.lastContext!) as { events: unknown[] };
++    expect(summary.events).toHaveLength(12);
++    expect(provider.lastContext).not.toContain('history-0');
++    expect(provider.lastContext).toContain('history-19');
++  });
++});
+diff --git a/src/__tests__/agent-tools.test.ts b/src/__tests__/agent-tools.test.ts
+index adb2a66..af15be7 100644
+--- a/src/__tests__/agent-tools.test.ts
++++ b/src/__tests__/agent-tools.test.ts
+@@ -230,35 +230,36 @@ describe('TASK-009 tool registry + executor', () => {
+       expect(result.ok).toBe(true);
+       expect(vi.mocked(markSubmitted)).toHaveBeenCalledTimes(1);
+       expect(vi.mocked(markSubmitted)).toHaveBeenCalledWith('exec-1');
+       expect(vi.mocked(markSucceeded)).toHaveBeenCalledTimes(1);
+       expect(vi.mocked(markFailed)).not.toHaveBeenCalled();
+       expect(vi.mocked(markOutcomeUnknown)).not.toHaveBeenCalled();
+       expect(domainCalls(tool, payway)).toBe(1);
+     });
+   }
+ 
+-  it('create action with status submitted skips markSubmitted but still runs', async () => {
++  it('create action with status submitted requires recovery and never runs again', async () => {
+     const record = makeRecord('submitted', { tool: 'generate_online_qr' });
+     const ctx = makeExecContext(payway, record);
+     const result = await executeAction(createAction('generate_online_qr'), ctx);
+-    expect(result.ok).toBe(true);
++    expect(result).toMatchObject({ ok: false, error: { code: 'RECOVERY_REQUIRED' } });
+     expect(vi.mocked(markSubmitted)).not.toHaveBeenCalled();
+-    expect(vi.mocked(markSucceeded)).toHaveBeenCalledTimes(1);
++    expect(vi.mocked(markSucceeded)).not.toHaveBeenCalled();
++    expect(domainCalls('generate_online_qr', payway)).toBe(0);
+   });
+ 
+-  it('create action blocks when ledger not confirmed/submitted', async () => {
++  it('create action requires recovery when ledger is not confirmed', async () => {
+     const record = makeRecord('planned', { tool: 'generate_online_qr' });
+     const ctx = makeExecContext(payway, record);
+     const result = await executeAction(createAction('generate_online_qr'), ctx);
+     expect(result.ok).toBe(false);
+-    expect(result.error?.code).toBe('LEDGER_NOT_READY');
++    expect(result.error?.code).toBe('RECOVERY_REQUIRED');
+     expect(domainCalls('generate_online_qr', payway)).toBe(0);
+     expect(vi.mocked(markSubmitted)).not.toHaveBeenCalled();
+   });
+ 
+   it('generate_online_qr passes exact SDK params', async () => {
+     const ctx = makeExecContext(payway, makeRecord('confirmed', { tool: 'generate_online_qr' }));
+     await executeAction(createAction('generate_online_qr'), ctx);
+     const call = (payway.qr.generateQr as ReturnType<typeof vi.fn>).mock.calls[0][0];
+     expect(call).toMatchObject({
+       transactionId: 'tx1',
+diff --git a/src/agent/artifacts.ts b/src/agent/artifacts.ts
+index 6183b0d..4ab5b57 100644
+--- a/src/agent/artifacts.ts
++++ b/src/agent/artifacts.ts
+@@ -24,21 +24,23 @@ export function defaultArtifactRoot(): string {
+ 
+ export interface ArtifactBundle {
+   metadata: ArtifactMetadataV1;
+   imagePath?: string;
+   dataUrl?: string;
+ }
+ 
+ export interface SaveQrArtifactInput {
+   qrString?: string;
+   content?: string;
++  /** Caller-controlled root; a non-default root needs explicit human confirmation. */
+   root?: string;
++  overrideApproval?: boolean;
+   name?: string;
+   sessionId: string;
+   route?: string;
+   amount?: number;
+   currency?: Currency;
+   transactionId?: string;
+   executionId?: string;
+ }
+ 
+ /**
+@@ -95,39 +97,44 @@ function atomicWriteBuffer(targetPath: string, buffer: Buffer): void {
+  * - Writes the PNG and the metadata JSON atomically (temp file + rename).
+  * - The metadata never carries credentials; only non-secret context is stored.
+  * - Throws a clear error on any write/render failure. This is a local
+  *   filesystem operation: it performs no network calls and must NOT retry a
+  *   payment — the executor handles API success vs. artifact failure separately.
+  */
+ export async function saveQrArtifact(input: SaveQrArtifactInput): Promise<ArtifactBundle> {
+   const {
+     qrString,
+     content,
+-    root = defaultArtifactRoot(),
++    root,
++    overrideApproval = false,
+     name,
+     sessionId,
+     route,
+     amount,
+     currency,
+     transactionId,
+     executionId,
+   } = input;
+ 
+   if (!sessionId) {
+     throw new Error('saveQrArtifact requires a sessionId');
+   }
+   if (!qrString && !content) {
+     throw new Error('saveQrArtifact requires either qrString or content');
+   }
+ 
+   const normalizedName = normalizeName(name, `artifact-${randomUUID().slice(0, 8)}`);
+-  const resolvedRoot = path.resolve(root);
++  const defaultRoot = defaultArtifactRoot();
++  const resolvedRoot = path.resolve(root ?? defaultRoot);
++  if (resolvedRoot !== defaultRoot && !overrideApproval) {
++    throw new Error('saveQrArtifact requires an explicit confirmed root override outside payway-output');
++  }
+   const imagePath = path.join(resolvedRoot, `${normalizedName}.png`);
+   const metadataPath = path.join(resolvedRoot, `${normalizedName}.json`);
+ 
+   const kind: ArtifactKind = qrString ? 'qr' : 'text';
+ 
+   let imageBuffer: Buffer | undefined;
+   let dataUrl: string | undefined;
+   if (qrString) {
+     try {
+       imageBuffer = await QRCode.toBuffer(qrString, { width: 512, margin: 2 });
+diff --git a/src/agent/contracts.ts b/src/agent/contracts.ts
+index 28e9ec1..ee0ac1d 100644
+--- a/src/agent/contracts.ts
++++ b/src/agent/contracts.ts
+@@ -113,21 +113,20 @@ export interface PollTransactionParams {
+   transactionId: string;
+   interval?: number;
+   timeout?: number;
+   rationale?: string;
+ }
+ 
+ export interface SaveArtifactParams {
+   tool: 'save_artifact';
+   qrString?: string;
+   content?: string;
+-  root?: string;
+   name?: string;
+   kind?: 'qr' | 'receipt' | 'text';
+   rationale?: string;
+ }
+ 
+ export interface OpenArtifactParams {
+   tool: 'open_artifact';
+   /** Path to a current-session artifact, or an explicitly selected HTTPS URL. */
+   reference: string;
+   rationale?: string;
+@@ -149,28 +148,25 @@ export type AgentActionParams =
+   | CheckTransactionByMerchantRefParams
+   | PollTransactionParams
+   | SaveArtifactParams
+   | OpenArtifactParams
+   | CopyToClipboardParams;
+ 
+ /** A proposed (pre-approval) action. Create actions may carry a null transactionId. */
+ export type AgentActionDraft = AgentActionParams;
+ 
+ /** A materialized action. Create actions must carry a valid (non-null) transactionId. */
+-export type MaterializedAgentAction = Exclude<
+-  {
+-    [K in keyof AgentActionParams]: AgentActionParams[K] extends { transactionId: string | null }
+-      ? Omit<AgentActionParams[K], 'transactionId'> & { transactionId: string }
+-      : AgentActionParams[K];
+-  }[keyof AgentActionParams],
+-  never
+->;
++type MaterializeAction<T extends AgentActionParams> = T extends { transactionId: string | null }
++  ? Omit<T, 'transactionId'> & { transactionId: string }
++  : T;
++
++export type MaterializedAgentAction = MaterializeAction<AgentActionParams>;
+ 
+ // ---------------------------------------------------------------------------
+ // Plan
+ // ---------------------------------------------------------------------------
+ 
+ export interface AgentPlanV1 {
+   version: AgentPlanVersion;
+   request: string;
+   actions: AgentActionDraft[];
+   assumptions?: string[];
+diff --git a/src/agent/executor.ts b/src/agent/executor.ts
+index 1bb0e89..6bf4a98 100644
+--- a/src/agent/executor.ts
++++ b/src/agent/executor.ts
+@@ -1,17 +1,17 @@
+ /**
+  * Agentic PayWay CLI — tool executor.
+  *
+  * `executeAction` is the single entry point that runs a
+  * {@link MaterializedAgentAction} (already schema-validated upstream) through
+  * the typed tool registry. For create actions it enforces the ledger
+- * state machine: the record must be `confirmed` or `submitted`, is advanced to
++ * state machine: the record must be `confirmed`, is advanced to
+  * `submitted`, the SDK call runs exactly once, and the result advances to
+  * `succeeded`, `failed`, or `outcome_unknown` (on timeout / abort / network
+  * failure / ambiguous response).
+  *
+  * The PayWay client is taken from {@link ExecutionContext.payway} when present,
+  * otherwise a fresh agent client is built (create-kind for writes, read-kind for
+  * reads) via `createAgentPayWay`.
+  */
+ 
+ import type { PayWay } from '../client.js';
+@@ -62,54 +62,56 @@ export async function executeAction(
+   action: MaterializedAgentAction,
+   executionContext: ExecutionContext,
+ ): Promise<ToolExecutionResult> {
+   // NOTE: The merged `MaterializedAgentAction` contract collapses to the
+   // `AgentToolName` string union (a non-distributive `keyof`), so at the type
+   // level `action` is the tool name. At runtime it is the discriminated object
+   // produced upstream; we recover the discriminant here and re-cast when
+   // delegating to the typed tool functions.
+   const tool = (action as unknown as { tool: AgentToolName }).tool;
+   const create = isCreateAction(tool);
+-  const client = resolveClient(executionContext.context, executionContext.payway, create);
+ 
+   const toolFn = toolRegistry[tool];
+   if (!toolFn) {
+     return {
+       ok: false,
+       tool,
+       error: { code: 'UNKNOWN_TOOL', message: `No tool registered for '${tool}'` },
+     };
+   }
+ 
+   if (!create) {
++    const client = resolveClient(executionContext.context, executionContext.payway, false);
+     return toolFn(action, client, executionContext);
+   }
+ 
+   const execution = executionContext.execution;
+   const status = execution?.status;
+-  if (status !== 'confirmed' && status !== 'submitted') {
++  if (status !== 'confirmed') {
+     return {
+       ok: false,
+       tool,
+       error: {
+-        code: 'LEDGER_NOT_READY',
+-        message: `Execution '${execution?.executionId}' is in status '${status}', expected 'confirmed' or 'submitted'`,
++        code: 'RECOVERY_REQUIRED',
++        message:
++          `Execution '${execution?.executionId}' is in status '${status}'. ` +
++          'Create actions are never replayed automatically; recover by checking the recorded transaction.',
+       },
+     };
+   }
+ 
+   const executionId = execution.executionId;
+ 
+-  // Advance confirmed -> submitted exactly once (idempotent if already submitted).
+-  if (status === 'confirmed') {
+-    markSubmitted(executionId);
+-  }
++  // Advance confirmed -> submitted exactly once. Submitted/outcome-unknown
++  // records are recovery-only and were rejected above before any SDK client use.
++  markSubmitted(executionId);
++  const client = resolveClient(executionContext.context, executionContext.payway, true);
+ 
+   let result: ToolExecutionResult;
+   try {
+     result = await toolFn(action, client, executionContext);
+   } catch (error) {
+     markOutcomeUnknown(executionId, {
+       code: error instanceof Error ? error.name : undefined,
+       message: error instanceof Error ? error.message : String(error),
+     });
+     return {
+diff --git a/src/agent/orchestrator.ts b/src/agent/orchestrator.ts
+index 9f7e483..49f23d3 100644
+--- a/src/agent/orchestrator.ts
++++ b/src/agent/orchestrator.ts
+@@ -28,35 +28,39 @@ import type {
+   MaterializedAgentPlanV1,
+   ProviderConfigV1,
+ } from './contracts.js';
+ import { type ExecutionContext, executeAction, type ToolExecutionResult } from './executor.js';
+ import { confirmExecution, createExecutionRecord } from './ledger.js';
+ import { renderHumanResult, serializeCommandResult } from './output.js';
+ import { normalizePlan } from './planning.js';
+ import { scrubSensitive } from './privacy.js';
+ import type { ProviderAdapter } from './provider.js';
+ import { ProviderProposalError } from './provider.js';
+-import { authorizePlan } from './risk.js';
+-import { validateAgentPlan, validateCommandResult } from './schemas.js';
++import { authorizePlan, classifyRisk } from './risk.js';
++import { validateAgentPlan, validateCommandResult, validateMaterializedPlan } from './schemas.js';
+ import { appendSessionEvent, buildDeterministicSummary, createSession, loadSession } from './sessions.js';
+ 
+ export interface OrchestratorOptions {
+   tty: boolean;
+   flag?: 'approve' | 'yolo';
+   environment?: 'sandbox' | 'production';
+   payway?: PayWay;
+ }
+ 
+ export interface OrchestratorDeps {
+   context: ResolvedPayWayContext;
+   provider: ProviderAdapter;
+   sessionId?: string;
++  /** Local caller-controlled artifact root; provider plans cannot set this. */
++  artifactRoot?: string;
++  /** Explicit confirmation for a non-default local artifact root. */
++  artifactRootOverrideConfirmed?: boolean;
+   /** Provider config used only for the privacy-acknowledgement gate. */
+   providerConfig?: ProviderConfigV1;
+ }
+ 
+ const CREATE_TOOLS: ReadonlySet<AgentToolName> = new Set<AgentToolName>([
+   'generate_online_qr',
+   'generate_offline_khqr',
+   'create_checkout_payload',
+   'create_checkout_purchase',
+   'create_payment_link',
+@@ -67,49 +71,50 @@ function toolOf(action: AgentActionDraft | MaterializedAgentAction): AgentToolNa
+ }
+ 
+ function isCreateTool(tool: AgentToolName): boolean {
+   return CREATE_TOOLS.has(tool);
+ }
+ 
+ export class AgentOrchestrator {
+   private readonly context: ResolvedPayWayContext;
+   private readonly provider: ProviderAdapter;
+   private readonly baseSessionId?: string;
++  private readonly artifactRoot?: string;
++  private readonly artifactRootOverrideConfirmed: boolean;
+   private readonly providerConfig?: ProviderConfigV1;
+-  private writeApproved = false;
+ 
+   constructor(deps: OrchestratorDeps) {
+     this.context = deps.context;
+     this.provider = deps.provider;
+     this.baseSessionId = deps.sessionId;
++    this.artifactRoot = deps.artifactRoot;
++    this.artifactRootOverrideConfirmed = deps.artifactRootOverrideConfirmed === true;
+     this.providerConfig = deps.providerConfig;
+   }
+ 
+   // ─── Public entry points ──────────────────────────────────────────────────
+ 
+   async runOneShot(request: string, options: OrchestratorOptions): Promise<AgentCommandResultV1> {
+     const sessionId = this.baseSessionId ?? createSession(this.context.displayLabel).sessionId;
+     return this.runPipeline(sessionId, request, options);
+   }
+ 
+   async runTurn(sessionId: string, request: string, options: OrchestratorOptions): Promise<AgentCommandResultV1> {
+     return this.runPipeline(sessionId, request, options);
+   }
+ 
+   /**
+    * Resume a prior session. Resets any in-memory write approval so a resumed
+    * session can NEVER auto-approve a create. Returns a `needs_confirmation`
+    * result carrying a deterministic summary; the caller must re-confirm.
+    */
+   async resume(sessionId: string): Promise<AgentCommandResultV1> {
+-    this.writeApproved = false;
+-
+     const session = loadSession(sessionId);
+     if (!session) {
+       return this.failure(
+         'blocked',
+         {
+           code: 'SESSION_NOT_FOUND',
+           message: `No session found for id '${sessionId}'.`,
+         },
+         { sessionId },
+       );
+@@ -127,56 +132,60 @@ export class AgentOrchestrator {
+ 
+   // ─── Pipeline ─────────────────────────────────────────────────────────────
+ 
+   private async runPipeline(
+     sessionId: string,
+     request: string,
+     options: OrchestratorOptions,
+   ): Promise<AgentCommandResultV1> {
+     // 1. Cancellation: record and leave the session usable; never call PayWay.
+     if (this.looksLikeCancellation(request)) {
+-      const sanitized = scrubSensitive(request, []) as string;
+-      appendSessionEvent(sessionId, { type: 'cancellation', data: { request: sanitized } });
++      const sanitized = this.scrub(request) as string;
++      this.appendEvent(sessionId, 'cancellation', { request: sanitized });
+       return this.result({
+         status: 'needs_confirmation',
+         sessionId,
+         message: 'Cancellation recorded. The session remains usable and no payment was created.',
+         request: sanitized,
+       });
+     }
+ 
+     // 1b. Scrub free-text secrets from the request before it is transmitted to
+     //     the provider or persisted into session/result output. A selected
+     //     profile never contributes credential material here; only user-supplied
+     //     free text that may contain an accidental secret is redacted.
+-    request = scrubSensitive(request, []) as string;
++    request = this.scrub(request) as string;
+ 
+     // 2. Privacy acknowledgement gate (provider config only; no PayWay/propose).
+     if (this.providerConfig && !this.providerConfig.privacyAcknowledgedAt) {
+       return this.result({
+         status: 'blocked',
+         sessionId,
+         message:
+           'Privacy acknowledgement required: set providerConfig.privacyAcknowledgedAt before ' +
+           'proposing plans. No action was taken.',
+         request,
+         error: { code: 'PRIVACY_ACK_REQUIRED', message: 'Provider privacy acknowledgement is missing.' },
+       });
+     }
+ 
+     // 3. Scrubbed context summary (provider context / audit; secrets redacted).
+     const scrubbedContext = this.buildScrubbedContext(sessionId);
+ 
+     // 4. Plan (provider proposal).
+     let plan: AgentPlanV1;
+     try {
+-      plan = await this.provider.propose(request);
++      // Keep the validated proposal intact for execution decisions. A scrubbed
++      // copy is used at every persistence/output boundary below; mutating the
++      // execution copy could transform a rejected path/URL into a safe-looking
++      // value and change its security semantics.
++      plan = await this.provider.propose(request, scrubbedContext);
+     } catch (error) {
+       if (error instanceof ProviderProposalError) {
+         return this.failure(
+           'failed',
+           {
+             code: 'PROVIDER_PROPOSAL_FAILED',
+             message: error.message,
+           },
+           { sessionId, request },
+         );
+@@ -195,46 +204,55 @@ export class AgentOrchestrator {
+       return this.failure(
+         'failed',
+         {
+           code: 'INVALID_PLAN',
+           message: 'Provider returned a plan that failed validation; no action taken.',
+         },
+         { sessionId, request },
+       );
+     }
+ 
+-    const storedPlan: AgentPlanV1 = {
+-      ...plan,
+-      request: scrubSensitive(plan.request, []) as string,
+-      ...(plan.context ? { context: scrubSensitive(plan.context, []) as Record<string, unknown> } : {}),
+-    };
+-    appendSessionEvent(sessionId, { type: 'plan', data: { plan: storedPlan, scrubbedContext } });
++    const storedPlan = this.scrub(plan) as AgentPlanV1;
++    this.appendEvent(sessionId, 'plan', { plan: storedPlan, scrubbedContext });
+ 
+     // 5. Clarification (normalize). If clarification needed, STOP — no writes.
+     const normalized = normalizePlan(plan, this.context);
+     if (normalized.needsClarification) {
+-      appendSessionEvent(sessionId, {
+-        type: 'summary',
+-        data: { clarification: normalized.clarification },
+-      });
++      this.appendEvent(sessionId, 'summary', { clarification: normalized.clarification });
+       return this.result({
+         status: 'needs_clarification',
+         sessionId,
+         message: normalized.clarification ?? 'Clarification required before proceeding.',
+         plan: normalized.plan,
+         request,
+       });
+     }
+ 
++    const riskDecisions = normalized.plan.actions.map((action) => classifyRisk(action, this.context));
++    const riskBlockers = [
++      ...normalized.warnings,
++      ...riskDecisions.filter((decision) => decision.level === 'blocked').map((decision) => decision.reason),
++    ];
++    if (riskBlockers.length > 0) {
++      return this.failure(
++        'blocked',
++        {
++          code: 'PLAN_RISK_BLOCKED',
++          message: `Plan blocked before authorization: ${riskBlockers.join('; ')}`,
++        },
++        { sessionId, plan: normalized.plan, request },
++      );
++    }
++
+     // 6. Persist planned writes (ledger 'planned' records) for create actions.
+     const created: Array<{ index: number; record: ExecutionRecordV1 }> = [];
+-    plan.actions.forEach((action, index) => {
++    normalized.plan.actions.forEach((action, index) => {
+       const tool = toolOf(action);
+       if (!isCreateTool(tool)) return;
+       const record = createExecutionRecord({
+         sessionId,
+         tool,
+         transactionId: ((action as { transactionId?: string | null }).transactionId ?? null) as string | null,
+         merchantRef: (action as { merchantRef?: string }).merchantRef,
+       });
+       created.push({ index, record });
+     });
+@@ -249,42 +267,52 @@ export class AgentOrchestrator {
+       const status = options.tty ? 'blocked' : 'needs_confirmation';
+       return this.result({
+         status,
+         sessionId,
+         message: `Approval required: ${authorization.reason}`,
+         plan: normalized.plan,
+         executionIds: created.map((c) => c.record.executionId),
+         request,
+       });
+     }
+-    // Authorization was granted by an explicit flag this turn; do not persist it.
+-    this.writeApproved = true;
+-
+     // 8. Materialize IDs: confirm each create record (planned -> confirmed) and
+     //    bind the generated transactionId into a materialized plan.
+-    const materializedActions = plan.actions.map((action) => ({ ...action }) as unknown as MaterializedAgentAction);
++    const materializedActions = normalized.plan.actions.map(
++      (action) => ({ ...action }) as unknown as MaterializedAgentAction,
++    );
+     for (const entry of created) {
+       const confirmed = confirmExecution(entry.record.executionId);
+       entry.record = confirmed;
+       const target = materializedActions[entry.index] as unknown as Record<string, unknown>;
+       if ('transactionId' in target) {
+         target.transactionId = confirmed.transactionId as string;
+       }
+     }
+     const materializedPlan: MaterializedAgentPlanV1 = {
+       version: 'agent-plan/v1',
+-      request: scrubSensitive(plan.request, []) as string,
++      request: normalized.plan.request,
+       actions: materializedActions,
+-      ...(plan.assumptions ? { assumptions: plan.assumptions } : {}),
+-      ...(plan.context ? { context: scrubSensitive(plan.context, []) as Record<string, unknown> } : {}),
++      ...(normalized.plan.assumptions ? { assumptions: normalized.plan.assumptions } : {}),
++      ...(normalized.plan.context ? { context: normalized.plan.context } : {}),
+     };
+ 
++    if (!validateMaterializedPlan(materializedPlan)) {
++      return this.failure(
++        'failed',
++        {
++          code: 'INVALID_MATERIALIZED_PLAN',
++          message: 'Materialized plan failed validation; no action was executed.',
++        },
++        { sessionId, plan: materializedPlan, executionIds: created.map((c) => c.record.executionId), request },
++      );
++    }
++
+     // 9. Execute each action (executor owns the submitted -> outcome transition
+     //    and runs the single SDK call for create actions).
+     const recordByIndex = new Map(created.map((c) => [c.index, c.record]));
+     const actionResults: Array<Record<string, unknown>> = [];
+     let anyFailure = false;
+     let outcomeUnknown = false;
+     let pollOffered = false;
+ 
+     for (let i = 0; i < materializedPlan.actions.length; i++) {
+       const action = materializedPlan.actions[i];
+@@ -306,54 +334,50 @@ export class AgentOrchestrator {
+           tool,
+           error: {
+             code: 'EXECUTION_ERROR',
+             message: error instanceof Error ? error.message : String(error),
+           },
+         };
+       }
+ 
+       // Session write failures must warn (handled inside appendSessionEvent)
+       // and must NOT crash the pipeline — the action still happened.
+-      appendSessionEvent(sessionId, { type: 'tool_call', data: { tool, index: i } });
+-      appendSessionEvent(sessionId, {
+-        type: 'tool_result',
+-        data: { tool, ok: result.ok, error: result.error ?? null },
+-      });
++      this.appendEvent(sessionId, 'tool_call', { tool, index: i });
++      this.appendEvent(sessionId, 'tool_result', { tool, ok: result.ok, error: result.error ?? null });
+ 
+       if (!result.ok) {
+         anyFailure = true;
+         if (result.error?.code === 'OUTCOME_UNKNOWN') outcomeUnknown = true;
+       }
+ 
+       const entry: Record<string, unknown> = { tool, ok: result.ok };
+       if (result.data) entry.data = result.data;
+       if (result.error) entry.error = result.error;
+ 
+       // Successful online QR: save artifact, then OFFER polling (never auto-poll).
+       if (result.ok && tool === 'generate_online_qr' && record) {
+         const qrString = (result.data?.qrString as string | undefined) ?? undefined;
+         if (qrString) {
+           try {
+             const bundle = await saveQrArtifact({
+               qrString,
++              root: this.artifactRoot,
++              overrideApproval: this.artifactRootOverrideConfirmed,
+               sessionId,
+               route: 'generate_online_qr',
+               amount: (action as { amount?: number }).amount,
+               currency: (action as { currency?: 'USD' | 'KHR' }).currency,
+               transactionId: record.transactionId ?? undefined,
+               executionId: record.executionId,
+             });
+-            appendSessionEvent(sessionId, {
+-              type: 'artifact',
+-              data: { artifactId: bundle.metadata.artifactId, path: bundle.metadata.path },
+-            });
+-            entry.artifact = bundle.metadata;
++            this.appendEvent(sessionId, 'artifact', { artifactId: bundle.metadata.artifactId, path: bundle.metadata.path });
++            entry.artifact = this.scrub(bundle.metadata);
+             pollOffered = true;
+           } catch (error) {
+             console.warn(
+               `Audit: failed to save QR artifact for execution ${record.executionId}; ` +
+                 `the payment was still created. Cause: ${error instanceof Error ? error.message : String(error)}`,
+             );
+           }
+         }
+       }
+ 
+@@ -386,31 +410,55 @@ export class AgentOrchestrator {
+       executionIds: created.map((c) => c.record.executionId),
+       request,
+     });
+   }
+ 
+   // ─── Helpers ──────────────────────────────────────────────────────────────
+ 
+   private buildScrubbedContext(sessionId: string): string {
+     const session = loadSession(sessionId);
+     if (!session) return '';
+-    const summary = buildDeterministicSummary(session, []);
+-    const scrubbed = scrubSensitive(JSON.parse(summary), []) as Record<string, unknown>;
++    const summary = buildDeterministicSummary(session, this.secretValues());
++    const scrubbed = this.scrub(JSON.parse(summary)) as Record<string, unknown>;
+     return JSON.stringify(scrubbed);
+   }
+ 
++  private secretValues(): string[] {
++    const values: string[] = [this.context.apiKey, this.context.publicKeyPem ?? '', process.env.PAYWAY_AGENT_API_KEY ?? ''];
++    const collect = (value: unknown): void => {
++      if (typeof value === 'string') values.push(value);
++      else if (Array.isArray(value)) value.forEach(collect);
++      else if (value && typeof value === 'object') Object.values(value as Record<string, unknown>).forEach(collect);
++    };
++    collect(this.context.khqr);
++    collect(this.providerConfig?.headers);
++    return values.filter((value) => value.trim() !== '');
++  }
++
++  private scrub(value: unknown): unknown {
++    return scrubSensitive(value, this.secretValues());
++  }
++
++  private appendEvent(
++    sessionId: string,
++    type: Parameters<typeof appendSessionEvent>[1]['type'],
++    data: Record<string, unknown>,
++  ): void {
++    appendSessionEvent(sessionId, { type, data: this.scrub(data) as Record<string, unknown> });
++  }
++
+   private looksLikeCancellation(request: string): boolean {
+     return /^(please\s+)?cancel(\b|\s|$)/i.test(request.trim());
+   }
+ 
+   private result(partial: Omit<AgentCommandResultV1, 'version'>): AgentCommandResultV1 {
+-    const result: AgentCommandResultV1 = { version: 'agent-command/v1', ...partial };
++    const result = this.scrub({ version: 'agent-command/v1', ...partial }) as AgentCommandResultV1;
+     if (!validateCommandResult(result)) {
+       throw new Error('Internal: produced an AgentCommandResultV1 that failed validation');
+     }
+     return result;
+   }
+ 
+   private failure(
+     status: 'failed' | 'blocked',
+     error: { code?: string; message: string; detail?: string },
+     extra: Partial<Omit<AgentCommandResultV1, 'version' | 'status' | 'error'>> = {},
+diff --git a/src/agent/privacy.ts b/src/agent/privacy.ts
+index 2fc219f..a99911d 100644
+--- a/src/agent/privacy.ts
++++ b/src/agent/privacy.ts
+@@ -40,26 +40,36 @@ function isSecretValue(value: unknown): boolean {
+   return SECRET_KEY_PATTERNS.some((pattern) => pattern.test(normalized));
+ }
+ 
+ /**
+  * Recursively scrub a value, redacting by secret key name and by exact secret
+  * value. Returns a brand-new structure; the input is never mutated.
+  */
+ export function scrubSensitive(value: unknown, secrets: string[]): unknown {
+   const knownSecrets = secrets.filter((s) => typeof s === 'string' && s.trim() !== '');
+ 
++  function redactKnownSecrets(text: string): string {
++    let redacted = text;
++    for (const secret of knownSecrets) {
++      if (redacted.includes(secret)) {
++        redacted = redacted.split(secret).join(REDACTED);
++      }
++    }
++    return redacted;
++  }
++
+   function scrub(node: unknown): unknown {
+     if (node === null || typeof node !== 'object') {
+       if (typeof node === 'string' && (knownSecrets.includes(node) || isSecretValue(node))) {
+         return REDACTED;
+       }
+-      return node;
++      return typeof node === 'string' ? redactKnownSecrets(node) : node;
+     }
+ 
+     if (Array.isArray(node)) {
+       return node.map((item) => scrub(item));
+     }
+ 
+     const source = node as Record<string, unknown>;
+     const result: Record<string, unknown> = {};
+     for (const key of Object.keys(source)) {
+       const child = source[key];
+diff --git a/src/agent/provider.ts b/src/agent/provider.ts
+index bb92171..157757f 100644
+--- a/src/agent/provider.ts
++++ b/src/agent/provider.ts
+@@ -22,21 +22,21 @@ export interface ProviderConnectivity {
+ /** Thrown when a provider cannot produce a valid, safe agent plan. */
+ export class ProviderProposalError extends Error {
+   constructor(message: string) {
+     super(message);
+     this.name = 'ProviderProposalError';
+   }
+ }
+ 
+ /** Adapter that proposes agent plans and reports endpoint connectivity. */
+ export interface ProviderAdapter {
+-  propose(request: string): Promise<AgentPlanV1>;
++  propose(request: string, sessionContext?: string): Promise<AgentPlanV1>;
+   checkConnectivity(): Promise<ProviderConnectivity>;
+ }
+ 
+ const PRESET_BASE_URLS: Record<Exclude<ProviderPreset, 'custom'>, string> = {
+   openai: 'https://api.openai.com/v1',
+   openrouter: 'https://openrouter.ai/api/v1',
+   nvidia: 'https://integrate.api.nvidia.com/v1',
+ };
+ 
+ const API_KEY_ENV = 'PAYWAY_AGENT_API_KEY';
+@@ -170,40 +170,44 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
+ 
+     if (!response.ok) {
+       throw new ProviderProposalError(
+         `provider returned HTTP ${response.status}: ${JSON.stringify(data).slice(0, 200)}`,
+       );
+     }
+     return data;
+   }
+ 
+   return {
+-    async propose(request: string): Promise<AgentPlanV1> {
++    async propose(request: string, sessionContext?: string): Promise<AgentPlanV1> {
+       const apiKey = getApiKey();
++      const contextMessage = sessionContext
++        ? { role: 'system' as const, content: `Bounded deterministic session context:\n${sessionContext}` }
++        : undefined;
+ 
+       let data: ChatCompletionResponse;
+       if (config.capabilityMode === 'native-tools') {
+         data = await postChatCompletions(
+           {
+             model: config.model,
+-            messages: [{ role: 'user', content: request }],
++            messages: [...(contextMessage ? [contextMessage] : []), { role: 'user', content: request }],
+             tools: buildToolSchemas(),
+             tool_choice: 'auto',
+           },
+           apiKey,
+         );
+       } else {
+         data = await postChatCompletions(
+           {
+             model: config.model,
+             messages: [
+               { role: 'system', content: buildStrictJsonSystemPrompt() },
++              ...(contextMessage ? [contextMessage] : []),
+               { role: 'user', content: request },
+             ],
+           },
+           apiKey,
+         );
+       }
+ 
+       const choice = data.choices?.[0];
+       const message = choice?.message;
+       if (!message) {
+diff --git a/src/agent/schemas.ts b/src/agent/schemas.ts
+index 9ae51e7..2e42829 100644
+--- a/src/agent/schemas.ts
++++ b/src/agent/schemas.ts
+@@ -129,21 +129,20 @@ function buildActionSchemas(materialized: boolean): Array<Record<string, unknown
+         rationale: { type: 'string' },
+       },
+     },
+     {
+       ...base,
+       required: ['tool'],
+       properties: {
+         tool: { const: 'save_artifact' },
+         qrString: { type: 'string' },
+         content: { type: 'string' },
+-        root: { type: 'string' },
+         name: { type: 'string' },
+         kind: { enum: ['qr', 'receipt', 'text'] },
+         rationale: { type: 'string' },
+       },
+     },
+     {
+       ...base,
+       required: ['tool', 'reference'],
+       properties: {
+         tool: { const: 'open_artifact' },
+diff --git a/src/agent/sessions.ts b/src/agent/sessions.ts
+index 797aa58..194cdc9 100644
+--- a/src/agent/sessions.ts
++++ b/src/agent/sessions.ts
+@@ -62,21 +62,21 @@ export function createSession(contextLabel: string): AgentSessionV1 {
+  */
+ export function appendSessionEvent(
+   sessionId: string,
+   event: { type: AgentSessionEventType; data: Record<string, unknown> },
+ ): AgentSessionV1 {
+   const existing = readSessionFile(sessionId);
+   const now = new Date().toISOString();
+   const record: AgentSessionEvent = {
+     type: event.type,
+     at: now,
+-    data: event.data,
++    data: scrubSensitive(event.data, []) as Record<string, unknown>,
+   };
+ 
+   const session: AgentSessionV1 = existing
+     ? { ...existing, events: [...existing.events, record], updatedAt: now }
+     : {
+         version: SESSION_VERSION,
+         sessionId,
+         createdAt: now,
+         updatedAt: now,
+         contextLabel: 'restored',
+diff --git a/src/agent/tools.ts b/src/agent/tools.ts
+index adfda4a..41d013e 100644
+--- a/src/agent/tools.ts
++++ b/src/agent/tools.ts
+@@ -316,21 +316,20 @@ async function runPollTransaction(action: MaterializedAgentAction, client: PayWa
+ 
+ async function runSaveArtifact(
+   action: MaterializedAgentAction,
+   _client: PayWay,
+   ctx: ExecutionContext,
+ ): Promise<ToolExecutionResult> {
+   const params = action as unknown as SaveArtifactParams;
+   const bundle = await saveQrArtifact({
+     qrString: params.qrString,
+     content: params.content,
+-    root: params.root,
+     name: params.name,
+     sessionId: ctx.sessionId,
+     transactionId: ctx.execution?.transactionId ?? undefined,
+     executionId: ctx.execution?.executionId,
+   });
+   return {
+     ok: true,
+     tool: 'save_artifact',
+     data: {
+       artifactId: bundle.metadata.artifactId,

@@ -1,0 +1,507 @@
+# Review package: bbfa650..a51ccd7## Commitsa51ccd7 fix(agent): complete interactive CLI and REPL safety
+
+## Files changed
+ .../r2-report.md                                   | 38 ++++++++++-
+ src/__tests__/agent-cli.test.ts                    | 78 ++++++++++++++++++++++
+ src/__tests__/agent-e2e.test.ts                    | 29 ++++++--
+ src/__tests__/agent-orchestrator.test.ts           | 41 ++++++++++++
+ src/agent/orchestrator.ts                          |  8 +--
+ src/cli/commands/agent.ts                          | 26 ++++++--
+ 6 files changed, 199 insertions(+), 21 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r2-report.md b/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r2-report.md
+index 712ca2a..a8f5ded 100644
+--- a/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r2-report.md
++++ b/.superpowers/sdd/2026-08-22-agentic-payway-cli-implementation/r2-report.md
+@@ -68,17 +68,49 @@ passed
+ The CLI tests run the rebuilt `dist/cli.js` subprocess and cover profile switching/default reporting, fresh first-turn session generation, and fresh profile context. The orchestrator tests cover accepted/rejected confirmation, cancellation/session reuse, production `--yolo` refusal, and the corrected polling message.
+ 
+ ## Self-review
+ 
+ - Confirmation proposal uses the already scrubbed persisted plan, preventing values scrubbed for sessions/output from reappearing in the TTY proposal.
+ - Non-create/read-only plans remain authorization-free and never prompt.
+ - Production `--yolo` stays unauthorized and cannot become authorized through the TTY callback.
+ - No credential values are printed by the new built-CLI profile tests.
+ - The built output is ignored; no generated `dist` files are part of the commit.
+ 
+-## Known unrelated regression evidence
++## Review correction round 1
+ 
+-`npx vitest run src/__tests__/agent-e2e.test.ts` retains two existing failures for malicious `open_artifact` path/file URI attempts: the established plan risk gate returns `blocked`, while those tests expect executor-stage `failed`. The R2 orchestrator diff does not alter that pre-authorization risk gate; this is outside the R2 boundary and is not included in the commit.
++The initial subprocess REPL tests intentionally used piped stdin, so they were non-TTY and did not prove the actual confirmation prompt boundary. This correction adds a deterministic injected-readline test of the real CLI prompt helpers:
++
++- It asserts the rendered proposal includes context, route, money, transaction-ID strategy, lifetime, URLs, artifacts, assumptions, and the `(y/N)` question.
++- It passes `y`, `n`, and an EOF-like `undefined` response through the actual `promptConfirm` answer parser, proving `y` accepts and the other two responses decline.
++- An orchestrator integration test wires that real EOF prompt callback and proves zero PayWay QR calls.
++
++Focused RED before the boundary implementation:
++
++```text
++npx vitest run src/__tests__/agent-cli.test.ts src/__tests__/agent-orchestrator.test.ts
++30 tests, 2 failed
++- createInteractivePlanConfirmation is not a function
++- warning exposed raw-confirmation-secret
++```
++
++The E2E mismatches were not unrelated failures: current R1/R2 behavior intentionally blocks the malicious action before executor/API/ledger work. The corrected tests assert `blocked`, `UNTRUSTED_ACTION_VALUE`, no result actions or execution IDs, zero fake SDK calls, and an absent/empty ledger. The first correction run confirmed the exact pre-ledger code (`UNTRUSTED_ACTION_VALUE`, not `PLAN_RISK_BLOCKED`), then the revised assertions passed.
++
++Final correction-round verification:
++
++```text
++npx vitest run src/__tests__/agent-cli.test.ts src/__tests__/agent-orchestrator.test.ts src/__tests__/agent-e2e.test.ts
++49 passed (3 files)
++npx tsc --noEmit
++passed
++npm run lint
++exit 0; 4 pre-existing warnings only
++git diff --check
++passed
++```
++
++The confirmation-callback exception warning is now intentionally generic and cannot include an exception message or secret-derived text.
++
++The final pre-commit run additionally included `src/__tests__/agent-r1-hardening.test.ts`: **74 tests passed across 4 files**.
+ 
+ ## Commit
+ 
+-`fix(agent): complete interactive CLI and REPL safety`
++Correction-round amendment: `fix(agent): complete interactive CLI and REPL safety`.
+diff --git a/src/__tests__/agent-cli.test.ts b/src/__tests__/agent-cli.test.ts
+index f8243cc..1f727a0 100644
+--- a/src/__tests__/agent-cli.test.ts
++++ b/src/__tests__/agent-cli.test.ts
+@@ -1,15 +1,16 @@
+ import { spawnSync } from 'node:child_process';
+ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import path from 'node:path';
+ import { afterEach, describe, expect, it } from 'vitest';
++import * as agentCommands from '../cli/commands/agent.js';
+ 
+ /**
+  * TASK-011 — public agent CLI surface + REPL.
+  *
+  * Tests run the BUILT cli (`dist/cli.js`) as a subprocess with an isolated
+  * APPDATA directory and a dummy PAYWAY_AGENT_API_KEY. Deterministic.
+  */
+ 
+ const temporaryDirectories: string[] = [];
+ 
+@@ -44,21 +45,98 @@ function baseEnv(appData: string): NodeJS.ProcessEnv {
+     PAYWAY_AGENT_API_KEY: 'dummy-agent-key',
+   };
+ }
+ 
+ afterEach(() => {
+   for (const directory of temporaryDirectories.splice(0)) {
+     rmSync(directory, { recursive: true, force: true });
+   }
+ });
+ 
++type PromptConfirmForTest = (
++  message: string,
++  createReadline: () => { question(message: string, callback: (answer: string) => void): void; close(): void },
++) => Promise<boolean>;
++
++type CreateInteractivePlanConfirmationForTest = (
++  prompt: (message: string) => Promise<boolean>,
++) => (proposal: {
++  request: string;
++  context: string;
++  actions: Array<{
++    route: string;
++    money: string;
++    transactionIdStrategy: string;
++    lifetime?: number;
++    urls: string[];
++    artifacts: string[];
++  }>;
++  assumptions: string[];
++  planContext: Record<string, unknown>;
++}) => Promise<boolean>;
++
++function deterministicReadline(answer: string | undefined) {
++  return () => ({
++    question: (_message: string, callback: (value: string) => void) => callback(answer as string),
++    close: () => undefined,
++  });
++}
++
+ describe('agentic payway CLI (TASK-011)', () => {
++  it('renders the complete TTY proposal and maps y, rejection, and EOF prompt responses to consent', async () => {
++    const boundary = agentCommands as unknown as {
++      promptConfirm: PromptConfirmForTest;
++      createInteractivePlanConfirmation: CreateInteractivePlanConfirmationForTest;
++    };
++    const proposal = {
++      request: 'pay $3',
++      context: 'profile: demo (sandbox)',
++      actions: [
++        {
++          route: 'generate_online_qr',
++          money: '3 USD',
++          transactionIdStrategy: 'generated after confirmation',
++          lifetime: 900,
++          urls: ['callback: https://pay.example.com/callback'],
++          artifacts: ['QR image and metadata will be saved locally'],
++        },
++      ],
++      assumptions: ['customer will scan immediately'],
++      planContext: { channel: 'terminal' },
++    };
++    const messages: string[] = [];
++    const accept = boundary.createInteractivePlanConfirmation(async (message) => {
++      messages.push(message);
++      return boundary.promptConfirm(message, deterministicReadline('y'));
++    });
++    const reject = boundary.createInteractivePlanConfirmation((message) =>
++      boundary.promptConfirm(message, deterministicReadline('n')),
++    );
++    const eof = boundary.createInteractivePlanConfirmation((message) =>
++      boundary.promptConfirm(message, deterministicReadline(undefined)),
++    );
++
++    await expect(accept(proposal)).resolves.toBe(true);
++    await expect(reject(proposal)).resolves.toBe(false);
++    await expect(eof(proposal)).resolves.toBe(false);
++    expect(messages[0]).toContain('Create plan proposal');
++    expect(messages[0]).toContain('Context: profile: demo (sandbox)');
++    expect(messages[0]).toContain('Route: generate_online_qr');
++    expect(messages[0]).toContain('Money: 3 USD');
++    expect(messages[0]).toContain('Transaction ID: generated after confirmation');
++    expect(messages[0]).toContain('Lifetime: 900 seconds');
++    expect(messages[0]).toContain('callback: https://pay.example.com/callback');
++    expect(messages[0]).toContain('QR image and metadata will be saved locally');
++    expect(messages[0]).toContain('customer will scan immediately');
++    expect(messages[0]).toContain('Execute this create plan? (y/N):');
++  });
++
+   it('ask --help lists the ask command and its options', () => {
+     const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
+     temporaryDirectories.push(appData);
+     const result = runCli(['ask', '--help'], baseEnv(appData));
+     const output = stripAnsi(result.stdout);
+     expect(result.status).toBe(0);
+     expect(output).toContain('Usage: payway-sdk ask');
+     expect(output).toContain('--approve');
+     expect(output).toContain('--yolo');
+     expect(output).toContain('--session');
+diff --git a/src/__tests__/agent-e2e.test.ts b/src/__tests__/agent-e2e.test.ts
+index 025d3e0..cececbf 100644
+--- a/src/__tests__/agent-e2e.test.ts
++++ b/src/__tests__/agent-e2e.test.ts
+@@ -1,19 +1,19 @@
+ /**
+  * TASK-013 — End-to-end verification of the agentic PayWay CLI milestone.
+  *
+  * Uses a MOCKED provider adapter (canned AgentPlanV1) and a MOCKED PayWay
+  * client (injected via OrchestratorOptions.payway). No real network and a temp
+  * APPDATA are used. Covers the eight e2e scenarios from the plan's TASK-013.
+  */
+ 
+-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
++import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import path from 'node:path';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import type { ResolvedPayWayContext } from '../agent/context.js';
+ import type { AgentPlanV1, ExecutionRecordV1, ProviderConfigV1 } from '../agent/contracts.js';
+ import { findUnfinishedExecutions } from '../agent/ledger.js';
+ import {
+   AgentOrchestrator as AgentOrchestratorBase,
+   type OrchestratorDeps,
+   type OrchestratorOptions,
+@@ -36,20 +36,21 @@ function loadExecutionRecordForTest(executionId: string): ExecutionRecordV1 {
+ function allSessions(): Array<{ events: Array<{ data: Record<string, unknown> }> }> {
+   const dir = getAgentDataPaths().sessionsDir;
+   return readdirSync(dir)
+     .filter((n) => n.endsWith('.json'))
+     .map((n) => JSON.parse(readFileSync(path.join(dir, n), 'utf8')));
+ }
+ 
+ /** Returns every persisted ledger record as parsed objects. */
+ function allLedgerRecords(): ExecutionRecordV1[] {
+   const dir = getAgentDataPaths().ledgerDir;
++  if (!existsSync(dir)) return [];
+   const names = readdirSync(dir);
+   if (names.length === 0) return [];
+   return names
+     .filter((n) => n.endsWith('.json'))
+     .map((n) => JSON.parse(readFileSync(path.join(dir, n), 'utf8')) as ExecutionRecordV1);
+ }
+ 
+ const tempDirs: string[] = [];
+ const originalAppData = process.env.APPDATA;
+ let artifactRoot = '';
+@@ -536,51 +537,65 @@ describe('TASK-013 (7) resume without approval and malicious provider attempts',
+     expect(calls.generateQr).toBe(0);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ 
+   it('rejects a malicious open_artifact path traversal attempt', async () => {
+     const provider = new FakeProvider(async () => ({
+       version: 'agent-plan/v1',
+       request: 'open the report',
+       actions: [{ tool: 'open_artifact', reference: '../../../etc/passwd' }],
+     }));
+-    const { payway } = makePayWay();
++    const { payway, calls } = makePayWay();
+     const orch = new AgentOrchestrator({
+       context: makeContext(),
+       provider,
+       providerConfig: privacyConfig(true),
+     });
+ 
+     const result = await orch.runOneShot('open', baseOptions({ flag: 'approve', payway }));
+ 
+-    expect(result.status).toBe('failed');
+-    expect((result.actions![0] as { ok: boolean }).ok).toBe(false);
++    expect(result.status).toBe('blocked');
++    expect(result.error?.code).toBe('UNTRUSTED_ACTION_VALUE');
++    expect(result.actions).toBeUndefined();
++    expect(result.executionIds).toBeUndefined();
++    expect(calls.generateQr).toBe(0);
++    expect(calls.createTransaction).toBe(0);
++    expect(calls.purchase).toBe(0);
++    expect(calls.paymentLink).toBe(0);
++    expect(allLedgerRecords()).toEqual([]);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ 
+   it('rejects a malicious file:// URI scheme in open_artifact', async () => {
+     const provider = new FakeProvider(async () => ({
+       version: 'agent-plan/v1',
+       request: 'open file',
+       actions: [{ tool: 'open_artifact', reference: 'file:///etc/secrets' }],
+     }));
+-    const { payway } = makePayWay();
++    const { payway, calls } = makePayWay();
+     const orch = new AgentOrchestrator({
+       context: makeContext(),
+       provider,
+       providerConfig: privacyConfig(true),
+     });
+ 
+     const result = await orch.runOneShot('open', baseOptions({ flag: 'approve', payway }));
+ 
+-    expect(result.status).toBe('failed');
+-    expect((result.actions![0] as { ok: boolean }).ok).toBe(false);
++    expect(result.status).toBe('blocked');
++    expect(result.error?.code).toBe('UNTRUSTED_ACTION_VALUE');
++    expect(result.actions).toBeUndefined();
++    expect(result.executionIds).toBeUndefined();
++    expect(calls.generateQr).toBe(0);
++    expect(calls.createTransaction).toBe(0);
++    expect(calls.purchase).toBe(0);
++    expect(calls.paymentLink).toBe(0);
++    expect(allLedgerRecords()).toEqual([]);
+     expect(validateCommandResult(result)).toBe(true);
+   });
+ 
+   it('rejects a non-https (http) URI scheme in open_artifact', async () => {
+     const provider = new FakeProvider(async () => ({
+       version: 'agent-plan/v1',
+       request: 'open url',
+       actions: [{ tool: 'open_artifact', reference: 'http://evil.example.com/x' }],
+     }));
+     const { payway } = makePayWay();
+diff --git a/src/__tests__/agent-orchestrator.test.ts b/src/__tests__/agent-orchestrator.test.ts
+index 9630a5d..7fcdc41 100644
+--- a/src/__tests__/agent-orchestrator.test.ts
++++ b/src/__tests__/agent-orchestrator.test.ts
+@@ -6,20 +6,21 @@
+  * Coverage: one-shot success (online QR, sandbox, --approve), clarification,
+  * cancellation, privacy refusal, provider failure, invalid plan, consent
+  * (non-TTY without --approve => needs_confirmation, zero PayWay calls),
+  * unknown outcome, resume (no write approval restored), polling offer.
+  */
+ 
+ import { mkdtempSync, rmSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import path from 'node:path';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { createInteractivePlanConfirmation, promptConfirm } from '../cli/commands/agent.js';
+ import type { ResolvedPayWayContext } from '../agent/context.js';
+ import type { AgentPlanV1, ProviderConfigV1 } from '../agent/contracts.js';
+ import { AgentOrchestrator, type OrchestratorDeps, type OrchestratorOptions } from '../agent/orchestrator.js';
+ import { type ProviderAdapter, ProviderProposalError } from '../agent/provider.js';
+ import { validateCommandResult } from '../agent/schemas.js';
+ import type { PayWay } from '../client.js';
+ import { PayWayNetworkError } from '../errors.js';
+ 
+ const tempDirs: string[] = [];
+ const originalAppData = process.env.APPDATA;
+@@ -321,20 +322,60 @@ describe('AgentOrchestrator — consent', () => {
+     expect(result.status).toBe('needs_confirmation');
+     expect(calls.generateQr).toBe(0);
+     const { loadSession } = await import('../agent/sessions.js');
+     expect(loadSession(sessionId)?.events.some((event) => event.type === 'cancellation')).toBe(true);
+ 
+     const retry = await orch.runTurn(sessionId, 'pay $3', baseOptions({ flag: 'approve', payway }));
+     expect(retry.status).toBe('succeeded');
+     expect(calls.generateQr).toBe(1);
+   });
+ 
++  it('does not execute a PayWay create when the real confirmation prompt reaches EOF', async () => {
++    const provider = new FakeProvider(async () => onlineQrPlan());
++    const { payway, calls } = makePayWay();
++    const orch = createOrchestrator({ context: makeContext(), provider });
++    const confirmation = createInteractivePlanConfirmation((message) =>
++      promptConfirm(message, () => ({
++        question: (_prompt, callback) => (callback as (answer: string) => void)(undefined as never),
++        close: () => undefined,
++      })),
++    );
++
++    const result = await orch.runOneShot('pay $3', baseOptions({ tty: true, payway, confirmCreatePlan: confirmation }));
++
++    expect(result.status).toBe('needs_confirmation');
++    expect(calls.generateQr).toBe(0);
++  });
++
++  it('uses a generic warning when an interactive confirmation callback fails', async () => {
++    const provider = new FakeProvider(async () => onlineQrPlan());
++    const { payway, calls } = makePayWay();
++    const orch = createOrchestrator({ context: makeContext(), provider });
++    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
++
++    const result = await orch.runOneShot(
++      'pay $3',
++      baseOptions({
++        tty: true,
++        payway,
++        confirmCreatePlan: async () => {
++          throw new Error('raw-confirmation-secret');
++        },
++      }),
++    );
++
++    expect(result.status).toBe('needs_confirmation');
++    expect(calls.generateQr).toBe(0);
++    expect(warning).toHaveBeenCalledWith('Confirmation prompt failed; treating the create plan as declined.');
++    expect(warning.mock.calls.flat().join(' ')).not.toContain('raw-confirmation-secret');
++  });
++
+   it('non-TTY without --approve => needs_confirmation and zero PayWay calls', async () => {
+     const provider = new FakeProvider(async () => onlineQrPlan());
+     const { payway, calls } = makePayWay();
+     const orch = createOrchestrator({ context: makeContext(), provider });
+ 
+     const result = await orch.runOneShot('pay $3', baseOptions({ tty: false, payway }));
+ 
+     expect(result.status).toBe('needs_confirmation');
+     expect(calls.generateQr).toBe(0);
+     // A planned ledger record is local only; no SDK call occurred.
+diff --git a/src/agent/orchestrator.ts b/src/agent/orchestrator.ts
+index 109cdab..e334ff5 100644
+--- a/src/agent/orchestrator.ts
++++ b/src/agent/orchestrator.ts
+@@ -298,26 +298,22 @@ export class AgentOrchestrator {
+     const authorization = authorizePlan(normalized.plan, {
+       tty: options.tty,
+       flag: options.flag,
+       environment: options.environment ?? this.context.environment,
+     });
+     let authorized = authorization.authorized;
+     if (!authorized && options.tty && !options.flag && options.confirmCreatePlan) {
+       let confirmed = false;
+       try {
+         confirmed = await options.confirmCreatePlan(this.createPlanConfirmation(storedPlan, request));
+-      } catch (error) {
+-        console.warn(
+-          `Confirmation prompt failed; treating the create plan as declined. Cause: ${
+-            error instanceof Error ? error.message : String(error)
+-          }`,
+-        );
++      } catch (_error) {
++        console.warn('Confirmation prompt failed; treating the create plan as declined.');
+       }
+       this.appendEvent(sessionId, 'confirmation', { accepted: confirmed, plan: storedPlan });
+       if (confirmed) {
+         authorized = true;
+       } else {
+         this.appendEvent(sessionId, 'cancellation', { request, reason: 'interactive confirmation declined' });
+         return this.result({
+           status: 'needs_confirmation',
+           sessionId,
+           message: 'Create plan cancelled. The session remains usable and no payment was created.',
+diff --git a/src/cli/commands/agent.ts b/src/cli/commands/agent.ts
+index 39fa898..cb28939 100644
+--- a/src/cli/commands/agent.ts
++++ b/src/cli/commands/agent.ts
+@@ -63,30 +63,47 @@ function marker(state: CapabilityState | 'blocked'): string {
+     case 'invalid':
+     case 'blocked':
+       return `${c.red('✗ invalid')}`;
+     case 'unverified':
+       return `${c.cyan('· unverified')}`;
+     default:
+       return String(state);
+   }
+ }
+ 
+-function promptConfirm(message: string): Promise<boolean> {
+-  const rl = readline.createInterface({ input: process.stdin as unknown as NodeJS.ReadableStream, output: process.stdout as unknown as NodeJS.WritableStream, terminal: false });
++type ConfirmationReadline = Pick<readline.Interface, 'question' | 'close'>;
++type CreateConfirmationReadline = () => ConfirmationReadline;
++
++export function promptConfirm(
++  message: string,
++  createReadline: CreateConfirmationReadline = () =>
++    readline.createInterface({
++      input: process.stdin as unknown as NodeJS.ReadableStream,
++      output: process.stdout as unknown as NodeJS.WritableStream,
++      terminal: false,
++    }),
++): Promise<boolean> {
++  const rl = createReadline();
+   return new Promise<boolean>((resolve) => {
+     rl.question(message, (answer) => {
+       rl.close();
+-      resolve(answer.trim().toLowerCase() === 'y');
++      resolve(typeof answer === 'string' && answer.trim().toLowerCase() === 'y');
+     });
+   });
+ }
+ 
++export function createInteractivePlanConfirmation(
++  prompt: (message: string) => Promise<boolean> = promptConfirm,
++): (proposal: CreatePlanConfirmation) => Promise<boolean> {
++  return (proposal) => prompt(`${renderCreatePlanConfirmation(proposal)}\n\nExecute this create plan? (y/N): `);
++}
++
+ /** Register the agentic command tree on the given Commander program. */
+ export function registerAgentCommands(program: Command): void {
+   setAgentProgram(program);
+ 
+   // ─── ask ───────────────────────────────────────────────────────────────────
+   program
+     .command('ask')
+     .description('Ask the PayWay agent to perform a request (single shot)')
+     .argument('<request>', 'Natural-language request, e.g. "generate a QR for $3"')
+     .option('--approve', 'Authorize create actions (both sandbox and production)')
+@@ -140,22 +157,21 @@ export function registerAgentCommands(program: Command): void {
+         provider,
+         sessionId: opts.session,
+         providerConfig: config,
+       });
+       const result = await orchestrator.runOneShot(request, {
+         tty,
+         flag,
+         environment: context.environment,
+         ...(tty && !flag
+           ? {
+-              confirmCreatePlan: async (proposal: CreatePlanConfirmation) =>
+-                promptConfirm(`${renderCreatePlanConfirmation(proposal)}\n\nExecute this create plan? (y/N): `),
++              confirmCreatePlan: createInteractivePlanConfirmation(),
+             }
+           : {}),
+       });
+ 
+       if (!tty) {
+         console.log(serializeCommandResult(result));
+         if (result.status === 'failed' || result.status === 'blocked') process.exitCode = 1;
+       } else {
+         console.log(renderHumanResult(result));
+       }
