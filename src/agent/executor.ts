@@ -4,7 +4,7 @@
  * `executeAction` is the single entry point that runs a
  * {@link MaterializedAgentAction} (already schema-validated upstream) through
  * the typed tool registry. For create actions it enforces the ledger
- * state machine: the record must be `confirmed` or `submitted`, is advanced to
+ * state machine: the record must be `confirmed`, is advanced to
  * `submitted`, the SDK call runs exactly once, and the result advances to
  * `succeeded`, `failed`, or `outcome_unknown` (on timeout / abort / network
  * failure / ambiguous response).
@@ -69,7 +69,6 @@ export async function executeAction(
   // delegating to the typed tool functions.
   const tool = (action as unknown as { tool: AgentToolName }).tool;
   const create = isCreateAction(tool);
-  const client = resolveClient(executionContext.context, executionContext.payway, create);
 
   const toolFn = toolRegistry[tool];
   if (!toolFn) {
@@ -81,28 +80,31 @@ export async function executeAction(
   }
 
   if (!create) {
+    const client = resolveClient(executionContext.context, executionContext.payway, false);
     return toolFn(action, client, executionContext);
   }
 
   const execution = executionContext.execution;
   const status = execution?.status;
-  if (status !== 'confirmed' && status !== 'submitted') {
+  if (status !== 'confirmed') {
     return {
       ok: false,
       tool,
       error: {
-        code: 'LEDGER_NOT_READY',
-        message: `Execution '${execution?.executionId}' is in status '${status}', expected 'confirmed' or 'submitted'`,
+        code: 'RECOVERY_REQUIRED',
+        message:
+          `Execution '${execution?.executionId}' is in status '${status}'. ` +
+          'Create actions are never replayed automatically; recover by checking the recorded transaction.',
       },
     };
   }
 
   const executionId = execution.executionId;
 
-  // Advance confirmed -> submitted exactly once (idempotent if already submitted).
-  if (status === 'confirmed') {
-    markSubmitted(executionId);
-  }
+  // Advance confirmed -> submitted exactly once. Submitted/outcome-unknown
+  // records are recovery-only and were rejected above before any SDK client use.
+  markSubmitted(executionId);
+  const client = resolveClient(executionContext.context, executionContext.payway, true);
 
   let result: ToolExecutionResult;
   try {

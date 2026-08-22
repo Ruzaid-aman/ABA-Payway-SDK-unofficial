@@ -106,6 +106,7 @@ describe('saveQrArtifact', () => {
     const bundle = await saveQrArtifact({
       qrString: '00020101021226aba01kh',
       root,
+      overrideApproval: true,
       name: 'pay-123',
       sessionId: 'sess_test_008',
       amount: 1.5,
@@ -134,6 +135,7 @@ describe('saveQrArtifact', () => {
     const bundle = await saveQrArtifact({
       qrString: 'khqr-content',
       root,
+      overrideApproval: true,
       sessionId: 'sess_test_008',
     });
     expect(existsSync(bundle.imagePath!)).toBe(true);
@@ -149,6 +151,7 @@ describe('saveQrArtifact', () => {
       saveQrArtifact({
         qrString: 'will-fail',
         root,
+        overrideApproval: true,
         name: 'fail',
         sessionId: 'sess_test_008',
       }),

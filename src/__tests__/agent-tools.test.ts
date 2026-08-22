@@ -237,21 +237,22 @@ describe('TASK-009 tool registry + executor', () => {
     });
   }
 
-  it('create action with status submitted skips markSubmitted but still runs', async () => {
+  it('create action with status submitted requires recovery and never runs again', async () => {
     const record = makeRecord('submitted', { tool: 'generate_online_qr' });
     const ctx = makeExecContext(payway, record);
     const result = await executeAction(createAction('generate_online_qr'), ctx);
-    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({ ok: false, error: { code: 'RECOVERY_REQUIRED' } });
     expect(vi.mocked(markSubmitted)).not.toHaveBeenCalled();
-    expect(vi.mocked(markSucceeded)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(markSucceeded)).not.toHaveBeenCalled();
+    expect(domainCalls('generate_online_qr', payway)).toBe(0);
   });
 
-  it('create action blocks when ledger not confirmed/submitted', async () => {
+  it('create action requires recovery when ledger is not confirmed', async () => {
     const record = makeRecord('planned', { tool: 'generate_online_qr' });
     const ctx = makeExecContext(payway, record);
     const result = await executeAction(createAction('generate_online_qr'), ctx);
     expect(result.ok).toBe(false);
-    expect(result.error?.code).toBe('LEDGER_NOT_READY');
+    expect(result.error?.code).toBe('RECOVERY_REQUIRED');
     expect(domainCalls('generate_online_qr', payway)).toBe(0);
     expect(vi.mocked(markSubmitted)).not.toHaveBeenCalled();
   });

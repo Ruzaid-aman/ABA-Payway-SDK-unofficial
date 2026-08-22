@@ -323,7 +323,6 @@ async function runSaveArtifact(
   const bundle = await saveQrArtifact({
     qrString: params.qrString,
     content: params.content,
-    root: params.root,
     name: params.name,
     sessionId: ctx.sessionId,
     transactionId: ctx.execution?.transactionId ?? undefined,

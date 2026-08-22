@@ -13,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResolvedPayWayContext } from '../agent/context.js';
 import type { AgentPlanV1, ExecutionRecordV1, ProviderConfigV1 } from '../agent/contracts.js';
 import { findUnfinishedExecutions } from '../agent/ledger.js';
-import { AgentOrchestrator, type OrchestratorOptions } from '../agent/orchestrator.js';
+import {
+  AgentOrchestrator as AgentOrchestratorBase,
+  type OrchestratorDeps,
+  type OrchestratorOptions,
+} from '../agent/orchestrator.js';
 import { serializeCommandResult } from '../agent/output.js';
 import { scrubSensitive } from '../agent/privacy.js';
 import type { ProviderAdapter, } from '../agent/provider.js';
@@ -48,26 +52,28 @@ function allLedgerRecords(): ExecutionRecordV1[] {
 
 const tempDirs: string[] = [];
 const originalAppData = process.env.APPDATA;
-const originalCwd = process.cwd();
+let artifactRoot = '';
 
 beforeEach(() => {
   const directory = mkdtempSync(path.join(tmpdir(), 'payway-e2e-'));
   tempDirs.push(directory);
   process.env.APPDATA = directory;
-  // Isolate the shared cwd/payway-output artifact root from other test files
-  // that also write there, to avoid concurrent rmdir collisions.
-  process.chdir(directory);
+  artifactRoot = path.join(directory, 'payway-output');
 });
 
 afterEach(() => {
-  process.chdir(originalCwd);
   process.env.APPDATA = originalAppData;
   for (const directory of tempDirs.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
-  rmSync(path.resolve(process.cwd(), 'payway-output'), { recursive: true, force: true });
   vi.restoreAllMocks();
 });
+
+class AgentOrchestrator extends AgentOrchestratorBase {
+  constructor(deps: OrchestratorDeps) {
+    super({ ...deps, artifactRoot, artifactRootOverrideConfirmed: true });
+  }
+}
 
 class FakeProvider implements ProviderAdapter {
   public lastRequest: string | null = null;

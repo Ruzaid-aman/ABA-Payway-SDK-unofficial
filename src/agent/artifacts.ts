@@ -31,7 +31,9 @@ export interface ArtifactBundle {
 export interface SaveQrArtifactInput {
   qrString?: string;
   content?: string;
+  /** Caller-controlled root; a non-default root needs explicit human confirmation. */
   root?: string;
+  overrideApproval?: boolean;
   name?: string;
   sessionId: string;
   route?: string;
@@ -102,7 +104,8 @@ export async function saveQrArtifact(input: SaveQrArtifactInput): Promise<Artifa
   const {
     qrString,
     content,
-    root = defaultArtifactRoot(),
+    root,
+    overrideApproval = false,
     name,
     sessionId,
     route,
@@ -120,7 +123,11 @@ export async function saveQrArtifact(input: SaveQrArtifactInput): Promise<Artifa
   }
 
   const normalizedName = normalizeName(name, `artifact-${randomUUID().slice(0, 8)}`);
-  const resolvedRoot = path.resolve(root);
+  const defaultRoot = defaultArtifactRoot();
+  const resolvedRoot = path.resolve(root ?? defaultRoot);
+  if (resolvedRoot !== defaultRoot && !overrideApproval) {
+    throw new Error('saveQrArtifact requires an explicit confirmed root override outside payway-output');
+  }
   const imagePath = path.join(resolvedRoot, `${normalizedName}.png`);
   const metadataPath = path.join(resolvedRoot, `${normalizedName}.json`);
 
