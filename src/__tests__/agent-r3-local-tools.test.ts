@@ -72,8 +72,13 @@ describe('R3 artifact opener command policy', () => {
     }
   });
 
-  it('rejects a special-use HTTPS URL before spawning an opener', async () => {
-    await expect(openArtifact('https://service.test/receipt', session())).rejects.toThrow(/public https/i);
+  it.each([
+    'https://service.test/receipt',
+    'https://router.home.arpa/receipt',
+    'https://service.invalid/receipt',
+    'https://hidden.onion/receipt',
+  ])('rejects special-use HTTPS URL %s before spawning an opener', async (reference) => {
+    await expect(openArtifact(reference, session())).rejects.toThrow(/public https/i);
     expect(spawned).toHaveLength(0);
   });
 });

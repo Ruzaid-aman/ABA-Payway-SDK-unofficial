@@ -101,8 +101,14 @@ function fakePayWay(error?: Error): { payway: PayWay; creates: { value: number }
         getTransactionsByMerchantRef: async () => ({}),
       },
       checkout: {
-        createTransaction: async () => ({}),
-        purchase: async () => ({}),
+        createTransaction: async () => {
+          creates.value++;
+          return {};
+        },
+        purchase: async () => {
+          creates.value++;
+          return {};
+        },
         checkTransaction: async () => {
           reads.value++;
           return { status: { code: '00' } };
@@ -209,6 +215,9 @@ describe('R3 callback URL policy', () => {
     'https://printer.local/callback',
     'https://merchant.test/callback',
     'https://merchant.example/callback',
+    'https://router.home.arpa/callback',
+    'https://service.invalid/callback',
+    'https://hidden.onion/callback',
     'https://singlelabel/callback',
   ])('rejects special-use or non-public DNS callback %s', (callbackUrl) => {
     const resolved = context({ callbackUrl });
@@ -227,6 +236,40 @@ describe('R3 callback URL policy', () => {
       );
     },
   );
+
+  it.each([
+    [
+      'callback URL',
+      onlineQrPlan({ callbackUrl: 'https://router.home.arpa/callback' }),
+    ],
+    [
+      'return URL',
+      {
+        version: 'agent-plan/v1',
+        request: 'checkout $3',
+        actions: [
+          {
+            tool: 'create_checkout_purchase',
+            amount: 3,
+            currency: 'USD',
+            transactionId: null,
+            returnUrl: 'https://service.invalid/return',
+          },
+        ],
+      } as AgentPlanV1,
+    ],
+  ])('blocks a special-use %s before ledger or API activity', async (_label, plan) => {
+    const provider = new FakeProvider(plan);
+    const { payway, creates } = fakePayWay();
+    const orchestrator = new AgentOrchestrator({ context: context(), provider, providerConfig: config() });
+
+    const result = await orchestrator.runOneShot('create payment', runOptions(payway, { flag: 'approve' }));
+
+    expect(result.status).toBe('blocked');
+    expect(result.error?.code).toBe('PLAN_RISK_BLOCKED');
+    expect(creates.value).toBe(0);
+    expect(ledgerFiles()).toHaveLength(0);
+  });
 });
 
 describe('R3 durable ledger privacy and non-TTY reads', () => {

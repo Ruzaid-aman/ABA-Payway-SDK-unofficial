@@ -33,8 +33,8 @@ function isPublicHost(hostname: string): boolean {
 
   const host = literal.replace(/\.+$/, '');
   if (host.length === 0 || !host.includes('.')) return false;
-  if (host === 'localhost' || host.endsWith('.localhost')) return false;
-  if (host.endsWith('.local') || host.endsWith('.test') || host.endsWith('.example')) return false;
+  const specialUseSuffixes = ['localhost', 'local', 'test', 'example', 'home.arpa', 'invalid', 'onion'];
+  if (specialUseSuffixes.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) return false;
   return true;
 }
 
