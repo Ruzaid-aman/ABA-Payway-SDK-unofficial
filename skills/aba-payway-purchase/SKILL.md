@@ -15,6 +15,8 @@ const payload = payway.checkout.createTransaction({ transactionId: 'order-123', 
 
 Post the returned signed payload from your server-rendered checkout form. Keep API credentials server-side.
 
+> **Local vs. network:** `createTransaction()` (and `createCheckoutPayload()`) only **builds a LOCAL signed payload** — it performs no network request. By contrast, `purchase()` (and the agentic `create_checkout_purchase` tool) performs the actual **NETWORK request** to PayWay. Use the local builder when you want to render your own checkout form; use `purchase()` when you want the SDK to submit the payment.
+
 ## Error Handling
 ```ts
 import { PayWayConfigError } from 'aba-payway-ts';

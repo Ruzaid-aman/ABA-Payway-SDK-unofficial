@@ -57,6 +57,15 @@ npx payway-sdk skills add claude copilot
 
 Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use `npx payway-sdk skills list` to inspect installed guides and `npx payway-sdk skills remove claude` to remove the ABA PayWay guides for an agent.
 
+### Agentic PayWay CLI
+
+The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk agent setup|doctor|sessions`). See the [1-pager agentic guide](./docs/QUICK-START-1-PAGER.md#agentic-payway-cli) and the skill guides:
+
+- [aba-payway-agent skill](./skills/aba-payway-agent/SKILL.md) — provider modes, the 11 tools, risk gates, execution ledger, sessions, redaction.
+- [aba-payway-first-payment skill](./skills/aba-payway-first-payment/SKILL.md) — choosing QR / checkout / payment-link for a first payment.
+
+> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. Every agent action has a fully-supported manual equivalent.
+
 ### CLI commands
 
 | Command | Description |

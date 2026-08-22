@@ -7,13 +7,15 @@ const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const skillsDirectory = path.join(testDirectory, '..', '..', 'skills');
 
 describe('packaged AI skills', () => {
-  it('provides 20 discoverable skill guides with quick-start content', async () => {
+  it('provides 23 discoverable skill guides with quick-start content', async () => {
     const skillDirectories = (await readdir(skillsDirectory, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'))
       .map((entry) => entry.name);
 
-    expect(skillDirectories).toHaveLength(21);
+    expect(skillDirectories).toHaveLength(23);
     expect(skillDirectories).toContain('aba-payway-transaction-by-merchant-ref');
+    expect(skillDirectories).toContain('aba-payway-agent');
+    expect(skillDirectories).toContain('aba-payway-first-payment');
 
     for (const skillDirectory of skillDirectories) {
       const content = await readFile(path.join(skillsDirectory, skillDirectory, 'SKILL.md'), 'utf8');

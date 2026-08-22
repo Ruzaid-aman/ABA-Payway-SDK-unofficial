@@ -1,0 +1,26 @@
+# TASK-012 — Agent Skills + Integration Docs
+
+- **Task ID:** TASK-012
+- **Agent:** task(TASK-012)
+- **Status:** Completed
+- **Commit:** (owned by orchestrator)
+- **Files changed:**
+  - skills/aba-payway-first-payment/SKILL.md (created)
+  - skills/aba-payway-agent/SKILL.md (created)
+  - skills/aba-payway-purchase/SKILL.md (modified — local-vs-network note)
+  - skills/README.md (modified — agent skill index)
+  - README.md (modified — agentic CLI subsection + links)
+  - docs/QUICK-START-1-PAGER.md (modified — full Agentic PayWay CLI section)
+  - docs/01-overview-and-concepts.md (modified — agentic link)
+  - docs/02-prerequisites-and-setup.md (modified — agentic secret-manager note)
+  - docs/README.md (modified — quick links to agent guidance)
+  - src/__tests__/skills.test.ts (modified — discover 23 skills incl. the two new)
+  - docs/superpowers/plans/agentic-payway-cli-status/TASK-012.md (created)
+- **Tests with results:**
+  - `npx vitest run src/__tests__/skills.test.ts src/__tests__/docs-examples.test.ts` → PASS (both suites green)
+  - `npm run typecheck` → PASS (no source changes)
+- **Issues:** none
+- **Handoff notes:**
+  - Both new skills follow the repo frontmatter/version convention (`version: 1.1.0`, `## Quick Start`, `## Error Handling`, ```` ```ts ````) so the existing discovery test stays green.
+  - Documented the 11 agent tools, risk gates (`--approve` sandbox+prod, `--yolo` sandbox-only, non-TTY without flag → `needs_confirmation`), execution ledger lifecycle (planned→confirmed→submitted→succeeded|failed|outcome_unknown, no replay), resolved-context authority, and secret redaction.
+  - All entry points (README, docs/README, QUICK-START, overview, setup) link to the new agent guidance; manual escape paths and plaintext-session/secret-manager warnings are documented.

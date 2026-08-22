@@ -100,6 +100,8 @@ This documentation is written for **junior to mid-level developers** who need to
 - [SDK Source Code](https://github.com/your-org/aba-payway-ts)
 - [Sandbox Dashboard](https://checkout-sandbox.payway.com.kh)
 - [Production Dashboard](https://checkout.payway.com.kh)
+- [Agentic PayWay CLI (1-pager)](./QUICK-START-1-PAGER.md#agentic-payway-cli) — risk-gated, provider-driven payments
+- [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md)
 
 ---
 

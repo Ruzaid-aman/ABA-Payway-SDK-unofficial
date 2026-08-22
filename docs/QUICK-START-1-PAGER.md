@@ -235,3 +235,44 @@ PayWay returns at most 50 matching historical transactions and limits this endpo
 Run `payway-sdk profiles add` to create a named `sandbox` or `production` profile. Each profile accepts an optional note up to 300 characters; the CLI supports a maximum of eight profiles total. Set the default with `payway-sdk profiles use <name>` or override it once with `payway-sdk --profile <name> <command>`. The CLI announces the selected profile and environment before an API request, while masking secrets.
 
 Profile storage is plaintext at `%APPDATA%\aba-payway-sdk\profiles.json`; do not commit it, and restrict access to it. Use an OS or cloud secret manager for production SDK deployments.
+
+---
+
+## Agentic PayWay CLI
+
+Let a supported provider propose and run PayWay actions through a risk-gated pipeline. Full detail lives in the skill guides: [aba-payway-agent](./skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment](./skills/aba-payway-first-payment/SKILL.md).
+
+### Provider setup
+
+```bash
+export PAYWAY_AGENT_API_KEY=sk-...        # the ONLY place the key lives — never stored
+payway-sdk agent setup --provider openai --model gpt-4o --capability-mode strict-json-plan
+payway-sdk agent doctor                   # print the capability matrix
+payway-sdk ask "Generate a $3 online QR for sandbox" --yolo
+```
+
+The provider **API key is supplied only via `PAYWAY_AGENT_API_KEY`** — it is never accepted as a CLI argument and never persisted. `agent setup` stores only a plaintext config (provider, model, mode); secrets are never written.
+
+### Privacy acknowledgement
+
+Before any plan is proposed, a privacy acknowledgement gate must be satisfied (`privacyAcknowledgedAt` set). Until then the CLI returns `blocked` with `PRIVACY_ACK_REQUIRED`. This protects against sending customer data to a provider without explicit consent.
+
+### First-payment selection
+
+The agent picks one of four routes — checkout, online QR, offline KHQR, or payment link — based on readiness (credentials, callback URL, RSA key, KHQR merchant data). See the [first-payment decision matrix](./skills/aba-payway-first-payment/SKILL.md) for required inputs and result handling per route.
+
+### Polling vs. webhook
+
+- **Webhook** is the trusted, signed source of truth for payment confirmation.
+- **Polling** (`poll_transaction` / `check_transaction`) is read-only and useful for sandbox verification only. The agent *offers* polling after an online QR is created and **never auto-polls**.
+
+### Artifacts & sessions (plaintext)
+
+- Artifacts are written to `<cwd>/payway-output` (e.g. QR bundles).
+- Sessions are plaintext JSON under `~/.config/aba-payway-sdk/agent/sessions` (or `%APPDATA%\aba-payway-sdk\agent\sessions`), **not encrypted**.
+
+> ⚠️ **Plaintext risk:** restrict filesystem access and never commit session files. For deployed SDK use, prefer an OS/cloud secret manager or CI/CD secret storage; never store provider or PayWay secrets in agent config or sessions.
+
+### Manual escape paths
+
+Every agent action maps to a fully-supported manual SDK/CLI command. If the agentic path is unavailable, use the underlying call directly — nothing is gated behind the agent. See [aba-payway-purchase](./skills/aba-payway-purchase/SKILL.md) for the checkout contract (`createTransaction()` builds a LOCAL signed payload; `purchase()` performs the NETWORK request).

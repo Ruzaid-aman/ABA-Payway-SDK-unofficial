@@ -187,4 +187,6 @@ Endpoints like **Pre-Auth**, **Payout**, and **Payment Link** require RSA-encryp
 
 Now that you understand the concepts, proceed to **[Chapter 2 — Prerequisites & Setup](./02-prerequisites-and-setup.md)** to get your credentials and environment configured.
 
+> 🤖 **Agentic CLI:** You can also let a supported provider drive these payments through the risk-gated agentic CLI. See the [Agentic PayWay CLI guide](./QUICK-START-1-PAGER.md#agentic-payway-cli) and the [aba-payway-agent](../skills/aba-payway-agent/SKILL.md) / [aba-payway-first-payment](../skills/aba-payway-first-payment/SKILL.md) skill guides.
+
 > ← [Back to Documentation Home](./README.md) | [Next: Prerequisites & Setup →](./02-prerequisites-and-setup.md)
