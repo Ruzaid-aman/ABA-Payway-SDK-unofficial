@@ -1,0 +1,362 @@
+/**
+ * TDD tests for TASK-010 — headless conversation orchestrator.
+ *
+ * Uses a MOCKED provider adapter (canned AgentPlanV1) and a MOCKED PayWay
+ * (passed via OrchestratorOptions.payway). Deterministic, no real network.
+ * Coverage: one-shot success (online QR, sandbox, --approve), clarification,
+ * cancellation, privacy refusal, provider failure, invalid plan, consent
+ * (non-TTY without --approve => needs_confirmation, zero PayWay calls),
+ * unknown outcome, resume (no write approval restored), polling offer.
+ */
+
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PayWay } from '../client.js';
+import { PayWayNetworkError } from '../errors.js';
+import type {
+  AgentCommandResultV1,
+  AgentPlanV1,
+  ProviderConfigV1,
+} from '../agent/contracts.js';
+import type { ResolvedPayWayContext } from '../agent/context.js';
+import { validateCommandResult } from '../agent/schemas.js';
+import { ProviderProposalError, type ProviderAdapter } from '../agent/provider.js';
+import { AgentOrchestrator, type OrchestratorOptions } from '../agent/orchestrator.js';
+
+const tempDirs: string[] = [];
+const originalAppData = process.env.APPDATA;
+
+beforeEach(() => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'payway-orch-'));
+  tempDirs.push(directory);
+  process.env.APPDATA = directory;
+});
+
+afterEach(() => {
+  process.env.APPDATA = originalAppData;
+  for (const directory of tempDirs.splice(0)) {
+    rmSync(directory, { recursive: true, force: true });
+  }
+  // The success path writes a QR artifact under cwd/payway-output.
+  rmSync(path.resolve(process.cwd(), 'payway-output'), { recursive: true, force: true });
+  vi.restoreAllMocks();
+});
+
+// ─── Builders ────────────────────────────────────────────────────────────────
+
+class FakeProvider implements ProviderAdapter {
+  constructor(private readonly impl: (request: string) => Promise<AgentPlanV1>) {}
+  propose(request: string): Promise<AgentPlanV1> {
+    return this.impl(request);
+  }
+  async checkConnectivity() {
+    return { status: 'ready' as const };
+  }
+}
+
+function makeContext(overrides: Partial<ResolvedPayWayContext> = {}) {
+  return {
+    source: 'option' as const,
+    profileName: 'test',
+    environment: 'sandbox' as const,
+    merchantId: 'MID',
+    apiKey: 'KEY',
+    callbackUrl: 'https://pay.example.com/cb',
+    displayLabel: 'profile: test (sandbox)',
+    ...overrides,
+  };
+}
+
+interface FakePayWay {
+  payway: PayWay;
+  calls: { generateQr: number; createTransaction: number; purchase: number; paymentLink: number };
+}
+
+function makePayWay(opts: { generateQrError?: Error } = {}): FakePayWay {
+  const calls = { generateQr: 0, createTransaction: 0, purchase: 0, paymentLink: 0 };
+  const payway = {
+    qr: {
+      generateQr: async (..._args: unknown[]) => {
+        calls.generateQr++;
+        if (opts.generateQrError) throw opts.generateQrError;
+        return { qrString: 'QRDATA-123', qrImage: 'IMG' };
+      },
+    },
+    khqr: {
+      generateOfflineQR: async () => 'khqr',
+      getTransactionsByMerchantRef: async () => ({}),
+    },
+    checkout: {
+      createTransaction: async (..._a: unknown[]) => {
+        calls.createTransaction++;
+        return {};
+      },
+      purchase: async (..._a: unknown[]) => {
+        calls.purchase++;
+        return {};
+      },
+      checkTransaction: async () => ({}),
+      pollTransactionStatus: async function* () {},
+    },
+    paymentLink: {
+      create: async (..._a: unknown[]) => {
+        calls.paymentLink++;
+        return {};
+      },
+    },
+  };
+  return { payway: payway as unknown as PayWay, calls };
+}
+
+function onlineQrPlan(amount = 3): AgentPlanV1 {
+  return {
+    version: 'agent-plan/v1',
+    request: `pay $${amount}`,
+    actions: [
+      {
+        tool: 'generate_online_qr',
+        amount,
+        currency: 'USD',
+        transactionId: null,
+        callbackUrl: 'https://pay.example.com/cb',
+        lifetime: 900,
+        rationale: 'generic online QR',
+      },
+    ],
+  };
+}
+
+function baseOptions(overrides: Partial<OrchestratorOptions> = {}): OrchestratorOptions {
+  return { tty: false, environment: 'sandbox', ...overrides };
+}
+
+function privacyConfig(ack: boolean): ProviderConfigV1 {
+  return {
+    version: 'agent-config/v1',
+    provider: 'openai',
+    model: 'gpt-4o',
+    capabilityMode: 'strict-json-plan',
+    ...(ack ? { privacyAcknowledgedAt: new Date().toISOString() } : {}),
+  };
+}
+
+// ─── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('AgentOrchestrator — one-shot success', () => {
+  it('generates an online QR in sandbox with --approve, saves artifact, offers polling', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({ context: makeContext(), provider });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+
+    expect(result.status).toBe('succeeded');
+    expect(calls.generateQr).toBe(1);
+    expect(result.actions?.[0].ok).toBe(true);
+    expect(result.actions?.[0].artifact).toBeTruthy();
+    expect((result.actions?.[0].artifact as { path?: string }).path).toMatch(/payway-output/);
+    expect(result.message).toMatch(/poll/i);
+    expect(result.executionIds?.length).toBe(1);
+    expect(validateCommandResult(result)).toBe(true);
+  });
+});
+
+describe('AgentOrchestrator — clarification', () => {
+  it('returns needs_clarification and makes zero PayWay calls when route is unavailable', async () => {
+    // No public callback => online QR readiness fails => clarification.
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({
+      context: makeContext({ callbackUrl: undefined }),
+      provider,
+    });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+
+    expect(result.status).toBe('needs_clarification');
+    expect(calls.generateQr).toBe(0);
+    expect(validateCommandResult(result)).toBe(true);
+  });
+});
+
+describe('AgentOrchestrator — cancellation', () => {
+  it('records a cancellation event, leaves session usable, zero PayWay calls', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({ context: makeContext(), provider });
+    const sessionId = 'cancel-session-id';
+
+    const result = await orch.runTurn(sessionId, 'cancel', baseOptions({ flag: 'approve', payway }));
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(calls.generateQr).toBe(0);
+    expect(result.message).toMatch(/cancel/i);
+    // Session remains usable (cancellation event persisted, loadable).
+    const { loadSession } = await import('../agent/sessions.js');
+    const session = loadSession(sessionId);
+    expect(session).not.toBeNull();
+    expect(session!.events.some((e) => e.type === 'cancellation')).toBe(true);
+    expect(validateCommandResult(result)).toBe(true);
+  });
+});
+
+describe('AgentOrchestrator — privacy refusal', () => {
+  it('blocks without acknowledgement and never calls the provider/PayWay', async () => {
+    const propose = vi.fn(async () => onlineQrPlan());
+    const provider = new FakeProvider(propose);
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(false),
+    });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+
+    expect(result.status).toBe('blocked');
+    expect(result.error?.code).toBe('PRIVACY_ACK_REQUIRED');
+    expect(propose).not.toHaveBeenCalled();
+    expect(calls.generateQr).toBe(0);
+    expect(validateCommandResult(result)).toBe(true);
+  });
+
+  it('proceeds when privacyAcknowledgedAt is present', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(true),
+    });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+
+    expect(result.status).toBe('succeeded');
+    expect(calls.generateQr).toBe(1);
+  });
+});
+
+describe('AgentOrchestrator — provider failure / invalid plan', () => {
+  it('returns failed on ProviderProposalError with zero PayWay calls', async () => {
+    const provider = new FakeProvider(async () => {
+      throw new ProviderProposalError('model refused');
+    });
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({ context: makeContext(), provider });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+
+    expect(result.status).toBe('failed');
+    expect(calls.generateQr).toBe(0);
+    expect(validateCommandResult(result)).toBe(true);
+  });
+
+  it('returns failed when propose returns an invalid (garbage) plan', async () => {
+    const provider = new FakeProvider(async () => {
+      return { version: 'agent-plan/v1', request: 'x', actions: [{ tool: 'not_a_tool' }] } as unknown as AgentPlanV1;
+    });
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({ context: makeContext(), provider });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+
+    expect(result.status).toBe('failed');
+    expect(result.error?.code).toBe('INVALID_PLAN');
+    expect(calls.generateQr).toBe(0);
+    expect(validateCommandResult(result)).toBe(true);
+  });
+});
+
+describe('AgentOrchestrator — consent', () => {
+  it('non-TTY without --approve => needs_confirmation and zero PayWay calls', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({ context: makeContext(), provider });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ tty: false, payway }));
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(calls.generateQr).toBe(0);
+    // A planned ledger record is local only; no SDK call occurred.
+    expect(validateCommandResult(result)).toBe(true);
+  });
+
+  it('non-TTY with --yolo in production => needs_confirmation, zero PayWay calls', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = new AgentOrchestrator({
+      context: makeContext({ environment: 'production' }),
+      provider,
+    });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'yolo', environment: 'production', payway }));
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(calls.generateQr).toBe(0);
+    expect(validateCommandResult(result)).toBe(true);
+  });
+});
+
+describe('AgentOrchestrator — unknown outcome', () => {
+  it('records outcome_unknown and reports failure after a network error', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay({
+      generateQrError: new PayWayNetworkError('connection reset'),
+    });
+    const orch = new AgentOrchestrator({ context: makeContext(), provider });
+    const sessionId = 'unknown-session-id';
+
+    const result = await orch.runTurn(sessionId, 'pay $3', baseOptions({ flag: 'approve', payway }));
+
+    expect(calls.generateQr).toBe(1);
+    expect(result.status).toBe('failed');
+    expect(result.actions?.[0].error).toMatchObject({ code: 'OUTCOME_UNKNOWN' });
+    expect(result.message).toMatch(/unknown outcome/i);
+    expect(validateCommandResult(result)).toBe(true);
+
+    const { findUnfinishedExecutions } = await import('../agent/ledger.js');
+    const unfinished = findUnfinishedExecutions(sessionId);
+    expect(unfinished.length).toBe(1);
+    expect(unfinished[0].status).toBe('outcome_unknown');
+  });
+});
+
+describe('AgentOrchestrator — resume', () => {
+  it('resumes with needs_confirmation and never auto-approves a create', async () => {
+    const propose = vi.fn(async () => onlineQrPlan());
+    const provider = new FakeProvider(propose);
+    const { payway, calls } = makePayWay();
+    const sessionId = 'resume-session-id';
+    // Seed a prior session.
+    await new AgentOrchestrator({ context: makeContext(), provider }).runTurn(
+      sessionId,
+      'pay $3',
+      baseOptions({ flag: 'approve', payway }),
+    );
+    propose.mockClear();
+    calls.generateQr = 0;
+
+    const orch = new AgentOrchestrator({ context: makeContext(), provider });
+    const result = await orch.resume(sessionId);
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(propose).not.toHaveBeenCalled();
+    expect(calls.generateQr).toBe(0);
+    expect(validateCommandResult(result)).toBe(true);
+  });
+});
+
+describe('AgentOrchestrator — polling offer', () => {
+  it('mentions polling in the success message for an online QR', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway } = makePayWay();
+    const orch = new AgentOrchestrator({ context: makeContext(), provider });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
+
+    expect(result.status).toBe('succeeded');
+    expect(result.message).toMatch(/poll/i);
+  });
+});
