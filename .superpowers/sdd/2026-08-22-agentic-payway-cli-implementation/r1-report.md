@@ -66,3 +66,19 @@
 ### Follow-up concerns
 
 - Per instruction, verification remains focused; the full suite was not rerun in this round.
+
+## Review remediation — round 3 of 5
+
+- Implementation commit: `0bd0606 fix(agent): reject IPv6 literal callback hosts`
+- The URL policy no longer tracks IPv6 special-use ranges. Every IPv6 literal is rejected for online callbacks and checkout return/cancel URLs; DNS names and validated public IPv4 literals remain supported.
+
+### TDD and focused verification
+
+- RED: `npx vitest run src/__tests__/agent-r1-hardening.test.ts` — 3 failures before remediation: callback literals `[2001:30::1]`, `[2606:4700:4700::1111]`, and checkout return/cancel coverage using those same literals.
+- GREEN: `npx vitest run src/__tests__/agent-r1-hardening.test.ts src/__tests__/agent-planning-risk.test.ts src/__tests__/agent-orchestrator.test.ts src/__tests__/agent-tools.test.ts` — 83/83 passed.
+- Typecheck: `npm run typecheck` — passed.
+- Build: `npm run build` — passed.
+
+### Follow-up concerns
+
+- Per instruction, verification remains focused; the full suite was not rerun in this round.
