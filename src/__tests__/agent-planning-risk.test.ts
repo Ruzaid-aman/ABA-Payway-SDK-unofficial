@@ -11,7 +11,7 @@ function makeContext(overrides: Partial<ResolvedPayWayContext> = {}): ResolvedPa
     environment: 'sandbox',
     merchantId: 'merchant-test',
     apiKey: 'key-test',
-    callbackUrl: 'https://cb.example.test/hook',
+    callbackUrl: 'https://cb.example.com/hook',
     khqr: {
       bakongId: 'bakong',
       abaMerchantId: '123456789012345',
@@ -54,7 +54,7 @@ describe('normalizePlan — explicit routes accepted', () => {
         amount: 3,
         currency: 'USD',
         transactionId: null,
-        callbackUrl: 'https://cb.example.test/hook',
+        callbackUrl: 'https://cb.example.com/hook',
         lifetime: 600,
       },
     ]);
@@ -72,7 +72,7 @@ describe('normalizePlan — explicit routes accepted', () => {
         amount: 3,
         currency: 'USD',
         transactionId: null,
-        callbackUrl: 'https://cb.example.test/hook',
+        callbackUrl: 'https://cb.example.com/hook',
       },
     ]);
     const res = normalizePlan(plan, ctx);
@@ -114,7 +114,7 @@ describe('normalizePlan — clarification rules', () => {
         tool: 'generate_online_qr',
         currency: 'USD',
         transactionId: null,
-        callbackUrl: 'https://cb.example.test/hook',
+        callbackUrl: 'https://cb.example.com/hook',
       } as AgentActionDraft,
     ]);
     const res = normalizePlan(plan, ctx);
@@ -149,7 +149,7 @@ describe('normalizePlan — currency validation', () => {
         amount: 3.005,
         currency: 'USD',
         transactionId: null,
-        callbackUrl: 'https://cb.example.test/hook',
+        callbackUrl: 'https://cb.example.com/hook',
       },
     ]);
     const res = normalizePlan(plan, ctx);
@@ -164,7 +164,7 @@ describe('normalizePlan — currency validation', () => {
         amount: 3000.5,
         currency: 'KHR',
         transactionId: null,
-        callbackUrl: 'https://cb.example.test/hook',
+        callbackUrl: 'https://cb.example.com/hook',
       },
     ]);
     const res = normalizePlan(plan, ctx);
@@ -187,7 +187,7 @@ describe('classifyRisk', () => {
         amount: 3,
         currency: 'USD',
         transactionId: null,
-        callbackUrl: 'https://cb.example.test/hook',
+        callbackUrl: 'https://cb.example.com/hook',
       } as AgentActionDraft,
       ctx,
     );
@@ -202,7 +202,7 @@ describe('classifyRisk', () => {
         amount: 3,
         currency: 'USD',
         transactionId: null,
-        callbackUrl: 'https://cb.example.test/hook',
+        callbackUrl: 'https://cb.example.com/hook',
       } as AgentActionDraft,
       ctx,
     );
@@ -238,7 +238,7 @@ describe('authorizePlan', () => {
       amount: 3,
       currency: 'USD',
       transactionId: null,
-      callbackUrl: 'https://cb.example.test/hook',
+      callbackUrl: 'https://cb.example.com/hook',
       lifetime: 900,
     },
   ]);

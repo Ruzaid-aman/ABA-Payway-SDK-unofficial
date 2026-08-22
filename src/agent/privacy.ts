@@ -47,12 +47,22 @@ function isSecretValue(value: unknown): boolean {
 export function scrubSensitive(value: unknown, secrets: string[]): unknown {
   const knownSecrets = secrets.filter((s) => typeof s === 'string' && s.trim() !== '');
 
+  function redactKnownSecrets(text: string): string {
+    let redacted = text;
+    for (const secret of knownSecrets) {
+      if (redacted.includes(secret)) {
+        redacted = redacted.split(secret).join(REDACTED);
+      }
+    }
+    return redacted;
+  }
+
   function scrub(node: unknown): unknown {
     if (node === null || typeof node !== 'object') {
       if (typeof node === 'string' && (knownSecrets.includes(node) || isSecretValue(node))) {
         return REDACTED;
       }
-      return node;
+      return typeof node === 'string' ? redactKnownSecrets(node) : node;
     }
 
     if (Array.isArray(node)) {

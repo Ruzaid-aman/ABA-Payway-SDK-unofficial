@@ -27,6 +27,18 @@ export interface ResolvePayWayContextOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+/** Sensitive values resolved into a PayWay context, for output/persistence redaction boundaries. */
+export function resolvedSensitiveValues(context: ResolvedPayWayContext): string[] {
+  const values = [context.merchantId, context.apiKey, context.publicKeyPem ?? ''];
+  const collect = (value: unknown): void => {
+    if (typeof value === 'string') values.push(value);
+    else if (Array.isArray(value)) value.forEach(collect);
+    else if (value && typeof value === 'object') Object.values(value as Record<string, unknown>).forEach(collect);
+  };
+  collect(context.khqr);
+  return values.filter((value) => value.trim() !== '');
+}
+
 type ProfileEnvironment = 'sandbox' | 'production';
 
 interface CandidateProfile {

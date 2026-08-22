@@ -69,7 +69,7 @@ export function appendSessionEvent(
   const record: AgentSessionEvent = {
     type: event.type,
     at: now,
-    data: event.data,
+    data: scrubSensitive(event.data, []) as Record<string, unknown>,
   };
 
   const session: AgentSessionV1 = existing

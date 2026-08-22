@@ -6,14 +6,18 @@
  * APPDATA are used. Covers the eight e2e scenarios from the plan's TASK-013.
  */
 
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResolvedPayWayContext } from '../agent/context.js';
 import type { AgentPlanV1, ExecutionRecordV1, ProviderConfigV1 } from '../agent/contracts.js';
 import { findUnfinishedExecutions } from '../agent/ledger.js';
-import { AgentOrchestrator, type OrchestratorOptions } from '../agent/orchestrator.js';
+import {
+  AgentOrchestrator as AgentOrchestratorBase,
+  type OrchestratorDeps,
+  type OrchestratorOptions,
+} from '../agent/orchestrator.js';
 import { serializeCommandResult } from '../agent/output.js';
 import { scrubSensitive } from '../agent/privacy.js';
 import type { ProviderAdapter, } from '../agent/provider.js';
@@ -39,6 +43,7 @@ function allSessions(): Array<{ events: Array<{ data: Record<string, unknown> }>
 /** Returns every persisted ledger record as parsed objects. */
 function allLedgerRecords(): ExecutionRecordV1[] {
   const dir = getAgentDataPaths().ledgerDir;
+  if (!existsSync(dir)) return [];
   const names = readdirSync(dir);
   if (names.length === 0) return [];
   return names
@@ -48,26 +53,28 @@ function allLedgerRecords(): ExecutionRecordV1[] {
 
 const tempDirs: string[] = [];
 const originalAppData = process.env.APPDATA;
-const originalCwd = process.cwd();
+let artifactRoot = '';
 
 beforeEach(() => {
   const directory = mkdtempSync(path.join(tmpdir(), 'payway-e2e-'));
   tempDirs.push(directory);
   process.env.APPDATA = directory;
-  // Isolate the shared cwd/payway-output artifact root from other test files
-  // that also write there, to avoid concurrent rmdir collisions.
-  process.chdir(directory);
+  artifactRoot = path.join(directory, 'payway-output');
 });
 
 afterEach(() => {
-  process.chdir(originalCwd);
   process.env.APPDATA = originalAppData;
   for (const directory of tempDirs.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
-  rmSync(path.resolve(process.cwd(), 'payway-output'), { recursive: true, force: true });
   vi.restoreAllMocks();
 });
+
+class AgentOrchestrator extends AgentOrchestratorBase {
+  constructor(deps: OrchestratorDeps) {
+    super({ ...deps, artifactRoot, artifactRootOverrideConfirmed: true });
+  }
+}
 
 class FakeProvider implements ProviderAdapter {
   public lastRequest: string | null = null;
@@ -256,7 +263,7 @@ describe('TASK-013 (2) non-TTY without approval', () => {
     expect(result.status).toBe('needs_confirmation');
     expect(validateCommandResult(result)).toBe(true);
     expect(calls.generateQr).toBe(0);
-    expect(result.executionIds).toBeDefined();
+    expect(result.executionIds).toBeUndefined();
   });
 });
 
@@ -537,7 +544,7 @@ describe('TASK-013 (7) resume without approval and malicious provider attempts',
       request: 'open the report',
       actions: [{ tool: 'open_artifact', reference: '../../../etc/passwd' }],
     }));
-    const { payway } = makePayWay();
+    const { payway, calls } = makePayWay();
     const orch = new AgentOrchestrator({
       context: makeContext(),
       provider,
@@ -546,8 +553,15 @@ describe('TASK-013 (7) resume without approval and malicious provider attempts',
 
     const result = await orch.runOneShot('open', baseOptions({ flag: 'approve', payway }));
 
-    expect(result.status).toBe('failed');
-    expect((result.actions![0] as { ok: boolean }).ok).toBe(false);
+    expect(result.status).toBe('blocked');
+    expect(result.error?.code).toBe('UNTRUSTED_ACTION_VALUE');
+    expect(result.actions).toBeUndefined();
+    expect(result.executionIds).toBeUndefined();
+    expect(calls.generateQr).toBe(0);
+    expect(calls.createTransaction).toBe(0);
+    expect(calls.purchase).toBe(0);
+    expect(calls.paymentLink).toBe(0);
+    expect(allLedgerRecords()).toEqual([]);
     expect(validateCommandResult(result)).toBe(true);
   });
 
@@ -557,7 +571,7 @@ describe('TASK-013 (7) resume without approval and malicious provider attempts',
       request: 'open file',
       actions: [{ tool: 'open_artifact', reference: 'file:///etc/secrets' }],
     }));
-    const { payway } = makePayWay();
+    const { payway, calls } = makePayWay();
     const orch = new AgentOrchestrator({
       context: makeContext(),
       provider,
@@ -566,8 +580,15 @@ describe('TASK-013 (7) resume without approval and malicious provider attempts',
 
     const result = await orch.runOneShot('open', baseOptions({ flag: 'approve', payway }));
 
-    expect(result.status).toBe('failed');
-    expect((result.actions![0] as { ok: boolean }).ok).toBe(false);
+    expect(result.status).toBe('blocked');
+    expect(result.error?.code).toBe('UNTRUSTED_ACTION_VALUE');
+    expect(result.actions).toBeUndefined();
+    expect(result.executionIds).toBeUndefined();
+    expect(calls.generateQr).toBe(0);
+    expect(calls.createTransaction).toBe(0);
+    expect(calls.purchase).toBe(0);
+    expect(calls.paymentLink).toBe(0);
+    expect(allLedgerRecords()).toEqual([]);
     expect(validateCommandResult(result)).toBe(true);
   });
 
@@ -586,8 +607,9 @@ describe('TASK-013 (7) resume without approval and malicious provider attempts',
 
     const result = await orch.runOneShot('open', baseOptions({ flag: 'approve', payway }));
 
-    expect(result.status).toBe('failed');
-    expect((result.actions![0] as { ok: boolean }).ok).toBe(false);
+    expect(result.status).toBe('blocked');
+    expect(result.error?.code).toBe('INVALID_LOCAL_ACTION');
+    expect(result.actions).toBeUndefined();
     expect(validateCommandResult(result)).toBe(true);
   });
 

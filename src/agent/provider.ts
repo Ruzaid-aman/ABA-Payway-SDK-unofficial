@@ -29,7 +29,7 @@ export class ProviderProposalError extends Error {
 
 /** Adapter that proposes agent plans and reports endpoint connectivity. */
 export interface ProviderAdapter {
-  propose(request: string): Promise<AgentPlanV1>;
+  propose(request: string, sessionContext?: string): Promise<AgentPlanV1>;
   checkConnectivity(): Promise<ProviderConnectivity>;
 }
 
@@ -177,15 +177,18 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
   }
 
   return {
-    async propose(request: string): Promise<AgentPlanV1> {
+    async propose(request: string, sessionContext?: string): Promise<AgentPlanV1> {
       const apiKey = getApiKey();
+      const contextMessage = sessionContext
+        ? { role: 'system' as const, content: `Bounded deterministic session context:\n${sessionContext}` }
+        : undefined;
 
       let data: ChatCompletionResponse;
       if (config.capabilityMode === 'native-tools') {
         data = await postChatCompletions(
           {
             model: config.model,
-            messages: [{ role: 'user', content: request }],
+            messages: [...(contextMessage ? [contextMessage] : []), { role: 'user', content: request }],
             tools: buildToolSchemas(),
             tool_choice: 'auto',
           },
@@ -197,6 +200,7 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
             model: config.model,
             messages: [
               { role: 'system', content: buildStrictJsonSystemPrompt() },
+              ...(contextMessage ? [contextMessage] : []),
               { role: 'user', content: request },
             ],
           },

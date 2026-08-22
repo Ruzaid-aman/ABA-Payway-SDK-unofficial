@@ -27,7 +27,6 @@ import {
 } from '../errors.js';
 import { saveQrArtifact } from './artifacts.js';
 import type {
-  AgentSessionV1,
   AgentToolName,
   CheckTransactionByMerchantRefParams,
   CheckTransactionParams,
@@ -44,18 +43,6 @@ import type {
 } from './contracts.js';
 import type { ExecutionContext, ToolExecutionResult } from './executor.js';
 import { copyToClipboard, openArtifact } from './local-tools.js';
-
-/** Builds a minimal session object sufficient for the local open utility. */
-function minimalSession(sessionId: string): AgentSessionV1 {
-  return {
-    version: 'agent-session/v1',
-    sessionId,
-    createdAt: '',
-    updatedAt: '',
-    contextLabel: '',
-    events: [],
-  };
-}
 
 /**
  * Classifies a caught provider/local error.
@@ -323,7 +310,6 @@ async function runSaveArtifact(
   const bundle = await saveQrArtifact({
     qrString: params.qrString,
     content: params.content,
-    root: params.root,
     name: params.name,
     sessionId: ctx.sessionId,
     transactionId: ctx.execution?.transactionId ?? undefined,
@@ -346,7 +332,8 @@ async function runOpenArtifact(
   ctx: ExecutionContext,
 ): Promise<ToolExecutionResult> {
   const params = action as unknown as OpenArtifactParams;
-  await openArtifact(params.reference, minimalSession(ctx.sessionId));
+  if (!ctx.session) throw new Error('open_artifact requires the active session');
+  await openArtifact(params.reference, ctx.session);
   return { ok: true, tool: 'open_artifact', data: { reference: params.reference } };
 }
 

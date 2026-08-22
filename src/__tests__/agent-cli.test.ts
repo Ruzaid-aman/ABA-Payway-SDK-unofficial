@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import * as agentCommands from '../cli/commands/agent.js';
 
 /**
  * TASK-011 — public agent CLI surface + REPL.
@@ -51,7 +52,86 @@ afterEach(() => {
   }
 });
 
+type PromptConfirmForTest = (
+  message: string,
+  createReadline: () => { question(message: string, callback: (answer: string) => void): void; close(): void },
+) => Promise<boolean>;
+
+type CreateInteractivePlanConfirmationForTest = (
+  prompt: (message: string) => Promise<boolean>,
+  ) => (proposal: {
+    request: string;
+    context: string;
+    environment: 'sandbox' | 'production';
+  actions: Array<{
+    route: string;
+    money: string;
+    transactionIdStrategy: string;
+    lifetime?: number;
+    urls: string[];
+    artifacts: string[];
+  }>;
+  assumptions: string[];
+  planContext: Record<string, unknown>;
+}) => Promise<boolean>;
+
+function deterministicReadline(answer: string | undefined) {
+  return () => ({
+    question: (_message: string, callback: (value: string) => void) => callback(answer as string),
+    close: () => undefined,
+  });
+}
+
 describe('agentic payway CLI (TASK-011)', () => {
+  it('renders the complete TTY proposal and maps y, rejection, and EOF prompt responses to consent', async () => {
+    const boundary = agentCommands as unknown as {
+      promptConfirm: PromptConfirmForTest;
+      createInteractivePlanConfirmation: CreateInteractivePlanConfirmationForTest;
+    };
+    const proposal = {
+      request: 'pay $3',
+      context: 'profile: demo (sandbox)',
+      environment: 'sandbox' as const,
+      actions: [
+        {
+          route: 'generate_online_qr',
+          money: '3 USD',
+          transactionIdStrategy: 'generated after confirmation',
+          lifetime: 900,
+          urls: ['callback: https://pay.example.com/callback'],
+          artifacts: ['QR image and metadata will be saved locally'],
+        },
+      ],
+      assumptions: ['customer will scan immediately'],
+      planContext: { channel: 'terminal' },
+    };
+    const messages: string[] = [];
+    const accept = boundary.createInteractivePlanConfirmation(async (message) => {
+      messages.push(message);
+      return boundary.promptConfirm(message, deterministicReadline('y'));
+    });
+    const reject = boundary.createInteractivePlanConfirmation((message) =>
+      boundary.promptConfirm(message, deterministicReadline('n')),
+    );
+    const eof = boundary.createInteractivePlanConfirmation((message) =>
+      boundary.promptConfirm(message, deterministicReadline(undefined)),
+    );
+
+    await expect(accept(proposal)).resolves.toBe(true);
+    await expect(reject(proposal)).resolves.toBe(false);
+    await expect(eof(proposal)).resolves.toBe(false);
+    expect(messages[0]).toContain('Create plan proposal');
+    expect(messages[0]).toContain('Context: profile: demo (sandbox)');
+    expect(messages[0]).toContain('Route: generate_online_qr');
+    expect(messages[0]).toContain('Money: 3 USD');
+    expect(messages[0]).toContain('Transaction ID: generated after confirmation');
+    expect(messages[0]).toContain('Lifetime: 900 seconds');
+    expect(messages[0]).toContain('callback: https://pay.example.com/callback');
+    expect(messages[0]).toContain('QR image and metadata will be saved locally');
+    expect(messages[0]).toContain('customer will scan immediately');
+    expect(messages[0]).toContain('Execute this create plan? (y/N):');
+  });
+
   it('ask --help lists the ask command and its options', () => {
     const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
     temporaryDirectories.push(appData);
@@ -186,19 +266,30 @@ describe('agentic payway CLI (TASK-011)', () => {
     expect(after.status).toBe(0);
   });
 
-  it('ask without approval in non-TTY returns needs_confirmation and makes no network call', () => {
+  it('ask without approval in non-TTY attempts planning before deciding whether confirmation is needed', () => {
     const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
     temporaryDirectories.push(appData);
-    // Configure the provider so we reach the authorization gate (no config would
-    // return 'blocked' instead). Point the provider at an unreachable URL to
-    // prove the short-circuit never contacts the network.
-    runCli(['agent', 'setup', '--provider', 'openai', '--model', 'gpt-4o'], baseEnv(appData));
+    // Point the provider at an unreachable URL. A provider failure proves the
+    // non-TTY path attempted planning instead of pre-emptively short-circuiting.
+    runCli(
+      [
+        'agent',
+        'setup',
+        '--provider',
+        'custom',
+        '--model',
+        'gpt-4o',
+        '--base-url',
+        'http://127.0.0.1:1',
+        '--acknowledge-privacy',
+      ],
+      baseEnv(appData),
+    );
     const env = baseEnv(appData);
     env.PAYWAY_BASE_URL = 'http://127.0.0.1:1'; // unreachable
     const result = runCli(['ask', 'generate a QR for $3'], env);
     expect(result.status).toBe(1);
     const output = stripAnsi(result.stdout).trim();
-    expect(output).not.toContain('provider request failed');
     let parsed: any;
     try {
       parsed = JSON.parse(output);
@@ -206,7 +297,9 @@ describe('agentic payway CLI (TASK-011)', () => {
       throw new Error(`expected JSON output, got: ${output}`);
     }
     expect(parsed.version).toBe('agent-command/v1');
-    expect(parsed.status).toBe('needs_confirmation');
+    expect(parsed.status).toBe('failed');
+    expect(parsed.error.code).toBe('PROVIDER_PROPOSAL_FAILED');
+    expect(parsed.error.message).toContain('provider request failed');
     expect(parsed.request).toContain('generate a QR');
   });
 
@@ -223,5 +316,85 @@ describe('agentic payway CLI (TASK-011)', () => {
     expect(output).toContain('Running: payway-sdk generate-qr');
     // REPL should exit cleanly via :exit.
     expect(result.status).toBe(0);
+  });
+
+  it('REPL :profile [name] switches to a freshly resolved named profile without exposing credentials', () => {
+    const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
+    temporaryDirectories.push(appData);
+    const profileDirectory = path.join(appData, 'aba-payway-sdk');
+    mkdirSync(profileDirectory, { recursive: true });
+    writeFileSync(
+      path.join(profileDirectory, 'profiles.json'),
+      JSON.stringify({
+        version: 1,
+        defaultProfile: 'sandbox',
+        profiles: [
+          { name: 'sandbox', environment: 'sandbox', merchantId: 'sandbox-mid', apiKey: 'sandbox-secret' },
+          { name: 'production', environment: 'production', merchantId: 'prod-mid', apiKey: 'prod-secret' },
+        ],
+      }),
+    );
+
+    const result = runCli(['agent'], baseEnv(appData), [':profile production', ':profile', ':exit'].join('\n'));
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+
+    expect(result.status).toBe(0);
+    expect(output).toContain('profile: production');
+    expect(output).toContain('profile: production (production)');
+    expect(output).not.toContain('prod-secret');
+  });
+
+  it('REPL :profile reports the resolved default profile when no explicit profile was supplied', () => {
+    const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
+    temporaryDirectories.push(appData);
+    const profileDirectory = path.join(appData, 'aba-payway-sdk');
+    mkdirSync(profileDirectory, { recursive: true });
+    writeFileSync(
+      path.join(profileDirectory, 'profiles.json'),
+      JSON.stringify({
+        version: 1,
+        defaultProfile: 'sandbox',
+        profiles: [{ name: 'sandbox', environment: 'sandbox', merchantId: 'sandbox-mid', apiKey: 'sandbox-secret' }],
+      }),
+    );
+
+    const result = runCli(['agent'], baseEnv(appData), [':profile', ':exit'].join('\n'));
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+
+    expect(result.status).toBe(0);
+    expect(output).toContain('profile: sandbox  (profile: sandbox (sandbox))');
+    expect(output).not.toContain('sandbox-secret');
+  });
+
+  it('uses a generated first-turn session and the profile selected immediately before that turn', () => {
+    const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
+    temporaryDirectories.push(appData);
+    const profileDirectory = path.join(appData, 'aba-payway-sdk');
+    mkdirSync(path.join(profileDirectory, 'agent'), { recursive: true });
+    writeFileSync(
+      path.join(profileDirectory, 'profiles.json'),
+      JSON.stringify({
+        version: 1,
+        profiles: [
+          { name: 'sandbox', environment: 'sandbox', merchantId: 'sandbox-mid', apiKey: 'sandbox-secret' },
+          { name: 'production', environment: 'production', merchantId: 'prod-mid', apiKey: 'prod-secret' },
+        ],
+      }),
+    );
+    // Deliberately omit privacy acknowledgement: the request stops before any
+    // provider/network call while still proving the real REPL session boundary.
+    writeFileSync(
+      path.join(profileDirectory, 'agent', 'agent-config.json'),
+      JSON.stringify({ version: 'agent-config/v1', provider: 'openai', model: 'gpt-4o', capabilityMode: 'strict-json-plan' }),
+    );
+
+    const result = runCli(['agent'], baseEnv(appData), [':profile production', 'pay $3', ':exit'].join('\n'));
+    const sessionsDirectory = path.join(profileDirectory, 'agent', 'sessions');
+    const sessionFiles = readdirSync(sessionsDirectory);
+    const session = JSON.parse(readFileSync(path.join(sessionsDirectory, sessionFiles[0]), 'utf8'));
+
+    expect(result.status).toBe(0);
+    expect(session.sessionId).not.toBe('repl');
+    expect(session.contextLabel).toBe('profile: production (production)');
   });
 });

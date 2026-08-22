@@ -12,6 +12,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { AgentToolName, ExecutionRecordV1, ExecutionStatus } from './contracts.js';
+import { scrubSensitive } from './privacy.js';
 import { validateLedger } from './schemas.js';
 import { atomicWriteJson, getAgentDataPaths } from './storage.js';
 
@@ -83,8 +84,15 @@ function persist(record: ExecutionRecordV1): ExecutionRecordV1 {
   return record;
 }
 
-function generateTransactionId(): string {
+export function generateTransactionId(): string {
   return `tx${randomBytes(8).toString('hex')}`;
+}
+
+function scrubLedgerError(
+  error: { code?: string; message: string },
+  sensitiveValues: string[],
+): { code?: string; message: string } {
+  return scrubSensitive(error, sensitiveValues) as { code?: string; message: string };
 }
 
 function requireStatus(record: ExecutionRecordV1, expected: ExecutionStatus): void {
@@ -162,9 +170,14 @@ export function markSucceeded(id: string, result?: Record<string, unknown>): Exe
 /**
  * submitted -> failed. Rejects if the record is not 'submitted'.
  */
-export function markFailed(id: string, error: { code?: string; message: string }): ExecutionRecordV1 {
+export function markFailed(
+  id: string,
+  error: { code?: string; message: string },
+  sensitiveValues: string[] = [],
+): ExecutionRecordV1 {
+  const safeError = scrubLedgerError(error, sensitiveValues);
   return advance(id, 'submitted', 'failed', (record) => {
-    record.error = { code: error.code, message: error.message };
+    record.error = safeError;
   });
 }
 
@@ -172,9 +185,14 @@ export function markFailed(id: string, error: { code?: string; message: string }
  * submitted -> outcome_unknown (timeout/abort/network/ambiguous). Rejects if
  * the record is not 'submitted'.
  */
-export function markOutcomeUnknown(id: string, error: { code?: string; message: string }): ExecutionRecordV1 {
+export function markOutcomeUnknown(
+  id: string,
+  error: { code?: string; message: string },
+  sensitiveValues: string[] = [],
+): ExecutionRecordV1 {
+  const safeError = scrubLedgerError(error, sensitiveValues);
   return advance(id, 'submitted', 'outcome_unknown', (record) => {
-    record.error = { code: error.code, message: error.message };
+    record.error = safeError;
   });
 }
 

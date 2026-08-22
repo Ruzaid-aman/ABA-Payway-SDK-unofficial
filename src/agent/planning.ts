@@ -1,6 +1,7 @@
 import type { ResolvedPayWayContext } from './context.js';
 import type { AgentActionDraft, AgentPlanV1, Currency, Environment, ProviderConfigV1 } from './contracts.js';
 import { evaluateReadiness } from './readiness.js';
+import { isPublicHttpsUrl } from './url-policy.js';
 
 export interface NormalizedPlanResult {
   plan: AgentPlanV1;
@@ -48,17 +49,6 @@ function amountViolation(currency: Currency, amount: number): string | null {
   return null;
 }
 
-function isPublicHttps(value: unknown): boolean {
-  if (typeof value !== 'string' || value.length === 0) return false;
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'https:') return false;
-    return !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
-
 function actionHasRoute(action: AgentActionDraft, route: string): boolean {
   return (action as { tool?: string }).tool === route;
 }
@@ -101,7 +91,7 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
         const violation = amountViolation(qr.currency, qr.amount);
         if (violation) warnings.push(violation);
       }
-      if (qr.callbackUrl !== undefined && !isPublicHttps(qr.callbackUrl)) {
+      if (qr.callbackUrl !== undefined && !isPublicHttpsUrl(qr.callbackUrl)) {
         warnings.push('online QR callbackUrl must be a public https URL');
       }
       if (readiness.onlineQr !== 'ready') {
@@ -133,6 +123,12 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
         const violation = amountViolation(checkout.currency, checkout.amount);
         if (violation) warnings.push(violation);
       }
+      if (checkout.returnUrl !== undefined && !isPublicHttpsUrl(checkout.returnUrl)) {
+        warnings.push('checkout returnUrl must be a public https URL');
+      }
+      if (checkout.cancelUrl !== undefined && !isPublicHttpsUrl(checkout.cancelUrl)) {
+        warnings.push('checkout cancelUrl must be a public https URL');
+      }
       if (readiness.checkout !== 'ready') {
         needsClarification = true;
         clarification = clarification ?? 'Checkout is not available because credentials are missing.';
@@ -143,7 +139,7 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
         const violation = amountViolation(link.currency, link.amount);
         if (violation) warnings.push(violation);
       }
-      if (!isPublicHttps(link.returnUrl)) {
+      if (!isPublicHttpsUrl(link.returnUrl)) {
         warnings.push('payment link returnUrl must be a public https URL');
       }
       if (readiness.paymentLinkRsa !== 'ready') {

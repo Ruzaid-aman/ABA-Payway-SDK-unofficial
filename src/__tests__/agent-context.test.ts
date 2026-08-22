@@ -137,7 +137,7 @@ describe('resolvePayWayContext — authority and safety', () => {
         PAYWAY_PROFILE: 'other',
         PAYWAY_MERCHANT_ID: 'stale',
         PAYWAY_API_KEY: 'stale',
-        PAYWAY_CALLBACK_URL: 'https://cb.example.test',
+        PAYWAY_CALLBACK_URL: 'https://cb.example.com',
       } as NodeJS.ProcessEnv,
     });
     expect(process.env).toEqual(snapshot);
@@ -183,7 +183,7 @@ describe('evaluateReadiness', () => {
   });
 
   it('reports onlineQr ready for a public https callback URL', () => {
-    const matrix = evaluateReadiness(context({ callbackUrl: 'https://cb.example.test/hook' }), baseProvider());
+    const matrix = evaluateReadiness(context({ callbackUrl: 'https://cb.example.com/hook' }), baseProvider());
     expect(matrix.onlineQr).toBe('ready');
   });
 

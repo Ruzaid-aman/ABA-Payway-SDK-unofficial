@@ -136,7 +136,6 @@ function buildActionSchemas(materialized: boolean): Array<Record<string, unknown
         tool: { const: 'save_artifact' },
         qrString: { type: 'string' },
         content: { type: 'string' },
-        root: { type: 'string' },
         name: { type: 'string' },
         kind: { enum: ['qr', 'receipt', 'text'] },
         rationale: { type: 'string' },

@@ -120,7 +120,6 @@ export interface SaveArtifactParams {
   tool: 'save_artifact';
   qrString?: string;
   content?: string;
-  root?: string;
   name?: string;
   kind?: 'qr' | 'receipt' | 'text';
   rationale?: string;
@@ -156,14 +155,11 @@ export type AgentActionParams =
 export type AgentActionDraft = AgentActionParams;
 
 /** A materialized action. Create actions must carry a valid (non-null) transactionId. */
-export type MaterializedAgentAction = Exclude<
-  {
-    [K in keyof AgentActionParams]: AgentActionParams[K] extends { transactionId: string | null }
-      ? Omit<AgentActionParams[K], 'transactionId'> & { transactionId: string }
-      : AgentActionParams[K];
-  }[keyof AgentActionParams],
-  never
->;
+type MaterializeAction<T extends AgentActionParams> = T extends { transactionId: string | null }
+  ? Omit<T, 'transactionId'> & { transactionId: string }
+  : T;
+
+export type MaterializedAgentAction = MaterializeAction<AgentActionParams>;
 
 // ---------------------------------------------------------------------------
 // Plan

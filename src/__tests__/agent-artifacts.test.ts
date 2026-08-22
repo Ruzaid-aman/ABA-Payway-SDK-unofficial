@@ -106,6 +106,7 @@ describe('saveQrArtifact', () => {
     const bundle = await saveQrArtifact({
       qrString: '00020101021226aba01kh',
       root,
+      overrideApproval: true,
       name: 'pay-123',
       sessionId: 'sess_test_008',
       amount: 1.5,
@@ -134,6 +135,7 @@ describe('saveQrArtifact', () => {
     const bundle = await saveQrArtifact({
       qrString: 'khqr-content',
       root,
+      overrideApproval: true,
       sessionId: 'sess_test_008',
     });
     expect(existsSync(bundle.imagePath!)).toBe(true);
@@ -149,6 +151,7 @@ describe('saveQrArtifact', () => {
       saveQrArtifact({
         qrString: 'will-fail',
         root,
+        overrideApproval: true,
         name: 'fail',
         sessionId: 'sess_test_008',
       }),
@@ -200,8 +203,15 @@ describe('openArtifact', () => {
   it('opens a current-session artifact path inside the root', async () => {
     const safeName = 'ok.json';
     mkdirSync(path.join(root, 'payway-output'), { recursive: true });
-    writeFileSync(path.join(root, 'payway-output', safeName), '{}');
-    await openArtifact(safeName, makeSession());
+    const artifactPath = path.join(root, 'payway-output', safeName);
+    writeFileSync(artifactPath, '{}');
+    const activeSession = makeSession();
+    activeSession.events.push({
+      type: 'artifact',
+      at: new Date().toISOString(),
+      data: { artifactId: 'artifact-task-008', path: artifactPath },
+    });
+    await openArtifact(artifactPath, activeSession);
     expect(spawned.length).toBe(1);
   });
 });
