@@ -206,7 +206,9 @@ describe('R1 pre-authorization risk gate', () => {
     'https://[2001:1::1]/callback',
     'https://[2001:2::1]/callback',
     'https://[2001:20::1]/callback',
+    'https://[2001:30::1]/callback',
     'https://[3fff::1]/callback',
+    'https://[2606:4700:4700::1111]/callback',
   ])('blocks non-public literal callback URL %s before ledger or SDK activity', async (callbackUrl) => {
     const provider = new FakeProvider(onlineQrPlan({ callbackUrl }));
     const { payway, calls } = makePayWay();
@@ -256,8 +258,8 @@ describe('R1 pre-authorization risk gate', () => {
           amount: 3,
           currency: 'USD',
           transactionId: null,
-          returnUrl: 'https://[2001:1::1]/return',
-          cancelUrl: 'https://[3fff::1]/cancel',
+          returnUrl: 'https://[2001:30::1]/return',
+          cancelUrl: 'https://[2606:4700:4700::1111]/cancel',
         },
       ],
     });
