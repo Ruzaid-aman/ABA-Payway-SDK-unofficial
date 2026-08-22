@@ -6,6 +6,7 @@
  */
 
 import type { AgentCommandResultV1 } from './contracts.js';
+import type { CreatePlanConfirmation } from './orchestrator.js';
 import { validateCommandResult } from './schemas.js';
 
 export function renderHumanResult(result: AgentCommandResultV1): string {
@@ -58,4 +59,20 @@ export function serializeCommandResult(result: AgentCommandResultV1): string {
     throw new Error('Internal: serialized AgentCommandResultV1 failed validation');
   }
   return serialized;
+}
+
+/** Render the complete, scrubbed proposal shown at the interactive CLI boundary. */
+export function renderCreatePlanConfirmation(proposal: CreatePlanConfirmation): string {
+  const lines = ['Create plan proposal', `Context: ${proposal.context}`, `Request: ${proposal.request}`];
+  for (const action of proposal.actions) {
+    lines.push(`Route: ${action.route}`);
+    lines.push(`Money: ${action.money}`);
+    lines.push(`Transaction ID: ${action.transactionIdStrategy}`);
+    if (action.lifetime !== undefined) lines.push(`Lifetime: ${action.lifetime} seconds`);
+    lines.push(`URLs: ${action.urls.length > 0 ? action.urls.join('; ') : 'none'}`);
+    lines.push(`Artifacts: ${action.artifacts.join('; ') || 'none'}`);
+  }
+  lines.push(`Assumptions: ${proposal.assumptions.join('; ') || 'none'}`);
+  lines.push(`Plan context: ${Object.keys(proposal.planContext).length > 0 ? JSON.stringify(proposal.planContext) : 'none'}`);
+  return lines.join('\n');
 }

@@ -13,6 +13,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createInteractivePlanConfirmation, promptConfirm } from '../cli/commands/agent.js';
 import type { ResolvedPayWayContext } from '../agent/context.js';
 import type { AgentPlanV1, ProviderConfigV1 } from '../agent/contracts.js';
 import { AgentOrchestrator, type OrchestratorDeps, type OrchestratorOptions } from '../agent/orchestrator.js';
@@ -270,6 +271,123 @@ describe('AgentOrchestrator — provider failure / invalid plan', () => {
 });
 
 describe('AgentOrchestrator — consent', () => {
+  it('executes a TTY create only after its fresh confirmation callback accepts the complete proposal', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = createOrchestrator({ context: makeContext(), provider });
+    let proposal: unknown;
+
+    const result = await orch.runOneShot(
+      'pay $3',
+      {
+        ...baseOptions({ tty: true, payway }),
+        confirmCreatePlan: async (candidate: unknown) => {
+          proposal = candidate;
+          return true;
+        },
+      } as OrchestratorOptions,
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(calls.generateQr).toBe(1);
+    expect(proposal).toMatchObject({
+      context: 'profile: test (sandbox)',
+      actions: [
+        {
+          route: 'generate_online_qr',
+          money: '3 USD',
+          transactionIdStrategy: 'generated after confirmation',
+          lifetime: 900,
+          urls: ['callback: https://pay.example.com/cb'],
+        },
+      ],
+    });
+  });
+
+  it('records a declined TTY create confirmation and leaves the session usable without a PayWay call', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = createOrchestrator({ context: makeContext(), provider });
+    const sessionId = 'declined-confirmation-session';
+
+    const result = await orch.runTurn(
+      sessionId,
+      'pay $3',
+      {
+        ...baseOptions({ tty: true, payway }),
+        confirmCreatePlan: async () => false,
+      } as OrchestratorOptions,
+    );
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(calls.generateQr).toBe(0);
+    const { loadSession } = await import('../agent/sessions.js');
+    expect(loadSession(sessionId)?.events.some((event) => event.type === 'cancellation')).toBe(true);
+
+    const retry = await orch.runTurn(sessionId, 'pay $3', baseOptions({ flag: 'approve', payway }));
+    expect(retry.status).toBe('succeeded');
+    expect(calls.generateQr).toBe(1);
+  });
+
+  it('does not execute a PayWay create when the real confirmation prompt reaches EOF', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = createOrchestrator({ context: makeContext(), provider });
+    const confirmation = createInteractivePlanConfirmation((message) =>
+      promptConfirm(message, () => ({
+        question: (_prompt, callback) => (callback as (answer: string) => void)(undefined as never),
+        close: () => undefined,
+      })),
+    );
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ tty: true, payway, confirmCreatePlan: confirmation }));
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(calls.generateQr).toBe(0);
+  });
+
+  it('records cancellation and makes no PayWay call when the real confirmation prompt answers n', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = createOrchestrator({ context: makeContext(), provider });
+    const confirmation = createInteractivePlanConfirmation((message) =>
+      promptConfirm(message, () => ({
+        question: (_prompt, callback) => (callback as (answer: string) => void)('n'),
+        close: () => undefined,
+      })),
+    );
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ tty: true, payway, confirmCreatePlan: confirmation }));
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(calls.generateQr).toBe(0);
+    const { loadSession } = await import('../agent/sessions.js');
+    expect(loadSession(result.sessionId ?? '')?.events.some((event) => event.type === 'cancellation')).toBe(true);
+  });
+
+  it('uses a generic warning when an interactive confirmation callback fails', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = createOrchestrator({ context: makeContext(), provider });
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const result = await orch.runOneShot(
+      'pay $3',
+      baseOptions({
+        tty: true,
+        payway,
+        confirmCreatePlan: async () => {
+          throw new Error('raw-confirmation-secret');
+        },
+      }),
+    );
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(calls.generateQr).toBe(0);
+    expect(warning).toHaveBeenCalledWith('Confirmation prompt failed; treating the create plan as declined.');
+    expect(warning.mock.calls.flat().join(' ')).not.toContain('raw-confirmation-secret');
+  });
+
   it('non-TTY without --approve => needs_confirmation and zero PayWay calls', async () => {
     const provider = new FakeProvider(async () => onlineQrPlan());
     const { payway, calls } = makePayWay();
@@ -296,6 +414,34 @@ describe('AgentOrchestrator — consent', () => {
     expect(result.status).toBe('needs_confirmation');
     expect(calls.generateQr).toBe(0);
     expect(validateCommandResult(result)).toBe(true);
+  });
+
+  it('never treats production --yolo as interactive confirmation authority', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = createOrchestrator({
+      context: makeContext({ environment: 'production' }),
+      provider,
+    });
+    let confirmations = 0;
+
+    const result = await orch.runOneShot(
+      'pay $3',
+      baseOptions({
+        tty: true,
+        flag: 'yolo',
+        environment: 'production',
+        payway,
+        confirmCreatePlan: async () => {
+          confirmations++;
+          return true;
+        },
+      }),
+    );
+
+    expect(result.status).toBe('blocked');
+    expect(confirmations).toBe(0);
+    expect(calls.generateQr).toBe(0);
   });
 });
 
@@ -357,6 +503,7 @@ describe('AgentOrchestrator — polling offer', () => {
     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
 
     expect(result.status).toBe('succeeded');
-    expect(result.message).toMatch(/poll/i);
+    expect(result.message).toContain('poll_transaction action');
+    expect(result.message).not.toContain('agent poll');
   });
 });

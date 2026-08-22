@@ -30,7 +30,7 @@ import type {
 } from './contracts.js';
 import { type ExecutionContext, executeAction, type ToolExecutionResult } from './executor.js';
 import { confirmExecution, createExecutionRecord } from './ledger.js';
-import { renderHumanResult, serializeCommandResult } from './output.js';
+import { renderCreatePlanConfirmation, renderHumanResult, serializeCommandResult } from './output.js';
 import { normalizePlan } from './planning.js';
 import { scrubSensitive } from './privacy.js';
 import type { ProviderAdapter } from './provider.js';
@@ -44,6 +44,29 @@ export interface OrchestratorOptions {
   flag?: 'approve' | 'yolo';
   environment?: 'sandbox' | 'production';
   payway?: PayWay;
+  /**
+   * CLI-owned confirmation boundary for unflagged interactive create plans.
+   * Core orchestration supplies only a complete, scrubbed proposal and never
+   * performs terminal I/O itself.
+   */
+  confirmCreatePlan?: (proposal: CreatePlanConfirmation) => Promise<boolean>;
+}
+
+export interface CreatePlanConfirmationAction {
+  route: AgentToolName;
+  money: string;
+  transactionIdStrategy: string;
+  lifetime?: number;
+  urls: string[];
+  artifacts: string[];
+}
+
+export interface CreatePlanConfirmation {
+  request: string;
+  context: string;
+  actions: CreatePlanConfirmationAction[];
+  assumptions: string[];
+  planContext: Record<string, unknown>;
 }
 
 export interface OrchestratorDeps {
@@ -269,23 +292,49 @@ export class AgentOrchestrator {
       created.push({ index, record });
     });
 
-    // 7. Authorize. Non-TTY -> needs_confirmation; TTY -> blocked. No PayWay call.
+    // 7. Authorize. An unflagged TTY can receive a fresh, CLI-owned
+    // confirmation callback. No PayWay call is made if it is rejected or
+    // absent. Production --yolo is never eligible for this path.
     const authorization = authorizePlan(normalized.plan, {
       tty: options.tty,
       flag: options.flag,
       environment: options.environment ?? this.context.environment,
     });
-    if (!authorization.authorized) {
+    let authorized = authorization.authorized;
+    if (!authorized && options.tty && !options.flag && options.confirmCreatePlan) {
+      let confirmed = false;
+      try {
+        confirmed = await options.confirmCreatePlan(this.createPlanConfirmation(storedPlan, request));
+      } catch (_error) {
+        console.warn('Confirmation prompt failed; treating the create plan as declined.');
+      }
+      this.appendEvent(sessionId, 'confirmation', { accepted: confirmed, plan: storedPlan });
+      if (confirmed) {
+        authorized = true;
+      } else {
+        this.appendEvent(sessionId, 'cancellation', { request, reason: 'interactive confirmation declined' });
+        return this.result({
+          status: 'needs_confirmation',
+          sessionId,
+          message: 'Create plan cancelled. The session remains usable and no payment was created.',
+          plan: normalized.plan,
+          executionIds: created.map((entry) => entry.record.executionId),
+          request,
+        });
+      }
+    }
+    if (!authorized) {
       const status = options.tty ? 'blocked' : 'needs_confirmation';
       return this.result({
         status,
         sessionId,
         message: `Approval required: ${authorization.reason}`,
         plan: normalized.plan,
-        executionIds: created.map((c) => c.record.executionId),
+        executionIds: created.map((entry) => entry.record.executionId),
         request,
       });
     }
+
     // 8. Materialize IDs: confirm each create record (planned -> confirmed) and
     //    bind the generated transactionId into a materialized plan.
     const materializedActions = normalized.plan.actions.map(
@@ -409,7 +458,7 @@ export class AgentOrchestrator {
       status = 'succeeded';
       message = pollOffered
         ? 'Online QR generated and saved. You can poll the transaction to detect payment ' +
-          '(run the poll_transaction action or `agent poll`); I will not auto-poll.'
+          '(run the poll_transaction action); I will not auto-poll.'
         : 'Command completed.';
     }
 
@@ -432,6 +481,63 @@ export class AgentOrchestrator {
     const summary = buildDeterministicSummary(session, this.secretValues());
     const scrubbed = this.scrub(JSON.parse(summary)) as Record<string, unknown>;
     return JSON.stringify(scrubbed);
+  }
+
+  private createPlanConfirmation(plan: AgentPlanV1, request: string): CreatePlanConfirmation {
+    const actions = plan.actions
+      .filter((action) => isCreateTool(toolOf(action)))
+      .map((action) => {
+        const fields = action as AgentActionDraft & Record<string, unknown>;
+        const urls = [
+          ['callback', fields.callbackUrl],
+          ['return', fields.returnUrl],
+          ['cancel', fields.cancelUrl],
+        ]
+          .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== '')
+          .map(([label, value]) => `${label}: ${value}`);
+        const amount = typeof fields.amount === 'number' && typeof fields.currency === 'string'
+          ? `${fields.amount} ${fields.currency}`
+          : 'not applicable';
+        const transactionIdStrategy = 'transactionId' in fields
+          ? fields.transactionId === null
+            ? 'generated after confirmation'
+            : 'provider-supplied transaction ID will be used'
+          : 'not used for this route';
+        const artifacts = this.artifactsForCreateTool(toolOf(action));
+        return {
+          route: toolOf(action),
+          money: amount,
+          transactionIdStrategy,
+          ...(typeof fields.lifetime === 'number' ? { lifetime: fields.lifetime } : {}),
+          urls,
+          artifacts,
+        };
+      });
+
+    return {
+      request,
+      context: this.context.displayLabel,
+      actions,
+      assumptions: plan.assumptions ?? [],
+      planContext: plan.context ?? {},
+    };
+  }
+
+  private artifactsForCreateTool(tool: AgentToolName): string[] {
+    switch (tool) {
+      case 'generate_online_qr':
+        return ['QR image and metadata will be saved locally'];
+      case 'generate_offline_khqr':
+        return ['KHQR payload will be returned'];
+      case 'create_checkout_payload':
+        return ['checkout payload will be returned'];
+      case 'create_checkout_purchase':
+        return ['checkout purchase response will be returned'];
+      case 'create_payment_link':
+        return ['payment link response will be returned'];
+      default:
+        return [];
+    }
   }
 
   private secretValues(): string[] {
@@ -489,4 +595,4 @@ export class AgentOrchestrator {
   }
 }
 
-export { ProviderProposalError, renderHumanResult, serializeCommandResult };
+export { ProviderProposalError, renderCreatePlanConfirmation, renderHumanResult, serializeCommandResult };

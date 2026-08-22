@@ -13,7 +13,13 @@ import readline from 'node:readline';
 import type { Command } from 'commander';
 import { readAgentConfig } from './config.js';
 import { resolvePayWayContext } from './context.js';
-import { AgentOrchestrator, renderHumanResult, serializeCommandResult } from './orchestrator.js';
+import {
+  AgentOrchestrator,
+  renderCreatePlanConfirmation,
+  renderHumanResult,
+  serializeCommandResult,
+  type CreatePlanConfirmation,
+} from './orchestrator.js';
 import { createProviderAdapter } from './provider.js';
 
 // The REPL re-dispatches recognized commands through the shared Commander
@@ -41,7 +47,7 @@ const PROMPT = `${c.cyan('payway-agent>')} `;
 const HELP = `
 ${c.bold('REPL directives')}
   :help              Show this help
-  :profile           Show the active credential profile
+  :profile [name]    Show the active credential profile, or switch to a named profile
   :history           Show command history
   :clear             Clear the screen
   :session           Show / create the active session id
@@ -67,8 +73,9 @@ function safeParseArgs(rest: string): string[] {
 }
 
 export async function startRepl(options: { profile?: string; sessionId?: string }): Promise<void> {
-  const profile = options.profile ?? process.env.PAYWAY_PROFILE ?? undefined;
-  const context = resolvePayWayContext({ profile });
+  let profile = options.profile ?? process.env.PAYWAY_PROFILE ?? undefined;
+  let context = resolvePayWayContext({ profile });
+  profile = context.profileName ?? profile;
 
   const rl = readline.createInterface({
     input: process.stdin as unknown as NodeJS.ReadableStream,
@@ -165,6 +172,18 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
       console.log(`  profile: ${c.cyan(profile ?? '(none)')}  ${c.dim(`(${context.displayLabel})`)}`);
       return;
     }
+    if (trimmed.startsWith(':profile ')) {
+      const requestedProfile = trimmed.slice(':profile '.length).trim();
+      const resolved = resolvePayWayContext({ profile: requestedProfile });
+      if (resolved.profileName !== requestedProfile) {
+        console.log(`  ${c.red('✗')} Profile '${requestedProfile}' does not exist.`);
+        return;
+      }
+      profile = requestedProfile;
+      context = resolved;
+      console.log(`  profile: ${c.cyan(profile)}  ${c.dim(`(${context.displayLabel})`)}`);
+      return;
+    }
     if (trimmed === ':session') {
       if (!sessionId) {
         const { createSession } = await import('./sessions.js');
@@ -190,12 +209,18 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
       );
       return;
     }
+    // Provider and orchestrator are reconstructed for every turn so a prior
+    // :profile switch cannot retain stale credentials or display labels.
     const provider = createProviderAdapter(config);
     const orchestrator = new AgentOrchestrator({ context, provider, sessionId, providerConfig: config });
-    const result = await orchestrator.runTurn(sessionId ?? 'repl', trimmed, {
+    const runOptions = {
       tty: Boolean(process.stdout.isTTY),
       environment: context.environment,
-    });
+      ...(process.stdout.isTTY ? { confirmCreatePlan } : {}),
+    };
+    const result = sessionId
+      ? await orchestrator.runTurn(sessionId, trimmed, runOptions)
+      : await orchestrator.runOneShot(trimmed, runOptions);
     if (!process.stdout.isTTY) {
       console.log(serializeCommandResult(result));
     } else {
@@ -234,6 +259,13 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
     return new Promise<string | null>((resolve) => {
       resolveLine = resolve;
     });
+  }
+
+  async function confirmCreatePlan(proposal: CreatePlanConfirmation): Promise<boolean> {
+    console.log(`\n${renderCreatePlanConfirmation(proposal)}`);
+    process.stdout.write('Execute this create plan? (y/N): ');
+    const answer = await nextLine();
+    return answer?.trim().toLowerCase() === 'y';
   }
 
   while (running) {

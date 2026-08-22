@@ -17,7 +17,13 @@ import type { Command } from 'commander';
 import { readAgentConfig, updateAgentConfig } from '../../agent/config.js';
 import { resolvePayWayContext } from '../../agent/context.js';
 import type { AgentCommandResultV1, CapabilityMode, ProviderConfigV1, ProviderPreset } from '../../agent/contracts.js';
-import { AgentOrchestrator, renderHumanResult, serializeCommandResult } from '../../agent/orchestrator.js';
+import {
+  AgentOrchestrator,
+  renderCreatePlanConfirmation,
+  renderHumanResult,
+  serializeCommandResult,
+  type CreatePlanConfirmation,
+} from '../../agent/orchestrator.js';
 import { createProviderAdapter, type ProviderConnectivity } from '../../agent/provider.js';
 import { evaluateReadiness } from '../../agent/readiness.js';
 import { setAgentProgram, startRepl } from '../../agent/repl.js';
@@ -64,14 +70,31 @@ function marker(state: CapabilityState | 'blocked'): string {
   }
 }
 
-function promptConfirm(message: string): Promise<boolean> {
-  const rl = readline.createInterface({ input: process.stdin as unknown as NodeJS.ReadableStream, output: process.stdout as unknown as NodeJS.WritableStream, terminal: false });
+type ConfirmationReadline = Pick<readline.Interface, 'question' | 'close'>;
+type CreateConfirmationReadline = () => ConfirmationReadline;
+
+export function promptConfirm(
+  message: string,
+  createReadline: CreateConfirmationReadline = () =>
+    readline.createInterface({
+      input: process.stdin as unknown as NodeJS.ReadableStream,
+      output: process.stdout as unknown as NodeJS.WritableStream,
+      terminal: false,
+    }),
+): Promise<boolean> {
+  const rl = createReadline();
   return new Promise<boolean>((resolve) => {
     rl.question(message, (answer) => {
       rl.close();
-      resolve(answer.trim().toLowerCase() === 'y');
+      resolve(typeof answer === 'string' && answer.trim().toLowerCase() === 'y');
     });
   });
+}
+
+export function createInteractivePlanConfirmation(
+  prompt: (message: string) => Promise<boolean> = promptConfirm,
+): (proposal: CreatePlanConfirmation) => Promise<boolean> {
+  return (proposal) => prompt(`${renderCreatePlanConfirmation(proposal)}\n\nExecute this create plan? (y/N): `);
 }
 
 /** Register the agentic command tree on the given Commander program. */
@@ -139,6 +162,11 @@ export function registerAgentCommands(program: Command): void {
         tty,
         flag,
         environment: context.environment,
+        ...(tty && !flag
+          ? {
+              confirmCreatePlan: createInteractivePlanConfirmation(),
+            }
+          : {}),
       });
 
       if (!tty) {
