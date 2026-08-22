@@ -356,32 +356,40 @@ const qrCode = await payway.qr.generateQr({
 
 ### 3.1 Offline QR Generation (`payway.khqr.generateOfflineQR`)
 
-Generate a merchant-scannable QR string entirely offline without calling PayWay. This is useful when you need a local QR payload for QR rendering or deep linking without an API request.
-
-> ⚠️ **Not official Bakong KHQR:** this helper produces a **custom TLV-encoded QR string** with a CRC-16 checksum. It will **not** be readable by generic consumer banking apps. Use `payway.qr.generateQr()` for PayWay-issued dynamic KHQR codes.
+Generate an official ABA KHQR payload locally, without a PayWay API call. It requires ABA-issued merchant data: it never derives tags `30` or `62.68` from PayWay API credentials. Configure those values explicitly in `new PayWay({ khqr: ... })`, through the seven `PAYWAY_KHQR_*` environment variables, or in a local CLI profile. Explicit constructor fields take priority over environment values.
 
 ```typescript
 import { PayWay } from 'aba-payway-ts';
 
 const payway = new PayWay({
-  merchantId: 'M001',
-  apiKey: 'secret',
-  environment: 'sandbox',
+  merchantId: process.env.PAYWAY_MERCHANT_ID!,
+  apiKey: process.env.PAYWAY_API_KEY!,
+  khqr: {
+    bakongId: 'your-bakong-id',
+    abaMerchantId: 'your-aba-merchant-id',
+    acquirerName: 'acquirer-name-provided-by-aba',
+    merchantCategoryCode: '5999',
+    merchantName: 'your-merchant-name',
+    merchantCity: 'your-merchant-city',
+    paywayData: 'payway-template-data-provided-by-aba',
+  },
 });
 
+const readiness = payway.khqr.validateConfiguration();
+if (!readiness.ready) throw new Error(readiness.issues.map((issue) => issue.code).join(', '));
+
 const qrString = payway.khqr.generateOfflineQR({
-  merchantId: 'M001',
-  transactionId: 'qr-order-123',
   amount: 1.50,
   currency: 'USD',
   merchantRef: 'REF-123',
-  tipAmount: 0.25,
-  feeAmount: 0.10,
-  transactionType: 'purchase',
 });
 
 console.log(qrString);
 ```
+
+With `amount`, the payload is dynamic (`01=12` and tag `54`); without it, it is static (`01=11`). The payload contains ABA merchant data in nested tag `30`, your reference in `62.01`, ABA-provided PayWay data in `62.68`, timestamp data in `99`, and a CRC in `63`. Generation is local only: it neither submits the QR nor confirms payment status.
+
+Earlier SDK releases emitted a private offline TLV format. This method now produces official ABA KHQR, so remove legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments. Obtain the required fields from ABA before deploying; do not copy sample values from another merchant.
 
 ### 4. Payment Link (`payway.paymentLink`)
 

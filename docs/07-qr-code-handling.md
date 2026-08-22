@@ -259,9 +259,9 @@ export default router;
 
 ---
 
-## KHQR Offline Generation (No API Call Required)
+## Official ABA KHQR Offline Generation (No API Call Required)
 
-The SDK also supports generating KHQR QR codes **entirely offline** — no API call to PayWay needed. This is faster and works even if PayWay is temporarily unreachable.
+The SDK can construct an official ABA KHQR payload entirely locally. This makes no HTTP request, so it does not submit, track, or reconcile a payment. It requires ABA-provided merchant configuration; API credentials are not a substitute for the nested merchant-account tag `30` or PayWay data tag `62.68`.
 
 ```typescript
 import { PayWay } from 'aba-payway-ts';
@@ -269,14 +269,22 @@ import { PayWay } from 'aba-payway-ts';
 const payway = new PayWay({
   merchantId: process.env.PAYWAY_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_API_KEY!,
-  environment: 'sandbox',
+  khqr: {
+    bakongId: process.env.PAYWAY_KHQR_BAKONG_ID,
+    abaMerchantId: process.env.PAYWAY_KHQR_ABA_MERCHANT_ID,
+    acquirerName: process.env.PAYWAY_KHQR_ACQUIRER_NAME,
+    merchantCategoryCode: process.env.PAYWAY_KHQR_MERCHANT_CATEGORY_CODE,
+    merchantName: process.env.PAYWAY_KHQR_MERCHANT_NAME,
+    merchantCity: process.env.PAYWAY_KHQR_MERCHANT_CITY,
+    paywayData: process.env.PAYWAY_KHQR_PAYWAY_DATA,
+  },
 });
 
-// Generate a KHQR QR string entirely offline
-// Uses EMVCo TLV encoding + CRC-16 CCITT checksum
+const readiness = payway.khqr.validateConfiguration();
+if (!readiness.ready) throw new Error(readiness.issues.map((issue) => issue.code).join(', '));
+
+// Generate an official ABA KHQR string locally.
 const qrString = payway.khqr.generateOfflineQR({
-  merchantId: process.env.PAYWAY_MERCHANT_ID!,
-  transactionId: `order-${Date.now()}`,
   amount: 15.00,
   currency: 'USD',
   merchantRef: 'REF-123', // Your internal reference
@@ -291,7 +299,11 @@ console.log(qrString);
 // const dataUri = await QRCode.toDataURL(qrString);
 ```
 
-> ⚠️ **Important:** Offline-generated QRs cannot be tracked by PayWay for status. They encode the payment data directly into the QR payload. Use the API-based `generateQr()` if you need server-side status tracking.
+The seven configuration fields can be supplied in the constructor (highest priority), environment (`PAYWAY_KHQR_BAKONG_ID`, `PAYWAY_KHQR_ABA_MERCHANT_ID`, `PAYWAY_KHQR_ACQUIRER_NAME`, `PAYWAY_KHQR_MERCHANT_CATEGORY_CODE`, `PAYWAY_KHQR_MERCHANT_NAME`, `PAYWAY_KHQR_MERCHANT_CITY`, and `PAYWAY_KHQR_PAYWAY_DATA`), or an optional local CLI profile. Keep them private and obtain them from ABA; do not infer or reuse another merchant's values.
+
+Omit `amount` for a static QR (`01=11`); provide it for a dynamic QR (`01=12` with tag `54`). The payload uses byte-aware TLV lengths, includes merchant reference `62.01`, ABA-provided PayWay data `62.68`, and CRC tag `63`. Earlier SDK versions used a private offline format; migrate by removing legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments.
+
+> ⚠️ **Important:** Offline-generated QRs cannot be tracked by PayWay for status. For server-side status tracking, use the API-based `generateQr()`. A payment notification, when ABA has provisioned one, still needs separate reconciliation.
 
 ---
 
@@ -547,7 +559,7 @@ console.log(info);
 |---|---|
 | **Physical POS (customer scans from phone screen)** | Use API-based `generateQr()` with polling |
 | **E-commerce (customer scans with phone camera)** | Use API-based `generateQr()` with polling and webhook |
-| **Static QR on invoice (same QR for multiple payments)** | Use offline `generateOfflineQR()` — no expiry |
+| **Static QR on invoice (same QR for multiple payments)** | Use configured offline `generateOfflineQR()` without `amount`; reconcile payments independently |
 | **Telegram bot / messaging** | Send `qrImage` as a photo message |
 | **Mobile app (display QR to another device)** | Use `qrString` with a native QR renderer |
 

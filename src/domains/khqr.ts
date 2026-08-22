@@ -1,11 +1,21 @@
 import { ENDPOINTS } from '../constants.js';
-import { filterParams, validateTransactionId, validatePositiveAmount, validateCurrency } from '../utils.js';
+import { filterParams } from '../utils.js';
 import type { components } from '../types.js';
 import type { PayWayConfig } from '../client.js';
 import { generateOfflineQR, type GenerateOfflineQrParams } from '../khqr-offline.js';
+import {
+  validateKhqrCallbackSetup,
+  validateKhqrConfiguration,
+  type KhqrCallbackReadiness,
+  type KhqrCallbackValidationOptions,
+  type KhqrConfigurationReadiness,
+  type KhqrMerchantConfiguration,
+} from '../khqr-config.js';
 
 export interface KhqrDomain {
   generateOfflineQR: (params: GenerateOfflineQrParams) => string;
+  validateConfiguration: () => KhqrConfigurationReadiness;
+  validateCallbackSetup: (options?: KhqrCallbackValidationOptions) => KhqrCallbackReadiness;
   getTransactionsByMerchantRef: (
     merchantRef: string,
     requestTime?: string,
@@ -13,7 +23,7 @@ export interface KhqrDomain {
 }
 
 export function createKhqrDomain(
-  _config: PayWayConfig,
+  config: PayWayConfig,
   request: <TResponse>(
     path: string,
     body: Record<string, unknown>,
@@ -23,18 +33,17 @@ export function createKhqrDomain(
     hashEncoding?: 'base64' | 'hex',
   ) => Promise<TResponse>,
 ): KhqrDomain {
+  const configuration: KhqrMerchantConfiguration | undefined = config.khqr;
+
   return {
     generateOfflineQR: (params: GenerateOfflineQrParams) => {
-      // Basic validation for offline QR params
-      validateTransactionId(params.transactionId);
-      validatePositiveAmount(params.amount, params.currency);
-      validateCurrency(params.currency);
-      if (typeof params.merchantId !== 'string' || params.merchantId.length === 0) {
-        throw new Error('merchantId is required for offline QR generation');
-      }
-
-      return generateOfflineQR(params);
+      return generateOfflineQR(params, configuration);
     },
+
+    validateConfiguration: () => validateKhqrConfiguration(configuration),
+
+    validateCallbackSetup: (options: KhqrCallbackValidationOptions = {}) =>
+      validateKhqrCallbackSetup(configuration?.callback, options),
 
     getTransactionsByMerchantRef: (merchantRef: string, requestTime?: string) => {
       if (typeof merchantRef !== 'string' || merchantRef.trim().length === 0) {

@@ -134,10 +134,8 @@ describe('Validation: khqr', () => {
     expect(() => khqr.getTransactionsByMerchantRef('')).toThrow();
   });
 
-  it('throws when generateOfflineQR has invalid params', () => {
-    expect(() =>
-      khqr.generateOfflineQR({ merchantId: '', transactionId: 'T1', amount: -1, currency: 'USD', merchantRef: 'r' }),
-    ).toThrow();
+  it('throws a KHQR readiness error when configuration is unavailable', () => {
+    expect(() => khqr.generateOfflineQR({ currency: 'USD', merchantRef: 'r' })).toThrow(/KHQR_.*_REQUIRED/);
   });
 
   it('calls request for getTransactionsByMerchantRef when merchantRef is valid', async () => {

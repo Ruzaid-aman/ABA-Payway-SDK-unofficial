@@ -9,6 +9,7 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import type { WebhookStorage } from './storage.js';
 import { verifyCallbackSignature } from '../auth.js';
+import { parseKhqrPaymentNotification } from './khqr-notification.js';
 
 export interface WebhookServerOptions {
   /** Port to listen on (default: 8443). */
@@ -17,6 +18,11 @@ export interface WebhookServerOptions {
   apiKey?: string;
   /** Suppress console output. */
   quiet?: boolean;
+  /** Offline ABA KHQR notification listener settings. */
+  khqr?: {
+    /** Dedicated path to prevent conflating KHQR notifications with checkout callbacks. */
+    path?: string;
+  };
 }
 
 export interface WebhookServerResult {
@@ -31,6 +37,7 @@ export interface WebhookServerResult {
 }
 
 const WEBHOOK_PATH = '/aba-payway-webhook';
+const KHQR_WEBHOOK_PATH = '/aba-payway-khqr-webhook';
 
 export function createWebhookServer(
   storage: WebhookStorage,
@@ -39,6 +46,10 @@ export function createWebhookServer(
   const port = options.port ?? 8443;
   const apiKey = options.apiKey;
   const quiet = options.quiet ?? false;
+  const khqrPath = options.khqr?.path ?? KHQR_WEBHOOK_PATH;
+  if (khqrPath === WEBHOOK_PATH) {
+    throw new Error(`KHQR webhook path must differ from the legacy ${WEBHOOK_PATH} route`);
+  }
 
   let server: Server | null = null;
   let running = false;
@@ -57,10 +68,11 @@ export function createWebhookServer(
   }
 
   function handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    // Only accept POST on the webhook path
-    if (req.method !== 'POST' || req.url !== WEBHOOK_PATH) {
-      res.writeHead(req.url === WEBHOOK_PATH ? 405 : 404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: req.url === WEBHOOK_PATH ? 'Method not allowed' : 'Not found' }));
+    const isOnlineWebhook = req.url === WEBHOOK_PATH;
+    const isKhqrWebhook = req.url === khqrPath;
+    if (req.method !== 'POST' || (!isOnlineWebhook && !isKhqrWebhook)) {
+      res.writeHead(isOnlineWebhook || isKhqrWebhook ? 405 : 404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: isOnlineWebhook || isKhqrWebhook ? 'Method not allowed' : 'Not found' }));
       return;
     }
 
@@ -76,25 +88,51 @@ export function createWebhookServer(
 
         const sourceIp = req.socket?.remoteAddress;
 
-        // Attempt signature verification (log only, never reject)
+        if (isKhqrWebhook) {
+          // Persist the delivery before parsing it: malformed JSON and future ABA
+          // schema changes must never discard the raw audit record.
+          const record = storage.save({ headers, body, sourceIp });
+          // This notification has no published ABA authentication contract. Parsing
+          // is capture metadata only; it must never decide that an order is paid.
+          let khqr: import('./storage.js').KhqrWebhookMetadata;
+          try {
+            const parsed = parseKhqrPaymentNotification(JSON.parse(body));
+            const duplicateTransactionId = storage.getAll().some(
+              (record) => record.khqr?.parsed?.notification.transactionId === parsed.notification.transactionId,
+            );
+            khqr = { parsed, duplicateTransactionId };
+          } catch (error) {
+            khqr = { parseError: error instanceof Error ? error.message : String(error) };
+          }
+
+          if (storage.updateKhqrMetadata) {
+            try {
+              storage.updateKhqrMetadata(record.id, khqr);
+            } catch (error) {
+              log(`  Unable to store KHQR parse metadata: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+          log(`  Received offline KHQR notification [${record.id}] at ${record.receivedAt}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ acknowledged: true, id: record.id }));
+          return;
+        }
+
+        // Online checkout callback behavior remains unchanged.
         let signatureValid: boolean | null = null;
         const receivedSignature = req.headers['x-payway-hmac-sha512'];
         if (apiKey && typeof receivedSignature === 'string') {
           try {
             const bodyObj = JSON.parse(body) as Record<string, unknown>;
-            // Strip hash field before verification (PayWay convention)
             const signedBody = { ...bodyObj };
             delete signedBody.hash;
             signatureValid = verifyCallbackSignature(signedBody, receivedSignature, apiKey);
           } catch {
             signatureValid = false;
           }
-          log(
-            `  Signature: ${signatureValid ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}`,
-          );
+          log(`  Signature: ${signatureValid ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}`);
         }
 
-        // Store raw payload
         const record = storage.save({ headers, body, sourceIp });
 
         log(`  Received callback [${record.id}] at ${record.receivedAt}`);

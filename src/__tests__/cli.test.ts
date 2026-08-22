@@ -1,5 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -10,6 +11,37 @@ const temporaryDirectories: string[] = [];
 function stripAnsi(s: string): string {
   const esc = String.fromCharCode(27);
   return s.replace(new RegExp(`${esc}\\[[0-9;]*m`, 'g'), '');
+}
+
+function runBuiltCli(
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), ...args], {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => (stdout += chunk));
+    child.stderr.on('data', (chunk: string) => (stderr += chunk));
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error('built CLI did not exit within 4 seconds'));
+    }, 4_000);
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on('close', (status) => {
+      clearTimeout(timeout);
+      resolve({ status, stdout, stderr });
+    });
+  });
 }
 
 afterEach(() => {
@@ -199,9 +231,25 @@ describe('built CLI', () => {
     expect(output).toContain('PAYWAY_API_KEY');
   });
 
-  it('does NOT require credentials for offline QR generation', () => {
+  it('generates an official offline ABA KHQR payload from the selected profile', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    const appData = mkdtempSync(path.join(tmpdir(), 'payway-appdata-'));
     temporaryDirectories.push(cwd);
+    temporaryDirectories.push(appData);
+    mkdirSync(path.join(appData, 'aba-payway-sdk'));
+    writeFileSync(
+      path.join(appData, 'aba-payway-sdk', 'profiles.json'),
+      JSON.stringify({
+        activeProfile: 'offline',
+        profiles: [{
+          name: 'offline',
+          khqr: {
+            bakongId: 'merchant@bakong', abaMerchantId: '123456789012345', acquirerName: 'ABA Bank',
+            merchantCategoryCode: '5999', merchantName: 'Example Merchant', merchantCity: 'Phnom Penh', paywayData: 'aba-template',
+          },
+        }],
+      }),
+    );
 
     const result = spawnSync(
       process.execPath,
@@ -213,8 +261,6 @@ describe('built CLI', () => {
         '--currency',
         'USD',
         '--offline',
-        '--merchant-id',
-        'merchant-001',
         '--ref',
         'REF001',
       ],
@@ -224,14 +270,62 @@ describe('built CLI', () => {
         env: {
           PATH: process.env.PATH ?? '',
           SystemRoot: process.env.SystemRoot ?? '',
+          APPDATA: appData,
         },
       },
     );
 
     const output = `${result.stdout}\n${result.stderr}`;
     expect(result.status).toBe(0);
-    expect(output).toContain('Offline QR generated');
+    expect(output).toContain('Offline ABA KHQR generated');
     expect(output).not.toContain('Missing merchant credentials');
+  });
+
+  it('redacts API and ABA KHQR values from profile status', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    const appData = mkdtempSync(path.join(tmpdir(), 'payway-appdata-'));
+    temporaryDirectories.push(cwd, appData);
+    mkdirSync(path.join(appData, 'aba-payway-sdk'));
+    writeFileSync(
+      path.join(appData, 'aba-payway-sdk', 'profiles.json'),
+      JSON.stringify({
+        activeProfile: 'private',
+        profiles: [{
+          name: 'private', merchantId: 'merchant-secret', apiKey: 'api-key-secret',
+          khqr: {
+            bakongId: 'bakong-secret', abaMerchantId: '123456789012345', acquirerName: 'ABA Bank',
+            merchantCategoryCode: '5999', merchantName: 'Example Merchant', merchantCity: 'Phnom Penh', paywayData: 'payway-data-secret',
+          },
+        }],
+      }),
+    );
+
+    for (const command of ['list', 'current']) {
+      const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'profiles', command], {
+        cwd,
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', APPDATA: appData },
+      });
+      const output = `${result.stdout}\n${result.stderr}`;
+      expect(result.status).toBe(0);
+      expect(output).not.toContain('api-key-secret');
+      expect(output).not.toContain('123456789012345');
+      expect(output).not.toContain('payway-data-secret');
+    }
+  });
+
+  it('reports stable KHQR readiness issue codes instead of emitting an offline payload', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+    const result = spawnSync(
+      process.execPath,
+      [path.join(process.cwd(), 'dist', 'cli.js'), 'generate-qr', '--offline', '--ref', 'REF001'],
+      { cwd, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } },
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(output).toContain('KHQR_BAKONG_ID_REQUIRED');
+    expect(output).not.toContain('QR String:');
   });
 
   // -----------------------------------------------------------------------
@@ -317,13 +411,23 @@ describe('built CLI', () => {
   // QR-REQ-03: --non-interactive flag tests
   // -----------------------------------------------------------------------
 
-  it('skips all prompts when --non-interactive is provided', () => {
+  it('generates offline without prompts when --non-interactive is provided', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);
 
     writeFileSync(
       path.join(cwd, '.env'),
-      'PAYWAY_MERCHANT_ID=test-merchant-001\nPAYWAY_API_KEY=test-api-key-123456789012\n',
+      [
+        'PAYWAY_MERCHANT_ID=test-merchant-001',
+        'PAYWAY_API_KEY=test-api-key-123456789012',
+        'PAYWAY_KHQR_BAKONG_ID=merchant@bakong',
+        'PAYWAY_KHQR_ABA_MERCHANT_ID=123456789012345',
+        'PAYWAY_KHQR_ACQUIRER_NAME=ABA Bank',
+        'PAYWAY_KHQR_MERCHANT_CATEGORY_CODE=5999',
+        'PAYWAY_KHQR_MERCHANT_NAME=Example Merchant',
+        'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh',
+        'PAYWAY_KHQR_PAYWAY_DATA=synthetic-template',
+      ].join('\n'),
     );
 
     const result = spawnSync(
@@ -335,8 +439,9 @@ describe('built CLI', () => {
         '1.00',
         '--currency',
         'USD',
-        '--callback-url',
-        'https://example.com/cb',
+        '--offline',
+        '--ref',
+        'NONINTERACTIVE-1',
         '--non-interactive',
       ],
       {
@@ -354,8 +459,78 @@ describe('built CLI', () => {
     // Should NOT show any interactive prompts
     expect(stripAnsi(output)).not.toContain('Submit to PayWay? (y/n)');
     expect(stripAnsi(output)).not.toContain('Modify lifetime?');
-    // Should show non-interactive notice
+    expect(result.status).toBe(0);
     expect(stripAnsi(output)).toContain('non-interactive mode');
+    expect(stripAnsi(output)).toContain('Offline ABA KHQR generated');
+    expect(stripAnsi(output)).toContain('QR String:');
+    expect(stripAnsi(output)).toMatch(/000201010212/);
+  });
+
+  it('generates online through a local API without prompts in non-interactive mode', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+    let requestedPath = '';
+    let requestedBody = '';
+    const mockServer = createServer((request, response) => {
+      requestedPath = request.url ?? '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => (requestedBody += chunk));
+      request.on('end', () => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            status: { code: 0, message: 'OK' },
+            qrString: 'ONLINE-MOCK-KHQR',
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
+    const address = mockServer.address();
+    if (!address || typeof address === 'string') throw new Error('mock server did not bind to a TCP port');
+
+    try {
+      const result = await runBuiltCli(
+        [
+          'generate-qr',
+          '--amount',
+          '1.00',
+          '--currency',
+          'USD',
+          '--transaction-id',
+          'ONLINE-NONINT',
+          '--callback-url',
+          'https://example.com/cb',
+          '--non-interactive',
+          '--no-polling',
+        ],
+        {
+          cwd,
+          env: {
+            PATH: process.env.PATH ?? '',
+            SystemRoot: process.env.SystemRoot ?? '',
+            PAYWAY_MERCHANT_ID: 'test-merchant-001',
+            PAYWAY_API_KEY: 'test-api-key-123456789012',
+            PAYWAY_BASE_URL: `http://127.0.0.1:${address.port}`,
+          },
+        },
+      );
+      const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+
+      expect(result.status, JSON.stringify({ output, requestedPath, requestedBody })).toBe(0);
+      expect(requestedPath).toBe('/api/payment-gateway/v1/payments/generate-qr');
+      expect(JSON.parse(requestedBody)).toMatchObject({ tran_id: 'ONLINE-NONINT', amount: '1.00' });
+      expect(output).toContain('non-interactive mode');
+      expect(output).toContain('Online QR generated via PayWay API');
+      expect(output).toContain('ONLINE-MOCK-KHQR');
+      expect(output).not.toContain('Submit to PayWay? (y/n)');
+      expect(output).not.toContain('Modify lifetime?');
+      expect(output).not.toContain('Cancelled by user');
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        mockServer.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   // -----------------------------------------------------------------------

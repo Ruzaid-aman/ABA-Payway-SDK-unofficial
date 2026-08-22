@@ -24,6 +24,7 @@ import type { PaymentLinkDomain } from './domains/payment-link.js';
 import type { PreAuthDomain } from './domains/pre-auth.js';
 import type { PayoutDomain } from './domains/payout.js';
 import type { KhqrDomain } from './domains/khqr.js';
+import { resolveKhqrConfiguration, type KhqrMerchantConfiguration } from './khqr-config.js';
 
 export type Currency = 'USD' | 'KHR';
 export type Environment = 'sandbox' | 'production';
@@ -61,6 +62,8 @@ export interface PayWayConfig {
   debug?: boolean;
   onRequest?: (endpoint: string, bodyPayload: string) => void;
   onResponse?: (endpoint: string, statusCode: number, body: unknown, rateLimitInfo?: RateLimitInfo) => void;
+  /** ABA-issued merchant data used only for official offline KHQR generation. */
+  khqr?: KhqrMerchantConfiguration;
 }
 
 interface ResolvedPayWayConfig extends PayWayConfig {
@@ -503,6 +506,7 @@ export class PayWay {
       baseUrl: config.baseUrl ?? process.env.PAYWAY_BASE_URL,
       timeout: config.timeout ?? (Number.isNaN(timeoutFromEnv) ? undefined : timeoutFromEnv),
       debug: config.debug ?? debugFromEnv,
+      khqr: resolveKhqrConfiguration(config.khqr),
     };
 
     if (!resolvedConfig.merchantId) {

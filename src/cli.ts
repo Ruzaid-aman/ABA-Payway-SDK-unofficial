@@ -24,11 +24,11 @@ import {
   validatePositiveAmount,
 } from './utils.js';
 import { validateRequiredCredentials, hasBlockingIssues, validatePayWayEnv } from './config/envValidator.js';
-import { generateOfflineQR } from './khqr-offline.js';
 import { PayWayAPIError, PollingAbortedError } from './errors.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
 import {
   addProfile,
+  activateProfile,
   getProfileByName,
   loadProfileStore,
   removeProfile,
@@ -36,6 +36,8 @@ import {
   setDefaultProfile,
 } from './config/profiles.js';
 import { randomBytes } from 'node:crypto';
+import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConfiguration } from './khqr-config.js';
+import { readMaskedInput } from './cli/masked-input.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (no dotenv dependency needed)
@@ -259,17 +261,13 @@ function activateSelectedProfile(command: Command): void {
   if (isProfilesCommand(command)) return;
   const selectedName = program.opts<{ profile?: string }>().profile
     ?? process.env.PAYWAY_PROFILE
-    ?? loadProfileStore().defaultProfile;
+    ?? loadProfileStore().defaultProfile
+    ?? loadProfileStore().activeProfile;
   if (!selectedName) return;
 
   const profile = getProfileByName(loadProfileStore(), selectedName);
   if (!profile) throw new Error(`Credential profile "${selectedName}" does not exist`);
-  process.env.PAYWAY_MERCHANT_ID = profile.merchantId;
-  process.env.PAYWAY_API_KEY = profile.apiKey;
-  process.env.PAYWAY_RSA_PUBLIC_KEY = profile.publicKeyPem ?? '';
-  process.env.PAYWAY_BASE_URL = profile.baseUrl ?? '';
-  process.env.PAYWAY_ENV = profile.environment;
-  process.env.PAYWAY_SANDBOX = profile.environment === 'sandbox' ? 'true' : 'false';
+  activateProfile(profile);
   console.log(`  ${c.dim(`Using profile: ${profile.name} (${profile.environment})`)}`);
 }
 
@@ -594,19 +592,15 @@ program
 program
   .command('generate-qr')
   .description('Generate a QR code (online via PayWay API or offline)')
-  .requiredOption('-a, --amount <number>', 'Payment amount')
+  .option('-a, --amount <number>', 'Payment amount (optional for static offline QR)')
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
-  .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
-  .option('--offline', 'Generate offline QR (no API call, no credentials needed)')
+  .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted; online mode only)')
+  .option('--offline', 'Generate official ABA KHQR offline (no API call)')
   .option('--callback-url <url>', 'Webhook callback URL (required for online mode)')
   .option('--payment-option <option>', 'Payment option for online mode', 'abapay_khqr')
   .option('--template <name>', 'QR image template for online mode', 'template2')
   .option('--lifetime <seconds>', 'Transaction lifetime in seconds (default: 180)', '180')
-  .option('--merchant-id <id>', 'Merchant ID (required for offline mode)')
   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
-  .option('--tip <number>', 'Tip amount (offline only)')
-  .option('--fee <number>', 'Fee amount (offline only)')
-  .option('--type <type>', 'Transaction type: purchase, refund, cash (offline only)', 'purchase')
   .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
   .option('--non-interactive, -y', 'Skip interactive prompts (no confirmation, no lifetime override)')
   .option('--polling', 'Poll transaction status after QR generation (enabled by default)', true)
@@ -616,12 +610,18 @@ program
   .action(async (opts: Record<string, string | undefined>) => {
     console.log(`\n${c.bold('ABA PayWay SDK')} — generate QR code\n`);
 
-    const amount = Number(opts.amount);
+    const amount = opts.amount === undefined ? undefined : Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
     const transactionId =
       opts.transactionId ?? `qr${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!opts.offline && amount === undefined) {
+      console.log(`  ${c.red('✗')} --amount is required for online mode`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
       console.log(
         `  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`,
       );
@@ -635,16 +635,15 @@ program
       return;
     }
 
+    if (opts.nonInteractive) {
+      console.log(`  ${c.dim('(non-interactive mode — skipping prompts)')}`);
+      console.log();
+    }
+
     if (opts.offline) {
       // ── Offline mode ──────────────────────────────────────────────────
-      const merchantId = opts.merchantId;
       const ref = opts.ref;
 
-      if (!merchantId) {
-        console.log(`  ${c.red('✗')} --merchant-id is required for offline mode`);
-        process.exitCode = 1;
-        return;
-      }
       if (!ref) {
         console.log(`  ${c.red('✗')} --ref is required for offline mode`);
         process.exitCode = 1;
@@ -652,25 +651,28 @@ program
       }
 
       try {
-        const qrString = generateOfflineQR({
-          merchantId,
-          transactionId,
-          amount,
+        // The KHQR domain performs only local TLV construction. Placeholder
+        // credentials keep the API-only PayWay constructor contract intact.
+        const payway = new PayWay({
+          merchantId: process.env.PAYWAY_MERCHANT_ID || 'offline-khqr',
+          apiKey: process.env.PAYWAY_API_KEY || 'offline-khqr',
+        });
+        const readiness = payway.khqr.validateConfiguration();
+        if (!readiness.ready) {
+          console.log(`  ${c.red('✗')} ABA KHQR configuration is not ready`);
+          for (const issue of readiness.issues) console.log(`    ${c.red('•')} ${issue.code}: ${issue.message}`);
+          process.exitCode = 1;
+          return;
+        }
+        const qrString = payway.khqr.generateOfflineQR({
+          ...(amount === undefined ? {} : { amount }),
           currency,
           merchantRef: ref,
-          tipAmount: opts.tip ? Number(opts.tip) : undefined,
-          feeAmount: opts.fee ? Number(opts.fee) : undefined,
-          transactionType: (opts.type as 'purchase' | 'refund' | 'cash') ?? 'purchase',
         });
 
-        console.log(`  ${c.green('✓')} Offline QR generated\n`);
-        console.log(`  ${c.bold('Transaction ID:')}  ${c.cyan(transactionId)}`);
-        console.log(`  ${c.bold('Amount:')}           ${c.cyan(`${amount} ${currency}`)}`);
-        console.log(`  ${c.bold('Merchant ID:')}      ${merchantId}`);
+        console.log(`  ${c.green('✓')} Offline ABA KHQR generated\n`);
+        console.log(`  ${c.bold('Amount:')}           ${c.cyan(amount === undefined ? `Static ${currency}` : `${amount} ${currency}`)}`);
         console.log(`  ${c.bold('Reference:')}        ${ref}`);
-        if (opts.tip) console.log(`  ${c.bold('Tip:')}              ${opts.tip} ${currency}`);
-        if (opts.fee) console.log(`  ${c.bold('Fee:')}              ${opts.fee} ${currency}`);
-        console.log(`  ${c.bold('Type:')}             ${opts.type ?? 'purchase'}`);
         console.log();
         console.log(`  ${c.bold('QR String:')}`);
         console.log(`  ${c.dim(qrString)}`);
@@ -681,6 +683,11 @@ program
       }
     } else {
       // ── Online mode ───────────────────────────────────────────────────
+      if (amount === undefined) {
+        // Guarded above; retained for TypeScript's branch-local narrowing.
+        process.exitCode = 1;
+        return;
+      }
       const callbackUrl = opts.callbackUrl || process.env.PAYWAY_CALLBACK_URL?.trim();
 
       if (!callbackUrl) {
@@ -711,10 +718,7 @@ program
 
       let finalLifetime = lifetimeSeconds;
 
-      if (opts.nonInteractive) {
-        console.log(`  ${c.dim('(non-interactive mode — skipping prompts)')}`);
-        console.log();
-      } else {
+      if (!opts.nonInteractive) {
         console.log();
         console.log(`  ${c.bold('Parameters:')}`);
         console.log(`    Amount:           ${c.cyan(`${amount} ${currency}`)}`);
@@ -1051,12 +1055,33 @@ profilesCmd
       const name = (await promptInput(rl, 'Profile name: ')).trim();
       const environment = (await promptInput(rl, 'Environment (sandbox/production): ')).trim().toLowerCase() as 'sandbox' | 'production';
       const merchantId = (await promptInput(rl, 'Merchant ID: ')).trim();
-      const apiKey = (await promptInput(rl, 'API key: ')).trim();
+      const apiKey = (await readMaskedInput('API key: ', { fallback: (prompt) => promptInput(rl, prompt) })).trim();
       const publicKeyPem = (await promptInput(rl, 'RSA public key PEM (optional): ')).trim() || undefined;
       const baseUrl = (await promptInput(rl, 'Base URL override (optional): ')).trim() || undefined;
       const note = (await promptInput(rl, 'Note (optional, max 300 characters): ')).trim() || undefined;
+      const configureKhqr = (await promptInput(rl, 'Configure ABA KHQR offline generation? (y/n): ')).trim().toLowerCase();
+      let khqr: KhqrMerchantConfiguration | undefined;
+      if (configureKhqr === 'y' || configureKhqr === 'yes') {
+        khqr = {
+          bakongId: (await promptInput(rl, 'Bakong ID: ')).trim(),
+          abaMerchantId: (await promptInput(rl, 'ABA merchant ID: ')).trim(),
+          acquirerName: (await promptInput(rl, 'Acquirer name: ')).trim(),
+          merchantCategoryCode: (await promptInput(rl, 'Merchant category code: ')).trim(),
+          merchantName: (await promptInput(rl, 'Merchant name: ')).trim(),
+          merchantCity: (await promptInput(rl, 'Merchant city: ')).trim(),
+          paywayData: (await readMaskedInput('ABA PayWay data: ', { fallback: (prompt) => promptInput(rl, prompt) })).trim(),
+        };
+        const callbackUrl = (await promptInput(rl, 'KHQR callback URL (optional): ')).trim();
+        if (callbackUrl) {
+          khqr.callback = {
+            url: callbackUrl,
+            enrollment: (await promptInput(rl, 'Callback enrollment (not-requested/requested/confirmed-by-merchant): ')).trim() as KhqrCallbackEnrollment,
+            verification: (await promptInput(rl, 'Callback verification (unknown/aba-confirmed-hmac/mTLS/ip-allowlist): ')).trim() as KhqrCallbackVerification,
+          };
+        }
+      }
       const store = loadProfileStore();
-      addProfile(store, { name, environment, merchantId, apiKey, publicKeyPem, baseUrl, note });
+      addProfile(store, { name, environment, merchantId, apiKey, publicKeyPem, baseUrl, note, khqr });
       if (!store.defaultProfile) setDefaultProfile(store, name);
       saveProfileStore(store);
       console.log(`\n${c.green('✓')} Saved profile ${c.cyan(name)} (${environment})`);

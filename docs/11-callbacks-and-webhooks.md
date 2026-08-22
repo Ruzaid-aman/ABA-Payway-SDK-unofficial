@@ -1,33 +1,38 @@
 # Chapter 11 — Callbacks & Webhooks
 
 > **Estimated reading time:** 15 minutes  
-> **Goal:** Build a secure webhook endpoint that verifies PayWay callbacks and updates your database.
+> **Goal:** Build a secure receiver for online checkout callbacks and a separate capture route for unverified offline ABA KHQR notifications.
 
 ---
 
-## What Is a Callback?
+## Callback Types and Trust Boundaries
 
-A **callback** (also called a **webhook**) is a server-to-server HTTP POST request sent by PayWay to your backend when a payment is confirmed, completed, or encounters an error. This is the **only reliable source of truth** for payment status.
+A **callback** (also called a **webhook**) is a server-to-server HTTP POST request sent by PayWay to your backend. This chapter distinguishes the existing online checkout callback from an offline ABA KHQR notification. They do not have the same published authentication contract.
 
-> ⚠️ **Golden Rule:** Never mark an order as "Paid" based on the client-side return URL alone. Only the callback is cryptographically signed and trustworthy.
+| Delivery | Route | Authentication and fulfilment rule |
+|---|---|---|
+| Online checkout callback | Your checkout callback route | Verify the documented `X-PAYWAY-HMAC-SHA512` signature before trusting it. |
+| Offline ABA KHQR notification | `/aba-payway-khqr-webhook` | Capture the raw delivery and reconcile it; do **not** assume it has the online HMAC contract or mark an order paid until ABA supplies and you implement its actual verification contract. |
+
+> ⚠️ **Golden Rule:** Never mark an order as "Paid" based on a client-side return URL. For offline KHQR notifications, parsing or receiving a payload is not payment verification.
 
 ---
 
-## Callback vs. Return URL
+## Online Checkout Callback vs. Return URL
 
 | | Return URL | Callback (Webhook) |
 |---|---|---|
 | **Who initiates it?** | Customer's browser (redirect) | PayWay's server (HTTP POST) |
-| **Trustworthy?** | ❌ No — user can manipulate/skip it | ✅ Yes — HMAC-SHA512 signed |
+| **Trustworthy?** | ❌ No — user can manipulate/skip it | ✅ Online checkout: HMAC-SHA512 signed |
 | **When does it fire?** | After customer completes payment page | When payment is confirmed by PayWay's backend |
 | **Can it be retried?** | No — one-time browser redirect | Yes — PayWay retries if you don't respond |
-| **What should you do with it?** | Show a "Thank You" page | Update database, fulfill order |
+| **What should you do with it?** | Show a "Thank You" page | After online signature verification, update database and fulfil order |
 
 ---
 
-## HMAC Signature Verification Algorithm
+## Online Checkout HMAC Signature Verification Algorithm
 
-PayWay signs every callback with HMAC-SHA512 using your API key. The algorithm is **sorted-key verification**:
+For the documented **online checkout callback**, PayWay signs the delivery with HMAC-SHA512 using your API key. The algorithm is **sorted-key verification**. This section does not apply to offline ABA KHQR notifications:
 
 ### Step-by-Step (What the SDK Does Internally)
 
@@ -38,7 +43,7 @@ PayWay signs every callback with HMAC-SHA512 using your API key. The algorithm i
 5. **Compute HMAC-SHA512** with your API key as the secret
 6. **Timing-safe comparison** between computed hash and received hash
 
-> ⚠️ **Verified in sandbox:** PayWay uses **HMAC-SHA512** (not SHA-256). Some older documentation may incorrectly reference SHA-256. Our sandbox probes confirm SHA-512 with Base64 encoding and sorted-key verification.
+> ⚠️ **Verified for online checkout in sandbox:** PayWay uses **HMAC-SHA512** (not SHA-256). Some older documentation may incorrectly reference SHA-256. Our sandbox probes confirm SHA-512 with Base64 encoding and sorted-key verification.
 
 ---
 
@@ -56,11 +61,11 @@ const router = Router();
 /**
  * POST /api/payway-webhook
  *
- * Receives payment confirmation callbacks from PayWay.
+ * Receives online checkout payment confirmation callbacks from PayWay.
  * This is the ONLY endpoint that should update order status to "paid".
  */
 router.post('/', (req, res) => {
-  // Step 1: Extract the received HMAC from the standard callback header
+  // Step 1: Extract the received HMAC from the online checkout callback header
   const receivedHash = req.headers['x-payway-hmac-sha512'] as string | undefined;
 
   if (!receivedHash) {
@@ -131,11 +136,11 @@ import { PayWayAPIError } from 'aba-payway-ts';
 const router = Router();
 
 /**
- * Webhook endpoint for PayWay payment callbacks.
+ * Webhook endpoint for online checkout payment callbacks.
  *
  * Security requirements:
  * - Uses standard express.json() middleware (parsed body)
- * - Verifies HMAC-SHA512 signature in timing-safe constant time
+ * - For online checkout callbacks, verifies HMAC-SHA512 in timing-safe constant time
  * - Always responds HTTP 200 within 5 seconds
  * - Uses transaction ID as idempotency key
  * - Never trusts client-side return URLs
@@ -276,9 +281,9 @@ export default router;
 
 ---
 
-## Idempotency: Handling Duplicate Callbacks
+## Idempotency: Handling Duplicate Online Checkout Callbacks
 
-PayWay **may send the same callback more than once**. Your handler must handle this gracefully.
+PayWay **may send the same online checkout callback more than once**. Your verified online handler must handle this gracefully.
 
 ### Pattern: `INSERT ... ON CONFLICT DO NOTHING` (PostgreSQL)
 
@@ -320,7 +325,7 @@ function isDuplicate(tranId: string): boolean {
 
 // In your webhook handler:
 router.post('/', (req, res) => {
-  // ... signature verification ...
+  // ... online checkout signature verification ...
 
   if (isDuplicate(req.body.tran_id)) {
     console.log(`Duplicate callback ignored: ${req.body.tran_id}`);
@@ -333,9 +338,25 @@ router.post('/', (req, res) => {
 
 ---
 
+## Offline ABA KHQR Notification Operations
+
+The SDK listener keeps the offline route distinct from the online checkout webhook:
+
+```text
+POST /aba-payway-khqr-webhook
+```
+
+Before relying on it, publish a stable HTTPS URL and ask ABA to configure and whitelist that exact URL for the merchant. Record that request separately from local SDK configuration: `confirmed-by-merchant` is an operator declaration, not proof that ABA completed provisioning. `payway.khqr.validateCallbackSetup()` checks an HTTPS URL, the declaration, and a non-`unknown` verification strategy, but cannot contact ABA or prove whitelisting.
+
+The listener persists headers, source IP, and the raw body before parsing. It preserves unknown fields and records parse errors so future ABA schema changes remain auditable. It intentionally accepts the published offline shape without requiring the online HMAC header. Treat the parsed `transaction_id` only as a deduplication key; reconcile it with your own `merchant_ref` and a verified ABA process before fulfilment. This capture listener must never decide that an order is paid. Do not use `tran_id`, online `status`, or `verifyCallback()` as assumptions for this offline notification.
+
+For a production receiver, apply the verification method ABA actually provides (for example, a confirmed HMAC, mTLS, or an IP allowlist), store the evidence with the raw delivery, and keep the decision to mark an order paid in your application—not in the capture listener.
+
+---
+
 ## Local Testing with curl
 
-You can simulate a PayWay callback for testing:
+You can simulate an online checkout PayWay callback for testing:
 
 ```bash
 # Fake callback payload (structure matches PayWay's actual callback)
@@ -365,7 +386,7 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
   }"
 ```
 
-> 💡 **Remember:** For local testing, your server must be exposed via ngrok (see Chapter 2). PayWay's callback happens from their servers to your server — `localhost` won't work.
+> 💡 **Remember:** For local testing, your server must be exposed via ngrok (see Chapter 2). The online checkout callback happens from PayWay's servers to your server — `localhost` won't work.
 
 ---
 
@@ -373,16 +394,18 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 
 | Check | Requirement |
 |---|---|
-| ✅ | Always verify HMAC signature before trusting callback data |
+| ✅ | For online checkout callbacks, always verify the HMAC signature before trusting data |
 | ✅ | Use timing-safe comparison (the SDK does this automatically) |
 | ✅ | Respond with HTTP 200 within 5 seconds |
-| ✅ | Use `tran_id` as idempotency key (handle duplicates) |
+| ✅ | For online checkout callbacks, use `tran_id` as the idempotency key |
 | ✅ | Process heavy work after responding (async/background jobs) |
 | ✅ | Use HTTPS in production (required by PayWay) |
 | ✅ | Log all webhook events for auditing |
 | ❌ | Never log the full API key |
-| ❌ | Never trust the `returnUrl` redirect as payment confirmation |
+| ❌ | Never trust an online `returnUrl` redirect as payment confirmation |
 | ❌ | Never update order status based on query parameters alone |
+| ❌ | Never assume offline KHQR notifications use the online HMAC header or schema |
+| ❌ | Never treat local callback configuration as ABA whitelisting confirmation |
 
 ---
 
@@ -390,10 +413,10 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 
 | Symptom | Likely Cause | Solution |
 |---|---|---|
-| "Invalid signature" every time | Wrong HMAC algorithm or API key | Confirm you're using HMAC-SHA512 (not SHA-256) |
-| Callback never arrives | ngrok not running or wrong URL | Verify ngrok URL is accessible from outside |
-| Callback arrives twice for same payment | Normal PayWay behavior | Implement idempotency (see above) |
-| Server timeout during callback | Processing too slow before 200 response | Always respond 200 BEFORE heavy processing |
+| Online callback "Invalid signature" every time | Wrong HMAC algorithm or API key | Confirm you're using HMAC-SHA512 (not SHA-256) |
+| Online callback never arrives | ngrok not running or wrong URL | Verify ngrok URL is accessible from outside |
+| Online callback arrives twice for same payment | Normal PayWay behavior | Implement idempotency (see above) |
+| Server timeout during online callback | Processing too slow before 200 response | Always respond 200 BEFORE heavy processing |
 | Express body empty | Missing `express.json()` middleware | Add `app.use(express.json())` |
 
 ---

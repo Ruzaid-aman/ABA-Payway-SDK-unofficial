@@ -68,6 +68,23 @@ export type { KhqrDomain } from './domains/khqr.js';
 
 export type { GenerateOfflineQrParams } from './khqr-offline.js';
 
+export {
+  resolveKhqrConfiguration,
+  validateKhqrConfiguration,
+  validateKhqrCallbackSetup,
+} from './khqr-config.js';
+
+export type {
+  KhqrCallbackConfiguration,
+  KhqrCallbackEnrollment,
+  KhqrCallbackReadiness,
+  KhqrCallbackValidationOptions,
+  KhqrCallbackVerification,
+  KhqrConfigurationIssue,
+  KhqrConfigurationReadiness,
+  KhqrMerchantConfiguration,
+} from './khqr-config.js';
+
 // ─── Decoupled SDK Facade (Modules 1, 2, 3) ─────────────────────────────────
 export { sdk } from './sdk.js';
 export type { Sdk } from './sdk.js';
@@ -106,4 +123,7 @@ export type {
 // ─── Webhook Storage ─────────────────────────────────────────────────────
 export { createStorage } from './webhook/storage-factory.js';
 export type { WebhookStorage, WebhookRecord } from './webhook/storage.js';
+export type { KhqrWebhookMetadata } from './webhook/storage.js';
 export type { StorageType } from './webhook/storage-factory.js';
+export { parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
+export type { KhqrPaymentNotification, ParsedKhqrPaymentNotification } from './webhook/khqr-notification.js';
