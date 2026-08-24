@@ -61,7 +61,11 @@ After building, the CLI binary is the SDK entry point (referenced here as `paywa
 ```bash
 # 1. Configure the agent's LLM provider (key stays in the environment, never stored)
 export PAYWAY_AGENT_API_KEY=sk-...
-payway-sdk agent setup --provider openai --model gpt-4o --acknowledge-privacy
+# Free option (OpenCode Zen):
+payway-sdk agent setup --provider opencode --model x-preview-f-free --acknowledge-privacy \
+  --max-tokens 8192 --temperature 0.2
+# Or OpenAI:
+# payway-sdk agent setup --provider openai --model gpt-4o --acknowledge-privacy
 
 # 2. Save your PayWay credentials as a PROFILE (required for agent readiness)
 payway-sdk profiles add          # interactive
@@ -165,8 +169,9 @@ exact command (or `payway-sdk onboard`) that resolves it.
 Guided, interactive setup. Scans the current state, shows a checklist of what is configured
 vs. missing, then walks through the stages needed to make the agent usable:
 
-1. **Inference provider** — choose OpenRouter / NVIDIA / OpenAI / Custom, pick a model, decide
-   where `PAYWAY_AGENT_API_KEY` lives (`.env` / session / user env), then verifies connectivity.
+1. **Inference provider** — choose OpenCode Zen / OpenRouter / NVIDIA / OpenAI / Custom, pick a
+   model, decide where `PAYWAY_AGENT_API_KEY` lives (`.env` / session / user env), then verifies
+   connectivity.
 2. **PayWay merchant profile** — name, environment, merchant id, API key (masked), optional RSA
    PEM, optional KHQR block. Saved via the profile store.
 3. **Callback URL** — validates a public HTTPS URL (offers `setup-webhook --tunnel` guidance).
@@ -244,21 +249,25 @@ Example (produced by `agent setup`):
 ```json
 {
   "version": "agent-config/v1",
-  "provider": "openai",
-  "model": "gpt-4o",
+  "provider": "opencode",
+  "model": "x-preview-f-free",
   "capabilityMode": "strict-json-plan",
   "timeoutMs": 30000,
+  "maxTokens": 8192,
+  "temperature": 0.2,
   "privacyAcknowledgedAt": "2026-08-22T10:00:00.000Z"
 }
 ```
 
 | Field | Notes |
 | --- | --- |
-| `provider` | `openai` (default `https://api.openai.com/v1`), `openrouter`, `nvidia`, or `custom`. |
+| `provider` | `opencode` (`https://opencode.ai/zen/v1`), `openai` (default `https://api.openai.com/v1`), `openrouter`, `nvidia`, or `custom`. |
 | `baseUrl` | Required for `custom`; otherwise derived from the preset. |
 | `model` | Sent as the `model` field to `/chat/completions`. |
-| `capabilityMode` | `native-tools` (model emits `tool_calls`) or `strict-json-plan` (model emits a single JSON object). |
-| `timeoutMs` | Defaults to `30000`. |
+| `capabilityMode` | `native-tools` (model emits `tool_calls`) or `strict-json-plan` (model emits a single JSON object). In strict-json mode the system prompt embeds a full tool catalog, and one automatic repair round re-asks the model with exact validation errors if its first plan is off-schema. |
+| `timeoutMs` | Defaults to `30000`. Raise it for slow models (thinking models may need 120000+). |
+| `maxTokens` / `temperature` / `topP` | Optional sampling passthrough; omitted from the request when unset. Set `maxTokens` explicitly for models with small server-side defaults — truncated output cannot form a valid plan. |
+| `extraBody` | Optional extra top-level request-body fields merged verbatim (e.g. `chat_template_kwargs`). |
 | `headers` | Optional **non-secret** headers only (e.g. `organization`). Forbidden auth headers are rejected. |
 | `privacyAcknowledgedAt` | ISO-8601 timestamp. **Required** before any plan is proposed (see §5). |
 
@@ -390,6 +399,13 @@ explicit approval flag.
 - `profiles add` is interactive-only (masked API-key prompt); it cannot be driven by piped
   stdin. Script profile creation by writing `profiles.json` directly or via the exported
   helpers in `src/config/profiles.ts`.
+- The model never chooses your webhook: a plan's online-QR callback URL is deterministically
+  replaced with the merchant profile's configured callback URL before execution.
+- PayWay's QR API **requires** `payment_option`; the SDK sends `abapay_khqr` when you omit it.
+- Provider hiccups are retried for you (429/5xx, up to 3 attempts with backoff). Persistent
+  503s mean provider-side capacity — wait and retry. If plans keep failing validation after
+  the automatic repair round, lower `--temperature`, raise `--max-tokens`, or use a stronger
+  model.
 
 ---
 

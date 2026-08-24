@@ -2,9 +2,9 @@
 
 > Last updated: 2026-08-24
 
-> **Agentic CLI is functional** (built on commit `adede4a`). The agentic PayWay CLI — provider modes, 11 tools, risk gates, execution ledger, sessions, and secret redaction — plus this session's **guided `onboard` wizard** and **runtime/provider UX hardening** are present in the working tree. Verification gate is green: **670 Vitest tests pass (42 files)**, Biome lint clean (0 warnings), `tsc --noEmit` clean, build clean.
+> **Agentic CLI is live end-to-end.** The agentic PayWay CLI — provider modes, 11 tools, risk gates, execution ledger, sessions, and secret redaction — now runs against **OpenCode Zen (`x-preview-f-free`, free)** with a verified live sandbox QR creation (`ask` → plan → authorize → PayWay `code 0 Success`). Key reliability work this session: tool-catalog planning prompt, one-round plan repair, transient-error retries, deterministic callback override, sampling passthrough flags, and a real SDK fix (`payment_option` is required by the PayWay QR API). Verification gate is green: **676 Vitest tests pass (42 files)**, Biome lint clean (0 warnings), `tsc --noEmit` clean, build clean.
 
-> **Milestone D committed** as `341923d` (guided `onboard` wizard, readiness matrix, runtime/provider UX). The working tree now holds the follow-up gap-hardening fixes (lint cleanups + deferred low-severity SDK issues), not yet committed.
+> All session work is committed: `341923d` (onboarding wizard + runtime/provider UX), `65046c8` (gap hardening: PEM validation, URL encoding, lint cleanups), `9f47648`/`e6c872c` (opencode preset, prompt/retry/override fixes), `b8ff4b6` (artifact ignore).
 
 ---
 
@@ -417,11 +417,13 @@ Tasks must be completed **in this order**:
 
 ```
 Package version (package.json):  1.1.1
-Last agentic commit:             adede4a (agentic payway CLI implementation review artifacts)
-Working tree state:              Gap-hardening fixes (lint cleanups, PEM validation, encodeBase64IfNeeded URL handling) — uncommitted; Milestone D committed as 341923d
-Vitest:                          670 passing / 0 failing (42 files)
+Recent commits:                  b8ff4b6 (ignore payway-output) / e6c872c (opencode preset, tool-catalog prompt, E2E fixes) / 9f47648 / 65046c8 (gap hardening) / 341923d (Milestone D onboarding)
+Working tree state:              Clean
+Active agent provider:           opencode (https://opencode.ai/zen/v1), model x-preview-f-free, key via PAYWAY_AGENT_API_KEY in .env
+Vitest:                          676 passing / 0 failing (42 files)
 Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck -> clean
 Lint:                            biome -> 0 errors, 0 warnings
 Build:                           clean (dist/ rebuilt)
-Next task:                       Commit gap-hardening fixeset, then tag next release
+Live E2E:                        ask -> plan (Zen model) -> authorize -> PayWay sandbox QR create = Success (2026-08-24)
+Next task:                       Tag next release; optional: fold sandbox-script assertions into Vitest (Task 18 leftover)
 ```

@@ -32,8 +32,8 @@ import type { ProviderConfigV1, CapabilityMode } from 'aba-payway-ts/agent';
 
 const config: ProviderConfigV1 = {
   version: 'agent-config/v1',
-  provider: 'openai',                 // 'openai' | 'openrouter' | 'nvidia' | 'custom'
-  model: 'gpt-4o',
+   provider: 'opencode',               // 'opencode' | 'openai' | 'openrouter' | 'nvidia' | 'custom'
+   model: 'x-preview-f-free',
   capabilityMode: 'strict-json-plan', // 'native-tools' | 'strict-json-plan'
   privacyAcknowledgedAt: new Date().toISOString(),
 };
@@ -114,7 +114,7 @@ executes zero PayWay creates.
   Every non-ready row includes a `→` fix hint pointing at the command that resolves it.
 - `payway-sdk onboard` — **guided interactive setup**. Scans state, shows a
   configured/missing checklist, then runs the needed stages in order: inference provider
-  (choose OpenRouter/NVIDIA/OpenAI/Custom, model, key placement, live connectivity check) →
+  (choose OpenCode Zen/OpenRouter/NVIDIA/OpenAI/Custom, model, key placement, live connectivity check) →
   PayWay merchant profile → callback URL (public HTTPS) → privacy acknowledgement. Re-prints
   the matrix before→after. In a non-TTY it emits a structured `blocked` JSON plan listing
   missing remedy ids. `--stage <name>` runs one stage; already-satisfied stages are skipped.
@@ -214,13 +214,19 @@ Common failures: `AGENT_NOT_CONFIGURED` (run `agent setup`/`onboard`), `PRIVACY_
 **Diagnosing `PROVIDER_PROPOSAL_FAILED`:** the message now distinguishes causes:
 - `missing API key: set PAYWAY_AGENT_API_KEY …` — key env var is empty.
 - `provider request timed out after 30000ms …` — network egress to the provider is
-  blocked or the key is invalid (the chat request hung until the `timeoutMs` abort).
+  blocked or the model is too slow (thinking models need `--timeout` raised and
+  `enable_thinking:false`); the chat request hung until the `timeoutMs` abort.
 - `provider returned HTTP 401/403 …` — key rejected by the provider.
+- `provider returned HTTP 503/429 …` — transient capacity limits; the adapter already
+  retried 3× with backoff before surfacing this. Wait and retry.
+- `provider output did not validate as an AgentPlanV1 (…) …` — the model produced an
+  off-schema plan even after the automatic repair round; lower `--temperature`, raise
+  `--max-tokens`, or switch to a stronger model.
 In a TTY, `ask`/`agent` print a `· Contacting <provider> (<model>) to propose a plan…`
-line plus a remediation hint; in non-TTY the provider message is **redacted** to
-`[REDACTED]` for safety, so diagnose interactively or via `agent doctor`. `agent doctor`
-reports the provider row as `blocked` when `PAYWAY_AGENT_API_KEY` is unset (it no longer
-trusts the unauthenticated `/models` ping).
+line plus per-stage progress and a remediation hint; in non-TTY the provider message is
+**redacted** to `[REDACTED]` for safety, so diagnose interactively or via `agent doctor`.
+`agent doctor` reports the provider row as `blocked` when `PAYWAY_AGENT_API_KEY` is unset
+(it no longer trusts the unauthenticated `/models` ping).
 
 ## Related Skills
 
