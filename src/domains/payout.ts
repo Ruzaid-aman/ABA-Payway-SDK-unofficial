@@ -5,6 +5,7 @@ import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
 import {
   filterParams,
+  isValidPublicKeyPem,
   validateBeneficiaries,
   validateCurrency,
   validatePositiveAmount,
@@ -39,6 +40,11 @@ export function createPayoutDomain(
     payout: async (params: PayoutParams) => {
       if (!config.publicKeyPem) {
         throw new PayWayConfigError('publicKeyPem is required for RSA-encrypted endpoints');
+      }
+      if (!isValidPublicKeyPem(config.publicKeyPem)) {
+        throw new PayWayConfigError(
+          'publicKeyPem does not look like a public key PEM (expected "-----BEGIN PUBLIC KEY-----")',
+        );
       }
 
       validateTransactionId(params.transactionId);

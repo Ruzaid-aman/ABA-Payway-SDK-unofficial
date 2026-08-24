@@ -36,6 +36,23 @@ try {
 }
 ```
 
+**Common config-error messages (RSA endpoints — Refund, Pre-Auth, Payout, Payment Link):**
+
+| Message | Cause | Fix |
+|---|---|---|
+| `publicKeyPem is required for RSA-encrypted endpoints` | No public key configured | Set `publicKeyPem` (or `PAYWAY_RSA_PUBLIC_KEY`) to the RSA key ABA gave you |
+| `publicKeyPem does not look like a public key PEM (expected "-----BEGIN PUBLIC KEY-----")` | The value is present but not a PEM-formatted public key (e.g. truncated copy/paste, a certificate instead of a key, or a private key) | Paste the **complete** key including the `-----BEGIN PUBLIC KEY-----` and `-----END PUBLIC KEY-----` lines. Literal `\n` sequences from single-line `.env` values are handled automatically |
+
+You can pre-flight your key without calling the SDK's RSA endpoints:
+
+```typescript
+import { isValidPublicKeyPem } from 'aba-payway-ts';
+
+if (!isValidPublicKeyPem(process.env.PAYWAY_PUBLIC_KEY)) {
+  console.error('PAYWAY_PUBLIC_KEY is missing or not a valid PEM public key');
+}
+```
+
 ### PayWayAPIError
 
 Thrown when PayWay's API returns an error (wrong hash, invalid merchant, etc.). Contains rich debugging information:

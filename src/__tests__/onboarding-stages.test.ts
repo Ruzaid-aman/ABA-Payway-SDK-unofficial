@@ -90,7 +90,6 @@ describe('pendingStages', () => {
 
   it('skips provider when configured + key present', () => {
     process.env.PAYWAY_AGENT_API_KEY = 'k';
-    const cfg = readAgentConfig();
     // simulate existing agent config by writing minimal
     writeAgentConfig({ version: 'agent-config/v1', provider: 'nvidia', model: 'm', capabilityMode: 'strict-json-plan' });
     const snap = scanOnboardingState(process.env);

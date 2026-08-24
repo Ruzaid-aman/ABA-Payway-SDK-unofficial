@@ -154,9 +154,29 @@ export function normalizePem(pem: string | undefined): string | undefined {
   return pem?.replace(/\\n/g, '\n');
 }
 
+const PUBLIC_KEY_PEM_HEADER = /-----BEGIN (RSA )?PUBLIC KEY-----/;
+const PUBLIC_KEY_PEM_FOOTER = /-----END (RSA )?PUBLIC KEY-----\s*$/;
+
+/**
+ * Structural check that a string looks like an RSA public key PEM.
+ * Used to fail fast with a clear message before RSA-encrypted endpoints
+ * instead of surfacing a raw OpenSSL error.
+ */
+export function isValidPublicKeyPem(pem: string | undefined): pem is string {
+  if (!pem) return false;
+  const trimmed = pem.trim();
+  return PUBLIC_KEY_PEM_HEADER.test(trimmed) && PUBLIC_KEY_PEM_FOOTER.test(trimmed);
+}
+
+const URL_PREFIXES = ['http://', 'https://', '//', 'www.'];
+
+function looksLikeUrl(val: string): boolean {
+  return URL_PREFIXES.some((prefix) => val.startsWith(prefix));
+}
+
 export function encodeBase64IfNeeded(val: unknown): string {
   if (typeof val === 'string') {
-    if (val.startsWith('http://') || val.startsWith('https://')) {
+    if (looksLikeUrl(val)) {
       return toBase64(val);
     }
     return val;

@@ -111,6 +111,8 @@ The SDK performs input validation in each domain to fail fast and give clear dev
 
 - **`checkout`**: validates `transactionId` presence, max 20 characters, and charset `[a-zA-Z0-9\-]`; validates `amount` positivity and currency rules (USD ≤ 2 decimals, KHR integer); validates `returnUrl`/`cancelUrl` are base64-encoded when URLs; validates `lifetime` is a positive integer.
 - **`payment-link`**: requires non-empty `title` and `merchantRefNo`, `amount` > 0, and `returnUrl` must be a public HTTPS URL when provided.
+- **RSA endpoints (`refund`, `pre-auth`, `payout`, `payment-link`)**: `publicKeyPem` must be present **and** structurally valid — the SDK checks for a `-----BEGIN PUBLIC KEY-----` / `-----END PUBLIC KEY-----` pair (SPKI or RSA format; literal `\n` sequences from `.env` files are normalized first) and throws a descriptive `PayWayConfigError` before any encryption or network call. The check is exported as `isValidPublicKeyPem()` for your own pre-flight validation.
+- **URL auto-encoding**: string fields that hold URLs are base64-encoded automatically when they start with `http://`, `https://`, `//` (protocol-relative), or `www.`; other strings (tokens, raw JSON) pass through unchanged.
 - **`pre-auth`**: validates `transactionId` and positive `amount`; `completeWithPayout` requires a non-empty payout array.
 - **`payout`**: validates `transactionId`, `amount`, `currency`, and that `beneficiaries` is a non-empty array summing to the total amount.
 - **`qr` / `khqr`**: validates `transactionId` (max 20 chars, `[a-zA-Z0-9\-]` charset), `amount`, `currency`, and `callbackUrl` as a public HTTPS URL; offline QR helper validates merchantId and amount.

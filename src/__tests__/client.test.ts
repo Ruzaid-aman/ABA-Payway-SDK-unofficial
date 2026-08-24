@@ -837,6 +837,13 @@ describe('checkout domain', () => {
       await expect(pw.checkout.refund('T001', 5.0)).rejects.toThrow('publicKeyPem');
     });
 
+    it('throws a clear error when publicKeyPem is present but not a valid PEM', async () => {
+      const pw = new PayWay({ ...TEST_CONFIG, publicKeyPem: 'not-a-real-pem', maxRetries: 0 });
+      await expect(pw.checkout.refund('T001', 5.0)).rejects.toThrow(PayWayConfigError);
+      await expect(pw.checkout.refund('T001', 5.0)).rejects.toThrow(/does not look like a public key PEM/);
+      await expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it('sends form-encoded request with merchant_auth when RSA key is present', async () => {
       const pwRsa = new PayWay(CONFIG_WITH_RSA);
       fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Refunded' } }));

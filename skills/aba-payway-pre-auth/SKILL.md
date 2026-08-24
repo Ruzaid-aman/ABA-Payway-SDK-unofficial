@@ -11,7 +11,7 @@ version: 1.1.0
 const result = await payway.preAuth.complete('order-123', 10);
 ```
 
-Pre-authorization endpoints require `publicKeyPem` because requests use RSA-encrypted merchant authorization.
+Pre-authorization endpoints require `publicKeyPem` because requests use RSA-encrypted merchant authorization. The SDK validates the PEM structure before any call — a malformed key throws a clear `PayWayConfigError` (use the exported `isValidPublicKeyPem()` to pre-flight).
 
 ## Error Handling
 ```ts

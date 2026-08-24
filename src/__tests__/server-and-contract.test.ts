@@ -193,15 +193,11 @@ describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {
   });
 
   it('rejects payloads missing transactionId', async () => {
-    await expect(
-      // biome-ignore lint/suspicious/noExplicitAny: intentional invalid payload
-      server.initiateTransaction({ amount: 10 } as any, config),
-    ).rejects.toThrow(/transactionId/);
+    await expect(server.initiateTransaction({ amount: 10 } as any, config)).rejects.toThrow(/transactionId/);
   });
 
   it('rejects payloads missing amount', async () => {
     await expect(
-      // biome-ignore lint/suspicious/noExplicitAny: intentional invalid payload
       server.initiateTransaction({ transactionId: 'x' } as any, config),
     ).rejects.toThrow(/amount/);
   });

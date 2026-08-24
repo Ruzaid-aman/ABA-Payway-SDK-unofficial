@@ -2,9 +2,9 @@
 
 > Last updated: 2026-08-24
 
-> **Agentic CLI is functional** (built on commit `adede4a`). The agentic PayWay CLI — provider modes, 11 tools, risk gates, execution ledger, sessions, and secret redaction — plus this session's **guided `onboard` wizard** and **runtime/provider UX hardening** are present in the working tree. Verification gate is green: **662 Vitest tests pass (42 files)**, Biome lint clean, `tsc --noEmit` clean, build clean.
+> **Agentic CLI is functional** (built on commit `adede4a`). The agentic PayWay CLI — provider modes, 11 tools, risk gates, execution ledger, sessions, and secret redaction — plus this session's **guided `onboard` wizard** and **runtime/provider UX hardening** are present in the working tree. Verification gate is green: **670 Vitest tests pass (42 files)**, Biome lint clean (0 warnings), `tsc --noEmit` clean, build clean.
 
-> ⚠️ **Uncommitted work in progress** — the agentic onboarding + provider-UX changes (Milestone D below) are staged in the working tree and not yet committed.
+> **Milestone D committed** as `341923d` (guided `onboard` wizard, readiness matrix, runtime/provider UX). The working tree now holds the follow-up gap-hardening fixes (lint cleanups + deferred low-severity SDK issues), not yet committed.
 
 ---
 
@@ -327,7 +327,7 @@ Tasks must be completed **in this order**:
 
 ---
 
-### Milestone D: Agentic CLI — Guided Onboarding & Runtime/Provider UX (DONE, uncommitted)
+### Milestone D: Agentic CLI — Guided Onboarding & Runtime/Provider UX (DONE — commit `341923d`)
 
 > Goal: Make the agentic PayWay CLI self-configuring and observable. Adds `payway-sdk onboard` (TUI wizard), a unified readiness matrix that powers both `doctor` fix-hints and `onboard` routing, and runtime UX so the user can see what the agent is doing and get actionable errors instead of opaque failures.
 
@@ -342,7 +342,7 @@ Tasks must be completed **in this order**:
   - [x] TTY shows the wizard; non-TTY returns `{status:'blocked'|'ready'}` JSON and exit code 1 when blocked (never prompts)
   - [x] First-run detection (`maybeAutoOnboard`) + `onboardingHintText` surfaced from `ask` and REPL when not configured
   - [x] `evaluateReadinessDetailed` (`src/agent/readiness.ts`) is the single canonical matrix carrying `remedyId`, consumed by both `doctor` hints and `onboard` routing
-- **Status**: 🟢 Completed (working tree, uncommitted)
+- **Status**: 🟢 Completed (`341923d`)
 
 #### Task D2 — `doctor` fix-hints
 
@@ -351,7 +351,7 @@ Tasks must be completed **in this order**:
 - **Actions**:
   - [x] Map each non-ready `CapabilityState` to a remedy hint (e.g. `agent setup --provider nvidia`, `agent profiles add`, `agent config --set callbackUrl=…`, `agent doctor --ack-privacy`)
   - [x] `CapabilityState` gained `'blocked'` to represent hard stops
-- **Status**: 🟢 Completed (working tree, uncommitted)
+- **Status**: 🟢 Completed (`341923d`)
 
 #### Task D3 — Runtime & provider UX hardening
 
@@ -363,7 +363,7 @@ Tasks must be completed **in this order**:
   - [x] `ask` gains `--provider-timeout <ms>` to override the inference request timeout so a hung provider surfaces in seconds
   - [x] TTY prints a remediation hint on `PROVIDER_PROPOSAL_FAILED` (verify `PAYWAY_AGENT_API_KEY`, run `agent doctor`)
   - [x] `checkConnectivity` reports `blocked` when `PAYWAY_AGENT_API_KEY` is unset (previously `/models` returned 200 without auth and falsely reported `ok`)
-- **Status**: 🟢 Completed (working tree, uncommitted)
+- **Status**: 🟢 Completed (`341923d`)
 
 #### Task D4 — Tests & docs
 
@@ -373,9 +373,9 @@ Tasks must be completed **in this order**:
   - [x] Tests for `remedies.ts` (provider/profile/webhook/privacy/verify → fix commands) and `stages.ts` (stage sequencing, skip logic, non-TTY JSON)
   - [x] New `docs/AGENT-SETUP-PLAYBOOK.md` capturing manual path + implementation/architecture + 12 maintainer gotchas
   - [x] User guide, quick-start, README, and the `aba-payway-agent` skill all describe `onboard` as the recommended setup path
-- **Status**: 🟢 Completed (working tree, uncommitted)
+- **Status**: 🟢 Completed (`341923d`)
 
-**🎯 After Milestone D: commit the agentic onboarding + provider-UX changeset, re-run the full gate (typecheck + lint + 662 tests + build), then tag the next release.**
+**🎯 Milestone D committed as `341923d` with the full gate green (typecheck + lint + 662 tests + build). Follow-up gap-hardening (lint warnings + deferred low-severity SDK issues) landed after; see Known Issues.**
 
 ---
 
@@ -406,9 +406,10 @@ Tasks must be completed **in this order**:
 | 🟡 Medium | `encryptMerchantAuth` type signature accepts `Record` but payout passes array | ✅ Resolved |
 | 🟡 Medium | No test verifies actual HMAC hash values | ✅ Resolved |
 | 🟡 Medium | No test for `getTransactionDetail` | ✅ Resolved |
-| 🔵 Low | `verifyCallbackSignature` should use explicit base64 encoding for Buffer comparison | Deferred |
-| 🔵 Low | No input validation on `publicKeyPem` format | Deferred |
-| 🔵 Low | `encodeBase64IfNeeded` doesn't handle URLs without scheme | Deferred |
+| 🔵 Low | `verifyCallbackSignature` should use explicit base64 encoding for Buffer comparison | ✅ Resolved (explicit `utf8` buffers) |
+| 🔵 Low | No input validation on `publicKeyPem` format | ✅ Resolved (`isValidPublicKeyPem` gate on RSA endpoints) |
+| 🔵 Low | `encodeBase64IfNeeded` doesn't handle URLs without scheme | ✅ Resolved (`//` and `www.` prefixes encoded; bare single-label hosts intentionally pass through) |
+| 🟡 Medium | Four biome lint warnings (unused suppressions + unused variable) flagged in r3-report residual concerns | ✅ Resolved (0 warnings) |
 
 ---
 
@@ -417,10 +418,10 @@ Tasks must be completed **in this order**:
 ```
 Package version (package.json):  1.1.1
 Last agentic commit:             adede4a (agentic payway CLI implementation review artifacts)
-Working tree state:              Uncommitted Milestone D — agentic onboarding wizard + provider/runtime UX (~20 files changed, src/agent/onboarding/*, src/cli/commands/onboard.ts, docs/AGENT-SETUP-PLAYBOOK.md, new onboarding tests)
-Vitest:                          662 passing / 0 failing (42 files)
+Working tree state:              Gap-hardening fixes (lint cleanups, PEM validation, encodeBase64IfNeeded URL handling) — uncommitted; Milestone D committed as 341923d
+Vitest:                          670 passing / 0 failing (42 files)
 Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck -> clean
-Lint:                            biome -> 0 errors
+Lint:                            biome -> 0 errors, 0 warnings
 Build:                           clean (dist/ rebuilt)
-Next task:                       Commit Milestone D changeset, then tag next release
+Next task:                       Commit gap-hardening fixeset, then tag next release
 ```

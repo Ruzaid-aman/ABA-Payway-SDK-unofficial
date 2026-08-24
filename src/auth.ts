@@ -77,8 +77,8 @@ export function verifyCallbackSignature(
 
   const computedSignature = crypto.createHmac('sha512', apiKey).update(concatenated).digest('base64');
 
-  const computedBuf = Buffer.from(computedSignature);
-  const receivedBuf = Buffer.from(receivedSignature);
+  const computedBuf = Buffer.from(computedSignature, 'utf8');
+  const receivedBuf = Buffer.from(receivedSignature, 'utf8');
 
   if (computedBuf.length !== receivedBuf.length) {
     return false;

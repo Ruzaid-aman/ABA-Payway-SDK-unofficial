@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   encodeBase64IfNeeded,
+  isValidPublicKeyPem,
   filterParams,
   formatAmount,
   formatRequestTime,
@@ -112,6 +113,18 @@ describe('encodeBase64IfNeeded', () => {
 
   it('base64-encodes strings starting with https://', () => {
     const url = 'https://example.com/callback';
+    const expected = Buffer.from(url, 'utf8').toString('base64');
+    expect(encodeBase64IfNeeded(url)).toBe(expected);
+  });
+
+  it('base64-encodes protocol-relative URLs', () => {
+    const url = '//example.com/callback';
+    const expected = Buffer.from(url, 'utf8').toString('base64');
+    expect(encodeBase64IfNeeded(url)).toBe(expected);
+  });
+
+  it('base64-encodes www-prefixed host-only URLs', () => {
+    const url = 'www.example.com/callback';
     const expected = Buffer.from(url, 'utf8').toString('base64');
     expect(encodeBase64IfNeeded(url)).toBe(expected);
   });
@@ -367,5 +380,42 @@ describe('validateRefundAmount', () => {
       expect(() => validateRefundAmount(0.01)).not.toThrow();
       expect(() => validateRefundAmount(0.005)).toThrow('at least $0.01 USD');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isValidPublicKeyPem
+// ---------------------------------------------------------------------------
+
+describe('isValidPublicKeyPem', () => {
+  const VALID_SPKI = '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3\n-----END PUBLIC KEY-----';
+  const VALID_RSA = '-----BEGIN RSA PUBLIC KEY-----\nMIGJAoGBAKG\n-----END RSA PUBLIC KEY-----';
+
+  it('accepts SPKI and RSA public key PEMs', () => {
+    expect(isValidPublicKeyPem(VALID_SPKI)).toBe(true);
+    expect(isValidPublicKeyPem(VALID_RSA)).toBe(true);
+  });
+
+  it('accepts keys with surrounding whitespace or literal \\n sequences', () => {
+    expect(isValidPublicKeyPem(`  ${VALID_SPKI}  `)).toBe(true);
+    expect(isValidPublicKeyPem(VALID_SPKI.replace(/\n/g, '\\n'))).toBe(true);
+  });
+
+  it('rejects missing, empty, or non-PEM strings', () => {
+    expect(isValidPublicKeyPem(undefined)).toBe(false);
+    expect(isValidPublicKeyPem('')).toBe(false);
+    expect(isValidPublicKeyPem('not-a-pem')).toBe(false);
+    expect(isValidPublicKeyPem('pem')).toBe(false);
+  });
+
+  it('rejects PEMs with a header but no footer (and vice versa)', () => {
+    expect(isValidPublicKeyPem(VALID_SPKI.split('\n')[0])).toBe(false);
+    expect(isValidPublicKeyPem(VALID_SPKI.split('\n')[2])).toBe(false);
+  });
+
+  it('rejects private-key PEMs', () => {
+    expect(
+      isValidPublicKeyPem('-----BEGIN PRIVATE KEY-----\nMIIEvQ\n-----END PRIVATE KEY-----'),
+    ).toBe(false);
   });
 });

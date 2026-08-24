@@ -596,6 +596,8 @@ try {
 
 > ℹ️ PayWay-specific error codes (like `PTL04` for refund validation) are extracted from HTTP error responses automatically. Previously these were buried in `rawBody`; now they appear in `error.paywayCode` for easy programmatic handling.
 
+> ⚠️ **RSA endpoints validate the public key before calling PayWay.** Refund, Pre-Auth, Payout, and Payment Link throw a descriptive `PayWayConfigError` when `publicKeyPem` is missing **or** is not a valid PEM (`-----BEGIN PUBLIC KEY-----` / `-----END PUBLIC KEY-----`). Use the exported `isValidPublicKeyPem()` helper to pre-flight your key.
+
 ### Error Type Reference
 
 | `instanceof` | `error.type` | When thrown | Retryable? |

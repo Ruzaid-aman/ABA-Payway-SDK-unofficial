@@ -188,7 +188,7 @@ const payway = new PayWay({
 |---|---|---|---|---|
 | `merchantId` | `string` | ✅ Yes | — | Your PayWay merchant identifier |
 | `apiKey` | `string` | ✅ Yes | — | Secret key for HMAC signing |
-| `publicKeyPem` | `string` | ❌ No | — | RSA public key in PEM format |
+| `publicKeyPem` | `string` | ❌ No | — | RSA public key in PEM format. Validated structurally before RSA calls (Refund/Pre-Auth/Payout/Payment Link) — an invalid key throws a clear `PayWayConfigError` instead of a raw OpenSSL error. Literal `\n` sequences from single-line `.env` values are normalized automatically |
 | `environment` | `'sandbox' \| 'production'` | ❌ No | `'sandbox'` | API endpoint cluster |
 | `timeout` | `number` | ❌ No | `30000` | HTTP request timeout (ms) |
 | `maxRetries` | `number` | ❌ No | `0` | Retry count for 5xx/network errors |

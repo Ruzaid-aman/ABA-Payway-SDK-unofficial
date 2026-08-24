@@ -24,7 +24,7 @@ import {
   PayWayRateLimitError,
 } from './errors.js';
 import { type KhqrMerchantConfiguration, resolveKhqrConfiguration } from './khqr-config.js';
-import { formatRequestTime, normalizePem, sanitizeForLog } from './utils.js';
+import { formatRequestTime, isValidPublicKeyPem, normalizePem, sanitizeForLog } from './utils.js';
 
 export type Currency = 'USD' | 'KHR';
 export type Environment = 'sandbox' | 'production';
@@ -708,6 +708,11 @@ export class PayWay {
   ): Promise<TResponse> {
     if (!this.config.publicKeyPem) {
       throw new PayWayConfigError('publicKeyPem is required for RSA-encrypted endpoints');
+    }
+    if (!isValidPublicKeyPem(this.config.publicKeyPem)) {
+      throw new PayWayConfigError(
+        'publicKeyPem does not look like a public key PEM (expected "-----BEGIN PUBLIC KEY-----")',
+      );
     }
 
     const requestTime = formatRequestTime();

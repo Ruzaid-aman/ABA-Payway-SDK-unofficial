@@ -224,7 +224,6 @@ describe('client.handleResponse (browser environment)', () => {
   // ── error paths ──────────────────────────────────────────────────────────
   it('unknown responseType: returns success=false and invokes onError', async () => {
     const session = makeSession({
-      // biome-ignore lint/suspicious/noExplicitAny: intentional invalid value
       responseType: 'not_a_real_type' as any,
       responsePayload: 'x',
     });

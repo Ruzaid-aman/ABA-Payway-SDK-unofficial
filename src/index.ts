@@ -99,7 +99,7 @@ export type {
   PollTransactionResult,
   TerminalPaymentStatus,
 } from './types.js';
-export { validateRefundAmount } from './utils.js';
+export { isValidPublicKeyPem, validateRefundAmount } from './utils.js';
 export type { KhqrPaymentNotification, ParsedKhqrPaymentNotification } from './webhook/khqr-notification.js';
 export { parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
 export type { KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './webhook/storage.js';
