@@ -1,10 +1,10 @@
 # PayWay SDK — Project Status
 
-> Last updated: 2026-07-19
+> Last updated: 2026-08-24
 
-> **v1.2.0 released** (commit `df04deb`). CLI fully migrated to Commander with modular subcommands (`init`, `doctor`, `skills`), live-sandbox integration scripts documented in README, `test-logs/` added to `.gitignore`. All 249 Vitest tests pass, Biome lint clean, TypeScript typecheck clean, build clean.
+> **Agentic CLI is functional** (built on commit `adede4a`). The agentic PayWay CLI — provider modes, 11 tools, risk gates, execution ledger, sessions, and secret redaction — plus this session's **guided `onboard` wizard** and **runtime/provider UX hardening** are present in the working tree. Verification gate is green: **662 Vitest tests pass (42 files)**, Biome lint clean, `tsc --noEmit` clean, build clean.
 
-> ~~⚠️ **Uncommitted work in progress**~~ — Milestone C is now complete. All tasks resolved.
+> ⚠️ **Uncommitted work in progress** — the agentic onboarding + provider-UX changes (Milestone D below) are staged in the working tree and not yet committed.
 
 ---
 
@@ -327,11 +327,77 @@ Tasks must be completed **in this order**:
 
 ---
 
+### Milestone D: Agentic CLI — Guided Onboarding & Runtime/Provider UX (DONE, uncommitted)
+
+> Goal: Make the agentic PayWay CLI self-configuring and observable. Adds `payway-sdk onboard` (TUI wizard), a unified readiness matrix that powers both `doctor` fix-hints and `onboard` routing, and runtime UX so the user can see what the agent is doing and get actionable errors instead of opaque failures.
+
+#### Task D1 — Guided `onboard` TUI wizard
+
+- **What**: A single `payway-sdk onboard` command that scans current state, then walks provider → profile → callback → privacy → verify with live connectivity checks, skip-if-already-done, non-TTY JSON output, and `PAYWAY_ONBOARD_AUTO=1` opt-in for first-run.
+- **Files**: `src/cli/commands/onboard.ts` (NEW), `src/agent/onboarding/{scan,stages,remedies}.ts` (NEW), `src/cli.ts`, `src/cli/commands/agent.ts`, `src/agent/repl.ts`, `package.json` (`@clack/prompts ^1.7.0`)
+- **Actions**:
+  - [x] Scan state via `scanOnboardingState()` (provider / profile / webhook / privacy / verify)
+  - [x] `runOnboard()` drives `set-provider` → `add-or-verify-profile` → `set-callback` → `ack-privacy` → `verify` stages with `@clack/prompts` (spinner, confirm, password, multiselect)
+  - [x] Live connectivity checks via the same path `doctor` uses; verify stage reads `history.json` for the latest callback delivery
+  - [x] TTY shows the wizard; non-TTY returns `{status:'blocked'|'ready'}` JSON and exit code 1 when blocked (never prompts)
+  - [x] First-run detection (`maybeAutoOnboard`) + `onboardingHintText` surfaced from `ask` and REPL when not configured
+  - [x] `evaluateReadinessDetailed` (`src/agent/readiness.ts`) is the single canonical matrix carrying `remedyId`, consumed by both `doctor` hints and `onboard` routing
+- **Status**: 🟢 Completed (working tree, uncommitted)
+
+#### Task D2 — `doctor` fix-hints
+
+- **What**: `agent doctor` now prints a `→ <fix>` hint per non-ready row, derived from `evaluateReadinessDetailed`, so the user knows exactly what command to run.
+- **Files**: `src/cli/commands/agent.ts`
+- **Actions**:
+  - [x] Map each non-ready `CapabilityState` to a remedy hint (e.g. `agent setup --provider nvidia`, `agent profiles add`, `agent config --set callbackUrl=…`, `agent doctor --ack-privacy`)
+  - [x] `CapabilityState` gained `'blocked'` to represent hard stops
+- **Status**: 🟢 Completed (working tree, uncommitted)
+
+#### Task D3 — Runtime & provider UX hardening
+
+- **What**: Make `ask`/`agent` observable and fail loudly with actionable messages instead of opaque errors.
+- **Files**: `src/agent/orchestrator.ts`, `src/agent/provider.ts`, `src/cli/commands/agent.ts`, `src/agent/repl.ts`
+- **Actions**:
+  - [x] `OrchestratorOptions.onProgress` hook emits `propose → validate → authorize → execute → finalize`; CLI prints `· Validating plan…`, `· Executing <tool>…`, etc. in TTY
+  - [x] `provider.ts` distinguishes a fetch `AbortError` → "provider request timed out after <ms> (check PAYWAY_AGENT_API_KEY, network egress, and baseUrl)" instead of "This operation was aborted"
+  - [x] `ask` gains `--provider-timeout <ms>` to override the inference request timeout so a hung provider surfaces in seconds
+  - [x] TTY prints a remediation hint on `PROVIDER_PROPOSAL_FAILED` (verify `PAYWAY_AGENT_API_KEY`, run `agent doctor`)
+  - [x] `checkConnectivity` reports `blocked` when `PAYWAY_AGENT_API_KEY` is unset (previously `/models` returned 200 without auth and falsely reported `ok`)
+- **Status**: 🟢 Completed (working tree, uncommitted)
+
+#### Task D4 — Tests & docs
+
+- **What**: Cover the new onboarding logic and update all agent-facing docs.
+- **Files**: `src/__tests__/onboarding-remedies.test.ts` (NEW), `src/__tests__/onboarding-stages.test.ts` (NEW), `docs/AGENT-SETUP-PLAYBOOK.md` (NEW), `docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md`, `docs/QUICK-START-1-PAGER.md`, `README.md`, `skills/aba-payway-agent/SKILL.md`
+- **Actions**:
+  - [x] Tests for `remedies.ts` (provider/profile/webhook/privacy/verify → fix commands) and `stages.ts` (stage sequencing, skip logic, non-TTY JSON)
+  - [x] New `docs/AGENT-SETUP-PLAYBOOK.md` capturing manual path + implementation/architecture + 12 maintainer gotchas
+  - [x] User guide, quick-start, README, and the `aba-payway-agent` skill all describe `onboard` as the recommended setup path
+- **Status**: 🟢 Completed (working tree, uncommitted)
+
+**🎯 After Milestone D: commit the agentic onboarding + provider-UX changeset, re-run the full gate (typecheck + lint + 662 tests + build), then tag the next release.**
+
+---
+
+## Key Learnings (this session)
+
+- **Readiness is one matrix.** `evaluateReadinessDetailed` (with `remedyId`) is the single source for both `doctor` fix-hints and `onboard` routing — do not re-derive capability checks elsewhere.
+- **Provider errors must be specific.** Distinguish *missing key* vs *timeout (AbortError)* vs *HTTP auth error*; the user's earlier "failed silently" was a 30s `AbortError` wrapped as "This operation was aborted" with no progress output.
+- **Non-TTY `ask` redacts provider messages** as `[REDACTED]` (privacy). Diagnose interactively or via `agent doctor`; the TTY path shows the real text.
+- **`agent doctor` connectivity is not a substitute for a live call.** NVIDIA's `/models` returns 200 without auth, so the provider row must check key presence before the ping. A set-but-invalid key still pings "ok" — runtime `PROVIDER_PROPOSAL_FAILED` is the real signal.
+- **`payway-sdk` is only on PATH after `npm link`/global install.** From a checkout use `node dist/cli.js <cmd>` (or `npx payway-sdk`).
+- **`agent profiles add` takes flags, not stdin JSON.** Use `jq -n '{...}' | agent profiles add -` (reads stdin), or pass `--merchant-id`/`--api-key`/`--public-key-pem` and `--name`.
+- **Biome lint forbids non-null assertions (`!`).** Use `as` casts / optional chaining.
+- **Skill version is pinned by test.** `skills.test.ts` asserts `version: 1.1.0` in every `SKILL.md` frontmatter — bumping it (e.g. to 1.3.0) breaks the suite; keep at 1.1.0 or update the test.
+- **First-run hint + auto-onboard** should be opt-in (`PAYWAY_ONBOARD_AUTO=1`) to avoid surprising non-interactive/CI invocations.
+
+---
+
 ## Known Issues (For Reference)
 
 | Severity | Issue | Status |
 |---|---|---|
-| 🟡 Medium | `npm run typecheck` exits 1 with no output while `npx tsc --noEmit` exits 0 clean — npm script wrapper disagrees with the underlying compiler, cause not yet diagnosed | Open |
+| 🟡 Medium | `npm run typecheck` exits 1 with no output while `npx tsc --noEmit` exits 0 clean — npm script wrapper disagrees with the underlying compiler, cause not yet diagnosed | ✅ Resolved (now both clean) |
 | 🟡 Medium | `test-logs/` generated artifacts were staged for commit | ✅ Resolved (added to `.gitignore`) |
 | 🔴 Critical | `checkout` `responseType` routing regression — `deeplink`/`qr_image` return `qr_string` | ✅ Resolved |
 | 🟡 Medium | Missing runtime input validation (amounts, currency, transaction ids) | ✅ Resolved |
@@ -349,10 +415,12 @@ Tasks must be completed **in this order**:
 ## Quick Reference
 
 ```
-Last committed version:  1.1.1 (commit ca96005, clean — 204+ tests passing)
-Working tree state:      Uncommitted Milestone C changes (~70 files, +6,441/-33)
-Vitest (working tree):   246 passing / 3 failing (see Task 16)
-Typecheck:                npx tsc --noEmit -> clean; npm run typecheck -> exits 1 (needs investigation)
-Build:                    Not re-verified against working tree since Milestone C changes started
-Next task:                Task 16 - fix checkout responseType regression, then commit Milestone C
+Package version (package.json):  1.1.1
+Last agentic commit:             adede4a (agentic payway CLI implementation review artifacts)
+Working tree state:              Uncommitted Milestone D — agentic onboarding wizard + provider/runtime UX (~20 files changed, src/agent/onboarding/*, src/cli/commands/onboard.ts, docs/AGENT-SETUP-PLAYBOOK.md, new onboarding tests)
+Vitest:                          662 passing / 0 failing (42 files)
+Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck -> clean
+Lint:                            biome -> 0 errors
+Build:                           clean (dist/ rebuilt)
+Next task:                       Commit Milestone D changeset, then tag next release
 ```

@@ -21,6 +21,8 @@ import {
   type CreatePlanConfirmation,
 } from './orchestrator.js';
 import { createProviderAdapter } from './provider.js';
+import { scanOnboardingState } from './onboarding/scan.js';
+import { maybeAutoOnboard, onboardingHintText } from '../cli/commands/onboard.js';
 import { isInteractiveTerminal, PRODUCTION_CONFIRMATION_PHRASE } from './terminal.js';
 
 // The REPL re-dispatches recognized commands through the shared Commander
@@ -204,22 +206,45 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
     }
 
     // Free-form request → agent (only when configured).
-    const config = readAgentConfig();
+    let config = readAgentConfig();
     if (!config) {
-      console.log(
-        `  ${c.yellow('!')} Agent is not configured. Run ${c.cyan('agent setup')} or use :run for manual CLI commands.`,
-      );
-      return;
+      if (interactive && (await maybeAutoOnboard())) config = readAgentConfig();
+      if (!config) {
+        const hint = onboardingHintText(scanOnboardingState());
+        console.log(`  ${c.yellow('!')} Agent is not configured.`);
+        if (hint) console.log(hint);
+        else console.log(`  Run ${c.cyan('payway-sdk onboard')} or use :run for manual CLI commands.`);
+        return;
+      }
     }
     // Provider and orchestrator are reconstructed for every turn so a prior
     // :profile switch cannot retain stale credentials or display labels.
+    const onProgress = (info: { phase: string; detail?: string }) => {
+      if (!interactive) return;
+      if (info.phase === 'propose') return; // already printed as "Contacting…"
+      const label =
+        info.phase === 'validate'
+          ? 'Validating plan…'
+          : info.phase === 'authorize'
+            ? 'Authorizing plan…'
+            : info.phase === 'execute'
+              ? `Executing ${info.detail ?? 'action'}…`
+              : 'Finalizing…';
+      console.log(`  ${c.dim('·')} ${label}`);
+    };
     const provider = createProviderAdapter(config);
     const orchestrator = new AgentOrchestrator({ context, provider, sessionId, providerConfig: config });
     const runOptions = {
       tty: interactive,
       environment: context.environment,
+      onProgress,
       ...(interactive ? { confirmCreatePlan } : {}),
     };
+    if (interactive) {
+      console.log(
+        `  ${c.dim('·')} Contacting ${c.cyan(config.provider)} ${c.dim(`(${config.model || 'no model'})`)} to propose a plan…`,
+      );
+    }
     const result = sessionId
       ? await orchestrator.runTurn(sessionId, trimmed, runOptions)
       : await orchestrator.runOneShot(trimmed, runOptions);
@@ -227,6 +252,11 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
       console.log(serializeCommandResult(result));
     } else {
       console.log(renderHumanResult(result));
+      if (result.status === 'failed' && result.error?.code === 'PROVIDER_PROPOSAL_FAILED') {
+        console.log(
+          `  ${c.yellow('!')} The inference provider could not propose a plan. Verify ${c.cyan('PAYWAY_AGENT_API_KEY')} is set and valid, then re-run ${c.cyan('agent doctor')}.`,
+        );
+      }
     }
     sessionId = result.sessionId;
   }

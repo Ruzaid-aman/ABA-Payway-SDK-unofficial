@@ -63,16 +63,27 @@ After building, the CLI binary is the SDK entry point (referenced here as `paywa
 export PAYWAY_AGENT_API_KEY=sk-...
 payway-sdk agent setup --provider openai --model gpt-4o --acknowledge-privacy
 
-# 2. Configure (or point at) your PayWay credentials
-#    via a profile:  payway-sdk profiles use <name>
-#    or via env:     PAYWAY_PROFILE / PAYWAY_MERCHANT_ID / PAYWAY_API_KEY / PAYWAY_SANDBOX
+# 2. Save your PayWay credentials as a PROFILE (required for agent readiness)
+payway-sdk profiles add          # interactive
+payway-sdk profiles use <name>   # make it the default
 
-# 3. Check the capability matrix
+# 3. Public HTTPS callback (required for online QR)
+#    PAYWAY_CALLBACK_URL=https://<public-host>/aba-payway-webhook in .env,
+#    or run: payway-sdk setup-webhook --tunnel
+
+# 4. Check the capability matrix
 payway-sdk agent doctor
 
-# 4. Run a request (sandbox, one-shot)
+# 5. Run a request (sandbox, one-shot)
 payway-sdk ask "Generate an online QR for 3 USD" --yolo
 ```
+
+> **`.env` credentials alone are not enough for the agent.** The context resolver does fall
+> back to environment variables, but agent readiness requires a **saved profile**
+> (`agent doctor` shows "PayWay context: missing" otherwise). See
+> [AGENT-SETUP-PLAYBOOK.md](./AGENT-SETUP-PLAYBOOK.md) for a field-tested setup path,
+> troubleshooting, and known pitfalls (including `profiles add` being interactive-only). The
+> guided `payway-sdk onboard` command automates every step above in one interactive flow.
 
 ---
 
@@ -133,7 +144,33 @@ Equivalent to passing `--acknowledge-privacy` on `setup`.
 
 Prints the capability matrix: provider connectivity, privacy-acknowledgment status, and each
 PayWay capability (online QR callback, offline KHQR, checkout, payment-link RSA,
-artifact/session storage).
+artifact/session storage). Every non-ready row also prints a `→` fix hint pointing at the
+exact command (or `payway-sdk onboard`) that resolves it.
+
+### `payway-sdk onboard`
+
+Guided, interactive setup. Scans the current state, shows a checklist of what is configured
+vs. missing, then walks through the stages needed to make the agent usable:
+
+1. **Inference provider** — choose OpenRouter / NVIDIA / OpenAI / Custom, pick a model, decide
+   where `PAYWAY_AGENT_API_KEY` lives (`.env` / session / user env), then verifies connectivity.
+2. **PayWay merchant profile** — name, environment, merchant id, API key (masked), optional RSA
+   PEM, optional KHQR block. Saved via the profile store.
+3. **Callback URL** — validates a public HTTPS URL (offers `setup-webhook --tunnel` guidance).
+4. **Privacy acknowledgement** — records `privacyAcknowledgedAt`.
+
+When every stage that is still missing has run, it re-renders the capability matrix before→after
+and ends with the suggested first command.
+
+| Option | Meaning |
+| --- | --- |
+| `--stage <name>` | Run one stage only: `provider` \| `profile` \| `callback` \| `privacy` \| `verify`. |
+
+- In a TTY the wizard runs; **in a non-TTY it emits a structured `blocked` JSON plan** (the same
+  shape as `ask`) listing the missing remedy ids, so scripts/CI can detect what to configure.
+- Already-satisfied stages are skipped automatically on a full run.
+- Set `PAYWAY_ONBOARD_AUTO=1` to auto-launch the wizard the first time `ask`/`agent` run
+  unconfigured in a TTY (opt-in; non-TTY is unaffected).
 
 ### `payway-sdk agent sessions`
 
@@ -230,6 +267,11 @@ The agent resolves credentials with this precedence:
 A selected profile's credentials are authoritative and are **never** overridden by ambient
 `PAYWAY_MERCHANT_ID` / `PAYWAY_API_KEY`.
 
+> **Agent readiness gate:** the env-var fallback above is honored for *execution*, but the
+> agent's capability matrix marks "PayWay context" as **missing** unless a profile is selected
+> (`--profile`, `PAYWAY_PROFILE`, a default, or an active profile). Save a profile with
+> `payway-sdk profiles add` + `profiles use <name>` before relying on the agent.
+
 Environment variables (used when no profile is selected):
 
 | Variable | Purpose |
@@ -250,10 +292,12 @@ Environment variables (used when no profile is selected):
 ### 6.3 On-disk layout
 
 ```
-<APPDATA or ~/.config>/aba-payway-sdk/agent/
-├── agent-config.json     # provider config (non-secret)
-├── sessions/             # durable session event logs
-└── ledger/               # execution ledger records
+<APPDATA or ~/.config>/aba-payway-sdk/
+├── profiles.json           # saved PayWay credential profiles (plaintext)
+└── agent/
+    ├── agent-config.json     # provider config (non-secret)
+    ├── sessions/             # durable session event logs
+    └── ledger/               # execution ledger records
 ```
 
 All writes are atomic (`<file>.tmp` → `rename`), so a crash never corrupts an existing file.
@@ -328,6 +372,11 @@ explicit approval flag.
   `agent setup --acknowledge-privacy` to configure and acknowledge in one step.
 - The REPL's `:run` only re-dispatches the existing manual top-level commands; it deliberately
   blocks agent-management commands and any shell/path/URI-looking input.
+- `generate_online_qr` accepts a `template` (passed to the API as `qrImageTemplate`) but the
+  PayWay online-QR API has **no color parameter** — QR styling is determined by the template.
+- `profiles add` is interactive-only (masked API-key prompt); it cannot be driven by piped
+  stdin. Script profile creation by writing `profiles.json` directly or via the exported
+  helpers in `src/config/profiles.ts`.
 
 ---
 

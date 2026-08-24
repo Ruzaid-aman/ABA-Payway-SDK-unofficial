@@ -5,6 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { Command } from 'commander';
 import { registerAgentCommands } from './cli/commands/agent.js';
+import { registerOnboardCommand } from './cli/commands/onboard.js';
 import { runDoctor } from './cli/commands/doctor.js';
 import { runInit } from './cli/commands/init.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
@@ -1186,6 +1187,7 @@ program
 
 // --- agentic command tree ---
 registerAgentCommands(program);
+registerOnboardCommand(program);
 
 // --- parse ---
 program.parseAsync().catch((err: unknown) => {

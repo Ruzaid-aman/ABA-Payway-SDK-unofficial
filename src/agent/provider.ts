@@ -156,7 +156,13 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
         signal: controller.signal,
       });
     } catch (cause) {
-      throw new ProviderProposalError(`provider request failed: ${(cause as Error).message}`);
+      const err = cause as Error;
+      if (err.name === 'AbortError' || /abort/i.test(err.message)) {
+        throw new ProviderProposalError(
+          `provider request timed out after ${timeoutMs}ms (check PAYWAY_AGENT_API_KEY, network egress, and baseUrl)`,
+        );
+      }
+      throw new ProviderProposalError(`provider request failed: ${err.message}`);
     } finally {
       clearTimeout(timer);
     }
@@ -238,6 +244,9 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
 
     async checkConnectivity(): Promise<ProviderConnectivity> {
       const apiKey = process.env[API_KEY_ENV] ?? '';
+      if (!apiKey.trim()) {
+        return { status: 'blocked', detail: `${API_KEY_ENV} is not set` };
+      }
       const baseUrl = resolveBaseUrl(config);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);

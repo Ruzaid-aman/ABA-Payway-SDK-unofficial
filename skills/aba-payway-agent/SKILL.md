@@ -108,6 +108,14 @@ executes zero PayWay creates.
 
 - `payway-sdk agent doctor` — prints the capability matrix (provider connectivity,
   context, online QR, offline KHQR, checkout, payment-link RSA, artifact/session storage).
+  Every non-ready row includes a `→` fix hint pointing at the command that resolves it.
+- `payway-sdk onboard` — **guided interactive setup**. Scans state, shows a
+  configured/missing checklist, then runs the needed stages in order: inference provider
+  (choose OpenRouter/NVIDIA/OpenAI/Custom, model, key placement, live connectivity check) →
+  PayWay merchant profile → callback URL (public HTTPS) → privacy acknowledgement. Re-prints
+  the matrix before→after. In a non-TTY it emits a structured `blocked` JSON plan listing
+  missing remedy ids. `--stage <name>` runs one stage; already-satisfied stages are skipped.
+  Set `PAYWAY_ONBOARD_AUTO=1` to auto-launch the wizard on first unconfigured `ask`/`agent`.
 - `payway-sdk agent sessions list|export|clear` — manage sessions. `export`
   scrubs secrets; `clear all` requires `--approve` in non-TTY.
 - `payway-sdk agent` (no subcommand) — interactive REPL.
@@ -128,9 +136,38 @@ executes zero PayWay creates.
 
 - Configure with `payway-sdk agent setup`. The provider **API key is supplied only
   via the `PAYWAY_AGENT_API_KEY` environment variable** — it is never accepted as
-  a CLI argument and never persisted.
+  a CLI argument and never persisted. On Windows, `.env` works too (the CLI loads
+  it into `process.env` at startup).
 - A privacy acknowledgement gate blocks any plan proposal until
-  `privacyAcknowledgedAt` is set.
+  `privacyAcknowledgedAt` is set (pass `--acknowledge-privacy` on first setup).
+
+## Setup playbook & pitfalls (field-tested)
+
+Full notes: [docs/AGENT-SETUP-PLAYBOOK.md](../../docs/AGENT-SETUP-PLAYBOOK.md).
+Architecture/maintenance notes (module map, stage order, gotchas): same doc,
+section "Implementation & architecture".
+
+1. **Preferred path: `payway-sdk onboard`.** It runs the whole flow
+   (provider → profile → callback → privacy → verify) interactively, skips
+   satisfied stages, and re-prints the matrix. Use it instead of the manual
+   steps below unless you are in CI/headless or need fine-grained control.
+2. **Order matters:** `agent setup` → PayWay **profile** (`profiles add`) →
+   public HTTPS callback → `agent doctor` all green → `ask`.
+3. **`.env` credentials alone are NOT enough for the agent.** Readiness requires
+   a saved profile (context source must not be `none`). `onboard` creates one
+   for you; manually, use `payway-sdk profiles add`, then make it the default.
+4. **`profiles add` is interactive-only** — piped stdin fails on the masked API
+   key prompt. `onboard` bypasses it via the exported profile helpers
+   (`addProfile`/`setDefaultProfile`/`saveProfileStore`); in scripts, write
+   `%APPDATA%\aba-payway-sdk\profiles.json` directly (schema in
+   `src/config/profiles.ts`).
+5. **Online QR needs a PUBLIC HTTPS callback.** `.local`, `http://`, and
+   localhost URLs fail validation — run `payway-sdk setup-webhook --tunnel` or
+   supply a real public webhook URL.
+6. **Diagnose with `agent doctor`:** provider/context/callback rows tell you
+   exactly which of the three setup legs is missing (see playbook table).
+6. Non-TTY creates require `--approve` (or sandbox-only `--yolo`);
+   `generate_online_qr` supports `template` but has no color option.
 
 ## Redaction (secrets never leave)
 
@@ -167,9 +204,20 @@ if (result.status === 'needs_confirmation') {
 }
 ```
 
-Common failures: `AGENT_NOT_CONFIGURED` (run `agent setup`), `PRIVACY_ACK_REQUIRED`
+Common failures: `AGENT_NOT_CONFIGURED` (run `agent setup`/`onboard`), `PRIVACY_ACK_REQUIRED`
 (set `privacyAcknowledgedAt`), `INVALID_PLAN` (provider returned an invalid plan),
 `PROVIDER_PROPOSAL_FAILED` (provider error).
+
+**Diagnosing `PROVIDER_PROPOSAL_FAILED`:** the message now distinguishes causes:
+- `missing API key: set PAYWAY_AGENT_API_KEY …` — key env var is empty.
+- `provider request timed out after 30000ms …` — network egress to the provider is
+  blocked or the key is invalid (the chat request hung until the `timeoutMs` abort).
+- `provider returned HTTP 401/403 …` — key rejected by the provider.
+In a TTY, `ask`/`agent` print a `· Contacting <provider> (<model>) to propose a plan…`
+line plus a remediation hint; in non-TTY the provider message is **redacted** to
+`[REDACTED]` for safety, so diagnose interactively or via `agent doctor`. `agent doctor`
+reports the provider row as `blocked` when `PAYWAY_AGENT_API_KEY` is unset (it no longer
+trusts the unauthenticated `/models` ping).
 
 ## Related Skills
 

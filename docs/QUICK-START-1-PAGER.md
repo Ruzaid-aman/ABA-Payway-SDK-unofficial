@@ -246,12 +246,31 @@ Let a supported provider propose and run PayWay actions through a risk-gated pip
 
 ```bash
 export PAYWAY_AGENT_API_KEY=sk-...        # the ONLY place the key lives — never stored
-payway-sdk agent setup --provider openai --model gpt-4o --capability-mode strict-json-plan
-payway-sdk agent doctor                   # print the capability matrix
+payway-sdk agent setup --provider openai --model gpt-4o --capability-mode strict-json-plan --acknowledge-privacy
+
+# PayWay credentials must be saved as a PROFILE (env vars alone fail agent readiness):
+payway-sdk profiles add && payway-sdk profiles use <name>
+
+# Online QR needs a PUBLIC HTTPS callback (set PAYWAY_CALLBACK_URL or run `setup-webhook --tunnel`):
+payway-sdk agent doctor                   # print the capability matrix — all rows green before `ask`
 payway-sdk ask "Generate a $3 online QR for sandbox" --yolo
 ```
 
 The provider **API key is supplied only via `PAYWAY_AGENT_API_KEY`** — it is never accepted as a CLI argument and never persisted. `agent setup` stores only a plaintext config (provider, model, mode); secrets are never written.
+
+> Field-tested setup path, troubleshooting table, and known pitfalls: [AGENT-SETUP-PLAYBOOK.md](./AGENT-SETUP-PLAYBOOK.md).
+
+### Guided onboarding (recommended)
+
+The `payway-sdk onboard` command runs the whole flow above in one interactive wizard: it scans
+state, shows what is missing, configures the inference provider (with a live connectivity check),
+saves the PayWay profile, validates the callback URL, and acknowledges privacy — then re-prints
+the capability matrix. In a non-TTY it emits a structured `blocked` JSON plan instead of prompts.
+
+```bash
+payway-sdk onboard          # interactive guided setup
+payway-sdk onboard --stage provider   # jump to a single stage
+```
 
 ### Privacy acknowledgement
 

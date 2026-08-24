@@ -64,7 +64,7 @@ The SDK ships an agentic CLI that lets a supported provider propose and run PayW
 - [aba-payway-agent skill](./skills/aba-payway-agent/SKILL.md) — provider modes, the 11 tools, risk gates, execution ledger, sessions, redaction.
 - [aba-payway-first-payment skill](./skills/aba-payway-first-payment/SKILL.md) — choosing QR / checkout / payment-link for a first payment.
 
-> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. Every agent action has a fully-supported manual equivalent.
+> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. Every agent action has a fully-supported manual equivalent. Setup requires a saved credential profile and a public HTTPS callback — run `payway-sdk onboard` for a guided interactive flow, or see the [Agent Setup Playbook](./docs/AGENT-SETUP-PLAYBOOK.md) for the field-tested path.
 
 ### CLI commands
 

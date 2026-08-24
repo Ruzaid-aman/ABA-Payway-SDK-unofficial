@@ -87,7 +87,7 @@ export function updateAgentConfig(
     ({
       version: 'agent-config/v1',
       provider: 'openai',
-      model: '',
+      model: 'gpt-4o',
       capabilityMode: 'strict-json-plan',
     } as import('./contracts.js').ProviderConfigV1);
 

@@ -41,6 +41,11 @@ import { authorizePlan, classifyRisk } from './risk.js';
 import { validateAgentPlan, validateCommandResult, validateMaterializedPlan } from './schemas.js';
 import { appendSessionEvent, buildDeterministicSummary, createSession, loadSession } from './sessions.js';
 
+export interface OrchestratorProgress {
+  phase: 'propose' | 'validate' | 'authorize' | 'execute' | 'finalize';
+  detail?: string;
+}
+
 export interface OrchestratorOptions {
   tty: boolean;
   flag?: 'approve' | 'yolo';
@@ -52,6 +57,8 @@ export interface OrchestratorOptions {
    * performs terminal I/O itself.
    */
   confirmCreatePlan?: (proposal: CreatePlanConfirmation) => Promise<boolean>;
+  /** Optional progress sink for runtime UX; core never performs terminal I/O. */
+  onProgress?: (info: OrchestratorProgress) => void;
 }
 
 export interface CreatePlanConfirmationAction {
@@ -169,6 +176,8 @@ export class AgentOrchestrator {
     request: string,
     options: OrchestratorOptions,
   ): Promise<AgentCommandResultV1> {
+    const progress = (info: OrchestratorProgress) => options.onProgress?.(info);
+
     // 1. Cancellation: record and leave the session usable; never call PayWay.
     if (this.looksLikeCancellation(request)) {
       const sanitized = this.scrub(request) as string;
@@ -204,6 +213,7 @@ export class AgentOrchestrator {
     const scrubbedContext = this.buildScrubbedContext(sessionId);
 
     // 4. Plan (provider proposal).
+    progress({ phase: 'propose' });
     let plan: AgentPlanV1;
     try {
       // Keep the validated proposal intact for execution decisions. A scrubbed
@@ -242,6 +252,7 @@ export class AgentOrchestrator {
         { sessionId, request },
       );
     }
+    progress({ phase: 'validate' });
 
     const storedPlan = this.scrub(plan) as AgentPlanV1;
     this.appendEvent(sessionId, 'plan', { plan: storedPlan, scrubbedContext });
@@ -364,6 +375,7 @@ export class AgentOrchestrator {
     // 7. Authorize. An unflagged TTY can receive a fresh, CLI-owned
     // confirmation callback. No PayWay call is made if it is rejected or
     // absent. Production --yolo is never eligible for this path.
+    progress({ phase: 'authorize' });
     const authorization = authorizePlan(materializedPlan, {
       tty: options.tty,
       flag: options.flag,
@@ -442,6 +454,7 @@ export class AgentOrchestrator {
 
       let result: ToolExecutionResult;
       try {
+        progress({ phase: 'execute', detail: tool });
         result = await executeAction(action, execCtx);
       } catch (error) {
         result = {

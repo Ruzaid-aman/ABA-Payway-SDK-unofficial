@@ -25,9 +25,13 @@ import {
   type CreatePlanConfirmation,
 } from '../../agent/orchestrator.js';
 import { createProviderAdapter, type ProviderConnectivity } from '../../agent/provider.js';
-import { evaluateReadiness } from '../../agent/readiness.js';
+import { evaluateReadinessDetailed } from '../../agent/readiness.js';
+import { REMEDIES } from '../../agent/onboarding/remedies.js';
+import type { RemedyId } from '../../agent/onboarding/remedies.js';
 import { setAgentProgram, startRepl } from '../../agent/repl.js';
 import { clearSessions, exportSession, listSessions } from '../../agent/sessions.js';
+import { scanOnboardingState } from '../../agent/onboarding/scan.js';
+import { maybeAutoOnboard, onboardingHintText } from './onboard.js';
 import { isInteractiveTerminal, PRODUCTION_CONFIRMATION_PHRASE } from '../../agent/terminal.js';
 
 export { isInteractiveTerminal } from '../../agent/terminal.js';
@@ -133,8 +137,13 @@ export function registerAgentCommands(program: Command): void {
     .option('--approve', 'Authorize create actions (both sandbox and production)')
     .option('--yolo', 'Skip confirmation for sandbox create actions only')
     .option('--session <id>', 'Resume an existing agent session')
-    .action(async (request: string, opts: { approve?: boolean; yolo?: boolean; session?: string }) => {
-      const context = resolvePayWayContext({ profile: readProfile(program) });
+    .option('--provider-timeout <ms>', 'Override the inference provider request timeout (ms)')
+    .action(
+      async (
+        request: string,
+        opts: { approve?: boolean; yolo?: boolean; session?: string; providerTimeout?: string },
+      ) => {
+        const context = resolvePayWayContext({ profile: readProfile(program) });
       const config = readAgentConfig();
 
       if (!config) {
@@ -143,16 +152,17 @@ export function registerAgentCommands(program: Command): void {
             version: 'agent-command/v1',
             status: 'blocked',
             request,
-            message: 'Agent is not configured. Run `payway-sdk agent setup` to configure a provider, then retry.',
+            message: 'Agent is not configured. Run `payway-sdk onboard` to configure a provider, then retry.',
             error: { code: 'AGENT_NOT_CONFIGURED', message: 'No agent provider configuration found.' },
           };
           console.log(serializeCommandResult(blocked));
           process.exitCode = 1;
         } else {
+          if (await maybeAutoOnboard()) return;
+          const hint = onboardingHintText(scanOnboardingState());
           console.log(`\n  ${c.yellow('!')} ${c.bold('Agent is not configured')}\n`);
-          console.log(
-            `  Run ${c.cyan('payway-sdk agent setup')} to configure a provider before using ${c.cyan('ask')}.\n`,
-          );
+          if (hint) console.log(`${hint}\n`);
+          else console.log(`  Run ${c.cyan('payway-sdk onboard')} to configure before using ${c.cyan('ask')}.\n`);
         }
         return;
       }
@@ -160,7 +170,32 @@ export function registerAgentCommands(program: Command): void {
       const tty = isInteractiveTerminal();
       const flag: 'approve' | 'yolo' | undefined = opts.approve ? 'approve' : opts.yolo ? 'yolo' : undefined;
 
-      const provider = createProviderAdapter(config);
+      const runConfig =
+        opts.providerTimeout && !Number.isNaN(Number(opts.providerTimeout))
+          ? { ...config, timeoutMs: Number(opts.providerTimeout) }
+          : config;
+
+      if (tty) {
+        console.log(
+          `  ${c.dim('·')} Contacting ${c.cyan(runConfig.provider)} ${c.dim(`(${runConfig.model || 'no model'})`)} to propose a plan…`,
+        );
+      }
+
+      const onProgress = (info: { phase: string; detail?: string }) => {
+        if (!tty) return;
+        if (info.phase === 'propose') return; // already printed as "Contacting…"
+        const label =
+          info.phase === 'validate'
+            ? 'Validating plan…'
+            : info.phase === 'authorize'
+              ? 'Authorizing plan…'
+              : info.phase === 'execute'
+                ? `Executing ${info.detail ?? 'action'}…`
+                : 'Finalizing…';
+        console.log(`  ${c.dim('·')} ${label}`);
+      };
+
+      const provider = createProviderAdapter(runConfig);
       const orchestrator = new AgentOrchestrator({
         context,
         provider,
@@ -171,6 +206,7 @@ export function registerAgentCommands(program: Command): void {
         tty,
         flag,
         environment: context.environment,
+        onProgress,
         ...(tty && !flag
           ? {
               confirmCreatePlan: createInteractivePlanConfirmation(),
@@ -183,6 +219,11 @@ export function registerAgentCommands(program: Command): void {
         if (result.status === 'failed' || result.status === 'blocked') process.exitCode = 1;
       } else {
         console.log(renderHumanResult(result));
+        if (result.status === 'failed' && result.error?.code === 'PROVIDER_PROPOSAL_FAILED') {
+          console.log(
+            `  ${c.yellow('!')} The inference provider could not propose a plan. Verify ${c.cyan('PAYWAY_AGENT_API_KEY')} is set and valid, then re-run ${c.cyan('agent doctor')}.`,
+          );
+        }
       }
     });
 
@@ -274,34 +315,42 @@ export function registerAgentCommands(program: Command): void {
     .action(async () => {
       const context = resolvePayWayContext({ profile: readProfile(program) });
       const config = readAgentConfig();
-      const matrix = evaluateReadiness(context, config ?? defaultConfig());
+      const matrix = evaluateReadinessDetailed(context, config ?? defaultConfig(), {
+        privacyAcknowledged: !!config?.privacyAcknowledgedAt,
+      });
 
       let connectivity: ProviderConnectivity = { status: 'unverified', detail: 'agent not configured' };
       if (config) {
         const provider = createProviderAdapter(config);
         connectivity = await provider.checkConnectivity();
       }
+      const providerRow = matrix.find((r) => r.id === 'provider') as (typeof matrix)[number];
+      providerRow.state =
+        connectivity.status === 'ready' ? 'ready' : connectivity.status === 'blocked' ? 'blocked' : 'unverified';
+      providerRow.detail = connectivity.detail;
+      providerRow.remedyId = providerRow.state === 'ready' ? undefined : providerRow.remedyId;
 
       console.log(`\n${c.bold('Agent Capability Matrix')}\n`);
-      console.log(
-        `  ${marker(connectivity.status === 'ready' ? 'ready' : connectivity.status === 'blocked' ? 'blocked' : 'unverified')}  Provider connectivity`,
-      );
-      console.log(
-        `  ${marker(config?.privacyAcknowledgedAt ? 'ready' : 'missing')}  Privacy acknowledgment${
-          config?.privacyAcknowledgedAt ? ` (${config.privacyAcknowledgedAt})` : ''
-        }`,
-      );
-      console.log(`  ${marker(matrix.context)}  PayWay context (${context.displayLabel})`);
-      console.log(`  ${marker(matrix.onlineQr)}  Online QR callback`);
-      console.log(`  ${marker(matrix.offlineKhqr)}  Offline KHQR`);
-      console.log(`  ${marker(matrix.checkout)}  Checkout`);
-      console.log(`  ${marker(matrix.paymentLinkRsa)}  Payment-link RSA`);
-      console.log(`  ${marker(matrix.artifactStorage)}  Artifact storage`);
-      console.log(`  ${marker(matrix.sessionStorage)}  Session storage`);
+      for (const row of matrix) {
+        const stateLabel =
+          row.id === 'privacy' && config?.privacyAcknowledgedAt
+            ? ` ${c.dim(`(${config.privacyAcknowledgedAt})`)}`
+            : row.detail
+              ? ` ${c.dim(`(${row.detail})`)}`
+              : '';
+        console.log(`  ${marker(row.state)}  ${row.label}${stateLabel}`);
+        if (row.remedyId) {
+          console.log(`    ${c.dim(`→ ${REMEDIES[row.remedyId].fix}`)}`);
+        }
+      }
       console.log();
       if (connectivity.detail) {
         console.log(`  ${c.dim(`Provider: ${connectivity.detail}`)}`);
         console.log();
+      }
+      const missing = matrix.filter((r) => r.state !== 'ready' && r.remedyId).map((r) => r.remedyId as RemedyId);
+      if (missing.length > 0 && config && !connectivity.detail) {
+        console.log(`  ${c.dim('Run "payway-sdk onboard" to configure missing items interactively.')}\n`);
       }
     });
 
@@ -311,7 +360,7 @@ export function registerAgentCommands(program: Command): void {
     .description('Acknowledge the provider privacy notice (required before plans are proposed)')
     .action(() => {
       const existing = readAgentConfig();
-      if (!existing || !existing.model) {
+      if (!existing?.model) {
         console.log(`\n  ${c.red('✗')} Privacy acknowledgment requires a configured provider.\n`);
         console.log(
           `  Run ${c.cyan('payway-sdk agent setup --provider <p> --model <m> --acknowledge-privacy')} first,\n  or run ${c.cyan('agent ack')} after ${c.cyan('agent setup')}.\n`,

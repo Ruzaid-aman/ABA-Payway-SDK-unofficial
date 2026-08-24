@@ -108,7 +108,7 @@ For API-calling commands, the CLI resolves credentials in this order: explicit `
 
 The profile file is plaintext at `%APPDATA%\aba-payway-sdk\profiles.json` on Windows, or `~/.config/aba-payway-sdk/profiles.json` when `APPDATA` is unavailable. Do not commit it, do not share it, and restrict local filesystem access. Plaintext profiles are a CLI convenience only: deployed SDK applications should load keys from an OS secret manager, a cloud secret manager, or CI/CD secret storage. Never put PayWay credentials in browser or mobile application code.
 
-> 🤖 **Agentic CLI:** The agentic CLI keeps its provider API key **only** in the `PAYWAY_AGENT_API_KEY` environment variable — it is never stored in agent config or session files (which are also plaintext; restrict access). For deployed SDK use, prefer an OS/cloud secret manager or CI/CD secret storage; never store provider or PayWay secrets in agent config or sessions. See the [Agentic PayWay CLI guide](./QUICK-START-1-PAGER.md#agentic-payway-cli) and the [aba-payway-agent](../skills/aba-payway-agent/SKILL.md) skill.
+> 🤖 **Agentic CLI:** The agentic CLI keeps its provider API key **only** in the `PAYWAY_AGENT_API_KEY` environment variable — it is never stored in agent config or session files (which are also plaintext; restrict access). Note that agent readiness requires a **saved credential profile** (`.env` fallback alone marks "PayWay context" as missing in `agent doctor`) plus a **public HTTPS** `PAYWAY_CALLBACK_URL` for online QR. See the [Agentic PayWay CLI guide](./QUICK-START-1-PAGER.md#agentic-payway-cli), the [aba-payway-agent](../skills/aba-payway-agent/SKILL.md) skill, and the field-tested [Agent Setup Playbook](./AGENT-SETUP-PLAYBOOK.md).
 
 ---
 
