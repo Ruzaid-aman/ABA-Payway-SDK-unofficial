@@ -159,6 +159,24 @@ agentic guidance before PayWay credentials are entered.
 12. **The `payway-sdk` bin is only on PATH after `npm link` or a global install.** From a
     source checkout, invoke `node dist/cli.js <command>` (or `npx payway-sdk`); running bare
     `payway-sdk` in a fresh terminal fails with "not recognized".
+13. **The strict-JSON system prompt MUST embed the tool catalog.** The original prompt said
+    `<tool_name>` without listing tools, so every model invented tool names (`generate_qr`,
+    `generateQrCode`) and failed plan validation. `buildStrictJsonSystemPrompt()` now derives a
+    TOOL CATALOG from the same definitions as `buildToolSchemas()` (single source of truth), and
+    the one-round repair feedback repeats the exact valid names.
+14. **Model-supplied URLs are never authoritative.** Models invent placeholder callback URLs;
+    `normalizePlan` deterministically overrides `generate_online_qr`'s `callbackUrl` with the
+    resolved merchant profile's URL when present. Do not remove this override.
+15. **PayWay's QR API requires `payment_option`.** The sandbox returns
+    `400 The given data was invalid` when it is omitted (older responses accepted it).
+    `src/domains/qr.ts` defaults it to `abapay_khqr`; keep that default.
+16. **Local artifact tools cannot consume same-plan outputs.** `save_artifact` chained after
+    `generate_online_qr` in one plan is rejected by prevalidation (`INVALID_LOCAL_ACTION`) because
+    the QR does not exist yet. The prompt now forbids this; do not loosen the prevalidation.
+17. **Sampling passthrough exists for weak/free models.** `agent setup --max-tokens/--temperature/
+    --top-p/--extra-body`. Set `--max-tokens` explicitly (server defaults can truncate plans),
+    prefer `--temperature 0.2`–0.5 for schema adherence, and use `--extra-body '{"chat_template_kwargs":
+    {"enable_thinking":false}}'` on NVIDIA thinking models — thinking mode multiplies latency 10×+.
 
 ### Where agent-mode knowledge lives (for coding agents)
 - `skills/aba-payway-agent/SKILL.md` (v1.1.0) — onboarding command reference +

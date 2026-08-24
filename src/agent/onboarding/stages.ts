@@ -49,6 +49,7 @@ const MODEL_DEFAULTS: Record<ProviderPreset, string> = {
   openai: 'gpt-4o',
   openrouter: 'openai/gpt-4o',
   nvidia: 'meta/llama-3.3-70b-instruct',
+  opencode: 'x-preview-f-free',
   custom: '',
 };
 

@@ -94,6 +94,14 @@ export function normalizePlan(plan: AgentPlanV1, context: ResolvedPayWayContext)
       if (qr.callbackUrl !== undefined && !isPublicHttpsUrl(qr.callbackUrl)) {
         warnings.push('online QR callbackUrl must be a public https URL');
       }
+      if (
+        context.callbackUrl &&
+        isPublicHttpsUrl(context.callbackUrl) &&
+        qr.callbackUrl !== context.callbackUrl
+      ) {
+        qr.callbackUrl = context.callbackUrl;
+        defaultsApplied.push('online QR callbackUrl set from the resolved merchant profile');
+      }
       if (readiness.onlineQr !== 'ready') {
         needsClarification = true;
         clarification =

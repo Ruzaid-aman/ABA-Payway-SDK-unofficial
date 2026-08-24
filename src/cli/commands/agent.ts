@@ -240,7 +240,7 @@ export function registerAgentCommands(program: Command): void {
   agentCmd
     .command('setup')
     .description('Configure the agent provider (API key stays in PAYWAY_AGENT_API_KEY env only)')
-    .option('--provider <provider>', 'Provider preset: openai | openrouter | nvidia | custom')
+    .option('--provider <provider>', 'Provider preset: openai | openrouter | nvidia | opencode | custom')
     .option('--model <model>', 'Model name, e.g. gpt-4o')
     .option('--base-url <url>', 'Custom provider base URL (for provider=custom)')
     .option('--capability-mode <mode>', 'native-tools | strict-json-plan')
@@ -269,7 +269,7 @@ export function registerAgentCommands(program: Command): void {
         const patch: Partial<ProviderConfigV1> = {};
         if (opts.provider) {
           const preset = opts.provider as ProviderPreset;
-          if (!['openai', 'openrouter', 'nvidia', 'custom'].includes(preset)) {
+          if (!['openai', 'openrouter', 'nvidia', 'opencode', 'custom'].includes(preset)) {
             console.log(`\n  ${c.red('✗')} Invalid --provider '${opts.provider}'.\n`);
             process.exitCode = 1;
             return;

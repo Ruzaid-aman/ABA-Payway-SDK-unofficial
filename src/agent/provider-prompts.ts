@@ -49,7 +49,7 @@ function opt(props: Record<string, unknown>): Record<string, unknown> {
  * intentionally omitted here (it is implied by the function name and added by
  * the adapter when assembling the plan).
  */
-export function buildToolSchemas(): unknown {
+function buildToolDefinitions(): ToolDefinition[] {
   const tools: ToolDefinition[] = [
     {
       type: 'function',
@@ -269,8 +269,43 @@ export function buildToolSchemas(): unknown {
       },
     },
   ];
-
   return tools;
+}
+
+export function buildToolSchemas(): unknown {
+  return buildToolDefinitions();
+}
+
+interface PropertySchema {
+  type?: string | string[];
+  description?: string;
+  enum?: unknown[];
+}
+
+/** Render one tool as a compact, exact catalog entry for the strict-JSON prompt. */
+function describeTool(tool: ToolDefinition): string {
+  const { name, description, parameters } = tool.function;
+  const required = new Set(parameters.required);
+  const paramLines = Object.entries(parameters.properties).map(([paramName, rawSchema]) => {
+    const schema = rawSchema as PropertySchema;
+    const parts: string[] = [];
+    if (Array.isArray(schema.type)) parts.push(schema.type.join('|'));
+    else if (schema.type) parts.push(schema.type);
+    if (schema.enum) parts.push(`one of ${schema.enum.map((v) => JSON.stringify(v)).join('|')}`);
+    if (!required.has(paramName)) parts.push('optional');
+    return `        ${paramName}: ${parts.join(', ')}${schema.description ? ` // ${schema.description}` : ''}`;
+  });
+  return [
+    `     "${name}" — ${description}`,
+    `       required: ${parameters.required.join(', ') || '(none)'}`,
+    ...paramLines,
+  ].join('\n');
+}
+
+function buildToolCatalog(): string {
+  return buildToolDefinitions()
+    .map(describeTool)
+    .join('\n');
 }
 
 /**
@@ -290,21 +325,26 @@ export function buildStrictJsonSystemPrompt(): string {
     '  "version": "agent-plan/v1",',
     '  "request": "<the original user request, verbatim or lightly normalized>",',
     '  "actions": [',
-    '    { "tool": "<tool_name>", ...tool_specific_parameters },',
+    '    { "tool": "<exact tool name from the catalog below>", ...tool_specific_parameters },',
     '    ...',
     '  ],',
     '  "assumptions": [ "<optional free-text assumption>" ],',
     '  "context": { "<optional key>: <optional value>" }',
     '}',
     '',
+    'TOOL CATALOG — use these EXACT tool names and ONLY the listed parameters:',
+    buildToolCatalog(),
+    '',
     'Rules:',
     '- `version` must be the literal string "agent-plan/v1".',
     '- `request` must be a non-empty string.',
     '- `actions` must be an array of one or more action objects.',
-    '- Each action must include its `tool` field and ONLY the parameters valid for that tool.',
+    "- Each action's `tool` value must be copied VERBATIM from the TOOL CATALOG above.",
+    '- Each action must include every parameter listed under that tool\'s `required:` line.',
     '- Do not invent parameters that are not part of the chosen tool.',
     '- Use `null` for any `transactionId` that is not yet known (a draft plan).',
     '- `callbackUrl`, `returnUrl`, and `cancelUrl` must be https:// URLs.',
+    '- Local artifact tools (`save_artifact`, `open_artifact`, `copy_to_clipboard`) operate on artifacts that ALREADY exist in this session. NEVER chain them after a create action in the same plan to persist that action\'s future output.',
     '- Output must be parseable by a strict JSON parser: a single object, no fences, no prose, no trailing content.',
   ].join('\n');
 }

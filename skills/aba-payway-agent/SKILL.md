@@ -15,8 +15,11 @@ materialized through the execution ledger.**
 
 ```sh
 # 1. Configure the provider (API key stays in the environment, never stored).
+#    Presets: opencode (free) | openai | openrouter | nvidia | custom
 export PAYWAY_AGENT_API_KEY=sk-...
-payway-sdk agent setup --provider openai --model gpt-4o --capability-mode strict-json-plan
+payway-sdk agent setup --provider opencode --model x-preview-f-free --capability-mode strict-json-plan \
+  --max-tokens 8192 --temperature 0.2
+# For NVIDIA thinking models add: --extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
 
 # 2. First run must acknowledge the privacy notice, then ask.
 payway-sdk ask "Generate a $3 online QR for sandbox" --yolo

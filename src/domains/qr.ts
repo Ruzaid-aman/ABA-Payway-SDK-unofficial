@@ -43,7 +43,7 @@ export function createQrDomain(
           tran_id: params.transactionId,
           amount: formatAmount(params.amount, params.currency || 'USD'),
           purchase_type: params.purchaseType || 'purchase',
-          payment_option: params.paymentOption,
+          payment_option: params.paymentOption || 'abapay_khqr',
           callback_url: encodeBase64IfNeeded(params.callbackUrl),
           currency: params.currency || 'USD',
           lifetime: params.lifetime ? Math.floor(params.lifetime / 60) : undefined,

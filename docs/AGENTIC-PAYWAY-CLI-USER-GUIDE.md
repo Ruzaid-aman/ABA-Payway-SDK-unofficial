@@ -125,12 +125,25 @@ Configures the provider (non-secret settings only).
 
 | Option | Meaning |
 | --- | --- |
-| `--provider <preset>` | `openai` \| `openrouter` \| `nvidia` \| `custom`. |
-| `--model <name>` | Model id, e.g. `gpt-4o`. |
+| `--provider <preset>` | `openai` \| `openrouter` \| `nvidia` \| `opencode` \| `custom`. |
+| `--model <name>` | Model id, e.g. `gpt-4o` or `x-preview-f-free`. |
 | `--base-url <url>` | Custom endpoint (required when `--provider custom`). |
 | `--capability-mode <mode>` | `native-tools` \| `strict-json-plan`. |
 | `--timeout <ms>` | Provider request timeout (positive integer). |
+| `--max-tokens <n>` | Sampling passthrough: `max_tokens` for chat completions. Recommended for models with small server-side defaults — a truncated response cannot produce a valid plan. |
+| `--temperature <n>` | Sampling passthrough: temperature (0–2). For strict-JSON planning, 0.2–0.5 adheres to the tool schema far better than 1.0. |
+| `--top-p <n>` | Sampling passthrough: top_p (0–1). |
+| `--extra-body <json>` | Extra top-level request-body fields merged verbatim into every call, e.g. `'{"chat_template_kwargs":{"enable_thinking":false}}'` for NVIDIA thinking models. |
 | `--acknowledge-privacy` | Records the privacy acknowledgment timestamp (required before plans are proposed). |
+
+Provider presets and their base URLs:
+
+| Preset | Base URL |
+| --- | --- |
+| `opencode` | `https://opencode.ai/zen/v1` (free models, e.g. `x-preview-f-free`) |
+| `openai` | `https://api.openai.com/v1` |
+| `openrouter` | `https://openrouter.ai/api/v1` |
+| `nvidia` | `https://integrate.api.nvidia.com/v1` |
 
 The API key is **never** stored — it is read from `PAYWAY_AGENT_API_KEY` at runtime.
 

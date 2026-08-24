@@ -70,6 +70,7 @@ function buildClackIO(env: NodeJS.ProcessEnv): OnboardingIO {
         await clackSelect({
           message: 'Choose an inference provider (the CLI uses it to guide you agentically)',
           options: [
+            { value: 'opencode', label: 'OpenCode Zen', hint: 'free models, e.g. x-preview-f-free' },
             { value: 'openrouter', label: 'OpenRouter', hint: 'one key, 400+ models' },
             { value: 'nvidia', label: 'NVIDIA NIM', hint: 'self-hosted / NIM catalog' },
             { value: 'openai', label: 'OpenAI', hint: 'gpt-4o etc.' },
