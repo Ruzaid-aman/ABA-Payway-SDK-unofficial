@@ -345,4 +345,135 @@ describe('provider adapter - checkConnectivity', () => {
     expectStatus(result, 'blocked');
     expect(result.detail).toContain('ENOTFOUND');
   });
+
+  it('passes sampling params through when configured and omits them when unset', async () => {
+    process.env[API_KEY_ENV] = 'sk-test';
+    const request = 'make me a 10 USD QR';
+    const envelope = { choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] };
+    const withSampling = vi.fn().mockResolvedValue(mockResponse(envelope));
+    const adapterA = createProviderAdapter(
+      strictConfig({
+        maxTokens: 8192,
+        temperature: 0.2,
+        topP: 0.95,
+        extraBody: { chat_template_kwargs: { enable_thinking: true } },
+      }),
+      withSampling,
+    );
+    await adapterA.propose(request);
+    const bodyA = JSON.parse(withSampling.mock.calls[0][1].body);
+    expect(bodyA.max_tokens).toBe(8192);
+    expect(bodyA.temperature).toBe(0.2);
+    expect(bodyA.top_p).toBe(0.95);
+    expect(bodyA.chat_template_kwargs).toEqual({ enable_thinking: true });
+
+    const withoutSampling = vi.fn().mockResolvedValue(mockResponse(envelope));
+    const adapterB = createProviderAdapter(strictConfig(), withoutSampling);
+    await adapterB.propose(request);
+    const bodyB = JSON.parse(withoutSampling.mock.calls[0][1].body);
+    expect('max_tokens' in bodyB).toBe(false);
+    expect('temperature' in bodyB).toBe(false);
+    expect('top_p' in bodyB).toBe(false);
+    expect('chat_template_kwargs' in bodyB).toBe(false);
+  });
+});
+
+describe('provider adapter - strict-JSON repair round', () => {
+  afterEach(() => {
+    delete process.env[API_KEY_ENV];
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function invalidPlanJson(): string {
+    return JSON.stringify({
+      version: 'agent-plan/v1',
+      request: 'make me a 10 USD QR',
+      actions: [{ tool: 'generate_qr_code', amount: '2.00' }],
+    });
+  }
+
+  it('repairs an off-schema plan using one validation-feedback round', async () => {
+    process.env[API_KEY_ENV] = 'sk-test';
+    const request = 'make me a 10 USD QR';
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(mockResponse({ choices: [{ message: { role: 'assistant', content: invalidPlanJson() } }] }))
+      .mockResolvedValueOnce(mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }));
+    const adapter = createProviderAdapter(strictConfig(), fetchImpl);
+
+    const plan = await adapter.propose(request);
+
+    expect(plan.actions?.[0]?.tool).toBe('generate_online_qr');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const repairBody = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    const roles = repairBody.messages.map((m: { role: string }) => m.role);
+    expect(roles).toContain('assistant');
+    const lastMessage = repairBody.messages.at(-1);
+    expect(lastMessage.role).toBe('user');
+    expect(lastMessage.content).toContain('did not validate');
+    expect(lastMessage.content).toContain('generate_online_qr');
+  });
+
+  it('throws after a failed repair round', async () => {
+    process.env[API_KEY_ENV] = 'sk-test';
+    const request = 'make me a 10 USD QR';
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(mockResponse({ choices: [{ message: { role: 'assistant', content: invalidPlanJson() } }] }));
+    const adapter = createProviderAdapter(strictConfig(), fetchImpl);
+
+    await expect(adapter.propose(request)).rejects.toThrow(ProviderProposalError);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('provider adapter - transient error retry', () => {
+  afterEach(() => {
+    delete process.env[API_KEY_ENV];
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('retries a transient 503 and succeeds on a later attempt', async () => {
+    vi.useFakeTimers();
+    process.env[API_KEY_ENV] = 'sk-test';
+    const request = 'make me a 10 USD QR';
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(mockResponse({ error: { message: 'ResourceExhausted' } }, 503, false))
+      .mockResolvedValueOnce(mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }));
+    const adapter = createProviderAdapter(strictConfig(), fetchImpl);
+
+    const pending = adapter.propose(request);
+    await vi.advanceTimersByTimeAsync(5000);
+    const plan = await pending;
+
+    expect(plan.version).toBe('agent-plan/v1');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry non-transient client errors', async () => {
+    process.env[API_KEY_ENV] = 'sk-test';
+    const fetchImpl = vi.fn().mockResolvedValue(mockResponse({ error: { message: 'bad model' } }, 400, false));
+    const adapter = createProviderAdapter(strictConfig(), fetchImpl);
+
+    await expect(adapter.propose('q')).rejects.toThrow(/HTTP 400/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up after three attempts on persistent transient errors', async () => {
+    vi.useFakeTimers();
+    process.env[API_KEY_ENV] = 'sk-test';
+    const fetchImpl = vi.fn().mockResolvedValue(mockResponse({ error: { message: 'overloaded' } }, 503, false));
+    const adapter = createProviderAdapter(strictConfig(), fetchImpl);
+
+    const pending = adapter.propose('q').catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(10000);
+    const error = (await pending) as ProviderProposalError;
+
+    expect(error).toBeInstanceOf(ProviderProposalError);
+    expect(error.message).toContain('HTTP 503');
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
 });

@@ -185,7 +185,7 @@ export interface MaterializedAgentPlanV1 {
 // Provider configuration (non-secret settings only)
 // ---------------------------------------------------------------------------
 
-export type ProviderPreset = 'openai' | 'openrouter' | 'nvidia' | 'custom';
+export type ProviderPreset = 'openai' | 'openrouter' | 'nvidia' | 'opencode' | 'custom';
 export type CapabilityMode = 'native-tools' | 'strict-json-plan';
 
 export interface ProviderConfigV1 {
@@ -194,6 +194,16 @@ export interface ProviderConfigV1 {
   baseUrl?: string;
   model: string;
   timeoutMs?: number;
+  /** Sampling passthrough for chat completions; omitted from the request when unset. */
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  /**
+   * Extra top-level request-body fields merged verbatim into every
+   * chat-completions call (e.g. {"chat_template_kwargs":{"enable_thinking":true}}).
+   * Never used for credentials; the API key stays in the environment.
+   */
+  extraBody?: Record<string, unknown>;
   /** Non-secret headers only (e.g. organization). Never authorization/api-key. */
   headers?: Record<string, string>;
   capabilityMode: CapabilityMode;

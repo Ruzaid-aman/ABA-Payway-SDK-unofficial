@@ -245,6 +245,13 @@ export function registerAgentCommands(program: Command): void {
     .option('--base-url <url>', 'Custom provider base URL (for provider=custom)')
     .option('--capability-mode <mode>', 'native-tools | strict-json-plan')
     .option('--timeout <ms>', 'Provider request timeout in milliseconds')
+    .option('--max-tokens <n>', 'Sampling passthrough: max_tokens for chat completions (e.g. 8192)')
+    .option('--temperature <n>', 'Sampling passthrough: temperature (0-2)')
+    .option('--top-p <n>', 'Sampling passthrough: top_p (0-1)')
+    .option(
+      '--extra-body <json>',
+      'Extra request-body fields merged verbatim, e.g. \'{"chat_template_kwargs":{"enable_thinking":true}}\'',
+    )
     .option('--acknowledge-privacy', 'Acknowledge the provider privacy notice (required before plans are proposed)')
     .action(
       async (opts: {
@@ -253,6 +260,10 @@ export function registerAgentCommands(program: Command): void {
         baseUrl?: string;
         capabilityMode?: string;
         timeout?: string;
+        maxTokens?: string;
+        temperature?: string;
+        topP?: string;
+        extraBody?: string;
         acknowledgePrivacy?: boolean;
       }) => {
         const patch: Partial<ProviderConfigV1> = {};
@@ -285,6 +296,48 @@ export function registerAgentCommands(program: Command): void {
           }
           patch.timeoutMs = Math.floor(ms);
         }
+        if (opts.maxTokens !== undefined) {
+          const n = Number(opts.maxTokens);
+          if (!Number.isInteger(n) || n <= 0) {
+            console.log(`\n  ${c.red('✗')} --max-tokens must be a positive integer.\n`);
+            process.exitCode = 1;
+            return;
+          }
+          patch.maxTokens = n;
+        }
+        if (opts.temperature !== undefined) {
+          const t = Number(opts.temperature);
+          if (!Number.isFinite(t) || t < 0 || t > 2) {
+            console.log(`\n  ${c.red('✗')} --temperature must be a number between 0 and 2.\n`);
+            process.exitCode = 1;
+            return;
+          }
+          patch.temperature = t;
+        }
+        if (opts.topP !== undefined) {
+          const p = Number(opts.topP);
+          if (!Number.isFinite(p) || p < 0 || p > 1) {
+            console.log(`\n  ${c.red('✗')} --top-p must be a number between 0 and 1.\n`);
+            process.exitCode = 1;
+            return;
+          }
+          patch.topP = p;
+        }
+        if (opts.extraBody !== undefined) {
+          try {
+            const parsed: unknown = JSON.parse(opts.extraBody);
+            if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+              throw new Error('must be a JSON object');
+            }
+            patch.extraBody = parsed as Record<string, unknown>;
+          } catch (error) {
+            console.log(
+              `\n  ${c.red('✗')} --extra-body must be a valid JSON object (${(error as Error).message}).\n`,
+            );
+            process.exitCode = 1;
+            return;
+          }
+        }
         if (opts.acknowledgePrivacy) {
           if (opts.provider === 'custom' && (!opts.baseUrl || opts.baseUrl.trim() === '')) {
             console.log(`\n  ${c.red('✗')} Custom provider requires --base-url.\n`);
@@ -301,6 +354,14 @@ export function registerAgentCommands(program: Command): void {
         console.log(`    Capability mode: ${c.cyan(config.capabilityMode)}`);
         if (config.baseUrl) console.log(`    Base URL:        ${c.cyan(config.baseUrl)}`);
         console.log(`    Timeout:         ${c.cyan(`${config.timeoutMs ?? 30000}ms`)}`);
+        if (config.maxTokens !== undefined || config.temperature !== undefined || config.topP !== undefined || config.extraBody) {
+          const parts: string[] = [];
+          if (config.temperature !== undefined) parts.push(`temperature=${config.temperature}`);
+          if (config.topP !== undefined) parts.push(`top_p=${config.topP}`);
+          if (config.maxTokens !== undefined) parts.push(`max_tokens=${config.maxTokens}`);
+          if (config.extraBody) parts.push(`extra_body=${JSON.stringify(config.extraBody)}`);
+          console.log(`    Sampling:        ${c.cyan(parts.join(', '))}`);
+        }
         console.log();
         console.log(
           `  ${c.dim('API key is read from the PAYWAY_AGENT_API_KEY environment variable; it is never stored.')}\n`,

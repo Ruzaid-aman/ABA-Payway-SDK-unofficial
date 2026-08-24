@@ -37,6 +37,7 @@ const PRESET_BASE_URLS: Record<Exclude<ProviderPreset, 'custom'>, string> = {
   openai: 'https://api.openai.com/v1',
   openrouter: 'https://openrouter.ai/api/v1',
   nvidia: 'https://integrate.api.nvidia.com/v1',
+  opencode: 'https://opencode.ai/zen/v1',
 };
 
 const API_KEY_ENV = 'PAYWAY_AGENT_API_KEY';
@@ -145,41 +146,57 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
 
   async function postChatCompletions(body: unknown, apiKey: string): Promise<ChatCompletionResponse> {
     const baseUrl = resolveBaseUrl(config);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let response: Response;
-    try {
-      response = await fetchImpl(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: buildHeaders(config, apiKey),
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-    } catch (cause) {
-      const err = cause as Error;
-      if (err.name === 'AbortError' || /abort/i.test(err.message)) {
-        throw new ProviderProposalError(
-          `provider request timed out after ${timeoutMs}ms (check PAYWAY_AGENT_API_KEY, network egress, and baseUrl)`,
-        );
+    const transientStatuses = new Set([429, 500, 502, 503, 504]);
+    let lastError: ProviderProposalError | undefined;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
       }
-      throw new ProviderProposalError(`provider request failed: ${err.message}`);
-    } finally {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      let response: Response;
+      try {
+        response = await fetchImpl(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: buildHeaders(config, apiKey),
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } catch (cause) {
+        clearTimeout(timer);
+        const err = cause as Error;
+        if (err.name === 'AbortError' || /abort/i.test(err.message)) {
+          throw new ProviderProposalError(
+            `provider request timed out after ${timeoutMs}ms (check PAYWAY_AGENT_API_KEY, network egress, and baseUrl)`,
+          );
+        }
+        throw new ProviderProposalError(`provider request failed: ${err.message}`);
+      }
       clearTimeout(timer);
+
+      let data: ChatCompletionResponse;
+      try {
+        data = (await response.json()) as ChatCompletionResponse;
+      } catch (cause) {
+        throw new ProviderProposalError(`provider returned non-JSON response: ${(cause as Error).message}`);
+      }
+
+      if (!response.ok) {
+        lastError = new ProviderProposalError(
+          `provider returned HTTP ${response.status}: ${JSON.stringify(data).slice(0, 200)}`,
+        );
+        if (response.status === 401 || response.status === 403 || !transientStatuses.has(response.status)) {
+          throw lastError;
+        }
+        continue;
+      }
+      return data;
     }
 
-    let data: ChatCompletionResponse;
-    try {
-      data = (await response.json()) as ChatCompletionResponse;
-    } catch (cause) {
-      throw new ProviderProposalError(`provider returned non-JSON response: ${(cause as Error).message}`);
-    }
-
-    if (!response.ok) {
-      throw new ProviderProposalError(
-        `provider returned HTTP ${response.status}: ${JSON.stringify(data).slice(0, 200)}`,
-      );
-    }
-    return data;
+    throw (
+      lastError ?? new ProviderProposalError('provider request failed after retries')
+    );
   }
 
   return {
@@ -190,26 +207,31 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
         : undefined;
 
       let data: ChatCompletionResponse;
+      const sampling = {
+        ...(config.maxTokens !== undefined ? { max_tokens: config.maxTokens } : {}),
+        ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
+        ...(config.topP !== undefined ? { top_p: config.topP } : {}),
+        ...(config.extraBody ?? {}),
+      };
+      const baseMessages: Array<{ role: 'system' | 'user'; content: string }> = [];
+      if (contextMessage) baseMessages.push(contextMessage);
       if (config.capabilityMode === 'native-tools') {
+        baseMessages.push({ role: 'user', content: request });
         data = await postChatCompletions(
           {
             model: config.model,
-            messages: [...(contextMessage ? [contextMessage] : []), { role: 'user', content: request }],
+            messages: baseMessages,
             tools: buildToolSchemas(),
             tool_choice: 'auto',
+            ...sampling,
           },
           apiKey,
         );
       } else {
+        baseMessages.unshift({ role: 'system', content: buildStrictJsonSystemPrompt() });
+        baseMessages.push({ role: 'user', content: request });
         data = await postChatCompletions(
-          {
-            model: config.model,
-            messages: [
-              { role: 'system', content: buildStrictJsonSystemPrompt() },
-              ...(contextMessage ? [contextMessage] : []),
-              { role: 'user', content: request },
-            ],
-          },
+          { model: config.model, messages: [...baseMessages], ...sampling },
           apiKey,
         );
       }
@@ -227,19 +249,67 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
           throw new ProviderProposalError('native-tools mode produced no tool calls');
         }
         plan = assemblePlanFromToolCalls(request, toolCalls);
-      } else {
-        if (typeof message.content !== 'string' || message.content.trim() === '') {
-          throw new ProviderProposalError('strict-json-plan mode produced no content');
+        if (!validateAgentPlan(plan)) {
+          throw new ProviderProposalError('provider output did not validate as an AgentPlanV1');
         }
-        const parsed = extractSingleJsonObject(message.content);
-        plan = parsed as AgentPlanV1;
+        return plan;
       }
 
-      if (!validateAgentPlan(plan)) {
-        throw new ProviderProposalError('provider output did not validate as an AgentPlanV1');
+      // strict-json-plan: parse the assistant output and, when it deviates from
+      // the AgentPlanV1 schema, give the model ONE feedback round with the exact
+      // validation errors before failing. Weak models frequently rename tools or
+      // mistype field types on the first attempt.
+      type ParseOutcome = { ok: true; plan: AgentPlanV1 } | { ok: false; error: string };
+      const parseStrictJson = (content: unknown): ParseOutcome => {
+        if (typeof content !== 'string' || content.trim() === '') {
+          return { ok: false, error: 'strict-json-plan mode produced no content' };
+        }
+        let parsed: unknown;
+        try {
+          parsed = extractSingleJsonObject(content);
+        } catch (error) {
+          return { ok: false, error: (error as Error).message };
+        }
+        if (!validateAgentPlan(parsed)) {
+          const details = (validateAgentPlan.errors ?? [])
+            .slice(0, 5)
+            .map((e) => `${e.instancePath || '/'} ${e.message}`)
+            .join('; ');
+          return { ok: false, error: `provider output did not validate as an AgentPlanV1 (${details})` };
+        }
+        return { ok: true, plan: parsed as AgentPlanV1 };
+      };
+
+      let outcome = parseStrictJson(message.content);
+      if (!outcome.ok && typeof message.content === 'string') {
+        const toolNames = (buildToolSchemas() as Array<{ function?: { name?: string } }>)
+          .map((schema) => schema.function?.name ?? '')
+          .filter((name) => name.length > 0)
+          .join(', ');
+        const repairMessages: Array<{ role: string; content: string }> = [
+          ...baseMessages,
+          { role: 'assistant', content: message.content },
+          {
+            role: 'user',
+            content:
+              `Your previous response was invalid: ${outcome.error}. ` +
+              `Valid tool names are exactly: ${toolNames}. ` +
+              'Respond again with ONLY the corrected single JSON object matching the AgentPlanV1 schema exactly — ' +
+              'no markdown fences, no prose.',
+          },
+        ];
+        data = await postChatCompletions(
+          { model: config.model, messages: repairMessages, ...sampling },
+          apiKey,
+        );
+        const repairChoice = data.choices?.[0];
+        outcome = parseStrictJson(repairChoice?.message?.content);
       }
 
-      return plan;
+      if (!outcome.ok) {
+        throw new ProviderProposalError(outcome.error);
+      }
+      return outcome.plan;
     },
 
     async checkConnectivity(): Promise<ProviderConnectivity> {

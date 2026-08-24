@@ -202,10 +202,14 @@ const providerConfigSchema = {
   required: ['version', 'provider', 'model', 'capabilityMode'],
   properties: {
     version: { const: 'agent-config/v1' },
-    provider: { enum: ['openai', 'openrouter', 'nvidia', 'custom'] },
+    provider: { enum: ['openai', 'openrouter', 'nvidia', 'opencode', 'custom'] },
     baseUrl: { type: 'string' },
     model: { type: 'string', minLength: 1 },
     timeoutMs: { type: 'integer', minimum: 1 },
+    maxTokens: { type: 'integer', minimum: 1 },
+    temperature: { type: 'number', minimum: 0, maximum: 2 },
+    topP: { type: 'number', minimum: 0, maximum: 1 },
+    extraBody: { type: 'object', additionalProperties: true },
     headers: {
       type: 'object',
       additionalProperties: { type: 'string' },
