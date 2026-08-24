@@ -63,3 +63,5 @@ test-logs/
 
 # OpenAPI bundled output
 dist/openapi.bundled.yaml
+
+/payway-output/
