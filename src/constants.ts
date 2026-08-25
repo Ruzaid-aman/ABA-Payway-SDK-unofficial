@@ -90,4 +90,6 @@ export const REFUND_ERROR_CODES = {
   CONCURRENT_REJECTED: 'PTL168',
   /** Insufficient available balance */
   INSUFFICIENT_BALANCE: 'PTL181',
+  /** Transaction not found or is invalid (refund target does not exist) */
+  REFUND_TARGET_NOT_FOUND: 'PTL36',
 } as const;

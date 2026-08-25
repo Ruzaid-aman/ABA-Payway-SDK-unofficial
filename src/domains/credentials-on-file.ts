@@ -94,6 +94,7 @@ export function createCredentialsOnFileDomain(
           frequency: params.frequency,
           return_url: params.returnUrl ? encodeBase64IfNeeded(params.returnUrl) : undefined,
           callback_url: params.callbackUrl ? encodeBase64IfNeeded(params.callbackUrl) : undefined,
+          currency: params.currency ?? 'USD',
           request_time: params.requestTime,
         }),
         [
@@ -106,6 +107,7 @@ export function createCredentialsOnFileDomain(
           'frequency',
           'return_url',
           'callback_url',
+          'currency',
         ],
         'request_time',
         'application/x-www-form-urlencoded',
@@ -173,6 +175,7 @@ export function createCredentialsOnFileDomain(
         ENDPOINTS.renewToken,
         filterParams({
           request_id: params.requestId,
+          request: params.request ?? params.requestId,
           ctid: params.ctid,
           pwt: params.paymentToken,
           request_time: params.requestTime,
@@ -197,6 +200,7 @@ export function createCredentialsOnFileDomain(
         ENDPOINTS.getTokenDetails,
         filterParams({
           request_id: params.requestId,
+          request: params.request ?? params.requestId,
           ctid: params.ctid,
           pwt: params.paymentToken,
           request_time: params.requestTime,
@@ -221,6 +225,7 @@ export function createCredentialsOnFileDomain(
         ENDPOINTS.removeToken,
         filterParams({
           request_id: params.requestId,
+          request: params.request ?? params.requestId,
           ctid: params.ctid,
           pwt: params.paymentToken,
           request_time: params.requestTime,

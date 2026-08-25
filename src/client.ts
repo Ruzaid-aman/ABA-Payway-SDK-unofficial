@@ -123,6 +123,11 @@ export interface LinkCardParams {
   frequency?: '1W' | '1M' | '2M';
   returnUrl?: string;
   callbackUrl?: string;
+  /**
+   * Payment currency. Required by the sandbox binding layer
+   * ("The currency field is required.") — defaults to 'USD'.
+   */
+  currency?: 'USD' | 'KHR';
   requestTime?: string;
 }
 
@@ -142,6 +147,12 @@ export interface TokenParams {
   requestId: string;
   ctid: string;
   paymentToken: string;
+  /**
+   * Value for the server-required `request` field on v3 token-management
+   * endpoints (defaults to `requestId`). Sandbox binding layer rejects
+   * requests without it ("The request field is required.").
+   */
+  request?: string;
   requestTime?: string;
 }
 
@@ -312,12 +323,22 @@ function createHttpError(
   });
 }
 
-function createJsonParseError(rawBody: string, endpoint?: string): PayWayAPIError {
-  return new PayWayAPIError('Invalid JSON response from PayWay API', {
-    rawBody,
-    endpoint,
-    retryable: false,
-  });
+function createJsonParseError(rawBody: string, endpoint?: string, contentType?: string): PayWayAPIError {
+  const snippet = rawBody.trim().slice(0, 120).replace(/\s+/g, ' ');
+  let hint = '';
+  if (/<!doctype html|<html/i.test(rawBody)) {
+    hint =
+      ' PayWay returned an HTML page instead of JSON. This usually means a parameter value was rejected ' +
+      '(e.g. an unsupported payment_gate) or the session expired. Try removing optional parameters.';
+  }
+  return new PayWayAPIError(
+    `Invalid JSON response from PayWay API${contentType ? ` (content-type: ${contentType})` : ''}${hint ? `.${hint}` : ''} Body starts with: ${snippet}`,
+    {
+      rawBody,
+      endpoint,
+      retryable: false,
+    },
+  );
 }
 
 function createNetworkError(error: unknown, timeoutMs: number, endpoint?: string): PayWayAPIError {

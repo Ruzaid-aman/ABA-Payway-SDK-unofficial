@@ -22,8 +22,14 @@ import {
   saveProfileStore,
   setDefaultProfile,
 } from './config/profiles.js';
-import { PAYMENT_STATUS_CODES, REFUND_ERROR_CODES } from './constants.js';
-import { PayWayAPIError, PollingAbortedError } from './errors.js';
+import { PAYMENT_STATUS_CODES, PAYMENT_STATUS_LABELS, REFUND_ERROR_CODES } from './constants.js';
+import {
+  PayWayAPIError,
+  PayWayError,
+  PayWayNetworkError,
+  PayWayRateLimitError,
+  PollingAbortedError,
+} from './errors.js';
 import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConfiguration } from './khqr-config.js';
 import { sdk } from './sdk.js';
 import { formatTestReport } from './test/index.js';
@@ -36,13 +42,36 @@ function loadDotEnv(): void {
   const envPath = path.resolve(process.cwd(), '.env');
   if (!existsSync(envPath)) return;
   const lines = readFileSync(envPath, 'utf-8').split('\n');
-  for (const line of lines) {
-    const trimmed = line.replace(/\r/g, '').trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIdx = trimmed.indexOf('=');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\r/g, '').trim();
+    if (!line || line.startsWith('#')) continue;
+    const eqIdx = line.indexOf('=');
     if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const val = trimmed.slice(eqIdx + 1).trim();
+    const key = line.slice(0, eqIdx).trim();
+    let val = line.slice(eqIdx + 1).trim();
+    // Support quoted values spanning multiple lines (e.g. RSA public key PEMs)
+    if (
+      (val.startsWith('"') && !val.slice(1).endsWith('"')) ||
+      (val.startsWith("'") && !val.slice(1).endsWith("'"))
+    ) {
+      const quote = val[0];
+      const parts = [val.slice(1)];
+      while (i + 1 < lines.length) {
+        i++;
+        const nextLine = lines[i].replace(/\r/g, '');
+        parts.push(nextLine);
+        if (nextLine.trimEnd().endsWith(quote)) break;
+      }
+      val = `${parts.join('\n').trimEnd()}`
+        .replace(/\\n/g, '\n')
+        .trim();
+      if (val.endsWith(quote)) val = val.slice(0, -1);
+    } else if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1).replace(/\\n/g, '\n');
+    }
     if (!(key in process.env)) {
       process.env[key] = val;
     }
@@ -84,9 +113,29 @@ function assertRsaKeyPresent(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Shared API error printer (includes PayWay code hints)
+// Standardized CLI exit codes (agent-friendly):
+//   0 = success | 1 = validation/input error | 2 = PayWay API failure | 3 = timeout/network/rate-limit
 // ---------------------------------------------------------------------------
-function printApiError(e: unknown): void {
+const EXIT_OK = 0;
+const EXIT_VALIDATION = 1;
+const EXIT_API_FAILURE = 2;
+const EXIT_NETWORK = 3;
+
+function classifyError(e: unknown): number {
+  if (e instanceof PollingAbortedError) return e.reason === 'max_consecutive_errors' ? EXIT_API_FAILURE : EXIT_NETWORK;
+  if (e instanceof PayWayNetworkError || e instanceof PayWayRateLimitError) return EXIT_NETWORK;
+  if (e instanceof PayWayAPIError) {
+    if (e.statusCode === undefined && e.retryable === true) return EXIT_NETWORK;
+    return EXIT_API_FAILURE;
+  }
+  if (e instanceof PayWayError) return EXIT_VALIDATION;
+  return EXIT_VALIDATION;
+}
+
+// ---------------------------------------------------------------------------
+// Shared API error printer (includes PayWay code hints). Returns exit code.
+// ---------------------------------------------------------------------------
+function printApiError(e: unknown): number {
   if (e instanceof PayWayAPIError) {
     console.log(`  ${c.red('✗')} ${e.message}`);
     if (e.paywayCode) console.log(`  ${c.dim(`PayWay code: ${e.paywayCode}`)}`);
@@ -94,10 +143,15 @@ function printApiError(e: unknown): void {
       console.log(`  ${c.dim('Hint: currency and return_url are required; description max 250 chars.')}`);
     } else if (e.paywayCode === '96') {
       console.log(`  ${c.dim('Hint: check the link id — use the data.id value returned by create.')}`);
+    } else if (e.paywayCode === '49') {
+      console.log(`  ${c.dim('Hint: transaction-list dates must be "YYYY-MM-DD HH:mm:ss" (sandbox-verified format).')}`);
+    } else if (/HTML page instead of JSON/.test(e.message)) {
+      console.log(`  ${c.dim('Hint: a parameter value was rejected server-side — try removing optional params (e.g. payment_gate).')}`);
     }
-  } else {
-    console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
+    return classifyError(e);
   }
+  console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
+  return classifyError(e);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,12 +567,320 @@ program
       const result = await payway.khqr.getTransactionsByMerchantRef(opts.merchantRef, opts.requestTime);
       console.log(JSON.stringify(result, null, 2));
     } catch (error) {
-      printApiError(error);
-      process.exitCode = 1;
+      process.exitCode = printApiError(error);
     }
   });
 
-// --- validate ---
+// --- check-transaction ---
+program
+  .command('check-transaction')
+  .description('Check the payment status of a transaction (rate limit: 600/s)')
+  .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: { transactionId: string; json?: boolean }) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      validateTransactionId(opts.transactionId);
+      const payway = new PayWay();
+      const result = await payway.checkout.checkTransaction(opts.transactionId);
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      const data = (result as Record<string, unknown>).data as Record<string, unknown> | undefined;
+      const status = String(data?.payment_status ?? 'UNKNOWN');
+      const icon =
+        status === 'APPROVED' ? c.green('✓') : status === 'PENDING' ? c.yellow('⚠') : c.red('✗');
+      console.log(`  ${icon} ${c.bold(opts.transactionId)} → ${c.bold(status)}`);
+      if (data?.payment_status_code !== undefined) {
+        console.log(`  ${c.dim(`status code: ${String(data.payment_status_code)} (${PAYMENT_STATUS_LABELS[Number(data.payment_status_code)] ?? '?'})`)}`);
+      }
+    } catch (error) {
+      if (error instanceof Error && !(error instanceof PayWayError)) {
+        // Local validation failure
+        console.log(`  ${c.red('✗')} ${error.message}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      process.exitCode = printApiError(error);
+    }
+  });
+
+// --- close-transaction ---
+program
+  .command('close-transaction')
+  .description('Void/close an open transaction before it is paid')
+  .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
+  .option('-y, --force', 'Skip confirmation prompt (for scripts/agents)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: { transactionId: string; force?: boolean; json?: boolean }) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      validateTransactionId(opts.transactionId);
+      if (!opts.force && !opts.json) {
+        const confirmed = await promptConfirmation(
+          `  Void/close transaction ${c.cyan(opts.transactionId)}? This cannot be undone. (y/n): `,
+        );
+        if (!confirmed) {
+          console.log(`  ${c.yellow('Cancelled by user.')}`);
+          process.exitCode = EXIT_OK;
+          return;
+        }
+      }
+      const payway = new PayWay();
+      const result = await payway.checkout.closeTransaction(opts.transactionId);
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Close request accepted for ${c.bold(opts.transactionId)}`);
+      console.log(`  ${c.dim(JSON.stringify(result).slice(0, 200))}`);
+      process.exitCode = EXIT_OK;
+    } catch (error) {
+      process.exitCode = printApiError(error);
+    }
+  });
+
+// --- transaction-detail ---
+program
+  .command('transaction-detail')
+  .description('Get full detail for one transaction (strict rate limit: 10/min)')
+  .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: { transactionId: string; json?: boolean }) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      validateTransactionId(opts.transactionId);
+      const payway = new PayWay();
+      const result = await payway.checkout.getTransactionDetail(opts.transactionId);
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      const data = (result as Record<string, unknown>).data as Record<string, unknown> | undefined;
+      console.log(`  ${c.bold('Detail:')} ${opts.transactionId}`);
+      for (const key of [
+        'payment_status',
+        'payment_status_code',
+        'payment_amount',
+        'original_amount',
+        'refund_amount',
+        'payment_currency',
+        'apv',
+        'payment_type',
+        'transaction_date',
+      ]) {
+        if (data?.[key] !== undefined) console.log(`  ${key.padEnd(20)} ${c.cyan(String(data[key]))}`);
+      }
+    } catch (error) {
+      process.exitCode = printApiError(error);
+    }
+  });
+
+// --- transaction-list ---
+const DATE_FMT = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+program
+  .command('transaction-list')
+  .description('List transactions in a time window (rate limit: 50/min)')
+  .requiredOption('--from <date>', 'Start date "YYYY-MM-DD HH:mm:ss" (sandbox-verified format)')
+  .requiredOption('--to <date>', 'End date "YYYY-MM-DD HH:mm:ss"')
+  .option('--status <status>', 'Filter: APPROVED, PENDING, DECLINED, REFUNDED, CANCELLED')
+  .option('--min-amount <n>', 'Minimum amount filter')
+  .option('--max-amount <n>', 'Maximum amount filter')
+  .option('--page <n>', 'Page number', '1')
+  .option('--pagination <n>', 'Page size', '50')
+  .option('--json', 'Print the raw JSON response')
+  .action(
+    async (opts: {
+      from: string;
+      to: string;
+      status?: string;
+      minAmount?: string;
+      maxAmount?: string;
+      page: string;
+      pagination: string;
+      json?: boolean;
+    }) => {
+      if (!assertCredentialsPresent()) {
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      if (!DATE_FMT.test(opts.from) || !DATE_FMT.test(opts.to)) {
+        console.log(`  ${c.red('✗')} Dates must use "YYYY-MM-DD HH:mm:ss"`);
+        console.log(`  ${c.dim('Example: --from "2026-08-25 00:00:00" --to "2026-08-25 23:59:59"')}`);
+        console.log(`  ${c.dim('(Compact formats like 20260825 are rejected by PayWay with code 49 — sandbox-verified.)')}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      try {
+        const payway = new PayWay();
+        const result = await payway.checkout.getTransactionList({
+          fromDate: opts.from,
+          toDate: opts.to,
+          fromAmount: opts.minAmount ?? null,
+          toAmount: opts.maxAmount ?? null,
+          status: opts.status ?? null,
+          page: opts.page,
+          pagination: opts.pagination,
+        });
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        const raw = result as unknown as Record<string, unknown>;
+        const list = Array.isArray(raw.data) ? (raw.data as Record<string, unknown>[]) : [];
+        console.log(`  ${c.green('✓')} ${list.length} transaction(s) in window\n`);
+        for (const t of list.slice(0, 20)) {
+          const statusStr = String(t.payment_status ?? '?');
+          const icon =
+            statusStr === 'APPROVED' ? c.green('✓') : statusStr === 'PENDING' ? c.yellow('⚠') : c.red('✗');
+          console.log(
+            `  ${icon} ${String(t.transaction_id)}  ${statusStr.padEnd(9)} ${String(t.original_amount ?? '')} ${String(t.original_currency ?? '')}  ${String(t.transaction_date ?? '')}`,
+          );
+        }
+        if (list.length > 20) console.log(`  ${c.dim(`… and ${list.length - 20} more (--json for full output)`)}`);
+      } catch (error) {
+        process.exitCode = printApiError(error);
+      }
+    },
+  );
+
+// --- refund ---
+program
+  .command('refund')
+  .description('Refund a captured transaction (pre-flight balance check against transaction-detail)')
+  .requiredOption('-t, --transaction-id <id>', 'Original transaction ID')
+  .requiredOption('-a, --amount <number>', 'Refund amount (≥ 0.01 USD / ≥ 1 KHR)')
+  .option('-c, --currency <code>', 'Currency of the original transaction: USD (default) or KHR', 'USD')
+  .option('-y, --force', 'Skip pre-flight check and confirmation prompt')
+  .option('--no-preflight', 'Skip the balance pre-flight check (detail API is rate-limited to 10/min)')
+  .option('--json', 'Print the raw JSON response')
+  .action(
+    async (opts: {
+      transactionId: string;
+      amount: string;
+      currency: string;
+      force?: boolean;
+      preflight?: boolean;
+      json?: boolean;
+    }) => {
+      if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      const currency = opts.currency.toUpperCase() as 'USD' | 'KHR';
+      if (currency !== 'USD' && currency !== 'KHR') {
+        console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${opts.currency}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      const amount = Number(opts.amount);
+      try {
+        validateTransactionId(opts.transactionId);
+        validateRefundAmount(amount, currency);
+      } catch (e) {
+        console.log(`  ${c.red('✗')} ${(e as Error).message}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+
+      // ── Pre-flight: verify refundable balance via transaction-detail ──
+      if (opts.preflight !== false && !opts.force) {
+        try {
+          const payway = new PayWay();
+          console.log(`  ${c.dim('Pre-flight: fetching original transaction (10/min rate limit)...')}`);
+          const detail = await payway.checkout.getTransactionDetail(opts.transactionId);
+          const data = ((detail as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+          const status = String(data.payment_status ?? '').toUpperCase();
+          const paid = Number(data.payment_amount ?? Number.NaN);
+          const refunded = Number(data.refund_amount ?? 0);
+          if (Number.isFinite(paid)) {
+            const remaining = paid - refunded;
+            if (remaining <= 0) {
+              console.log(`  ${c.red('✗')} Nothing left to refund: paid=${paid}, already refunded=${refunded}`);
+              process.exitCode = EXIT_VALIDATION;
+              return;
+            }
+            if (amount > remaining + 1e-9) {
+              console.log(
+                `  ${c.red('✗')} Refund ${amount} exceeds remaining refundable balance ${remaining} (paid=${paid}, refunded=${refunded})`,
+              );
+              console.log(`  ${c.dim('Use --force to submit anyway (PayWay will reject with PTL37/PTL58).')}`);
+              process.exitCode = EXIT_VALIDATION;
+              return;
+            }
+            console.log(`  ${c.green('✓')} Pre-flight OK: remaining refundable = ${remaining}`);
+          } else if (status !== 'APPROVED') {
+            console.log(`  ${c.yellow('⚠')} Original transaction status is "${status || 'UNKNOWN'}" — refunds usually require APPROVED.`);
+          }
+        } catch (e) {
+          console.log(`  ${c.yellow('⚠')} Pre-flight lookup failed: ${(e as Error).message}`);
+          console.log(`  ${c.dim('Continuing without balance validation. Use --no-preflight to silence this check.')}`);
+        }
+      }
+
+      if (!opts.force && !opts.json) {
+        const confirmed = await promptConfirmation(
+          `  Refund ${c.cyan(String(amount))} ${currency} from ${c.cyan(opts.transactionId)}? (y/n): `,
+        );
+        if (!confirmed) {
+          console.log(`  ${c.yellow('Cancelled by user.')}`);
+          process.exitCode = EXIT_OK;
+          return;
+        }
+      }
+
+      try {
+        const payway = new PayWay();
+        const result = await payway.checkout.refund(opts.transactionId, amount, currency);
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        const status = (result as Record<string, unknown>).status as Record<string, unknown> | undefined;
+        console.log(`  ${c.green('✓')} Refund submitted for ${c.bold(opts.transactionId)}`);
+        if (status) console.log(`  ${c.dim(JSON.stringify(status).slice(0, 220))}`);
+        process.exitCode = EXIT_OK;
+      } catch (error) {
+        process.exitCode = printApiError(error);
+      }
+    },
+  );
+
+// --- exchange-rate ---
+program
+  .command('exchange-rate')
+  .description('Fetch the current USD/KHR exchange rate from PayWay')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: { json?: boolean }) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.checkout.getExchangeRate();
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Exchange rate:`);
+      console.log(`  ${JSON.stringify(result).slice(0, 300)}`);
+    } catch (error) {
+      process.exitCode = printApiError(error);
+    }
+  });
+
+
 program
   .command('validate')
   .description('Validate a refund amount or transaction ID locally')
@@ -840,7 +1202,6 @@ program
         amount,
         currency,
         paymentOption: (opts.paymentOption as 'abapay_khqr_deeplink') ?? 'abapay_khqr_deeplink',
-        paymentGate: 0,
         returnUrl: opts.returnUrl,
         cancelUrl: opts.cancelUrl,
       });
@@ -973,8 +1334,7 @@ paymentLinkCmd
       console.log(`  ${c.bold('Transaction:')}    ${result.tran_id ?? result.status?.tran_id ?? '-'}`);
       console.log();
     } catch (e) {
-      printApiError(e);
-      process.exitCode = 1;
+      process.exitCode = printApiError(e);
     }
   });
 
@@ -1012,8 +1372,7 @@ paymentLinkCmd
       console.log(`  ${c.bold('Link:')}        ${c.cyan(data?.payment_link ?? '-')}`);
       console.log();
     } catch (e) {
-      printApiError(e);
-      process.exitCode = 1;
+      process.exitCode = printApiError(e);
     }
   });
 
