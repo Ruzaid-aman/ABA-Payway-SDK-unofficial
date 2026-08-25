@@ -1,11 +1,17 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import * as crypto from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const temporaryDirectories: string[] = [];
+const TEST_RSA = crypto.generateKeyPairSync('rsa', {
+  modulusLength: 1024,
+  publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
+  privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+});
 
 /** Strip ANSI escape sequences so string matching works reliably. */
 function stripAnsi(s: string): string {
@@ -51,6 +57,49 @@ afterEach(() => {
 });
 
 describe('built CLI', () => {
+  it('lists the first-payment status and detail commands in built help output', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    const result = await runBuiltCli(['--help'], {
+      cwd,
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
+      },
+    });
+
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+    expect(result.status).toBe(0);
+    expect(output).toContain('check-transaction');
+    expect(output).toContain('transaction-detail');
+  });
+
+  it('prints a first-payment quickstart in doctor output when credentials exist but online QR is not ready', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+    writeFileSync(
+      path.join(cwd, '.env'),
+      ['PAYWAY_ENV=sandbox', 'PAYWAY_MERCHANT_ID=test-merchant', `PAYWAY_API_KEY=${'a'.repeat(32)}`].join('\n'),
+    );
+
+    const result = await runBuiltCli(['doctor'], {
+      cwd,
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
+      },
+    });
+
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+    expect(result.status).toBe(1);
+    expect(output).toContain('First payment quickstart');
+    expect(output).toContain('generate-qr -a 3.00 -c USD');
+    expect(output).toContain('check-transaction -t <id>');
+    expect(output).toContain('transaction-detail -t <id>');
+    expect(output).toContain('setup-webhook --tunnel');
+  });
+
   it('runs the generate-checkout handler instead of treating it as an unknown command', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);
@@ -486,6 +535,7 @@ describe('built CLI', () => {
           JSON.stringify({
             status: { code: 0, message: 'OK' },
             qrString: 'ONLINE-MOCK-KHQR',
+            qrImage: 'data:image/png;base64,aGVsbG8=',
           }),
         );
       });
@@ -528,9 +578,123 @@ describe('built CLI', () => {
       expect(output).toContain('non-interactive mode');
       expect(output).toContain('Online QR generated via PayWay API');
       expect(output).toContain('ONLINE-MOCK-KHQR');
+      expect(output).toContain('Image saved to');
+      expect(output).toContain(path.join(cwd, 'payway-output', 'ONLINE-NONINT.png'));
+      expect(existsSync(path.join(cwd, 'payway-output', 'ONLINE-NONINT.png'))).toBe(true);
       expect(output).not.toContain('Submit to PayWay? (y/n)');
       expect(output).not.toContain('Modify lifetime?');
       expect(output).not.toContain('Cancelled by user');
+    } finally {
+      await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
+    }
+  });
+
+  it('allows opting out of the default QR image save', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    let requestedPath = '';
+    const mockServer = createServer((request, response) => {
+      requestedPath = request.url ?? '';
+      request.on('data', () => {});
+      request.on('end', () => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            status: { code: 0, message: 'OK' },
+            qrString: 'ONLINE-MOCK-KHQR',
+            qrImage: 'data:image/png;base64,aGVsbG8=',
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
+    const address = mockServer.address();
+    if (!address || typeof address === 'string') throw new Error('mock server did not bind to a TCP port');
+
+    try {
+      const result = await runBuiltCli(
+        [
+          'generate-qr',
+          '--amount',
+          '1.00',
+          '--currency',
+          'USD',
+          '--transaction-id',
+          'ONLINE-NOSAVE',
+          '--callback-url',
+          'https://example.com/cb',
+          '--non-interactive',
+          '--no-polling',
+          '--no-save-image',
+        ],
+        {
+          cwd,
+          env: {
+            PATH: process.env.PATH ?? '',
+            SystemRoot: process.env.SystemRoot ?? '',
+            PAYWAY_MERCHANT_ID: 'test-merchant-001',
+            PAYWAY_API_KEY: 'test-api-key-123456789012',
+            PAYWAY_BASE_URL: `http://127.0.0.1:${address.port}`,
+          },
+        },
+      );
+      const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+
+      expect(result.status, JSON.stringify({ output, requestedPath })).toBe(0);
+      expect(requestedPath).toBe('/api/payment-gateway/v1/payments/generate-qr');
+      expect(output).not.toContain('Image saved to');
+      expect(existsSync(path.join(cwd, 'payway-output', 'ONLINE-NOSAVE.png'))).toBe(false);
+    } finally {
+      await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
+    }
+  });
+
+  it('prints refund follow-up guidance with the exact fields to inspect', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    let requestedPath = '';
+    let requestedBody = '';
+    const mockServer = createServer((request, response) => {
+      requestedPath = request.url ?? '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => (requestedBody += chunk));
+      request.on('end', () => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            status: { code: 0, message: 'OK' },
+            data: { tran_id: 'REFUND-TEST-001' },
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
+    const address = mockServer.address();
+    if (!address || typeof address === 'string') throw new Error('mock server did not bind to a TCP port');
+
+    try {
+      const result = await runBuiltCli(['refund', '-t', 'REFUND-TEST-001', '-a', '1.11', '-c', 'USD', '-y'], {
+        cwd,
+        env: {
+          PATH: process.env.PATH ?? '',
+          SystemRoot: process.env.SystemRoot ?? '',
+          PAYWAY_MERCHANT_ID: 'test-merchant-001',
+          PAYWAY_API_KEY: 'test-api-key-123456789012',
+          PAYWAY_BASE_URL: `http://127.0.0.1:${address.port}`,
+          PAYWAY_RSA_PUBLIC_KEY: TEST_RSA.publicKey,
+        },
+      });
+      const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+
+      expect(result.status, JSON.stringify({ output, requestedPath, requestedBody })).toBe(0);
+      expect(requestedPath).toBe('/api/merchant-portal/merchant-access/online-transaction/refund');
+      expect(output).toContain('Refund submitted for REFUND-TEST-001');
+      expect(output).toContain('Requested refund: 1.11 USD');
+      expect(output).toContain('transaction-detail -t REFUND-TEST-001');
+      expect(output).toContain('refund_amount = total refunded so far');
+      expect(output).toContain('transaction_operations = refund event history');
     } finally {
       await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
     }

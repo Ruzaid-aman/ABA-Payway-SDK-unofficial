@@ -1,7 +1,7 @@
 import { generateHmac } from '../auth.js';
 import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
-import { PollingAbortedError } from '../errors.js';
+import { PayWayAPIError, PollingAbortedError } from '../errors.js';
 import type { components, PollTransactionOptions, PollTransactionResult } from '../types.js';
 import {
   encodeBase64IfNeeded,
@@ -283,9 +283,16 @@ export function createCheckoutDomain(
      * Poll transaction status at regular intervals using an AsyncIterator.
      *
      * Yields a `PollTransactionResult` on each poll. Stops when:
-     * - A terminal status is reached (APPROVED, DECLINED, CANCELLED, REFUNDED), OR
-     * - `maxDurationMs` elapses (default 10 minutes — matching QR lifetime), OR
-     * - `maxConsecutiveErrors` consecutive poll failures occur (default 3).
+      * - A terminal status is reached (APPROVED, DECLINED, CANCELLED, REFUNDED), OR
+      * - `maxDurationMs` elapses (default 10 minutes — matching QR lifetime), OR
+      * - `maxConsecutiveErrors` consecutive poll failures occur (default 3).
+      *
+      * Sandbox note: a freshly-created transaction may not be visible to
+      * check-transaction for a few seconds (HTTP 200 with `status.code 6`
+      * "tran_id not found"). The poller recognizes this grace period and
+      * yields `paymentStatus: 'NOT_FOUND'` without counting it as an error,
+      * so a legitimate purchase flow is never aborted by propagation delay.
+      * If the ID never appears, polling ends via the max-duration abort.
      *
      * @example
      * ```ts
@@ -358,6 +365,46 @@ export function createCheckoutDomain(
           // Stop if terminal — iterator completes naturally
           if (isTerminal) return;
         } catch (error: unknown) {
+          const isTranIdNotFound = error instanceof PayWayAPIError && error.paywayCode === '6';
+
+          if (isTranIdNotFound) {
+            lastStatus = 'NOT_FOUND';
+            const rawBody =
+              error instanceof PayWayAPIError && error.rawBody && typeof error.rawBody === 'object'
+                ? (error.rawBody as components['schemas']['CheckTransactionResponse'])
+                : undefined;
+            yield {
+              transactionId,
+              attempt,
+              response:
+                rawBody ??
+                ({
+                  status: {
+                    code: '6',
+                    message: error instanceof Error ? error.message : 'tran_id not found',
+                  },
+                } as components['schemas']['CheckTransactionResponse']),
+              paymentStatus: 'NOT_FOUND',
+              isTerminal: false,
+              durationMs: 0,
+              timestamp: new Date().toISOString(),
+            };
+
+            const remainingNotFoundMs = maxDurationMs - (Date.now() - startTime);
+            if (remainingNotFoundMs <= 0) {
+              throw new PollingAbortedError({
+                transactionId,
+                reason: 'max_duration_exceeded',
+                lastStatus,
+                totalAttempts: attempt,
+              });
+            }
+            await new Promise<void>((resolve) =>
+              setTimeout(resolve, Math.min(intervalMs, remainingNotFoundMs)),
+            );
+            continue;
+          }
+
           consecutiveErrors++;
 
           // Yield error result FIRST so caller can observe the failing attempt before abort

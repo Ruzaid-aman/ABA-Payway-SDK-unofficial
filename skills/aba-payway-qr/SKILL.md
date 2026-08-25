@@ -1,7 +1,7 @@
 ---
 name: aba-payway-qr
 description: Generate an online ABA PayWay KHQR payment QR code.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # ABA PayWay QR
@@ -15,12 +15,24 @@ const qr = await payway.qr.generateQr({ transactionId: 'order-123', amount: 10, 
 
 Use an HTTPS callback URL and save the transaction ID before displaying the returned QR data.
 
+## Lifetime
+`lifetime` is in **seconds** (SDK converts to whole minutes for the API; min 3 minutes). For a 10-minute QR pass `lifetime: 600`. Sandbox-verified end-to-end (2026-08-25): $31.11 USD QR at 600s lifetime → APPROVED on poll #8 (~37s).
+
 ## Error Handling
 ```ts
 import { PayWayAPIError } from 'aba-payway-ts';
 try { await payway.qr.generateQr(params); }
 catch (error) { if (error instanceof PayWayAPIError) console.error(error.statusCode); }
 ```
+
+## Tools (scripts/)
+
+- **`online-qr-poll.ts`** — one-command live flow: generates ONE online KHQR for an amount (default $31.11), saves + auto-opens the PNG, then polls status every 5s for 10 minutes using `checkout.pollTransactionStatus`.
+  ```sh
+  npx tsx scripts/online-qr-poll.ts            # 31.11 USD, 600s lifetime, 10-min poll
+  npx tsx scripts/online-qr-poll.ts 5 KHR      # custom amount/currency
+  ```
+  Artifacts land in `test-logs/qr-payment/<txId>-*` (PNG, KHQR payload, deeplink). Requires `PAYWAY_MERCHANT_ID`, `PAYWAY_API_KEY`, `PAYWAY_CALLBACK_URL` in `.env`.
 
 ## Related Skills
 - [Offline QR](../aba-payway-offline-qr/SKILL.md)

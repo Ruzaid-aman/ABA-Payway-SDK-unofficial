@@ -6,7 +6,9 @@
 
 > **Agentic CLI is live end-to-end.** The agentic PayWay CLI — provider modes, 11 tools, risk gates, execution ledger, sessions, and secret redaction — now runs against **OpenCode Zen (`x-preview-f-free`, free)** with a verified live sandbox QR creation (`ask` → plan → authorize → PayWay `code 0 Success`). Key reliability work this session: tool-catalog planning prompt, one-round plan repair, transient-error retries, deterministic callback override, sampling passthrough flags, and a real SDK fix (`payment_option` is required by the PayWay QR API). Verification gate is green: **676 Vitest tests pass (42 files)**, Biome lint clean (0 warnings), `tsc --noEmit` clean, build clean.
 
-> All session work is committed: `341923d` (onboarding wizard + runtime/provider UX), `65046c8` (gap hardening: PEM validation, URL encoding, lint cleanups), `9f47648`/`e6c872c` (opencode preset, prompt/retry/override fixes), `b8ff4b6` (artifact ignore).
+> Session work committed through: `341923d` (onboarding wizard + runtime/provider UX), `65046c8` (gap hardening: PEM validation, URL encoding, lint cleanups), `9f47648`/`e6c872c` (opencode preset, prompt/retry/override fixes), `b8ff4b6` (artifact ignore), `e135c19` (agent docs sync), `bc4efb7` (sandbox-campaign SDK/CLI fixes + lifecycle commands), `922cf67`/`88459f0` (docs & learnings sync), `808dc80` (journey UX pass: poll-transaction, doctor --live, terminal QR, explain).
+
+> **Documentation-audit session (2026-08-25, uncommitted):** added the 24th packaged skill `aba-payway-customer-qr` with bundled offline tools (`decode-khqr.cjs`, `qr-manifest.cjs`) covered by `src/__tests__/skill-scripts.test.ts`, and documented the six skill helper scripts in their SKILL.md guides. Aligned all user-facing docs to the code-read environment variables (`PAYWAY_RSA_PUBLIC_KEY`, `PAYWAY_ENV` per `src/client.ts`) across `README.md`, `CONTRIBUTING.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `docs/RELEASE_CHECKLIST.md`, and Chapters 02/12/14; completed the README CLI command table (`generate-checkout`, `payment-link create/detail`, `setup-webhook`, `config`); fixed chapter-count references (15 → 16) and broken table cells; updated the `.agents/AGENTS.md` knowledge base (skill count 20 → 24, scripts tooling, `PAYWAY_ENV` row).
 
 ---
 
@@ -53,7 +55,7 @@ All 7 API domains probed against `checkout-sandbox.payway.com.kh`:
 - Catches invalid transaction IDs before API calls (rather than relying on HTTP 400 responses)- 4 new unit tests added covering: valid IDs, empty/missing, > 20 chars, invalid charset
 ### Documentation & Reference App (DONE)
 
-- **15-chapter integration guide** in `docs/`, covering setup through deployment
+- **16-chapter integration guide** in `docs/`, covering setup through deployment
 - **Merchant scenario coverage docs** — 28 attested scenarios, coverage audit report, and `superpowers/` implementation plans
 - **QR-POS reference app** at `payway-boilerplate/merchant-qr-pos/` — full Next.js consumer demo with Express backend, SQLite store, and Vitest tests
 - **Cloudflare Workers webhook archiver guide** — `docs/cloudflare-free-webhook.md`
@@ -285,9 +287,9 @@ Tasks must be completed **in this order**:
 
 ---
 
-### Milestone C: CLI Modularization & Live-Sandbox Hardening `v1.2.0` (IN PROGRESS, uncommitted)
+### Milestone C: CLI Modularization & Live-Sandbox Hardening `v1.2.0` (DONE)
 
-> Goal: Migrate the CLI to Commander with modular subcommands, and validate the full transaction lifecycle (QR → poll → refund) against the live sandbox with real captured evidence. Started after `v1.1.1` (commit `ca96005`); **not yet committed**.
+> Goal: Migrate the CLI to Commander with modular subcommands, and validate the full transaction lifecycle (QR → poll → refund) against the live sandbox with real captured evidence. Started after `v1.1.1` (commit `ca96005`).
 
 #### Task 16 — Fix Regression: `checkout` `responseType` Routing ⬅️ START HERE
 
@@ -381,7 +383,7 @@ Tasks must be completed **in this order**:
 
 ---
 
-### Milestone E: Full-Cycle Sandbox Validation Campaign (DONE — 2026-08-25, uncommitted)
+### Milestone E: Full-Cycle Sandbox Validation Campaign (DONE — 2026-08-25, committed `bc4efb7`)
 
 > Goal: Audit the entire transaction lifecycle against the live sandbox, convert findings into SDK/CLI/agent-framework improvements, and document evidence. Reusable harness: `scripts/sandbox-campaign-full-cycle.ts` → `test-output/campaign-evidence.json`.
 
@@ -425,7 +427,7 @@ Tasks must be completed **in this order**:
 
 ---
 
-### Milestone F: Scope-Coverage Campaign — CoF / Payout / Pre-auth / Payment Link / KHQR (DONE — 2026-08-25, uncommitted)
+### Milestone F: Scope-Coverage Campaign — CoF / Payout / Pre-auth / Payment Link / KHQR (DONE — 2026-08-25, committed `bc4efb7`, docs synced `922cf67`)
 
 > Goal: extend the validation campaign to every API scope not covered by Milestone E. Harness: `scripts/sandbox-campaign-scopes.ts` → `test-output/campaign-scopes-evidence.json` (27 scenarios). Deep-probe trail documented in [SANDBOX-FINDINGS §9](./SANDBOX-FINDINGS.md).
 

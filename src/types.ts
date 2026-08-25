@@ -570,7 +570,9 @@ export interface components {
        * @enum {string}
        */
       view_type?: 'hosted_view' | 'popup';
-      /** @description Set to 0 to route through Checkout service when the profile also has QR Payment API enabled. */
+      /**
+       * @description Set to 0 to route through Checkout service when the profile also has QR Payment API enabled. Sandbox-verified (2026-08-25): with a JSON request, gate 0 is what makes the response include `checkout_qr_url` (hosted page URL). Omitting it returns only qr_string/qr_image/abapay_deeplink. Note: when POSTing this payload as a browser form, gate 0 answers with an HTML page instead of JSON.
+       */
       payment_gate?: number;
       /** @description Base64-encoded JSON array of {acc, amt} splitting the payment across up to 10 destination accounts (error 25 if exceeded). Accounts must be whitelisted first (error 37). */
       payout?: string;
@@ -589,7 +591,7 @@ export interface components {
       qr_string?: string;
       /** @description Deeplink that opens ABA Mobile directly to the pre-filled payment. */
       abapay_deeplink?: string;
-      /** @description Hosted URL rendering the QR code as an image/page, for platforms that can't render qr_string themselves. */
+      /** @description Hosted URL rendering the QR code as an image/page, for platforms that can't render qr_string themselves. Only returned when payment_gate=0 is sent. */
       checkout_qr_url?: string;
     };
     /** @description purchase's JSON error shape (distinct from the HTML success path). Non-exhaustive: purchase alone defines ~80 distinct error codes (wrong hash, invalid amount, currency not allowed, payout validation, Google Pay token failures, etc.) — pull the full table from the scraped spec into your SDK's error-code enum rather than hand-copying a subset here; this skeleton intentionally does not restate all ~80 to keep the spec reviewable, but the generated client MUST surface `code` typed, not just `message` stringly. */

@@ -22,8 +22,8 @@ import { PayWay, PayWayAPIError } from 'aba-payway-ts';
 const payway = new PayWay({
   merchantId: process.env.PAYWAY_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_API_KEY!,
-  publicKeyPem: process.env.PAYWAY_PUBLIC_KEY,
-  environment: (process.env.PAYWAY_ENVIRONMENT as 'sandbox' | 'production') || 'sandbox',
+  publicKeyPem: process.env.PAYWAY_RSA_PUBLIC_KEY,
+  environment: (process.env.PAYWAY_ENV as 'sandbox' | 'production') || 'sandbox',
   maxRetries: 3,
   retryDelayMs: 3000,
   onRequest: (endpoint, body) => {
@@ -201,7 +201,7 @@ app.post('/api/qr/generate', async (req, res) => {
 // 4. Health Check
 // ============================================
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', environment: process.env.PAYWAY_ENVIRONMENT || 'sandbox' });
+  res.json({ status: 'ok', environment: process.env.PAYWAY_ENV || 'sandbox' });
 });
 
 // ============================================
@@ -209,7 +209,7 @@ app.get('/health', (req, res) => {
 // ============================================
 app.listen(PORT, () => {
   console.log(`🚀 Server running at ${BASE_URL}`);
-  console.log(`   Environment: ${process.env.PAYWAY_ENVIRONMENT || 'sandbox'}`);
+  console.log(`   Environment: ${process.env.PAYWAY_ENV || 'sandbox'}`);
   console.log(`   Webhook: ${BASE_URL}/api/payway-webhook`);
 });
 ```

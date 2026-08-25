@@ -98,8 +98,12 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min) |
 | `payway-sdk transaction-list --from <date> --to <date>` | List transactions in a window (`"YYYY-MM-DD HH:mm:ss"` dates) |
 | `payway-sdk close-transaction -t <id>` | Void/close an unpaid transaction (prompts; `-y/--force` skips) |
-| `payway-sdk refund -t <id> -a <amount> [-c USD\\|KHR]` | Refund with pre-flight balance check and confirmation |
+| `payway-sdk refund -t <id> -a <amount> [-c <currency>]` | Refund with a pre-flight balance check and confirmation by default; `--no-preflight` skips only the detail lookup, `-y/--force` skips both the lookup and the prompt |
 | `payway-sdk exchange-rate` | Fetch the live USD/KHR exchange rate |
+| `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (requires credentials) |
+| `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials) |
+| `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks |
+| `payway-sdk config` | Display loaded configuration and validate environment variables |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
 | `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |
 | `payway-sdk skills list` | Show installed skills per agent |
@@ -108,6 +112,40 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk --version` | Print SDK version |
 
 > **Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit — so scripts and agent frameworks can branch on `$?`. Lifecycle commands also accept `--json` for structured output.
+
+### Fastest QR flow
+
+For the fastest manual first payment in sandbox:
+
+```bash
+payway-sdk doctor
+payway-sdk generate-qr -a 3.31 -c USD
+payway-sdk check-transaction -t <id>
+payway-sdk transaction-detail -t <id>
+```
+
+For **online QR**, make sure `PAYWAY_CALLBACK_URL` is a public HTTPS URL first. If you do not already have one locally, run:
+
+```bash
+payway-sdk setup-webhook --tunnel
+```
+
+Online `generate-qr` now saves the QR PNG by default to `payway-output/<transaction-id>.png` and renders the QR in the terminal when possible. Use `--save-image <path>` to override the file location, or `--no-save-image` to opt out for one run.
+
+### Fastest refund follow-up
+
+For the fastest verified refund flow:
+
+```bash
+payway-sdk refund -t <id> -a 1.11 -c USD
+payway-sdk transaction-detail -t <id>
+```
+
+Interpret the follow-up detail like this:
+
+- `refund_amount` is the authoritative total refunded so far.
+- `transaction_operations` shows each refund event.
+- `payment_status` may read `REFUNDED` even after a partial refund, so do not use that field alone to infer that the original payment was fully refunded.
 
 ### Get transactions by merchant reference
 
@@ -149,6 +187,8 @@ Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or
 | `npx tsx scripts/sandbox-integration-test.ts` | Full lifecycle test — QR → poll → refund → exchange rate |
 | `npx tsx scripts/post-payment-test.ts` | Post-payment operations (refund, close, check) |
 | `npx tsx scripts/qr-payment-test.ts` | QR payment flow with live transaction polling |
+| `npx tsx scripts/online-qr-poll.ts` | One online KHQR (default $31.11 USD, 600s lifetime) → save/open PNG → poll every 5s for 10 min |
+| `npx tsx scripts/checkout-link-poll.ts` | Create Transaction API (default $12.12 USD, 600s lifetime) → open hosted `checkout_qr_url` → poll every 5s for 10 min |
 | `npx tsx scripts/check-qr-transactions.ts` | Fetch transactions via `getTransactionList`, query detail for each |
 | `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 10 PayWay templates, save PNGs + QR strings to `test-logs/qr-images/` |
 | `npx tsx scripts/zero-logic-purchase-flow.ts` | End-to-end purchase flow with no business logic (demo) |
@@ -159,7 +199,7 @@ Results from integration scripts are written to `test-logs/` with timestamps.
 
 ### Full integration guide
 
-For a complete 15-chapter integration guide, diagrams, and runnable examples, see [docs/README.md](./docs/README.md).
+For a complete 16-chapter integration guide, diagrams, and runnable examples, see [docs/README.md](./docs/README.md).
 
 > 🗺️ **New to the project?** Start with the [Visual Guide](./docs/VISUAL-GUIDE.md) — architecture, setup paths, onboarding journey, and the payment lifecycle in one page of diagrams.
 
@@ -168,7 +208,7 @@ For a complete 15-chapter integration guide, diagrams, and runnable examples, se
 ### Documentation & examples
 
 - `README.md` for a quick getting started flow
-- `docs/README.md` for the full 15-chapter integration guide
+- `docs/README.md` for the full 16-chapter integration guide
 - `docs/examples/` for runnable webhook, checkout, QR, and backend samples
 - `CONTRIBUTING.md` for contribution and testing guidance
 - `SECURITY.md` for responsible vulnerability disclosure
@@ -194,7 +234,7 @@ import { PayWay } from 'aba-payway-ts';
 const payway = new PayWay({
   merchantId: process.env.PAYWAY_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_API_KEY!,
-  publicKeyPem: process.env.PAYWAY_PUBLIC_KEY_PEM, // Required for Refund, Pre-auth, Payout, and Payment Link APIs
+  publicKeyPem: process.env.PAYWAY_RSA_PUBLIC_KEY, // Required for Refund, Pre-auth, Payout, and Payment Link APIs
   environment: 'sandbox', // 'sandbox' | 'production'
 });
 ```
@@ -316,7 +356,7 @@ PayWay does not currently expose Stripe-style per-request `Idempotency-Key` supp
 - Treat webhook callbacks as the trusted final source of truth.
 - Do not rely on client-side redirects alone for payment confirmation.
 
-> For sandbox verification, always supply `PAYWAY_MERCHANT_ID`, `PAYWAY_API_KEY`, and `PAYWAY_PUBLIC_KEY_PEM` from environment variables, never hardcode them in source.
+> For sandbox verification, always supply `PAYWAY_MERCHANT_ID`, `PAYWAY_API_KEY`, and `PAYWAY_RSA_PUBLIC_KEY` from environment variables, never hardcode them in source.
 
 ---
 

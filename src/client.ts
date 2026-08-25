@@ -98,6 +98,7 @@ export interface CreateTransactionParams {
   customFields?: string | Record<string, unknown>;
   returnParams?: string;
   viewType?: 'hosted_view' | 'popup';
+  /** Send 0 (with a JSON request via purchase()) to receive checkout_qr_url — the hosted page rendering the QR. */
   paymentGate?: number;
   payout?: string | { acc: string; amt: number }[];
   additionalParams?: string | Record<string, unknown>;
@@ -165,6 +166,7 @@ export interface GenerateQrParams {
   currency?: 'KHR' | 'USD';
   qrImageTemplate?: string;
   requestTime?: string;
+  /** Lifetime in seconds (SDK converts to whole minutes for the API). Min 3 minutes. */
   lifetime?: number;
 }
 

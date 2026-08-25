@@ -20,7 +20,7 @@ describe('packaged AI skills', () => {
 
     for (const skillDirectory of skillDirectories) {
       const content = await readFile(path.join(skillsDirectory, skillDirectory, 'SKILL.md'), 'utf8');
-      expect(content).toMatch(/^---\r?\nname: aba-payway-[\w-]+\r?\ndescription: .+\r?\nversion: 1\.1\.0\r?\n---/);
+      expect(content).toMatch(/^---\r?\nname: aba-payway-[\w-]+\r?\ndescription: .+\r?\nversion: \d+\.\d+\.\d+\r?\n---/);
       expect(content).toContain('## Quick Start');
       expect(content).toContain('```ts');
       expect(content).toContain('## Error Handling');

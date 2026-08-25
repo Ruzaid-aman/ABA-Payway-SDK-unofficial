@@ -325,3 +325,46 @@ sandbox profile (consistent with 2026-07-16 probe).
 8. Is duplicate `merchant_ref_no` on payment links intentional?
 9. What payee format does `add-whitelist-payout` expect (PTL04 vs code 96)?
 10. Which sandbox profiles are provisioned for `complete-with-payout` (PTL62)?
+
+## 10. Online QR + hosted checkout-link flows, poller hardening (2026-08-25)
+
+Two end-to-end live runs with real sandbox payments; captured as reusable
+scripts `scripts/online-qr-poll.ts` and `scripts/checkout-link-poll.ts`.
+
+### 10a. Online QR (`qr.generateQr`) — paid in ~37s
+
+$31.11 USD, `paymentOption: 'abapay_khqr'`, template `template2_color`,
+`lifetime: 600` (seconds; SDK converts to whole minutes). Poll #1-7 PENDING,
+#8 APPROVED (~37s). PNG + KHQR payload + deeplink saved per transaction.
+
+### 10b. Hosted checkout link (`checkout.purchase`) — gate contract pinned
+
+| Request shape | Response |
+|---|---|
+| `paymentOption: 'abapay_khqr_deeplink'`, no gate | JSON: `qrString` + `qrImage` + `abapay_deeplink`; **no `checkout_qr_url`** |
+| same + `viewType: 'hosted_view'` + `paymentGate: 0` | JSON **includes `checkout_qr_url`** (hosted page at `checkout-sandbox.payway.com.kh/eyJ…`) |
+
+So on the JSON API path, gate 0 is what produces the hosted URL. This refines
+the earlier "Changed" note about `generate-checkout`: when POSTing the payload
+as a browser form, gate 0 answers with an HTML page instead of JSON — both
+behaviors are the same routing decision (gate 0 = Checkout service renders it).
+
+Run 2: $12.12 USD, lifetime 600s. Poll timeline: NOT_FOUND ×1 → PENDING ×4 →
+APPROVED (~32s).
+
+### 10c. First check after creation returns code 6 (grace period)
+
+The first `check-transaction` immediately after creation returned HTTP 200 /
+`status.code 6` "tran_id not found"; ~5s later the same ID reported PENDING.
+Propagation delay, not a wrong-ID error.
+
+**Action taken:** `pollTransactionStatus()` now detects `paywayCode === '6'`
+and yields `paymentStatus: 'NOT_FOUND'` without incrementing
+`maxConsecutiveErrors` (previously one such poll burned a third of the error
+budget and could abort legitimate purchase flows). Covered by two new tests in
+`src/__tests__/client.test.ts`.
+
+### 10d. Open questions (adds to §8c/§9f)
+
+11. Does production enforce unique `tran_id`? Sandbox silently accepts duplicates (reconfirmed during these runs).
+12. What is the authoritative visibility delay for check/list after create in production?

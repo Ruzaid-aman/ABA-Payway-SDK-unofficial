@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
 import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
-import { isValidPublicKeyPem } from '../../utils.js';
+import { isValidPublicKeyPem, validatePublicHttpsUrl } from '../../utils.js';
 import { parseDotEnvFile } from '../dotenv.js';
 
 export interface DoctorOptions {
@@ -122,6 +122,37 @@ function checkEnvVars(env: NodeJS.ProcessEnv): DoctorCheck[] {
   return checks;
 }
 
+function checkCallbackUrl(env: NodeJS.ProcessEnv): DoctorCheck {
+  const callbackUrl = env.PAYWAY_CALLBACK_URL?.trim();
+  if (!callbackUrl) {
+    return {
+      id: 'env-PAYWAY_CALLBACK_URL',
+      label: 'PAYWAY_CALLBACK_URL is set',
+      ok: false,
+      detail: 'required for online QR and webhook confirmation',
+      fix: 'Set PAYWAY_CALLBACK_URL=<public-https-url> or run `payway-sdk setup-webhook --tunnel`',
+    };
+  }
+
+  try {
+    validatePublicHttpsUrl(callbackUrl, 'callbackUrl');
+    return {
+      id: 'env-PAYWAY_CALLBACK_URL',
+      label: 'PAYWAY_CALLBACK_URL is set',
+      ok: true,
+      detail: callbackUrl,
+    };
+  } catch {
+    return {
+      id: 'env-PAYWAY_CALLBACK_URL',
+      label: 'PAYWAY_CALLBACK_URL is set',
+      ok: false,
+      detail: `${callbackUrl} is not a public HTTPS URL`,
+      fix: 'Use a public HTTPS callback URL for online QR, or run `payway-sdk setup-webhook --tunnel` during local development',
+    };
+  }
+}
+
 /**
  * Run the `doctor` command: validate env, detect framework, report health.
  */
@@ -136,9 +167,10 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
   const envFileCheck = checkEnvFile(cwd);
   const frameworkCheck = checkFramework(cwd);
   const envVarChecks = checkEnvVars(mergedEnv);
+  const callbackCheck = checkCallbackUrl(mergedEnv);
   const rsaCheck = checkRsaPem(mergedEnv);
 
-  const checks = [envFileCheck, frameworkCheck, ...envVarChecks, ...(rsaCheck ? [rsaCheck] : [])];
+  const checks = [envFileCheck, frameworkCheck, ...envVarChecks, callbackCheck, ...(rsaCheck ? [rsaCheck] : [])];
   const envIssues = validatePayWayEnv(mergedEnv);
   const detection = detectFramework(cwd);
 

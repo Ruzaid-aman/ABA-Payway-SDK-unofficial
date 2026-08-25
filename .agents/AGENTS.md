@@ -54,6 +54,7 @@
 | `PAYWAY_API_KEY` | Required signing key when not passed to `PayWay`. |
 | `PAYWAY_RSA_PUBLIC_KEY` | RSA public key for encrypted endpoints. |
 | `PAYWAY_BASE_URL` | Optional API base URL override. |
+| `PAYWAY_ENV` | Named environment override (`sandbox` or `production`). Takes precedence over `PAYWAY_SANDBOX`. |
 | `PAYWAY_SANDBOX` | `true` selects sandbox; `false` selects production. |
 | `PAYWAY_TIMEOUT` | Optional request timeout in milliseconds. |
 | `DEBUG_PAYWAY` | `true` or `1` enables sanitized diagnostic logging. |

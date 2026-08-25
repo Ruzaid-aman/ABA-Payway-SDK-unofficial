@@ -60,12 +60,12 @@ npm install aba-payway-ts
 # .env file (add to .gitignore!)
 PAYWAY_MERCHANT_ID=ec476910
 PAYWAY_API_KEY=[REMOVED-HISTORICAL-6f49ced9c4d9]
-PAYWAY_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----
+PAYWAY_RSA_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC...
 -----END PUBLIC KEY-----"
 ```
 
-> **Note:** The SDK accepts both `PAYWAY_PUBLIC_KEY` and `PAYWAY_RSA_PUBLIC_KEY`. If your `.env` stores the PEM as a single line with literal `\n` escapes, the SDK normalizes them automatically.
+> **Note:** The SDK reads `PAYWAY_RSA_PUBLIC_KEY` from the environment when the `publicKeyPem` constructor option is not provided. If your `.env` stores the PEM as a single line with literal `\n` escapes, the SDK normalizes them automatically.
 >
 > 🧪 **Sandbox-verified (2026-08-25):** The CLI's built-in `.env` loader now supports the **multi-line quoted PEM format shown above** (value spanning several lines wrapped in quotes) as well as `\n`-escaped single-line values. Earlier CLI versions silently truncated multi-line PEMs to just `"-----BEGIN PUBLIC KEY-----`, which made every RSA-encrypted endpoint (refunds, payment links, pre-auth, payout) fail with a misleading *"publicKeyPem does not look like a public key PEM"* error. If you still see that error: make sure the value starts with `-----BEGIN PUBLIC KEY-----` and ends with `-----END PUBLIC KEY-----` after quote-stripping.
 
@@ -130,7 +130,7 @@ const payway = new PayWay({
 
   // RSA Public Key for Pre-Auth, Payout, Payment Link, and Refund endpoints
   // Optional: omit if you only need checkout, QR, and CoF
-  publicKeyPem: process.env.PAYWAY_PUBLIC_KEY,
+  publicKeyPem: process.env.PAYWAY_RSA_PUBLIC_KEY,
 
   // 'sandbox' for testing, 'production' for live payments
   environment: 'sandbox',
@@ -372,7 +372,7 @@ import { PayWay } from 'aba-payway-ts';
 export const payway = new PayWay({
   merchantId: process.env.PAYWAY_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_API_KEY!,
-  publicKeyPem: process.env.PAYWAY_PUBLIC_KEY,
+  publicKeyPem: process.env.PAYWAY_RSA_PUBLIC_KEY,
   environment: (process.env.PAYWAY_ENV as 'sandbox' | 'production') || 'sandbox',
   maxRetries: 2,
   onRequest: (endpoint, body) => {

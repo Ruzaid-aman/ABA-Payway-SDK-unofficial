@@ -8,6 +8,10 @@ version: 1.1.0
 
 ## Quick Start
 
+If the request is about a first payment flow, an online QR, checking a QR
+payment, or fetching transaction detail after a payment, load this skill first.
+It is the route-selection and command-sequencing entrypoint.
+
 For the simplest first payment on a website, build a signed checkout payload
 locally and let your frontend POST it to PayWay's hosted checkout:
 
@@ -29,6 +33,27 @@ const payload = payway.checkout.createTransaction({
 
 // Render an HTML form posting `payload` fields to PayWay's checkout URL.
 ```
+
+## CLI Readiness First
+
+Before running first-payment commands in the CLI:
+
+- Run `payway-sdk doctor`.
+- For **online QR**, require `PAYWAY_MERCHANT_ID`, `PAYWAY_API_KEY`, and a public HTTPS `PAYWAY_CALLBACK_URL`.
+- If the callback is missing locally, run `payway-sdk setup-webhook --tunnel`.
+
+Exact manual CLI sequence for the QR path:
+
+```sh
+payway-sdk generate-qr -a 3.00 -c USD
+payway-sdk check-transaction -t <id>
+payway-sdk transaction-detail -t <id>
+```
+
+When the manual CLI generates an **online QR**, it should save the QR PNG by
+default to `payway-output/<transaction-id>.png` and show the QR in the terminal
+when possible. Use `--save-image <path>` to override the file location, or
+`--no-save-image` to opt out for a one-off run.
 
 ## Route decision matrix
 

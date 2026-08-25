@@ -1698,6 +1698,57 @@ describe('checkout.pollTransactionStatus', () => {
     expect(results[2].isTerminal).toBe(true);
   });
 
+  it('yields NOT_FOUND for early tran_id-not-found grace period and keeps polling', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } }),
+      )
+      .mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } }),
+      )
+      .mockResolvedValueOnce(mockJsonResponse(approvedResponse));
+
+    const results: PollTransactionResult[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', {
+      intervalMs: 1,
+      maxConsecutiveErrors: 3,
+    })) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(3);
+    expect(results[0].paymentStatus).toBe('NOT_FOUND');
+    expect(results[0].isTerminal).toBe(false);
+    expect(results[1].paymentStatus).toBe('NOT_FOUND');
+    expect(results[2].paymentStatus).toBe('APPROVED');
+    expect(results[2].isTerminal).toBe(true);
+  });
+
+  it('does not abort when NOT_FOUND repeats past maxConsecutiveErrors', async () => {
+    const notFound = () =>
+      mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } });
+    fetchSpy
+      .mockResolvedValueOnce(notFound())
+      .mockResolvedValueOnce(notFound())
+      .mockResolvedValueOnce(notFound())
+      .mockResolvedValueOnce(notFound())
+      .mockResolvedValueOnce(mockJsonResponse(approvedResponse));
+
+    const results: PollTransactionResult[] = [];
+    for await (const result of payway.checkout.pollTransactionStatus('T001', {
+      intervalMs: 1,
+      maxConsecutiveErrors: 3,
+    })) {
+      results.push(result);
+    }
+
+    // 4× NOT_FOUND (grace period, no error counted) + 1 APPROVED = no abort despite maxConsecutiveErrors=3
+    expect(results).toHaveLength(5);
+    expect(results.slice(0, 4).every((r) => r.paymentStatus === 'NOT_FOUND')).toBe(true);
+    expect(results[4].paymentStatus).toBe('APPROVED');
+    expect(results[4].isTerminal).toBe(true);
+  });
+
   it('empty iterator when transaction immediately returns terminal', async () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse(approvedResponse));
 

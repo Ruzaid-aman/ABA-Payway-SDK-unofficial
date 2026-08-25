@@ -12,7 +12,7 @@ import { PayWay } from 'aba-payway-ts';
 const payway = new PayWay();
 ```
 
-Set `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`. Optional values are `PAYWAY_RSA_PUBLIC_KEY`, `PAYWAY_BASE_URL`, `PAYWAY_SANDBOX`, `PAYWAY_TIMEOUT`, and `DEBUG_PAYWAY`. Explicit constructor options take precedence. Use `debug: true` only in controlled environments; logs redact secrets.
+Set `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`. Optional values are `PAYWAY_RSA_PUBLIC_KEY`, `PAYWAY_BASE_URL`, `PAYWAY_ENV` (named `sandbox` or `production`; takes precedence over `PAYWAY_SANDBOX`), `PAYWAY_SANDBOX`, `PAYWAY_TIMEOUT`, and `DEBUG_PAYWAY`. Explicit constructor options take precedence over all environment variables. Use `debug: true` only in controlled environments; logs redact secrets.
 
 ## Error Handling
 ```ts

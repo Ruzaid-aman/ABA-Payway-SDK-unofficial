@@ -6,6 +6,7 @@ import readline from 'node:readline';
 import { Command } from 'commander';
 import { loadDotEnvIntoProcess } from './cli/dotenv.js';
 import { explainAll, explainPayWayCode } from './cli/explain-code.js';
+import { renderFirstPaymentQuickstart } from './cli/first-payment.js';
 import { formatClock, mapPollOutcomeToExitCode } from './cli/journey.js';
 import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
 import { registerAgentCommands } from './cli/commands/agent.js';
@@ -132,6 +133,24 @@ const c = {
 };
 
 const executableDirectory = path.dirname(process.argv[1] ?? process.cwd());
+
+interface GenerateQrCommandOptions {
+  amount?: string;
+  currency?: string;
+  transactionId?: string;
+  offline?: boolean;
+  callbackUrl?: string;
+  paymentOption?: string;
+  template?: string;
+  lifetime?: string;
+  ref?: string;
+  saveImage?: string | boolean;
+  showQr?: boolean;
+  nonInteractive?: boolean;
+  polling?: boolean;
+  pollInterval?: string;
+  pollTimeout?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Shared polling runner for generate-qr and generate-checkout
@@ -431,8 +450,11 @@ program
 
     // Live probe depends on credentials, NOT cosmetic rows like framework detection
     // (the SDK's own repo fails that check and previously could never go live).
-    const credChecks = result.checks.filter((c) => c.id.startsWith('env-'));
+    const liveGateIds = new Set(['env-PAYWAY_ENV', 'env-PAYWAY_MERCHANT_ID', 'env-PAYWAY_API_KEY']);
+    const blockingCheckIds = new Set([...liveGateIds, 'env-PAYWAY_CALLBACK_URL']);
+    const credChecks = result.checks.filter((c) => liveGateIds.has(c.id));
     const credFailures = credChecks.filter((c) => !c.ok);
+    const blockingFailures = result.checks.filter((c) => blockingCheckIds.has(c.id) && !c.ok);
     let liveStatus: 'ok' | 'fail' | undefined;
 
     if (opts.live && process.env.PAYWAY_MERCHANT_ID && process.env.PAYWAY_API_KEY) {
@@ -458,7 +480,7 @@ program
       console.log(`  ${c.dim('(live probe skipped — no PAYWAY_MERCHANT_ID / PAYWAY_API_KEY configured)')}\n`);
     }
 
-    if (credFailures.length === 0 && liveStatus !== 'fail') {
+    if (blockingFailures.length === 0 && liveStatus !== 'fail') {
       console.log(`  ${c.green('All credential & connectivity checks passed.')}\n`);
       if (!result.allHealthy) {
         const cosmetic = result.checks.filter((c) => !c.ok && !c.id.startsWith('env-'));
@@ -473,6 +495,13 @@ program
       }
       process.exitCode = EXIT_OK;
     } else {
+      const hasCoreCredentials = credFailures.length === 0;
+      if (hasCoreCredentials) {
+        for (const line of renderFirstPaymentQuickstart()) {
+          console.log(`  ${line}`);
+        }
+        console.log();
+      }
       console.log(`  ${c.yellow('Run')} ${c.cyan('payway-sdk init')} ${c.yellow('to fix configuration issues.')}\n`);
       process.exitCode = 1;
     }
@@ -1001,9 +1030,13 @@ program
           return;
         }
         const status = (result as Record<string, unknown>).status as Record<string, unknown> | undefined;
+        const displayAmount = currency === 'USD' ? amount.toFixed(2) : String(amount);
         console.log(`  ${c.green('✓')} Refund submitted for ${c.bold(opts.transactionId)}`);
+        console.log(`  ${c.bold('Requested refund:')} ${c.cyan(`${displayAmount} ${currency}`)}`);
         if (status) console.log(`  ${c.dim(JSON.stringify(status).slice(0, 220))}`);
         console.log(`  ${c.dim(`Next: verify with payway-sdk transaction-detail -t ${opts.transactionId}`)}`);
+        console.log(`  ${c.dim('      Read refund_amount = total refunded so far')}`);
+        console.log(`  ${c.dim('      Read transaction_operations = refund event history')}`);
         process.exitCode = EXIT_OK;
       } catch (error) {
         process.exitCode = printApiError(error);
@@ -1107,13 +1140,14 @@ program
   .option('--lifetime <seconds>', 'Transaction lifetime in seconds (default: 180)', '180')
   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
   .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
+  .option('--no-save-image', 'Do not save the QR image PNG to payway-output/<transaction-id>.png by default')
   .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
   .option('--non-interactive, -y', 'Skip interactive prompts (no confirmation, no lifetime override)')
   .option('--polling', 'Poll transaction status after QR generation (enabled by default)', true)
   .option('--no-polling', 'Disable automatic polling after QR generation')
   .option('--poll-interval <seconds>', 'Polling interval in seconds (default: 5)', '5')
   .option('--poll-timeout <seconds>', 'Max polling duration in seconds (default: 600)', '600')
-  .action(async (opts: Record<string, string | undefined>) => {
+  .action(async (opts: GenerateQrCommandOptions) => {
     console.log(`\n${c.bold('ABA PayWay SDK')} — generate QR code\n`);
 
     const amount = opts.amount === undefined ? undefined : Number(opts.amount);
@@ -1287,19 +1321,26 @@ program
           }
         }
 
-        if (qr.qrImage && opts.saveImage) {
+        const resolvedSaveImage =
+          opts.saveImage === false
+            ? false
+            : typeof opts.saveImage === 'string'
+              ? opts.saveImage
+              : path.join(process.cwd(), 'payway-output', `${transactionId}.png`);
+
+        if (qr.qrImage && resolvedSaveImage) {
           const { writeFileSync, mkdirSync } = await import('node:fs');
-          const imgDir = path.dirname(opts.saveImage);
+          const imgDir = path.dirname(resolvedSaveImage);
           mkdirSync(imgDir, { recursive: true });
           // qrImage is a data URL: "data:image/png;base64,iVBOR..."
           const base64Data = qr.qrImage.includes('base64,') ? qr.qrImage.split('base64,')[1] : qr.qrImage;
           const imgBuffer = Buffer.from(base64Data, 'base64');
-          writeFileSync(opts.saveImage, imgBuffer);
-          console.log(`  ${c.green('✓')} Image saved to ${c.cyan(opts.saveImage)}`);
+          writeFileSync(resolvedSaveImage, imgBuffer);
+          console.log(`  ${c.green('✓')} Image saved to ${c.cyan(resolvedSaveImage)}`);
           console.log();
         } else if (qr.qrImage) {
           console.log(`  ${c.bold('QR Image:')} base64 data available (${qr.qrImage.length} chars)`);
-          console.log(`  ${c.dim('Use --save-image <path> to save as PNG')}`);
+          console.log(`  ${c.dim('Image auto-save disabled for this run.')}`);
           console.log();
         }
 

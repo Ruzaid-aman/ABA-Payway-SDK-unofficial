@@ -4,6 +4,7 @@
 
 ### Added
 
+- **End-to-end live-flow scripts** — `scripts/online-qr-poll.ts` (one online KHQR → save/open PNG → poll 10 min) and `scripts/checkout-link-poll.ts` (Create Transaction API with `paymentGate: 0` → open hosted `checkout_qr_url` → poll 10 min). Registered as tools in the QR, purchase, and check-transaction skills; sandbox-paid and verified 2026-08-25 ($31.11 APPROVED ~37s, $12.12 APPROVED ~32s).
 - **Transaction-lifecycle CLI commands** — `check-transaction`, `poll-transaction` (NDJSON event stream; exit 0 terminal / 2 API error / 3 timeout), `transaction-detail`, `transaction-list` (defaults to today, aligned table), `close-transaction -y/--force`, `refund` with pre-flight refundable-balance check via transaction-detail, and `exchange-rate`. All accept `--json`.
 - **Standardized CLI exit codes** — `0` success · `1` validation/input · `2` PayWay API failure · `3` network/timeout/rate-limit (`classifyError()`), applied across every command.
 - **Terminal QR rendering** — `generate-qr`, `generate-checkout`, and `payment-link create` render scannable half-block QRs in interactive terminals (`--no-show-qr` to opt out).
@@ -27,6 +28,8 @@
 
 ### Changed
 
+- **`pollTransactionStatus` tolerates the creation grace period** — a check right after creation can answer HTTP 200 / `status.code 6` ("tran_id not found") for a few seconds; the poller now yields `paymentStatus: 'NOT_FOUND'` without counting it toward `maxConsecutiveErrors`, so legitimate purchase flows are never aborted by propagation delay (sandbox-verified 2026-08-25, see SANDBOX-FINDINGS §10).
+- **`payment_gate=0` contract documented** — on the JSON Create Transaction path, gate 0 (+ `hosted_view`) is what makes the response include the hosted `checkout_qr_url`; JSDoc on `CreateTransactionParams.paymentGate`, `GenerateQrParams.lifetime` (seconds, min 3 min), and the OpenAPI types now state this.
 - **`generate-checkout` no longer sends `payment_gate: 0`** — sandbox answers that value with an HTTP 200 HTML page instead of JSON.
 - **Non-JSON responses are diagnosable** — "Invalid JSON response" errors now include content-type, an HTML-detection hint ("parameter rejected server-side"), and a body snippet.
 - **`LinkCardParams.currency`** added (sandbox binding layer requires it; defaults `USD`) and included in the HMAC field list.
@@ -47,10 +50,15 @@
 
 ### Documentation
 
-- Corrected the packaged-skill count in `.agents/AGENTS.md` (20 → 24) and documented the bundled `scripts/` tooling there.
+- Corrected the packaged-skill count in `.agents/AGENTS.md` (20 → 24) and documented the bundled `scripts/` tooling there; added the missing `PAYWAY_ENV` row to its environment-variable table.
 - Replaced a dangling "Customer Module guide §10" reference in the transaction-by-merchant-ref skill with a direct link to the [aba-payway-customer-qr](skills/aba-payway-customer-qr/SKILL.md) skill.
 - Added discovery pointers for the new skill and its offline helper scripts to `docs/README.md` Quick Links and the `docs/VISUAL-GUIDE.md` cheat sheet.
 - Cross-linked online / offline / customer-module QR skills so the static-but-routable distinction is discoverable from each.
+- **Environment-variable alignment (code is source of truth — the SDK reads `PAYWAY_RSA_PUBLIC_KEY` and `PAYWAY_ENV`, per `src/client.ts`)**: replaced incorrect `PAYWAY_PUBLIC_KEY_PEM` / `PAYWAY_PUBLIC_KEY` / `PAYWAY_ENVIRONMENT` references across `README.md`, `CONTRIBUTING.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `docs/RELEASE_CHECKLIST.md`, and Chapters 02, 12, and 14; corrected a false claim that both public-key variable names are accepted.
+- Added missing CLI commands to the README command table (`generate-checkout`, `payment-link create/detail`, `setup-webhook`, `config`) and fixed table cells that contained double-backslash pipe escapes.
+- Updated "15-chapter guide" references to **16 chapters** (`README.md`, `docs/PROJECT_STATUS.md`).
+- Synced `docs/PROJECT_STATUS.md` with repository reality: milestone C/E/F "uncommitted" markers corrected to their landing commits (`df04deb`, `bc4efb7`), commit history extended through `808dc80`, and a documentation-audit session entry added.
+- Added `PAYWAY_ENV` to the configuration skill's environment-variable list (`skills/aba-payway-sdk-configuration/SKILL.md`).
 
 ### Known open item
 

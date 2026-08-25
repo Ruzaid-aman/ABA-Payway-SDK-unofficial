@@ -22,6 +22,23 @@ When using the PayWay QR API, you get two related but distinct pieces of data:
 
 The QR API endpoint generates a KHQR-compatible QR code that works with **all Cambodian banking apps** (ABA Pay, ACLEDA, etc.), not just ABA Pay.
 
+### Fast manual CLI path
+
+If you are testing the QR flow from the terminal instead of wiring your own backend first:
+
+```bash
+payway-sdk doctor
+payway-sdk generate-qr -a 3.31 -c USD
+payway-sdk check-transaction -t <id>
+payway-sdk transaction-detail -t <id>
+```
+
+- `doctor` confirms credentials and online-QR callback readiness.
+- `generate-qr` saves the QR PNG by default to `payway-output/<transaction-id>.png`.
+- Use `--save-image <path>` to choose a different output path.
+- Use `--no-save-image` to disable the default PNG write for one run.
+- If `PAYWAY_CALLBACK_URL` is missing locally, run `payway-sdk setup-webhook --tunnel`.
+
 ### Backend Endpoint
 
 ```typescript
@@ -326,6 +343,8 @@ QR codes generated via the API have a limited lifetime:
 - **Duplicate `tran_id` is silently accepted** on purchase in sandbox (HTTP 200, `code 0`). Generate unique transaction IDs (the CLI does: `qr<timestamp><random>`); do not rely on PayWay for idempotency. Production behavior is an open question — see [SANDBOX-FINDINGS §8c](./SANDBOX-FINDINGS.md).
 - **Closing an unpaid transaction keeps it reporting `PENDING`** via check/list APIs (not `CANCELLED`). Treat "closed" as a local state you track yourself; the close call returns `code 0 Success!` when accepted.
 - **`closeTransaction()` on a nonexistent ID** → HTTP 403, internal code `5` ("Transaction not found"), while `checkTransaction()` on a nonexistent ID → HTTP 200 with `status.code 6` ("tran_id not found"). Handle both shapes.
+- **Creation grace period:** the first check right after creating a transaction can return `status.code 6` for a few seconds before it becomes visible. `pollTransactionStatus()` yields `NOT_FOUND` for these and does **not** count them toward `maxConsecutiveErrors`. Verified live 2026-08-25: checkout-link flow saw 1× NOT_FOUND, then PENDING ×4 → APPROVED (~32s).
+- **Hosted checkout link requires `payment_gate=0`:** via the JSON Create Transaction API (`checkout.purchase()`), the response includes `checkout_qr_url` only when you send `viewType: 'hosted_view'` + `paymentGate: 0` alongside `paymentOption: 'abapay_khqr_deeplink'`. Without gate 0 you get only `qrString` / `qrImage` / `abapay_deeplink`.
 - **Transaction-list date filters must be `"YYYY-MM-DD HH:mm:ss"`** (e.g. `"2026-08-25 00:00:00"`). Compact (`20260825`), ISO-date (`2026-08-25`), and epoch formats all fail with HTTP 403 / code `49` "Invalid Start Date."
 
 ---
@@ -341,6 +360,15 @@ payway-sdk check-transaction -t qrabc123
 # Full detail (rate-limited to 10/min by PayWay)
 payway-sdk transaction-detail -t qrabc123
 
+# Generate an online QR and save the PNG automatically to payway-output/<id>.png
+payway-sdk generate-qr -a 3.31 -c USD
+
+# Override the default PNG path
+payway-sdk generate-qr -a 3.31 -c USD --save-image tmp/qr.png
+
+# Disable the default PNG write
+payway-sdk generate-qr -a 3.31 -c USD --no-save-image
+
 # List today's transactions (strict date format)
 payway-sdk transaction-list --from "2026-08-25 00:00:00" --to "2026-08-25 23:59:59" --status APPROVED
 
@@ -352,6 +380,25 @@ payway-sdk refund -t order-123 -a 5.00 -c USD
 
 # Live USD/KHR rate
 payway-sdk exchange-rate
+```
+
+---
+
+## Ready-Made End-to-End Scripts
+
+Two reusable scripts wire the full live flow (create → display → poll) in one command. Both read `PAYWAY_MERCHANT_ID` / `PAYWAY_API_KEY` (+ `PAYWAY_CALLBACK_URL` for QR) from `.env`, default to a **600-second lifetime** with a **10-minute poll window at 5s intervals**, and stop as soon as a terminal status arrives:
+
+| Script | Flow | Artifacts |
+|---|---|---|
+| `npx tsx scripts/online-qr-poll.ts [amount] [currency]` | Online KHQR via `qr.generateQr()` → saves + auto-opens PNG | `test-logs/qr-payment/<txId>-*` |
+| `npx tsx scripts/checkout-link-poll.ts [amount] [currency]` | Create Transaction API (`checkout.purchase()` + `paymentGate: 0`) → auto-opens hosted `checkout_qr_url` in browser | `test-logs/checkout-link/<txId>-*` |
+
+```bash
+# $31.11 USD online QR, 10-min lifetime, polls until paid or 10 minutes elapse
+npx tsx scripts/online-qr-poll.ts
+
+# $12.12 USD checkout link opened in your browser
+npx tsx scripts/checkout-link-poll.ts
 ```
 
 ---
@@ -457,6 +504,12 @@ for await (const result of payway.checkout.pollTransactionStatus(transactionId))
   if (result.paymentStatus.startsWith('ERROR:')) {
     console.warn(`Poll #${result.attempt} failed: ${result.paymentStatus}`);
     // Continue — the next poll may succeed (consecutive error count resets on success)
+    continue;
+  }
+
+  if (result.paymentStatus === 'NOT_FOUND') {
+    // Freshly-created transactions can take a few seconds to become visible
+    // (check-transaction answers status.code 6). NOT_FOUND does not count as an error.
     continue;
   }
 

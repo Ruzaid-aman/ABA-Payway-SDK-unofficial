@@ -48,8 +48,8 @@ You can pre-flight your key without calling the SDK's RSA endpoints:
 ```typescript
 import { isValidPublicKeyPem } from 'aba-payway-ts';
 
-if (!isValidPublicKeyPem(process.env.PAYWAY_PUBLIC_KEY)) {
-  console.error('PAYWAY_PUBLIC_KEY is missing or not a valid PEM public key');
+if (!isValidPublicKeyPem(process.env.PAYWAY_RSA_PUBLIC_KEY)) {
+  console.error('PAYWAY_RSA_PUBLIC_KEY is missing or not a valid PEM public key');
 }
 ```
 
@@ -176,6 +176,22 @@ try {
 > ℹ️ **Client-side validation:** The SDK validates refund amounts before making the API call. Use `validateRefundAmount(amount, currency)` to catch invalid amounts locally. The `refund()` method calls this automatically.
 >
 > 🧪 **Sandbox-verified (2026-08-25):** Refunding an unknown/unpaid transaction returns **HTTP 403 + PTL36**. The CLI's `payway-sdk refund` command runs a pre-flight balance check via `getTransactionDetail` first (paid − already-refunded) and fails fast with exit code 1 before touching PayWay.
+>
+> ℹ️ **CLI operator note:** `--no-preflight` skips only the detail lookup; `-y/--force` skips both the lookup and the confirmation prompt.
+
+### Interpreting a successful refund
+
+After a successful CLI or SDK refund, verify with:
+
+```bash
+payway-sdk transaction-detail -t <id>
+```
+
+Then interpret these fields carefully:
+
+- `refund_amount`: authoritative refunded total so far
+- `transaction_operations`: refund event history, including each refund action
+- `payment_status`: coarse lifecycle state only; sandbox verification on August 25, 2026 showed `payment_status: REFUNDED` even after a partial refund, so do not treat it as proof that the full original amount was refunded
 
 ### "Invalid JSON response from PayWay API" — HTML instead of JSON
 

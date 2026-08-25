@@ -222,7 +222,7 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 | `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min) |
 | `payway-sdk transaction-list --from "YYYY-MM-DD HH:mm:ss" --to ...` | List transactions in a window (strict date format) |
 | `payway-sdk close-transaction -t <id> [-y]` | Void/close an unpaid transaction (prompts unless `-y/--force`) |
-| `payway-sdk refund -t <id> -a <amount> [-c USD]` | Refund with pre-flight balance check and confirmation (`-y` to skip prompts, `--no-preflight` to skip the balance check) |
+| `payway-sdk refund -t <id> -a <amount> [-c USD]` | Refund with pre-flight balance check and confirmation by default (`--no-preflight` skips only the detail lookup; `-y/--force` skips both the lookup and the prompt) |
 | `payway-sdk exchange-rate` | Live USD/KHR exchange rate |
 | `payway-sdk setup-webhook` | Start a local webhook server for callback testing |
 
@@ -231,10 +231,36 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 ### Transaction lifecycle from the terminal
 
 ```bash
+payway-sdk doctor
+payway-sdk generate-qr -a 3.31 -c USD
 payway-sdk check-transaction -t qrabc123
+payway-sdk transaction-detail -t qrabc123
 payway-sdk close-transaction -t qrabc123 -y
 payway-sdk refund -t order-123 -a 5.00 -c USD -y
 ```
+
+For the fastest manual QR test:
+
+- `doctor` should show the callback row ready before online QR creation.
+- `generate-qr` saves the PNG automatically to `payway-output/<transaction-id>.png`.
+- Use `--save-image <path>` to override the PNG path.
+- Use `--no-save-image` to disable the default PNG write for one run.
+- If the callback row is missing, run `payway-sdk setup-webhook --tunnel`.
+
+### Refund follow-up
+
+For the fastest verified refund check:
+
+```bash
+payway-sdk refund -t <id> -a 1.11 -c USD
+payway-sdk transaction-detail -t <id>
+```
+
+Read the detail response in this order:
+
+- `refund_amount`: authoritative refunded total so far
+- `transaction_operations`: refund history
+- `payment_status`: coarse lifecycle only; `REFUNDED` can still appear after a partial refund
 
 Sandbox-verified gotchas: duplicate `tran_id` is silently accepted on purchase (generate unique IDs), closed-but-unpaid transactions keep reporting `PENDING`, and list dates must be `"YYYY-MM-DD HH:mm:ss"` or PayWay rejects with code 49. See [SANDBOX-FINDINGS §8](./SANDBOX-FINDINGS.md).
 

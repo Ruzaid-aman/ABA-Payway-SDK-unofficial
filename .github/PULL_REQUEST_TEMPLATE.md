@@ -17,7 +17,7 @@ Describe the sandbox command used and the result:
 ```bash
 PAYWAY_MERCHANT_ID=$PAYWAY_MERCHANT_ID \
 PAYWAY_API_KEY=$PAYWAY_API_KEY \
-PAYWAY_PUBLIC_KEY_PEM="$PAYWAY_PUBLIC_KEY_PEM" \
+PAYWAY_RSA_PUBLIC_KEY="$PAYWAY_RSA_PUBLIC_KEY" \
 npm run probe
 ```
 
