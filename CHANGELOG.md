@@ -4,6 +4,14 @@
 
 ### Added
 
+- **Transaction-lifecycle CLI commands** — `check-transaction`, `poll-transaction` (NDJSON event stream; exit 0 terminal / 2 API error / 3 timeout), `transaction-detail`, `transaction-list` (defaults to today, aligned table), `close-transaction -y/--force`, `refund` with pre-flight refundable-balance check via transaction-detail, and `exchange-rate`. All accept `--json`.
+- **Standardized CLI exit codes** — `0` success · `1` validation/input · `2` PayWay API failure · `3` network/timeout/rate-limit (`classifyError()`), applied across every command.
+- **Terminal QR rendering** — `generate-qr`, `generate-checkout`, and `payment-link create` render scannable half-block QRs in interactive terminals (`--no-show-qr` to opt out).
+- **`payway-sdk explain [code]`** — offline decoder for gateway/refund/pre-auth codes with fix hints; backed by new exports `PRE_AUTH_ERROR_CODES` (`PTL59/62/170`) and `GATEWAY_CODE_HINTS`, plus programmatic `explainPayWayCode()` / `explainAll()`.
+- **`doctor --live`** — real sandbox round-trip (exchange-rate) after static checks; verdict gates on credential rows only so advisory failures (e.g. framework detection in non-framework repos) never block it.
+- **Doctor RSA PEM shape check** — flags truncated multi-line `.env` keys with a targeted fix hint.
+- **Shared multi-line `.env` parser** (`src/cli/dotenv.ts`) — quoted values spanning lines fold correctly; used by the CLI entrypoint and doctor.
+- **Visual guide** (`docs/VISUAL-GUIDE.md`) — one-page ASCII tour: architecture, setup paths, onboarding journey, payment lifecycle, cheat sheet.
 - **Guided onboarding** (`payway-sdk onboard`) - interactive TUI wizard (@clack/prompts) that scans the current setup and walks provider → profile → callback → privacy → verify with live connectivity checks, skip-if-already-done stages, non-TTY JSON output, and opt-in first-run automation (`PAYWAY_ONBOARD_AUTO=1`).
 - **OpenCode Zen provider preset** (`opencode`, `https://opencode.ai/zen/v1`) - first-class preset with `x-preview-f-free` as the onboarding default model.
 - **Sampling passthrough** on `agent setup`: `--max-tokens`, `--temperature`, `--top-p`, and `--extra-body <json>` (e.g. NVIDIA `chat_template_kwargs`) merged into every chat-completions request.
@@ -17,6 +25,11 @@
 
 ### Changed
 
+- **`generate-checkout` no longer sends `payment_gate: 0`** — sandbox answers that value with an HTTP 200 HTML page instead of JSON.
+- **Non-JSON responses are diagnosable** — "Invalid JSON response" errors now include content-type, an HTML-detection hint ("parameter rejected server-side"), and a body snippet.
+- **`LinkCardParams.currency`** added (sandbox binding layer requires it; defaults `USD`) and included in the HMAC field list.
+- **v3 token-management trio sends the required `request` field** (defaults to `requestId`), satisfying the server binding model.
+- **Refund skill/docs** document the pre-flight balance pattern and PTL36.
 - **Deterministic callback override** - `normalizePlan` replaces model-supplied `generate_online_qr` callback URLs with the merchant profile's configured URL; models can no longer inject placeholder webhooks into executed plans.
 - **`payment_option` defaults to `abapay_khqr`** in `qr.generateQr` - PayWay's QR API now rejects requests without it (`400 The given data was invalid`).
 - **PEM validation on RSA endpoints** - Refund, Pre-Auth, Payout, and Payment Link now throw a descriptive `PayWayConfigError` ("does not look like a public key PEM") before any encryption/network call when `publicKeyPem` is malformed.
@@ -26,8 +39,13 @@
 
 ### Fixed
 
+- Multi-line quoted RSA PEMs in `.env` were truncated to their first line by the CLI's loader, silently breaking every RSA-encrypted endpoint (refund, payment links, pre-auth, payout).
 - Explicit buffer encoding in `verifyCallbackSignature` timing-safe comparison.
 - Removed four stale Biome lint warnings (unused suppressions + unused variable).
+
+### Known open item
+
+- v3 token-management endpoints (`renew-expired-account-token`, `get-token-details`, `remove-token`) reject all derivable HMAC compositions (~60 tried; SANDBOX-FINDINGS §9a) — awaiting ABA's official signature spec. Requests now pass the binding layer but fail at the hash layer.
 
 ## 1.3.0
 

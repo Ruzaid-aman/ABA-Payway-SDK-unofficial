@@ -177,6 +177,23 @@ agentic guidance before PayWay credentials are entered.
     --top-p/--extra-body`. Set `--max-tokens` explicitly (server defaults can truncate plans),
     prefer `--temperature 0.2`–0.5 for schema adherence, and use `--extra-body '{"chat_template_kwargs":
     {"enable_thinking":false}}'` on NVIDIA thinking models — thinking mode multiplies latency 10×+.
+18. **Exit codes are the agent's decision surface.** Every CLI command returns
+    `0` success / `1` input-validation / `2` PayWay API failure / `3`
+    network-timeout-ratelimit. Polling that reaches ANY terminal status
+    (even DECLINED) is `0` — read `payment_status` from the final `--json`
+    event instead of guessing from the exit code alone. Never collapse these
+    categories when adding commands.
+19. **Prefer direct CLI over a plan round-trip for one-shot actions.**
+    `check-transaction`, `poll-transaction --json`, `transaction-detail`,
+    `transaction-list`, `close-transaction -y`, `refund -y`, and `explain`
+    resolve profiles identically to agent tools and skip LLM latency entirely.
+    Reserve `ask` for multi-step or fuzzy-intent journeys. Decode unknown
+    codes programmatically via `explainPayWayCode()` (`aba-payway-ts/cli/explain-code.js`).
+20. **`doctor --live` gates on credential rows, not cosmetic ones.** Framework
+    detection fails in non-framework repos (including this SDK repo) by design;
+    the live exchange-rate probe and final verdict ignore it. When adding new
+    doctor checks, prefix purely informational ids with something other than
+    `env-` so they stay advisory.
 
 ### Where agent-mode knowledge lives (for coding agents)
 - `skills/aba-payway-agent/SKILL.md` (v1.1.0) — onboarding command reference +
@@ -184,4 +201,3 @@ agentic guidance before PayWay credentials are entered.
   profile or pick tools efficiently.
 - This playbook documents the manual path + architecture; prefer `onboard` for
   interactive use and the manual steps only for CI/headless/fine-grained control.
-

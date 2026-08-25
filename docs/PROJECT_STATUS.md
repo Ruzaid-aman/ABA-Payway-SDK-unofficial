@@ -468,6 +468,15 @@ Tasks must be completed **in this order**:
 - **Skill version is pinned by test.** `skills.test.ts` asserts `version: 1.1.0` in every `SKILL.md` frontmatter — bumping it (e.g. to 1.3.0) breaks the suite; keep at 1.1.0 or update the test.
 - **First-run hint + auto-onboard** should be opt-in (`PAYWAY_ONBOARD_AUTO=1`) to avoid surprising non-interactive/CI invocations.
 
+### Sandbox-campaign learnings (2026-08-25, Milestones E–F)
+
+- **Tag which layer a probe reached.** PayWay processes requests as *binding → hash → business*. Earlier CoF "verified" notes had only ever reached the binding layer; always record the layer in evidence (binding errors = HTTP 400 code `"04"` with an `errors{}` map; hash failure = 403 code `01`).
+- **Binding errors are free spec discovery.** The server names its exact model and missing properties ("missing required properties including 'request_time'") — satisfy binding first, then hunt HMAC compositions. This decoded every CoF contract in one session.
+- **One loader, one place.** The multi-line `.env` PEM bug existed because three copies of a naive line-based loader drifted (cli.ts fixed last, doctor.ts silently broken until extracted into `src/cli/dotenv.ts`). Any env parsing belongs in one shared module.
+- **Sandbox acceptance ≠ security proof.** `link-card` returns its hosted page even with a corrupted hash — never present sandbox success as evidence that server-side verification exists.
+- **Exit codes are an API.** Agents branch on `$?`; collapsing validation vs API vs network failures into a single nonzero code destroys automation. Keep the 0/1/2/3 contract in every new command.
+- **Advisory checks must not gate critical ones.** `doctor --live` originally refused to probe because "framework detected: unknown" failed in the SDK's own repo — separate credential health from cosmetic detection before composing verdicts.
+
 ---
 
 ## Known Issues (For Reference)
@@ -494,14 +503,14 @@ Tasks must be completed **in this order**:
 
 ```
 Package version (package.json):  1.1.1
-Recent commits:                  b8ff4b6 (ignore payway-output) / e6c872c (opencode preset, tool-catalog prompt, E2E fixes) / 9f47648 / 65046c8 (gap hardening) / 341923d (Milestone D onboarding)
-Working tree state:              Milestone E campaign changes (uncommitted): cli.ts, client.ts, constants.ts, docs, skills
+Recent commits:                  808dc80 (journey UX pass) / 922cf67 (docs sync) / bc4efb7 (campaign fixes) / b8ff4b6 / e6c872c / 341923d (Milestone D)
+Working tree state:              Learnings sync: CHANGELOG Unreleased, PROJECT_STATUS, chapter 12, skills (check/close/detail/list/agent), VISUAL-GUIDE.md
 Active agent provider:           opencode (https://opencode.ai/zen/v1), model x-preview-f-free, key via PAYWAY_AGENT_API_KEY in .env
-Vitest:                          676 passing / 0 failing (42 files)
+Vitest:                          694 passing / 0 failing (45 files)
 Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck -> clean
 Lint:                            biome -> 0 errors, 0 warnings
 Build:                           clean (dist/ rebuilt)
-Live E2E:                        ask -> plan (Zen model) -> authorize -> PayWay sandbox QR create = Success (2026-08-24)
-Sandbox campaign (2026-08-25):   Milestones E+F complete & committed (bc4efb7/922cf67); UX pass: poll-transaction, doctor --live, terminal QR, explain
-Next task:                       Commit UX-pass changeset; ask ABA: v3 token-trio HMAC composition (findings §9a)
+Live E2E:                        doctor --live round-trip ✓; poll-transaction/list verified against sandbox (2026-08-25)
+Sandbox campaigns:               Milestones E+F committed; evidence in test-output/campaign-*.json + SANDBOX-FINDINGS §8–9
+Next task:                       Commit learnings sync; ask ABA: v3 token-trio HMAC composition (findings §9a)
 ```

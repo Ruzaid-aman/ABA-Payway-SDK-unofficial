@@ -109,10 +109,24 @@ try {
 | `"22"` | Expired Transaction | 403 | Token or transaction has expired | Call `renew()` for tokens, or create new transaction |
 | `"23"` | Transaction Not Found | 403 | No transaction with given `tran_id` | Check transaction ID, it may have been closed |
 | `"24"` | Invalid Beneficiary Data | 403 | RSA-encrypted beneficiary data is wrong | Verify public key PEM and beneficiary account format |
-| `"49"` | Invalid Request | 400/403 | Generic validation error | Check all parameters against the OpenAPI spec |
-| `"96"` | Payee Not Found | 403 | Beneficiary account not whitelisted | Call `addBeneficiary()` first before payout |
+| `"37"` | Payout Whitelist | 403 | Payout account not whitelisted | Call `addBeneficiary()` first (sandbox-verified) |
+| `"49"` | Invalid Request | 400/403 | Generic validation error — for lists, dates must be `"YYYY-MM-DD HH:mm:ss"` | Check all parameters against the OpenAPI spec |
+| `"96"` | Payee Not Found / Invalid merchant data | 403 | Beneficiary not whitelisted, or payment-link id invalid | Whitelist the payee; verify the link id |
 
-> 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema and verified against sandbox probe responses.
+> 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema and verified against sandbox probe responses. The full hint map ships in `GATEWAY_CODE_HINTS` and is queryable via `payway-sdk explain <code>`.
+
+### Pre-Authorization Error Codes
+
+Discovered by exercising a real pre-auth lifecycle in sandbox (`purchase` with
+`type: 'pre-auth'`, then complete/cancel). Exported as
+`PRE_AUTH_ERROR_CODES`:
+
+| Code | Constant | Meaning | How to Fix |
+|---|---|---|---|
+| `PTL59` | `PRE_AUTH_ERROR_CODES.UNABLE_TO_COMPLETE` | Cannot capture — transaction status invalid | Only authorized OPEN pre-auths can be completed |
+| `PTL62` | `PRE_AUTH_ERROR_CODES.MERCHANT_INVALID` | Merchant info invalid for this operation | Sandbox profile lacks permission (e.g. complete-with-payout) — contact PayWay |
+| `PTL170` | `PRE_AUTH_ERROR_CODES.UNABLE_TO_CANCEL` | Cannot cancel — transaction status invalid | Only unpaid OPEN pre-auths can be cancelled |
+| `PTL36` | *(shared with refunds)* | Transaction not found or invalid | Verify the `tran_id` |
 
 ### Refund-Specific Error Codes
 

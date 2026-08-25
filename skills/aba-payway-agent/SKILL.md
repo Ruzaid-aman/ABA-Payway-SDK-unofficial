@@ -233,3 +233,28 @@ line plus per-stage progress and a remediation hint; in non-TTY the provider mes
 - [First Payment](../aba-payway-first-payment/SKILL.md)
 - [Purchase](../aba-payway-purchase/SKILL.md)
 - [Configuration](../aba-payway-sdk-configuration/SKILL.md)
+
+## Direct CLI journey commands (prefer these for one-shot actions)
+
+For single-step actions the plain CLI is faster than a plan/authorize round-trip
+and shares the same credential resolution:
+
+```sh
+payway-sdk generate-qr -a 5 -y              # terminal QR; polls until paid
+payway-sdk check-transaction -t <id> --json # one-shot status
+payway-sdk poll-transaction -t <id> --json  # NDJSON events: poll|terminal|aborted
+payway-sdk transaction-list                 # today's window, table output
+payway-sdk refund -t <id> -a 2 -y           # pre-flight balance check built in
+payway-sdk explain PTL36                    # decode any code offline
+```
+
+**Exit-code contract** — branch on `$?`, never on prose:
+`0` success · `1` input/validation · `2` PayWay API failure · `3`
+network/timeout/rate-limit. Polling reaching ANY terminal status (including
+DECLINED) is `0`; read `payment_status` from the final JSON event.
+
+Programmatic lookups without spawning the CLI:
+```ts
+import { explainPayWayCode } from 'aba-payway-ts/cli/explain-code.js';
+explainPayWayCode('PTL36'); // { family:'refund', title:'Transaction not found', hint:'...' }
+```

@@ -161,6 +161,8 @@ Results from integration scripts are written to `test-logs/` with timestamps.
 
 For a complete 15-chapter integration guide, diagrams, and runnable examples, see [docs/README.md](./docs/README.md).
 
+> 🗺️ **New to the project?** Start with the [Visual Guide](./docs/VISUAL-GUIDE.md) — architecture, setup paths, onboarding journey, and the payment lifecycle in one page of diagrams.
+
 > Note: The SDK also performs fast client-side validation per domain. See the validation behavior section in [docs/README.md](./docs/README.md) for details.
 
 ### Documentation & examples

@@ -14,6 +14,7 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 | **Mobile developer** | Read Chapter 1 → 2, then skip to Chapter 4 (Native) or 5 (WebView) |
 | **Backend developer** | Read Chapter 1 → 2 → 11 → 14 (code snippets) |
 | **Debugging an issue** | Jump to Chapter 12 (Error Handling) or Chapter 13 (Deployment Checklist) |
+| **Want the 1-page visual tour** | [Visual Guide](./VISUAL-GUIDE.md) — architecture → setup → onboarding → payment lifecycle |
 | **Looking for a specific term** | Check the [Glossary](./glossary.md) |
 
 > 💡 **Estimated reading time for the full guide:** ~2–3 hours  
