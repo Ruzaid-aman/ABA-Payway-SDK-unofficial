@@ -37,9 +37,10 @@ The command reads `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`, signs the request, 
 
 ## Tools (scripts/)
 
-- **`reconcile.cjs`** — cron-ready fallback job (Customer Module guide §10): signs and calls `get-transactions-by-mc-ref`, dedupes by `transaction_id`, tracks a watermark file so each run prints only NEW transactions, optional CSV append and watch mode.
+- **`reconcile.cjs`** — cron-ready reconciliation fallback job (the missed-callback safety net for portal-generated static QRs — see [Customer Module QR](../aba-payway-customer-qr/SKILL.md)): signs and calls `get-transactions-by-mc-ref`, dedupes by `transaction_id`, tracks a watermark file so each run prints only NEW transactions, optional CSV append and watch mode.
   ```sh
   node scripts/reconcile.cjs --merchant-ref "dt-one-8989" --env sandbox          # one-shot
   node scripts/reconcile.cjs --merchant-ref "dt-one-8989" --watch --interval 300 --csv payments.csv
   ```
   Rate limit (10/min) and pagination constraints are enforced; exit 0 on success even with no new rows.
+

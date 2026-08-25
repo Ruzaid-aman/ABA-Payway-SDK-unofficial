@@ -22,6 +22,8 @@
 - **Runtime progress visibility** - `ask`/`agent` print per-stage progress (`propose → validate → authorize → execute`) via a new orchestrator `onProgress` hook.
 - **`ask --provider-timeout <ms>`** - override the inference provider request timeout so hung providers surface fast.
 - **`isValidPublicKeyPem()` export** - structural PEM public-key check for pre-flight validation.
+- **`aba-payway-customer-qr` skill (24th skill)** — Merchant Portal Customer Module static QRs ("Printed QR channel"): decoded payload anatomy (PayWay routing tags `62·68`, `99`), callback handling via `merchant_ref`, reconciliation guidance, plus bundled tools `decode-khqr.cjs` (TLV decode + CRC-16 validation) and `qr-manifest.cjs` (batch QR-folder audit to CSV).
+- **Skill helper scripts** — six dependency-free `.cjs` tools shipped inside their skills and covered by `src/__tests__/skill-scripts.test.ts`: `verify-callback.cjs`, `sign-request.cjs`, `mock-callback.cjs` (hash/webhooks), `checkout-payload.cjs` (first payment), `decode-status.cjs` (check-transaction), and `reconcile.cjs` (transaction-by-merchant-ref watermark/dedupe fallback job).
 
 ### Changed
 
@@ -42,6 +44,13 @@
 - Multi-line quoted RSA PEMs in `.env` were truncated to their first line by the CLI's loader, silently breaking every RSA-encrypted endpoint (refund, payment links, pre-auth, payout).
 - Explicit buffer encoding in `verifyCallbackSignature` timing-safe comparison.
 - Removed four stale Biome lint warnings (unused suppressions + unused variable).
+
+### Documentation
+
+- Corrected the packaged-skill count in `.agents/AGENTS.md` (20 → 24) and documented the bundled `scripts/` tooling there.
+- Replaced a dangling "Customer Module guide §10" reference in the transaction-by-merchant-ref skill with a direct link to the [aba-payway-customer-qr](skills/aba-payway-customer-qr/SKILL.md) skill.
+- Added discovery pointers for the new skill and its offline helper scripts to `docs/README.md` Quick Links and the `docs/VISUAL-GUIDE.md` cheat sheet.
+- Cross-linked online / offline / customer-module QR skills so the static-but-routable distinction is discoverable from each.
 
 ### Known open item
 

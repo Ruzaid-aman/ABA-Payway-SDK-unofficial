@@ -199,6 +199,8 @@ payway-sdk refund -t <id> -a 2.00           # pre-flight balance check built in
 payway-sdk explain 49                       # decode any error code
 payway-sdk poll-transaction -t <id> --json  # machine-readable watch
 payway-sdk skills add claude opencode       # install agent skill guides
+# skills/*/scripts also ship offline .cjs helpers: sign-request, verify-callback,
+# decode-status, checkout-payload, reconcile — each SKILL.md documents its own
 ```
 
 Sandbox facts baked into these defaults: duplicate `tran_id` is accepted

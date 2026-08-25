@@ -103,6 +103,7 @@ This documentation is written for **junior to mid-level developers** who need to
 - [Production Dashboard](https://checkout.payway.com.kh)
 - [Agentic PayWay CLI (1-pager)](./QUICK-START-1-PAGER.md#agentic-payway-cli) — risk-gated, provider-driven payments
 - [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md)
+- [All 24 AI skills](../skills/README.md) — task-focused agent guides; several bundle dependency-free `.cjs` tools (request signing, callback verification, KHQR decode/CRC validation, status decoding, reconciliation) under their `scripts/` folders
 
 ---
 
