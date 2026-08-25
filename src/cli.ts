@@ -112,6 +112,10 @@ function printApiError(e: unknown): number {
       console.log(`  ${c.dim('Hint: check the link id — use the data.id value returned by create.')}`);
     } else if (e.paywayCode === '49') {
       console.log(`  ${c.dim('Hint: transaction-list dates must be "YYYY-MM-DD HH:mm:ss" (sandbox-verified format).')}`);
+    } else if (e.paywayCode === '8' || e.paywayCode === '15' || e.paywayCode === '26') {
+      console.log(
+        `  ${c.dim('Hint: PayWay rejected the merchant identity — verify PAYWAY_MERCHANT_ID (env or active profile) and that it belongs to this environment. Run: payway-sdk profiles list')}`,
+      );
     } else if (e.paywayCode === '429' || e instanceof PayWayRateLimitError) {
       console.log(
         `  ${c.dim('Hint: strict documented cap hit (sandbox sends HTTP 403 + body code 429). Wait for the window to reset, or use check-transaction (600 req/s) for status-only reads.')}`,

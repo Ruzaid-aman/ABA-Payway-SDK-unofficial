@@ -76,6 +76,17 @@ describe('explainPayWayCode', () => {
     expect(e ? e.hint : '').toContain('YYYY-MM-DD HH:mm:ss');
   });
 
+  it('explains sandbox-verified merchant-identity codes (8, 26)', () => {
+    const notFound = explainPayWayCode('8');
+    expect(notFound?.family).toBe('gateway');
+    expect(notFound ? notFound.title : '').toMatch(/merchant_id/i);
+
+    const invalidProfile = explainPayWayCode('26');
+    expect(invalidProfile?.family).toBe('gateway');
+    expect(invalidProfile ? invalidProfile.title : '').toMatch(/Invalid Merchant Profile/);
+    expect(invalidProfile ? invalidProfile.hint : '').toContain('PAYWAY_MERCHANT_ID');
+  });
+
   it('returns undefined for unknown codes', () => {
     expect(explainPayWayCode('ZZZ999')).toBeUndefined();
   });

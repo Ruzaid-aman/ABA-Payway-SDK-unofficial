@@ -24,7 +24,9 @@ From <https://developer.payway.com.kh/close-transaction-14530822e0>
 Documented response codes: `00` Success · `1` Wrong Hash · `5` Transaction not found ·
 `26` Invalid merchant profile. (No "already closed" code is defined.)
 
-## 2. Observed reality (two independent live violations)
+## 2. Observed reality (channel-dependent!)
+
+### 2a. Hosted CARD page — close NOT enforced (two live violations)
 
 Both cases: card checkout created via the official web integration
 (`createTransaction` local payload → form POST → `checkout2-0.js` page),
@@ -49,6 +51,22 @@ Case 2 detail (`transaction-detail`, verbatim operations history):
 No cancellation/reversal operation appears between them, no callback-related
 flag differs, and funds state is a normal approval. Case 1's history is identical
 in shape (`Create Order` 22:00:17 → `Completed` 22:00:50).
+
+### 2b. KHQR scan channel — close IS enforced (one live observation)
+
+`PAY8vgeeljbs` (USD 55.89 online QR, 600s lifetime) was closed with code 00
+while PENDING; the customer then attempted payment by scanning the QR in ABA
+Mobile → **payment rejected**. Afterwards check/detail still show plain PENDING:
+no `apv`, no `bank_ref`, `payment_amount: 0`, `transaction_operations: []`.
+
+### 2c. Working hypothesis
+
+Enforcement is **per-channel**: KHQR apps re-validate transaction state
+server-side at pay time (correctly refusing closed txns), while the hosted card
+page carries a **checkout session issued before the close** that the gateway
+accepts without re-validation. If confirmed, the merchant risk is specifically
+**stale pre-rendered card/hosted sessions**, not the QR channel. Single sample
+on the QR side — re-verify alongside ABA (see §7).
 
 ## 3. Secondary findings around closure
 
@@ -88,8 +106,9 @@ and probe dossier `test-output/txn-detail-probe.json`.
 
 ## 5. Questions for ABA
 
-1. Is post-close **rejection or reversal** enforced in PRODUCTION, or only in sandbox?
-   (Sandbox enforces neither — payment completes normally after code-00 close.)
+1. Is post-close **rejection or reversal** enforced in PRODUCTION, per channel?
+   Sandbox data: KHQR channel rejects closed txns; hosted card sessions do not
+   (two approvals). Which behavior is production-intended for each channel?
 2. Why is there **no CLOSED status** in check-transaction / transaction-detail?
    Merchants cannot reconcile closures remotely; a `CLOSED` value (or operation entry)
    is needed.
@@ -106,8 +125,9 @@ and probe dossier `test-output/txn-detail-probe.json`.
   `closed` flag; never infer state from PayWay reads.
 - Watch webhooks + poll check-transaction for **late APPROVED after close** →
   route to refund path immediately.
-- After payment completes on any open page, consider the page live until expiry —
-  ideally discard/refresh the page server-side post-close.
+- KHQR/QR channel appears safe post-close (sandbox rejects); the risk
+  concentrates in **pre-rendered hosted/card sessions** — discard/refresh such
+  pages server-side after close instead of relying on the close call.
 - Never fulfill orders off close semantics; fulfill only on verified APPROVED
   webhook/callback signature.
 
