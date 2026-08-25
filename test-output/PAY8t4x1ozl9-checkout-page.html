@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>PayWay Cards Checkout — PAY8t4x1ozl9</title>
+<script src="https://checkout.payway.com.kh/plugins/checkout2-0.js" defer></script>
+<style>
+  body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 90vh; margin: 0; }
+  .box { text-align: center; }
+  button { font-size: 1rem; padding: 12px 28px; border-radius: 8px; border: 0;
+           background: #00bcd4; color: #fff; cursor: pointer; margin: 6px; }
+  button[disabled] { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: #455a64; }
+  p { color: #555; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h2>ABA PayWay — Card Checkout</h2>
+    <p>Transaction <strong>PAY8t4x1ozl9</strong> · USD 7.77</p>
+    <noscript><p style="color:#b00020">JavaScript is required for the PayWay checkout.</p></noscript>
+
+    <div>
+      <button id="pay-modal-btn" type="button" disabled title="Renders PayWay's HTML in an in-page modal via checkout2-0.js">Pay in modal</button>
+      <button id="pay-hosted-btn" type="button" class="secondary" title="Full-page redirect to PayWay's hosted checkout">Open hosted checkout</button>
+    </div>
+    <p id="status">Waiting for PayWay plugin…</p>
+  </div>
+
+  <form method="POST" target="aba_webservice" id="aba_merchant_request" action="https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase">
+    <input type="hidden" name="tran_id" value="PAY8t4x1ozl9" />
+    <input type="hidden" name="amount" value="7.77" />
+    <input type="hidden" name="type" value="purchase" />
+    <input type="hidden" name="payment_option" value="cards" />
+    <input type="hidden" name="currency" value="USD" />
+    <input type="hidden" name="view_type" value="hosted_view" />
+    <input type="hidden" name="payment_gate" value="0" />
+    <input type="hidden" name="lifetime" value="600" />
+    <input type="hidden" name="req_time" value="20260825151605" />
+    <input type="hidden" name="merchant_id" value="ec476910" />
+    <input type="hidden" name="hash" value="ET3v9vLUILNc4dZk8PA4+y+Gzfkdp4qzhVIhFxwKF+Bu7XE0e1U8K1HPm7VLTye3RG5Rqh9nkB380LPCceoxXw==" />
+  </form>
+
+  <script>
+    (function () {
+      var form = document.getElementById('aba_merchant_request');
+      var statusEl = document.getElementById('status');
+      var modalBtn = document.getElementById('pay-modal-btn');
+      var hostedBtn = document.getElementById('pay-hosted-btn');
+      var started = false;
+
+      function pluginReady() {
+        return !!(window.AbaPayway && typeof window.AbaPayway.checkout === 'function');
+      }
+
+      function startModal() {
+        if (started || !pluginReady()) return;
+        started = true;
+        statusEl.textContent = 'Opening PayWay modal…';
+        try {
+          AbaPayway.checkout(); // modal popup on desktop / bottom sheet on mobile
+          statusEl.textContent = 'Modal open — complete the card form there.';
+        } catch (e) {
+          started = false;
+          statusEl.textContent = 'Modal failed (' + e.message + ') — use hosted checkout.';
+        }
+      }
+
+      function startHosted() {
+        if (started) return;
+        started = true;
+        statusEl.textContent = 'Redirecting to PayWay hosted checkout…';
+        // Hosted view = normal top-level navigation, so drop the iframe target.
+        form.removeAttribute('target');
+        form.submit();
+      }
+
+      modalBtn.addEventListener('click', startModal);
+      hostedBtn.addEventListener('click', startHosted);
+
+      // Enable modal as soon as the deferred plugin attaches (poll up to ~8s).
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries++;
+        if (pluginReady()) {
+          clearInterval(timer);
+          modalBtn.disabled = false;
+          statusEl.textContent = 'Choose a mode — modal is ready.';
+          if (!started) startModal(); // auto-open the modal once
+        } else if (tries > 80) {
+          clearInterval(timer);
+          statusEl.textContent = 'Plugin did not load — use hosted checkout.';
+        }
+      }, 100);
+    })();
+  </script>
+</body>
+</html>

@@ -418,3 +418,56 @@ success once the window rolled.
 while the gateway reports code 6) and prints a lag hint with the
 check-transaction escape hatch when it gives up. `printApiError` now explains
 the 403+429 cap shape and points to the fast alternative endpoint.
+
+## 12. Card-payment checkout matrix + create→close lifecycle (2026-08-25)
+
+Probed `checkout.purchase()` with `paymentOption: 'cards'` across payment_gate
+values (JSON content-type throughout):
+
+| Request | Response | Transaction created? |
+|---|---|---|
+| `cards`, no gate | JSON PurchaseQrResponse (`qrString`/`qrImage`/`abapay_deeplink`) — **KHQR data regardless of the cards option** | yes |
+| `cards` + `paymentGate: 1` | same JSON | yes |
+| `cards` + `paymentGate: 0` (+`hosted_view`) | **the hosted card-checkout page itself as HTML** (~47 KB, test-card fields included); surfaces through the SDK as an "Invalid JSON" PayWayAPIError whose `rawBody` holds the full page | yes |
+
+So gate 0's meaning is consistent with §10b — "Checkout service renders it" —
+but for `cards` there is no JSON+URL shape: the page IS the response body, and
+it cannot be rendered from a static file (its relative `/_nuxt/*` assets break
+under file:// with CORS/file-origin errors).
+
+**Correct integration (official docs,
+developer.payway.com.kh/ecommerce-checkout-3158159f0):** build the signed
+payload locally (`checkout.createTransaction()`), embed it as hidden inputs in
+`<form method="POST" target="aba_webservice" action="…/v1/payments/purchase">`,
+load `https://checkout.payway.com.kh/plugins/checkout2-0.js` deferred, and call
+`AbaPayway.checkout()` — the HTML renders in a modal via iframe form POST
+(no CORS). Implemented in `scripts/checkout-cards-close.ts`; creation verified
+by check-transaction within ~3s of page open.
+
+Live end-to-end run ($7.77 USD): created → PENDING → `closeTransaction`
+code 00 → post-close still PENDING. Extra observations:
+
+- **Closing is advisory, not a hard void — sandbox violates the documented
+  contract.** Docs (close-transaction): "Once a transaction is closed, it will
+  no longer accept payment: any incoming payment will be rejected or reversed…"
+  Live card payments disproved this TWICE: `PAY8skk3vbbi` (MC \*6777) and
+  `PAY8t4x1ozl9` (VISA \*0206) were both closed with code 00 while PENDING,
+  then paid on still-open checkout pages → **APPROVED**.
+- **Closure is not queryable:** check-transaction keeps reporting PENDING for
+  closed-unpaid txns, and transaction-detail shows no cancellation marker —
+  operation history reads `Create Order → Completed` even when a close was
+  accepted in between. There is NO CLOSED status anywhere.
+- Closing an **already-closed** transaction is idempotent in sandbox
+  (code 00 again) — reusable tool: `scripts/close-transaction-verify.ts`.
+- Modal vs hosted: the generated page must WAIT for the deferred
+  `checkout2-0.js` before calling `AbaPayway.checkout()`; racing window.load
+  falls back to full-page hosted navigation. The page now offers both modes
+  explicitly (modal enabled once the plugin attaches, hosted always available;
+  hosted drops the `target="aba_webservice"` iframe attribute so navigation is
+  top-level).
+- **Open question for ABA (#13):** is post-close rejection/reversal enforced in
+  PRODUCTION? Until answered, merchants must treat close as advisory, keep a
+  local closed flag, watch webhooks for late APPROVED events, and refund.
+
+> 📁 **Full close-API dossier (evidence, reproduction, questions for ABA,
+> post-fix validation checklist): [CLOSE-TRANSACTION-FINDINGS.md](./CLOSE-TRANSACTION-FINDINGS.md)**

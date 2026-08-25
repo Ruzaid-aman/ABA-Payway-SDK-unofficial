@@ -31,6 +31,14 @@ const url = (res as any).checkout_qr_url; // hosted page — open in browser/app
 
 Caution: POSTing the same payload as a browser form with `payment_gate=0` answers with an HTML page instead of JSON — that's why `generate-checkout` CLI omits it.
 
+### Card-payment response matrix (`paymentOption: 'cards'`, sandbox-verified 2026-08-25)
+| Request | Response |
+|---|---|
+| `cards` (no gate, or gate 1) via `purchase()` | JSON PurchaseQrResponse — but with **KHQR data** (qrString/deeplink), no checkout URL |
+| `cards` + `paymentGate: 0` via `purchase()` | the hosted card-checkout page as **HTML** — transaction IS created, but you cannot render that response from a static page (relative `/_nuxt/*` assets → CORS/file-origin errors) |
+
+**Correct card integration (official):** build the signed payload LOCALLY with `checkout.createTransaction({ paymentOption: 'cards', ... })`, embed all fields as hidden inputs in a `<form method="POST" target="aba_webservice" action="…/v1/payments/purchase">`, load `<script src="https://checkout.payway.com.kh/plugins/checkout2-0.js" defer></script>`, and call `AbaPayway.checkout()` on submit — PayWay's HTML renders in a modal (iframe POST, no CORS). Docs: https://developer.payway.com.kh/ecommerce-checkout-3158159f0
+
 ## Error Handling
 ```ts
 import { PayWayConfigError } from 'aba-payway-ts';
@@ -46,6 +54,18 @@ catch (error) { if (error instanceof PayWayConfigError) console.error(error.mess
   npx tsx scripts/checkout-link-poll.ts 5 KHR     # custom amount/currency
   ```
   Artifacts land in `test-logs/checkout-link/<txId>-*` (response JSON, checkout URL). Requires `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY` in `.env`.
+
+- **`checkout-cards-close.ts`** — card-payment lifecycle using the OFFICIAL web integration: builds the payload locally (`createTransaction`), generates a checkout2-0.js modal page, waits for server-side creation, then delegates to the closer/verifier.
+  ```sh
+  npx tsx scripts/checkout-cards-close.ts [amount] [currency]
+  ```
+
+- **`close-transaction-verify.ts`** — reusable close + verify tool (CLI or import): closes a transaction (tolerant of already-closed/unknown IDs — sandbox re-closing returns code 00 again) and reads status twice so you see the settled view.
+  ```sh
+  npx tsx scripts/close-transaction-verify.ts <txId>              # close + verify
+  npx tsx scripts/close-transaction-verify.ts <txId> --status-only
+  ```
+  Exports `closeOrReport()`, `statusOf()`, `closeAndVerify()` for other scripts.
 
 ## Related Skills
 - [Configuration](../aba-payway-sdk-configuration/SKILL.md)

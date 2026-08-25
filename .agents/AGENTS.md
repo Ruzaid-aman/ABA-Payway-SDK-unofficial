@@ -29,6 +29,7 @@
 ## Workflow & State Tracking
 - **Always check status first**: Before beginning new work or deciding what to do next, ALWAYS read `PROJECT_STATUS.md` in the root of the workspace. This is the source of truth for what has been done and what the current priorities are.
 - **Understand the API quirks**: Read `SANDBOX-FINDINGS.md` to understand API behaviors we have verified during our sandbox probes.
+- **Close Transaction escalation (open)**: `docs/CLOSE-TRANSACTION-FINDINGS.md` documents that sandbox close is NOT enforced (paid-after-close → APPROVED, twice) and closure is unqueryable. Read it before ANY work involving `closeTransaction`, and re-run its §7 validation checklist when ABA ships a fix.
 - **When probing endpoints**: When tasked to probe a sandbox endpoint, write a script in the `scripts/` folder to execute and verify the endpoint exists and validates formatting correctly, similar to prior probes.
 - **Update status continuously**: Keep `PROJECT_STATUS.md` updated as tasks are completed.
 

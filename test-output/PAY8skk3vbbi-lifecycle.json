@@ -1,0 +1,17 @@
+{
+  "txId": "PAY8skk3vbbi",
+  "amount": 7.77,
+  "currency": "USD",
+  "preClose": "PENDING",
+  "summary": {
+    "txId": "PAY8skk3vbbi",
+    "close": {
+      "attempted": true,
+      "accepted": true,
+      "code": "00",
+      "message": "Success!"
+    },
+    "immediateStatus": "PENDING",
+    "delayedStatus": "PENDING"
+  }
+}
