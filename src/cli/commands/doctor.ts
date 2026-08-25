@@ -1,7 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
 import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
+import { isValidPublicKeyPem } from '../../utils.js';
+import { parseDotEnvFile } from '../dotenv.js';
 
 export interface DoctorOptions {
   readonly cwd?: string;
@@ -24,20 +26,27 @@ export interface DoctorResult {
   readonly allHealthy: boolean;
 }
 
-function loadDotEnv(envPath: string): Record<string, string> {
-  if (!existsSync(envPath)) return {};
-  const content = readFileSync(envPath, 'utf8');
-  const result: Record<string, string> = {};
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIndex = trimmed.indexOf('=');
-    if (eqIndex === -1) continue;
-    const key = trimmed.slice(0, eqIndex).trim();
-    const value = trimmed.slice(eqIndex + 1).trim();
-    result[key] = value;
+function checkRsaPem(env: NodeJS.ProcessEnv): DoctorCheck | undefined {
+  const pem = env.PAYWAY_RSA_PUBLIC_KEY?.trim();
+  if (!pem) return undefined; // optional credential — absence handled by command pre-flight
+
+  const looksValid: boolean = isValidPublicKeyPem(pem);
+  if (looksValid) {
+    return { id: 'env-rsa-pem', label: 'RSA public key shape', ok: true, detail: 'BEGIN/END PUBLIC KEY detected' };
   }
-  return result;
+
+  const truncated = pem.startsWith('"-----BEGIN') || (pem.includes('BEGIN PUBLIC KEY') && !pem.includes('END PUBLIC KEY'));
+  return {
+    id: 'env-rsa-pem',
+    label: 'RSA public key shape',
+    ok: false,
+    detail: truncated
+      ? 'PEM appears truncated — only the BEGIN header is present'
+      : 'Does not look like a full public key PEM',
+    fix: truncated
+      ? 'The CLI supports multi-line quoted PEMs in .env: wrap the whole key in double quotes across lines. Re-copy the full key from the PayWay portal.'
+      : 'PAYWAY_RSA_PUBLIC_KEY must contain "-----BEGIN PUBLIC KEY-----" and "-----END PUBLIC KEY-----". Multi-line quoted values are supported.',
+  };
 }
 
 function checkEnvFile(cwd: string): DoctorCheck {
@@ -121,14 +130,15 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
   const env = options.env ?? process.env;
 
   const envPath = path.join(cwd, '.env');
-  const fileVars = loadDotEnv(envPath);
+  const fileVars = parseDotEnvFile(envPath);
   const mergedEnv = { ...fileVars, ...env } as NodeJS.ProcessEnv;
 
   const envFileCheck = checkEnvFile(cwd);
   const frameworkCheck = checkFramework(cwd);
   const envVarChecks = checkEnvVars(mergedEnv);
+  const rsaCheck = checkRsaPem(mergedEnv);
 
-  const checks = [envFileCheck, frameworkCheck, ...envVarChecks];
+  const checks = [envFileCheck, frameworkCheck, ...envVarChecks, ...(rsaCheck ? [rsaCheck] : [])];
   const envIssues = validatePayWayEnv(mergedEnv);
   const detection = detectFramework(cwd);
 

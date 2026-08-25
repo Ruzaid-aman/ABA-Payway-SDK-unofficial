@@ -502,6 +502,6 @@ Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck ->
 Lint:                            biome -> 0 errors, 0 warnings
 Build:                           clean (dist/ rebuilt)
 Live E2E:                        ask -> plan (Zen model) -> authorize -> PayWay sandbox QR create = Success (2026-08-24)
-Sandbox campaign (2026-08-25):   Milestone E lifecycle probe + Milestone F scope coverage (CoF/payout/pre-auth/link/KHQR); evidence in test-output/
-Next task:                       Commit Milestones E+F as clean changeset; ask ABA: v3 token-trio HMAC composition (findings §9a)
+Sandbox campaign (2026-08-25):   Milestones E+F complete & committed (bc4efb7/922cf67); UX pass: poll-transaction, doctor --live, terminal QR, explain
+Next task:                       Commit UX-pass changeset; ask ABA: v3 token-trio HMAC composition (findings §9a)
 ```

@@ -192,6 +192,18 @@ payway-sdk refund -t order-123 -a 5.00 -y
 echo $?   # 0 = submitted, 1 = bad input, 2 = PayWay rejected, 3 = network issue
 ```
 
+### Decode any error with `explain`
+
+Instead of searching this chapter for a code, ask the CLI — works offline, no credentials:
+
+```bash
+payway-sdk explain PTL36    # → Transaction not found: verify the original tran_id...
+payway-sdk explain 49       # → Invalid Request: list dates must be "YYYY-MM-DD HH:mm:ss"
+payway-sdk explain          # list every known code
+```
+
+The same lookup is available programmatically via `explainPayWayCode()` in `aba-payway-ts/cli/explain-code.js`.
+
 ---
 
 ## Error Handling Patterns

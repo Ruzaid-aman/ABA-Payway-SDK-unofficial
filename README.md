@@ -84,10 +84,12 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | Command | Description |
 |---|---|
 | `payway-sdk init` | Initialize PayWay integration in the current project |
-| `payway-sdk doctor` | Validate environment configuration and connectivity |
+| `payway-sdk doctor` | Validate environment configuration and connectivity (`--live` adds a real sandbox round-trip) |
 | `payway-sdk test` | Run the sandbox test suite (default) |
 | `payway-sdk demo` | Run the test suite with pass/fail output |
+| `payway-sdk poll-transaction -t <id>` | Watch a transaction until terminal status (`--json` events for agents) |
 | `payway-sdk status` | Display payment status codes and refund error codes reference |
+| `payway-sdk explain [code]` | Decode a PayWay error code (e.g. `explain PTL36`, `explain 49`) with a fix hint — no credentials needed |
 | `payway-sdk validate` | Validate a refund amount or transaction ID locally |
 | `payway-sdk get-transactions-by-ref --merchant-ref <reference>` | Retrieve transactions for a merchant reference |
 | `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |

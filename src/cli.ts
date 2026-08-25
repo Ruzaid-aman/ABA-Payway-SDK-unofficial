@@ -4,6 +4,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { Command } from 'commander';
+import { loadDotEnvIntoProcess } from './cli/dotenv.js';
+import { explainAll, explainPayWayCode } from './cli/explain-code.js';
+import { formatClock, mapPollOutcomeToExitCode } from './cli/journey.js';
+import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
 import { registerAgentCommands } from './cli/commands/agent.js';
 import { registerOnboardCommand } from './cli/commands/onboard.js';
 import { runDoctor } from './cli/commands/doctor.js';
@@ -36,48 +40,9 @@ import { formatTestReport } from './test/index.js';
 import { validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
 
 // ---------------------------------------------------------------------------
-// Load .env file if present (no dotenv dependency needed)
+// Load .env file if present (shared parser; supports multi-line quoted PEMs)
 // ---------------------------------------------------------------------------
-function loadDotEnv(): void {
-  const envPath = path.resolve(process.cwd(), '.env');
-  if (!existsSync(envPath)) return;
-  const lines = readFileSync(envPath, 'utf-8').split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].replace(/\r/g, '').trim();
-    if (!line || line.startsWith('#')) continue;
-    const eqIdx = line.indexOf('=');
-    if (eqIdx === -1) continue;
-    const key = line.slice(0, eqIdx).trim();
-    let val = line.slice(eqIdx + 1).trim();
-    // Support quoted values spanning multiple lines (e.g. RSA public key PEMs)
-    if (
-      (val.startsWith('"') && !val.slice(1).endsWith('"')) ||
-      (val.startsWith("'") && !val.slice(1).endsWith("'"))
-    ) {
-      const quote = val[0];
-      const parts = [val.slice(1)];
-      while (i + 1 < lines.length) {
-        i++;
-        const nextLine = lines[i].replace(/\r/g, '');
-        parts.push(nextLine);
-        if (nextLine.trimEnd().endsWith(quote)) break;
-      }
-      val = `${parts.join('\n').trimEnd()}`
-        .replace(/\\n/g, '\n')
-        .trim();
-      if (val.endsWith(quote)) val = val.slice(0, -1);
-    } else if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
-    ) {
-      val = val.slice(1, -1).replace(/\\n/g, '\n');
-    }
-    if (!(key in process.env)) {
-      process.env[key] = val;
-    }
-  }
-}
-loadDotEnv();
+loadDotEnvIntoProcess(process.cwd());
 
 // ---------------------------------------------------------------------------
 // Pre-flight credential check for API-calling commands (QR-REQ-02)
@@ -174,61 +139,107 @@ const executableDirectory = path.dirname(process.argv[1] ?? process.cwd());
 async function runPolling(
   payway: InstanceType<typeof PayWay>,
   transactionId: string,
-  opts: { pollInterval?: string; pollTimeout?: string },
-): Promise<void> {
+  opts: { pollInterval?: string; pollTimeout?: string; json?: boolean },
+): Promise<{ terminalReached: boolean; status?: string; abortedReason?: 'max_duration_exceeded' | 'max_consecutive_errors' | 'caller_aborted' }> {
   const intervalMs = opts.pollInterval ? Number(opts.pollInterval) * 1000 : 5_000;
   const maxDurationMs = opts.pollTimeout ? Number(opts.pollTimeout) * 1000 : 600_000;
+  const asJson = opts.json === true;
 
-  console.log(`  ${c.bold('Polling:')}`);
-  console.log(`    Interval:     ${c.cyan(`${intervalMs / 1000}s`)}`);
-  console.log(`    Max duration: ${c.cyan(`${maxDurationMs / 1000}s`)}`);
-  console.log();
+  if (!asJson) {
+    console.log(`  ${c.bold('Polling:')} ${c.cyan(transactionId)}`);
+    console.log(`    Interval:     ${c.cyan(`${intervalMs / 1000}s`)}`);
+    console.log(`    Max duration: ${c.cyan(`${maxDurationMs / 1000}s`)}`);
+    console.log();
+  }
 
   const startTime = Date.now();
+  const emit = (line: string): void => console.log(asJson ? line : `  ${line}`);
 
   try {
     for await (const result of payway.checkout.pollTransactionStatus(transactionId, {
       intervalMs,
       maxDurationMs,
     })) {
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      const elapsed = formatClock(Date.now() - startTime);
 
       if (result.paymentStatus.startsWith('ERROR:')) {
-        console.log(
-          `  ${c.yellow('⚠')} [${elapsed}s] Poll #${result.attempt}: ${c.yellow(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`,
-        );
+        if (asJson) {
+          emit(
+            JSON.stringify({
+              event: 'poll',
+              attempt: result.attempt,
+              error: result.paymentStatus,
+              timestamp: result.timestamp,
+            }),
+          );
+        } else {
+          emit(
+            `${c.yellow('⚠')} [${elapsed}] Poll #${result.attempt}: ${c.yellow(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`,
+          );
+        }
         continue;
       }
 
       if (result.isTerminal) {
-        const icon = result.paymentStatus === 'APPROVED' ? c.green('✓') : c.red('✗');
-        console.log(
-          `  ${icon} [${elapsed}s] Poll #${result.attempt}: ${c.bold(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`,
-        );
-        console.log();
-        console.log(`  ${c.green(`Payment ${result.paymentStatus.toLowerCase()}.`)}`);
-        console.log();
-        return;
+        if (asJson) {
+          emit(
+            JSON.stringify({
+              event: 'terminal',
+              transactionId,
+              payment_status: result.paymentStatus,
+              attempt: result.attempt,
+              elapsed_seconds: (Date.now() - startTime) / 1000,
+              response: result.response,
+            }),
+          );
+        } else {
+          const icon = result.paymentStatus === 'APPROVED' ? c.green('✓') : c.red('✗');
+          emit(`${icon} [${elapsed}] Poll #${result.attempt}: ${c.bold(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`);
+          emit('');
+          emit(c.green(`Payment ${result.paymentStatus.toLowerCase()}.`));
+          emit('');
+          if (result.paymentStatus === 'APPROVED') {
+            emit(c.dim(`Next: payway-sdk transaction-detail -t ${transactionId}`));
+            emit(c.dim(`      or refund it:     payway-sdk refund -t ${transactionId} -a <amount>`));
+          } else {
+            emit(c.dim(`Next: create a new transaction with generate-qr or generate-checkout.`));
+          }
+          emit('');
+        }
+        return { terminalReached: true, status: result.paymentStatus };
       }
 
-      console.log(
-        `  ${c.dim('○')} [${elapsed}s] Poll #${result.attempt}: ${c.dim(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`,
-      );
+      if (asJson) {
+        emit(
+          JSON.stringify({
+            event: 'poll',
+            attempt: result.attempt,
+            payment_status: result.paymentStatus,
+            timestamp: result.timestamp,
+          }),
+        );
+      } else {
+        const remaining = formatClock(maxDurationMs - (Date.now() - startTime));
+        emit(`${c.dim('○')} [${elapsed} elapsed / ${remaining} left] Poll #${result.attempt}: ${result.paymentStatus}`);
+      }
     }
+    return { terminalReached: false };
   } catch (error) {
     if (error instanceof PollingAbortedError) {
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log();
-      console.log(
-        `  ${c.yellow('⚠')} Polling stopped: ${c.yellow(error.reason)} after ${c.bold(String(error.totalAttempts))} attempts (${elapsed}s elapsed)`,
-      );
-      if (error.lastStatus) {
-        console.log(`  ${c.dim(`Last status: ${error.lastStatus}`)}`);
+      if (asJson) {
+        emit(JSON.stringify({ event: 'aborted', reason: error.reason, totalAttempts: error.totalAttempts, lastStatus: error.lastStatus }));
+      } else {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        emit('');
+        emit(
+          `${c.yellow('⚠')} Polling stopped: ${c.yellow(error.reason)} after ${c.bold(String(error.totalAttempts))} attempts (${elapsed}s elapsed)`,
+        );
+        if (error.lastStatus) emit(c.dim(`Last status: ${error.lastStatus}`));
+        emit('');
       }
-      console.log();
-    } else {
-      throw error;
+      return { terminalReached: false, abortedReason: error.reason };
     }
+    throw error;
   }
 }
 
@@ -250,6 +261,15 @@ async function promptConfirmation(message: string, rl?: readline.Interface): Pro
 
 function promptInput(rl: readline.Interface, message: string): Promise<string> {
   return new Promise((resolve) => rl.question(message, resolve));
+}
+
+/** Normalize a commander boolean flag that may arrive typed as string|undefined. */
+function asBoolFlag(v: unknown): boolean | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v === 'boolean') return v;
+  if (v === 'false') return false;
+  if (v === 'true') return true;
+  return undefined;
 }
 
 async function promptLifetimeOverride(current: number, rl?: readline.Interface): Promise<number | null> {
@@ -300,7 +320,22 @@ program
   .name('payway-sdk')
   .description('CLI for the ABA PayWay TypeScript SDK')
   .version(readPackageVersion())
-  .option('--profile <name>', 'Use a saved credential profile for this command');
+  .option('--profile <name>', 'Use a saved credential profile for this command')
+  .addHelpText(
+    'after',
+    `
+${'Journey examples'}:
+  ${'$ payway-sdk init && payway-sdk doctor --live'.padEnd(0)}   set up, then prove a real sandbox round-trip
+  $ payway-sdk generate-qr -a 5.00                create QR (scans right in your terminal) and poll until paid
+  $ payway-sdk check-transaction -t <id>          one-shot status check
+  $ payway-sdk poll-transaction -t <id> --json    watch a transaction until terminal status (agent-friendly)
+  $ payway-sdk transaction-list                   today's transactions
+  $ payway-sdk refund -t <id> -a 2.00             partial refund with pre-flight balance check
+  $ payway-sdk explain PTL36                      decode any PayWay error code
+
+Exit codes: 0 success · 1 input/validation · 2 PayWay API failure · 3 network/timeout/rate-limit.
+`,
+  );
 
 function isProfilesCommand(command: Command): boolean {
   let current: Command | null = command;
@@ -374,7 +409,8 @@ program
 program
   .command('doctor')
   .description('Validate environment configuration and connectivity')
-  .action(() => {
+  .option('--live', 'Also perform a real sandbox round-trip (exchange-rate) when credentials are present')
+  .action(async (opts: { live?: boolean }) => {
     console.log(`\n${c.bold('ABA PayWay SDK Doctor')}\n`);
     const result = runDoctor();
 
@@ -393,9 +429,49 @@ program
     }
     console.log();
 
-    if (result.allHealthy) {
-      console.log(`  ${c.green('All checks passed.')}\n`);
-      process.exitCode = 0;
+    // Live probe depends on credentials, NOT cosmetic rows like framework detection
+    // (the SDK's own repo fails that check and previously could never go live).
+    const credChecks = result.checks.filter((c) => c.id.startsWith('env-'));
+    const credFailures = credChecks.filter((c) => !c.ok);
+    let liveStatus: 'ok' | 'fail' | undefined;
+
+    if (opts.live && process.env.PAYWAY_MERCHANT_ID && process.env.PAYWAY_API_KEY) {
+      if (credFailures.length > 0) {
+        console.log(`  ${c.dim('(skipping live probe — fix credential checks first)')}\n`);
+      } else {
+        process.stdout.write(`  ${c.dim('Live probe: calling PayWay sandbox (exchange-rate)...')} `);
+        const start = Date.now();
+        try {
+          const payway = new PayWay({ rateLimitThrottling: false });
+          await payway.checkout.getExchangeRate();
+          const ms = Date.now() - start;
+          console.log(`${c.green('✓')} ${c.dim(`round-trip ${ms}ms`)}`);
+          liveStatus = 'ok';
+        } catch (e) {
+          console.log(c.red('✗'));
+          printApiError(e);
+          liveStatus = 'fail';
+        }
+        console.log();
+      }
+    } else if (opts.live && credChecks.length === 0) {
+      console.log(`  ${c.dim('(live probe skipped — no PAYWAY_MERCHANT_ID / PAYWAY_API_KEY configured)')}\n`);
+    }
+
+    if (credFailures.length === 0 && liveStatus !== 'fail') {
+      console.log(`  ${c.green('All credential & connectivity checks passed.')}\n`);
+      if (!result.allHealthy) {
+        const cosmetic = result.checks.filter((c) => !c.ok && !c.id.startsWith('env-'));
+        for (const c2 of cosmetic) {
+          console.log(`  ${c.dim(`ℹ ${c2.label}: ${c2.detail} — advisory only for SDK/CLI usage.`)}`);
+        }
+        console.log();
+      }
+      if (!opts.live) {
+        console.log(`  ${c.dim('Tip: run')} ${c.cyan('payway-sdk doctor --live')} ${c.dim('to verify a real sandbox round-trip.')}`);
+        console.log();
+      }
+      process.exitCode = EXIT_OK;
     } else {
       console.log(`  ${c.yellow('Run')} ${c.cyan('payway-sdk init')} ${c.yellow('to fix configuration issues.')}\n`);
       process.exitCode = 1;
@@ -550,6 +626,33 @@ program
     console.log();
   });
 
+// --- explain ---
+program
+  .command('explain')
+  .description('Decode a PayWay error/status code (e.g. explain PTL36, explain 49). No credentials needed.')
+  .argument('[code]', 'PayWay code to explain — omit to list all known codes')
+  .action((code?: string) => {
+    console.log(`\n${c.bold('ABA PayWay SDK')} — code reference\n`);
+    if (!code) {
+      for (const e of explainAll()) {
+        console.log(`  ${c.cyan(e.code.padEnd(7))} ${c.bold(`[${e.family}]`).padEnd(0)} ${e.title}`);
+        if (e.hint) console.log(`  ${''.padEnd(7)} ${c.dim(e.hint)}`);
+      }
+      console.log();
+      return;
+    }
+    const explanation = explainPayWayCode(code);
+    if (!explanation) {
+      console.log(`  ${c.yellow('?')} Unknown or undocumented code: ${c.bold(code)}`);
+      console.log(`  ${c.dim('Run')} ${c.cyan('payway-sdk explain')} ${c.dim('to list all known codes.')}`);
+      console.log();
+      return;
+    }
+    console.log(`  ${c.cyan(explanation.code)}  ${c.bold(explanation.title)}  ${c.dim(`(${explanation.family})`)}`);
+    if (explanation.hint) console.log(`  → ${explanation.hint}`);
+    console.log();
+  });
+
 // --- get-transactions-by-ref ---
 program
   .command('get-transactions-by-ref')
@@ -609,6 +712,40 @@ program
     }
   });
 
+// --- poll-transaction ---
+program
+  .command('poll-transaction')
+  .description('Poll a transaction until it reaches a terminal status (APPROVED, DECLINED, CANCELLED, REFUNDED)')
+  .requiredOption('-t, --transaction-id <id>', 'Transaction ID to watch')
+  .option('--poll-interval <seconds>', 'Seconds between status checks (default: 5)', '5')
+  .option('--poll-timeout <seconds>', 'Give up after this many seconds — exit code 3, outcome unknown (default: 600)', '600')
+  .option('--json', 'Emit one JSON object per event (poll/terminal/aborted) for agents')
+  .action(async (opts: { transactionId: string; pollInterval: string; pollTimeout: string; json?: boolean }) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      validateTransactionId(opts.transactionId);
+    } catch (e) {
+      console.log(`  ${c.red('✗')} ${(e as Error).message}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
+    try {
+      const payway = new PayWay();
+      const outcome = await runPolling(payway, opts.transactionId, {
+        pollInterval: opts.pollInterval,
+        pollTimeout: opts.pollTimeout,
+        json: opts.json,
+      });
+      process.exitCode = mapPollOutcomeToExitCode(outcome);
+    } catch (error) {
+      process.exitCode = printApiError(error);
+    }
+  });
+
 // --- close-transaction ---
 program
   .command('close-transaction')
@@ -641,6 +778,7 @@ program
       }
       console.log(`  ${c.green('✓')} Close request accepted for ${c.bold(opts.transactionId)}`);
       console.log(`  ${c.dim(JSON.stringify(result).slice(0, 200))}`);
+      console.log(`  ${c.dim(`Note: unpaid closed transactions may keep reporting PENDING — verify with: payway-sdk check-transaction -t ${opts.transactionId}`)}`);
       process.exitCode = EXIT_OK;
     } catch (error) {
       process.exitCode = printApiError(error);
@@ -690,9 +828,9 @@ program
 const DATE_FMT = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 program
   .command('transaction-list')
-  .description('List transactions in a time window (rate limit: 50/min)')
-  .requiredOption('--from <date>', 'Start date "YYYY-MM-DD HH:mm:ss" (sandbox-verified format)')
-  .requiredOption('--to <date>', 'End date "YYYY-MM-DD HH:mm:ss"')
+  .description('List transactions in a time window (rate limit: 50/min; defaults to today)')
+  .option('--from <date>', 'Start date "YYYY-MM-DD HH:mm:ss" (default: today 00:00:00)')
+  .option('--to <date>', 'End date "YYYY-MM-DD HH:mm:ss" (default: today 23:59:59)')
   .option('--status <status>', 'Filter: APPROVED, PENDING, DECLINED, REFUNDED, CANCELLED')
   .option('--min-amount <n>', 'Minimum amount filter')
   .option('--max-amount <n>', 'Maximum amount filter')
@@ -701,8 +839,8 @@ program
   .option('--json', 'Print the raw JSON response')
   .action(
     async (opts: {
-      from: string;
-      to: string;
+      from?: string;
+      to?: string;
       status?: string;
       minAmount?: string;
       maxAmount?: string;
@@ -714,7 +852,14 @@ program
         process.exitCode = EXIT_VALIDATION;
         return;
       }
-      if (!DATE_FMT.test(opts.from) || !DATE_FMT.test(opts.to)) {
+
+      // Default window = today (sandbox-verified date format)
+      const now = new Date();
+      const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const fromDate = opts.from ?? `${day} 00:00:00`;
+      const toDate = opts.to ?? `${day} 23:59:59`;
+
+      if (!DATE_FMT.test(fromDate) || !DATE_FMT.test(toDate)) {
         console.log(`  ${c.red('✗')} Dates must use "YYYY-MM-DD HH:mm:ss"`);
         console.log(`  ${c.dim('Example: --from "2026-08-25 00:00:00" --to "2026-08-25 23:59:59"')}`);
         console.log(`  ${c.dim('(Compact formats like 20260825 are rejected by PayWay with code 49 — sandbox-verified.)')}`);
@@ -724,8 +869,8 @@ program
       try {
         const payway = new PayWay();
         const result = await payway.checkout.getTransactionList({
-          fromDate: opts.from,
-          toDate: opts.to,
+          fromDate,
+          toDate,
           fromAmount: opts.minAmount ?? null,
           toAmount: opts.maxAmount ?? null,
           status: opts.status ?? null,
@@ -738,16 +883,25 @@ program
         }
         const raw = result as unknown as Record<string, unknown>;
         const list = Array.isArray(raw.data) ? (raw.data as Record<string, unknown>[]) : [];
-        console.log(`  ${c.green('✓')} ${list.length} transaction(s) in window\n`);
-        for (const t of list.slice(0, 20)) {
-          const statusStr = String(t.payment_status ?? '?');
-          const icon =
-            statusStr === 'APPROVED' ? c.green('✓') : statusStr === 'PENDING' ? c.yellow('⚠') : c.red('✗');
-          console.log(
-            `  ${icon} ${String(t.transaction_id)}  ${statusStr.padEnd(9)} ${String(t.original_amount ?? '')} ${String(t.original_currency ?? '')}  ${String(t.transaction_date ?? '')}`,
-          );
+        console.log(`\n  Window: ${c.cyan(`${fromDate} → ${toDate}`)}${opts.status ? c.dim(`  status=${opts.status}`) : ''}`);
+        console.log(`  ${c.green('✓')} ${list.length} transaction(s)\n`);
+
+        if (list.length > 0) {
+          const idPad = 24;
+          console.log(`  ${'TRANSACTION ID'.padEnd(idPad)}${'STATUS'.padEnd(11)}${'AMOUNT'.padEnd(12)}DATE`);
+          console.log(`  ${'-'.repeat(idPad + 11 + 12 + 19)}`);
+          for (const t of list.slice(0, 20)) {
+            const id = String(t.transaction_id ?? '').slice(0, idPad - 1);
+            const statusStr = String(t.payment_status ?? '?');
+            const amount = `${String(t.original_amount ?? '')} ${String(t.original_currency ?? '')}`.trim();
+            console.log(
+              `  ${id.padEnd(idPad)}${statusStr.padEnd(11)}${amount.padEnd(12)}${String(t.transaction_date ?? '')}`,
+            );
+          }
+          if (list.length > 20) console.log(`\n  ${c.dim(`… and ${list.length - 20} more (--json or --pagination)`)}`);
+          console.log(`\n  ${c.dim('Next: payway-sdk transaction-detail -t <id>   ·   explain a code with payway-sdk explain')}`);
         }
-        if (list.length > 20) console.log(`  ${c.dim(`… and ${list.length - 20} more (--json for full output)`)}`);
+        console.log();
       } catch (error) {
         process.exitCode = printApiError(error);
       }
@@ -849,6 +1003,7 @@ program
         const status = (result as Record<string, unknown>).status as Record<string, unknown> | undefined;
         console.log(`  ${c.green('✓')} Refund submitted for ${c.bold(opts.transactionId)}`);
         if (status) console.log(`  ${c.dim(JSON.stringify(status).slice(0, 220))}`);
+        console.log(`  ${c.dim(`Next: verify with payway-sdk transaction-detail -t ${opts.transactionId}`)}`);
         process.exitCode = EXIT_OK;
       } catch (error) {
         process.exitCode = printApiError(error);
@@ -952,6 +1107,7 @@ program
   .option('--lifetime <seconds>', 'Transaction lifetime in seconds (default: 180)', '180')
   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
   .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
+  .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
   .option('--non-interactive, -y', 'Skip interactive prompts (no confirmation, no lifetime override)')
   .option('--polling', 'Poll transaction status after QR generation (enabled by default)', true)
   .option('--no-polling', 'Disable automatic polling after QR generation')
@@ -1118,6 +1274,17 @@ program
           console.log(`  ${c.bold('QR String:')}`);
           console.log(`  ${c.dim(qr.qrString)}`);
           console.log();
+
+          // Render a scannable QR right in the terminal when interactive.
+          if (shouldAutoRenderQr(process.stdout, asBoolFlag(opts.showQr))) {
+            try {
+              const terminalQr = await renderQrToTerminal(qr.qrString);
+              console.log(terminalQr);
+              console.log(`  ${c.dim('Scan the QR above with the ABA app to pay.')}\n`);
+            } catch {
+              // Terminal rendering is best-effort; the raw string is already printed.
+            }
+          }
         }
 
         if (qr.qrImage && opts.saveImage) {
@@ -1139,10 +1306,12 @@ program
         // ── Polling ─────────────────────────────────────────────────────
         if ((opts as Record<string, unknown>).polling !== false) {
           await runPolling(payway, transactionId, opts);
+        } else {
+          console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
+          console.log();
         }
       } catch (e) {
-        console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
-        process.exitCode = 1;
+        process.exitCode = printApiError(e);
       }
     }
   });
@@ -1162,6 +1331,7 @@ program
   .option('--no-polling', 'Disable automatic polling after checkout')
   .option('--poll-interval <seconds>', 'Polling interval in seconds (default: 5)', '5')
   .option('--poll-timeout <seconds>', 'Max polling duration in seconds (default: 600)', '600')
+  .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
   .action(async (opts: Record<string, string | undefined>) => {
     console.log(`\n${c.bold('ABA PayWay SDK')} — generate checkout QR URL\n`);
 
@@ -1218,6 +1388,16 @@ program
           console.log(`  ${c.bold('QR String:')}`);
           console.log(`  ${c.dim(String(r.qr_string))}`);
           console.log();
+
+          if (shouldAutoRenderQr(process.stdout, asBoolFlag(opts.showQr))) {
+            try {
+              const terminalQr = await renderQrToTerminal(String(r.qr_string));
+              console.log(terminalQr);
+              console.log(`  ${c.dim('Scan the QR above with the ABA app to pay.')}\n`);
+            } catch {
+              // best-effort
+            }
+          }
         }
         if (r.abapay_deeplink) {
           console.log(`  ${c.bold('ABA Deeplink:')}`);
@@ -1234,10 +1414,12 @@ program
       // ── Polling ─────────────────────────────────────────────────────
       if ((opts as Record<string, unknown>).polling !== false) {
         await runPolling(payway, transactionId, opts);
+      } else {
+        console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
+        console.log();
       }
     } catch (e) {
-      console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
-      process.exitCode = 1;
+      process.exitCode = printApiError(e);
     }
   });
 
@@ -1323,8 +1505,20 @@ paymentLinkCmd
 
       const data = result.data;
       console.log(`  ${c.green('✓')} Payment link created\n`);
+      const shareLink = data?.payment_link ?? '(not returned)';
       console.log(`  ${c.bold('Share this link:')}`);
-      console.log(`  ${c.cyan(data?.payment_link ?? '(not returned)')}\n`);
+      console.log(`  ${c.cyan(shareLink)}\n`);
+
+      if (typeof shareLink === 'string' && shareLink.startsWith('http') && shouldAutoRenderQr(process.stdout)) {
+        try {
+          const terminalQr = await renderQrToTerminal(shareLink);
+          console.log(terminalQr);
+          console.log(`  ${c.dim('Customers can scan this QR to open the payment link.')}\n`);
+        } catch {
+          // best-effort
+        }
+      }
+
       console.log(`  ${c.bold('Link ID:')}        ${data?.id ?? '(not returned)'}`);
       console.log(`  ${c.dim('(save the Link ID — required for `payment-link detail`)')}`);
       console.log(`  ${c.bold('Title:')}          ${data?.title ?? opts.title}`);

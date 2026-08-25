@@ -93,3 +93,40 @@ export const REFUND_ERROR_CODES = {
   /** Transaction not found or is invalid (refund target does not exist) */
   REFUND_TARGET_NOT_FOUND: 'PTL36',
 } as const;
+
+/**
+ * Pre-auth (hold payments) error codes discovered via sandbox testing
+ * (2026-08-25 scope campaign). Returned on the pre-auth completion and
+ * cancellation endpoints.
+ */
+export const PRE_AUTH_ERROR_CODES = {
+  /** Unable to complete pre-authorization — transaction status invalid for capture */
+  UNABLE_TO_COMPLETE: 'PTL59',
+  /** Merchant information invalid (e.g. profile lacks payout permission) */
+  MERCHANT_INVALID: 'PTL62',
+  /** Unable to cancel pre-authorization — transaction status invalid */
+  UNABLE_TO_CANCEL: 'PTL170',
+} as const;
+
+/**
+ * Sandbox-verified gateway error code hints (numeric `status.code` values).
+ * Used by the CLI `explain` command; not exhaustive.
+ *
+ * Sources: docs/12 error table + 2026-08-25 sandbox campaigns.
+ */
+export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }> = {
+  '1': { title: 'Wrong Hash', hint: 'HMAC signature mismatch — check API key, field ordering, base64 vs hex encoding.' },
+  '4': { title: 'Invalid Data', hint: 'Server-side binding/validation failed — see errors map in rawBody for per-field messages.' },
+  '5': { title: 'Transaction Not Found', hint: 'Close/cancel target does not exist — verify tran_id.' },
+  '6': { title: 'tran_id not found', hint: 'check-transaction found no transaction with this ID.' },
+  '7': { title: 'Invalid Request Data', hint: 'Missing or malformed field — check parameter types.' },
+  '15': { title: 'Invalid Merchant', hint: 'merchant_id not recognized in this environment.' },
+  '16': { title: 'Invalid Amount', hint: 'Amount format wrong — use formatAmount()/decimal rules for the currency.' },
+  '17': { title: 'Invalid Currency', hint: "Currency must be 'USD' or 'KHR'." },
+  '22': { title: 'Expired Transaction', hint: 'Transaction/token expired — create a new one or renew the token.' },
+  '23': { title: 'Transaction Not Found', hint: 'No transaction with this tran_id (may have been closed).' },
+  '24': { title: 'Invalid Beneficiary Data', hint: 'RSA-encrypted beneficiaries malformed — verify public key + account format.' },
+  '37': { title: 'Payout Whitelist', hint: 'Payout account not whitelisted — call addBeneficiary() first.' },
+  '49': { title: 'Invalid Request', hint: "Validation failed. For transaction-list dates use \"YYYY-MM-DD HH:mm:ss\"." },
+  '96': { title: 'Payee / Merchant Data', hint: 'Beneficiary payee unknown, or payment-link id invalid (detail).' },
+};
