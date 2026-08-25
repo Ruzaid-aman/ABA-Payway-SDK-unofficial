@@ -218,7 +218,25 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 | `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
 | `payway-sdk generate-qr` | Generate a QR code (online or offline). Use `--non-interactive` (`-y`) to skip prompts for scripts/CI. |
 | `payway-sdk generate-checkout` | Generate a checkout QR URL |
+| `payway-sdk check-transaction -t <id>` | One-shot payment status check |
+| `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min) |
+| `payway-sdk transaction-list --from "YYYY-MM-DD HH:mm:ss" --to ...` | List transactions in a window (strict date format) |
+| `payway-sdk close-transaction -t <id> [-y]` | Void/close an unpaid transaction (prompts unless `-y/--force`) |
+| `payway-sdk refund -t <id> -a <amount> [-c USD]` | Refund with pre-flight balance check and confirmation (`-y` to skip prompts, `--no-preflight` to skip the balance check) |
+| `payway-sdk exchange-rate` | Live USD/KHR exchange rate |
 | `payway-sdk setup-webhook` | Start a local webhook server for callback testing |
+
+**Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit. Scripts and agents can branch on `$?` without parsing output. Every command also accepts `--json` where structured output helps automation.
+
+### Transaction lifecycle from the terminal
+
+```bash
+payway-sdk check-transaction -t qrabc123
+payway-sdk close-transaction -t qrabc123 -y
+payway-sdk refund -t order-123 -a 5.00 -c USD -y
+```
+
+Sandbox-verified gotchas: duplicate `tran_id` is silently accepted on purchase (generate unique IDs), closed-but-unpaid transactions keep reporting `PENDING`, and list dates must be `"YYYY-MM-DD HH:mm:ss"` or PayWay rejects with code 49. See [SANDBOX-FINDINGS §8](./SANDBOX-FINDINGS.md).
 
 ### Get transactions by merchant reference
 

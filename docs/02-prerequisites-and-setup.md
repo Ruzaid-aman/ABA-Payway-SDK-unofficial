@@ -66,6 +66,8 @@ MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC...
 ```
 
 > **Note:** The SDK accepts both `PAYWAY_PUBLIC_KEY` and `PAYWAY_RSA_PUBLIC_KEY`. If your `.env` stores the PEM as a single line with literal `\n` escapes, the SDK normalizes them automatically.
+>
+> 🧪 **Sandbox-verified (2026-08-25):** The CLI's built-in `.env` loader now supports the **multi-line quoted PEM format shown above** (value spanning several lines wrapped in quotes) as well as `\n`-escaped single-line values. Earlier CLI versions silently truncated multi-line PEMs to just `"-----BEGIN PUBLIC KEY-----`, which made every RSA-encrypted endpoint (refunds, payment links, pre-auth, payout) fail with a misleading *"publicKeyPem does not look like a public key PEM"* error. If you still see that error: make sure the value starts with `-----BEGIN PUBLIC KEY-----` and ends with `-----END PUBLIC KEY-----` after quote-stripping.
 
 
 ```bash

@@ -152,6 +152,7 @@ try {
 |---|---|---|---|
 | `PTL02` | `REFUND_ERROR_CODES.INVALID_HASH` | Invalid HMAC signature | Check API key and field ordering |
 | `PTL04` | `REFUND_ERROR_CODES.PARAMETER_VALIDATION` | Amount below minimum or invalid format | Ensure ≥ $0.01 USD or ≥ 1 KHR |
+| `PTL36` | `REFUND_ERROR_CODES.REFUND_TARGET_NOT_FOUND` | Transaction not found or is invalid (HTTP 403) | Verify the original `tran_id`; refunds require a captured transaction |
 | `PTL37` | `REFUND_ERROR_CODES.REFUND_EXCEEDS_ORIGINAL` | Refund > original payment | Reduce refund amount |
 | `PTL57` | `REFUND_ERROR_CODES.UNABLE_TO_REFUND` | Cannot process refund | Check transaction status |
 | `PTL58` | `REFUND_ERROR_CODES.REFUND_FAILED` | Refund processing failed | Contact PayWay support |
@@ -159,6 +160,37 @@ try {
 | `PTL181` | `REFUND_ERROR_CODES.INSUFFICIENT_BALANCE` | Insufficient merchant balance | Top up merchant account |
 
 > ℹ️ **Client-side validation:** The SDK validates refund amounts before making the API call. Use `validateRefundAmount(amount, currency)` to catch invalid amounts locally. The `refund()` method calls this automatically.
+>
+> 🧪 **Sandbox-verified (2026-08-25):** Refunding an unknown/unpaid transaction returns **HTTP 403 + PTL36**. The CLI's `payway-sdk refund` command runs a pre-flight balance check via `getTransactionDetail` first (paid − already-refunded) and fails fast with exit code 1 before touching PayWay.
+
+### "Invalid JSON response from PayWay API" — HTML instead of JSON
+
+If you see an error like:
+
+```
+Invalid JSON response from PayWay API (content-type: text/html). PayWay returned
+an HTML page instead of JSON... Body starts with: <!DOCTYPE html><html...
+```
+
+PayWay accepted the request but routed it to a web flow instead of answering with API JSON. Sandbox-verified cause: **unsupported parameter values**, e.g. `payment_gate: 0` on `/v1/payments/purchase`. Removing optional parameters resolves it. The error message includes a body snippet so you can see which page PayWay returned.
+
+---
+
+## CLI Exit Codes
+
+All `payway-sdk` commands use standardized exit codes so scripts and agent frameworks can branch without parsing output:
+
+| Code | Meaning | Typical trigger |
+|---|---|---|
+| `0` | Success | Command completed as requested |
+| `1` | Validation / input error | Bad amount, invalid tran_id format, wrong date format, missing credentials |
+| `2` | PayWay API failure | HTTP 4xx/5xx, business errors (`Wrong Hash`, `PTL*`, code 6 not-found) |
+| `3` | Timeout / network / rate-limit | Network errors, request timeouts, 429s, polling aborted by consecutive poll failures |
+
+```bash
+payway-sdk refund -t order-123 -a 5.00 -y
+echo $?   # 0 = submitted, 1 = bad input, 2 = PayWay rejected, 3 = network issue
+```
 
 ---
 

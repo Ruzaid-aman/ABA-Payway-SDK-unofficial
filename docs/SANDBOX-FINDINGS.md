@@ -1,5 +1,10 @@
 # Sandbox probe findings — 2026-07-16
 
+> **2026-08-25 full-cycle campaign appended at the bottom of this file.**
+> New CLI commands (`check-transaction`, `close-transaction`, `transaction-detail`,
+> `transaction-list`, `refund`, `exchange-rate`), standardized exit codes, and a
+> multi-line `.env` loader fix landed from that campaign.
+
 Ran `scripts/sandbox-probe.ts` against `https://checkout-sandbox.payway.com.kh`
 with real sandbox credentials (merchant `ec476910`). Results below are now
 reflected in `payway-openapi/openapi.yaml` (info.description items 6 & 10)
@@ -199,3 +204,124 @@ Probed the 6 CoF endpoints (`link-account`, `link-card`, `payment-credential`, `
 - Added `contentType` support to `client.ts`'s `request()` to support URL-encoded forms, and applied it to `linkCard`.
 - Added `frequency` to `LinkCardParams`.
 - Updated `credentials-on-file.yaml` OpenAPI paths and schemas to reflect `pwt`, `ctid`, and `application/x-www-form-urlencoded` for `linkCard`.
+
+---
+
+## 8. Full-cycle validation campaign — 2026-08-25
+
+Evidence: `test-output/campaign-evidence.json` (raw), harness:
+`scripts/sandbox-campaign-full-cycle.ts` (re-runnable).
+
+### 8a. Defects found & fixed in this repo
+
+| # | Defect | Evidence | Fix |
+|---|---|---|---|
+| 1 | `loadDotEnv()` was line-based; multi-line quoted PEMs in `.env` were truncated to `"-----BEGIN PUBLIC KEY-----`. Every RSA endpoint (refund, payment-link, pre-auth, payout) failed with a misleading "does not look like a public key PEM". | `.env` stores the PEM across 6 lines; refund probe failed at config stage before reaching PayWay. | `src/cli.ts loadDotEnv()` now folds quoted values across lines and strips quotes/`\n` escapes. Verified: refund now reaches PayWay. |
+| 2 | `payway-sdk generate-checkout` hardcoded `payment_gate: 0`; sandbox now responds to that param with **HTTP 200 + HTML page**, surfacing as "Invalid JSON response" with zero diagnostics. | Reproduced twice via SDK path (`REPRO*` transactions). Without the param → clean JSON `qrString`/`qrImage`. | Removed hardcoded gate from CLI; `createJsonParseError()` now reports content-type, an HTML-detection hint ("parameter value rejected server-side"), and a body snippet. |
+| 3 | No standalone CLI commands for check/close/detail/list/refund/exchange-rate even though agent skills documented those flows. | `src/cli.ts` command audit vs `skills/*`. | Added 6 commands, all with `--json` for agents. |
+| 4 | Any API failure exited with code 1 — indistinguishable from validation errors for agent frameworks. | CLI audit. | Standardized exit codes: `0` success / `1` validation-input / `2` PayWay API failure / `3` network-timeout-rate-limit (`classifyError`). |
+
+### 8b. New sandbox facts
+
+- **Duplicate `tran_id` is silently accepted** on purchase (HTTP 200, code=00) —
+  sandbox overwrites/reuses. Production semantics unknown.
+- **`payment_status_code` 2 = PENDING confirmed** via list + check after close;
+  a closed-but-unpaid transaction still reports PENDING (not CANCELLED).
+- **Refund target missing → HTTP 403 `PTL36`** "Transaction not found or is
+  invalid" (new code added to `REFUND_ERROR_CODES`). Refund of a *known but
+  unpaid* tran returned the same shape.
+- **`transaction-list-2` date format is strictly `YYYY-MM-DD HH:mmss`.**
+  Compact `YYYYMMDD`, ISO `YYYY-MM-DD`, epoch seconds, and
+  `YYYYMMDDHHmmss` all return code 49 "Invalid Start Date." (HTTP 403).
+- **Close on nonexistent tran → HTTP 403 code 5** "Transaction not found";
+  check on nonexistent tran → HTTP 200 code 6 "tran_id not found".
+- Exchange rate returns `status.code: "00"` with `exchange_rates` object.
+
+### 8c. Clarifying questions for ABA / future probes
+
+1. Does production reject duplicate `tran_id`, or does it also silently overwrite?
+   (Sandbox accepts — dangerous idempotency semantics.)
+2. Why do closed/unpaid transactions keep reporting `PENDING` instead of a
+   CANCELLED status? Is close only effective before payment authorization?
+3. What are the official retry/backoff semantics for webhook delivery failures?
+4. Do partial refunds round to the original currency's scale (0.01 USD / 1 KHR)
+   or to KHR integers regardless of original currency?
+5. Is `payment_gate` still supported on `/v1/payments/purchase`? (HTML response
+   suggests it now routes to a web flow rather than an API error.)
+
+---
+
+## 9. Scope-coverage campaign: CoF / Payout / Pre-auth / Payment Link / KHQR — 2026-08-25
+
+Evidence: `test-output/campaign-scopes-evidence.json`; harness:
+`scripts/sandbox-campaign-scopes.ts`. Deep-probe trail (kept for reference in
+git history): `scripts/probe-cof-deep{,2,3,5,6}.ts`, `probe-cof-hunt.ts`.
+Portal scope map: https://developer.payway.com.kh/ (Accept payments /
+Auto-payments / Hold payments / Multi-party payouts).
+
+### 9a. Credentials-on-File (all 6 endpoints live)
+
+Binding layer leaks per-field validation errors — `HTTP 400 code "04"` with an
+`errors{}` map (Laravel/.NET style). This shape is NOT in our OpenAPI spec.
+
+| Endpoint | Content-type | Server-required fields | Verified outcome |
+|---|---|---|---|
+| `link-account` | JSON | `request_id`, `ctid`, `token_flag` (enum **CITI_FLEX\|CITO_FLEX\|CITO_FIX\|CITR_FLEX**), `currency`; optional `callback_url` | Binding passes w/ valid flag → hash layer |
+| `link-card` | form-urlencoded | `request_id`, **`ctid`**, **`currency`**, `token_flag` (same enum), `frequency` (`1W\|1M\|2M`) | Full payload → **HTTP 200 hosted HTML checkout page** (= success; redirect customer) |
+| `payment-credential` | JSON only (form → 415) | flat fields incl. `pwt`; `token_flag` uses a DIFFERENT enum: **CITU_FLEX\|MITU_FLEX\|MITU_FIX\|MITR_FLEX\|MITR_FIX** | Binding passes → hash layer |
+| token trio (`renew/get-details/remove`) | JSON | model `CheckPushbackStatusRequest` requires flat `request_time`, `request_id`, **`request`** (string; we default it to request_id), `ctid`, `pwt`, `hash` | Binding passes → hash layer |
+
+**OPEN — token-trio HMAC composition is black-box.** ~60 compositions tried
+(field orders × base64/hex × separators × JSON-subset × decoded-values ×
+merchant_auth wrapper). All → 403 "Wrong Hash". The v3 CoF HMAC plaintext is
+undocumented and not derivable without ABA's official sample. SDK now sends
+the correct binding shape but these three calls will fail at the hash layer
+until ABA publishes the composition.
+
+**SECURITY observation:** `link-card` returned its hosted checkout page even
+with a deliberately corrupted hash (sandbox). Hash appears unenforced there —
+clarifying question for ABA; do not rely on client-side hash as a control.
+
+### 9b. Payout & beneficiaries
+
+| Probe | Result |
+|---|---|
+| payout to non-whitelisted account (valid RSA beneficiaries, hex HMAC) | HTTP 403, numeric code **37** "Payout accounts are not in whitelist" |
+| add-beneficiary dummy account `0077777777` | HTTP 400 **PTL04** Parameter validation required |
+| update-whitelist-status nonexistent payee | HTTP 400 **PTL04** |
+
+### 9c. Pre-auth (hold payments) — real lifecycle
+
+Created a REAL pre-auth hold via `purchase {type:'pre-auth', paymentOption:'cards'}`
+(code 00). Then:
+
+| Operation | Result |
+|---|---|
+| check-transaction on unpaid pre-auth | Success (status visible) |
+| complete (never cardholder-authorized) | HTTP 403 **PTL59** "Unable to complete pre-authorization: transaction status is invalid..." |
+| complete-with-payout | HTTP 403 **PTL62** "Merchant information is invalid" (sandbox profile lacks payout permission) |
+| cancel unauthorized | HTTP 403 **PTL170** "Unable to cancel pre-authorization: transaction status is invalid" |
+| cancel nonexistent tran | HTTP 403 **PTL36** (same code as refund target-missing) |
+
+### 9d. Payment Link — fully working end-to-end
+
+- `create` → real link: id `q1qXwF59VQGUPqbMBpqSsw==`,
+  url `https://link-sandbox.payway.com.kh/ABAPAY…`; `detail` on it → Success.
+- detail of nonexistent id → HTTP 403 code **96** "Invalid merchant data".
+- `expired_date` in the past → rejected PTL04.
+- **Duplicate `merchant_ref_no` accepted** (two links created with same ref) —
+  mirrors the duplicate-`tran_id` finding; PayWay does not enforce uniqueness
+  on merchant references in sandbox.
+
+### 9e. KHQR get-transactions-by-mc-ref
+
+Still **404** for validly signed requests — endpoint unavailable under this
+sandbox profile (consistent with 2026-07-16 probe).
+
+### 9f. New clarifying questions for ABA (adds to §8c)
+
+6. Publish the v3 token-management / CoF HMAC composition (or official samples).
+7. Why does `link-card` skip hash verification in sandbox? Is it enforced in production?
+8. Is duplicate `merchant_ref_no` on payment links intentional?
+9. What payee format does `add-whitelist-payout` expect (PTL04 vs code 96)?
+10. Which sandbox profiles are provisioned for `complete-with-payout` (PTL62)?

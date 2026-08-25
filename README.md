@@ -92,12 +92,20 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk get-transactions-by-ref --merchant-ref <reference>` | Retrieve transactions for a merchant reference |
 | `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
 | `payway-sdk generate-qr` | Generate a QR code (online via PayWay API or offline) |
+| `payway-sdk check-transaction -t <id>` | Check payment status for one transaction |
+| `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min) |
+| `payway-sdk transaction-list --from <date> --to <date>` | List transactions in a window (`"YYYY-MM-DD HH:mm:ss"` dates) |
+| `payway-sdk close-transaction -t <id>` | Void/close an unpaid transaction (prompts; `-y/--force` skips) |
+| `payway-sdk refund -t <id> -a <amount> [-c USD\\|KHR]` | Refund with pre-flight balance check and confirmation |
+| `payway-sdk exchange-rate` | Fetch the live USD/KHR exchange rate |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
 | `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |
 | `payway-sdk skills list` | Show installed skills per agent |
 | `payway-sdk skills doctor` | Verify installation health for all agents |
 | `payway-sdk --help` | Show usage guide |
 | `payway-sdk --version` | Print SDK version |
+
+> **Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit — so scripts and agent frameworks can branch on `$?`. Lifecycle commands also accept `--json` for structured output.
 
 ### Get transactions by merchant reference
 
@@ -129,6 +137,7 @@ Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or
 | Script | Description |
 |---|---|
 | `npx tsx scripts/sandbox-probe.ts` | Run full sandbox probe across all 7 API domains |
+| `npx tsx scripts/sandbox-campaign-full-cycle.ts` | Full-cycle validation campaign: purchase → check → close → detail → list → refund + edge cases (writes `test-output/campaign-evidence.json`) |
 | `npx tsx scripts/sandbox-probe-qr-api.ts` | Probe QR API endpoint specifically |
 | `npx tsx scripts/sandbox-probe-checkout-errors.ts` | Probe checkout error handling |
 | `npx tsx scripts/sandbox-probe-cof.ts` | Probe credentials-on-file endpoints |

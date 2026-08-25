@@ -178,6 +178,18 @@ async function linkCustomerCard() {
 
 > ⚠️ **Critical difference:** `linkCard()` requires `frequency` and uses `application/x-www-form-urlencoded` (the SDK handles the encoding automatically). `linkAccount()` uses JSON. This was verified in sandbox testing — sending JSON to `link-card` will be rejected without being read.
 
+### Sandbox-verified facts (2026-08-25 scope campaign)
+
+- **`linkCard()` also requires `currency`** — the SDK now defaults it to `'USD'`; pass the customer's currency explicitly. Server rejects without it: `"The currency field is required."`
+- **A successful `linkCard()` returns an HTTP 200 HTML page** (the hosted card-entry checkout), not JSON — redirect the customer to it / embed it. Treat "HTML body" as the success signal for this one endpoint.
+- **Valid `token_flag` values differ per endpoint:**
+  - Linking (`link-account`, `link-card`): `CITI_FLEX | CITO_FLEX | CITO_FIX | CITR_FLEX`
+  - Charging (`payment-credential`): `CITU_FLEX | MITU_FLEX | MITU_FIX | MITR_FLEX | MITR_FIX`
+  - (C = customer-initiated, M = merchant-initiated; IT/TR ≈ initial transaction / recurring; FLEX/FIX = flexible or fixed amount.)
+- **Token management trio needs a `request` field**: renew/get-details/remove models require flat `request_time`, `request_id`, `request`, `ctid`, `pwt`. The SDK now sends `request` automatically (defaults to your `requestId`). Their HMAC composition remains unpublished — see [SANDBOX-FINDINGS §9a](./SANDBOX-FINDINGS.md).
+- PayWay's binding layer answers malformed CoF payloads with **HTTP 400 code `"04"` plus a per-field `errors{}` map** — read `error.rawBody.status.errors` for exact field messages when debugging.
+- The KHQR `get-transactions-by-mc-ref` endpoint returns 404 in this sandbox profile.
+
 ### 3. Charge a Saved Payment Method
 
 Once you have a token (`pwt`), charge it:

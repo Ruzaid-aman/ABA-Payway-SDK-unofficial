@@ -321,6 +321,39 @@ QR codes generated via the API have a limited lifetime:
 
 > 💡 **Best practice:** Display a countdown timer on the QR page showing when the QR expires, and offer a "Refresh QR" button if the customer takes too long.
 
+### Sandbox-verified lifecycle facts (2026-08-25)
+
+- **Duplicate `tran_id` is silently accepted** on purchase in sandbox (HTTP 200, `code 0`). Generate unique transaction IDs (the CLI does: `qr<timestamp><random>`); do not rely on PayWay for idempotency. Production behavior is an open question — see [SANDBOX-FINDINGS §8c](./SANDBOX-FINDINGS.md).
+- **Closing an unpaid transaction keeps it reporting `PENDING`** via check/list APIs (not `CANCELLED`). Treat "closed" as a local state you track yourself; the close call returns `code 0 Success!` when accepted.
+- **`closeTransaction()` on a nonexistent ID** → HTTP 403, internal code `5` ("Transaction not found"), while `checkTransaction()` on a nonexistent ID → HTTP 200 with `status.code 6` ("tran_id not found"). Handle both shapes.
+- **Transaction-list date filters must be `"YYYY-MM-DD HH:mm:ss"`** (e.g. `"2026-08-25 00:00:00"`). Compact (`20260825`), ISO-date (`2026-08-25`), and epoch formats all fail with HTTP 403 / code `49` "Invalid Start Date."
+
+---
+
+## CLI Transaction Lifecycle Commands
+
+For scripts, terminals, and agent frameworks, the CLI mirrors the SDK's checkout domain with `--json` output and standardized exit codes (`0` success / `1` input error / `2` API failure / `3` network):
+
+```bash
+# One-shot status check
+payway-sdk check-transaction -t qrabc123
+
+# Full detail (rate-limited to 10/min by PayWay)
+payway-sdk transaction-detail -t qrabc123
+
+# List today's transactions (strict date format)
+payway-sdk transaction-list --from "2026-08-25 00:00:00" --to "2026-08-25 23:59:59" --status APPROVED
+
+# Void/close before payment (prompts; -y/--force for agents)
+payway-sdk close-transaction -t qrabc123 -y
+
+# Refund with pre-flight balance check (paid − refunded) and confirmation
+payway-sdk refund -t order-123 -a 5.00 -c USD
+
+# Live USD/KHR rate
+payway-sdk exchange-rate
+```
+
 ---
 
 ## Transaction Status Polling (On-Demand)

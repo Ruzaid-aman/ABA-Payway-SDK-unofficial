@@ -1,6 +1,8 @@
 # PayWay SDK — Project Status
 
-> Last updated: 2026-08-24
+> Last updated: 2026-08-25
+
+> **Full-cycle sandbox validation campaign complete (2026-08-25).** Ran a 15-scenario lifecycle probe (`scripts/sandbox-campaign-full-cycle.ts`, evidence in `test-output/campaign-evidence.json`): purchase → check → close → re-check → detail → list → refund paths plus edge cases. Fixed two P1 CLI/SDK defects found live: (1) the `.env` loader truncated multi-line quoted PEMs, silently breaking every RSA endpoint (refund/payment-link/pre-auth/payout); (2) `generate-checkout` hardcoded `payment_gate: 0`, which the sandbox now answers with an HTML page → "Invalid JSON response". Added six missing transaction-lifecycle CLI commands with `--json`, standardized exit codes `0/1/2/3`, refund pre-flight balance check, and new sandbox facts (duplicate `tran_id` accepted; closed txns stay `PENDING`; strict `"YYYY-MM-DD HH:mm:ss"` list-date format; refund code `PTL36`). Gate: **676 tests / lint clean / typecheck clean**, all fixes verified against live sandbox. Details: [SANDBOX-FINDINGS §8](./SANDBOX-FINDINGS.md).
 
 > **Agentic CLI is live end-to-end.** The agentic PayWay CLI — provider modes, 11 tools, risk gates, execution ledger, sessions, and secret redaction — now runs against **OpenCode Zen (`x-preview-f-free`, free)** with a verified live sandbox QR creation (`ask` → plan → authorize → PayWay `code 0 Success`). Key reliability work this session: tool-catalog planning prompt, one-round plan repair, transient-error retries, deterministic callback override, sampling passthrough flags, and a real SDK fix (`payment_option` is required by the PayWay QR API). Verification gate is green: **676 Vitest tests pass (42 files)**, Biome lint clean (0 warnings), `tsc --noEmit` clean, build clean.
 
@@ -379,6 +381,81 @@ Tasks must be completed **in this order**:
 
 ---
 
+### Milestone E: Full-Cycle Sandbox Validation Campaign (DONE — 2026-08-25, uncommitted)
+
+> Goal: Audit the entire transaction lifecycle against the live sandbox, convert findings into SDK/CLI/agent-framework improvements, and document evidence. Reusable harness: `scripts/sandbox-campaign-full-cycle.ts` → `test-output/campaign-evidence.json`.
+
+#### Task E1 — P1: Multi-line `.env` PEM loader fix
+
+- **What**: `loadDotEnv()` was line-based; a quoted multi-line RSA PEM in `.env` was truncated to `"-----BEGIN PUBLIC KEY-----`, so **every** RSA-encrypted endpoint (refund, payment-link, pre-auth, payout) failed with "publicKeyPem does not look like a public key PEM" even with correct config.
+- **Evidence**: Live refund probe failed at config stage; `.env` stores the PEM across 6 lines.
+- [x] Fold quoted values across lines, strip quotes and `\n` escapes (`src/cli.ts`)
+- [x] Verified: `payway-sdk refund` now reaches PayWay (server responds PTL36 for unknown tran)
+- **Status**: 🟢 Completed
+
+#### Task E2 — P1: `generate-checkout` broken by `payment_gate: 0`
+
+- **What**: CLI hardcoded `paymentGate: 0`; sandbox now answers that parameter with **HTTP 200 + HTML page**, surfacing as opaque "Invalid JSON response from PayWay API".
+- **Evidence**: Reproduced twice via the SDK path; identical payload without `payment_gate` returns clean JSON (`qrString`/`qrImage`).
+- [x] Removed hardcoded gate from CLI
+- [x] `createJsonParseError()` now reports content-type, HTML-detection hint ("parameter value rejected server-side"), and body snippet (`src/client.ts`)
+- **Status**: 🟢 Completed
+
+#### Task E3 — Transaction-lifecycle CLI commands
+
+- **What**: Skills documented check/close/detail/list/refund flows but the CLI had no commands for them.
+- [x] Added `check-transaction`, `close-transaction -y/--force`, `transaction-detail`, `transaction-list --from/--to/--status`, `refund` (pre-flight balance check via detail API), `exchange-rate` — all with `--json`
+- [x] Enforce sandbox-verified `"YYYY-MM-DD HH:mm:ss"` date format locally with an actionable error (code 49 trap)
+- **Status**: 🟢 Completed
+
+#### Task E4 — Standardized exit codes for agents
+
+- **What**: All failures exited 1 — indistinguishable to agent frameworks.
+- [x] `classifyError()`: `0` success / `1` validation-input / `2` PayWay API failure / `3` network-timeout-ratelimit; wired through `printApiError()` and all command catch blocks
+- [x] Live-verified: bad amount → 1, PTL36 → 2
+- **Status**: 🟢 Completed
+
+#### Task E5 — Knowledge base update
+
+- [x] `docs/SANDBOX-FINDINGS.md` §8: campaign evidence, new sandbox facts, 5 clarifying questions for ABA
+- [x] Chapter 2 (`.env` multi-line PEM support), Chapter 7 (lifecycle facts + CLI commands), Chapter 12 (PTL36, HTML-response debugging, exit-code table), refund skill (pre-flight pattern)
+- **Status**: 🟢 Completed
+
+**🎯 Gate green after Milestone E: 676/676 tests, biome 0 warnings, tsc clean. New sandbox facts & open questions: [SANDBOX-FINDINGS §8b–8c](./SANDBOX-FINDINGS.md).**
+
+---
+
+### Milestone F: Scope-Coverage Campaign — CoF / Payout / Pre-auth / Payment Link / KHQR (DONE — 2026-08-25, uncommitted)
+
+> Goal: extend the validation campaign to every API scope not covered by Milestone E. Harness: `scripts/sandbox-campaign-scopes.ts` → `test-output/campaign-scopes-evidence.json` (27 scenarios). Deep-probe trail documented in [SANDBOX-FINDINGS §9](./SANDBOX-FINDINGS.md).
+
+#### Task F1 — Credentials-on-File contract decode
+
+- **What**: Server binding layer leaks per-field errors (HTTP 400 code `"04"` + `errors{}` map) — used them to decode exact contracts.
+- [x] Decoded required fields per endpoint; token_flag enums (`CITI/CITO/CITR_FLEX…` for linking vs `CITU/MITU/MITR_FLEX/FIX` for charging)
+- [x] Confirmed `payment-credential` is JSON-only (form → 415); `link-card` form-only
+- [x] **Fixed SDK gap:** `LinkCardParams.currency` added (server-required, defaults USD) — payload + HMAC wired (`src/client.ts`, `src/domains/credentials-on-file.ts`)
+- [x] **Fixed SDK gap:** v3 token-trio now sends the binding-required `request` field (defaults to requestId)
+- [x] **OPEN (documented):** v3 token-management HMAC composition not derivable black-box (~60 combos tried; all 403 Wrong Hash) — needs ABA sample/spec
+- [x] **Security observation:** `link-card` returns hosted page even with corrupted hash in sandbox
+- **Status**: 🟢 Completed
+
+#### Task F2 — Payout / pre-auth / payment-link / KHQR live evidence
+
+- [x] payout non-whitelisted → code **37** "Payout accounts are not in whitelist"
+- [x] Real pre-auth lifecycle: purchase(type=pre-auth) OK → complete unauthorized **PTL59**, complete-with-payout **PTL62** (profile lacks permission), cancel **PTL170**, cancel-missing **PTL36**
+- [x] Payment link created end-to-end (live `link-sandbox.payway.com.kh/ABAPAY…` URL), detail verified; nonexistent detail → code **96**; past expiry → PTL04; **duplicate merchant_ref_no accepted**
+- [x] KHQR by-ref still 404 in this sandbox profile
+- **Status**: 🟢 Completed
+
+#### Task F3 — Knowledge base sync
+
+- [x] SANDBOX-FINDINGS §9 (per-scope tables + questions 6–10 for ABA)
+- [x] Chapter 9 sandbox-verified facts block; refund skill already current
+- **Status**: 🟢 Completed
+
+---
+
 ## Key Learnings (this session)
 
 - **Readiness is one matrix.** `evaluateReadinessDetailed` (with `remedyId`) is the single source for both `doctor` fix-hints and `onboard` routing — do not re-derive capability checks elsewhere.
@@ -418,12 +495,13 @@ Tasks must be completed **in this order**:
 ```
 Package version (package.json):  1.1.1
 Recent commits:                  b8ff4b6 (ignore payway-output) / e6c872c (opencode preset, tool-catalog prompt, E2E fixes) / 9f47648 / 65046c8 (gap hardening) / 341923d (Milestone D onboarding)
-Working tree state:              Clean
+Working tree state:              Milestone E campaign changes (uncommitted): cli.ts, client.ts, constants.ts, docs, skills
 Active agent provider:           opencode (https://opencode.ai/zen/v1), model x-preview-f-free, key via PAYWAY_AGENT_API_KEY in .env
 Vitest:                          676 passing / 0 failing (42 files)
 Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck -> clean
 Lint:                            biome -> 0 errors, 0 warnings
 Build:                           clean (dist/ rebuilt)
 Live E2E:                        ask -> plan (Zen model) -> authorize -> PayWay sandbox QR create = Success (2026-08-24)
-Next task:                       Tag next release; optional: fold sandbox-script assertions into Vitest (Task 18 leftover)
+Sandbox campaign (2026-08-25):   Milestone E lifecycle probe + Milestone F scope coverage (CoF/payout/pre-auth/link/KHQR); evidence in test-output/
+Next task:                       Commit Milestones E+F as clean changeset; ask ABA: v3 token-trio HMAC composition (findings §9a)
 ```
