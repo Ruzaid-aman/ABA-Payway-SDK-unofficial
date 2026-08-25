@@ -25,3 +25,4 @@ catch (error) { if (error instanceof PayWayAPIError) console.error(error.statusC
 ## Related Skills
 - [Offline QR](../aba-payway-offline-qr/SKILL.md)
 - [Check Transaction](../aba-payway-check-transaction/SKILL.md)
+- [Customer Module QR](../aba-payway-customer-qr/SKILL.md) — static portal-generated customer QRs (Printed QR channel); not API-generated, but callback and get-transactions-by-mc-ref behave the same

@@ -125,3 +125,12 @@ agentic, risk-gated path to choose and run these routes.
 - [Configuration](../aba-payway-sdk-configuration/SKILL.md)
 - [Offline QR](../aba-payway-offline-qr/SKILL.md)
 - [Check Transaction](../aba-payway-check-transaction/SKILL.md)
+
+## Tools (scripts/)
+
+- **`checkout-payload.cjs`** — fastest first payment: builds the locally-signed checkout payload (exact SDK field order/formatting) and can emit a ready-to-open HTML auto-post form. No network call.
+  ```sh
+  node scripts/checkout-payload.cjs --tran-id order-123 --amount 10 --currency USD \
+      --return-url https://example.com/success --html checkout.html
+  ```
+  Open `checkout.html` in a browser to pay in sandbox. The webhook callback remains the only proof of payment.

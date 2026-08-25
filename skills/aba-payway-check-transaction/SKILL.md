@@ -34,5 +34,13 @@ try { await payway.checkout.checkTransaction('order-123'); }
 catch (error) { if (error instanceof PayWayBusinessError) console.error(error.paywayCode); }
 ```
 
+## Tools (scripts/)
+
+- **`decode-status.cjs`** — paste any PayWay callback/API response JSON and get a human verdict: status-code meaning, terminal vs non-terminal, gateway/PTL error-code hints, key fields.
+  ```sh
+  node scripts/decode-status.cjs --body '{"payment_status_code":0,...}'
+  cat response.json | node scripts/decode-status.cjs
+  ```
+
 ## Related Skills
 - [Hash and Webhooks](../aba-payway-hash/SKILL.md)
