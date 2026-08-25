@@ -679,7 +679,7 @@ export interface components {
       /** @description Core-banking booking entry id — populated for ABA PAY operations only, blank otherwise. */
       bank_ref?: string;
     };
-    /** @description Response for getTransactionDetail. NOT intended for real-time polling — see rate-limit note on the operation (10 req/min, not raisable). */
+    /** @description Response for getTransactionDetail. NOT intended for real-time polling — a fresh transaction takes ~5s to appear here (check-transaction sees it in <1s), and the rate limit is strict: 10 req/min, not raisable, enforced as HTTP 403 + numeric body code 429 with no rate-limit headers. */
     TransactionDetailResponse: {
       /** @description Present when status.code == "00". */
       data?: {
@@ -1376,7 +1376,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Full transaction detail with operation history */
+      /** @description Full transaction detail with operation history. Sandbox-verified (2026-08-25): NOT for real-time polling — a fresh transaction takes ~5s to appear here while check-transaction sees it in <1s, and the 10 req/min cap (not raisable) is enforced as HTTP 403 with NUMERIC body code 429 and no rate-limit headers. */
       200: {
         headers: {
           [name: string]: unknown;

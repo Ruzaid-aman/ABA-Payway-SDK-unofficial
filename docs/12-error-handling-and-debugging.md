@@ -375,10 +375,11 @@ async function getExchangeRateWithFallback(): Promise<any> {
 
 ## Endpoint HTTP Behavior
 
-The SDK automatically handles two different error response styles that PayWay uses:
+The SDK automatically handles three different error response styles that PayWay uses:
 
-1. **HTTP error status (4xx/5xx)** — returned by some endpoints such as `transaction-list-2` (400/403) and `check-transaction-2` (403 for invalid hash). The SDK extracts `paywayCode` from the response body's `status.code` field when present, and maps the response to the most specific error class (`PayWayBusinessError`, `PayWayRateLimitError`, etc.).
+1. **HTTP error status (4xx/5xx)** — returned by some endpoints such as `transaction-list-2` (400/403) and `check-transaction-2` (403 for invalid hash). The SDK extracts `paywayCode` from the response body's `status.code` field when present (string **or numeric**), and maps the response to the most specific error class (`PayWayBusinessError`, `PayWayRateLimitError`, etc.).
 2. **HTTP 200 with a wrapped error** — returned by most merchant-portal and payment-gateway endpoints. The SDK inspects the body for `status.code`, `status` string (`FAILED`/`ERROR`), or a top-level `code` field and throws `PayWayAPIError` with `statusCode: 200`.
+3. **Strict rate-limit responses (sandbox-verified 2026-08-25)** — endpoints with documented caps (e.g. transaction-detail 10/min, transaction-list 50/min) answer call N+1 within the window with HTTP **403** carrying a NUMERIC body `status.code` of `429` ("Rate limit exceeded for this request. Please try again later") and **no rate-limit headers** (no `X-RateLimit-*`, no `Retry-After`). The SDK classifies this as a typed, retryable `PayWayRateLimitError` — not an opaque permission error.
 
 > ℹ️ **Important:** PayWay error codes like `PTL04` (refund validation) are returned inside the response body even on HTTP 400 responses. The SDK automatically extracts these into `error.paywayCode` so you can handle them programmatically without parsing `error.rawBody` yourself.
 
@@ -395,14 +396,17 @@ If you need exact once semantics, implement server-side deduplication on `tran_i
 
 ### Retry behavior
 
-The SDK retries **only** transient failures by default (`maxRetries: 0`):
+The SDK retries **only** transient failures by default (`maxRetries: 3`, base delay `retryDelayMs: 3000`):
 
 | Failure type | Retried? | Notes |
 |---|---|---|
 | HTTP 5xx | ✅ Yes | Exponential backoff using `retryDelayMs` |
 | Network errors / timeouts | ✅ Yes | `retryable: true` |
-| HTTP 4xx | ❌ No | Client error — fix the request |
+| Rate limit (HTTP 429, or sandbox's HTTP 403 + body code 429) | ✅ Yes | Honors `Retry-After` when present; otherwise paces from the SDK's own observed request window for endpoints with documented limits (1–10s), falling back to exponential backoff |
+| Other HTTP 4xx | ❌ No | Client error — fix the request |
 | HTTP 200 wrapped errors | ❌ No | Business error — inspect `paywayCode` |
+
+> 💡 For endpoints with a documented cap, the SDK also tracks its own recent request timestamps per endpoint. When the gateway rejects with the undocumented 403+429 shape, retries wait just long enough for the locally observed window to free a slot, then re-send — a burst slightly over the cap recovers automatically instead of failing.
 
 You can configure retry with:
 

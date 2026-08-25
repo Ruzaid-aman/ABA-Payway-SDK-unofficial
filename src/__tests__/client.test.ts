@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayWay } from '../client.js';
+import { createCheckoutDomain } from '../domains/checkout.js';
 import { ENDPOINTS } from '../constants.js';
 import {
   PayWayAPIError,
@@ -659,6 +660,47 @@ describe('checkout domain', () => {
       expect(rule).toBeDefined();
       expect(rule?.limit).toBe(10);
       expect(rule?.intervalMs).toBe(60_000);
+    });
+
+    it('classifies sandbox rate limiting (HTTP 403 + numeric status.code 429) as PayWayRateLimitError', async () => {
+      // Sandbox-verified 2026-08-25: the strict 10/min cap arrives as HTTP 403
+      // with a NUMERIC code 429 in the body and no rate-limit headers.
+      fetchSpy.mockResolvedValueOnce(
+        mockJsonResponse(
+          {
+            status: {
+              code: 429,
+              message: 'Rate limit exceeded for this request. Please try again later',
+              tran_id: 'T001',
+            },
+          },
+          403,
+          'Forbidden',
+        ),
+      );
+
+      const err = await payway.checkout.getTransactionDetail('T001').catch((e) => e);
+
+      expect(err).toBeInstanceOf(PayWayRateLimitError);
+      expect(err.paywayCode).toBe('429');
+      expect(err.statusCode).toBe(403);
+      expect(err.retryable).toBe(true);
+      expect(err.message).toContain('Rate limit exceeded');
+    });
+
+    it('retries a sandbox rate-limit response and succeeds when the window rolls', async () => {
+      const pw = new PayWay({ ...TEST_CONFIG, retryDelayMs: 1 });
+      fetchSpy.mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: 429, message: 'Rate limit exceeded' } }, 403, 'Forbidden'),
+      );
+      fetchSpy.mockResolvedValueOnce(
+        mockJsonResponse({ status: { code: '00', message: 'Success!' }, data: { tran_id: 'T001' } }),
+      );
+
+      const result = await pw.checkout.getTransactionDetail('T001');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect((result as Record<string, unknown>).status).toEqual({ code: '00', message: 'Success!' });
     });
   });
 
@@ -1747,6 +1789,32 @@ describe('checkout.pollTransactionStatus', () => {
     expect(results.slice(0, 4).every((r) => r.paymentStatus === 'NOT_FOUND')).toBe(true);
     expect(results[4].paymentStatus).toBe('APPROVED');
     expect(results[4].isTerminal).toBe(true);
+  });
+
+  it('synthesizes a valid NOT_FOUND response when paywayCode 6 rawBody is malformed', async () => {
+    const request = vi
+      .fn()
+      .mockRejectedValueOnce(new PayWayAPIError('tran_id not found', { paywayCode: '6', rawBody: {} }))
+      .mockResolvedValueOnce(approvedResponse);
+    const checkout = createCheckoutDomain(
+      { ...TEST_CONFIG },
+      request,
+      vi.fn(),
+    );
+
+    const results: PollTransactionResult[] = [];
+    for await (const result of checkout.pollTransactionStatus('T001', {
+      intervalMs: 1,
+      maxConsecutiveErrors: 3,
+    })) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(2);
+    expect(results[0].paymentStatus).toBe('NOT_FOUND');
+    expect(results[0].response.status).toEqual({ code: '6', message: 'tran_id not found' });
+    expect(results[1].paymentStatus).toBe('APPROVED');
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
   it('empty iterator when transaction immediately returns terminal', async () => {

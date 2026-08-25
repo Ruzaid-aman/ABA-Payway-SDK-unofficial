@@ -30,6 +30,7 @@ import {
 import { PAYMENT_STATUS_CODES, PAYMENT_STATUS_LABELS, REFUND_ERROR_CODES } from './constants.js';
 import {
   PayWayAPIError,
+  PayWayBusinessError,
   PayWayError,
   PayWayNetworkError,
   PayWayRateLimitError,
@@ -111,6 +112,10 @@ function printApiError(e: unknown): number {
       console.log(`  ${c.dim('Hint: check the link id — use the data.id value returned by create.')}`);
     } else if (e.paywayCode === '49') {
       console.log(`  ${c.dim('Hint: transaction-list dates must be "YYYY-MM-DD HH:mm:ss" (sandbox-verified format).')}`);
+    } else if (e.paywayCode === '429' || e instanceof PayWayRateLimitError) {
+      console.log(
+        `  ${c.dim('Hint: strict documented cap hit (sandbox sends HTTP 403 + body code 429). Wait for the window to reset, or use check-transaction (600 req/s) for status-only reads.')}`,
+      );
     } else if (/HTML page instead of JSON/.test(e.message)) {
       console.log(`  ${c.dim('Hint: a parameter value was rejected server-side — try removing optional params (e.g. payment_gate).')}`);
     }
@@ -819,8 +824,13 @@ program
   .command('transaction-detail')
   .description('Get full detail for one transaction (strict rate limit: 10/min)')
   .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
+  .option(
+    '--wait <seconds>',
+    'Retry until the transaction is indexed (detail lags creation by ~5s; check-transaction sees it instantly)',
+    '0',
+  )
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: { transactionId: string; json?: boolean }) => {
+  .action(async (opts: { transactionId: string; wait?: string; json?: boolean }) => {
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -828,7 +838,29 @@ program
     try {
       validateTransactionId(opts.transactionId);
       const payway = new PayWay();
-      const result = await payway.checkout.getTransactionDetail(opts.transactionId);
+      const waitMs = (Number.parseInt(opts.wait ?? '0', 10) || 0) * 1000;
+      const deadline = Date.now() + waitMs;
+
+      let result: Awaited<ReturnType<typeof payway.checkout.getTransactionDetail>> | undefined;
+      for (;;) {
+        try {
+          result = await payway.checkout.getTransactionDetail(opts.transactionId);
+          break;
+        } catch (error) {
+          const notIndexed = error instanceof PayWayBusinessError && error.paywayCode === '6';
+          if (!notIndexed || Date.now() >= deadline) {
+            if (notIndexed && waitMs === 0) {
+              console.log(
+                `  ${c.dim('Hint: detail lags creation by ~5s in sandbox. Retry, use --wait <seconds>, or check status instantly with:')} payway-sdk check-transaction -t ${opts.transactionId}`,
+              );
+            }
+            throw error;
+          }
+          console.log(`  ${c.dim(`not indexed yet — retrying for up to ${Math.ceil(waitMs / 1000)}s...`)}`);
+          await new Promise((resolve) => setTimeout(resolve, 2_000));
+        }
+      }
+
       if (opts.json) {
         console.log(JSON.stringify(result, null, 2));
         return;

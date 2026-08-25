@@ -62,6 +62,8 @@ export interface PayWayConfig {
   debug?: boolean;
   onRequest?: (endpoint: string, bodyPayload: string) => void;
   onResponse?: (endpoint: string, statusCode: number, body: unknown, rateLimitInfo?: RateLimitInfo) => void;
+  /** Called when a request is delayed locally by the token-bucket throttle for an endpoint with a documented limit. */
+  onThrottle?: (info: { endpoint: string; waitMs: number }) => void;
   /** ABA-issued merchant data used only for official offline KHQR generation. */
   khqr?: KhqrMerchantConfiguration;
 }
@@ -294,18 +296,28 @@ function createHttpError(
   // PayWay often wraps business errors in non-200 HTTP responses (e.g. HTTP 400
   // with PTL04 for refund validation, HTTP 403 with PTL36 for permission errors).
   // Without this extraction, the paywayCode and description are buried in rawBody.
+  // Sandbox-verified (2026-08-25): the strict rate-limit response arrives as
+  // HTTP 403 with a NUMERIC status.code 429 ("Rate limit exceeded...") and no
+  // rate-limit headers — numeric codes must be extracted too, otherwise
+  // rate limiting is misreported as a generic api_error.
   let extractedCode: string | undefined;
   let extractedMessage: string | undefined;
   if (rawBody && typeof rawBody === 'object') {
     const body = rawBody as Record<string, unknown>;
     const status = body.status as Record<string, unknown> | undefined;
-    if (status && typeof status.code === 'string' && status.code !== '0' && status.code !== '00') {
-      extractedCode = status.code;
+    const rawCode = status?.code;
+    const isNonZero =
+      rawCode !== undefined &&
+      rawCode !== null &&
+      String(rawCode) !== '0' &&
+      String(rawCode) !== '00';
+    if (status && (typeof rawCode === 'string' || typeof rawCode === 'number') && isNonZero) {
+      extractedCode = String(rawCode);
       extractedMessage = typeof status.message === 'string' ? status.message : undefined;
     }
   }
 
-  if (response.status === 429) {
+  if (response.status === 429 || extractedCode === '429') {
     return new PayWayRateLimitError(extractedMessage ?? message, {
       statusCode: response.status,
       paywayCode: extractedCode,
@@ -448,6 +460,7 @@ export class PayWay {
   private baseUrl: string;
   private rateLimitRules: Record<string, RateLimitRule>;
   private rateLimitState = new Map<string, { tokens: number; lastRefill: number }>();
+  private recentCallsByEndpoint = new Map<string, number[]>();
 
   // --- Sub-Clients ---
   public readonly checkout: CheckoutDomain;
@@ -579,6 +592,34 @@ export class PayWay {
     }
   }
 
+  /**
+   * Track real request timestamps per endpoint so that when the gateway
+   * rejects with its undocumented rate-limit response, the retry delay can be
+   * derived from our own observed window instead of a blind backoff.
+   */
+  private _recordRecentCall(endpoint: string): void {
+    const rule = this.rateLimitRules[endpoint];
+    if (!rule) return;
+    const now = Date.now();
+    const list = (this.recentCallsByEndpoint.get(endpoint) ?? []).filter(
+      (ts) => now - ts < rule.intervalMs,
+    );
+    list.push(now);
+    this.recentCallsByEndpoint.set(endpoint, list);
+  }
+
+  /** Milliseconds until the locally-observed window frees a slot, or undefined when under the cap. */
+  private _windowRemainingMs(endpoint: string): number | undefined {
+    const rule = this.rateLimitRules[endpoint];
+    if (!rule) return undefined;
+    const now = Date.now();
+    const list = (this.recentCallsByEndpoint.get(endpoint) ?? []).filter(
+      (ts) => now - ts < rule.intervalMs,
+    );
+    if (list.length < rule.limit) return undefined;
+    return Math.max(0, rule.intervalMs - (now - list[0]));
+  }
+
   private async _acquireRateLimitToken(endpoint: string): Promise<void> {
     const rule = this._getRateLimitRule(endpoint);
     if (!rule) {
@@ -600,6 +641,14 @@ export class PayWay {
 
     const refillRate = rule.limit / rule.intervalMs;
     const waitMs = Math.ceil((1 - state.tokens) / refillRate);
+    try {
+      this.config.onThrottle?.({ endpoint, waitMs });
+    } catch {
+      // Logging hooks must never fail SDK execution.
+    }
+    if (this.config.debug) {
+      console.debug(`[payway] local rate-limit: waiting ${waitMs}ms for ${endpoint}`);
+    }
     await delay(waitMs);
 
     this._refillRateLimitState(rule, state);
@@ -622,6 +671,7 @@ export class PayWay {
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      this._recordRecentCall(endpoint);
 
       try {
         try {
@@ -671,8 +721,21 @@ export class PayWay {
         if (shouldRetry) {
           const rateLimitInfo = paywayError.rateLimitInfo as Record<string, unknown> | undefined;
           const retryAfterMs = rateLimitInfo?.retryAfterMs;
-          const waitMs =
-            isRateLimitError && typeof retryAfterMs === 'number' ? retryAfterMs : retryDelayMs * 2 ** attempt;
+          let waitMs: number;
+          if (isRateLimitError && typeof retryAfterMs === 'number') {
+            waitMs = retryAfterMs;
+          } else if (isRateLimitError) {
+            // Gateway sends no Retry-After (sandbox-verified): pace the retry
+            // by our own observed window when the endpoint has a documented
+            // rule; fall back to exponential backoff otherwise.
+            const remaining = this._windowRemainingMs(endpoint);
+            waitMs =
+              remaining !== undefined
+                ? Math.min(Math.max(remaining + 250, 1_000), 10_000)
+                : retryDelayMs * 2 ** attempt;
+          } else {
+            waitMs = retryDelayMs * 2 ** attempt;
+          }
           await delay(waitMs);
           continue;
         }

@@ -28,6 +28,9 @@
 
 ### Changed
 
+- **Rate-limit responses are typed and retryable** - the strict caps (e.g. transaction-detail 10/min) are enforced by the sandbox as HTTP 403 with a NUMERIC body `status.code` 429 ("Rate limit exceeded...") and no rate-limit headers; numeric codes now pass error extraction so this maps to `PayWayRateLimitError` instead of an opaque non-retryable `api_error`. Rate-limited retries pace from the SDK's own observed request window (1-10s) rather than blind exponential backoff; verified live end-to-end (SANDBOX-FINDINGS §11).
+- **Local throttle transparency** - new optional `onThrottle({ endpoint, waitMs })` hook (plus debug logging) fires when a request is queued by a documented-limit token bucket.
+- **`transaction-detail --wait <seconds>`** - retries every 2s while the gateway reports code 6; sandbox-measured detail lag after creation is ~5s vs <1s for check-transaction. The command (and `printApiError`) now print targeted hints for both the lag and the 403+429 cap shape, pointing to check-transaction (600 req/s) as the fast status read.
 - **`pollTransactionStatus` tolerates the creation grace period** — a check right after creation can answer HTTP 200 / `status.code 6` ("tran_id not found") for a few seconds; the poller now yields `paymentStatus: 'NOT_FOUND'` without counting it toward `maxConsecutiveErrors`, so legitimate purchase flows are never aborted by propagation delay (sandbox-verified 2026-08-25, see SANDBOX-FINDINGS §10).
 - **`payment_gate=0` contract documented** — on the JSON Create Transaction path, gate 0 (+ `hosted_view`) is what makes the response include the hosted `checkout_qr_url`; JSDoc on `CreateTransactionParams.paymentGate`, `GenerateQrParams.lifetime` (seconds, min 3 min), and the OpenAPI types now state this.
 - **`generate-checkout` no longer sends `payment_gate: 0`** — sandbox answers that value with an HTTP 200 HTML page instead of JSON.

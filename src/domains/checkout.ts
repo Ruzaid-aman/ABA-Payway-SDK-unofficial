@@ -74,6 +74,12 @@ export interface CheckoutDomain {
   ) => AsyncGenerator<PollTransactionResult, void, undefined>;
 }
 
+function isCheckTransactionResponse(value: unknown): value is components['schemas']['CheckTransactionResponse'] {
+  if (!value || typeof value !== 'object') return false;
+  const status = (value as { status?: unknown }).status;
+  return !!status && typeof status === 'object';
+}
+
 export function createCheckoutDomain(
   config: PayWayConfig & { merchantId: string; apiKey: string },
   request: <TResponse>(
@@ -369,10 +375,7 @@ export function createCheckoutDomain(
 
           if (isTranIdNotFound) {
             lastStatus = 'NOT_FOUND';
-            const rawBody =
-              error instanceof PayWayAPIError && error.rawBody && typeof error.rawBody === 'object'
-                ? (error.rawBody as components['schemas']['CheckTransactionResponse'])
-                : undefined;
+            const rawBody = isCheckTransactionResponse(error.rawBody) ? error.rawBody : undefined;
             yield {
               transactionId,
               attempt,

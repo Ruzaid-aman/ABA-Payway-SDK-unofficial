@@ -368,3 +368,53 @@ budget and could abort legitimate purchase flows). Covered by two new tests in
 
 11. Does production enforce unique `tran_id`? Sandbox silently accepts duplicates (reconfirmed during these runs).
 12. What is the authoritative visibility delay for check/list after create in production?
+
+## 11. get-transaction-detail deep probe — rate-limit contract pinned, SDK hardened (2026-08-25)
+
+Instrumented live probe (`scripts/sandbox-probe-txn-detail.ts`) across four phases.
+Evidence: `test-output/txn-detail-probe.json`.
+
+### 11a. Latency & richness
+
+| Endpoint | n | min | p50 | max |
+|---|---|---|---|---|
+| check-transaction | 4 | 130ms | 467ms | 624ms |
+| transaction-detail | 5 | 174ms | 225ms | 749ms |
+
+Detail returns the richest body (`apv`, `bank_ref`, `payer_account`,
+`payment_type`, full `transaction_operations` history) — right for
+reconciliation/refund decisions, not for real-time status.
+
+### 11b. Fresh-creation visibility is ASYMMETRIC
+
+After creating a QR: **check-transaction sees the new ID in <1s; transaction-
+detail took ~5s** to return it (HTTP 200 code 6 "tran_id not found" before).
+Status polling must use check-transaction; detail is for after-the-fact reads.
+
+### 11c. Rate-limit contract (the big one)
+
+The documented 10/min cap on detail is enforced as:
+
+```
+HTTP 403 Forbidden          ← NOT 429
+{"status":{"code":429,"message":"Rate limit exceeded for this request.
+Please try again later","tran_id":"…"}}   ← code is a JSON NUMBER
+```
+
+- No rate-limit headers at all (no X-RateLimit-*, no Retry-After).
+- Exactly 10 OK calls per rolling minute, then 403s.
+- The numeric `status.code 429` slipped past the SDK's string-only body-code
+  extraction, so this was surfacing as an opaque non-retryable `api_error`.
+
+**Action taken:** extraction now accepts numeric codes; the response maps to
+typed `PayWayRateLimitError` (retryable). Retry pacing derives from the SDK's
+own observed request window (capped 1-10s) instead of blind backoff when no
+Retry-After exists. Verified live: burst → paced retries → typed error →
+success once the window rolled.
+
+### 11d. CLI hardening
+
+`payway-sdk transaction-detail` gained `--wait <seconds>` (retries every 2s
+while the gateway reports code 6) and prints a lag hint with the
+check-transaction escape hatch when it gives up. `printApiError` now explains
+the 403+429 cap shape and points to the fast alternative endpoint.

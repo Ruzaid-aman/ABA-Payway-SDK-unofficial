@@ -95,7 +95,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
 | `payway-sdk generate-qr` | Generate a QR code (online via PayWay API or offline) |
 | `payway-sdk check-transaction -t <id>` | Check payment status for one transaction |
-| `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min) |
+| `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min; `--wait <seconds>` retries the ~5s post-creation indexing lag) |
 | `payway-sdk transaction-list --from <date> --to <date>` | List transactions in a window (`"YYYY-MM-DD HH:mm:ss"` dates) |
 | `payway-sdk close-transaction -t <id>` | Void/close an unpaid transaction (prompts; `-y/--force` skips) |
 | `payway-sdk refund -t <id> -a <amount> [-c <currency>]` | Refund with a pre-flight balance check and confirmation by default; `--no-preflight` skips only the detail lookup, `-y/--force` skips both the lookup and the prompt |
@@ -179,6 +179,7 @@ Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or
 | `npx tsx scripts/sandbox-probe.ts` | Run full sandbox probe across all 7 API domains |
 | `npx tsx scripts/sandbox-campaign-full-cycle.ts` | Full-cycle validation campaign: purchase → check → close → detail → list → refund + edge cases (writes `test-output/campaign-evidence.json`) |
 | `npx tsx scripts/sandbox-probe-qr-api.ts` | Probe QR API endpoint specifically |
+| `npx tsx scripts/sandbox-probe-txn-detail.ts` | Instrumented get-transaction-detail probe: latency, visibility lag, rate-limit contract |
 | `npx tsx scripts/sandbox-probe-checkout-errors.ts` | Probe checkout error handling |
 | `npx tsx scripts/sandbox-probe-cof.ts` | Probe credentials-on-file endpoints |
 | `npx tsx scripts/sandbox-probe-pre-auth.ts` | Probe pre-authorization endpoints |
@@ -248,7 +249,9 @@ PayWay documents these endpoint-specific limits:
 - `transaction-detail`: 10 requests/minute
 - `refund`: 500 requests/second
 
-This SDK applies client-side throttling for documented PayWay limits by default. You can fine-tune or disable this behavior using `rateLimitThrottling` and `rateLimitRules`.
+Sandbox-verified (2026-08-25): exceeding a cap returns **HTTP 403 with a numeric body `status.code` of 429** ("Rate limit exceeded for this request. Please try again later") and no rate-limit headers. The SDK classifies this as retryable `PayWayRateLimitError` and paces retries from its own observed request window, so bursts slightly over a cap recover automatically.
+
+This SDK applies client-side throttling for documented PayWay limits by default (`onThrottle` reports each local wait). You can fine-tune or disable this behavior using `rateLimitThrottling` and `rateLimitRules`.
 
 ```typescript
 const paywayWithRateLimits = new PayWay({
