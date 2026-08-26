@@ -1,5 +1,7 @@
 import { ENDPOINTS } from '../constants.js';
+import type { PayWayConfig } from '../client.js';
 import { PayWayConfigError } from '../errors.js';
+import { validateSandboxBeneficiary } from '../sandbox-beneficiaries.js';
 import type { components } from '../types.js';
 import { validatePositiveAmount, validateTransactionId } from '../utils.js';
 
@@ -14,6 +16,7 @@ export interface PreAuthDomain {
 }
 
 export function createPreAuthDomain(
+  config: PayWayConfig,
   requestWithMerchantAuth: <TResponse>(
     path: string,
     authPayload: Record<string, unknown>,
@@ -45,6 +48,14 @@ export function createPreAuthDomain(
       validatePositiveAmount(amount, 'USD');
       if (!Array.isArray(payout) || payout.length === 0) {
         throw new PayWayConfigError('payout must be a non-empty array');
+      }
+
+      // Pre-auth payouts are always USD; sandbox enforces the beneficiary
+      // allowlist + currency match (a non-whitelisted/non-USD account is rejected).
+      const sandbox = config.environment === 'sandbox';
+      for (const entry of payout) {
+        validatePositiveAmount(entry.amt, 'USD');
+        validateSandboxBeneficiary(entry.acc, 'USD', { sandbox });
       }
 
       return requestWithMerchantAuth<components['schemas']['CompletePreAuthResponse']>(

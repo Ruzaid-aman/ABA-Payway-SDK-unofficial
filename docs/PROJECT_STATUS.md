@@ -520,3 +520,18 @@ Live E2E:                        doctor --live round-trip ✓; poll-transaction/
 Sandbox campaigns:               Milestones E+F committed; evidence in test-output/campaign-*.json + SANDBOX-FINDINGS §8–9
 Next task:                       Commit the QR auto-open changeset; ask ABA: v3 token-trio HMAC composition (findings §9a), close-transaction enforcement (CLOSE-TRANSACTION-FINDINGS §5)
 ```
+
+## Recent Session — Payout hardening (2026-08-26, UNCOMMITTED)
+
+- Enforced **payout currency must match beneficiary account currency** client-side in
+  sandbox: `payout.ts` and `pre-auth.ts` (`completeWithPayout`) now call
+  `validateSandboxBeneficiary(acc, currency, { sandbox })` → throws `currency mismatch`
+  for e.g. a KHR payout to a seeded USD account. Production still validates format only.
+- Added payout error codes to `constants.ts` (`PAYOUT_ERROR_CODES`) and
+  `cli/explain-code.ts`; `payway-sdk explain PTL147|12|PTL146|PTL-PAYOUT-37|PTL46|PTL-PAYOUT-36`
+  now resolve with actionable hints. `printApiError` gained payout-specific branches + 415.
+- Added a **`payout` CLI command** (`-t/-a/-c/-b "acc:amt,..."`) — the SDK had no CLI path.
+- Docs: `docs/12-error-handling-and-debugging.md` gained a Payout-Specific error table + `12/PTL147` row.
+- Skills: `aba-payway-payout` v1.2.0 (currency rule + error matrix + CLI), synced to all 3 skill paths.
+- Tests: payout/pre-auth fixtures moved to seeded `500000001`; new test asserts KHR→USD rejection.
+- Status: `npx tsc --noEmit` clean, `vitest` 754 passing / 0 failing, `biome lint` clean.

@@ -3,11 +3,11 @@
  * Backs the `payway-sdk explain <code>` command; pure data + lookup so it is
  * trivially testable and usable by agents without spawning the CLI.
  */
-import { GATEWAY_CODE_HINTS, PRE_AUTH_ERROR_CODES, REFUND_ERROR_CODES } from '../constants.js';
+import { GATEWAY_CODE_HINTS, PAYOUT_ERROR_CODES, PRE_AUTH_ERROR_CODES, REFUND_ERROR_CODES } from '../constants.js';
 
 export interface CodeExplanation {
   readonly code: string;
-  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payment-status';
+  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status';
   readonly title: string;
   readonly hint: string;
 }
@@ -48,6 +48,28 @@ const PRE_AUTH_HINTS: Record<string, string> = {
   [PRE_AUTH_ERROR_CODES.UNABLE_TO_CANCEL]: 'Only OPEN/PENDING pre-auths can be cancelled — check current status first.',
 };
 
+// Payout / split-payout error codes (direct payout API). The currency must
+// match the beneficiary account currency; non-whitelisted accounts and amount
+// mismatches are also common.
+const PAYOUT_TITLES: Record<string, string> = {
+  [PAYOUT_ERROR_CODES.CURRENCY_NOT_ALLOWED]: 'Payment currency not allowed',
+  '12': 'Payment currency not allowed',
+  [PAYOUT_ERROR_CODES.ACCOUNT_NOT_WHITELISTED]: 'Payout account not whitelisted',
+  'PTL-PAYOUT-37': 'Payout account not whitelisted',
+  PTL46: 'Payout account not whitelisted',
+  [PAYOUT_ERROR_CODES.AMOUNT_MISMATCH]: 'Payout amount mismatch',
+};
+
+const PAYOUT_HINTS: Record<string, string> = {
+  [PAYOUT_ERROR_CODES.CURRENCY_NOT_ALLOWED]:
+    'Payout currency must match the beneficiary account currency and your merchant credential currency. Send USD to a USD account; KHR to a KHR account.',
+  '12': 'Payout currency must match the beneficiary account currency and your merchant credential currency. Send USD to a USD account; KHR to a KHR account.',
+  [PAYOUT_ERROR_CODES.ACCOUNT_NOT_WHITELISTED]: 'Whitelist the beneficiary first via addBeneficiary().',
+  'PTL-PAYOUT-37': 'Whitelist the beneficiary first via addBeneficiary().',
+  PTL46: 'Whitelist the beneficiary first via addBeneficiary().',
+  [PAYOUT_ERROR_CODES.AMOUNT_MISMATCH]: 'Sum of beneficiary amounts must equal the payout (transaction complete) amount.',
+};
+
 export function explainPayWayCode(rawCode: string): CodeExplanation | undefined {
   const code = rawCode.trim().toUpperCase().replace(/^PTL0+/, 'PTL0').replace(/^CODE[=: ]*/, '');
 
@@ -62,6 +84,9 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
   }
   if (code in PRE_AUTH_TITLES) {
     return { code, family: 'pre-auth', title: PRE_AUTH_TITLES[code], hint: PRE_AUTH_HINTS[code] ?? '' };
+  }
+  if (code in PAYOUT_TITLES) {
+    return { code, family: 'payout', title: PAYOUT_TITLES[code], hint: PAYOUT_HINTS[code] ?? '' };
   }
 
   // Numeric gateway codes
@@ -89,6 +114,9 @@ export function explainAll(): CodeExplanation[] {
   }
   for (const [name, code] of Object.entries(PRE_AUTH_ERROR_CODES)) {
     all.push({ code, family: 'pre-auth', title: PRE_AUTH_TITLES[code] ?? name, hint: PRE_AUTH_HINTS[code] ?? '' });
+  }
+  for (const code of Object.keys(PAYOUT_TITLES)) {
+    all.push({ code, family: 'payout', title: PAYOUT_TITLES[code] ?? code, hint: PAYOUT_HINTS[code] ?? '' });
   }
   return all;
 }

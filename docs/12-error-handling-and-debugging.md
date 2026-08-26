@@ -106,6 +106,7 @@ try {
 | `"15"` | Invalid Merchant | 403 | Merchant ID not recognized | Verify `merchantId` in your config |
 | `"16"` | Invalid Amount | 400 | Amount format is wrong | Use `formatAmount()` helper; check decimal places |
 | `"17"` | Invalid Currency | 400 | Currency not `'USD'` or `'KHR'` | Set `currency` to `'USD'` or `'KHR'` |
+| `"12"` / `"PTL147"` | Payment currency not allowed | 403 | Payout currency doesn't match the beneficiary account currency or the merchant credential currency | Send USD to a USD account and KHR to a KHR account; align the merchant profile currency |
 | `"22"` | Expired Transaction | 403 | Token or transaction has expired | Call `renew()` for tokens, or create new transaction |
 | `"23"` | Transaction Not Found | 403 | No transaction with given `tran_id` | Check transaction ID, it may have been closed |
 | `"24"` | Invalid Beneficiary Data | 403 | RSA-encrypted beneficiary data is wrong | Verify public key PEM and beneficiary account format |
@@ -178,6 +179,23 @@ try {
 > 🧪 **Sandbox-verified (2026-08-25):** Refunding an unknown/unpaid transaction returns **HTTP 403 + PTL36**. The CLI's `payway-sdk refund` command runs a pre-flight balance check via `getTransactionDetail` first (paid − already-refunded) and fails fast with exit code 1 before touching PayWay.
 >
 > ℹ️ **CLI operator note:** `--no-preflight` skips only the detail lookup; `-y/--force` skips both the lookup and the confirmation prompt.
+
+### Payout-Specific Error Codes
+
+Payouts (`payway.payout.payout`) go through the direct payout API and have their own failure modes. The single most common mistake is a **currency mismatch**: the payout `currency` must match both the beneficiary account currency and the merchant credential currency — a KHR payout to a USD account is rejected. The SDK enforces the beneficiary-currency match client-side in sandbox (throws `PayWayConfigError`), so it fails fast before the network round-trip.
+
+| Code | Constant | Meaning | How to Fix |
+|---|---|---|---|
+| `12` / `PTL147` | `PAYOUT_ERROR_CODES.CURRENCY_NOT_ALLOWED` | Payment currency not allowed | Payout currency must match the beneficiary account currency **and** merchant credential currency (USD→USD, KHR→KHR) |
+| `37` / `PTL146` / `PTL-PAYOUT-37` / `PTL46` | `PAYOUT_ERROR_CODES.ACCOUNT_NOT_WHITELISTED` | Beneficiary not whitelisted | Register the payee via `addBeneficiary()` (or the payment-link whitelist) first |
+| `PTL-PAYOUT-36` | `PAYOUT_ERROR_CODES.AMOUNT_MISMATCH` | Payout amount mismatch | Sum of `beneficiaries[].amount` must equal the payout (transaction complete) amount |
+| `1` | *(shared with gateway)* | Wrong Hash | Check API key, HMAC field ordering, base64 vs hex encoding |
+| `24` | *(shared with gateway)* | Invalid Beneficiary Data | RSA-encrypted beneficiaries malformed — verify public key + account format |
+| `415` (HTTP) | — | Unsupported Media Type | Direct payout API requires `Content-Type: application/json` (not form-encoded) |
+
+> 🧪 **Sandbox-verified (2026-08-25):** Payout to a non-whitelisted account → HTTP 403, numeric code **`37`** ("Payout accounts are not in whitelist"). Beneficiaries are RSA-encrypted and the HMAC is **hex**-encoded for this endpoint.
+>
+> 💡 **CLI:** `payway-sdk payout -t <txId> -a 10 -c USD -b "500000001:10"` validates currency/whitelist locally in sandbox and prints payout-specific hints on failure. Use `payway-sdk sandbox-beneficiaries` to list the seeded test accounts.
 
 ### Interpreting a successful refund
 

@@ -109,6 +109,27 @@ export const PRE_AUTH_ERROR_CODES = {
 } as const;
 
 /**
+ * Payout / split-payout error codes (direct payout API).
+ *
+ * Source: PayWay integration guidance + sandbox probing. The payout currency
+ * must match the beneficiary account currency AND the merchant credential
+ * currency, otherwise the gateway rejects with HTTP 403 / `PTL147` (or the
+ * numeric `12`, "Payment currency is not allowed").
+ *
+ * Note: numeric gateway code `37`, `PTL146`, `PTL-PAYOUT-37`, and `PTL46` all
+ * indicate a non-whitelisted payout account; `PTL-PAYOUT-36` indicates a
+ * beneficiary-amount vs payout-amount mismatch.
+ */
+export const PAYOUT_ERROR_CODES = {
+  /** Payout currency does not match beneficiary/merchant credential currency */
+  CURRENCY_NOT_ALLOWED: 'PTL147',
+  /** Beneficiary account not whitelisted for payout */
+  ACCOUNT_NOT_WHITELISTED: 'PTL146',
+  /** Sum of beneficiary amounts != payout (transaction complete) amount */
+  AMOUNT_MISMATCH: 'PTL-PAYOUT-36',
+} as const;
+
+/**
  * Sandbox-verified gateway error code hints (numeric `status.code` values).
  * Used by the CLI `explain` command; not exhaustive.
  *
@@ -121,6 +142,7 @@ export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }>
   '6': { title: 'tran_id not found', hint: 'check-transaction found no transaction with this ID.' },
   '7': { title: 'Invalid Request Data', hint: 'Missing or malformed field - check parameter types.' },
   '8': { title: 'merchant_id not found', hint: 'Merchant identity rejected on this endpoint (sandbox-verified HTTP 403 on check-transaction) - check PAYWAY_MERCHANT_ID or the active profile.' },
+  '12': { title: 'Payment currency not allowed', hint: 'Payout currency must match the beneficiary account currency and your merchant credential currency (e.g. send USD to a USD account).' },
   '15': { title: 'Invalid Merchant', hint: 'merchant_id not recognized in this environment.' },
   '16': { title: 'Invalid Amount', hint: 'Amount format wrong — use formatAmount()/decimal rules for the currency.' },
   '17': { title: 'Invalid Currency', hint: "Currency must be 'USD' or 'KHR'." },

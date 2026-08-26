@@ -1258,7 +1258,7 @@ describe('preAuth domain', () => {
   it('completeWithPayout uses the completion path with encrypted payout instructions', async () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Completed' } }));
 
-    await payway.preAuth.completeWithPayout('T-PREAUTH-002', 200.0, [{ acc: '000123456', amt: 200 }]);
+    await payway.preAuth.completeWithPayout('T-PREAUTH-002', 200.0, [{ acc: '500000001', amt: 200 }]);
 
     const [url, opts] = fetchSpy.mock.calls[0];
     expect(url).toContain(ENDPOINTS.completePreAuth);
@@ -1291,7 +1291,7 @@ describe('payout domain', () => {
     await payway.payout.payout({
       transactionId: 'PO-001',
       amount: 50.0,
-      beneficiaries: [{ account: '000123456', amount: 50.0 }],
+      beneficiaries: [{ account: '500000001', amount: 50.0 }],
       currency: 'USD',
     });
 
@@ -1308,7 +1308,7 @@ describe('payout domain', () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'Updated' } }));
 
     await payway.payout.updateBeneficiaryStatus({
-      payee: '000123456',
+      payee: '500000001',
       status: 1,
     });
 
@@ -1320,7 +1320,7 @@ describe('payout domain', () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'Added' } }));
 
     await payway.payout.addBeneficiary({
-      payee: '000123456',
+      payee: '500000001',
     });
 
     const [url, opts] = fetchSpy.mock.calls[0];
@@ -1335,7 +1335,7 @@ describe('payout domain', () => {
     await payway.payout.payout({
       transactionId: 'PO-CF-001',
       amount: 100.0,
-      beneficiaries: [{ account: '000123456', amount: 100.0 }],
+      beneficiaries: [{ account: '500000001', amount: 100.0 }],
       currency: 'USD',
       customFields: { source: 'web', campaign: 'summer2026' },
     });
@@ -1350,7 +1350,7 @@ describe('payout domain', () => {
       payway.payout.payout({
         transactionId: 'PO-002',
         amount: 100.0,
-        beneficiaries: [{ account: '000123456', amount: 50.0 }],
+        beneficiaries: [{ account: '500000001', amount: 50.0 }],
         currency: 'USD',
       }),
     ).rejects.toThrow('beneficiary amounts (50) must sum to total amount (100)');
@@ -1365,6 +1365,17 @@ describe('payout domain', () => {
         currency: 'USD',
       }),
     ).rejects.toThrow('beneficiaries must be a non-empty array');
+  });
+
+  it('rejects a KHR payout to a USD beneficiary in sandbox (currency mismatch)', async () => {
+    await expect(
+      payway.payout.payout({
+        transactionId: 'PO-KHR-001',
+        amount: 1000.0,
+        beneficiaries: [{ account: '500000001', amount: 1000.0 }],
+        currency: 'KHR',
+      }),
+    ).rejects.toThrow(/currency mismatch/);
   });
 });
 

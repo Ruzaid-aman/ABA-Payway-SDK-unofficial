@@ -512,7 +512,7 @@ export class PayWay {
     this.credentialsOnFile = createCredentialsOnFileDomain(this.config, this.request.bind(this));
     this.qr = createQrDomain(this.config, this.request.bind(this));
     this.paymentLink = createPaymentLinkDomain(this.config, this.requestWithMerchantAuth.bind(this));
-    this.preAuth = createPreAuthDomain(this.requestWithMerchantAuth.bind(this));
+    this.preAuth = createPreAuthDomain(this.config, this.requestWithMerchantAuth.bind(this));
     this.payout = createPayoutDomain(this.config, this.request.bind(this), this.requestWithMerchantAuth.bind(this));
     this.khqr = createKhqrDomain(this.config, this.request.bind(this));
   }

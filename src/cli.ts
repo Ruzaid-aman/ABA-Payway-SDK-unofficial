@@ -28,9 +28,11 @@ import {
   setDefaultProfile,
 } from './config/profiles.js';
 import { PAYMENT_STATUS_CODES, PAYMENT_STATUS_LABELS, REFUND_ERROR_CODES } from './constants.js';
+import { listSandboxBeneficiaries } from './sandbox-beneficiaries.js';
 import {
   PayWayAPIError,
   PayWayBusinessError,
+  PayWayConfigError,
   PayWayError,
   PayWayNetworkError,
   PayWayRateLimitError,
@@ -123,6 +125,22 @@ function printApiError(e: unknown): number {
       );
     } else if (/HTML page instead of JSON/.test(e.message)) {
       console.log(`  ${c.dim('Hint: a parameter value was rejected server-side — try removing optional params (e.g. payment_gate).')}`);
+    } else if (e.paywayCode === '12' || e.paywayCode === 'PTL147') {
+      console.log(
+        `  ${c.dim('Hint: payout currency must match the beneficiary account currency AND your merchant credential currency — send USD to a USD account, KHR to a KHR account.')}`,
+      );
+    } else if (e.paywayCode === '37' || e.paywayCode === 'PTL146' || e.paywayCode === 'PTL-PAYOUT-37' || e.paywayCode === 'PTL46') {
+      console.log(
+        `  ${c.dim('Hint: the payout beneficiary is not whitelisted — register it first via addBeneficiary() (or the payment-link whitelist).')}`,
+      );
+    } else if (e.paywayCode === 'PTL-PAYOUT-36') {
+      console.log(
+        `  ${c.dim('Hint: the sum of beneficiary amounts must equal the payout (transaction complete) amount.')}`,
+      );
+    } else if (e.statusCode === 415) {
+      console.log(
+        `  ${c.dim('Hint: the direct payout API requires Content-Type: application/json — ensure the request body is JSON, not form-encoded.')}`,
+      );
     }
     return classifyError(e);
   }
@@ -1662,6 +1680,141 @@ paymentLinkCmd
       console.log(`  ${c.bold('Created:')}     ${data?.created_at ?? '-'}`);
       console.log(`  ${c.bold('Expires:')}     ${data?.expired_date || '-'}`);
       console.log(`  ${c.bold('Link:')}        ${c.cyan(data?.payment_link ?? '-')}`);
+      console.log();
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+// --- sandbox-beneficiaries ---
+program
+  .command('sandbox-beneficiaries')
+  .description('List seeded sandbox beneficiary accounts and test MIDs for payout testing (SANDBOX ONLY)')
+  .option('--currency <code>', 'Filter by currency: USD or KHR')
+  .option('--json', 'Print as JSON')
+  .action((opts: { currency?: string; json?: boolean }) => {
+    const currency = opts.currency?.toUpperCase();
+    if (currency && currency !== 'USD' && currency !== 'KHR') {
+      console.log(`  ${c.red('✗')} --currency must be USD or KHR, received: ${currency}`);
+      process.exitCode = 1;
+      return;
+    }
+    const all = listSandboxBeneficiaries();
+    const filtered = currency ? all.filter((b) => b.currencies.includes(currency as 'USD' | 'KHR')) : all;
+
+    if (opts.json) {
+      console.log(JSON.stringify(filtered, null, 2));
+      return;
+    }
+
+    console.log(`\n${c.bold('Sandbox beneficiaries')} ${c.dim('— sandbox-only test fixtures, NEVER use in production')}\n`);
+    const accounts = filtered.filter((b) => b.kind === 'account');
+    const mids = filtered.filter((b) => b.kind === 'mid');
+
+    if (accounts.length > 0) {
+      console.log(`  ${c.bold('USD accounts (9-digit)')}`);
+      for (const a of accounts) console.log(`    ${c.cyan(a.id)}   ${a.currencies.join('/')}`);
+      console.log();
+    }
+    if (mids.length > 0) {
+      console.log(`  ${c.bold('Test MIDs (15-digit, KHR)')}`);
+      for (const m of mids) console.log(`    ${c.cyan(m.id)}   ${m.currencies.join('/')}`);
+      console.log();
+    }
+    console.log(`  ${c.dim('Use these in payout / split-payout calls while environment=sandbox.')}`);
+    console.log(`  ${c.dim('Any other account is rejected in sandbox (format: 9/11/15 digits).')}\n`);
+  });
+
+// --- payout ---
+function parseBeneficiariesArg(raw: string): { account: string; amount: number }[] {
+  return raw.split(',').map((part) => {
+    const idx = part.indexOf(':');
+    if (idx < 0) {
+      throw new PayWayConfigError(`invalid beneficiary "${part.trim()}" — expected account:amount`);
+    }
+    const account = part.slice(0, idx).trim();
+    const amount = Number(part.slice(idx + 1).trim());
+    if (!account) throw new PayWayConfigError(`beneficiary account is empty in "${part.trim()}"`);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new PayWayConfigError(`invalid beneficiary amount in "${part.trim()}" — must be a positive number`);
+    }
+    return { account, amount };
+  });
+}
+
+program
+  .command('payout')
+  .description('Send a payout / split-payout to one or more whitelisted beneficiary accounts')
+  .requiredOption('-t, --transaction-id <id>', 'Source transaction id (pre-auth completed, or a paid transaction)')
+  .requiredOption('-a, --amount <number>', 'Total payout amount (must equal sum of beneficiary amounts)')
+  .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
+  .requiredOption(
+    '-b, --beneficiaries <list>',
+    'Comma-separated beneficiaries as account:amount (e.g. "500000001:10,500000002:5")',
+  )
+  .option('--custom-fields <json>', 'Optional JSON custom fields object/string')
+  .option('--json', 'Print the raw response as JSON')
+  .action(async (opts: { transactionId: string; amount: string; currency: string; beneficiaries: string; customFields?: string; json?: boolean }) => {
+    console.log(`\n${c.bold('ABA PayWay SDK')} — payout\n`);
+
+    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
+    const currency = opts.currency.toUpperCase() as 'USD' | 'KHR';
+    if (currency !== 'USD' && currency !== 'KHR') {
+      console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${c.red(currency)}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
+    let beneficiaries: { account: string; amount: number }[];
+    try {
+      beneficiaries = parseBeneficiariesArg(opts.beneficiaries);
+    } catch (e) {
+      console.log(`  ${c.red('✗')} ${(e as Error).message}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
+    const amount = Number(opts.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
+    let customFields: unknown;
+    if (opts.customFields) {
+      try {
+        customFields = JSON.parse(opts.customFields);
+      } catch {
+        console.log(`  ${c.red('✗')} --custom-fields is not valid JSON: ${opts.customFields}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+    }
+
+    try {
+      const payway = new PayWay();
+      console.log(`  ${c.dim('Calling PayWay payout API...')}`);
+      const result = await payway.payout.payout({
+        transactionId: opts.transactionId,
+        amount,
+        currency,
+        beneficiaries,
+        customFields: customFields as Record<string, unknown> | string | undefined,
+      });
+
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        const data = ((result as Record<string, unknown>).data ?? result) as Record<string, unknown>;
+        console.log(`  ${c.green('✓')} Payout submitted`);
+        if (data?.tran_id) console.log(`  ${c.bold('Transaction ID:')} ${c.cyan(String(data.tran_id))}`);
+        if (data?.status) console.log(`  ${c.bold('Status:')} ${c.cyan(String(data.status))}`);
+      }
       console.log();
     } catch (e) {
       process.exitCode = printApiError(e);

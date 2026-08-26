@@ -2,6 +2,7 @@ import { encryptMerchantAuth } from '../auth.js';
 import type { AddBeneficiaryParams, PayoutParams, PayWayConfig, UpdateBeneficiaryStatusParams } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
+import { validateSandboxBeneficiary } from '../sandbox-beneficiaries.js';
 import type { components } from '../types.js';
 import {
   filterParams,
@@ -51,6 +52,15 @@ export function createPayoutDomain(
       validatePositiveAmount(params.amount, params.currency);
       validateCurrency(params.currency);
       validateBeneficiaries(params.beneficiaries, params.amount, params.currency);
+
+      // Sandbox: the payout currency MUST match each beneficiary's account
+      // currency (e.g. a USD account rejects a KHR payout). In production we
+      // only validate the account format — the real whitelist/currency check
+      // is enforced by PayWay per merchant.
+      const sandbox = config.environment === 'sandbox';
+      for (const b of params.beneficiaries) {
+        validateSandboxBeneficiary(b.account, params.currency, { sandbox });
+      }
 
       return request<components['schemas']['PayoutResponse']>(
         ENDPOINTS.payout,

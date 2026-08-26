@@ -110,8 +110,8 @@ describe('Validation: payment-link', () => {
 });
 
 describe('Validation: pre-auth', () => {
-  const preAuth = createPreAuthDomain(dummyRequestWithAuth);
-  const preAuthPos = createPreAuthDomain(spyRequestWithAuth);
+  const preAuth = createPreAuthDomain(DUMMY_CONFIG, dummyRequestWithAuth);
+  const preAuthPos = createPreAuthDomain(DUMMY_CONFIG, spyRequestWithAuth);
 
   it('throws when transactionId is invalid', () => {
     expect(() => preAuth.complete('', 10)).toThrow(PayWayConfigError);
