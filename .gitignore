@@ -51,6 +51,7 @@ __pycache__/
 
 # Generated test artifacts
 test-logs/
+test-output/
 .venv/
 
 # Output logs

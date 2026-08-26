@@ -12,7 +12,9 @@ import { PayWay } from 'aba-payway-ts';
 const payway = new PayWay();
 ```
 
-Set `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`. Optional values are `PAYWAY_RSA_PUBLIC_KEY`, `PAYWAY_BASE_URL`, `PAYWAY_ENV` (named `sandbox` or `production`; takes precedence over `PAYWAY_SANDBOX`), `PAYWAY_SANDBOX`, `PAYWAY_TIMEOUT`, and `DEBUG_PAYWAY`. Explicit constructor options take precedence over all environment variables. Use `debug: true` only in controlled environments; logs redact secrets.
+Set `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`. Optional values are `PAYWAY_RSA_PUBLIC_KEY`, `PAYWAY_BASE_URL`, `PAYWAY_ENV` (named `sandbox` or `production`; takes precedence over `PAYWAY_SANDBOX`), `PAYWAY_SANDBOX`, `PAYWAY_TIMEOUT`, `PAYWAY_LOG_LEVEL` (`debug|info|warn|error`), and `DEBUG_PAYWAY`. Explicit constructor options take precedence over all environment variables. Use `debug: true` only in controlled environments; logs redact secrets.
+
+Constructor-only resilience/observability options (see docs/12): `logLevel`, `logFormat: 'json'`, `backoffJitter: 'full'`, `circuitBreaker: { failureThreshold, resetTimeoutMs }`, and the TD-03 guard flag `allowUnverifiedTokenOperations` (required to call renew/get-details/remove token operations while their HMAC composition is unconfirmed by ABA).
 
 ## Error Handling
 ```ts

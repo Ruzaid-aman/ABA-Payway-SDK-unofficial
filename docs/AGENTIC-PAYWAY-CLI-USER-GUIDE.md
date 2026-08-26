@@ -49,10 +49,24 @@ Two optional agent-guidance skills are also shipped under `skills/`:
 npm install
 npm run build      # tsup → dist/
 npm run typecheck  # tsc --noEmit
-npm test           # vitest (578 tests)
+npm test           # vitest (787 tests)
 ```
 
 After building, the CLI binary is the SDK entry point (referenced here as `payway-sdk`).
+
+**Startup latency — prefer the built artifact over `npx tsx`.** The compiled
+`node dist/cli.js --help` starts in **P50 ≈ 413 ms / P95 ≈ 415 ms** (plan
+threshold: 500 ms; measured by
+`audit-results/four-pillars/evidence/startup-probe.ts node dist/cli.js --help`,
+Windows). The `npx tsx src/cli.ts` dev path costs ~2 s P50 because of `npx`
+resolution + JIT transpilation of the whole command graph — fine for
+development, not for scripted/production use. For regular CLI work, install
+globally once and skip both overheads:
+
+```bash
+npm install -g .        # or: npm link
+payway-sdk --help       # runs dist/cli.js directly, no npx/tsx
+```
 
 ---
 

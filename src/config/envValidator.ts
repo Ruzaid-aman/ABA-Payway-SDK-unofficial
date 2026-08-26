@@ -10,6 +10,43 @@ export interface EnvIssue {
 const REQUIRED_VARS = ['PAYWAY_ENV', 'PAYWAY_MERCHANT_ID', 'PAYWAY_API_KEY'] as const;
 const URL_VARS = ['PAYWAY_RETURN_URL', 'PAYWAY_CANCEL_URL', 'PAYWAY_CALLBACK_URL'] as const;
 
+/**
+ * Every PAYWAY_-prefixed variable the SDK/CLI ecosystem understands (TD-12).
+ * Anything else present in the environment is reported as a warning so
+ * typos like PAYWAY_APIKEY or stale variables surface during doctor/init.
+ */
+const KNOWN_VARS: ReadonlySet<string> = new Set([
+  ...REQUIRED_VARS,
+  ...URL_VARS,
+  'PAYWAY_SANDBOX',
+  'PAYWAY_BASE_URL',
+  'PAYWAY_TIMEOUT',
+  'PAYWAY_RSA_PUBLIC_KEY',
+  'PAYWAY_AGENT_API_KEY',
+  'PAYWAY_AGENT_BASE_URL',
+  'PAYWAY_PROFILE',
+  'PAYWAY_LOG_LEVEL',
+  'PAYWAY_ONBOARD_AUTO',
+]);
+
+/** Validate env-only vars actually carry values that appear in the env map. */
+function collectUnknownVarWarnings(env: NodeJS.ProcessEnv): EnvIssue[] {
+  const unknown = Object.keys(env)
+    .filter((key) => /^PAYWAY_/i.test(key))
+    .filter((key) => !KNOWN_VARS.has(key));
+  if (unknown.length === 0) return [];
+  return [
+    {
+      code: 'W-PAYWAY-UNKNOWN-VAR',
+      severity: 'warn',
+      varName: unknown.join(','),
+      message:
+        `Unrecognized PayWay environment variable(s): ${unknown.join(', ')}. ` +
+        'Check for typos or removed configuration keys.',
+    },
+  ];
+}
+
 function isNonEmpty(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -99,6 +136,8 @@ export function validatePayWayEnv(env: NodeJS.ProcessEnv): EnvIssue[] {
       message: 'PAYWAY_RSA_PUBLIC_KEY should be a PEM-formatted string starting with -----BEGIN',
     });
   }
+
+  issues.push(...collectUnknownVarWarnings(env));
 
   return issues;
 }

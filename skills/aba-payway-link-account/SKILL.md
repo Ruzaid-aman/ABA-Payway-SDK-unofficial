@@ -8,7 +8,8 @@ version: 1.1.0
 
 ## Quick Start
 ```ts
-const result = await payway.credentialsOnFile.linkAccount({ requestId: 'link-123', callbackUrl: 'https://merchant.example/payway/callback' });
+// requestId/ctid must match the gateway rule [a-zA-Z0-9]{5,24} — no hyphens.
+const result = await payway.credentialsOnFile.linkAccount({ requestId: 'linkacct001', callbackUrl: 'https://merchant.example/payway/callback' });
 ```
 
 The callback URL must be public HTTPS. Store returned credential identifiers securely.

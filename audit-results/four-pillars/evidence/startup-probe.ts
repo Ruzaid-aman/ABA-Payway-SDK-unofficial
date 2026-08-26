@@ -1,15 +1,17 @@
 /**
  * Pillar D evidence probe — CLI startup latency (D.1.1).
  *
- * Spawns `npx tsx src/cli.ts --help` N times via child_process (no shell
- * quoting games), records wall-clock duration per run, prints P50/P95/max.
+ * Spawns the CLI `--help` N times via child_process (no shell quoting games),
+ * records wall-clock duration per run, prints P50/P95/max.
  *
- * Run: npx tsx audit-results/four-pillars/evidence/startup-probe.ts
+ * Run (dev/tsx path):    npx tsx audit-results/four-pillars/evidence/startup-probe.ts
+ * Run (built artifact):  npx tsx audit-results/four-pillars/evidence/startup-probe.ts node dist/cli.js
+ * Any command works:     npx tsx audit-results/four-pillars/evidence/startup-probe.ts <cmd> [args...]
  */
 import { spawnSync } from 'node:child_process';
 
 const RUNS = 5;
-const argv = ['npx', 'tsx', 'src/cli.ts', '--help'];
+const argv = process.argv.slice(2).length > 0 ? process.argv.slice(2) : ['npx', 'tsx', 'src/cli.ts', '--help'];
 
 function timeOnce(): number {
   const startedAt = Date.now();

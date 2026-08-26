@@ -389,6 +389,59 @@ async function getExchangeRateWithFallback(): Promise<any> {
 }
 ```
 
+### Pattern 5: Structured Logging with Levels and Trace Correlation (TD-08)
+
+Beyond the binary `DEBUG_PAYWAY` switch, the SDK has a level-aware logger. Set
+`logLevel` (or `PAYWAY_LOG_LEVEL=debug|info|warn|error`) and optionally
+`logFormat: 'json'` for single-line JSON your log aggregator can parse:
+
+```typescript
+const payway = new PayWay({
+  merchantId: process.env.PAYWAY_MERCHANT_ID!,
+  apiKey: process.env.PAYWAY_API_KEY!,
+  environment: 'sandbox',
+  debug: true, // activates built-in diagnostics
+  logLevel: 'info', // config > PAYWAY_LOG_LEVEL > DEBUG_PAYWAY > info
+  logFormat: 'json', // {"ts":"…","level":"debug","source":"payway-sdk","msg":"[payway] <- 200 …","data":{…}}
+});
+```
+
+PayWay envelopes carry a correlation id (`status.trace`). When present it is
+emitted as `[payway] trace_id=<id> endpoint=<path>` so you can quote it back to
+ABA support; the legacy text output remains byte-compatible with `DEBUG_PAYWAY`.
+
+All logger output passes through `sanitizeForLog`, which redacts exact-match
+secret keys **and** fuzzy key-name matches (anything containing
+`secret/apikey/password/credential/hash/token` — e.g. a novel `secretField`
+field is masked) plus raw 32+ hex-char values under unrecognized keys.
+
+### Pattern 6: Resilience Options — Jitter and Circuit Breaker (TD-07)
+
+Defaults keep retry behaviour deterministic for tests. Two opt-in upgrades harden
+production transports:
+
+```typescript
+const payway = new PayWay({
+  merchantId: process.env.PAYWAY_MERCHANT_ID!,
+  apiKey: process.env.PAYWAY_API_KEY!,
+  environment: 'production',
+
+  // Full jitter: wait random(0..delay) instead of fixed exponential delays so
+  // fleet instances don't synchronize retries into a thundering herd.
+  backoffJitter: 'full',
+
+  // Transport circuit breaker per endpoint:
+  //   closed → open after 5 consecutive network/5xx failures (configurable)
+  //          → fail fast ~30s → single half-open probe → close or re-open.
+  circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30_000 },
+});
+```
+
+While a circuit is open, calls throw `CircuitOpenError` immediately (before any
+fetch), naming the endpoint and the remaining cooldown — surface it to your
+monitoring rather than retrying blindly. Business errors never count as
+breaker failures: only network errors and HTTP 5xx trip the circuit.
+
 ---
 
 ## Endpoint HTTP Behavior

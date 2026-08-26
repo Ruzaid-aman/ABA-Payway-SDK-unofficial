@@ -4,6 +4,31 @@
 
 ### Added
 
+- **CLI startup guidance & probe generalization** — `evidence/startup-probe.ts` now accepts an arbitrary command; measured compiled artifact startup: `node dist/cli.js --help` P50 **413 ms** / P95 415 ms (under the 500 ms plan threshold; the previously reported 2041 ms was the `npx tsx` dev path only). Global-install pattern (`npm i -g .` → `payway-sdk`) documented in the CLI user guide §2.
+
+### Fixed
+
+- **KHQR notification module restored to compilable state** — pass-2 edits left an orphan `}` in `src/webhook/khqr-notification.ts` and omitted the `extractJsonPayload` import in `src/webhook/server.ts`, breaking typecheck and 2 test suites. All gates re-run with unmasked exit codes: typecheck ✅, lint ✅, **787/787 tests ✅**, `npm audit --omit=dev` ✅.
+- **Skill example conformance (TD-06 sweep)** — `aba-payway-link-account` quick-start used `requestId: 'link-123'`, which now fails fast against the `[a-zA-Z0-9]{5,24}` gateway-parity validator; example updated, remaining skills/docs examples verified conforming.
+
+### Changed
+
+- **Slimmer runtime dependency footprint (Pillar A A.3)** — `canvas`, `qrcode-reader`, and `@types/qrcode` moved from `dependencies` to `devDependencies`; they were only imported by an untracked dev scratch script. SDK consumers no longer install the native canvas build toolchain; runtime deps are now 4 pure-JS packages (`@clack/prompts`, `ajv`, `commander`, `qrcode`).
+
+- **Resilience pack (TD-07)** — opt-in transport hardening: `backoffJitter: 'full'` (AWS-style full-jitter exponential backoff, thundering-herd protection) and `circuitBreaker: { failureThreshold, resetTimeoutMs }` (per-endpoint closed→open→half-open breaker that fails fast with `CircuitOpenError` while the gateway is down; business errors never trip it). Defaults unchanged for deterministic test runs.
+- **Structured logging (TD-08)** — new level-aware logger (`logLevel` config or `PAYWAY_LOG_LEVEL` env) with single-line JSON output via `logFormat: 'json'`; gateway correlation ids (`status.trace`) surfaced as `[payway] trace_id=… endpoint=…`; exported `createPayWayLogger` / `resolveLogLevel`. Legacy `[payway]` text output stays byte-compatible when only `DEBUG_PAYWAY`/`debug: true` is used.
+- **Token expiry helpers (TD-10)** — `computeTokenExpiry()` / `daysUntilTokenExpiry()` (+ `TOKEN_VALIDITY_DAYS = 90`) for merchant-side renewal scheduling of the credentials-on-file lifecycle.
+- **Webhook verdict mode (TD-09)** — `createWebhookServer(..., { rejectInvalidSignature: true })` responds 401 to deliveries whose HMAC fails verification (still stores them for audit); unsigned deliveries remain accepted-200. Default behavior unchanged (always-200 capture sink).
+- **SDK capability guard for the token trio (TD-03 partial)** — `renewToken()`/`getTokenDetails()`/`removeToken()` throw a descriptive `PayWayConfigError` unless `allowUnverifiedTokenOperations: true` is set explicitly, preventing merchants from shipping blind against the ABA-unconfirmed v3 token-management HMAC composition.
+- **Gateway-parity validation & constants exported** — `REQUEST_ID_PATTERN`, `TOKEN_FLAG_LINKING`, `TOKEN_FLAG_CHARGING`, `TOKEN_VALIDITY_DAYS`, plus the new resilience/logger exports (`CircuitBreaker`, `CircuitOpenError`, `DEFAULT_CIRCUIT_BREAKER_OPTIONS`, logger types).
+- **Consolidated ABA clarification list** (`audit-results/four-pillars/ABA-OPEN-QUESTIONS.md`) — nine prioritized question groups (token-trio HMAC, subscription initiation, token-lifecycle semantics, close-transaction contract incl. the five standing close findings, rate limits, callback retry policy, sandbox TLS hygiene, exposed-key rotation procedure, production `tran_id` uniqueness/visibility semantics) plus a partial-answer log.
+
+### Changed
+
+- **`sanitizeForLog` value-pattern hardening (TD-12)** — redacts novel sensitive keys by fuzzy name matching (contains `secret/apikey/password/credential/hash/token`, or ends with `key`; exact-match blocklist retained; `token_flag` deliberately exempt since it carries public enum values) and masks raw 32+-char hex values under unrecognized keys.
+- **Unknown-env-var detection (TD-12)** — `validatePayWayEnv()` warns (`W-PAYWAY-UNKNOWN-VAR`) on any unrecognized `PAYWAY_*` variable, catching typos like `PAYWAY_APIKEY`.
+- **Hermetic vitest environment** — registered setup file scrubs ambient `PAYWAY_*` variables once per test file so host machines exporting real credentials can no longer flip suite outcomes (post-audit follow-up to TD-02).
+
 - **QR image auto-open** — `generate-qr` now opens the saved QR PNG (`payway-output/<txId>.png`) with the OS default image viewer so it is immediately scannable. Default is TTY-aware (interactive terminals only; scripts/CI/agents unaffected); force with `--open-image`, suppress with `--no-open-image`. Backed by the new exported helper `openImageInDefaultViewer()` / `defaultViewerCommandForPlatform()` (`src/open-image.ts`): per-platform allowlisted command (Windows `rundll32 url.dll,FileProtocolHandler` / macOS `open` / Linux `xdg-open`), spawned shell-less and detached, never throws — failures degrade to an "Open it manually" hint.
 - **Close-Transaction violation dossier** (`docs/CLOSE-TRANSACTION-FINDINGS.md`) — full evidence that sandbox close is advisory only: two live card payments completed AFTER a code-00 close (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206 → both APPROVED), closure is invisible in check/detail (no CLOSED status, no operation marker), close is idempotent (re-close returns 00), plus reproduction commands, five questions for ABA, merchant mitigations, and a post-fix validation checklist. Cross-linked from SANDBOX-FINDINGS §12 and agent rules.
 - **Cards-checkout lifecycle tools** — `scripts/checkout-cards-close.ts` (official checkout2-0.js modal OR hosted page; `--no-close` supported) and reusable `scripts/close-transaction-verify.ts` (`closeOrReport`/`statusOf`/`closeAndVerify`, flags `--raw/--json/--status-only/--delay`) with the post-close interpretation table.

@@ -53,6 +53,24 @@ export {
   PayWayWebhookError,
   PollingAbortedError,
 } from './errors.js';
+// ─── Resilience & observability (TD-07/TD-08/TD-10) ────────────────────────
+export {
+  CircuitBreaker,
+  CircuitOpenError,
+  DEFAULT_CIRCUIT_BREAKER_OPTIONS,
+} from './circuit-breaker.js';
+export type { CircuitBreakerOptions, CircuitState } from './circuit-breaker.js';
+export { createPayWayLogger, resolveLogLevel } from './logger.js';
+export type { LogLevel, LogSink, PayWayLogger, PayWayLoggerOptions } from './logger.js';
+export { computeTokenExpiry, daysUntilTokenExpiry } from './utils.js';
+export {
+  REQUEST_ID_PATTERN,
+  TOKEN_FLAG_CHARGING,
+  TOKEN_FLAG_LINKING,
+  TOKEN_VALIDITY_DAYS,
+} from './constants.js';
+export type { WebhookServerOptions, WebhookServerResult } from './webhook/server.js';
+export { createWebhookServer } from './webhook/server.js';
 export type {
   KhqrCallbackConfiguration,
   KhqrCallbackEnrollment,
@@ -106,7 +124,7 @@ export type {
 } from './types.js';
 export { isValidPublicKeyPem, validateRefundAmount } from './utils.js';
 export type { KhqrPaymentNotification, ParsedKhqrPaymentNotification } from './webhook/khqr-notification.js';
-export { parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
+export { extractJsonPayload, parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
 export type { KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './webhook/storage.js';
 export type { StorageType } from './webhook/storage-factory.js';
 // ─── Webhook Storage ─────────────────────────────────────────────────────

@@ -160,7 +160,7 @@ describe('Validation: credentials-on-file', () => {
   });
 
   it('throws when linkCard returnUrl is invalid', () => {
-    expect(() => cof.linkCard({ requestId: 'r1', returnUrl: 'not-a-url' } as unknown as LinkCardParams)).toThrow(
+    expect(() => cof.linkCard({ requestId: 'req01', returnUrl: 'not-a-url' } as unknown as LinkCardParams)).toThrow(
       PayWayConfigError,
     );
   });
@@ -168,7 +168,7 @@ describe('Validation: credentials-on-file', () => {
   it('throws when payment missing paymentToken', () => {
     expect(() =>
       cof.payment({
-        requestId: 'r1',
+        requestId: 'req01',
         transactionId: 't1',
         amount: 10,
         paymentToken: '',
@@ -185,11 +185,112 @@ describe('Validation: credentials-on-file', () => {
   it('calls request for valid payment', async () => {
     rawSpy.mockClear();
     await cofPos.payment({
-      requestId: 'r1',
+      requestId: 'req01',
       transactionId: 't1',
       amount: 10,
       paymentToken: 'pt',
     } as unknown as CofPaymentParams);
+    expect(rawSpy).toHaveBeenCalled();
+  });
+});
+
+// TD-06 (four-pillars audit, Pillar A A.1.1/A.2.4/A.2.5): fail-fast parity with
+// the gateway's server-side rules instead of opaque roundtrip errors.
+describe('Validation: gateway-parity identifier & token-flag rules (TD-06)', () => {
+  const cof = createCredentialsOnFileDomain(DUMMY_CONFIG, dummyRequest);
+  const cofPos = createCredentialsOnFileDomain(
+    { allowUnverifiedTokenOperations: true } as unknown as PayWayConfig,
+    spyRequest,
+  );
+
+  it('rejects requestId shorter than 5 characters on linkAccount', () => {
+    expect(() =>
+      cof.linkAccount({ requestId: 'r1' } as unknown as LinkAccountParams),
+    ).toThrow(PayWayConfigError);
+  });
+
+  it('rejects requestId containing characters outside [a-zA-Z0-9]', () => {
+    expect(() =>
+      cof.linkAccount({ requestId: 'REQ-001' } as unknown as LinkAccountParams),
+    ).toThrow(/a-zA-Z0-9/);
+  });
+
+  it('rejects ctid violating the [a-zA-Z0-9]{5,24} rule on getTokenDetails', () => {
+    expect(() =>
+      cof.getTokenDetails({ requestId: 'req01', ctid: 'CUST-005', paymentToken: 'pt' } as unknown as TokenParams),
+    ).toThrow(PayWayConfigError);
+  });
+
+  it('accepts identifiers matching the gateway rule end-to-end', async () => {
+    rawSpy.mockClear();
+    await cofPos.removeToken({
+      requestId: 'req01',
+      ctid: 'CUST006',
+      paymentToken: 'pt',
+    } as unknown as TokenParams);
+    expect(rawSpy).toHaveBeenCalled();
+  });
+
+  it('rejects tokenFlag outside the linking enum on linkAccount', () => {
+    expect(() =>
+      cof.linkAccount({ requestId: 'req01', tokenFlag: 'MITR_FIX' } as unknown as LinkAccountParams),
+    ).toThrow(/tokenFlag/);
+  });
+
+  it('rejects CITR_FIX for linking but accepts CITO_FIX (RTM R-09 correction)', async () => {
+    rawSpy.mockClear();
+    expect(() =>
+      cof.linkCard({ requestId: 'req01', tokenFlag: 'CITR_FIX' } as unknown as LinkCardParams),
+    ).toThrow(PayWayConfigError);
+    await cofPos.linkCard({ requestId: 'req01', tokenFlag: 'CITO_FIX' } as unknown as LinkCardParams);
+    expect(rawSpy).toHaveBeenCalled();
+  });
+
+  it('allows charging-only flags on the CoF payment endpoint', async () => {
+    rawSpy.mockClear();
+    await cofPos.payment({
+      requestId: 'req01',
+      transactionId: 'T003',
+      amount: 25.5,
+      currency: 'USD',
+      paymentToken: 'pt',
+      tokenFlag: 'MITU_FIX',
+    } as unknown as CofPaymentParams);
+    expect(rawSpy).toHaveBeenCalled();
+  });
+});
+
+// ─── TD-03: token-trio capability guard ───────────────────────────────────
+describe('Validation: token-trio capability guard (TD-03)', () => {
+  const blocked = createCredentialsOnFileDomain({} as unknown as PayWayConfig, dummyRequest);
+  const allowed = createCredentialsOnFileDomain(
+    { allowUnverifiedTokenOperations: true } as unknown as PayWayConfig,
+    spyRequest,
+  );
+
+  it('blocks renewToken by default with an actionable message', () => {
+    try {
+      blocked.renewToken({ requestId: 'req01', ctid: 'ctid01', paymentToken: 'pt' } as unknown as TokenParams);
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(PayWayConfigError);
+      expect((error as Error).message).toContain('allowUnverifiedTokenOperations');
+      expect((error as Error).message).toContain('TD-03');
+    }
+  });
+
+  it('blocks getTokenDetails and removeToken by default', () => {
+    expect(() =>
+      blocked.getTokenDetails({ requestId: 'req01', ctid: 'ctid01', paymentToken: 'pt' } as unknown as TokenParams),
+    ).toThrow(PayWayConfigError);
+    expect(() =>
+      blocked.removeToken({ requestId: 'req01', ctid: 'ctid01', paymentToken: 'pt' } as unknown as TokenParams),
+    ).toThrow(PayWayConfigError);
+  });
+
+  it('lets linking/charging endpoints work without the flag', async () => {
+    rawSpy.mockClear();
+    await allowed.linkAccount({ requestId: 'req01' } as unknown as LinkAccountParams);
     expect(rawSpy).toHaveBeenCalled();
   });
 });

@@ -8,10 +8,11 @@ version: 1.1.0
 
 ## Quick Start
 ```ts
+// requestId/ctid must match the gateway rule [a-zA-Z0-9]{5,24} — no hyphens.
 const result = await payway.credentialsOnFile.linkCard({
-  requestId: 'link-123',
-  ctid: 'customer-abc',
-  tokenFlag: 'CITR_FLEX',      // CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX
+  requestId: 'link001',
+  ctid: 'customerabc',
+  tokenFlag: 'CITR_FLEX',      // CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX (validated client-side)
   frequency: '1M',             // 1W|1M|2M — required
   currency: 'USD',             // server-required; defaults to USD
   returnUrl: 'https://merchant.example/return',

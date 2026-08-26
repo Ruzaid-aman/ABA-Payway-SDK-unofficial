@@ -22,6 +22,9 @@ const TEST_CONFIG = {
   merchantId: 'test-merchant-001',
   apiKey: 'test-api-key-secret',
   environment: 'sandbox' as const,
+  // TD-03: token-trio happy-path tests exercise the request pipeline, not the
+  // (ABA-blocked) HMAC composition — opt in to the capability guard.
+  allowUnverifiedTokenOperations: true,
 };
 
 const TEST_KHQR_CONFIG = {
@@ -988,12 +991,12 @@ describe('credentialsOnFile domain', () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'OK' } }));
 
     await payway.credentialsOnFile.linkAccount({
-      requestId: 'REQ-001',
+      requestId: 'REQ001',
       currency: 'USD',
     });
 
     const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
-    expect(body).toHaveProperty('request_id', 'REQ-001');
+    expect(body).toHaveProperty('request_id', 'REQ001');
     expect(body).toHaveProperty('request_time');
     expect(body).toHaveProperty('merchant_id', TEST_CONFIG.merchantId);
     expect(body).toHaveProperty('hash');
@@ -1005,7 +1008,7 @@ describe('credentialsOnFile domain', () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'OK' } }));
 
     await payway.credentialsOnFile.linkCard({
-      requestId: 'REQ-002',
+      requestId: 'REQ002',
       returnUrl: 'https://example.com/return',
     });
 
@@ -1013,7 +1016,7 @@ describe('credentialsOnFile domain', () => {
     expect(url).toContain(ENDPOINTS.linkCard);
     expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
     const params = new URLSearchParams(opts.body);
-    expect(params.get('request_id')).toBe('REQ-002');
+    expect(params.get('request_id')).toBe('REQ002');
     // return_url should be base64 encoded
     expect(params.get('return_url')).not.toContain('https://');
   });
@@ -1022,7 +1025,7 @@ describe('credentialsOnFile domain', () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'OK' } }));
 
     await payway.credentialsOnFile.payment({
-      requestId: 'REQ-003',
+      requestId: 'REQ003',
       transactionId: 'T003',
       amount: 25.5,
       paymentToken: 'tok_abc',
@@ -1040,8 +1043,8 @@ describe('credentialsOnFile domain', () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Renewed' } }));
 
     await payway.credentialsOnFile.renewToken({
-      requestId: 'REQ-004',
-      ctid: 'CUST-004',
+      requestId: 'REQ004',
+      ctid: 'CUST004',
       paymentToken: 'tok_expired',
     });
 
@@ -1055,8 +1058,8 @@ describe('credentialsOnFile domain', () => {
     );
 
     await payway.credentialsOnFile.getTokenDetails({
-      requestId: 'REQ-005',
-      ctid: 'CUST-005',
+      requestId: 'REQ005',
+      ctid: 'CUST005',
       paymentToken: 'tok_abc',
     });
 
@@ -1068,8 +1071,8 @@ describe('credentialsOnFile domain', () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Removed' } }));
 
     await payway.credentialsOnFile.removeToken({
-      requestId: 'REQ-006',
-      ctid: 'CUST-006',
+      requestId: 'REQ006',
+      ctid: 'CUST006',
       paymentToken: 'tok_abc',
     });
 

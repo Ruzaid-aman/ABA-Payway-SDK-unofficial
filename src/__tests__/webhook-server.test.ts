@@ -5,7 +5,7 @@
  * WH-TC-08 (port conflict), and general server behavior.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -269,5 +269,54 @@ describe('WebhookServer KHQR route configuration', () => {
     } finally {
       storage.close();
     }
+  });
+});
+
+// ─── TD-09: rejectInvalidSignature hardening mode ─────────────────────────
+describe('WebhookServer rejectInvalidSignature (TD-09)', () => {
+  let tempDir: string;
+  let storage: JsonWebhookStorage;
+  let server: WebhookServerResult;
+  let port: number;
+
+  function getFreePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const srv = http.createServer();
+      srv.listen(0, () => {
+        const addr = srv.address();
+        if (addr && typeof addr === 'object') srv.close(() => resolve(addr.port));
+        else srv.close(() => reject(new Error('no port')));
+      });
+    });
+  }
+
+  beforeEach(async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'webhook-reject-test-'));
+    storage = new JsonWebhookStorage(join(tempDir, 'callbacks.jsonl'));
+    port = await getFreePort();
+    // Deterministic invalid signature: verification key differs from signer key.
+    server = createWebhookServer(storage, { port, quiet: true, apiKey: 'verification-key', rejectInvalidSignature: true });
+    await server.start();
+  });
+
+  afterEach(async () => {
+    await server.stop();
+    storage.close();
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('responds 401 and still stores a delivery with an INVALID signature', async () => {
+    const payload = JSON.stringify({ tran_id: 'TX-BAD', status: 'COMPLETED' });
+    const res = await httpRequest(port, 'POST', '/aba-payway-webhook', payload, {
+      'x-payway-hmac-sha512': 'definitely-not-valid',
+    });
+    expect(res.statusCode).toBe(401);
+    const fileContent = readFileSync(join(tempDir, 'callbacks.jsonl'), 'utf-8');
+    expect(fileContent).toContain('TX-BAD');
+  });
+
+  it('still responds 200 for deliveries without any signature header', async () => {
+    const res = await httpRequest(port, 'POST', '/aba-payway-webhook', JSON.stringify({ tran_id: 'TX-NOSIG' }));
+    expect(res.statusCode).toBe(200);
   });
 });

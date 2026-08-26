@@ -8,7 +8,8 @@ version: 1.1.0
 
 ## Quick Start
 ```ts
-const result = await payway.credentialsOnFile.payment({ requestId: 'request-123', transactionId: 'order-123', amount: 10, paymentToken: 'stored-token' });
+// requestId must match the gateway rule [a-zA-Z0-9]{5,24} — no hyphens.
+const result = await payway.credentialsOnFile.payment({ requestId: 'req0001234', transactionId: 'order-123', amount: 10, paymentToken: 'stored-token' });
 ```
 
 Never log or expose the payment token to browsers.

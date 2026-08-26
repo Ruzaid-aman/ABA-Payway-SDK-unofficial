@@ -1,5 +1,6 @@
 import { generateHmac, verifyCallbackSignature } from './auth.js';
 import { BASE_URLS, ENDPOINTS } from './constants.js';
+import { CircuitBreaker, type CircuitBreakerOptions } from './circuit-breaker.js';
 import type { CheckoutDomain } from './domains/checkout.js';
 import type { CredentialsOnFileDomain } from './domains/credentials-on-file.js';
 import {
@@ -24,6 +25,7 @@ import {
   PayWayRateLimitError,
 } from './errors.js';
 import { type KhqrMerchantConfiguration, resolveKhqrConfiguration } from './khqr-config.js';
+import { createPayWayLogger, resolveLogLevel, type LogLevel } from './logger.js';
 import { formatRequestTime, isValidPublicKeyPem, normalizePem, sanitizeForLog } from './utils.js';
 
 export type Currency = 'USD' | 'KHR';
@@ -66,6 +68,31 @@ export interface PayWayConfig {
   onThrottle?: (info: { endpoint: string; waitMs: number }) => void;
   /** ABA-issued merchant data used only for official offline KHQR generation. */
   khqr?: KhqrMerchantConfiguration;
+  /**
+   * TD-03 guard: the v3 token-management trio (renewToken/getTokenDetails/
+   * removeToken) has NO ABA-confirmed HMAC composition (every derivable field
+   * ordering was rejected in sandbox campaigns) and is therefore blocked by
+   * default. Set `true` only when you accept shipping blind against the
+   * gateway's current behaviour.
+   */
+  allowUnverifiedTokenOperations?: boolean;
+  /**
+   * TD-07: `'full'` randomizes exponential backoff to `random(0..delay)`
+   * (AWS-style full jitter) so concurrent clients do not synchronize retries
+   * into a thundering herd. Default `'none'` keeps deterministic delays for
+   * reproducible tests.
+   */
+  backoffJitter?: 'full' | 'none';
+  /**
+   * TD-07: opt-in transport circuit breaker per endpoint
+   * (closed → open after N consecutive network/5xx failures → half-open probe).
+   * Pass `false` to disable explicitly; disabled by default.
+   */
+  circuitBreaker?: CircuitBreakerOptions | false;
+  /** Minimum level for SDK diagnostics (TD-08). Falls back to PAYWAY_LOG_LEVEL / DEBUG_PAYWAY. */
+  logLevel?: LogLevel;
+  /** Emit single-line JSON diagnostics instead of `[payway]` text lines (TD-08). */
+  logFormat?: 'text' | 'json';
 }
 
 interface ResolvedPayWayConfig extends PayWayConfig {
@@ -438,6 +465,15 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * TD-07: AWS-style full jitter — wait a uniformly random duration between 0
+ * and the computed exponential delay, preventing synchronized retry storms
+ * across fleet instances. `'none'` (default) keeps deterministic delays.
+ */
+function applyBackoffJitter(computedDelayMs: number, mode: 'full' | 'none'): number {
+  return mode === 'full' ? Math.floor(Math.random() * computedDelayMs) : computedDelayMs;
+}
+
 function parseDebugRequestBody(bodyPayload: string): unknown {
   try {
     return JSON.parse(bodyPayload) as unknown;
@@ -447,6 +483,20 @@ function parseDebugRequestBody(bodyPayload: string): unknown {
     }
     return bodyPayload.slice(0, 200);
   }
+}
+
+/**
+ * Pull the gateway correlation id out of a response envelope
+ * (`status.trace` per OpenAPI types.ts, with a bare `trace` fallback).
+ */
+function extractTraceId(body: unknown): unknown {
+  if (!body || typeof body !== 'object') return undefined;
+  const resp = body as Record<string, unknown>;
+  const status = resp.status;
+  if (status && typeof status === 'object' && (status as Record<string, unknown>).trace !== undefined) {
+    return (status as Record<string, unknown>).trace;
+  }
+  return resp.trace;
 }
 
 /**
@@ -461,6 +511,7 @@ export class PayWay {
   private rateLimitRules: Record<string, RateLimitRule>;
   private rateLimitState = new Map<string, { tokens: number; lastRefill: number }>();
   private recentCallsByEndpoint = new Map<string, number[]>();
+  private readonly breaker: CircuitBreaker | undefined;
 
   // --- Sub-Clients ---
   public readonly checkout: CheckoutDomain;
@@ -506,6 +557,9 @@ export class PayWay {
       ...defaultRateLimitRules,
       ...(this.config.rateLimitRules ?? {}),
     };
+
+    // TD-07: opt-in transport circuit breaker (per-endpoint state).
+    this.breaker = this.config.circuitBreaker ? new CircuitBreaker(this.config.circuitBreaker) : undefined;
 
     // Initialize domain sub-clients
     this.checkout = createCheckoutDomain(this.config, this.request.bind(this), this.requestWithMerchantAuth.bind(this));
@@ -555,16 +609,29 @@ export class PayWay {
       return resolvedConfig;
     }
 
+    // TD-08: route legacy diagnostics through the structured logger. In text
+    // format at debug level this produces byte-identical output to the old
+    // console.debug call sites; JSON format upgrades them to single lines.
+    const paywayLogger = createPayWayLogger({
+      level: resolveLogLevel(resolvedConfig.logLevel, true),
+      format: resolvedConfig.logFormat,
+    });
     const onRequest = resolvedConfig.onRequest;
     const onResponse = resolvedConfig.onResponse;
     return {
       ...resolvedConfig,
       onRequest: (endpoint, bodyPayload) => {
-        console.debug(`[payway] -> POST ${endpoint}`, sanitizeForLog(parseDebugRequestBody(bodyPayload)));
+        paywayLogger.debug(`[payway] -> POST ${endpoint}`, sanitizeForLog(parseDebugRequestBody(bodyPayload)));
         onRequest?.(endpoint, bodyPayload);
       },
       onResponse: (endpoint, statusCode, body, rateLimitInfo) => {
-        console.debug(`[payway] <- ${statusCode} ${endpoint}`, sanitizeForLog(body), rateLimitInfo);
+        paywayLogger.debug(`[payway] <- ${statusCode} ${endpoint}`, sanitizeForLog(body), rateLimitInfo);
+        const traceId = extractTraceId(body);
+        if (traceId !== undefined) {
+          // TD-08: PayWay envelopes carry `status.trace` / `trace`; surface it
+          // so merchants can correlate SDK diagnostics with gateway support.
+          paywayLogger.info(`[payway] trace_id=${String(traceId)} endpoint=${endpoint}`);
+        }
         onResponse?.(endpoint, statusCode, body, rateLimitInfo);
       },
     };
@@ -664,7 +731,14 @@ export class PayWay {
     const timeoutMs = this.config.timeout ?? 30_000;
     const maxRetries = this.config.maxRetries ?? 3;
     const retryDelayMs = this.config.retryDelayMs ?? 3000;
+    const jitter = this.config.backoffJitter ?? 'none';
     const url = `${this.baseUrl}${endpoint}`;
+
+    // TD-07: fail fast while the endpoint's circuit is open (half-open probes
+    // are admitted one at a time by the breaker itself).
+    if (this.breaker) {
+      this.breaker.assertAllowed(endpoint);
+    }
 
     await this._acquireRateLimitToken(endpoint);
 
@@ -700,6 +774,10 @@ export class PayWay {
 
         checkResponseError(parsedBody, endpoint);
 
+        // TD-07: reaching a parsed response (even a business error) proves the
+        // transport and gateway are alive — close/reset the circuit.
+        this.breaker?.recordSuccess(endpoint);
+
         try {
           this.config.onResponse?.(endpoint, response.status, parsedBody, rateLimitInfo);
         } catch {
@@ -711,6 +789,18 @@ export class PayWay {
         clearTimeout(timeoutId);
 
         const paywayError = error instanceof PayWayAPIError ? error : createNetworkError(error, timeoutMs, endpoint);
+
+        // TD-07: count network failures and 5xx against the breaker; anything
+        // with a sub-500 HTTP status means the gateway responded → success
+        // (429 included: the server is demonstrably up).
+        if (this.breaker) {
+          if (paywayError.statusCode === undefined || paywayError.statusCode >= 500) {
+            this.breaker.recordFailure(endpoint);
+          } else {
+            this.breaker.recordSuccess(endpoint);
+          }
+        }
+
         const isRateLimitError = paywayError.statusCode === 429 || paywayError.paywayCode === '429';
         const shouldRetry =
           attempt < maxRetries &&
@@ -732,9 +822,9 @@ export class PayWay {
             waitMs =
               remaining !== undefined
                 ? Math.min(Math.max(remaining + 250, 1_000), 10_000)
-                : retryDelayMs * 2 ** attempt;
+                : applyBackoffJitter(retryDelayMs * 2 ** attempt, jitter);
           } else {
-            waitMs = retryDelayMs * 2 ** attempt;
+            waitMs = applyBackoffJitter(retryDelayMs * 2 ** attempt, jitter);
           }
           await delay(waitMs);
           continue;

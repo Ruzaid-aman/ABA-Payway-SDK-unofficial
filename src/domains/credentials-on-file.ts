@@ -9,6 +9,8 @@ import {
   validateCurrency,
   validatePositiveAmount,
   validatePublicHttpsUrl,
+  validateRequestIdOrCtid,
+  validateTokenFlag,
   validateTransactionId,
 } from '../utils.js';
 
@@ -22,7 +24,7 @@ export interface CredentialsOnFileDomain {
 }
 
 export function createCredentialsOnFileDomain(
-  _config: PayWayConfig,
+  config: PayWayConfig,
   request: <TResponse>(
     path: string,
     body: Record<string, unknown>,
@@ -32,10 +34,33 @@ export function createCredentialsOnFileDomain(
     hashEncoding?: 'base64' | 'hex',
   ) => Promise<TResponse>,
 ): CredentialsOnFileDomain {
+  /**
+   * TD-03 capability guard: the v3 token-management trio has no ABA-confirmed
+   * HMAC composition (~60 derivable field orderings rejected in sandbox
+   * campaigns — SANDBOX-FINDINGS §9a). Blocked by default so merchants cannot
+   * ship blind; explicit opt-in is required to call through anyway.
+   */
+  const requireVerifiedTokenOps = (): void => {
+    if (!config.allowUnverifiedTokenOperations) {
+      throw new PayWayConfigError(
+        'renewToken/getTokenDetails/removeToken are BLOCKED: ABA has not confirmed the HMAC composition for the v3 token-management endpoints ' +
+          '(see audit-results/four-pillars RTM R-04/05/06 and technical-debt-register TD-03). ' +
+          'Set allowUnverifiedTokenOperations: true in the PayWay config to force-enable while awaiting the ABA spec.',
+      );
+    }
+  };
+
   return {
     linkAccount: (params: LinkAccountParams) => {
       if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
         throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      }
+      validateRequestIdOrCtid(params.requestId, 'requestId');
+      if (params.ctid !== undefined) {
+        validateRequestIdOrCtid(params.ctid, 'ctid');
+      }
+      if (params.tokenFlag !== undefined) {
+        validateTokenFlag(params.tokenFlag, 'linking');
       }
 
       if (params.currency) {
@@ -74,6 +99,13 @@ export function createCredentialsOnFileDomain(
     linkCard: (params: LinkCardParams) => {
       if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
         throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      }
+      validateRequestIdOrCtid(params.requestId, 'requestId');
+      if (params.ctid !== undefined) {
+        validateRequestIdOrCtid(params.ctid, 'ctid');
+      }
+      if (params.tokenFlag !== undefined) {
+        validateTokenFlag(params.tokenFlag, 'linking');
       }
 
       if (params.returnUrl) {
@@ -118,6 +150,13 @@ export function createCredentialsOnFileDomain(
       if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
         throw new PayWayConfigError('requestId is required and must be a non-empty string');
       }
+      validateRequestIdOrCtid(params.requestId, 'requestId');
+      if (params.ctid !== undefined) {
+        validateRequestIdOrCtid(params.ctid, 'ctid');
+      }
+      if (params.tokenFlag !== undefined) {
+        validateTokenFlag(params.tokenFlag, 'charging');
+      }
 
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency || 'USD');
@@ -161,15 +200,12 @@ export function createCredentialsOnFileDomain(
     },
 
     renewToken: (params: TokenParams) => {
-      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
-        throw new PayWayConfigError('requestId is required and must be a non-empty string');
-      }
-      if (typeof params.ctid !== 'string' || params.ctid.trim().length === 0) {
-        throw new PayWayConfigError('ctid is required and must be a non-empty string');
-      }
+      requireVerifiedTokenOps();
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required');
       }
+      validateRequestIdOrCtid(params.requestId, 'requestId');
+      validateRequestIdOrCtid(params.ctid, 'ctid');
 
       return request<components['schemas']['RenewTokenResponse']>(
         ENDPOINTS.renewToken,
@@ -186,15 +222,12 @@ export function createCredentialsOnFileDomain(
     },
 
     getTokenDetails: (params: TokenParams) => {
-      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
-        throw new PayWayConfigError('requestId is required and must be a non-empty string');
-      }
-      if (typeof params.ctid !== 'string' || params.ctid.trim().length === 0) {
-        throw new PayWayConfigError('ctid is required and must be a non-empty string');
-      }
+      requireVerifiedTokenOps();
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required');
       }
+      validateRequestIdOrCtid(params.requestId, 'requestId');
+      validateRequestIdOrCtid(params.ctid, 'ctid');
 
       return request<components['schemas']['GetTokenDetailsResponse']>(
         ENDPOINTS.getTokenDetails,
@@ -211,15 +244,12 @@ export function createCredentialsOnFileDomain(
     },
 
     removeToken: (params: TokenParams) => {
-      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
-        throw new PayWayConfigError('requestId is required and must be a non-empty string');
-      }
-      if (typeof params.ctid !== 'string' || params.ctid.trim().length === 0) {
-        throw new PayWayConfigError('ctid is required and must be a non-empty string');
-      }
+      requireVerifiedTokenOps();
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required');
       }
+      validateRequestIdOrCtid(params.requestId, 'requestId');
+      validateRequestIdOrCtid(params.ctid, 'ctid');
 
       return request<components['schemas']['RemoveTokenResponse']>(
         ENDPOINTS.removeToken,

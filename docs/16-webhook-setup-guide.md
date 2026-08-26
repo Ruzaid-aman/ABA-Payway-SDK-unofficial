@@ -181,6 +181,36 @@ For the **online checkout route**, the server extracts the `X-PAYWAY-HMAC-SHA512
 - ❌ **Signature invalid** → logs `✗ Signature mismatch (expected: ...)` but still saves the record
 - ⏭️ **No API key** → logs `⊘ Signature verification skipped (no API key)`
 
+#### Verdict mode: rejecting invalid signatures (TD-09)
+
+The capture server above is intentionally always-200 — it is a **sink**, not a
+verdict. For deployments that need the webhook itself to refuse tampered
+deliveries, pass `rejectInvalidSignature` when creating the listener:
+
+```typescript
+import { createWebhookServer, createStorage } from 'aba-payway-ts';
+
+const storage = createStorage('json');
+const listener = createWebhookServer(storage, {
+  port: 8443,
+  apiKey: process.env.PAYWAY_API_KEY, // required for verification
+  rejectInvalidSignature: true, // ← 401 on invalid signatures (default: false)
+});
+```
+
+Semantics in verdict mode:
+
+| Delivery | Stored? | Response |
+|---|---|---|
+| Valid signature | ✅ | `200 { acknowledged: true }` |
+| **Invalid signature** | ✅ (audit trail kept) | **`401 { error: 'invalid signature' }`** |
+| No signature header | ✅ | `200` (nothing to verify against — gateway may omit it on retries) |
+
+Capture-vs-verdict separation matters for ABA callback retries: a capture sink
+never causes redelivery storms, while a 401-verdict endpoint should be paired
+with idempotent business handlers. When in doubt, keep the default and enforce
+verdicts inside your own handler after persisting the payload.
+
 > **Important:** This development listener never rejects either route based on its capture processing. Production online checkout handling must reject invalid HMACs; offline KHQR handling must use only an ABA-confirmed verification contract.
 
 The offline KHQR route has no assumed online HMAC contract. The listener retains its raw body, headers, source IP, parsed `transaction_id`, unknown fields, and parse errors. Receiving or parsing it does not mean a payment is verified or an order is paid. Deduplicate on `transaction_id`, reconcile against your own `merchant_ref`, and only fulfil after implementing the verification mechanism ABA actually supplies for your merchant.

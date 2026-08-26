@@ -8,7 +8,10 @@ version: 1.1.0
 
 ## Quick Start
 ```ts
-const result = await payway.credentialsOnFile.removeToken({ requestId: 'remove-123', ctid: 'credential-id', paymentToken: 'stored-token' });
+// ⚠️ BLOCKED by default until ABA publishes the token-management HMAC spec (TD-03).
+// Opt in explicitly: new PayWay({ ..., allowUnverifiedTokenOperations: true })
+// requestId/ctid must match the gateway rule [a-zA-Z0-9]{5,24} — no hyphens.
+const result = await payway.credentialsOnFile.removeToken({ requestId: 'remove123', ctid: 'credential01', paymentToken: 'stored-token' });
 ```
 
 PayWay uses the unified `removeToken` endpoint for account and card credentials.

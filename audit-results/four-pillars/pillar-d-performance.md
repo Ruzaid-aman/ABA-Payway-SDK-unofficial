@@ -13,6 +13,21 @@ transpilation entirely. Re-run against the built artifact before treating this a
 (probe included in TD-11). Even so, perceived startup will remain seconds-scale on Windows due to
 npx indirection — worth documenting a global-install usage pattern.
 
+### D.1.1b Re-measurement vs the shipped artifact (remediation pass 3, 2026-08-27) — ✅ PASS
+
+`npx tsx audit-results/four-pillars/evidence/startup-probe.ts node dist/cli.js --help`
+(probe now accepts an arbitrary command):
+
+```json
+{ "runs": 5, "command": "node dist/cli.js --help",
+  "p50ms": 413, "p95ms": 415, "minMs": 401, "maxMs": 415, "thresholdMs": 500 }
+```
+
+The **product artifact meets the <500 ms plan threshold** (P50 413 ms / P95 415 ms on Windows).
+The original 2041 ms figure is therefore dev-tooling cost only (`npx` + `tsx` JIT), not product
+debt. Global-install usage pattern (`npm i -g .` → `payway-sdk`) documented in
+`docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md` §2. Residual for TD-11: cpu-prof/heap automation suite.
+
 ### Latency profile — `evidence/latency-probe.ts` (loopback proxy, 30 samples)
 ```json
 { "runs": 30, "firstError": null,

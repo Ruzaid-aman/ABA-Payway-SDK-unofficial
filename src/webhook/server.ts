@@ -8,7 +8,7 @@
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { verifyCallbackSignature } from '../auth.js';
-import { parseKhqrPaymentNotification } from './khqr-notification.js';
+import { extractJsonPayload, parseKhqrPaymentNotification } from './khqr-notification.js';
 import type { WebhookStorage } from './storage.js';
 
 export interface WebhookServerOptions {
@@ -16,6 +16,14 @@ export interface WebhookServerOptions {
   port?: number;
   /** Callback signature verification key. If provided, signatures are logged. */
   apiKey?: string;
+  /**
+   * TD-09 hardening mode: when `apiKey` is configured and a callback carries a
+   * signature that FAILS verification, respond 401 instead of the capture
+   * server's default always-200. Requests without any signature header are
+   * still accepted with 200 (nothing to verify against). Default: false —
+   * keep capture-sink semantics unless you need verdict-style endpoints.
+   */
+  rejectInvalidSignature?: boolean;
   /** Suppress console output. */
   quiet?: boolean;
   /** Offline ABA KHQR notification listener settings. */
@@ -93,7 +101,9 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           // is capture metadata only; it must never decide that an order is paid.
           let khqr: import('./storage.js').KhqrWebhookMetadata;
           try {
-            const parsed = parseKhqrPaymentNotification(JSON.parse(body));
+            // Tolerate payload variations per ABA guidance: raw JSON or
+            // HTML-wrapped deliveries are both accepted here.
+            const parsed = parseKhqrPaymentNotification(extractJsonPayload(body));
             const duplicateTransactionId = storage
               .getAll()
               .some((record) => record.khqr?.parsed?.notification.transactionId === parsed.notification.transactionId);
@@ -137,7 +147,16 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           log(`  Source IP: ${sourceIp}`);
         }
 
-        // Always respond 200 — never reject based on content
+        // TD-09: optional verdict mode. The capture sink still stores every
+        // delivery, but an explicitly-invalid signed callback is refused.
+        if (options.rejectInvalidSignature && apiKey && signatureValid === false) {
+          log(`  \x1b[31m✗ Rejecting [${record.id}]: invalid signature (rejectInvalidSignature enabled)\x1b[0m`);
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid signature', id: record.id }));
+          return;
+        }
+
+        // Always respond 200 otherwise — never reject based on content
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ acknowledged: true, id: record.id }));
       })

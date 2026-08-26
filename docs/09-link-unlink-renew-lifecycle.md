@@ -92,11 +92,11 @@ async function linkCustomerAccount() {
   try {
     const result = await payway.credentialsOnFile.linkAccount({
       // Your unique request ID for idempotency (required)
-      requestId: `link-${Date.now()}`,
+      requestId: `link${Date.now()}`,
 
       // Your customer reference — used across all CoF operations (required)
       // This is how you identify the customer in your system
-      ctid: 'customer-abc-123',
+      ctid: 'customerabc123',
 
       // Token usage flag (required)
       // 'CITR_FLEX' = Customer-Initiated Transaction, Recurring + Flexible
@@ -121,7 +121,7 @@ async function linkCustomerAccount() {
     // Store the pwt in your database alongside the ctid
     // await db.query(
     //   'INSERT INTO saved_payments (ctid, pwt, type) VALUES ($1, $2, $3)',
-    //   ['customer-abc-123', result.pwt, 'account']
+    //   ['customerabc123', result.pwt, 'account']
     // );
 
     return result;
@@ -141,10 +141,10 @@ async function linkCustomerCard() {
   try {
     const result = await payway.credentialsOnFile.linkCard({
       // Your unique request ID (required)
-      requestId: `link-${Date.now()}`,
+      requestId: `link${Date.now()}`,
 
       // Customer identifier (required)
-      ctid: 'customer-abc-123',
+      ctid: 'customerabc123',
 
       // Token usage flag (required)
       tokenFlag: 'CITR_FLEX',
@@ -165,7 +165,7 @@ async function linkCustomerCard() {
     // Store the token reference
     // await db.query(
     //   'INSERT INTO saved_payments (ctid, pwt, type, frequency) VALUES ($1, $2, $3, $4)',
-    //   ['customer-abc-123', result.pwt, 'card', '1M']
+    //   ['customerabc123', result.pwt, 'card', '1M']
     // );
 
     return result;
@@ -187,6 +187,20 @@ async function linkCustomerCard() {
   - Charging (`payment-credential`): `CITU_FLEX | MITU_FLEX | MITU_FIX | MITR_FLEX | MITR_FIX`
   - (C = customer-initiated, M = merchant-initiated; IT/TR ≈ initial transaction / recurring; FLEX/FIX = flexible or fixed amount.)
 - **Token management trio needs a `request` field**: renew/get-details/remove models require flat `request_time`, `request_id`, `request`, `ctid`, `pwt`. The SDK now sends `request` automatically (defaults to your `requestId`). Their HMAC composition remains unpublished — see [SANDBOX-FINDINGS §9a](./SANDBOX-FINDINGS.md).
+- **⚠️ Token management trio is BLOCKED by default (TD-03 capability guard):** because ABA has not confirmed the HMAC composition for `renewToken()` / `getTokenDetails()` / `removeToken()`, every derivable field ordering was rejected in sandbox (~60 attempts), and no merchant can ship them blind, the SDK throws a `PayWayConfigError` when they are called without an explicit opt-in:
+
+  ```typescript
+  const payway = new PayWay({
+    merchantId: process.env.PAYWAY_MERCHANT_ID!,
+    apiKey: process.env.PAYWAY_API_KEY!,
+    // ...other options
+    allowUnverifiedTokenOperations: true, // ← explicit opt-in required until ABA publishes the hash spec
+  });
+  ```
+
+  Linking and charging endpoints are unaffected. Remove this flag once ABA answers the composition question ([open questions](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md)).
+- **Client-side identifier parity (TD-06):** `requestId`/`ctid` must match the gateway rule `[a-zA-Z0-9]{5,24}` — letters/digits only, 5–24 chars, **no hyphens or underscores**. The SDK now fails fast locally instead of surfacing the gateway's per-field errors map. `transactionId` keeps its own rule (`[a-zA-Z0-9-]{1,20}`, hyphens allowed).
+- **`tokenFlag` is enum-validated client-side** with the exact sandbox enums above; `CITR_FIX` is rejected for linking, and charging-only flags are rejected on linking endpoints.
 - PayWay's binding layer answers malformed CoF payloads with **HTTP 400 code `"04"` plus a per-field `errors{}` map** — read `error.rawBody.status.errors` for exact field messages when debugging.
 - The KHQR `get-transactions-by-mc-ref` endpoint returns 404 in this sandbox profile.
 
@@ -199,7 +213,7 @@ async function chargeSavedCard() {
   try {
     const result = await payway.credentialsOnFile.payment({
       // Your unique request ID (required)
-      requestId: `charge-${Date.now()}`,
+      requestId: `charge${Date.now()}`,
 
       // Unique transaction ID for this charge (required)
       transactionId: `order-${Date.now()}`,
@@ -208,7 +222,7 @@ async function chargeSavedCard() {
       amount: 25.00,
 
       // Customer identifier — must match the linked token (required)
-      ctid: 'customer-abc-123',
+      ctid: 'customerabc123',
 
       // ⚠️ The field name is 'pwt', NOT 'paymentToken' (verified in sandbox)
       paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]', // This gets mapped to 'pwt' by the SDK
@@ -241,10 +255,10 @@ async function checkTokenStatus() {
   try {
     const details = await payway.credentialsOnFile.getTokenDetails({
       // Your request ID (required)
-      requestId: `check-${Date.now()}`,
+      requestId: `check${Date.now()}`,
 
       // Customer identifier (required for token management)
-      ctid: 'customer-abc-123',
+      ctid: 'customerabc123',
 
       // The token to check (required)
       paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]',
@@ -260,6 +274,33 @@ async function checkTokenStatus() {
 }
 ```
 
+### 4a. Track Token Expiry Client-Side (TD-10 helpers)
+
+The gateway does not return a per-token `expiresAt`; validity is calendar-based
+(~90 days from grant/renewal). The SDK ships small helpers so every merchant
+tracks it consistently:
+
+```typescript
+import { computeTokenExpiry, daysUntilTokenExpiry, TOKEN_VALIDITY_DAYS } from 'aba-payway-ts';
+
+// At link/renew time — persist expiresAt alongside the pwt in YOUR database:
+const renewedAt = new Date();
+const expiresAt = computeTokenExpiry(renewedAt); // renewedAt + 90 days
+
+// In your renewal scheduler / cron job:
+const daysLeft = daysUntilTokenExpiry(expiresAt);
+if (daysLeft <= 7 && daysLeft > 0) {
+  await scheduleRenewal({ ctid, paymentToken }); // → credentialsOnFile.renewToken() once TD-03 unblocks
+} else if (daysLeft <= 0) {
+  await forceReLinkCustomer(ctid); // expired tokens cannot be charged
+}
+```
+
+> Note: until ABA confirms whether the exact window is 89 vs 90 vs 91 days
+> (`daysUntilTokenExpiry` granularity across time zones), treat day ≤7 as the
+> renewal trigger and never assume charges work on the boundary day.
+> See [ABA-OPEN-QUESTIONS.md](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md).
+
 ### 5. Renew an Expiring Token
 
 Tokens have a limited lifetime. Renew them before expiry:
@@ -269,10 +310,10 @@ async function renewToken() {
   try {
     const result = await payway.credentialsOnFile.renewToken({
       // Your request ID (required)
-      requestId: `renew-${Date.now()}`,
+      requestId: `renew${Date.now()}`,
 
       // Customer identifier (required)
-      ctid: 'customer-abc-123',
+      ctid: 'customerabc123',
 
       // The token to renew (required)
       paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]',
@@ -301,10 +342,10 @@ async function unlinkToken() {
   try {
     const result = await payway.credentialsOnFile.removeToken({
       // Your request ID (required)
-      requestId: `unlink-${Date.now()}`,
+      requestId: `unlink${Date.now()}`,
 
       // Customer identifier (required)
-      ctid: 'customer-abc-123',
+      ctid: 'customerabc123',
 
       // The token to remove (required)
       paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]',
@@ -315,7 +356,7 @@ async function unlinkToken() {
     // Delete from your database
     // await db.query(
     //   'DELETE FROM saved_payments WHERE ctid = $1 AND pwt = $2',
-    //   ['customer-abc-123', '[REMOVED-HISTORICAL-81b242e05d38]']
+    //   ['customerabc123', '[REMOVED-HISTORICAL-81b242e05d38]']
     // );
 
     return result;
@@ -365,7 +406,7 @@ Tokens expire. Your application should handle this:
 async function chargeWithExpiryHandling(ctid: string, pwt: string, amount: number) {
   try {
     return await payway.credentialsOnFile.payment({
-      requestId: `charge-${Date.now()}`,
+      requestId: `charge${Date.now()}`,
       transactionId: `order-${Date.now()}`,
       amount,
       ctid,
@@ -379,7 +420,7 @@ async function chargeWithExpiryHandling(ctid: string, pwt: string, amount: numbe
       console.log('Token expired, attempting renewal...');
       try {
         await payway.credentialsOnFile.renewToken({
-          requestId: `renew-${Date.now()}`,
+          requestId: `renew${Date.now()}`,
           ctid,
           paymentToken: pwt,
           tokenFlag: 'CITR_FLEX',
@@ -479,7 +520,7 @@ async function removeCardLocally(ctid: string, pwt: string) {
 async function removeCardProperly(ctid: string, pwt: string) {
   // Step 1: Remove from PayWay (this is the important one)
   await payway.credentialsOnFile.removeToken({
-    requestId: `unlink-${Date.now()}`,
+    requestId: `unlink${Date.now()}`,
     ctid,
     paymentToken: pwt,
   });

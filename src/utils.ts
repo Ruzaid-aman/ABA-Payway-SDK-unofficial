@@ -1,4 +1,10 @@
 import { PayWayConfigError } from './errors.js';
+import {
+  REQUEST_ID_PATTERN,
+  TOKEN_FLAG_CHARGING,
+  TOKEN_FLAG_LINKING,
+  TOKEN_VALIDITY_DAYS,
+} from './constants.js';
 
 export function formatRequestTime(date?: Date): string {
   const now = date || new Date();
@@ -71,6 +77,78 @@ export function validatePublicHttpsUrl(url: string, fieldName: string): void {
   } catch {
     throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
   }
+}
+
+/**
+ * Fail-fast parity for the gateway's `[a-zA-Z0-9]{5,24}` identifier rule
+ * (sandbox-verified; see Pillar A A.1.1/A.2.5 of the four-pillars audit).
+ * Prevents late server-side rejections with opaque error bodies.
+ */
+export function validateRequestIdOrCtid(value: string, fieldName: 'requestId' | 'ctid'): void {
+  if (typeof value !== 'string' || !REQUEST_ID_PATTERN.test(value)) {
+    throw new PayWayConfigError(
+      `${fieldName} must be 5–24 characters containing only letters and digits ([a-zA-Z0-9]{5,24}, gateway-enforced), received: "${value}"`,
+    );
+  }
+}
+
+/**
+ * Client-side enum validation for `token_flag`.
+ *
+ * The SDK previously accepted arbitrary strings and relied on a server
+ * roundtrip (Pillar A A.2.4). The enums are stricter than the OpenAPI doc:
+ * `CITR_FIX` is only valid for charging, not linking.
+ */
+export function validateTokenFlag(value: string, scope: 'linking' | 'charging'): void {
+  const allowed: ReadonlySet<string> = new Set(scope === 'linking' ? TOKEN_FLAG_LINKING : TOKEN_FLAG_CHARGING);
+  if (!allowed.has(value)) {
+    const accepted = [...(scope === 'linking' ? TOKEN_FLAG_LINKING : TOKEN_FLAG_CHARGING)].join(', ');
+    throw new PayWayConfigError(`tokenFlag "${value}" is not valid for ${scope}; accepted values: ${accepted}`);
+  }
+}
+
+// ─── Token lifecycle helpers (TD-10) ──────────────────────────────────────
+
+/**
+ * Compute the calendar instant at which a token granted/renewed at `from`
+ * expires under the standard 90-day cycle (TD-10 helper).
+ *
+ * @param from - Grant/renewal timestamp (Date, epoch ms, or ISO string). Defaults to now.
+ * @param days - Validity window in days; defaults to {@link TOKEN_VALIDITY_DAYS}.
+ * @returns A new Date `days` after `from`.
+ *
+ * @example Schedule renewal checks:
+ * ```ts
+ * import { computeTokenExpiry, daysUntilTokenExpiry } from 'aba-payway-ts';
+ * const expiresAt = computeTokenExpiry(new Date());
+ * if (daysUntilTokenExpiry(expiresAt) < 7) await scheduleRenewal();
+ * ```
+ */
+export function computeTokenExpiry(
+  from: Date | number | string = Date.now(),
+  days: number = TOKEN_VALIDITY_DAYS,
+): Date {
+  const base = from instanceof Date ? new Date(from.getTime()) : new Date(from);
+  if (Number.isNaN(base.getTime())) {
+    throw new PayWayConfigError('computeTokenExpiry: "from" must be a valid date, epoch ms, or ISO string');
+  }
+  if (!Number.isFinite(days) || days <= 0) {
+    throw new PayWayConfigError('computeTokenExpiry: days must be a positive finite number');
+  }
+  return new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+/** Whole days remaining until `expiresAt` (floors toward zero; negative = expired). */
+export function daysUntilTokenExpiry(
+  expiresAt: Date | number | string,
+  now: Date | number | string = Date.now(),
+): number {
+  const exp = new Date(expiresAt).getTime();
+  const ref = new Date(now).getTime();
+  if (Number.isNaN(exp) || Number.isNaN(ref)) {
+    throw new PayWayConfigError('daysUntilTokenExpiry: dates must be valid');
+  }
+  return Math.floor((exp - ref) / (24 * 60 * 60 * 1000));
 }
 
 export function validateBeneficiaries(
@@ -212,17 +290,51 @@ const SENSITIVE_LOG_KEYS = new Set([
 
 /** Return a JSON-safe copy of a value with secrets removed for diagnostic logging. */
 export function sanitizeForLog(value: unknown): unknown {
+  return sanitizeValue(value);
+}
+
+/**
+ * Key names whose lowercase form contains one of these fragments are treated
+ * as sensitive even when they are not exact matches (e.g. novel keys like
+ * `secretField` or `apiKey2` that the blocklist would miss).
+ * `token_flag` is deliberately excluded: it carries public enum values
+ * (`MITU_FLEX`, …), not secrets.
+ */
+const SENSITIVE_KEY_FRAGMENTS = ['secret', 'apikey', 'password', 'passwd', 'credential', 'hash'] as const;
+
+function isSensitiveKeyFuzzy(keyLower: string): boolean {
+  if (keyLower === 'token_flag') return false;
+  if (SENSITIVE_KEY_FRAGMENTS.some((frag) => keyLower.includes(frag))) return true;
+  // Exact-match aliases plus token-shaped keys ('payment_token', 'x-payway-token', …).
+  return keyLower.includes('token') || keyLower.endsWith('key');
+}
+
+function sanitizeValue(value: unknown, keyHint?: string): unknown {
   if (value === null || typeof value !== 'object') {
+    if (
+      typeof value === 'string' &&
+      keyHint !== undefined &&
+      /^[a-f0-9]{32,}$/i.test(value)
+    ) {
+      // High-entropy 32+ hex-char strings under unrecognized keys are almost
+      // certainly credentials/hashes — mask them defensively (TD-12).
+      return '***HIDDEN***';
+    }
     return value;
   }
 
   if (Array.isArray(value)) {
-    return value.map(sanitizeForLog);
+    return value.map((item) => sanitizeValue(item));
   }
 
   const sanitized: Record<string, unknown> = {};
   for (const [key, nestedValue] of Object.entries(value)) {
-    sanitized[key] = SENSITIVE_LOG_KEYS.has(key.toLowerCase()) ? '***HIDDEN***' : sanitizeForLog(nestedValue);
+    const keyLower = key.toLowerCase();
+    if (SENSITIVE_LOG_KEYS.has(keyLower) || isSensitiveKeyFuzzy(keyLower)) {
+      sanitized[key] = '***HIDDEN***';
+    } else {
+      sanitized[key] = sanitizeValue(nestedValue, keyLower);
+    }
   }
   return sanitized;
 }

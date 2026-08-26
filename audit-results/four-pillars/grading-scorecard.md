@@ -1,5 +1,21 @@
 # Grading Scorecard — Final
 
+> **Post-remediation note (2026-08-27):** the grade below reflects the audit-date state. Since then
+> TD-02 and TD-04 are resolved and the dynamic-test gate is green again, TD-06 shipped,
+> TD-07/08/09/10/12 shipped in pass 2, and TD-01's in-repo portion (HEAD removal + gitleaks CI) is done.
+> **Pass 3 re-verification (2026-08-27, this file's projection now largely realized):** gates re-run with
+> unmasked exit codes — typecheck ✅, lint ✅, **787/787 tests / 49 files ✅**, `npm audit --omit=dev` ✅ 0 vulns;
+> canvas/qrcode-reader moved out of runtime deps (A.3); compiled CLI startup measured at P50 413 ms
+> (< 500 ms threshold → D.1.1 flips to PASS, see Pillar D §D.1.1b).
+> Zero-tolerance trigger #1 remains formally open until the exposed key is **rotated** and **purged
+> from git history** (manual steps outside this repo's code; rotation procedure = ABA question Q8).
+>
+> **Current-state recomputation (pass 3 evidence; still carrying trigger #1 as open):**
+> A ≈ 26/30 (dependency isolation 4/5 post-canvas-move), B ≈ 21/25 (jitter + breaker + logger shipped),
+> C ≈ 20/30 (credential handling still capped by unrotated key), D ≈ 11/15 (latency 5/6, footprint 2/5 UTP)
+> → **≈ 74.5/100**. With trigger #1 fully closed (rotation + purge attested) the credential-handling cap
+> lifts toward ≈ 83+ (**B, conditional pass**) — matching the original "path to B" estimate.
+
 ## Weighted calculation
 | Pillar | Sub-item | Score | Pillar Σ | % | Weight | Contribution |
 |---|---|---|---|---|---|---|

@@ -154,3 +154,22 @@ export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }>
   '49': { title: 'Invalid Request', hint: "Validation failed. For transaction-list dates use \"YYYY-MM-DD HH:mm:ss\"." },
   '96': { title: 'Payee / Merchant Data', hint: 'Beneficiary payee unknown, or payment-link id invalid (detail).' },
 };
+
+/**
+ * Sandbox-verified `token_flag` enums for credentials-on-file endpoints.
+ *
+ * Sources (RTM R-08/R-09, `docs/09:185-188`, sandbox campaign section 9):
+ * - linking (link-account / link-card): `CITI_FLEX | CITO_FLEX | CITO_FIX | CITR_FLEX`
+ *   (`CITR_FIX` is NOT an accepted linking value).
+ * - charging (purchase with payment credential): `CITU_FLEX | MITU_FLEX | MITU_FIX | MITR_FLEX | MITR_FIX`.
+ */
+export const TOKEN_FLAG_LINKING = ['CITI_FLEX', 'CITO_FLEX', 'CITO_FIX', 'CITR_FLEX'] as const;
+export const TOKEN_FLAG_CHARGING = ['CITU_FLEX', 'MITU_FLEX', 'MITU_FIX', 'MITR_FLEX', 'MITR_FIX'] as const;
+
+/** Server-enforced identifier rule observed in sandbox campaigns (`[a-zA-Z0-9]{5,24}`). */
+export const REQUEST_ID_PATTERN = /^[a-zA-Z0-9]{5,24}$/;
+
+/** ABA grants linked account/card tokens a documented ~90-day validity window; renewal resets it. */
+export const TOKEN_VALIDITY_DAYS = 90;
+
+
