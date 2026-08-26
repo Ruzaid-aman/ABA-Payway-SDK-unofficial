@@ -5,9 +5,9 @@
  * Creates ONE online KHQR payment QR and polls its transaction status.
  *
  * Usage:
- *   npx tsx scripts/online-qr-poll.ts [amount] [currency]
+ *   npx tsx scripts/online-qr-poll.ts [amount] [currency] [lifetimeSeconds]
  *
- * Defaults: amount = 31.11 USD, lifetime = 600s (10 min), poll window = 10 min.
+ * Defaults: amount = 31.11 USD, lifetime = 600s (10 min), poll window = lifetime.
  * Saves the QR PNG under test-logs/qr-payment/ and opens it for scanning.
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -42,9 +42,10 @@ const CALLBACK_URL =
 
 const AMOUNT = Number.parseFloat(process.argv[2] ?? '31.11');
 const CURRENCY = (process.argv[3] ?? 'USD').toUpperCase() as 'USD' | 'KHR';
-const QR_LIFETIME_SECONDS = 600;
+const QR_LIFETIME_SECONDS = Number.parseInt(process.argv[4] ?? '600', 10);
+const QR_TEMPLATE = process.argv[5] ?? 'template2_color';
 const POLL_INTERVAL_MS = 5_000;
-const MAX_POLL_MS = 600_000;
+const MAX_POLL_MS = QR_LIFETIME_SECONDS * 1_000;
 
 const c = {
   bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
@@ -75,6 +76,7 @@ async function main(): Promise<void> {
   console.log(`  ${c.dim('Transaction ID:')} ${txId}`);
   console.log(`  ${c.dim('Amount:')}         ${CURRENCY} ${AMOUNT.toFixed(CURRENCY === 'USD' ? 2 : 0)}`);
   console.log(`  ${c.dim('QR Lifetime:')}    ${QR_LIFETIME_SECONDS}s (${QR_LIFETIME_SECONDS / 60} min)`);
+  console.log(`  ${c.dim('QR Template:')}    ${QR_TEMPLATE}`);
   console.log(`  ${c.dim('Poll window:')}    ${MAX_POLL_MS / 1000}s @ ${(POLL_INTERVAL_MS / 1000).toFixed(0)}s interval\n`);
 
   const payway = new PayWay({
@@ -95,7 +97,7 @@ async function main(): Promise<void> {
       currency: CURRENCY,
       paymentOption: 'abapay_khqr',
       callbackUrl: CALLBACK_URL,
-      qrImageTemplate: 'template2_color',
+      qrImageTemplate: QR_TEMPLATE,
       lifetime: QR_LIFETIME_SECONDS,
     });
 
@@ -132,7 +134,7 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`${c.bold('STEP 2: Poll transaction status (up to 10 minutes)')}\n`);
+  console.log(`${c.bold('STEP 2: Poll transaction status (up to ' + QR_LIFETIME_SECONDS / 60 + ' minutes)')}\n`);
   console.log(`  Scan the QR with ABA Mobile or any KHQR-compatible app to pay.\n`);
 
   const startedAt = Date.now();
@@ -157,7 +159,7 @@ async function main(): Promise<void> {
     }
   } catch (err) {
     if (err instanceof PollingAbortedError && err.reason === 'max_duration_exceeded') {
-      console.log(`\n  ${c.yellow('⏱')} Polling window ended after 600s (transaction still PENDING or expired).`);
+      console.log(`\n  ${c.yellow('⏱')} Polling window ended after ${QR_LIFETIME_SECONDS}s (transaction still PENDING or expired).`);
     } else {
       throw err;
     }
