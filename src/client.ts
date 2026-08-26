@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { generateHmac, verifyCallbackSignature } from './auth.js';
 import { BASE_URLS, ENDPOINTS } from './constants.js';
 import { CircuitBreaker, type CircuitBreakerOptions } from './circuit-breaker.js';
@@ -620,12 +621,12 @@ export class PayWay {
     const onResponse = resolvedConfig.onResponse;
     return {
       ...resolvedConfig,
+      // Debug logging (correlation id + duration) is emitted by _executeFetch so
+      // each request gets a stable cid and an accurate timing measurement.
       onRequest: (endpoint, bodyPayload) => {
-        paywayLogger.debug(`[payway] -> POST ${endpoint}`, sanitizeForLog(parseDebugRequestBody(bodyPayload)));
         onRequest?.(endpoint, bodyPayload);
       },
       onResponse: (endpoint, statusCode, body, rateLimitInfo) => {
-        paywayLogger.debug(`[payway] <- ${statusCode} ${endpoint}`, sanitizeForLog(body), rateLimitInfo);
         const traceId = extractTraceId(body);
         if (traceId !== undefined) {
           // TD-08: PayWay envelopes carry `status.trace` / `trace`; surface it
@@ -733,6 +734,8 @@ export class PayWay {
     const retryDelayMs = this.config.retryDelayMs ?? 3000;
     const jitter = this.config.backoffJitter ?? 'none';
     const url = `${this.baseUrl}${endpoint}`;
+    const correlationId = randomBytes(8).toString('hex');
+    const requestStartedAt = Date.now();
 
     // TD-07: fail fast while the endpoint's circuit is open (half-open probes
     // are admitted one at a time by the breaker itself).
@@ -749,6 +752,12 @@ export class PayWay {
 
       try {
         try {
+          if (this.config.debug) {
+            console.debug(
+              `[payway] -> POST ${endpoint} (cid=${correlationId})`,
+              sanitizeForLog(parseDebugRequestBody(bodyPayload)),
+            );
+          }
           this.config.onRequest?.(endpoint, bodyPayload);
         } catch {
           // Logging hooks must never fail SDK execution.
@@ -778,7 +787,15 @@ export class PayWay {
         // transport and gateway are alive — close/reset the circuit.
         this.breaker?.recordSuccess(endpoint);
 
+        const durationMs = Date.now() - requestStartedAt;
         try {
+          if (this.config.debug) {
+            console.debug(
+              `[payway] <- ${response.status} ${endpoint} (${durationMs}ms, cid=${correlationId})`,
+              sanitizeForLog(parsedBody),
+              rateLimitInfo,
+            );
+          }
           this.config.onResponse?.(endpoint, response.status, parsedBody, rateLimitInfo);
         } catch {
           // Logging hooks must never fail SDK execution.

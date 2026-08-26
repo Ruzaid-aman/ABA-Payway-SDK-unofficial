@@ -1268,6 +1268,22 @@ describe('preAuth domain', () => {
     expect(opts.headers['Content-Type']).toBe('application/json');
     expect(JSON.parse(opts.body)).toHaveProperty('merchant_auth');
   });
+
+  it('rejects completion that exceeds the 110% over-capture ceiling', () => {
+    expect(() => payway.preAuth.complete('T-PREAUTH-001', 200.0, { originalAmount: 100 })).toThrow(
+      PayWayConfigError,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('encrypts the completion payload into merchant_auth', async () => {
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Completed' } }));
+
+    await payway.preAuth.complete('T-PREAUTH-001', 100.0, { idempotencyKey: 'idemp-xyz' });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body).toHaveProperty('merchant_auth');
+  });
 });
 
 // ---------------------------------------------------------------------------

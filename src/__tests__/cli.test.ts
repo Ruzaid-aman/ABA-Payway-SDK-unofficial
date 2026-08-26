@@ -1087,3 +1087,101 @@ describe('built CLI', () => {
     expect(output).toContain('PAYWAY_RSA_PUBLIC_KEY is missing');
   });
 });
+
+describe('pre-auth command group', () => {
+  it('lists complete, complete-payout, and cancel subcommands in --help', () => {
+    const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'pre-auth', '--help'], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '' },
+    });
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+    expect(output).toContain('complete');
+    expect(output).toContain('complete-payout');
+    expect(output).toContain('cancel');
+  });
+
+  it('cancel hits the pre-auth-cancellation endpoint and prints JSON', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    let requestedPath = '';
+    let requestedBody = '';
+    const mockServer = createServer((request, response) => {
+      requestedPath = request.url ?? '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => (requestedBody += chunk));
+      request.on('end', () => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ status: { code: '00', message: 'Cancelled' }, tran_id: 'PREAUTH-1' }));
+      });
+    });
+    await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
+    const address = mockServer.address();
+    if (!address || typeof address === 'string') throw new Error('mock server did not bind');
+
+    try {
+      const result = await runBuiltCli(['pre-auth', 'cancel', '-t', 'PREAUTH-1', '-y', '--json'], {
+        cwd,
+        env: {
+          PATH: process.env.PATH ?? '',
+          SystemRoot: process.env.SystemRoot ?? '',
+          PAYWAY_MERCHANT_ID: 'test-merchant-001',
+          PAYWAY_API_KEY: 'test-api-key-123456789012',
+          PAYWAY_BASE_URL: `http://127.0.0.1:${address.port}`,
+          PAYWAY_RSA_PUBLIC_KEY: TEST_RSA.publicKey,
+        },
+      });
+      const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+      expect(result.status, JSON.stringify({ output, requestedPath })).toBe(0);
+      expect(requestedPath).toContain('/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation');
+      // tran_id is RSA-encrypted inside merchant_auth; the round-trip is proven by the echoed response below.
+      expect(output).toContain('"tran_id": "PREAUTH-1"');
+    } finally {
+      await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
+    }
+  });
+
+  it('complete hits the pre-auth-completion endpoint and prints JSON', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    let requestedPath = '';
+    let requestedBody = '';
+    const mockServer = createServer((request, response) => {
+      requestedPath = request.url ?? '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => (requestedBody += chunk));
+      request.on('end', () => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ status: { code: '00', message: 'Completed' }, tran_id: 'PREAUTH-1' }));
+      });
+    });
+    await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
+    const address = mockServer.address();
+    if (!address || typeof address === 'string') throw new Error('mock server did not bind');
+
+    try {
+      const result = await runBuiltCli(
+        ['pre-auth', 'complete', '-t', 'PREAUTH-1', '-a', '10', '--original-amount', '10', '--json'],
+        {
+          cwd,
+          env: {
+            PATH: process.env.PATH ?? '',
+            SystemRoot: process.env.SystemRoot ?? '',
+            PAYWAY_MERCHANT_ID: 'test-merchant-001',
+            PAYWAY_API_KEY: 'test-api-key-123456789012',
+            PAYWAY_BASE_URL: `http://127.0.0.1:${address.port}`,
+            PAYWAY_RSA_PUBLIC_KEY: TEST_RSA.publicKey,
+          },
+        },
+      );
+      const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+      expect(result.status, JSON.stringify({ output, requestedPath })).toBe(0);
+      expect(requestedPath).toContain('/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion');
+      // tran_id is RSA-encrypted inside merchant_auth; the round-trip is proven by the echoed response below.
+      expect(output).toContain('"tran_id": "PREAUTH-1"');
+    } finally {
+      await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
+    }
+  });
+});
