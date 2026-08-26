@@ -1,7 +1,7 @@
 ---
 name: aba-payway-sandbox-beneficiaries
 description: Seeded sandbox-only beneficiary accounts and test MIDs for PayWay payout / split-payout testing.
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Sandbox Beneficiaries (test fixtures)
@@ -38,6 +38,16 @@ validateSandboxBeneficiary('500000001', 'KHR', { sandbox: true }); // currency m
   match (USD accounts → USD, MIDs → KHR). Otherwise throws `PayWayConfigError`
   (`not a known sandbox beneficiary` / `currency mismatch`) before the request is sent.
 - **Production:** only the structural format is checked; real whitelists are managed by PayWay per merchant.
+
+## The payout currency rule
+A payout's `currency` must match the beneficiary account currency **and** the
+merchant credential currency. A KHR payout to a USD account is rejected — the SDK
+throws `currency mismatch` in sandbox *before* the network call; in production
+PayWay returns **HTTP 403 / `PTL147`** (or numeric **`12`**). Use the seeded
+accounts for their currency: USD accounts with `currency: 'USD'`, test MIDs with
+`currency: 'KHR'`. The full error matrix (`PTL147` / `37` / `PTL146` /
+`PTL-PAYOUT-37` / `PTL46` / `PTL-PAYOUT-36` / `1` / `415`) lives in the
+[Payout](../aba-payway-payout/SKILL.md) skill and `docs/12-error-handling-and-debugging.md`.
 
 ## CLI
 ```bash

@@ -29,7 +29,7 @@ scoped to the command only (same workaround as official boilerplate). Never set 
 
 ## Skills
 
-24 packaged guides install via `npx tsx src/cli.ts skills add opencode`.
+25 packaged guides install via `npx tsx src/cli.ts skills add opencode`.
 NOTE (2026-08-26): the installer writes to `~/.opencode/skills`, but this opencode build loads from
 `~/.config/opencode/skills` — copy the `aba-payway-*` dirs there after install.
 Deeper project rules live in `.agents/AGENTS.md`.

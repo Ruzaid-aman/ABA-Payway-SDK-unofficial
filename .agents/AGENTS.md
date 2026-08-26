@@ -61,7 +61,7 @@
 | `DEBUG_PAYWAY` | `true` or `1` enables sanitized diagnostic logging. |
 
 ## Skills Directory
-- The packaged `skills/` directory contains 24 focused `aba-payway-*` guides.
+- The packaged `skills/` directory contains 25 focused `aba-payway-*` guides.
 - Several guides bundle dependency-free `.cjs` tools under their `scripts/` folder (KHQR decode/CRC validation, request signing, callback verification, mock callbacks, reconciliation cron, checkout payload builder, status decoder) — each SKILL.md documents its own tools.
 - Install all of them (including bundled scripts) with `npx payway-sdk skills add <agent>`, where agent is `claude`, `codex`, `opencode`, `cursor`, or `copilot`.
 

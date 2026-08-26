@@ -27,6 +27,10 @@
 - **`ask --provider-timeout <ms>`** - override the inference provider request timeout so hung providers surface fast.
 - **`isValidPublicKeyPem()` export** - structural PEM public-key check for pre-flight validation.
 - **`aba-payway-customer-qr` skill (24th skill)** — Merchant Portal Customer Module static QRs ("Printed QR channel"): decoded payload anatomy (PayWay routing tags `62·68`, `99`), callback handling via `merchant_ref`, reconciliation guidance, plus bundled tools `decode-khqr.cjs` (TLV decode + CRC-16 validation) and `qr-manifest.cjs` (batch QR-folder audit to CSV).
+- **`aba-payway-sandbox-beneficiaries` skill (25th skill)** — seeded sandbox-only beneficiary accounts (6 USD 9-digit) and test MIDs (3 KHR 15-digit) for payout / split-payout testing, with the currency-match rule and error-code cross-references. Backed by a new `src/sandbox-beneficiaries.ts` module exporting `listSandboxBeneficiaries`, `isKnownSandboxBeneficiary`, `lookupSandboxBeneficiary`, and `validateSandboxBeneficiary`.
+- **`payway-sdk sandbox-beneficiaries` CLI command** — lists the seeded test accounts/MIDs (`--currency USD|KHR`, `--json`).
+- **`payway-sdk payout` CLI command** — sends a payout / split-payout (`-t/-a/-c/-b "acc:amt,..."`); validates locally in sandbox and prints payout-specific error hints.
+- **Payout hardening (SDK + CLI + docs)** — the payout `currency` must match the beneficiary account currency (and merchant credential currency). In sandbox, `payout.payout()` and `preAuth.completeWithPayout()` now call `validateSandboxBeneficiary(acc, currency, { sandbox })` so a KHR payout to a USD account (or any non-seeded account) throws `currency mismatch` / `not a known sandbox beneficiary` *before* the network call. New `PAYOUT_ERROR_CODES` (`PTL147`/`12` currency, `PTL146`/`PTL-PAYOUT-37`/`PTL46` whitelist, `PTL-PAYOUT-36` amount) are queryable via `payway-sdk explain` and surfaced by `printApiError` (plus HTTP 415 for the direct payout API's JSON-only requirement).
 - **Skill helper scripts** — six dependency-free `.cjs` tools shipped inside their skills and covered by `src/__tests__/skill-scripts.test.ts`: `verify-callback.cjs`, `sign-request.cjs`, `mock-callback.cjs` (hash/webhooks), `checkout-payload.cjs` (first payment), `decode-status.cjs` (check-transaction), and `reconcile.cjs` (transaction-by-merchant-ref watermark/dedupe fallback job).
 
 ### Changed
@@ -44,6 +48,7 @@
 - **Refund skill/docs** document the pre-flight balance pattern and PTL36.
 - **Deterministic callback override** - `normalizePlan` replaces model-supplied `generate_online_qr` callback URLs with the merchant profile's configured URL; models can no longer inject placeholder webhooks into executed plans.
 - **`payment_option` defaults to `abapay_khqr`** in `qr.generateQr` - PayWay's QR API now rejects requests without it (`400 The given data was invalid`).
+- **Package entry exports** — `PAYOUT_ERROR_CODES`, `PRE_AUTH_ERROR_CODES`, and `GATEWAY_CODE_HINTS` are now exported from `aba-payway-ts` (in addition to `REFUND_ERROR_CODES`), so consumers and skills can switch on payout/pre-auth error codes directly.
 - **PEM validation on RSA endpoints** - Refund, Pre-Auth, Payout, and Payment Link now throw a descriptive `PayWayConfigError` ("does not look like a public key PEM") before any encryption/network call when `publicKeyPem` is malformed.
 - **URL auto-encoding** - `encodeBase64IfNeeded` now also base64-encodes protocol-relative (`//host/path`) and `www.`-prefixed URLs alongside `http(s)://`.
 - **Provider error clarity** - inference timeouts now report "provider request timed out after <ms>" instead of the opaque "This operation was aborted"; TTY runs print a remediation hint on `PROVIDER_PROPOSAL_FAILED`.
@@ -66,6 +71,8 @@
 - Updated "15-chapter guide" references to **16 chapters** (`README.md`, `docs/PROJECT_STATUS.md`).
 - Synced `docs/PROJECT_STATUS.md` with repository reality: milestone C/E/F "uncommitted" markers corrected to their landing commits (`df04deb`, `bc4efb7`), commit history extended through `808dc80`, and a documentation-audit session entry added.
 - Added `PAYWAY_ENV` to the configuration skill's environment-variable list (`skills/aba-payway-sdk-configuration/SKILL.md`).
+- Added the **payout/sandbox-beneficiary knowledge base** (`docs/SANDBOX-BENEFICIARIES.md`) with the seeded fixtures, the currency-match rule, and where enforcement lives; added a Payout-Specific error table to `docs/12-error-handling-and-debugging.md` (codes `PTL147`/`12`, `37`/`PTL146`/`PTL-PAYOUT-37`/`PTL46`, `PTL-PAYOUT-36`, `1`, `24`, `415`) plus a `12`/`PTL147` row in the common-code table.
+- Updated payout, pre-auth, and sandbox-beneficiaries skills (v1.2.0 / v1.2.0 / v1.1.0) with the currency-match rule, full error matrix, and `completeWithPayout` validation; corrected the packaged-skill count to **25** in `AGENTS.md` and `.agents/AGENTS.md`.
 
 ### Known open item
 

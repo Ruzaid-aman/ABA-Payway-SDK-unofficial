@@ -30,6 +30,9 @@ export {
   PAYMENT_STATUS_CODES,
   PAYMENT_STATUS_LABELS,
   REFUND_ERROR_CODES,
+  PRE_AUTH_ERROR_CODES,
+  PAYOUT_ERROR_CODES,
+  GATEWAY_CODE_HINTS,
 } from './constants.js';
 export type { CheckoutDomain } from './domains/checkout.js';
 export type { CredentialsOnFileDomain } from './domains/credentials-on-file.js';

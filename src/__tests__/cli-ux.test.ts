@@ -76,6 +76,35 @@ describe('explainPayWayCode', () => {
     expect(e ? e.hint : '').toContain('YYYY-MM-DD HH:mm:ss');
   });
 
+  it('explains payout error codes (currency, whitelist, amount)', () => {
+    const currency = explainPayWayCode('PTL147');
+    expect(currency?.family).toBe('payout');
+    expect(currency ? currency.title : '').toMatch(/currency not allowed/i);
+
+    const numericCurrency = explainPayWayCode('12');
+    expect(numericCurrency?.family).toBe('payout');
+
+    const whitelist = explainPayWayCode('PTL146');
+    expect(whitelist?.family).toBe('payout');
+    expect(whitelist ? whitelist.title : '').toMatch(/not whitelisted/i);
+
+    // Aliases for non-whitelisted accounts all resolve to the same guidance.
+    for (const code of ['PTL-PAYOUT-37', 'PTL46']) {
+      const e = explainPayWayCode(code);
+      expect(e?.family).toBe('payout');
+      expect(e ? e.title : '').toMatch(/not whitelisted/i);
+    }
+
+    // Numeric `37` is the pre-existing gateway "Payout Whitelist" code — still resolves.
+    const legacy = explainPayWayCode('37');
+    expect(legacy?.family).toBe('gateway');
+    expect(legacy ? legacy.title : '').toMatch(/whitelist/i);
+
+    const amount = explainPayWayCode('PTL-PAYOUT-36');
+    expect(amount?.family).toBe('payout');
+    expect(amount ? amount.title : '').toMatch(/amount mismatch/i);
+  });
+
   it('explains sandbox-verified merchant-identity codes (8, 26)', () => {
     const notFound = explainPayWayCode('8');
     expect(notFound?.family).toBe('gateway');
