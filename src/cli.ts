@@ -37,6 +37,7 @@ import {
   PollingAbortedError,
 } from './errors.js';
 import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConfiguration } from './khqr-config.js';
+import { openImageInDefaultViewer } from './open-image.js';
 import { sdk } from './sdk.js';
 import { formatTestReport } from './test/index.js';
 import { validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
@@ -154,6 +155,7 @@ interface GenerateQrCommandOptions {
   lifetime?: string;
   ref?: string;
   saveImage?: string | boolean;
+  openImage?: boolean;
   showQr?: boolean;
   nonInteractive?: boolean;
   polling?: boolean;
@@ -1177,6 +1179,8 @@ program
   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
   .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
   .option('--no-save-image', 'Do not save the QR image PNG to payway-output/<transaction-id>.png by default')
+  .option('--open-image', 'Open the saved QR image with the OS default viewer (default: auto when interactive)')
+  .option('--no-open-image', 'Never open the QR image, even in interactive terminals')
   .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
   .option('--non-interactive, -y', 'Skip interactive prompts (no confirmation, no lifetime override)')
   .option('--polling', 'Poll transaction status after QR generation (enabled by default)', true)
@@ -1373,6 +1377,23 @@ program
           const imgBuffer = Buffer.from(base64Data, 'base64');
           writeFileSync(resolvedSaveImage, imgBuffer);
           console.log(`  ${c.green('✓')} Image saved to ${c.cyan(resolvedSaveImage)}`);
+
+          // Open with the OS default viewer: forced via --open-image,
+          // suppressed via --no-open-image, otherwise only for humans
+          // (interactive TTYs — agents and CI keep stdout clean).
+          const shouldOpenImage =
+            opts.openImage === true || (opts.openImage === undefined && Boolean(process.stdout.isTTY));
+          if (shouldOpenImage) {
+            const opened = await openImageInDefaultViewer(resolvedSaveImage);
+            if (opened.opened) {
+              console.log(`  ${c.green('✓')} QR image opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
+            } else {
+              console.log(
+                `  ${c.yellow('⚠')} Could not open QR image automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`,
+              );
+              console.log(`  ${c.dim(`Open it manually: ${resolvedSaveImage}`)}`);
+            }
+          }
           console.log();
         } else if (qr.qrImage) {
           console.log(`  ${c.bold('QR Image:')} base64 data available (${qr.qrImage.length} chars)`);

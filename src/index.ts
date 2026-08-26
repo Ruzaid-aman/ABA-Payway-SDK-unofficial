@@ -24,6 +24,8 @@ export {
 export type { ClientModule } from './client-handler/index.js';
 export { client } from './client-handler/index.js';
 
+export type { OpenImageResult } from './open-image.js';
+export { defaultViewerCommandForPlatform, openImageInDefaultViewer } from './open-image.js';
 export {
   PAYMENT_STATUS_CODES,
   PAYMENT_STATUS_LABELS,

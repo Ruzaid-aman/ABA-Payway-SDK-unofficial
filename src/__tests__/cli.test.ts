@@ -584,6 +584,8 @@ describe('built CLI', () => {
       expect(output).not.toContain('Submit to PayWay? (y/n)');
       expect(output).not.toContain('Modify lifetime?');
       expect(output).not.toContain('Cancelled by user');
+      // Auto image-open stays off for non-TTY (agent/CI) runs.
+      expect(output).not.toContain('default viewer');
     } finally {
       await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
     }
@@ -645,6 +647,67 @@ describe('built CLI', () => {
       expect(requestedPath).toBe('/api/payment-gateway/v1/payments/generate-qr');
       expect(output).not.toContain('Image saved to');
       expect(existsSync(path.join(cwd, 'payway-output', 'ONLINE-NOSAVE.png'))).toBe(false);
+    } finally {
+      await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
+    }
+  });
+
+  it('degrades gracefully when --open-image cannot launch a viewer', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    const mockServer = createServer((request, response) => {
+      request.on('data', () => {});
+      request.on('end', () => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            status: { code: 0, message: 'OK' },
+            qrString: 'ONLINE-MOCK-KHQR',
+            qrImage: 'data:image/png;base64,aGVsbG8=',
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
+    const address = mockServer.address();
+    if (!address || typeof address === 'string') throw new Error('mock server did not bind to a TCP port');
+
+    try {
+      // Empty PATH guarantees the platform viewer binary cannot be found,
+      // exercising the graceful-degradation path on every OS.
+      const result = await runBuiltCli(
+        [
+          'generate-qr',
+          '--amount',
+          '1.00',
+          '--currency',
+          'USD',
+          '--transaction-id',
+          'ONLINE-FORCEOPEN',
+          '--callback-url',
+          'https://example.com/cb',
+          '--non-interactive',
+          '--no-polling',
+          '--open-image',
+        ],
+        {
+          cwd,
+          env: {
+            PATH: '',
+            SystemRoot: process.env.SystemRoot ?? '',
+            PAYWAY_MERCHANT_ID: 'test-merchant-001',
+            PAYWAY_API_KEY: 'test-api-key-123456789012',
+            PAYWAY_BASE_URL: `http://127.0.0.1:${address.port}`,
+          },
+        },
+      );
+      const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+
+      expect(result.status, JSON.stringify({ output })).toBe(0);
+      expect(existsSync(path.join(cwd, 'payway-output', 'ONLINE-FORCEOPEN.png'))).toBe(true);
+      expect(output).toContain('Could not open QR image automatically');
+      expect(output).toContain(`Open it manually: ${path.join(cwd, 'payway-output', 'ONLINE-FORCEOPEN.png')}`);
     } finally {
       await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
     }
