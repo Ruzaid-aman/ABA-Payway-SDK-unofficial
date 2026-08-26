@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { generateHmac, verifyCallbackSignature } from './auth.js';
 import { BASE_URLS, ENDPOINTS } from './constants.js';
 import type { CheckoutDomain } from './domains/checkout.js';
@@ -559,12 +560,12 @@ export class PayWay {
     const onResponse = resolvedConfig.onResponse;
     return {
       ...resolvedConfig,
+      // Debug logging (correlation id + duration) is emitted by _executeFetch so
+      // each request gets a stable cid and an accurate timing measurement.
       onRequest: (endpoint, bodyPayload) => {
-        console.debug(`[payway] -> POST ${endpoint}`, sanitizeForLog(parseDebugRequestBody(bodyPayload)));
         onRequest?.(endpoint, bodyPayload);
       },
       onResponse: (endpoint, statusCode, body, rateLimitInfo) => {
-        console.debug(`[payway] <- ${statusCode} ${endpoint}`, sanitizeForLog(body), rateLimitInfo);
         onResponse?.(endpoint, statusCode, body, rateLimitInfo);
       },
     };
@@ -665,6 +666,8 @@ export class PayWay {
     const maxRetries = this.config.maxRetries ?? 3;
     const retryDelayMs = this.config.retryDelayMs ?? 3000;
     const url = `${this.baseUrl}${endpoint}`;
+    const correlationId = randomBytes(8).toString('hex');
+    const requestStartedAt = Date.now();
 
     await this._acquireRateLimitToken(endpoint);
 
@@ -675,6 +678,12 @@ export class PayWay {
 
       try {
         try {
+          if (this.config.debug) {
+            console.debug(
+              `[payway] -> POST ${endpoint} (cid=${correlationId})`,
+              sanitizeForLog(parseDebugRequestBody(bodyPayload)),
+            );
+          }
           this.config.onRequest?.(endpoint, bodyPayload);
         } catch {
           // Logging hooks must never fail SDK execution.
@@ -700,7 +709,15 @@ export class PayWay {
 
         checkResponseError(parsedBody, endpoint);
 
+        const durationMs = Date.now() - requestStartedAt;
         try {
+          if (this.config.debug) {
+            console.debug(
+              `[payway] <- ${response.status} ${endpoint} (${durationMs}ms, cid=${correlationId})`,
+              sanitizeForLog(parsedBody),
+              rateLimitInfo,
+            );
+          }
           this.config.onResponse?.(endpoint, response.status, parsedBody, rateLimitInfo);
         } catch {
           // Logging hooks must never fail SDK execution.

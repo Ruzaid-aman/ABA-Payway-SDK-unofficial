@@ -31,6 +31,7 @@ import { PAYMENT_STATUS_CODES, PAYMENT_STATUS_LABELS, REFUND_ERROR_CODES } from 
 import {
   PayWayAPIError,
   PayWayBusinessError,
+  PayWayConfigError,
   PayWayError,
   PayWayNetworkError,
   PayWayRateLimitError,
@@ -273,9 +274,17 @@ async function runPolling(
   }
 }
 
+/** Typed readline factory (avoids `as any` on process.stdin/stdout). */
+function createCliReadline(terminal = false): readline.Interface {
+  return readline.createInterface({
+    input: process.stdin as unknown as NodeJS.ReadableStream,
+    output: process.stdout as unknown as NodeJS.WritableStream,
+    terminal,
+  });
+}
+
 async function promptConfirmation(message: string, rl?: readline.Interface): Promise<boolean> {
-  const rlInstance =
-    rl ?? readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
+  const rlInstance = rl ?? createCliReadline(false);
   try {
     const answer = await new Promise<string>((resolve) => {
       rlInstance.question(message, (ans) => {
@@ -303,8 +312,7 @@ function asBoolFlag(v: unknown): boolean | undefined {
 }
 
 async function promptLifetimeOverride(current: number, rl?: readline.Interface): Promise<number | null> {
-  const rlInstance =
-    rl ?? readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: false });
+  const rlInstance = rl ?? createCliReadline(false);
   try {
     const answer = await new Promise<string>((resolve) => {
       rlInstance.question(
@@ -1304,11 +1312,7 @@ program
         console.log(`    Lifetime:         ${c.cyan(`${lifetimeSeconds} seconds`)}`);
         console.log();
 
-        const rl = readline.createInterface({
-          input: process.stdin as any,
-          output: process.stdout as any,
-          terminal: false,
-        });
+        const rl = createCliReadline(false);
         const lifetimeOverride = await promptLifetimeOverride(lifetimeSeconds, rl);
         finalLifetime = lifetimeOverride ?? lifetimeSeconds;
 
@@ -1675,7 +1679,7 @@ profilesCmd
   .command('add')
   .description('Interactively add a credential profile (maximum 8 profiles)')
   .action(async () => {
-    const rl = readline.createInterface({ input: process.stdin as any, output: process.stdout as any, terminal: true });
+    const rl = createCliReadline(true);
     try {
       const name = (await promptInput(rl, 'Profile name: ')).trim();
       const environment = (await promptInput(rl, 'Environment (sandbox/production): ')).trim().toLowerCase() as
@@ -1839,6 +1843,167 @@ program
 // --- agentic command tree ---
 registerAgentCommands(program);
 registerOnboardCommand(program);
+
+// --- pre-auth (complete / complete-with-payout / cancel) ---
+const preAuthComplete = new Command('complete')
+  .description('Complete (capture) a PayWay pre-authorization')
+  .requiredOption('-t, --transaction-id <id>', 'Pre-auth transaction ID')
+  .requiredOption('-a, --amount <number>', 'Completion amount (USD)')
+  .option('--original-amount <number>', 'Original pre-auth amount (enables the 110% over-capture guard)')
+  .option('--max-over-capture-pct <number>', 'Over-capture ceiling as % of original (default 110)', '110')
+  .option('--idempotency-key <key>', 'Idempotency key forwarded to PayWay')
+  .option('-y, --force', 'Skip confirmation prompt (for scripts/agents)')
+  .option('--json', 'Print the raw JSON response')
+  .action(
+    async (opts: {
+      transactionId: string;
+      amount: string;
+      originalAmount?: string;
+      maxOverCapturePct?: string;
+      idempotencyKey?: string;
+      force?: boolean;
+      json?: boolean;
+    }) => {
+      if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      try {
+        const amount = Number(opts.amount);
+        validateTransactionId(opts.transactionId);
+        const originalAmount = opts.originalAmount !== undefined ? Number(opts.originalAmount) : undefined;
+        const payway = new PayWay();
+        const result = await payway.preAuth.complete(opts.transactionId, amount, {
+          idempotencyKey: opts.idempotencyKey,
+          originalAmount,
+          maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
+        });
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        console.log(`  ${c.green('✓')} Pre-auth completed for ${c.bold(opts.transactionId)}`);
+        console.log(`  ${c.dim(JSON.stringify(result).slice(0, 200))}`);
+        process.exitCode = EXIT_OK;
+      } catch (error) {
+        process.exitCode = printApiError(error);
+      }
+    },
+  );
+
+const preAuthCompletePayout = new Command('complete-payout')
+  .description('Complete a pre-auth and push funds to beneficiary accounts in one call')
+  .requiredOption('-t, --transaction-id <id>', 'Pre-auth transaction ID')
+  .requiredOption('-a, --amount <number>', 'Completion amount (USD)')
+  .requiredOption(
+    '--payout <json>',
+    'Payout array as JSON, e.g. \'[{"acc":"500000001","amt":10}]\'',
+  )
+  .option('--original-amount <number>', 'Original pre-auth amount (over-capture guard)')
+  .option('--max-over-capture-pct <number>', 'Over-capture ceiling as % of original (default 110)', '110')
+    .option('--idempotency-key <key>', 'Idempotency key forwarded to PayWay')
+  .option('--json', 'Print the raw JSON response')
+  .action(
+    async (opts: {
+      transactionId: string;
+      amount: string;
+      payout: string;
+      originalAmount?: string;
+      maxOverCapturePct?: string;
+      idempotencyKey?: string;
+      json?: boolean;
+    }) => {
+      if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      try {
+        const amount = Number(opts.amount);
+        validateTransactionId(opts.transactionId);
+        let payout: { acc: string; amt: number }[];
+        try {
+          payout = JSON.parse(opts.payout) as { acc: string; amt: number }[];
+        } catch {
+          throw new PayWayConfigError('Invalid --payout JSON. Expected an array like \'[{"acc":"500000001","amt":10}]\'.');
+        }
+        if (!Array.isArray(payout) || payout.length === 0) {
+          throw new PayWayConfigError('payout must be a non-empty array');
+        }
+        const originalAmount = opts.originalAmount !== undefined ? Number(opts.originalAmount) : undefined;
+        const payway = new PayWay();
+        const result = await payway.preAuth.completeWithPayout(opts.transactionId, amount, payout, {
+          idempotencyKey: opts.idempotencyKey,
+          originalAmount,
+          maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
+        });
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        console.log(`  ${c.green('✓')} Pre-auth completed with payout for ${c.bold(opts.transactionId)}`);
+        console.log(`  ${c.dim(JSON.stringify(result).slice(0, 200))}`);
+        process.exitCode = EXIT_OK;
+      } catch (error) {
+        process.exitCode = printApiError(error);
+      }
+    },
+  );
+
+const preAuthCancel = new Command('cancel')
+  .description('Cancel (void) an open PayWay pre-authorization')
+  .requiredOption('-t, --transaction-id <id>', 'Pre-auth transaction ID')
+  .option('--reason <reason>', 'Optional cancellation reason')
+  .option('--idempotency-key <key>', 'Idempotency key forwarded to PayWay')
+  .option('-y, --force', 'Skip confirmation prompt')
+  .option('--json', 'Print the raw JSON response')
+  .action(
+    async (opts: {
+      transactionId: string;
+      reason?: string;
+      idempotencyKey?: string;
+      force?: boolean;
+      json?: boolean;
+    }) => {
+      if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      try {
+        validateTransactionId(opts.transactionId);
+        if (!opts.force && !opts.json) {
+          const confirmed = await promptConfirmation(
+            `  Cancel pre-auth ${c.cyan(opts.transactionId)}? This cannot be undone. (y/n): `,
+          );
+          if (!confirmed) {
+            console.log(`  ${c.yellow('Cancelled by user.')}`);
+            process.exitCode = EXIT_OK;
+            return;
+          }
+        }
+        const payway = new PayWay();
+        const result = await payway.preAuth.cancel(opts.transactionId, {
+          reason: opts.reason,
+          idempotencyKey: opts.idempotencyKey,
+        });
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+        console.log(`  ${c.green('✓')} Pre-auth cancelled for ${c.bold(opts.transactionId)}`);
+        console.log(`  ${c.dim(JSON.stringify(result).slice(0, 200))}`);
+        process.exitCode = EXIT_OK;
+      } catch (error) {
+        process.exitCode = printApiError(error);
+      }
+    },
+  );
+
+program
+  .command('pre-auth')
+  .description('Complete, complete-with-payout, or cancel a PayWay pre-authorization')
+  .addCommand(preAuthComplete)
+  .addCommand(preAuthCompletePayout)
+  .addCommand(preAuthCancel);
 
 // --- parse ---
 program.parseAsync().catch((err: unknown) => {

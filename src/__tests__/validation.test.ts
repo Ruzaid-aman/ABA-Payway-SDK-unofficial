@@ -130,6 +130,31 @@ describe('Validation: pre-auth', () => {
     await preAuthPos.complete('T1', 10);
     expect(rawAuthSpy).toHaveBeenCalled();
   });
+
+  it('throws when completion exceeds the 110% over-capture ceiling', () => {
+    expect(() => preAuth.complete('T1', 200, { originalAmount: 100 })).toThrow(PayWayConfigError);
+  });
+
+  it('allows completion within the 110% over-capture ceiling', async () => {
+    rawAuthSpy.mockClear();
+    await preAuthPos.complete('T1', 105, { originalAmount: 100 });
+    expect(rawAuthSpy).toHaveBeenCalled();
+  });
+
+  it('forwards idempotencyKey as idempotency_key in the payload', async () => {
+    rawAuthSpy.mockClear();
+    await preAuthPos.complete('T1', 10, { idempotencyKey: 'idemp-1' });
+    const payload = rawAuthSpy.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.idempotency_key).toBe('idemp-1');
+  });
+
+  it('forwards reason in the cancel payload', async () => {
+    rawAuthSpy.mockClear();
+    await preAuthPos.cancel('T1', { reason: 'customer request' });
+    const payload = rawAuthSpy.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.reason).toBe('customer request');
+    expect(payload.tran_id).toBe('T1');
+  });
 });
 
 describe('Validation: khqr', () => {
