@@ -216,7 +216,7 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 | `payway-sdk test` | Run the sandbox test suite |
 | `payway-sdk get-transactions-by-ref --merchant-ref <reference>` | Retrieve up to 50 transactions for a merchant reference |
 | `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
-| `payway-sdk generate-qr` | Generate a QR code (online or offline). Use `--non-interactive` (`-y`) to skip prompts for scripts/CI. |
+| `payway-sdk generate-qr` | Generate a QR code (online or offline). Saves the PNG and opens it in the OS default viewer on interactive terminals. Use `--non-interactive` (`-y`) to skip prompts for scripts/CI. |
 | `payway-sdk generate-checkout` | Generate a checkout QR URL |
 | `payway-sdk check-transaction -t <id>` | One-shot payment status check |
 | `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min) |
@@ -242,9 +242,10 @@ payway-sdk refund -t order-123 -a 5.00 -c USD -y
 For the fastest manual QR test:
 
 - `doctor` should show the callback row ready before online QR creation.
-- `generate-qr` saves the PNG automatically to `payway-output/<transaction-id>.png`.
+- `generate-qr` saves the PNG automatically to `payway-output/<transaction-id>.png` and opens it in your OS default image viewer (interactive terminals only).
 - Use `--save-image <path>` to override the PNG path.
 - Use `--no-save-image` to disable the default PNG write for one run.
+- Use `--open-image` / `--no-open-image` to force or suppress the viewer.
 - If the callback row is missing, run `payway-sdk setup-webhook --tunnel`.
 
 ### Refund follow-up

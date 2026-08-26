@@ -186,7 +186,7 @@ Confused by a code? `payway-sdk explain PTL36` — offline, no credentials.
 # SETUP
 payway-sdk init && payway-sdk doctor --live
 
-# TAKE A PAYMENT (terminal QR appears; polls until paid)
+# TAKE A PAYMENT (terminal QR + PNG auto-open; polls until paid)
 payway-sdk generate-qr -a 5.00
 
 # OPERATIONS

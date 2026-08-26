@@ -130,7 +130,13 @@ For **online QR**, make sure `PAYWAY_CALLBACK_URL` is a public HTTPS URL first. 
 payway-sdk setup-webhook --tunnel
 ```
 
-Online `generate-qr` now saves the QR PNG by default to `payway-output/<transaction-id>.png` and renders the QR in the terminal when possible. Use `--save-image <path>` to override the file location, or `--no-save-image` to opt out for one run.
+Online `generate-qr` saves the QR PNG by default to `payway-output/<transaction-id>.png`, renders the QR in the terminal when possible, and **opens the PNG with your OS default image viewer** so it is immediately scannable. Image-open behavior:
+
+- **Auto (default):** opens only when stdout is an interactive terminal — scripts, CI, and agents are never interrupted.
+- `--open-image` — force-open regardless of environment.
+- `--no-open-image` — never open; use `--save-image <path>` still controls where the file lands.
+
+The same opener is available programmatically via the exported [`openImageInDefaultViewer()`](src/open-image.ts) helper (allowlisted per-platform command, spawned without a shell, never throws).
 
 ### Fastest refund follow-up
 

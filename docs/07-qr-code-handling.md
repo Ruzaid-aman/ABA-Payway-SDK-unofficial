@@ -34,9 +34,10 @@ payway-sdk transaction-detail -t <id>
 ```
 
 - `doctor` confirms credentials and online-QR callback readiness.
-- `generate-qr` saves the QR PNG by default to `payway-output/<transaction-id>.png`.
+- `generate-qr` saves the QR PNG by default to `payway-output/<transaction-id>.png` and opens it in your OS default image viewer (interactive terminals only — scripts/agents are never interrupted).
 - Use `--save-image <path>` to choose a different output path.
 - Use `--no-save-image` to disable the default PNG write for one run.
+- Use `--open-image` to force the viewer open regardless of environment, or `--no-open-image` to never open it.
 - If `PAYWAY_CALLBACK_URL` is missing locally, run `payway-sdk setup-webhook --tunnel`.
 
 ### Backend Endpoint
@@ -371,6 +372,11 @@ payway-sdk generate-qr -a 3.31 -c USD --save-image tmp/qr.png
 # Disable the default PNG write
 payway-sdk generate-qr -a 3.31 -c USD --no-save-image
 
+# QR image viewer: auto-opens on interactive terminals only.
+# Force it open (headless/CI too) or suppress it entirely:
+payway-sdk generate-qr -a 3.31 -c USD --open-image
+payway-sdk generate-qr -a 3.31 -c USD --no-open-image
+
 # List today's transactions (strict date format)
 payway-sdk transaction-list --from "2026-08-25 00:00:00" --to "2026-08-25 23:59:59" --status APPROVED
 
@@ -383,6 +389,22 @@ payway-sdk refund -t order-123 -a 5.00 -c USD
 # Live USD/KHR rate
 payway-sdk exchange-rate
 ```
+
+### Opening the saved PNG from your own code
+
+The viewer opener is exported for programmatic use — handy in POS scripts right after `generateQr()`:
+
+```typescript
+import { openImageInDefaultViewer } from 'aba-payway-ts';
+
+const result = await openImageInDefaultViewer('payway-output/order-123.png');
+if (!result.opened) {
+  // 'missing_file' | 'unsupported_platform' | 'spawn_error'
+  console.warn(`Could not open QR image (${result.reason})`);
+}
+```
+
+It never throws and never touches a shell: each platform gets a fixed allowlisted command (`rundll32 url.dll,FileProtocolHandler` on Windows, `open` on macOS, `xdg-open` on Linux) spawned detached, so polling continues while the viewer loads.
 
 ---
 

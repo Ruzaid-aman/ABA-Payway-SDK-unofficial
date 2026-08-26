@@ -1,6 +1,8 @@
 # PayWay SDK — Project Status
 
-> Last updated: 2026-08-25
+> Last updated: 2026-08-26
+
+> **QR image auto-open session (2026-08-26, uncommitted).** `generate-qr` now opens the saved QR PNG with the OS default image viewer so it is immediately scannable: default behavior is TTY-aware (interactive terminals only; scripts/CI/agents unaffected), `--open-image` forces it, `--no-open-image` suppresses it. New SDK export `openImageInDefaultViewer()` + `defaultViewerCommandForPlatform()` in `src/open-image.ts` (allowlisted per-platform command — Windows `rundll32 url.dll,FileProtocolHandler` / macOS `open` / Linux `xdg-open` — spawned shell-less and detached, never throws, degrades to an "Open it manually" hint). Live-verified on Windows (rundll32 opened the PNG from transaction `qrmt9v6kaa288eb2`). Docs synced across README, CHANGELOG, Chapter 7, QUICK-START-1-PAGER, VISUAL-GUIDE, and `skills/aba-payway-qr` v1.3.0. Gate: **738 tests / 47 files / lint clean / typecheck clean / build clean**.
 
 > **Close-Transaction escalation open (2026-08-25, uncommitted).** Live sandbox evidence that `closeTransaction` is advisory only: two card payments completed AFTER a code-00 close (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206 → both APPROVED), closure is unqueryable (no CLOSED status in check/detail, no operation marker), and re-close returns 00 idempotently. Full dossier with reproduction + ABA questions + post-fix checklist: [CLOSE-TRANSACTION-FINDINGS.md](./CLOSE-TRANSACTION-FINDINGS.md). Same session also shipped: typed rate-limit errors for the undocumented HTTP 403 + numeric-code-429 shape with window-aware retry pacing and `onThrottle` hook; poller `NOT_FOUND` grace period; end-to-end tools (`online-qr-poll.ts`, `checkout-link-poll.ts`, `checkout-cards-close.ts`, `close-transaction-verify.ts`); skills/docs sync (qr/purchase/check-transaction/transaction-detail/transaction-close v1.2.0). Gate: **727 tests / lint clean / typecheck clean**, all flows paid & verified live.
 
@@ -508,13 +510,13 @@ Tasks must be completed **in this order**:
 ```
 Package version (package.json):  1.1.1
 Recent commits:                  808dc80 (journey UX pass) / 922cf67 (docs sync) / bc4efb7 (campaign fixes) / b8ff4b6 / e6c872c / 341923d (Milestone D)
-Working tree state:              Learnings sync: CHANGELOG Unreleased, PROJECT_STATUS, chapter 12, skills (check/close/detail/list/agent), VISUAL-GUIDE.md
+Working tree state:              QR image auto-open session (2026-08-26) UNCOMMITTED: src/open-image.ts + export, generate-qr --open-image/--no-open-image, 11 new tests, docs/README/CHANGELOG/VISUAL-GUIDE/QUICK-START sync, aba-payway-qr skill v1.3.0
 Active agent provider:           opencode (https://opencode.ai/zen/v1), model x-preview-f-free, key via PAYWAY_AGENT_API_KEY in .env
-Vitest:                          694 passing / 0 failing (45 files)
+Vitest:                          738 passing / 0 failing (47 files)
 Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck -> clean
 Lint:                            biome -> 0 errors, 0 warnings
 Build:                           clean (dist/ rebuilt)
-Live E2E:                        doctor --live round-trip ✓; poll-transaction/list verified against sandbox (2026-08-25)
+Live E2E:                        doctor --live round-trip ✓; poll-transaction/list verified against sandbox (2026-08-25); openImageInDefaultViewer live-opened a real sandbox QR PNG on Windows (2026-08-26)
 Sandbox campaigns:               Milestones E+F committed; evidence in test-output/campaign-*.json + SANDBOX-FINDINGS §8–9
-Next task:                       Commit learnings sync; ask ABA: v3 token-trio HMAC composition (findings §9a)
+Next task:                       Commit the QR auto-open changeset; ask ABA: v3 token-trio HMAC composition (findings §9a), close-transaction enforcement (CLOSE-TRANSACTION-FINDINGS §5)
 ```
