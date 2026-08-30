@@ -28,6 +28,7 @@ const REGISTERED_COMMANDS = [
   'validate',
   'generate-qr',
   'generate-checkout',
+  'checkout-form',
   'payment-link',
   'sandbox-beneficiaries',
   'payout',

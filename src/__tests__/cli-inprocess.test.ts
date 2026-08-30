@@ -12,10 +12,10 @@
  * switched to an empty temp dir BEFORE the dynamic import — keeping the
  * hermetic test environment free of ambient credentials.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { captureConsole } from '../test/test-utils.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-inprocess-'));
@@ -149,5 +149,103 @@ describe('CLI in-process (runCli)', () => {
     expect(text.length).toBeGreaterThan(0);
     expect(text).not.toContain('ENOENT'); // missing dir is reported, not crashed on
     expect([undefined, 0, 1]).toContain(exitCode);
+  });
+});
+
+describe('checkout-form (in-process runCli)', () => {
+  // The CLI's persisted global profile store (%APPDATA%/aba-payway-sdk) would
+  // otherwise supply machine-local credentials; point APPDATA at an empty dir
+  // so every case below is deterministic on any machine.
+  const emptyAppData = mkdtempSync(path.join(tmpdir(), 'payway-empty-appdata-'));
+
+  afterAll(() => {
+    rmSync(emptyAppData, { recursive: true, force: true });
+  });
+
+  it('requires credentials (the signed form embeds merchant_id + hash)', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    // Earlier tests in this file trigger profile activation, which persists
+    // resolved credentials into process.env for the whole file — remove them
+    // so the missing-credentials path is actually exercised.
+    const savedMid = process.env.PAYWAY_MERCHANT_ID;
+    const savedKey = process.env.PAYWAY_API_KEY;
+    delete process.env.PAYWAY_MERCHANT_ID;
+    delete process.env.PAYWAY_API_KEY;
+    try {
+      const { text, exitCode } = await run(['checkout-form', '-a', '15']);
+      expect(text).toContain('Missing merchant credentials');
+      expect(exitCode).toBe(1);
+    } finally {
+      if (savedMid !== undefined) process.env.PAYWAY_MERCHANT_ID = savedMid;
+      if (savedKey !== undefined) process.env.PAYWAY_API_KEY = savedKey;
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('writes a signed form document to --out with stubbed credentials', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    const outDir = mkdtempSync(path.join(tmpdir(), 'payway-checkout-form-'));
+    const outPath = path.join(outDir, 'form.html');
+    try {
+      const { text, exitCode } = await run(['checkout-form', '-a', '15.00', '--out', outPath]);
+      expect(exitCode).toBe(0);
+      expect(text).toContain('written to');
+      expect(text).toMatch(/Transaction ID:/);
+
+      const html = readFileSync(outPath, 'utf8');
+      expect(html).toMatch(/^<!DOCTYPE html>/);
+      expect(html).toContain('https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase');
+      expect(html).toContain('name="merchant_id" value="inprocess-mid"');
+      expect(html).toContain('name="hash"');
+      expect(html).toContain('name="amount" value="15.00"');
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('emits clean HTML on stdout and diagnostics on stderr (redirect-safe)', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    const stdoutChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+    try {
+      const { text, exitCode } = await run(['checkout-form', '-a', '3', '-t', 'stdout-tx-1']);
+      expect(exitCode).toBe(0);
+      const html = stdoutChunks.join('');
+      expect(html).toMatch(/^<!DOCTYPE html>/);
+      expect(html).toContain('name="tran_id" value="stdout-tx-1"');
+      // Diagnostics ride console.error (captured by run()), never stdout.
+      expect(html).not.toContain('Transaction ID:');
+      expect(text).toContain('Transaction ID:');
+    } finally {
+      stdoutSpy.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('rejects an invalid amount with exit code 1', async () => {
+    const { text, exitCode } = await run(['checkout-form', '-a', '0']);
+    expect(text).toContain('Amount must be a positive number');
+    expect(exitCode).toBe(1);
+  });
+
+  it('surfaces domain validation conflicts (autoSubmit + popupMode) as exit 1', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    try {
+      const { text, exitCode } = await run(['checkout-form', '-a', '3', '--auto-submit', '--popup']);
+      expect(text).toContain('mutually exclusive');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

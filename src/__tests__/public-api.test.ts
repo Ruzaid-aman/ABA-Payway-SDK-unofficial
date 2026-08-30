@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as PublicApi from '../index.js';
+import type { CheckoutFormOptions } from '../index.js';
 
 describe('public API surface (src/index.ts barrel)', () => {
   it('exports the main client and facade', () => {
@@ -15,6 +16,10 @@ describe('public API surface (src/index.ts barrel)', () => {
     expect(typeof PublicApi.sdk.server.initiateTransaction).toBe('function');
     expect(typeof PublicApi.verifyCallbackSignature).toBe('function');
     expect(typeof PublicApi.client).toBe('object');
+    // Compile-time pin: the option type stays part of the public surface.
+    // (Type-only exports have no runtime binding to assert on.)
+    const formOptions: CheckoutFormOptions = {};
+    void formOptions;
   });
 
   it('exports error classes', () => {
