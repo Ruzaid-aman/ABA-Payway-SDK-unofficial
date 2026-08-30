@@ -1,9 +1,13 @@
 # ABA PayWay TypeScript SDK
 
+[![CI](https://github.com/antigravity-google/aba-payway-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/antigravity-google/aba-payway-ts/actions/workflows/ci.yml)
+
 Production-ready, fully-typed TypeScript SDK for the ABA PayWay payment gateway.
 
 > [!IMPORTANT]
 > **Security Warning**: This SDK is designed for **Server-Side (Node.js) execution only**. It relies on `node:crypto` for cryptographic signing (HMAC-SHA512) and RSA encryption. **Never** import or use this SDK in frontend/client-side applications (React, Angular, Vue, iOS, Android), as doing so will expose your high-privilege PayWay API Key and RSA credentials to the public.
+>
+> Requires Node.js 20 or later.
 
 ---
 

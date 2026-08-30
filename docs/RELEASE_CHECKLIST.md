@@ -55,3 +55,20 @@ npm run docs:api
 ```
 
 - [ ] Confirm `docs/README.md` and `README.md` both link to the new docs or API reference.
+
+## First Public npm Publish (one-time, maintainer decision)
+
+The package is publish-ready (`files: ["dist", "skills"]`, `prepublishOnly` clean-builds) but is **not yet on the registry** (`npm view aba-payway-ts` → 404 as of 2026-08-30). Publishing is outward-facing and requires registry credentials, so it is deliberately left as a maintainer-executed step.
+
+- [ ] Verify the exact tarball contents **without** publishing:
+
+```bash
+npm publish --dry-run
+```
+
+Confirm only `dist/` and `skills/` ship, no `.env`, profile stores, `test-output/`, or audit artifacts appear in the file list, and the tarball size is sane.
+
+- [ ] Confirm registry identity and name rights: `npm whoami`; the `aba-payway-ts` name must be free or already owned by the org.
+- [ ] Publish with 2FA: `npm publish`.
+- [ ] Post-publish smoke: `npm view aba-payway-ts version`, then in a clean temp directory `npm i aba-payway-ts` and `node -e "console.log(Object.keys(require('aba-payway-ts')).length)"` (expect 54 exports).
+- [ ] If publishing from CI later, add `--provenance` (requires an OIDC-linked workflow) and pin the release to a tag build, not `main` pushes.

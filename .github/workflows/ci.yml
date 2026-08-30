@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   secret-scan:
     name: Secret scan (TD-01 gate)
@@ -47,5 +51,19 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      # dist must exist before the suite: the child-process suites
+      # (cli.test.ts, agent-cli.test.ts, webhook-cli.test.ts) spawn dist/cli.js.
+      - name: Build
+        run: npm run build
       - name: Unit & integration tests
         run: npm test
+      - name: Coverage (enforces floor thresholds from vitest.config.ts)
+        if: matrix.node-version == '22.x'
+        run: npx vitest run --coverage --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html
+      - name: Upload coverage artifact
+        if: matrix.node-version == '22.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-node-22
+          path: coverage/
+          retention-days: 14
