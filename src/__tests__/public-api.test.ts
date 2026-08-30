@@ -52,7 +52,7 @@ describe('public API surface (src/index.ts barrel)', () => {
   });
 
   it('logger and circuit-breaker exports return working instances', () => {
-    const logger = PublicApi.createPayWayLogger({ level: 'silent' });
+    const logger = PublicApi.createPayWayLogger({ level: 'error' });
     for (const level of ['debug', 'info', 'warn', 'error'] as const) {
       expect(typeof logger[level]).toBe('function');
     }
@@ -61,7 +61,8 @@ describe('public API surface (src/index.ts barrel)', () => {
     expect(() => breaker.assertAllowed('/api/payment-gateway/v1/exchange-rate')).not.toThrow();
     breaker.recordSuccess('/api/payment-gateway/v1/exchange-rate');
     expect(PublicApi.resolveLogLevel('debug')).toBe('debug');
-    expect(PublicApi.resolveLogLevel('nonsense')).toBeDefined();
+    expect(PublicApi.resolveLogLevel('nonsense' as never)).toBeDefined(); // unknown strings fall back
+
   });
 
   it('exports gateway code tables and constants', () => {
