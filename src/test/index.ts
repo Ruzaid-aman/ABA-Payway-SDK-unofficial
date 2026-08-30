@@ -254,6 +254,97 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
         return;
       }
 
+      // Status/reference endpoints — same shapes as the live sandbox
+      // (SANDBOX-FINDINGS §6, §14a). Tran-ID conventions:
+      //   • `e2e-approved-*` → APPROVED (payment_status_code 0, paid amount 5.00)
+      //   • ids containing "missing" → 200-wrapped business error, status.code 6
+      //   • anything else → PENDING (payment_status_code 2)
+      const statusEndpoints: { match: string; respond: (tranId: string) => unknown }[] = [
+        {
+          match: '/payments/check-transaction-2',
+          respond: (tranId) => ({
+            status: { code: '00', message: 'Success', tran_id: tranId },
+            data: {
+              payment_status: tranId.startsWith('e2e-approved') ? 'APPROVED' : 'PENDING',
+              payment_status_code: tranId.startsWith('e2e-approved') ? 0 : 2,
+              original_amount: '1.00',
+              payment_amount: tranId.startsWith('e2e-approved') ? '5.00' : '0',
+            },
+          }),
+        },
+        {
+          match: '/payments/transaction-detail',
+          respond: (tranId) => ({
+            status: { code: '00', message: 'Success', tran_id: tranId },
+            data: {
+              payment_status: tranId.startsWith('e2e-approved') ? 'APPROVED' : 'PENDING',
+              payment_status_code: tranId.startsWith('e2e-approved') ? 0 : 2,
+              original_amount: '1.00',
+              apv: '876776',
+              transaction_operations: [],
+            },
+          }),
+        },
+        {
+          match: '/payments/transaction-list-2',
+          respond: () => ({
+            status: { code: '00', message: 'Success!', tran_id: '1788110078' },
+            page: 1,
+            pagination: 40,
+            data: [
+              {
+                transaction_id: 'e2e-list-row-1',
+                payment_status: 'APPROVED',
+                payment_status_code: 0,
+                original_amount: '5.00',
+                original_currency: 'USD',
+                transaction_date: '2026-08-30 12:00:00',
+              },
+            ],
+          }),
+        },
+        {
+          match: '/payments/close-transaction',
+          respond: (tranId) => ({ status: { code: '00', message: 'Success!', tran_id: tranId } }),
+        },
+        {
+          match: '/exchange-rate',
+          respond: () => ({
+            status: { code: '00', message: 'Success!' },
+            date: '',
+            exchange_rates: {
+              usd: { sell: '4012', buy: '3990' },
+              eur: { sell: '4667.55', buy: '4466.96' },
+            },
+          }),
+        },
+      ];
+
+      const statusEndpoint = statusEndpoints.find((e) => (req.url ?? '').includes(e.match));
+      if (statusEndpoint) {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          let tranId = '';
+          try {
+            const parsed = JSON.parse(body) as Record<string, unknown>;
+            tranId = typeof parsed.tran_id === 'string' ? parsed.tran_id : '';
+          } catch {
+            // Fall through — tranId stays ''.
+          }
+          if (tranId.includes('missing')) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: { code: 6, message: 'tran_id not found', tran_id: tranId } }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(statusEndpoint.respond(tranId)));
+        });
+        return;
+      }
+
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Not found' }));
     });

@@ -13,7 +13,9 @@
 
 import type { Server as HttpServer } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PayWay } from '../client.js';
 import type { PayWayConfig } from '../client.js';
+import { PayWayBusinessError } from '../errors.js';
 import { normalizePaywayResponse, server } from '../server/index.js';
 import {
   generateMockSession,
@@ -200,5 +202,78 @@ describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {
     await expect(
       server.initiateTransaction({ transactionId: 'x' } as any, config),
     ).rejects.toThrow(/amount/);
+  });
+});
+
+describe('mock harness parity with client status endpoints', () => {
+  let mockServer: HttpServer;
+  let mockUrl: string;
+  let client: PayWay;
+
+  beforeAll(async () => {
+    mockServer = await startMockPaywayServer(0);
+    mockUrl = getMockPaywayUrl(mockServer);
+    client = new PayWay({
+      merchantId: 'mock',
+      apiKey: 'mock-key',
+      environment: 'sandbox',
+      baseUrl: mockUrl,
+    });
+  });
+
+  afterAll(async () => {
+    await stopMockPaywayServer(mockServer);
+  });
+
+  it('checkTransaction resolves a PENDING transaction (check-transaction-2 route)', async () => {
+    const res = await client.checkout.checkTransaction('e2e-pending-1');
+    expect(res.status?.code).toBe('00');
+    expect(res.data?.payment_status).toBe('PENDING');
+    expect(res.data?.payment_status_code).toBe(2);
+  });
+
+  it('checkTransaction resolves an APPROVED transaction by tran_id convention', async () => {
+    const res = await client.checkout.checkTransaction('e2e-approved-1');
+    expect(res.data?.payment_status).toBe('APPROVED');
+    expect(res.data?.payment_status_code).toBe(0);
+    expect(res.data?.payment_amount).toBe('5.00');
+  });
+
+  it('checkTransaction surfaces the sandbox not-found business error (code 6)', async () => {
+    let caught: unknown;
+    try {
+      await client.checkout.checkTransaction('missing-1');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(PayWayBusinessError);
+    expect(String((caught as PayWayBusinessError).paywayCode)).toBe('6');
+  });
+
+  it('getTransactionDetail returns the sandbox detail shape (transaction-detail route)', async () => {
+    const res = await client.checkout.getTransactionDetail('e2e-detail-1');
+    expect(res.status?.code).toBe('00');
+    expect(res.data?.apv).toBe('876776');
+    expect(Array.isArray(res.data?.transaction_operations)).toBe(true);
+  });
+
+  it('getTransactionList returns the sandbox { status, page, pagination, data } shape', async () => {
+    const res = await client.checkout.getTransactionList({});
+    expect(res.status?.code).toBe('00');
+    expect(Array.isArray((res as unknown as { data: unknown[] }).data)).toBe(true);
+    expect((res as unknown as { data: { transaction_id: string }[] }).data[0]?.transaction_id).toBe(
+      'e2e-list-row-1',
+    );
+  });
+
+  it('closeTransaction succeeds (close-transaction route)', async () => {
+    const res = await client.checkout.closeTransaction('e2e-close-1');
+    expect(res.status?.code).toBe('00');
+  });
+
+  it('getExchangeRate returns the sandbox exchange_rates shape (exchange-rate route)', async () => {
+    const res = await client.checkout.getExchangeRate();
+    expect(res.status?.code).toBe('00');
+    expect(res.exchange_rates?.usd?.sell).toBe('4012');
   });
 });
