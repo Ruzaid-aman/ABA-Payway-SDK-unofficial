@@ -471,3 +471,56 @@ code 00 → post-close still PENDING. Extra observations:
 
 > 📁 **Full close-API dossier (evidence, reproduction, questions for ABA,
 > post-fix validation checklist): [CLOSE-TRANSACTION-FINDINGS.md](./CLOSE-TRANSACTION-FINDINGS.md)**
+
+## 13. Edge-case campaign: QR lifecycle bounds, duplicates, response shapes (2026-08-30)
+
+Evidence: `test-output/edge-case-probe/live-probe.log`; harness:
+`src/__tests__/edge-case-audit.test.ts` (43 behavior-pinning probes); full
+findings matrix in `audit-results/edge-case-report.md`.
+
+### 13a. QR lifetime — minimum is exactly 180s (pinned)
+
+| `lifetime` (seconds) | Sent to API (minutes) | Result |
+|---|---|---|
+| 30 | 0 | HTTP 400, code `"04"` |
+| 59 / 60 / 90 / 120 / 150 / 179 | 0/1/1/2/2/2 | HTTP 400, code `"04"` |
+| **180** | **3** | **HTTP 200, code 00** |
+| 100000 (~27.8h) | 1666 | HTTP 200, code 00 |
+
+Matches the OpenAPI spec note ("Minimum: 3 mins. Maximum: 120 days") — but
+neither `validateLifetime()` nor the CLI enforces or hints it, so sub-180s
+requests die at the gateway with the opaque string code `"04"`
+("The given data was invalid"). `payway-sdk explain 04` already normalizes
+`"04"` → `4` "Invalid Data" (verified). ~27h values are accepted, consistent
+with the 120-day max not being approached.
+
+### 13b. Duplicate `tran_id` on generate-qr silently accepted
+
+Same `-t ec-probe-dup` at $5.00 and then $7.77: both returned HTTP 200 /
+code 00 with **two different live QR payloads** (amounts embedded: "5.00"
+and "7.77"). Mirrors the §8b duplicate-purchase finding — whichever QR is
+scanned first wins; the other amount goes stale. Extends open question #1/#11
+to the QR endpoint.
+
+### 13c. Amount bounds on generate-qr
+
+- $0.01 USD → accepted (EMVCo amount "0.01").
+- $100000 USD → accepted (no observed cap at this scale).
+- KHR 4000 → accepted (EMVCo amount "4000.00", gateway adds decimals for KHR).
+
+### 13d. Reconfirmed live
+
+- check-transaction on nonexistent ID → HTTP 200, nested `status.code 6`
+  "tran_id not found"; CLI prints friendly message + `PayWay code: 6`, exit 2.
+- CLI exit codes behave as documented (validate errors → 1, API failure → 2).
+- `validate` command rejects every malformed amount/ID thrown at it with a
+  precise message and exit 1.
+
+### 13e. CLI credential precedence surprise
+
+Running any API command from a directory **without** `.env` (and with the env
+cleared) still reached the sandbox: the persisted global profile store
+(`profiles`) supplied credentials ("Using profile: sandbox (sandbox)") with no
+opt-in. Precedence (profile store > `.env` > ambient env) is undocumented —
+see finding EC-14 and the improvement plan.
+

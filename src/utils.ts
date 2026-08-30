@@ -1,5 +1,6 @@
 import { PayWayConfigError } from './errors.js';
 import {
+  QR_LIFETIME_MIN_SECONDS,
   REQUEST_ID_PATTERN,
   TOKEN_FLAG_CHARGING,
   TOKEN_FLAG_LINKING,
@@ -61,6 +62,23 @@ export function validateTransactionId(transactionId: string): void {
 export function validateLifetime(lifetime: number | undefined): void {
   if (lifetime !== undefined && (!Number.isInteger(lifetime) || lifetime <= 0)) {
     throw new PayWayConfigError('lifetime must be a positive whole number of seconds');
+  }
+}
+
+/**
+ * Validate a QR-code lifetime supplied in seconds.
+ *
+ * PayWay's generate-qr API takes whole minutes and rejects anything below 3
+ * with an opaque HTTP 400 code "04" (sandbox-pinned boundary 2026-08-30:
+ * 179s → 400 "04", 180s → OK). The generic {@link validateLifetime} cannot
+ * enforce this because checkout.purchase sends its lifetime in minutes.
+ */
+export function validateQrLifetimeSeconds(lifetime: number | undefined): void {
+  validateLifetime(lifetime);
+  if (lifetime !== undefined && lifetime < QR_LIFETIME_MIN_SECONDS) {
+    throw new PayWayConfigError(
+      `QR lifetime must be at least ${QR_LIFETIME_MIN_SECONDS} seconds (3 minutes — PayWay gateway minimum), received: ${lifetime}`,
+    );
   }
 }
 
@@ -169,7 +187,11 @@ export function validateBeneficiaries(
     sum += b.amount;
   }
 
-  if (Math.abs(sum - totalAmount) > Number.EPSILON) {
+  // Compare in integer minor units (cents for USD): accumulated float error
+  // on legitimate sums drifts by ~1e-15, which exceeds Number.EPSILON and
+  // used to false-reject valid splits like [1.1, 2.2] vs 3.3.
+  const minorUnitScale = currency === 'USD' ? 100 : 1;
+  if (Math.round(sum * minorUnitScale) !== Math.round(totalAmount * minorUnitScale)) {
     throw new PayWayConfigError(`beneficiary amounts (${sum}) must sum to total amount (${totalAmount})`);
   }
 }

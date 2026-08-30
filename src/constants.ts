@@ -152,6 +152,7 @@ export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }>
   '26': { title: 'Invalid Merchant Profile', hint: 'Merchant identity rejected (sandbox-verified HTTP 400 on exchange-rate with unknown merchant_id) — check PAYWAY_MERCHANT_ID or the active profile.' },
   '37': { title: 'Payout Whitelist', hint: 'Payout account not whitelisted — call addBeneficiary() first.' },
   '49': { title: 'Invalid Request', hint: "Validation failed. For transaction-list dates use \"YYYY-MM-DD HH:mm:ss\"." },
+  '69': { title: 'Lifetime Below Minimum', hint: 'Checkout purchase lifetime must be >= 3 minutes (API takes minutes; max 43200 = 30 days; spec-documented).' },
   '96': { title: 'Payee / Merchant Data', hint: 'Beneficiary payee unknown, or payment-link id invalid (detail).' },
 };
 
@@ -168,6 +169,14 @@ export const TOKEN_FLAG_CHARGING = ['CITU_FLEX', 'MITU_FLEX', 'MITU_FIX', 'MITR_
 
 /** Server-enforced identifier rule observed in sandbox campaigns (`[a-zA-Z0-9]{5,24}`). */
 export const REQUEST_ID_PATTERN = /^[a-zA-Z0-9]{5,24}$/;
+
+/**
+ * PayWay generate-qr lifetime minimum, in seconds. The API takes whole
+ * minutes and rejects anything below 3 with an opaque HTTP 400 code "04"
+ * (sandbox-pinned boundary 2026-08-30: 179s → 400 "04", 180s → OK; see
+ * docs/SANDBOX-FINDINGS.md §13a).
+ */
+export const QR_LIFETIME_MIN_SECONDS = 180;
 
 /** ABA grants linked account/card tokens a documented ~90-day validity window; renewal resets it. */
 export const TOKEN_VALIDITY_DAYS = 90;

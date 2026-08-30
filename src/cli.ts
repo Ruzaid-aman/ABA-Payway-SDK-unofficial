@@ -27,7 +27,12 @@ import {
   saveProfileStore,
   setDefaultProfile,
 } from './config/profiles.js';
-import { PAYMENT_STATUS_CODES, PAYMENT_STATUS_LABELS, REFUND_ERROR_CODES } from './constants.js';
+import {
+  PAYMENT_STATUS_CODES,
+  PAYMENT_STATUS_LABELS,
+  QR_LIFETIME_MIN_SECONDS,
+  REFUND_ERROR_CODES,
+} from './constants.js';
 import { listSandboxBeneficiaries } from './sandbox-beneficiaries.js';
 import {
   PayWayAPIError,
@@ -1200,7 +1205,11 @@ program
   .option('--callback-url <url>', 'Webhook callback URL (required for online mode)')
   .option('--payment-option <option>', 'Payment option for online mode', 'abapay_khqr')
   .option('--template <name>', 'QR image template for online mode', 'template2')
-  .option('--lifetime <seconds>', 'Transaction lifetime in seconds (default: 180)', '180')
+  .option(
+    '--lifetime <seconds>',
+    'Transaction lifetime in seconds — minimum 180, sent to the API as whole minutes (default: 180)',
+    '180',
+  )
   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
   .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
   .option('--no-save-image', 'Do not save the QR image PNG to payway-output/<transaction-id>.png by default')
@@ -1306,6 +1315,13 @@ program
       if (!Number.isFinite(lifetimeSeconds) || lifetimeSeconds <= 0 || !Number.isInteger(lifetimeSeconds)) {
         console.log(
           `  ${c.red('✗')} --lifetime must be a positive whole number of seconds, received: ${opts.lifetime}`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+      if (lifetimeSeconds < QR_LIFETIME_MIN_SECONDS) {
+        console.log(
+          `  ${c.red('✗')} --lifetime must be at least ${QR_LIFETIME_MIN_SECONDS} seconds (3 minutes — PayWay gateway minimum; below that the API rejects with code "04"), received: ${opts.lifetime}`,
         );
         process.exitCode = 1;
         return;

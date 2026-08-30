@@ -89,6 +89,7 @@ export function createCheckoutDomain(
     timeFieldName?: 'req_time' | 'request_time',
     contentType?: 'application/json' | 'application/x-www-form-urlencoded',
     hashEncoding?: 'base64' | 'hex',
+    fetchOptions?: { retry?: 'transient' | 'none' },
   ) => Promise<TResponse>,
   requestWithMerchantAuth: <TResponse>(
     path: string,
@@ -202,6 +203,8 @@ export function createCheckoutDomain(
         fields,
         'req_time',
         'application/json',
+        undefined,
+        { retry: params.retryPolicy === 'none' ? 'none' : undefined },
       );
     },
 

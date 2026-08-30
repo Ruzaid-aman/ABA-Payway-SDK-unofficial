@@ -7,7 +7,7 @@ import {
   filterParams,
   formatAmount,
   validateCurrency,
-  validateLifetime,
+  validateQrLifetimeSeconds,
   validatePositiveAmount,
   validatePublicHttpsUrl,
   validateTransactionId,
@@ -35,7 +35,7 @@ export function createQrDomain(
       validatePositiveAmount(params.amount, params.currency || 'USD');
       validateCurrency(params.currency);
       validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
-      validateLifetime(params.lifetime);
+      validateQrLifetimeSeconds(params.lifetime);
 
       return request<components['schemas']['GenerateQrResponse']>(
         ENDPOINTS.generateQr,
@@ -46,6 +46,11 @@ export function createQrDomain(
           payment_option: params.paymentOption || 'abapay_khqr',
           callback_url: encodeBase64IfNeeded(params.callbackUrl),
           currency: params.currency || 'USD',
+          // The API takes whole minutes; floor keeps the actual expiry at or
+          // below the merchant's requested countdown (a live QR must never
+          // outlast the displayed timer). validateQrLifetimeSeconds already
+          // guaranteed >= 180s, so this can never send 0 — the gateway
+          // rejects sub-3-minute lifetimes with opaque code "04".
           lifetime: params.lifetime ? Math.floor(params.lifetime / 60) : undefined,
           qr_image_template: params.qrImageTemplate || 'template2',
           req_time: params.requestTime,

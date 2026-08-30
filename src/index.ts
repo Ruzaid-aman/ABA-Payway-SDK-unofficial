@@ -64,6 +64,7 @@ export { createPayWayLogger, resolveLogLevel } from './logger.js';
 export type { LogLevel, LogSink, PayWayLogger, PayWayLoggerOptions } from './logger.js';
 export { computeTokenExpiry, daysUntilTokenExpiry } from './utils.js';
 export {
+  QR_LIFETIME_MIN_SECONDS,
   REQUEST_ID_PATTERN,
   TOKEN_FLAG_CHARGING,
   TOKEN_FLAG_LINKING,

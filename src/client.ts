@@ -132,8 +132,21 @@ export interface CreateTransactionParams {
   paymentGate?: number;
   payout?: string | { acc: string; amt: number }[];
   additionalParams?: string | Record<string, unknown>;
+  /**
+   * Lifetime in MINUTES, forwarded raw to the API (unlike the QR domain,
+   * which accepts seconds). Spec: min 3, max 43200 (30 days); below 3 the
+   * gateway rejects with error 69. Not converted or minimum-enforced here.
+   */
   lifetime?: number;
   googlePayToken?: string;
+  /**
+   * Retry policy for this purchase call. 'transient' (default) re-sends the
+   * request after network errors/5xx/429; 'none' surfaces those failures
+   * after the first attempt — use for strict once-only submission, since
+   * production duplicate-tran_id semantics are unconfirmed (sandbox
+   * overwrites duplicates).
+   */
+  retryPolicy?: 'transient' | 'none';
 }
 
 export interface LinkAccountParams {
@@ -278,10 +291,38 @@ function checkResponseError(body: unknown, endpoint?: string): void {
     }
   }
 
+  // Legacy (non -2) endpoints answer with a flat numeric status, e.g.
+  // {"status": 6, "description": "tran_id not found"}. Non-zero is a
+  // business error carrying the code; 0 falls through (no code field in
+  // that shape, so it resolves as success).
+  if (typeof resp.status === 'number' && resp.status !== 0) {
+    const message = String(resp.description ?? resp.message ?? 'Unknown PayWay API Error');
+    throw new PayWayBusinessError(message, {
+      statusCode: 200,
+      paywayCode: String(resp.status),
+      rawBody: body,
+      endpoint,
+      retryable: false,
+    });
+  }
+
   if (resp.code !== undefined && resp.code !== null && typeof resp.code !== 'object') {
     const code = String(resp.code);
     const message = String(resp.message ?? 'Unknown PayWay API Error');
     if (code !== '0' && code !== '00') {
+      if (code === '429') {
+        // A 200-wrapped flat code "429" is a rate-limit response in a
+        // non-standard envelope. The retry engine already paces these by
+        // paywayCode; throw the typed error so callers matching on
+        // PayWayRateLimitError catch it too.
+        throw new PayWayRateLimitError(message, {
+          statusCode: 200,
+          paywayCode: code,
+          rawBody: body,
+          endpoint,
+          retryable: true,
+        });
+      }
       throw new PayWayBusinessError(message, {
         statusCode: 200,
         paywayCode: code,
@@ -342,6 +383,23 @@ function createHttpError(
     if (status && (typeof rawCode === 'string' || typeof rawCode === 'number') && isNonZero) {
       extractedCode = String(rawCode);
       extractedMessage = typeof status.message === 'string' ? status.message : undefined;
+    }
+    if (extractedCode === undefined) {
+      // Legacy/flat error envelopes put the code at the top level instead of
+      // nesting it under status, e.g. the legacy transaction-list 403 shape
+      // {"code": "49", "message": "Invalid Start Date"}.
+      const flatCode = body.code;
+      const flatIsNonZero =
+        flatCode !== undefined &&
+        flatCode !== null &&
+        typeof flatCode !== 'object' &&
+        String(flatCode) !== '0' &&
+        String(flatCode) !== '00' &&
+        String(flatCode) !== '';
+      if (flatIsNonZero) {
+        extractedCode = String(flatCode);
+        extractedMessage = typeof body.message === 'string' ? body.message : undefined;
+      }
     }
   }
 
@@ -421,6 +479,28 @@ function parseHeaderNumber(headers: Headers, names: string[]): number | undefine
   return undefined;
 }
 
+/**
+ * Retry-After is defined by RFC 7231 as delta-SECONDS or an HTTP-date.
+ * Parsed separately from the generic numeric headers so the seconds → ms
+ * conversion is never applied to rate-limit limit/remaining/reset values.
+ */
+function parseRetryAfterMs(headers: Headers): number | undefined {
+  for (const name of ['retry-after', 'x-retry-after']) {
+    const value = headers.get(name);
+    if (!value) continue;
+    const normalized = value.trim();
+    const seconds = Number(normalized);
+    if (!Number.isNaN(seconds)) {
+      return Math.max(0, seconds * 1000);
+    }
+    const date = Date.parse(normalized);
+    if (!Number.isNaN(date)) {
+      return Math.max(0, date - Date.now());
+    }
+  }
+  return undefined;
+}
+
 function parseRateLimitInfo(headers: Headers): RateLimitInfo | undefined {
   if (!headers) {
     return undefined;
@@ -433,9 +513,9 @@ function parseRateLimitInfo(headers: Headers): RateLimitInfo | undefined {
     'rate-limit-remaining',
   ]);
   const reset = parseHeaderNumber(headers, ['x-rate-limit-reset', 'ratelimit-reset', 'rate-limit-reset']);
-  const retryAfter = parseHeaderNumber(headers, ['retry-after', 'x-retry-after']);
+  const retryAfterMs = parseRetryAfterMs(headers);
 
-  if (limit === undefined && remaining === undefined && reset === undefined && retryAfter === undefined) {
+  if (limit === undefined && remaining === undefined && reset === undefined && retryAfterMs === undefined) {
     return undefined;
   }
 
@@ -457,7 +537,7 @@ function parseRateLimitInfo(headers: Headers): RateLimitInfo | undefined {
     limit,
     remaining,
     reset,
-    retryAfterMs: retryAfter,
+    retryAfterMs,
     rawHeaders,
   };
 }
@@ -498,6 +578,17 @@ function extractTraceId(body: unknown): unknown {
     return (status as Record<string, unknown>).trace;
   }
   return resp.trace;
+}
+
+/** Return the value as an http(s) base URL, or undefined when it isn't one. */
+function parseHttpBaseUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -586,15 +677,20 @@ export class PayWay {
           : process.env.PAYWAY_SANDBOX === 'false'
             ? 'production'
             : undefined;
+    // validatePayWayEnv accepts a URL-valued PAYWAY_ENV ("sandbox",
+    // "production", or an https URL") — honor it as the base URL so the
+    // validator's promise and the client agree. Explicit PAYWAY_BASE_URL
+    // and config.baseUrl still win.
+    const baseUrlFromEnv = parseHttpBaseUrl(namedEnvironment);
     const timeoutFromEnv = Number.parseInt(process.env.PAYWAY_TIMEOUT ?? '', 10);
     const debugFromEnv = process.env.DEBUG_PAYWAY === 'true' || process.env.DEBUG_PAYWAY === '1';
     const resolvedConfig: ResolvedPayWayConfig = {
       ...config,
-      merchantId: config.merchantId ?? process.env.PAYWAY_MERCHANT_ID ?? '',
-      apiKey: config.apiKey ?? process.env.PAYWAY_API_KEY ?? '',
+      merchantId: (config.merchantId ?? process.env.PAYWAY_MERCHANT_ID ?? '').trim(),
+      apiKey: (config.apiKey ?? process.env.PAYWAY_API_KEY ?? '').trim(),
       publicKeyPem: normalizePem(config.publicKeyPem ?? process.env.PAYWAY_RSA_PUBLIC_KEY),
       environment: config.environment ?? environmentFromEnv,
-      baseUrl: config.baseUrl ?? process.env.PAYWAY_BASE_URL,
+      baseUrl: config.baseUrl ?? process.env.PAYWAY_BASE_URL ?? baseUrlFromEnv,
       timeout: config.timeout ?? (Number.isNaN(timeoutFromEnv) ? undefined : timeoutFromEnv),
       debug: config.debug ?? debugFromEnv,
       khqr: resolveKhqrConfiguration(config.khqr),
@@ -605,6 +701,14 @@ export class PayWay {
     }
     if (!resolvedConfig.apiKey) {
       throw new PayWayConfigError('apiKey is required');
+    }
+    if (
+      resolvedConfig.timeout !== undefined &&
+      (!Number.isFinite(resolvedConfig.timeout) || resolvedConfig.timeout <= 0)
+    ) {
+      throw new PayWayConfigError(
+        `timeout must be a positive number of milliseconds, received: ${resolvedConfig.timeout}`,
+      );
     }
     if (!resolvedConfig.debug) {
       return resolvedConfig;
@@ -728,11 +832,16 @@ export class PayWay {
     endpoint: string,
     headers: Record<string, string>,
     bodyPayload: string,
+    options?: { retry?: 'transient' | 'none' },
   ): Promise<TResponse> {
     const timeoutMs = this.config.timeout ?? 30_000;
     const maxRetries = this.config.maxRetries ?? 3;
     const retryDelayMs = this.config.retryDelayMs ?? 3000;
     const jitter = this.config.backoffJitter ?? 'none';
+    // Per-call opt-out for non-idempotent endpoints (purchase): 'none'
+    // surfaces network/5xx/429 failures after the first attempt instead of
+    // silently re-sending.
+    const retriesDisabled = options?.retry === 'none';
     const url = `${this.baseUrl}${endpoint}`;
     const correlationId = randomBytes(8).toString('hex');
     const requestStartedAt = Date.now();
@@ -773,12 +882,17 @@ export class PayWay {
         const rateLimitInfo = parseRateLimitInfo(response.headers);
         const parsedBody = await parseResponseBody(response);
 
-        if (typeof parsedBody === 'string') {
-          throw createJsonParseError(parsedBody, endpoint);
+        if (!response.ok) {
+          // HTTP status BEFORE body shape: a 4xx/5xx answered with an
+          // HTML/plain-text page (CDN/load-balancer error) must surface as
+          // an HTTP error — keeping statusCode and 5xx retryability — not
+          // as a client-side JSON-parse failure that bypasses the retry
+          // engine.
+          throw createHttpError(response, parsedBody, endpoint, rateLimitInfo);
         }
 
-        if (!response.ok) {
-          throw createHttpError(response, parsedBody, endpoint, rateLimitInfo);
+        if (typeof parsedBody === 'string') {
+          throw createJsonParseError(parsedBody, endpoint);
         }
 
         checkResponseError(parsedBody, endpoint);
@@ -820,6 +934,7 @@ export class PayWay {
 
         const isRateLimitError = paywayError.statusCode === 429 || paywayError.paywayCode === '429';
         const shouldRetry =
+          !retriesDisabled &&
           attempt < maxRetries &&
           (isRateLimitError ||
             (paywayError.statusCode !== undefined && paywayError.statusCode >= 500) ||
@@ -863,6 +978,7 @@ export class PayWay {
     timeFieldName: 'req_time' | 'request_time' = 'req_time',
     contentType: 'application/json' | 'application/x-www-form-urlencoded' = 'application/json',
     hashEncoding: 'base64' | 'hex' = 'base64',
+    fetchOptions?: { retry?: 'transient' | 'none' },
   ): Promise<TResponse> {
     const fullBody: Record<string, unknown> = {
       ...body,
@@ -888,7 +1004,7 @@ export class PayWay {
       bodyPayload = JSON.stringify(fullBody);
     }
 
-    return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload);
+    return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload, fetchOptions);
   }
 
   private async requestWithMerchantAuth<TResponse>(

@@ -306,6 +306,21 @@ describe('validateBeneficiaries', () => {
     ).not.toThrow();
   });
 
+  it('accepts sums whose floating-point drift exceeds Number.EPSILON (minor-unit comparison)', () => {
+    // 1.1 + 2.2 === 3.3000000000000003 — drift of 4.4e-16 > Number.EPSILON
+    // used to false-reject this legitimate split (edge-case audit EC-16).
+    expect(() =>
+      validateBeneficiaries(
+        [
+          { account: 'A', amount: 1.1 },
+          { account: 'B', amount: 2.2 },
+        ],
+        3.3,
+        'USD',
+      ),
+    ).not.toThrow();
+  });
+
   it('throws when beneficiary amounts do not sum to total', () => {
     expect(() => validateBeneficiaries([{ account: 'A', amount: 50 }], 100, 'USD')).toThrow(
       'beneficiary amounts (50) must sum to total amount (100)',

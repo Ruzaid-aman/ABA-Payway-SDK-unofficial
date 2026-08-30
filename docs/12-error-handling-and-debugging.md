@@ -102,6 +102,7 @@ try {
 | Code | Message | HTTP Status | Meaning | How to Fix |
 |---|---|---|---|---|
 | `"1"` | Wrong Hash | 403 | HMAC signature doesn't match | Check API key, field ordering, encoding (Base64 vs hex) |
+| `"04"` | The given data was invalid | 400 | String form of the binding/validation code — observed on `generate-qr` when `lifetime` is below the 3-minute minimum (the SDK now rejects sub-180s locally) | Send `lifetime >= 180` seconds; if you still hit `"04"`, another field is malformed — compare against the OpenAPI request schema |
 | `"7"` | Invalid Request Data | 400/403 | Missing or malformed field | Check parameter types and required fields |
 | `"15"` | Invalid Merchant | 403 | Merchant ID not recognized | Verify `merchantId` in your config |
 | `"16"` | Invalid Amount | 400 | Amount format is wrong | Use `formatAmount()` helper; check decimal places |
@@ -112,6 +113,7 @@ try {
 | `"24"` | Invalid Beneficiary Data | 403 | RSA-encrypted beneficiary data is wrong | Verify public key PEM and beneficiary account format |
 | `"37"` | Payout Whitelist | 403 | Payout account not whitelisted | Call `addBeneficiary()` first (sandbox-verified) |
 | `"49"` | Invalid Request | 400/403 | Generic validation error — for lists, dates must be `"YYYY-MM-DD HH:mm:ss"` | Check all parameters against the OpenAPI spec |
+| `"69"` | Lifetime below minimum | 400 | purchase `lifetime` < 3 minutes (checkout API takes minutes; spec-documented, max 43200 = 30 days) | Send `lifetime >= 3` (minutes) |
 | `"96"` | Payee Not Found / Invalid merchant data | 403 | Beneficiary not whitelisted, or payment-link id invalid | Whitelist the payee; verify the link id |
 
 > 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema and verified against sandbox probe responses. The full hint map ships in `GATEWAY_CODE_HINTS` and is queryable via `payway-sdk explain <code>`.
@@ -465,6 +467,8 @@ PayWay does not currently provide a Stripe-style `Idempotency-Key` mechanism for
 
 If you need exact once semantics, implement server-side deduplication on `tran_id` or request-level metadata, and do not assume retries are automatically safe.
 
+`checkout.purchase()` also accepts `retryPolicy: 'none'` to disable the SDK's automatic re-send of transient failures (network errors, 5xx, 429) for that call; the default `'transient'` preserves the historical retry behavior.
+
 ### Retry behavior
 
 The SDK retries **only** transient failures by default (`maxRetries: 3`, base delay `retryDelayMs: 3000`):
@@ -478,6 +482,13 @@ The SDK retries **only** transient failures by default (`maxRetries: 3`, base de
 | HTTP 200 wrapped errors | ❌ No | Business error — inspect `paywayCode` |
 
 > 💡 For endpoints with a documented cap, the SDK also tracks its own recent request timestamps per endpoint. When the gateway rejects with the undocumented 403+429 shape, retries wait just long enough for the locally observed window to free a slot, then re-send — a burst slightly over the cap recovers automatically instead of failing.
+
+#### Response-shape & configuration caveats (edge-case audit, 2026-08-30)
+
+Pinned by `src/__tests__/edge-case-audit.test.ts`; several are candidates for
+the [code improvement plan](../audit-results/code-improvement-plan.md):
+
+- **Empty success bodies.** An HTTP 200 or 204 with an empty body resolves to `null` without any error — type-guard the result of low-level calls.
 
 You can configure retry with:
 

@@ -303,10 +303,19 @@ const paywayWithRetry = new PayWay({
   merchantId: process.env.PAYWAY_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_API_KEY!,
   environment: 'sandbox',
-  maxRetries: 3,         // Number of retry attempts (default: 0 = no retry)
-  retryDelayMs: 1000,    // Base delay in ms between retries (default: 1000, doubled each attempt)
+  maxRetries: 3,         // Number of retry attempts (default: 3)
+  retryDelayMs: 1000,    // Base delay in ms between retries (default: 3000, doubled each attempt)
 });
 ```
+
+> ⚠️ **Non-idempotent endpoints:** a `purchase`/QR creation that fails with a
+> network error or 5xx is silently re-sent (up to `maxRetries`). PayWay's
+> sandbox accepts duplicate `tran_id` by overwriting, so this recovers
+> transparently there — but production duplicate semantics are unconfirmed
+> (open question in [SANDBOX-FINDINGS §8c](./docs/SANDBOX-FINDINGS.md)). If
+> you need strict once-only submission, pass `retryPolicy: 'none'` to
+> `checkout.purchase()` (or set `maxRetries: 0` for purchase calls) and
+> handle retries in your own code with a fresh `tran_id`.
 
 ### 2. Initiate Checkout (Server-Side)
 
