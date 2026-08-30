@@ -231,6 +231,21 @@ export interface GenerateQrParams {
   lifetime?: number;
 }
 
+/**
+ * An optional image attached to a payment link. Sent as a top-level
+ * `multipart/form-data` part named `image`; the image bytes are NOT part of
+ * the HMAC hash (confirmed against ABA's official sample: the hash covers
+ * `request_time + merchant_id + merchant_auth` only).
+ */
+export interface PaymentLinkImage {
+  /** Raw image bytes. */
+  data: Uint8Array;
+  /** Multipart filename as the gateway should store it. Default `'image.jpg'`. */
+  filename?: string;
+  /** MIME type of the image. Default `'image/jpeg'`. */
+  contentType?: string;
+}
+
 export interface CreatePaymentLinkParams {
   title: string;
   amount: number;
@@ -242,6 +257,8 @@ export interface CreatePaymentLinkParams {
   expiredDate?: number;
   /** Payment currency. Required by PayWay; defaults to 'USD'. */
   currency?: 'USD' | 'KHR';
+  /** Optional image shown with the link (multipart upload; not hashed). */
+  image?: PaymentLinkImage;
 }
 
 export interface PayoutParams {
@@ -583,6 +600,22 @@ function parseDebugRequestBody(bodyPayload: string): unknown {
 }
 
 /**
+ * One-line summary of a multipart body for debug logs / the `onRequest` hook
+ * (whose string signature stays unchanged): part names only — never bytes.
+ */
+function describeMultipartBody(form: FormData): string {
+  const parts: string[] = [];
+  for (const [name, value] of form.entries()) {
+    parts.push(typeof value === 'string' ? name : `${name} (file: ${value.name}, ${value.size} bytes)`);
+  }
+  return `<multipart: ${parts.join(', ')}>`;
+}
+
+function describeBodyForHook(bodyPayload: string | FormData): string {
+  return typeof bodyPayload === 'string' ? bodyPayload : describeMultipartBody(bodyPayload);
+}
+
+/**
  * Pull the gateway correlation id out of a response envelope
  * (`status.trace` per OpenAPI types.ts, with a bare `trace` fallback).
  */
@@ -852,7 +885,7 @@ export class PayWay {
   private async _executeFetch<TResponse>(
     endpoint: string,
     headers: Record<string, string>,
-    bodyPayload: string,
+    bodyPayload: string | FormData,
     options?: { retry?: 'transient' | 'none' },
   ): Promise<TResponse> {
     const timeoutMs = this.config.timeout ?? 30_000;
@@ -883,12 +916,13 @@ export class PayWay {
       try {
         try {
           if (this.config.debug) {
-            console.debug(
-              `[payway] -> POST ${endpoint} (cid=${correlationId})`,
-              sanitizeForLog(parseDebugRequestBody(bodyPayload)),
-            );
+            const loggedBody =
+              typeof bodyPayload === 'string'
+                ? sanitizeForLog(parseDebugRequestBody(bodyPayload))
+                : sanitizeForLog(describeMultipartBody(bodyPayload));
+            console.debug(`[payway] -> POST ${endpoint} (cid=${correlationId})`, loggedBody);
           }
-          this.config.onRequest?.(endpoint, bodyPayload);
+          this.config.onRequest?.(endpoint, describeBodyForHook(bodyPayload));
         } catch {
           // Logging hooks must never fail SDK execution.
         }
@@ -1051,6 +1085,13 @@ export class PayWay {
     options: {
       hmacFields?: string[];
       contentType?: 'application/json' | 'application/x-www-form-urlencoded';
+      /**
+       * Optional binary part appended to a `multipart/form-data` body
+       * (payment-link `image`). When present, the string fields travel as
+       * multipart parts and no manual Content-Type header is set — undici
+       * must generate the boundary. The hash is unchanged.
+       */
+      multipartFile?: { name: string; filename: string; contentType: string; data: Uint8Array };
     } = {},
   ): Promise<TResponse> {
     if (!this.config.publicKeyPem) {
@@ -1080,6 +1121,19 @@ export class PayWay {
     const hmacFields = options.hmacFields ?? ['request_time', 'merchant_id', 'merchant_auth'];
     body.hash = generateHmac(body, hmacFields, this.config.apiKey);
     const contentType = options.contentType ?? 'application/x-www-form-urlencoded';
+
+    if (options.multipartFile) {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(body)) {
+        if (value !== undefined && value !== null) {
+          form.append(key, String(value));
+        }
+      }
+      const part = options.multipartFile;
+      form.append(part.name, new Blob([part.data], { type: part.contentType }), part.filename);
+      // No Content-Type header: undici generates `multipart/form-data; boundary=…`.
+      return this._executeFetch<TResponse>(path, {}, form);
+    }
 
     let bodyPayload: string;
     if (contentType === 'application/json') {

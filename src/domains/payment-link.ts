@@ -10,6 +10,9 @@ import {
   validatePublicHttpsUrl,
 } from '../utils.js';
 
+const DEFAULT_IMAGE_FILENAME = 'image.jpg';
+const DEFAULT_IMAGE_CONTENT_TYPE = 'image/jpeg';
+
 export interface PaymentLinkDomain {
   create: (params: CreatePaymentLinkParams) => Promise<components['schemas']['CreatePaymentLinkResponse']>;
   getDetails: (paymentLinkId: string) => Promise<components['schemas']['GetPaymentLinkDetailsResponse']>;
@@ -20,7 +23,11 @@ export function createPaymentLinkDomain(
   requestWithMerchantAuth: <TResponse>(
     path: string,
     authPayload: Record<string, unknown>,
-    options?: { hmacFields?: string[]; contentType?: 'application/json' | 'application/x-www-form-urlencoded' },
+    options?: {
+      hmacFields?: string[];
+      contentType?: 'application/json' | 'application/x-www-form-urlencoded';
+      multipartFile?: { name: string; filename: string; contentType: string; data: Uint8Array };
+    },
   ) => Promise<TResponse>,
 ): PaymentLinkDomain {
   return {
@@ -55,6 +62,27 @@ export function createPaymentLinkDomain(
         allowPrivateHosts: config.allowPrivateCallbackHosts === true,
       });
 
+      // Optional image travels as a top-level multipart part (never inside
+      // merchant_auth, never hashed) — sandbox probe evidence in
+      // docs/SANDBOX-FINDINGS.md §14.
+      let multipartFile: { name: string; filename: string; contentType: string; data: Uint8Array } | undefined;
+      if (params.image !== undefined) {
+        const { image } = params;
+        if (!(image.data instanceof Uint8Array) || image.data.byteLength === 0) {
+          throw new PayWayConfigError('image.data is required and must be non-empty bytes (Uint8Array/Buffer)');
+        }
+        const filename = image.filename ?? DEFAULT_IMAGE_FILENAME;
+        if (typeof filename !== 'string' || filename.trim().length === 0) {
+          throw new PayWayConfigError('image.filename must be a non-empty string when provided');
+        }
+        multipartFile = {
+          name: 'image',
+          filename,
+          contentType: image.contentType ?? DEFAULT_IMAGE_CONTENT_TYPE,
+          data: image.data,
+        };
+      }
+
       return requestWithMerchantAuth<components['schemas']['CreatePaymentLinkResponse']>(
         ENDPOINTS.createPaymentLink,
         filterParams({
@@ -67,6 +95,7 @@ export function createPaymentLinkDomain(
           merchant_ref_no: params.merchantRefNo,
           expired_date: params.expiredDate,
         }),
+        multipartFile ? { multipartFile } : undefined,
       );
     },
 

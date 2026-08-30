@@ -12,6 +12,7 @@ export type {
   LinkCardParams,
   PayoutParams,
   PayWayConfig,
+  PaymentLinkImage,
   RateLimitInfo,
   RateLimitRule,
   TokenParams,

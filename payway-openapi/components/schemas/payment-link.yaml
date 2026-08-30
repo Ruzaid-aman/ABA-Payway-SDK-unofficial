@@ -8,6 +8,9 @@ CreatePaymentLinkRequest:
     See x-merchant-auth-encryption on the operation for encryption process.
     Sandbox-verified: currency and return_url are REQUIRED inside
     merchant_auth (PTL04 "Parameter validation required" when omitted).
+    Sent as multipart/form-data. The HMAC hash covers
+    request_time + merchant_id + merchant_auth ONLY — the optional
+    image bytes are never hashed (per ABA's official PHP sample).
   properties:
     request_time:
       type: string
@@ -24,6 +27,13 @@ CreatePaymentLinkRequest:
     hash:
       type: string
       description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+    image:
+      type: string
+      format: binary
+      description: >
+        Optional image shown with the payment link (top-level multipart
+        part, not part of the hash). The created PaymentLink echoes it
+        back as the `image` object.
 
 PaymentLink:
   type: object
