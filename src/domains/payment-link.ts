@@ -1,4 +1,4 @@
-import type { CreatePaymentLinkParams, PayWayConfig } from '../client.js';
+import type { CreatePaymentLinkParams, PayWayConfig, RequestCallOptions } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
@@ -14,8 +14,14 @@ const DEFAULT_IMAGE_FILENAME = 'image.jpg';
 const DEFAULT_IMAGE_CONTENT_TYPE = 'image/jpeg';
 
 export interface PaymentLinkDomain {
-  create: (params: CreatePaymentLinkParams) => Promise<components['schemas']['CreatePaymentLinkResponse']>;
-  getDetails: (paymentLinkId: string) => Promise<components['schemas']['GetPaymentLinkDetailsResponse']>;
+  create: (
+    params: CreatePaymentLinkParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['CreatePaymentLinkResponse']>;
+  getDetails: (
+    paymentLinkId: string,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['GetPaymentLinkDetailsResponse']>;
 }
 
 export function createPaymentLinkDomain(
@@ -27,11 +33,12 @@ export function createPaymentLinkDomain(
       hmacFields?: string[];
       contentType?: 'application/json' | 'application/x-www-form-urlencoded';
       multipartFile?: { name: string; filename: string; contentType: string; data: Uint8Array };
+      callOptions?: RequestCallOptions;
     },
   ) => Promise<TResponse>,
 ): PaymentLinkDomain {
   return {
-    create: (params: CreatePaymentLinkParams) => {
+    create: (params: CreatePaymentLinkParams, callOptions?: RequestCallOptions) => {
       // Basic parameter validation
       if (typeof params.title !== 'string' || params.title.trim().length === 0) {
         throw new PayWayConfigError('title is required and must be a non-empty string');
@@ -95,11 +102,11 @@ export function createPaymentLinkDomain(
           merchant_ref_no: params.merchantRefNo,
           expired_date: params.expiredDate,
         }),
-        multipartFile ? { multipartFile } : undefined,
+        multipartFile ? { multipartFile, callOptions } : { callOptions },
       );
     },
 
-    getDetails: (paymentLinkId: string) => {
+    getDetails: (paymentLinkId: string, callOptions?: RequestCallOptions) => {
       if (typeof paymentLinkId !== 'string' || paymentLinkId.trim().length === 0) {
         throw new PayWayConfigError('paymentLinkId is required and must be a non-empty string');
       }
@@ -107,6 +114,7 @@ export function createPaymentLinkDomain(
       return requestWithMerchantAuth<components['schemas']['GetPaymentLinkDetailsResponse']>(
         ENDPOINTS.getPaymentLinkDetails,
         { id: paymentLinkId },
+        { callOptions },
       );
     },
   };

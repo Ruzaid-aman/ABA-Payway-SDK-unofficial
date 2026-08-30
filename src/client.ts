@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { generateHmac, verifyCallbackSignature } from './auth.js';
+import { generateHmac, verifyCallbackDetailed, verifyCallbackSignature } from './auth.js';
+import type { CallbackVerificationResult } from './auth.js';
 import { BASE_URLS, ENDPOINTS } from './constants.js';
 import { CircuitBreaker, type CircuitBreakerOptions } from './circuit-breaker.js';
 import type { CheckoutDomain } from './domains/checkout.js';
@@ -123,6 +124,21 @@ export interface GatewayErrorDetails {
   message?: string;
   rawBody?: unknown;
   statusCode?: number;
+}
+
+/**
+ * Per-call overrides for a single API request (DX review 2026-08-30).
+ * Applied on top of the client-wide config for this call only — pass as the
+ * trailing `callOptions` argument of any domain method.
+ */
+export interface RequestCallOptions {
+  /** Override the client-wide request timeout (ms) for this call. */
+  timeoutMs?: number;
+  /**
+   * Abort this call early; aborting the signal cancels the in-flight fetch.
+   * A caller-requested abort is never retried.
+   */
+  signal?: AbortSignal;
 }
 
 export interface CreateTransactionParams {
@@ -887,8 +903,9 @@ export class PayWay {
     headers: Record<string, string>,
     bodyPayload: string | FormData,
     options?: { retry?: 'transient' | 'none' },
+    callOptions?: RequestCallOptions,
   ): Promise<TResponse> {
-    const timeoutMs = this.config.timeout ?? 30_000;
+    const timeoutMs = callOptions?.timeoutMs ?? this.config.timeout ?? 30_000;
     const maxRetries = this.config.maxRetries ?? 3;
     const retryDelayMs = this.config.retryDelayMs ?? 3000;
     const jitter = this.config.backoffJitter ?? 'none';
@@ -911,6 +928,17 @@ export class PayWay {
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      // Per-call abort (DX review 2026-08-30): an external AbortSignal cancels
+      // the in-flight fetch; removal prevents leaking listeners across retries.
+      const externalSignal = callOptions?.signal;
+      const onExternalAbort = () => controller.abort();
+      if (externalSignal) {
+        if (externalSignal.aborted) {
+          controller.abort();
+        } else {
+          externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+        }
+      }
       this._recordRecentCall(endpoint);
 
       try {
@@ -991,7 +1019,13 @@ export class PayWay {
       } catch (error) {
         clearTimeout(timeoutId);
 
-        const paywayError = error instanceof PayWayAPIError ? error : createNetworkError(error, timeoutMs, endpoint);
+        const paywayError =
+          error instanceof PayWayAPIError
+            ? error
+            : externalSignal?.aborted
+              ? // Caller-requested cancellation is never retried.
+                new PayWayNetworkError('Request aborted by caller signal', { endpoint, retryable: false })
+              : createNetworkError(error, timeoutMs, endpoint);
 
         // TD-07: count network failures and 5xx against the breaker; anything
         // with a sub-500 HTTP status means the gateway responded → success
@@ -1037,6 +1071,7 @@ export class PayWay {
         throw paywayError;
       } finally {
         clearTimeout(timeoutId);
+        externalSignal?.removeEventListener('abort', onExternalAbort);
       }
     }
 
@@ -1051,6 +1086,7 @@ export class PayWay {
     contentType: 'application/json' | 'application/x-www-form-urlencoded' = 'application/json',
     hashEncoding: 'base64' | 'hex' = 'base64',
     fetchOptions?: { retry?: 'transient' | 'none' },
+    callOptions?: RequestCallOptions,
   ): Promise<TResponse> {
     const fullBody: Record<string, unknown> = {
       ...body,
@@ -1076,7 +1112,7 @@ export class PayWay {
       bodyPayload = JSON.stringify(fullBody);
     }
 
-    return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload, fetchOptions);
+    return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload, fetchOptions, callOptions);
   }
 
   private async requestWithMerchantAuth<TResponse>(
@@ -1092,6 +1128,8 @@ export class PayWay {
        * must generate the boundary. The hash is unchanged.
        */
       multipartFile?: { name: string; filename: string; contentType: string; data: Uint8Array };
+      /** Per-call timeout/abort overrides for this request. */
+      callOptions?: RequestCallOptions;
     } = {},
   ): Promise<TResponse> {
     if (!this.config.publicKeyPem) {
@@ -1132,7 +1170,7 @@ export class PayWay {
       const part = options.multipartFile;
       form.append(part.name, new Blob([part.data], { type: part.contentType }), part.filename);
       // No Content-Type header: undici generates `multipart/form-data; boundary=…`.
-      return this._executeFetch<TResponse>(path, {}, form);
+      return this._executeFetch<TResponse>(path, {}, form, undefined, options.callOptions);
     }
 
     let bodyPayload: string;
@@ -1148,7 +1186,7 @@ export class PayWay {
       bodyPayload = form.toString();
     }
 
-    return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload);
+    return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload, undefined, options.callOptions);
   }
 
   /**
@@ -1164,6 +1202,20 @@ export class PayWay {
     options?: { stripHash?: boolean },
   ): boolean {
     return verifyCallbackSignature(body, signature, this.config.apiKey, options);
+  }
+
+  /**
+   * Diagnostic variant of {@link verifyCallback}: same canonicalization and
+   * timing-safe comparison, but reports WHY a callback failed (wrong key,
+   * malformed/missing signature, body still carrying hash: hash table empty, tampered
+   * payload) so integrators can self-diagnose without string-guessing.
+   */
+  public verifyCallbackDetailed(
+    body: Record<string, unknown>,
+    signature: string,
+    options?: { stripHash?: boolean },
+  ): CallbackVerificationResult {
+    return verifyCallbackDetailed(body, signature, this.config.apiKey, options);
   }
 
   public getGatewayErrorDetails(error: unknown): GatewayErrorDetails | null {
@@ -1197,4 +1249,5 @@ export class PayWay {
     return null;
   }
 }
-export { verifyCallbackSignature } from './auth.js';
+export { verifyCallbackSignature, verifyCallbackDetailed } from './auth.js';
+export type { CallbackVerificationFailure, CallbackVerificationResult } from './auth.js';

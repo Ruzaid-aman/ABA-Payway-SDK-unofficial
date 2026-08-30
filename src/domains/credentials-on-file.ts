@@ -1,4 +1,4 @@
-import type { CofPaymentParams, LinkAccountParams, LinkCardParams, PayWayConfig, TokenParams } from '../client.js';
+import type { CofPaymentParams, LinkAccountParams, LinkCardParams, PayWayConfig, RequestCallOptions, TokenParams } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
@@ -15,12 +15,30 @@ import {
 } from '../utils.js';
 
 export interface CredentialsOnFileDomain {
-  linkAccount: (params: LinkAccountParams) => Promise<components['schemas']['LinkAccountResponse']>;
-  linkCard: (params: LinkCardParams) => Promise<components['schemas']['LinkCardResponse']>;
-  payment: (params: CofPaymentParams) => Promise<components['schemas']['CofPaymentResponse']>;
-  renewToken: (params: TokenParams) => Promise<components['schemas']['RenewTokenResponse']>;
-  getTokenDetails: (params: TokenParams) => Promise<components['schemas']['GetTokenDetailsResponse']>;
-  removeToken: (params: TokenParams) => Promise<components['schemas']['RemoveTokenResponse']>;
+  linkAccount: (
+    params: LinkAccountParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['LinkAccountResponse']>;
+  linkCard: (
+    params: LinkCardParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['LinkCardResponse']>;
+  payment: (
+    params: CofPaymentParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['CofPaymentResponse']>;
+  renewToken: (
+    params: TokenParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['RenewTokenResponse']>;
+  getTokenDetails: (
+    params: TokenParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['GetTokenDetailsResponse']>;
+  removeToken: (
+    params: TokenParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['RemoveTokenResponse']>;
 }
 
 export function createCredentialsOnFileDomain(
@@ -32,6 +50,8 @@ export function createCredentialsOnFileDomain(
     timeFieldName?: 'req_time' | 'request_time',
     contentType?: 'application/json' | 'application/x-www-form-urlencoded',
     hashEncoding?: 'base64' | 'hex',
+    fetchOptions?: { retry?: 'transient' | 'none' },
+    callOptions?: RequestCallOptions,
   ) => Promise<TResponse>,
 ): CredentialsOnFileDomain {
   /**
@@ -51,7 +71,7 @@ export function createCredentialsOnFileDomain(
   };
 
   return {
-    linkAccount: (params: LinkAccountParams) => {
+    linkAccount: (params: LinkAccountParams, callOptions?: RequestCallOptions) => {
       if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
         throw new PayWayConfigError('requestId is required and must be a non-empty string');
       }
@@ -95,10 +115,14 @@ export function createCredentialsOnFileDomain(
           'callback_url',
         ],
         'request_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
-    linkCard: (params: LinkCardParams) => {
+    linkCard: (params: LinkCardParams, callOptions?: RequestCallOptions) => {
       if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
         throw new PayWayConfigError('requestId is required and must be a non-empty string');
       }
@@ -149,10 +173,13 @@ export function createCredentialsOnFileDomain(
         ],
         'request_time',
         'application/x-www-form-urlencoded',
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
-    payment: (params: CofPaymentParams) => {
+    payment: (params: CofPaymentParams, callOptions?: RequestCallOptions) => {
       if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
         throw new PayWayConfigError('requestId is required and must be a non-empty string');
       }
@@ -204,10 +231,14 @@ export function createCredentialsOnFileDomain(
           'callback_url',
         ],
         'request_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
-    renewToken: (params: TokenParams) => {
+    renewToken: (params: TokenParams, callOptions?: RequestCallOptions) => {
       requireVerifiedTokenOps();
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required');
@@ -226,10 +257,14 @@ export function createCredentialsOnFileDomain(
         }),
         ['request_time', 'merchant_id', 'request_id', 'ctid', 'pwt'],
         'request_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
-    getTokenDetails: (params: TokenParams) => {
+    getTokenDetails: (params: TokenParams, callOptions?: RequestCallOptions) => {
       requireVerifiedTokenOps();
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required');
@@ -248,10 +283,14 @@ export function createCredentialsOnFileDomain(
         }),
         ['request_time', 'merchant_id', 'request_id', 'ctid', 'pwt'],
         'request_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
-    removeToken: (params: TokenParams) => {
+    removeToken: (params: TokenParams, callOptions?: RequestCallOptions) => {
       requireVerifiedTokenOps();
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required');
@@ -270,6 +309,10 @@ export function createCredentialsOnFileDomain(
         }),
         ['request_time', 'merchant_id', 'request_id', 'ctid', 'pwt'],
         'request_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
   };

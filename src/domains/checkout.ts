@@ -1,5 +1,5 @@
 import { generateHmac } from '../auth.js';
-import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig } from '../client.js';
+import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig, RequestCallOptions } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
 import type { components, PollTransactionOptions, PollTransactionResult } from '../types.js';
@@ -54,6 +54,7 @@ export interface CheckoutDomain {
   createTransaction: (params: CreateTransactionParams) => Record<string, unknown> & { hash: string };
   purchase: (
     params: CreateTransactionParams,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>;
   /**
    * Build a complete hosted-checkout HTML document (local-only, no network call).
@@ -81,16 +82,22 @@ export interface CheckoutDomain {
   checkTransaction: (
     transactionId: string,
     requestTime?: string,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['CheckTransactionResponse']>;
   closeTransaction: (
     transactionId: string,
     requestTime?: string,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['CloseTransactionResponse']>;
   getTransactionDetail: (
     transactionId: string,
     requestTime?: string,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['TransactionDetailResponse']>;
-  getTransactionList: (params: GetTransactionListParams) => Promise<components['schemas']['TransactionListResponse']>;
+  getTransactionList: (
+    params: GetTransactionListParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['TransactionListResponse']>;
   /**
    * Refund a completed transaction.
    * @param transactionId - The original purchase transaction ID.
@@ -103,8 +110,9 @@ export interface CheckoutDomain {
     transactionId: string,
     amount: number,
     currency?: 'USD' | 'KHR',
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['RefundResponse']>;
-  getExchangeRate: (requestTime?: string) => Promise<components['schemas']['ExchangeRateResponse']>;
+  getExchangeRate: (requestTime?: string, callOptions?: RequestCallOptions) => Promise<components['schemas']['ExchangeRateResponse']>;
 
   /**
    * Poll transaction status at regular intervals using an AsyncIterator.
@@ -148,11 +156,16 @@ export function createCheckoutDomain(
     contentType?: 'application/json' | 'application/x-www-form-urlencoded',
     hashEncoding?: 'base64' | 'hex',
     fetchOptions?: { retry?: 'transient' | 'none' },
+    callOptions?: RequestCallOptions,
   ) => Promise<TResponse>,
   requestWithMerchantAuth: <TResponse>(
     path: string,
     authPayload: Record<string, unknown>,
-    options?: { hmacFields?: string[]; contentType?: 'application/json' | 'application/x-www-form-urlencoded' },
+    options?: {
+      hmacFields?: string[];
+      contentType?: 'application/json' | 'application/x-www-form-urlencoded';
+      callOptions?: RequestCallOptions;
+    },
   ) => Promise<TResponse>,
   resolvedBaseUrl: string,
 ): CheckoutDomain {
@@ -292,7 +305,7 @@ export function createCheckoutDomain(
 `;
     },
 
-    purchase: (params: CreateTransactionParams) => {
+    purchase: (params: CreateTransactionParams, callOptions?: RequestCallOptions) => {
       const payload = buildPurchasePayload(params);
       const fields = [
         'req_time',
@@ -328,6 +341,7 @@ export function createCheckoutDomain(
         'application/json',
         undefined,
         { retry: params.retryPolicy === 'none' ? 'none' : undefined },
+        callOptions,
       );
     },
 
@@ -335,19 +349,29 @@ export function createCheckoutDomain(
      * Check an existing transaction.
      * @rateLimit 600 requests per second.
      */
-    checkTransaction: (transactionId: string, requestTime?: string) => {
+    checkTransaction: (transactionId: string, requestTime?: string, callOptions?: RequestCallOptions) => {
       return request<components['schemas']['CheckTransactionResponse']>(
         ENDPOINTS.checkTransaction,
         filterParams({ tran_id: transactionId, req_time: requestTime }),
         ['req_time', 'merchant_id', 'tran_id'],
+        'req_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
-    closeTransaction: (transactionId: string, requestTime?: string) => {
+    closeTransaction: (transactionId: string, requestTime?: string, callOptions?: RequestCallOptions) => {
       return request<components['schemas']['CloseTransactionResponse']>(
         ENDPOINTS.closeTransaction,
         filterParams({ tran_id: transactionId, req_time: requestTime }),
         ['req_time', 'merchant_id', 'tran_id'],
+        'req_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
@@ -355,11 +379,16 @@ export function createCheckoutDomain(
      * Get detailed transaction information.
      * @rateLimit 10 requests per minute. This PayWay limit cannot be increased.
      */
-    getTransactionDetail: (transactionId: string, requestTime?: string) => {
+    getTransactionDetail: (transactionId: string, requestTime?: string, callOptions?: RequestCallOptions) => {
       return request<components['schemas']['TransactionDetailResponse']>(
         ENDPOINTS.getTransactionDetail,
         filterParams({ tran_id: transactionId, req_time: requestTime }),
         ['req_time', 'merchant_id', 'tran_id'],
+        'req_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
@@ -367,7 +396,7 @@ export function createCheckoutDomain(
      * List transactions that match the supplied filters.
      * @rateLimit 50 requests per minute.
      */
-    getTransactionList: (params: GetTransactionListParams) => {
+    getTransactionList: (params: GetTransactionListParams, callOptions?: RequestCallOptions) => {
       return request<components['schemas']['TransactionListResponse']>(
         ENDPOINTS.getTransactionList,
         filterParams({
@@ -382,6 +411,10 @@ export function createCheckoutDomain(
         }),
         ['req_time', 'merchant_id', 'from_date', 'to_date', 'from_amount', 'to_amount', 'status', 'page', 'pagination'],
         'req_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 
@@ -393,21 +426,30 @@ export function createCheckoutDomain(
      * PayWay rejects refund_amount < 0.01 USD with HTTP 400 / PTL04
      * ("Parameter validation required — refund_amount must be ≥ 0.01").
      */
-    refund: (transactionId: string, amount: number, currency: 'USD' | 'KHR' = 'USD') => {
+    refund: (transactionId: string, amount: number, currency: 'USD' | 'KHR' = 'USD', callOptions?: RequestCallOptions) => {
       validateTransactionId(transactionId);
       validateRefundAmount(amount, currency);
 
-      return requestWithMerchantAuth<components['schemas']['RefundResponse']>(ENDPOINTS.refund, {
-        tran_id: transactionId,
-        refund_amount: amount,
-      });
+      return requestWithMerchantAuth<components['schemas']['RefundResponse']>(
+        ENDPOINTS.refund,
+        {
+          tran_id: transactionId,
+          refund_amount: amount,
+        },
+        { callOptions },
+      );
     },
 
-    getExchangeRate: (requestTime?: string) => {
+    getExchangeRate: (requestTime?: string, callOptions?: RequestCallOptions) => {
       return request<components['schemas']['ExchangeRateResponse']>(
         ENDPOINTS.getExchangeRate,
         filterParams({ req_time: requestTime }),
         ['req_time', 'merchant_id'],
+        'req_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 

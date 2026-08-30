@@ -15,13 +15,16 @@ export type {
   PaymentLinkImage,
   RateLimitInfo,
   RateLimitRule,
+  RequestCallOptions,
   TokenParams,
   UpdateBeneficiaryStatusParams,
 } from './client.js';
 export {
   PayWay,
+  verifyCallbackDetailed,
   verifyCallbackSignature,
 } from './client.js';
+export type { CallbackVerificationFailure, CallbackVerificationResult } from './auth.js';
 export type { ClientModule } from './client-handler/index.js';
 export { client } from './client-handler/index.js';
 

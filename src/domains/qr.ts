@@ -1,4 +1,4 @@
-import type { GenerateQrParams, PayWayConfig } from '../client.js';
+import type { GenerateQrParams, PayWayConfig, RequestCallOptions } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { type GenerateOfflineQrParams, generateOfflineQR } from '../khqr-offline.js';
 import type { components } from '../types.js';
@@ -14,7 +14,10 @@ import {
 } from '../utils.js';
 
 export interface QrDomain {
-  generateQr: (params: GenerateQrParams) => Promise<components['schemas']['GenerateQrResponse']>;
+  generateQr: (
+    params: GenerateQrParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['GenerateQrResponse']>;
   generateOfflineQR: (params: GenerateOfflineQrParams) => string;
 }
 
@@ -27,10 +30,12 @@ export function createQrDomain(
     timeFieldName?: 'req_time' | 'request_time',
     contentType?: 'application/json' | 'application/x-www-form-urlencoded',
     hashEncoding?: 'base64' | 'hex',
+    fetchOptions?: { retry?: 'transient' | 'none' },
+    callOptions?: RequestCallOptions,
   ) => Promise<TResponse>,
 ): QrDomain {
   return {
-    generateQr: (params: GenerateQrParams) => {
+    generateQr: (params: GenerateQrParams, callOptions?: RequestCallOptions) => {
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency || 'USD');
       validateCurrency(params.currency);
@@ -69,6 +74,11 @@ export function createQrDomain(
           'lifetime',
           'qr_image_template',
         ],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
 

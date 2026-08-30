@@ -404,6 +404,26 @@ app.post('/api/payway-webhook', (req, res) => {
 });
 ```
 
+> **Debugging verification failures?** `payway.verifyCallbackDetailed(body, sig)` returns
+> `{ valid, reason }` where reason is `malformed_signature` (empty/missing header),
+> `empty_body` (null payload), or `signature_mismatch` (wrong API key, hash field not
+> stripped, or tampered payload) — so failed webhooks are diagnosable without guesswork.
+
+### Per-call request options
+
+Every API domain method accepts an optional trailing `callOptions` argument to override
+the client-wide settings for that single request:
+
+```ts
+const controller = new AbortController();
+setTimeout(() => controller.abort(), 5_000); // cancel slow check after 5s
+
+await payway.checkout.checkTransaction(tranId, undefined, {
+  timeoutMs: 10_000,                   // per-call timeout (default: config.timeout)
+  signal: controller.signal,           // per-call cancellation — never retried
+});
+```
+
 ### Idempotency and duplicate protection
 
 PayWay does not currently expose Stripe-style per-request `Idempotency-Key` support in its public API. Instead, use a unique `tran_id` for every checkout attempt, persist transaction events durably, and deduplicate duplicate webhook callbacks or repeated return URL checks on your backend.

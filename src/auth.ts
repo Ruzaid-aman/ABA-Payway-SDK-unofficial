@@ -51,19 +51,37 @@ export function encryptMerchantAuth(data: unknown, publicKeyPem: string): string
 }
 
 /**
- * Verifies a webhook signature using PayWay's sorted-key signature validation algorithm.
- *
- * @param options.stripHash - Strip a `hash` field from the body before
- *   verifying. Default `false` for backward compatibility: raw callback
- *   payloads that still carry `hash` never validate unless it is removed
- *   first (the webhook server strips it; direct callers can now opt in).
+ * Why {@link verifyCallbackSignature} rejected a callback (DX review
+ * 2026-08-30: a bare boolean cannot tell a merchant whether the canonical
+ * form, the key, or the payload shape was wrong).
  */
-export function verifyCallbackSignature(
+export type CallbackVerificationFailure = 'signature_mismatch' | 'malformed_signature' | 'empty_body';
+
+export interface CallbackVerificationResult {
+  valid: boolean;
+  /** Present only when `valid === false`. */
+  reason?: CallbackVerificationFailure;
+}
+
+/**
+ * Detailed variant of {@link verifyCallbackSignature}: identical
+ * canonicalization and timing-safe comparison, but returns *why* a callback
+ * was rejected so integrators can self-diagnose (wrong key, missing header,
+ * body passed with `hash` still attached, tampered payload).
+ */
+export function verifyCallbackDetailed(
   body: Record<string, unknown>,
   receivedSignature: string,
   apiKey: string,
   options?: { stripHash?: boolean },
-): boolean {
+): CallbackVerificationResult {
+  if (typeof receivedSignature !== 'string' || receivedSignature.length === 0) {
+    return { valid: false, reason: 'malformed_signature' };
+  }
+  if (!body || typeof body !== 'object') {
+    return { valid: false, reason: 'empty_body' };
+  }
+
   const payload = options?.stripHash
     ? Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'hash'))
     : body;
@@ -91,8 +109,27 @@ export function verifyCallbackSignature(
   const receivedBuf = Buffer.from(receivedSignature, 'utf8');
 
   if (computedBuf.length !== receivedBuf.length) {
-    return false;
+    return { valid: false, reason: 'signature_mismatch' };
   }
 
-  return crypto.timingSafeEqual(computedBuf, receivedBuf);
+  return crypto.timingSafeEqual(computedBuf, receivedBuf)
+    ? { valid: true }
+    : { valid: false, reason: 'signature_mismatch' };
+}
+
+/**
+ * Verifies a webhook signature using PayWay's sorted-key signature validation algorithm.
+ *
+ * @param options.stripHash - Strip a `hash` field from the body before
+ *   verifying. Default `false` for backward compatibility: raw callback
+ *   payloads that still carry `hash` never validate unless it is removed
+ *   first (the webhook server strips it; direct callers can now opt in).
+ */
+export function verifyCallbackSignature(
+  body: Record<string, unknown>,
+  receivedSignature: string,
+  apiKey: string,
+  options?: { stripHash?: boolean },
+): boolean {
+  return verifyCallbackDetailed(body, receivedSignature, apiKey, options).valid;
 }

@@ -1,5 +1,5 @@
 import { encryptMerchantAuth } from '../auth.js';
-import type { AddBeneficiaryParams, PayoutParams, PayWayConfig, UpdateBeneficiaryStatusParams } from '../client.js';
+import type { AddBeneficiaryParams, PayoutParams, PayWayConfig, RequestCallOptions, UpdateBeneficiaryStatusParams } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 import { validateSandboxBeneficiary } from '../sandbox-beneficiaries.js';
@@ -14,11 +14,18 @@ import {
 } from '../utils.js';
 
 export interface PayoutDomain {
-  payout: (params: PayoutParams) => Promise<components['schemas']['PayoutResponse']>;
+  payout: (
+    params: PayoutParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['PayoutResponse']>;
   updateBeneficiaryStatus: (
     params: UpdateBeneficiaryStatusParams,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['BeneficiaryResponse']>;
-  addBeneficiary: (params: AddBeneficiaryParams) => Promise<components['schemas']['BeneficiaryResponse']>;
+  addBeneficiary: (
+    params: AddBeneficiaryParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['BeneficiaryResponse']>;
 }
 
 export function createPayoutDomain(
@@ -30,15 +37,21 @@ export function createPayoutDomain(
     timeFieldName?: 'req_time' | 'request_time',
     contentType?: 'application/json' | 'application/x-www-form-urlencoded',
     hashEncoding?: 'base64' | 'hex',
+    fetchOptions?: { retry?: 'transient' | 'none' },
+    callOptions?: RequestCallOptions,
   ) => Promise<TResponse>,
   requestWithMerchantAuth: <TResponse>(
     path: string,
     authPayload: Record<string, unknown>,
-    options?: { hmacFields?: string[]; contentType?: 'application/json' | 'application/x-www-form-urlencoded' },
+    options?: {
+      hmacFields?: string[];
+      contentType?: 'application/json' | 'application/x-www-form-urlencoded';
+      callOptions?: RequestCallOptions;
+    },
   ) => Promise<TResponse>,
 ): PayoutDomain {
   return {
-    payout: async (params: PayoutParams) => {
+    payout: async (params: PayoutParams, callOptions?: RequestCallOptions) => {
       if (!config.publicKeyPem) {
         throw new PayWayConfigError('publicKeyPem is required for RSA-encrypted endpoints');
       }
@@ -79,22 +92,24 @@ export function createPayoutDomain(
         'req_time',
         'application/json',
         'hex',
+        undefined,
+        callOptions,
       );
     },
 
-    updateBeneficiaryStatus: (params: UpdateBeneficiaryStatusParams) => {
+    updateBeneficiaryStatus: (params: UpdateBeneficiaryStatusParams, callOptions?: RequestCallOptions) => {
       return requestWithMerchantAuth<components['schemas']['BeneficiaryResponse']>(
         ENDPOINTS.updateBeneficiaryStatus,
         { payee: params.payee, status: params.status },
-        { hmacFields: ['request_time', 'merchant_auth'], contentType: 'application/json' },
+        { hmacFields: ['request_time', 'merchant_auth'], contentType: 'application/json', callOptions },
       );
     },
 
-    addBeneficiary: (params: AddBeneficiaryParams) => {
+    addBeneficiary: (params: AddBeneficiaryParams, callOptions?: RequestCallOptions) => {
       return requestWithMerchantAuth<components['schemas']['BeneficiaryResponse']>(
         ENDPOINTS.addBeneficiary,
         { payee: params.payee },
-        { hmacFields: ['request_time', 'merchant_auth'], contentType: 'application/json' },
+        { hmacFields: ['request_time', 'merchant_auth'], contentType: 'application/json', callOptions },
       );
     },
   };

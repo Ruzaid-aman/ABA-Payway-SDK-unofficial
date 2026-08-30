@@ -1,5 +1,5 @@
 import { ENDPOINTS } from '../constants.js';
-import type { PayWayConfig } from '../client.js';
+import type { PayWayConfig, RequestCallOptions } from '../client.js';
 import { PayWayConfigError } from '../errors.js';
 import { validateSandboxBeneficiary } from '../sandbox-beneficiaries.js';
 import type { components } from '../types.js';
@@ -29,16 +29,19 @@ export interface PreAuthDomain {
     transactionId: string,
     amount: number,
     opts?: PreAuthCompleteOptions,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['CompletePreAuthResponse']>;
   completeWithPayout: (
     transactionId: string,
     amount: number,
     payout: { acc: string; amt: number }[],
     opts?: PreAuthCompleteOptions,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['CompletePreAuthResponse']>;
   cancel: (
     transactionId: string,
     opts?: PreAuthCancelOptions,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['CancelPreAuthResponse']>;
 }
 
@@ -65,11 +68,15 @@ export function createPreAuthDomain(
   requestWithMerchantAuth: <TResponse>(
     path: string,
     authPayload: Record<string, unknown>,
-    options?: { hmacFields?: string[]; contentType?: 'application/json' | 'application/x-www-form-urlencoded' },
+    options?: {
+      hmacFields?: string[];
+      contentType?: 'application/json' | 'application/x-www-form-urlencoded';
+      callOptions?: RequestCallOptions;
+    },
   ) => Promise<TResponse>,
 ): PreAuthDomain {
   return {
-    complete: (transactionId: string, amount: number, opts: PreAuthCompleteOptions = {}) => {
+    complete: (transactionId: string, amount: number, opts: PreAuthCompleteOptions = {}, callOptions?: RequestCallOptions) => {
       // Validate inputs
       validateTransactionId(transactionId);
       validatePositiveAmount(amount, 'USD');
@@ -87,6 +94,7 @@ export function createPreAuthDomain(
         {
           hmacFields: ['merchant_auth', 'request_time', 'merchant_id'],
           contentType: 'application/json',
+          callOptions,
         },
       );
     },
@@ -96,6 +104,7 @@ export function createPreAuthDomain(
       amount: number,
       payout: { acc: string; amt: number }[],
       opts: PreAuthCompleteOptions = {},
+      callOptions?: RequestCallOptions,
     ) => {
       // Validate inputs
       validateTransactionId(transactionId);
@@ -126,11 +135,12 @@ export function createPreAuthDomain(
         {
           hmacFields: ['merchant_auth', 'request_time', 'merchant_id'],
           contentType: 'application/json',
+          callOptions,
         },
       );
     },
 
-    cancel: (transactionId: string, opts: PreAuthCancelOptions = {}) => {
+    cancel: (transactionId: string, opts: PreAuthCancelOptions = {}, callOptions?: RequestCallOptions) => {
       const body: Record<string, unknown> = { tran_id: transactionId };
       if (opts.idempotencyKey) body.idempotency_key = opts.idempotencyKey;
       if (opts.reason) body.reason = opts.reason;
@@ -141,6 +151,7 @@ export function createPreAuthDomain(
         {
           hmacFields: ['merchant_id', 'merchant_auth', 'request_time'],
           contentType: 'application/json',
+          callOptions,
         },
       );
     },

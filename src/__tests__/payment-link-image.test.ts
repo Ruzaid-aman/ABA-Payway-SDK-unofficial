@@ -107,7 +107,9 @@ describe('paymentLink.create image validation (domain)', () => {
     const authSpy = vi.fn(() => Promise.resolve({} as never));
     const domain = createPaymentLinkDomain(DUMMY_CONFIG, authSpy);
     await domain.create({ ...VALID_PARAMS });
-    expect(authSpy).toHaveBeenCalledWith(expect.any(String), expect.anything(), undefined);
+    // The options object always carries callOptions now (per-call options
+    // threading, 2026-08-30) — no multipartFile means it is undefined here.
+    expect(authSpy).toHaveBeenCalledWith(expect.any(String), expect.anything(), { callOptions: undefined });
   });
 });
 

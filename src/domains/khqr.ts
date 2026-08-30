@@ -1,4 +1,4 @@
-import type { PayWayConfig } from '../client.js';
+import type { PayWayConfig, RequestCallOptions } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import {
   type KhqrCallbackReadiness,
@@ -19,6 +19,7 @@ export interface KhqrDomain {
   getTransactionsByMerchantRef: (
     merchantRef: string,
     requestTime?: string,
+    callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['GetTransactionsByMcRefResponse']>;
 }
 
@@ -31,6 +32,8 @@ export function createKhqrDomain(
     timeFieldName?: 'req_time' | 'request_time',
     contentType?: 'application/json' | 'application/x-www-form-urlencoded',
     hashEncoding?: 'base64' | 'hex',
+    fetchOptions?: { retry?: 'transient' | 'none' },
+    callOptions?: RequestCallOptions,
   ) => Promise<TResponse>,
 ): KhqrDomain {
   const configuration: KhqrMerchantConfiguration | undefined = config.khqr;
@@ -45,7 +48,7 @@ export function createKhqrDomain(
     validateCallbackSetup: (options: KhqrCallbackValidationOptions = {}) =>
       validateKhqrCallbackSetup(configuration?.callback, options),
 
-    getTransactionsByMerchantRef: (merchantRef: string, requestTime?: string) => {
+    getTransactionsByMerchantRef: (merchantRef: string, requestTime?: string, callOptions?: RequestCallOptions) => {
       if (typeof merchantRef !== 'string' || merchantRef.trim().length === 0) {
         throw new Error('merchantRef is required and must be a non-empty string');
       }
@@ -54,6 +57,11 @@ export function createKhqrDomain(
         ENDPOINTS.getTransactionsByMerchantRef,
         filterParams({ merchant_ref: merchantRef, req_time: requestTime }),
         ['req_time', 'merchant_id', 'merchant_ref'],
+        'req_time',
+        undefined,
+        undefined,
+        undefined,
+        callOptions,
       );
     },
   };
