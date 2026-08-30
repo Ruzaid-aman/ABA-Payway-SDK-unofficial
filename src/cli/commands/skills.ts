@@ -1,4 +1,4 @@
-import type { Dirent } from 'node:fs';
+import { existsSync, type Dirent } from 'node:fs';
 import { cp, mkdir, readdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -33,6 +33,11 @@ function getSkillAgents(agentNames: string[]): SkillAgent[] {
 }
 
 export async function getPackagedSkillNames(skillsDirectory: string): Promise<string[]> {
+  // A missing skills directory (e.g. running from a source checkout where the
+  // executable's sibling layout doesn't exist) is an empty result, not a crash.
+  if (!existsSync(skillsDirectory)) {
+    return [];
+  }
   const entries = await readdir(skillsDirectory, { withFileTypes: true });
   return entries
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'))

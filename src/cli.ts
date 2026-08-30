@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
+import { pathToFileURL } from 'node:url';
 import { Command } from 'commander';
 import { loadDotEnvIntoProcess } from './cli/dotenv.js';
 import { explainAll, explainPayWayCode } from './cli/explain-code.js';
@@ -2174,7 +2175,27 @@ program
   .addCommand(preAuthCancel);
 
 // --- parse ---
-program.parseAsync().catch((err: unknown) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+/**
+ * Run the CLI in-process against an explicit argv (defaults to process.argv).
+ * Exported so tests (and embedders) can drive commands without spawning a
+ * child process; `node dist/cli.js` / `npx tsx src/cli.ts` executions go
+ * through the direct-invocation guard below instead.
+ */
+export async function runCli(argv: string[]): Promise<void> {
+  await program.parseAsync(argv, { from: 'user' });
+}
+
+const invokedDirectly = (() => {
+  try {
+    return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
+  } catch {
+    return false;
+  }
+})();
+
+if (invokedDirectly) {
+  runCli(process.argv.slice(2)).catch((err: unknown) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}

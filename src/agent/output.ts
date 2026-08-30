@@ -35,7 +35,8 @@ export function renderHumanResult(result: AgentCommandResultV1): string {
       let line = `  - ${tool}: ${ok}`;
       if (action.error) {
         const err = action.error as { code?: string; message?: string };
-        line += ` (${err.code ?? ''}: ${err.message ?? ''})`.trim();
+        const detail = [err.code, err.message].filter(Boolean).join(': ');
+        if (detail) line += ` (${detail})`;
       }
       lines.push(line);
       if (action.artifact) {
