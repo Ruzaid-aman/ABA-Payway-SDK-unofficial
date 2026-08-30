@@ -34,7 +34,7 @@ export {
   PAYOUT_ERROR_CODES,
   GATEWAY_CODE_HINTS,
 } from './constants.js';
-export type { CheckoutDomain } from './domains/checkout.js';
+export type { CheckoutDomain, CheckoutFormOptions } from './domains/checkout.js';
 export type { CredentialsOnFileDomain } from './domains/credentials-on-file.js';
 export type { KhqrDomain } from './domains/khqr.js';
 export type { PaymentLinkDomain } from './domains/payment-link.js';

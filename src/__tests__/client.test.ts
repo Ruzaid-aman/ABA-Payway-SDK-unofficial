@@ -1810,6 +1810,7 @@ describe('checkout.pollTransactionStatus', () => {
       { ...TEST_CONFIG },
       request,
       vi.fn(),
+      'https://checkout-sandbox.payway.com.kh',
     );
 
     const results: PollTransactionResult[] = [];

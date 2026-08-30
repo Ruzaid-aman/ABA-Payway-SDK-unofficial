@@ -1,7 +1,7 @@
 import { generateHmac } from '../auth.js';
 import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
-import { PayWayAPIError, PollingAbortedError } from '../errors.js';
+import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
 import type { components, PollTransactionOptions, PollTransactionResult } from '../types.js';
 import {
   encodeBase64IfNeeded,
@@ -15,11 +15,69 @@ import {
   validateTransactionId,
 } from '../utils.js';
 
+/**
+ * Rendering options for {@link CheckoutDomain.getCheckoutFormHtml}.
+ */
+export interface CheckoutFormOptions {
+  /** `id` attribute of the `<form>` element. Default `'aba_merchant_request'`. */
+  formId?: string;
+  /**
+   * Submit the form as soon as the page loads, navigating the same tab to the
+   * hosted checkout page. Default `false`.
+   */
+  autoSubmit?: boolean;
+  /**
+   * Use the official AbaPayway popup plugin (as in ABA's sample checkout): the
+   * form targets the `aba_webservice` frame opened by
+   * `https://checkout.payway.com.kh/plugins/checkout2-0.js` and the submit
+   * button invokes `AbaPayway.checkout()`. Default `false`.
+   */
+  popupMode?: boolean;
+  /** Label of the submit button. Default `'Pay with ABA PayWay'`. */
+  submitLabel?: string;
+  /** Render the form without a submit button (for pages that provide their own controls). */
+  omitSubmitButton?: boolean;
+}
+
+const CHECKOUT_FORM_PLUGIN_SRC = 'https://checkout.payway.com.kh/plugins/checkout2-0.js';
+const DEFAULT_FORM_ID = 'aba_merchant_request';
+const POPUP_TARGET = 'aba_webservice';
+
+function escapeHtmlAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(
+    /'/g,
+    '&#39;',
+  );
+}
+
 export interface CheckoutDomain {
   createTransaction: (params: CreateTransactionParams) => Record<string, unknown> & { hash: string };
   purchase: (
     params: CreateTransactionParams,
   ) => Promise<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>;
+  /**
+   * Build a complete hosted-checkout HTML document (local-only, no network call).
+   *
+   * The hidden fields and HMAC hash are byte-identical to `createTransaction()`;
+   * the form POSTs to the gateway's purchase endpoint, which renders the hosted
+   * checkout page (or returns the deeplink JSON for `abapay_khqr_deeplink`).
+   *
+   * @param params  - Same parameters as `createTransaction()`.
+   * @param options - Form rendering options.
+   * @returns A standalone HTML document containing the signed form.
+   * @throws `PayWayConfigError` when `autoSubmit` and `popupMode` are combined or
+   *   `formId` is not a safe HTML id.
+   * @example
+   * ```ts
+   * const html = payway.checkout.getCheckoutFormHtml({
+   *   transactionId: 'order-123',
+   *   amount: 15,
+   *   returnUrl: 'https://mywebsite.com/payment-result',
+   * });
+   * res.type('html').send(html); // Express: browser lands on the hosted page
+   * ```
+   */
+  getCheckoutFormHtml: (params: CreateTransactionParams, options?: CheckoutFormOptions) => string;
   checkTransaction: (
     transactionId: string,
     requestTime?: string,
@@ -96,6 +154,7 @@ export function createCheckoutDomain(
     authPayload: Record<string, unknown>,
     options?: { hmacFields?: string[]; contentType?: 'application/json' | 'application/x-www-form-urlencoded' },
   ) => Promise<TResponse>,
+  resolvedBaseUrl: string,
 ): CheckoutDomain {
   function buildPurchasePayload(params: CreateTransactionParams): Record<string, unknown> & { hash: string } {
     validateTransactionId(params.transactionId);
@@ -167,6 +226,70 @@ export function createCheckoutDomain(
   return {
     createTransaction: (params: CreateTransactionParams): Record<string, unknown> & { hash: string } => {
       return buildPurchasePayload(params);
+    },
+
+    getCheckoutFormHtml: (params: CreateTransactionParams, options: CheckoutFormOptions = {}): string => {
+      const {
+        formId = DEFAULT_FORM_ID,
+        autoSubmit = false,
+        popupMode = false,
+        submitLabel = 'Pay with ABA PayWay',
+        omitSubmitButton = false,
+      } = options;
+
+      if (autoSubmit && popupMode) {
+        throw new PayWayConfigError(
+          'getCheckoutFormHtml: autoSubmit and popupMode are mutually exclusive — autoSubmit navigates the same tab, popupMode opens the AbaPayway plugin frame',
+        );
+      }
+      if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(formId)) {
+        throw new PayWayConfigError(
+          `formId must match /^[A-Za-z][A-Za-z0-9_-]*$/, received: ${JSON.stringify(formId)}`,
+        );
+      }
+
+      const payload = buildPurchasePayload(params);
+      const actionUrl = `${resolvedBaseUrl}${ENDPOINTS.purchase}`;
+      const hiddenInputs = Object.entries(payload)
+        .map(
+          ([key, value]) =>
+            `<input type="hidden" name="${escapeHtmlAttribute(key)}" value="${escapeHtmlAttribute(String(value))}"/>`,
+        )
+        .join('\n      ');
+
+      const targetAttr = popupMode ? ` target="${POPUP_TARGET}"` : '';
+      const button = omitSubmitButton
+        ? ''
+        : `\n      <button type="submit" id="${formId}-submit">${escapeHtmlAttribute(submitLabel)}</button>`;
+
+      let scripts = '';
+      if (autoSubmit) {
+        scripts = `\n    <script>document.getElementById('${formId}').submit();</script>`;
+      } else if (popupMode) {
+        scripts = [
+          `\n    <script src="${CHECKOUT_FORM_PLUGIN_SRC}"></script>`,
+          `<script>document.getElementById('${formId}-submit').addEventListener('click', function () { AbaPayway.checkout(); });</script>`,
+        ].join('\n    ');
+        if (omitSubmitButton) {
+          // No default button: drop the click wiring so merchant controls can call AbaPayway.checkout() themselves.
+          scripts = `\n    <script src="${CHECKOUT_FORM_PLUGIN_SRC}"></script>`;
+        }
+      }
+
+      return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Pay with ABA PayWay</title>
+  </head>
+  <body>
+    <form method="POST" action="${escapeHtmlAttribute(actionUrl)}"${targetAttr} id="${formId}">
+      ${hiddenInputs}${button}
+    </form>${scripts}
+  </body>
+</html>
+`;
     },
 
     purchase: (params: CreateTransactionParams) => {

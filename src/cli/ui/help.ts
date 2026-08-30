@@ -15,7 +15,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
   { title: 'Setup', commands: ['init', 'doctor', 'config', 'profiles', 'onboard'] },
   {
     title: 'Payments',
-    commands: ['generate-qr', 'generate-checkout', 'payment-link', 'setup-webhook'],
+    commands: ['generate-qr', 'generate-checkout', 'checkout-form', 'payment-link', 'setup-webhook'],
   },
   {
     title: 'Transactions',
@@ -106,6 +106,7 @@ export const COMMAND_EXAMPLES: Record<string, string[]> = {
     'payway-sdk generate-qr --offline --ref spring-sale',
   ],
   'generate-checkout': ['payway-sdk generate-checkout -a 5.00 --return-url https://example.com/return'],
+  'checkout-form': ['payway-sdk checkout-form -a 15.00 --return-url https://example.com/return -o form.html'],
   'check-transaction': ['payway-sdk check-transaction -t <transaction-id>'],
   'poll-transaction': ['payway-sdk poll-transaction -t <transaction-id> --json'],
   'transaction-list': ['payway-sdk transaction-list --status APPROVED'],

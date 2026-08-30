@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
@@ -1400,6 +1400,89 @@ program
     }
 
     process.exitCode = hasError ? 1 : 0;
+  });
+
+// --- checkout-form ---
+// Local-only render of the signed hosted-checkout form. Requires merchant
+// credentials (merchant_id is a hidden field and the hash needs the API key)
+// but never touches the network and needs no RSA key. HTML goes to stdout or
+// --out; diagnostics go to stderr so `checkout-form ... > form.html` is clean.
+program
+  .command('checkout-form')
+  .description('Generate the hosted-checkout HTML form (local signing, no API call)')
+  .requiredOption('-a, --amount <number>', 'Payment amount')
+  .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
+  .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
+  .option('--payment-option <option>', 'Payment option (omit to let PayWay show all options)')
+  .option('--return-url <url>', 'Return URL after payment')
+  .option('--cancel-url <url>', 'Cancel URL')
+  .option('--firstname <name>', 'Customer first name')
+  .option('--lastname <name>', 'Customer last name')
+  .option('--email <email>', 'Customer email')
+  .option('--phone <phone>', 'Customer phone')
+  .option('--auto-submit', 'Submit the form on page load (same-tab navigation)')
+  .option('--popup', 'Use the official AbaPayway popup plugin (checkout2-0.js)')
+  .option('-o, --out <path>', 'Write the HTML document to a file instead of stdout')
+  .action((opts: Record<string, string | undefined>) => {
+    const say = opts.out ? console.log : console.error;
+    say(`\n${c.bold('ABA PayWay SDK')} — hosted checkout form\n`);
+
+    const amount = Number(opts.amount);
+    const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
+    const transactionId = opts.transactionId ?? `ck${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      say(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    if (!['USD', 'KHR'].includes(currency)) {
+      say(`  ${c.red('✗')} Currency must be USD or KHR, received: ${c.red(currency)}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
+    try {
+      const payway = new PayWay();
+      const html = payway.checkout.getCheckoutFormHtml(
+        {
+          transactionId,
+          amount,
+          currency,
+          ...(opts.paymentOption ? { paymentOption: opts.paymentOption } : {}),
+          ...(opts.returnUrl ? { returnUrl: opts.returnUrl } : {}),
+          ...(opts.cancelUrl ? { cancelUrl: opts.cancelUrl } : {}),
+          ...(opts.firstname ? { firstname: opts.firstname } : {}),
+          ...(opts.lastname ? { lastname: opts.lastname } : {}),
+          ...(opts.email ? { email: opts.email } : {}),
+          ...(opts.phone ? { phone: opts.phone } : {}),
+        },
+        { autoSubmit: Boolean(opts.autoSubmit), popupMode: Boolean(opts.popup) },
+      );
+
+      if (opts.out) {
+        writeFileSync(opts.out, html, 'utf8');
+        say(`  ${c.green('✓')} Hosted checkout form written to ${c.cyan(opts.out)}`);
+        say(`  ${c.dim('Transaction ID:')} ${c.cyan(transactionId)}`);
+        say(
+          `  ${c.dim('Next: open/serve the page, complete the payment, then')} ${c.cyan(`payway-sdk check-transaction -t ${transactionId}`)}`,
+        );
+      } else {
+        process.stdout.write(html);
+        say(`  ${c.dim('Transaction ID:')} ${c.cyan(transactionId)}`);
+        say(
+          `  ${c.dim('Next: complete the payment, then')} ${c.cyan(`payway-sdk check-transaction -t ${transactionId}`)}`,
+        );
+      }
+      process.exitCode = EXIT_OK;
+    } catch (e) {
+      say(`  ${c.red('✗')} ${String(e instanceof Error ? e.message : e)}`);
+      process.exitCode = classifyError(e);
+    }
   });
 
 // --- generate-qr ---

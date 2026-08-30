@@ -670,7 +670,12 @@ export class PayWay {
     this.breaker = this.config.circuitBreaker ? new CircuitBreaker(this.config.circuitBreaker) : undefined;
 
     // Initialize domain sub-clients
-    this.checkout = createCheckoutDomain(this.config, this.request.bind(this), this.requestWithMerchantAuth.bind(this));
+    this.checkout = createCheckoutDomain(
+      this.config,
+      this.request.bind(this),
+      this.requestWithMerchantAuth.bind(this),
+      this.baseUrl,
+    );
     this.credentialsOnFile = createCredentialsOnFileDomain(this.config, this.request.bind(this));
     this.qr = createQrDomain(this.config, this.request.bind(this));
     this.paymentLink = createPaymentLinkDomain(this.config, this.requestWithMerchantAuth.bind(this));
