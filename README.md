@@ -113,6 +113,20 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 
 > **Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit — so scripts and agent frameworks can branch on `$?`. Lifecycle commands also accept `--json` for structured output.
 
+### Interactive experience
+
+On an interactive terminal the CLI adds a guided layer: `generate-qr` with missing options walks through a wizard (currency → amount → template → payment option → lifetime → callback → confirm), `generate-checkout` asks for a pre-submit confirm, polling shows a live progress spinner, and an APPROVED payment offers a next-step picker. Piped stdin, `--json`, `-y`, and CI/non-TTY runs keep the plain scripted output.
+
+```bash
+$ payway-sdk generate-qr
+◆  Currency: USD
+◆  Amount: 6.12
+◆  QR template: template3_color
+└  Confirm to generate & poll
+```
+
+Prefer the classic behavior? Set `PAYWAY_UI=classic` to opt out entirely, or pass the global `--no-color` flag (or set `NO_COLOR`) to disable ANSI colors only.
+
 ### Fastest QR flow
 
 For the fastest manual first payment in sandbox:

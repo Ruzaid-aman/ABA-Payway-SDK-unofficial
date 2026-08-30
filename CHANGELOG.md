@@ -10,11 +10,13 @@
 ### Added
 
 - **`runCli(argv)` exported from the CLI entry** — `src/cli.ts` now guards its self-parse behind a main-module check and exposes `runCli`, so tests and embedders can drive commands in-process (verified against the documented `npx tsx src/cli.ts` workflow, `dist/cli.js`, and the child-process `cli.test.ts` suite).
+- **Interactive TUI layer for the CLI** — activates only on a real TTY (stdin+stdout): bare `payway-sdk` prints a compact banner with grouped command help (Setup / Payments / Transactions / Money-out / Reference / Agent & skills); `generate-qr` with missing inputs runs a guided wizard (currency → amount → QR template → payment option → lifetime → callback URL → summary → confirm; explicit flags are never re-asked; offline mode probes `--ref` and an optional static amount); `generate-checkout` gains a pre-submit confirm; QR/checkout polling shows a live `Poll #N · PENDING · m:ss elapsed / m:ss left` spinner with a terminal ✓/✗ line; an APPROVED payment offers a next-step picker (fetch transaction detail / keep watching / show refund command / done); one-shot submits (refund, close-transaction, pre-auth complete/complete-payout/cancel) show spinners; and unknown commands/flags get Levenshtein "Did you mean …?" hints (unknown `--template` warns, unknown `--payment-option` errors with a suggestion). Piped stdin, `--json`, `-y`/`--force`/`--non-interactive`, CI, and `PAYWAY_UI=classic` keep byte-identical legacy behavior; a global `--no-color` flag (accepted before the subcommand, like `--profile`) and `NO_COLOR` disable ANSI; Ctrl-C during a prompt exits 130 (exit codes 0/1/2/3 unchanged).
 
 ### Fixed
 
 - **`skills doctor` crashed with a raw ENOENT stack** when the executable's sibling `skills/` directory was missing (e.g. source checkouts); a missing directory now reports as "no packaged skills" instead.
 - **Agent human output spacing** — failed actions rendered as `tool(E1: msg)`; now `tool (E1: msg)`.
+- **Interactive lifetime override now enforces the 180s gateway minimum before submit** — a lifetime below 180s entered in the wizard re-asks with an explanation of gateway code `"04"` (179s → HTTP 400), matching the `--lifetime` flag validation from the edge-case audit instead of failing after submit.
 
 ## 1.3.0 — 2026-08-30
 
