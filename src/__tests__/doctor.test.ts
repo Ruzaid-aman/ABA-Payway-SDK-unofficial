@@ -15,13 +15,21 @@ afterEach(() => {
 });
 
 describe('runDoctor', () => {
-  it('returns a valid DoctorResult', () => {
+  it('returns a valid DoctorResult with unique, well-formed checks', () => {
     const result = runDoctor({ cwd: TEST_DIR });
     expect(result.checks).toBeInstanceOf(Array);
     expect(result.envIssues).toBeInstanceOf(Array);
-    expect(result.framework).toBeDefined();
+    // A bare directory has no supported framework dependency.
+    expect(result.framework).toBe('unknown');
     expect(result.frameworkEvidence).toBeInstanceOf(Array);
-    expect(typeof result.allHealthy).toBe('boolean');
+    expect(result.allHealthy).toBe(false);
+    const ids = result.checks.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const check of result.checks) {
+      expect(typeof check.id).toBe('string');
+      expect(typeof check.ok).toBe('boolean');
+      expect(typeof check.label).toBe('string');
+    }
   });
 
   it('reports .env file missing when no .env exists', () => {

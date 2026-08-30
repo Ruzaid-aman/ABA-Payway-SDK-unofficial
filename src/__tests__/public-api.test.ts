@@ -38,6 +38,32 @@ describe('public API surface (src/index.ts barrel)', () => {
     }
   });
 
+  it('error classes construct with a message and chain back to PayWayError', () => {
+    const { PayWayError, PayWayConfigError, PayWayAPIError, PayWayBusinessError, PayWayNetworkError, PayWayRateLimitError } = PublicApi;
+    for (const Ctor of [PayWayConfigError, PayWayAPIError, PayWayBusinessError, PayWayNetworkError, PayWayRateLimitError]) {
+      const error = new Ctor('boom');
+      expect(error, Ctor.name).toBeInstanceOf(PayWayError);
+      expect(error, Ctor.name).toBeInstanceOf(Error);
+      expect(error.message, Ctor.name).toBe('boom');
+    }
+    const apiError = new PayWayAPIError('gateway down', { statusCode: 502, retryable: true });
+    expect(apiError.statusCode).toBe(502);
+    expect(apiError.retryable).toBe(true);
+  });
+
+  it('logger and circuit-breaker exports return working instances', () => {
+    const logger = PublicApi.createPayWayLogger({ level: 'silent' });
+    for (const level of ['debug', 'info', 'warn', 'error'] as const) {
+      expect(typeof logger[level]).toBe('function');
+    }
+    const breaker = new PublicApi.CircuitBreaker(PublicApi.DEFAULT_CIRCUIT_BREAKER_OPTIONS);
+    expect(breaker.stateFor('/api/payment-gateway/v1/exchange-rate')).toBe('closed');
+    expect(() => breaker.assertAllowed('/api/payment-gateway/v1/exchange-rate')).not.toThrow();
+    breaker.recordSuccess('/api/payment-gateway/v1/exchange-rate');
+    expect(PublicApi.resolveLogLevel('debug')).toBe('debug');
+    expect(PublicApi.resolveLogLevel('nonsense')).toBeDefined();
+  });
+
   it('exports gateway code tables and constants', () => {
     expect(PublicApi.PAYMENT_STATUS_CODES.APPROVED).toBe(0);
     expect(PublicApi.REFUND_ERROR_CODES.PARAMETER_VALIDATION).toBe('PTL04');

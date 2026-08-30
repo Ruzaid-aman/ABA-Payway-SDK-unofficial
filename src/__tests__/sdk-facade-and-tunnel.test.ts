@@ -63,7 +63,8 @@ describe('sdk facade', () => {
     const session = sdk.test('qr_image', payload);
     // No DOM in this environment → the handler reports the skip outcome.
     const result = await sdk.client.handleResponse(session);
-    expect(result).toBeDefined();
+    expect(result.action).toBe('qr_image_skipped_no_dom');
+    expect(result.success).toBe(true);
   });
 
   it('runTestSuiteAndPrint() prints the formatted report and returns it', async () => {

@@ -32,8 +32,11 @@ describe('validatePayWayEnv', () => {
     };
     const issues = validatePayWayEnv(env);
     const issue = issues.find((i) => i.varName === 'PAYWAY_MERCHANT_ID');
-    expect(issue).toBeDefined();
-    expect(issue?.severity).toBe('error');
+    expect(issue).toMatchObject({
+      code: 'E-PAYWAY_MERCHANT_ID-MISSING',
+      severity: 'error',
+      message: expect.stringContaining('PAYWAY_MERCHANT_ID is missing or empty'),
+    });
   });
 
   it('reports error when PAYWAY_API_KEY is missing', () => {
@@ -43,8 +46,11 @@ describe('validatePayWayEnv', () => {
     };
     const issues = validatePayWayEnv(env);
     const issue = issues.find((i) => i.varName === 'PAYWAY_API_KEY');
-    expect(issue).toBeDefined();
-    expect(issue?.severity).toBe('error');
+    expect(issue).toMatchObject({
+      code: 'E-PAYWAY_API_KEY-MISSING',
+      severity: 'error',
+      message: expect.stringContaining('PAYWAY_API_KEY is missing or empty'),
+    });
   });
 
   it('reports warn when PAYWAY_API_KEY is suspiciously short', () => {
@@ -55,8 +61,11 @@ describe('validatePayWayEnv', () => {
     };
     const issues = validatePayWayEnv(env);
     const issue = issues.find((i) => i.code === 'E-PAYWAY_API_KEY-TOO-SHORT');
-    expect(issue).toBeDefined();
-    expect(issue?.severity).toBe('warn');
+    expect(issue).toMatchObject({
+      severity: 'warn',
+      varName: 'PAYWAY_API_KEY',
+      message: expect.stringContaining('suspiciously short'),
+    });
   });
 
   it('reports error when PAYWAY_ENV has invalid value', () => {
@@ -67,8 +76,11 @@ describe('validatePayWayEnv', () => {
     };
     const issues = validatePayWayEnv(env);
     const issue = issues.find((i) => i.code === 'E-PAYWAY_ENV-WRONG');
-    expect(issue).toBeDefined();
-    expect(issue?.severity).toBe('error');
+    expect(issue).toMatchObject({
+      severity: 'error',
+      varName: 'PAYWAY_ENV',
+      message: expect.stringContaining('staging'),
+    });
   });
 
   it('accepts https URL as PAYWAY_ENV', () => {
@@ -90,8 +102,11 @@ describe('validatePayWayEnv', () => {
     };
     const issues = validatePayWayEnv(env);
     const issue = issues.find((i) => i.code === 'E-PAYWAY_RETURN_URL-MISSING');
-    expect(issue).toBeDefined();
-    expect(issue?.severity).toBe('error');
+    expect(issue).toMatchObject({
+      severity: 'error',
+      varName: 'PAYWAY_RETURN_URL',
+      message: expect.stringContaining('required when launching checkout'),
+    });
   });
 
   it('reports error when RETURN_URL is not a valid URL', () => {
@@ -103,8 +118,11 @@ describe('validatePayWayEnv', () => {
     };
     const issues = validatePayWayEnv(env);
     const issue = issues.find((i) => i.code === 'E-PAYWAY_RETURN_URL-INVALID');
-    expect(issue).toBeDefined();
-    expect(issue?.severity).toBe('error');
+    expect(issue).toMatchObject({
+      severity: 'error',
+      varName: 'PAYWAY_RETURN_URL',
+      message: expect.stringContaining('must be an http(s) URL'),
+    });
   });
 
   it('reports warn when RSA key is not PEM formatted', () => {
@@ -117,8 +135,11 @@ describe('validatePayWayEnv', () => {
     };
     const issues = validatePayWayEnv(env);
     const issue = issues.find((i) => i.code === 'E-PAYWAY_RSA_PUBLIC_KEY-INVALID');
-    expect(issue).toBeDefined();
-    expect(issue?.severity).toBe('warn');
+    expect(issue).toMatchObject({
+      severity: 'warn',
+      varName: 'PAYWAY_RSA_PUBLIC_KEY',
+      message: expect.stringContaining('PEM-formatted'),
+    });
   });
 
   it('accepts valid PEM-formatted RSA key', () => {
