@@ -106,7 +106,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk exchange-rate` | Fetch the live USD/KHR exchange rate |
 | `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (requires credentials) |
 | `payway-sdk checkout-form -a <amount> -o form.html` | Write the signed hosted-checkout HTML form (local signing, no API call) |
-| `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials) |
+| `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image) |
 | `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks |
 | `payway-sdk config` | Display loaded configuration and validate environment variables |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
@@ -537,6 +537,28 @@ const link = await payway.paymentLink.create({
 
 // Get payment link details
 const details = await payway.paymentLink.getDetails(link.id);
+```
+
+Attach an image (sent as a top-level `multipart/form-data` part; the image bytes are **not** part of the HMAC hash — sandbox-verified 2026-08-31, see [SANDBOX-FINDINGS §15](./docs/SANDBOX-FINDINGS.md)):
+
+```typescript
+import { readFileSync } from 'node:fs';
+
+const linkWithImage = await payway.paymentLink.create({
+  title: 'Invoice #1092',
+  amount: 150.00,
+  merchantRefNo: 'inv-1092',
+  returnUrl: 'https://mywebsite.com/invoice/1092',
+  image: {
+    data: readFileSync('./invoice-banner.png'),
+    filename: 'banner.png',   // default 'image.jpg' — note: the gateway renames the stored file
+    contentType: 'image/png', // default 'image/jpeg'
+  },
+});
+
+// Gateway-hosted copy of the uploaded image:
+const details = await payway.paymentLink.getDetails(linkWithImage.data.id);
+console.log(details.data?.image?.image); // https://…/payment_link_image_<epoch-ms>.png
 ```
 
 ### 5. Pre-Authorization (`payway.preAuth`)
