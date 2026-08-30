@@ -7,6 +7,10 @@
  * REJECTS shells, executables, file paths, URI schemes, agent-management
  * subcommands and arbitrary tokens — only the manual top-level command names are
  * accepted.
+ *
+ * Directive classification and dispatch validation live in `repl-helpers.ts`
+ * (pure, unit-tested). The loop itself is exposed as `runRepl(io, …)` so tests
+ * can drive it with injected streams; `startRepl` wires the real stdin/stdout.
  */
 
 import readline from 'node:readline';
@@ -24,6 +28,9 @@ import { createProviderAdapter } from './provider.js';
 import { scanOnboardingState } from './onboarding/scan.js';
 import { maybeAutoOnboard, onboardingHintText } from '../cli/commands/onboard.js';
 import { isInteractiveTerminal, PRODUCTION_CONFIRMATION_PHRASE } from './terminal.js';
+import { ansi as c } from './ansi.js';
+import { contactingProviderLine, createProgressPrinter, providerProposalFailedHint } from './progress.js';
+import { classifyReplLine, REPL_HELP, REPL_PROMPT, validateDispatch } from './repl-helpers.js';
 
 // The REPL re-dispatches recognized commands through the shared Commander
 // program. It is injected at registration time (see registerAgentCommands) so
@@ -35,60 +42,46 @@ export function setAgentProgram(program: Command): void {
   dispatchProgram = program;
 }
 
-// Local ANSI helpers.
-const c = {
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-};
-
-const PROMPT = `${c.cyan('payway-agent>')} `;
-
-const HELP = `
-${c.bold('REPL directives')}
-  :help              Show this help
-  :profile [name]    Show the active credential profile, or switch to a named profile
-  :history           Show command history
-  :clear             Clear the screen
-  :session           Show / create the active session id
-  :run <cmd>         Re-dispatch a recognized PayWay command (e.g. :run generate-qr --amount 3)
-  :exit              Leave the REPL
-
-Any other line is sent to the agent as a free-form request.
-`;
-
-/** Agent-management and meta commands must never be re-dispatched from the REPL. */
-const FORBIDDEN_DISPATCH = new Set(['agent', 'ask']);
-
-/** Tokens that indicate a shell escape / executable / path / URI. */
-function isUnsafeDispatch(rest: string): boolean {
-  if (/[;&|`$<>(){}\n\r]/.test(rest)) return true;
-  if (rest.includes('/') || rest.includes('\\')) return true;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(rest.trim())) return true;
-  return false;
+/** Injectable terminal endpoints for the REPL loop. */
+export interface ReplIo {
+  input: NodeJS.ReadableStream;
+  output: NodeJS.WritableStream;
+  interactive: boolean;
 }
 
-function safeParseArgs(rest: string): string[] {
-  return rest.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((t) => t.replace(/^["']|["']$/g, '')) ?? [];
-}
-
+/** Enter the REPL on the real terminal. */
 export async function startRepl(options: { profile?: string; sessionId?: string }): Promise<void> {
-  let profile = options.profile ?? process.env.PAYWAY_PROFILE ?? undefined;
-  let context = resolvePayWayContext({ profile });
-  profile = context.profileName ?? profile;
-  const interactive = isInteractiveTerminal();
-
-  const rl = readline.createInterface({
+  return runRepl({
+    profile: options.profile,
+    sessionId: options.sessionId,
     input: process.stdin as unknown as NodeJS.ReadableStream,
     output: process.stdout as unknown as NodeJS.WritableStream,
+    interactive: isInteractiveTerminal(),
+  });
+}
+
+/**
+ * Run the REPL loop against injected streams. Output lines go through
+ * `console.log` (the real stdout in production; captured in tests); prompt and
+ * clear-screen writes go to `io.output` so a TTY-less harness can still verify
+ * them.
+ */
+export async function runRepl(
+  io: ReplIo & { profile?: string; sessionId?: string },
+): Promise<void> {
+  let profile = io.profile ?? process.env.PAYWAY_PROFILE ?? undefined;
+  let context = resolvePayWayContext({ profile });
+  profile = context.profileName ?? profile;
+  const interactive = io.interactive;
+
+  const rl = readline.createInterface({
+    input: io.input as NodeJS.ReadableStream,
+    output: io.output as NodeJS.WritableStream,
     terminal: interactive,
   });
 
   const history: string[] = [];
-  let sessionId = options.sessionId;
+  let sessionId = io.sessionId;
   let running = true;
 
   console.log(`\n${c.bold('Agentic PayWay REPL')} ${c.dim('(type :help for directives, :exit to quit)')}\n`);
@@ -97,27 +90,14 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
   }
 
   async function dispatch(rest: string): Promise<void> {
-    const tokens = safeParseArgs(rest);
-    if (tokens.length === 0) {
-      console.log(`  ${c.red('✗')} Rejected: no command supplied to :run`);
+    const program = dispatchProgram;
+    const decision = validateDispatch(rest, program?.commands.map((cmd) => cmd.name()) ?? []);
+    if (!decision.ok) {
+      console.log(`  ${c.red('✗')} ${decision.message}`);
       return;
     }
-    const name = tokens[0];
-
-    if (
-      FORBIDDEN_DISPATCH.has(name) ||
-      !dispatchProgram ||
-      !dispatchProgram.commands.some((cmd) => cmd.name() === name)
-    ) {
-      console.log(
-        `  ${c.red('✗')} Rejected: '${name}' is not a dispatchable PayWay command (agent-management commands are blocked)`,
-      );
-      return;
-    }
-    if (isUnsafeDispatch(rest)) {
-      console.log(`  ${c.red('✗')} Rejected: '${rest}' looks like a shell, path, or URI — not a PayWay command`);
-      return;
-    }
+    if (!program) return; // unreachable: decision.ok implies a registered command matched
+    const tokens = decision.tokens;
 
     console.log(`  ${c.cyan('→')} Running: payway-sdk ${tokens.join(' ')}`);
     // Prevent an unexpected process.exit (e.g. missing required option) from
@@ -130,7 +110,7 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
       throw new Error(`__repl_exit__${code ?? 0}`);
     }) as (code?: number) => never;
     try {
-      await dispatchProgram.parseAsync(tokens, { from: 'user' });
+      await program.parseAsync(tokens, { from: 'user' });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.startsWith('__repl_exit__')) {
@@ -145,66 +125,7 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
     void exited;
   }
 
-  async function handleLine(line: string): Promise<void> {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    history.push(trimmed);
-
-    if (trimmed === ':exit' || trimmed === ':quit') {
-      running = false;
-      return;
-    }
-    if (trimmed === ':help') {
-      console.log(HELP);
-      return;
-    }
-    if (trimmed === ':history') {
-      if (history.length === 0) {
-        console.log(`  ${c.dim('(no history yet)')}`);
-      } else {
-        history.forEach((h, i) => {
-          console.log(`  ${c.dim(`${i + 1}.`)} ${h}`);
-        });
-      }
-      return;
-    }
-    if (trimmed === ':clear') {
-      if (interactive) process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
-      return;
-    }
-    if (trimmed === ':profile') {
-      console.log(`  profile: ${c.cyan(profile ?? '(none)')}  ${c.dim(`(${context.displayLabel})`)}`);
-      return;
-    }
-    if (trimmed.startsWith(':profile ')) {
-      const requestedProfile = trimmed.slice(':profile '.length).trim();
-      const resolved = resolvePayWayContext({ profile: requestedProfile });
-      if (resolved.profileName !== requestedProfile) {
-        console.log(`  ${c.red('✗')} Profile '${requestedProfile}' does not exist.`);
-        return;
-      }
-      profile = requestedProfile;
-      context = resolved;
-      console.log(`  profile: ${c.cyan(profile)}  ${c.dim(`(${context.displayLabel})`)}`);
-      return;
-    }
-    if (trimmed === ':session') {
-      if (!sessionId) {
-        const { createSession } = await import('./sessions.js');
-        sessionId = createSession(context.displayLabel).sessionId;
-      }
-      console.log(`  session: ${c.cyan(sessionId)}`);
-      return;
-    }
-    if (trimmed.startsWith(':run ')) {
-      await dispatch(trimmed.slice(5).trim());
-      return;
-    }
-    if (trimmed.startsWith(':')) {
-      console.log(`  ${c.red('✗')} Unknown directive: ${trimmed} (try :help)`);
-      return;
-    }
-
+  async function handleRequest(text: string): Promise<void> {
     // Free-form request → agent (only when configured).
     let config = readAgentConfig();
     if (!config) {
@@ -219,19 +140,7 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
     }
     // Provider and orchestrator are reconstructed for every turn so a prior
     // :profile switch cannot retain stale credentials or display labels.
-    const onProgress = (info: { phase: string; detail?: string }) => {
-      if (!interactive) return;
-      if (info.phase === 'propose') return; // already printed as "Contacting…"
-      const label =
-        info.phase === 'validate'
-          ? 'Validating plan…'
-          : info.phase === 'authorize'
-            ? 'Authorizing plan…'
-            : info.phase === 'execute'
-              ? `Executing ${info.detail ?? 'action'}…`
-              : 'Finalizing…';
-      console.log(`  ${c.dim('·')} ${label}`);
-    };
+    const onProgress = createProgressPrinter({ tty: interactive, write: (line) => console.log(line) });
     const provider = createProviderAdapter(config);
     const orchestrator = new AgentOrchestrator({ context, provider, sessionId, providerConfig: config });
     const runOptions = {
@@ -241,24 +150,78 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
       ...(interactive ? { confirmCreatePlan } : {}),
     };
     if (interactive) {
-      console.log(
-        `  ${c.dim('·')} Contacting ${c.cyan(config.provider)} ${c.dim(`(${config.model || 'no model'})`)} to propose a plan…`,
-      );
+      console.log(contactingProviderLine(config.provider, config.model));
     }
     const result = sessionId
-      ? await orchestrator.runTurn(sessionId, trimmed, runOptions)
-      : await orchestrator.runOneShot(trimmed, runOptions);
+      ? await orchestrator.runTurn(sessionId, text, runOptions)
+      : await orchestrator.runOneShot(text, runOptions);
     if (!interactive) {
       console.log(serializeCommandResult(result));
     } else {
       console.log(renderHumanResult(result));
       if (result.status === 'failed' && result.error?.code === 'PROVIDER_PROPOSAL_FAILED') {
-        console.log(
-          `  ${c.yellow('!')} The inference provider could not propose a plan. Verify ${c.cyan('PAYWAY_AGENT_API_KEY')} is set and valid, then re-run ${c.cyan('agent doctor')}.`,
-        );
+        console.log(providerProposalFailedHint());
       }
     }
     sessionId = result.sessionId;
+  }
+
+  async function handleLine(line: string): Promise<void> {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    history.push(trimmed);
+
+    const directive = classifyReplLine(trimmed);
+    switch (directive.kind) {
+      case 'exit':
+        running = false;
+        return;
+      case 'help':
+        console.log(REPL_HELP);
+        return;
+      case 'history':
+        if (history.length === 0) {
+          console.log(`  ${c.dim('(no history yet)')}`);
+        } else {
+          history.forEach((h, i) => {
+            console.log(`  ${c.dim(`${i + 1}.`)} ${h}`);
+          });
+        }
+        return;
+      case 'clear':
+        if (interactive) io.output.write('\x1b[2J\x1b[3J\x1b[H');
+        return;
+      case 'profile-show':
+        console.log(`  profile: ${c.cyan(profile ?? '(none)')}  ${c.dim(`(${context.displayLabel})`)}`);
+        return;
+      case 'profile-switch': {
+        const resolved = resolvePayWayContext({ profile: directive.profile });
+        if (resolved.profileName !== directive.profile) {
+          console.log(`  ${c.red('✗')} Profile '${directive.profile}' does not exist.`);
+          return;
+        }
+        profile = directive.profile;
+        context = resolved;
+        console.log(`  profile: ${c.cyan(profile)}  ${c.dim(`(${context.displayLabel})`)}`);
+        return;
+      }
+      case 'session':
+        if (!sessionId) {
+          const { createSession } = await import('./sessions.js');
+          sessionId = createSession(context.displayLabel).sessionId;
+        }
+        console.log(`  session: ${c.cyan(sessionId)}`);
+        return;
+      case 'run':
+        await dispatch(directive.rest);
+        return;
+      case 'unknown-directive':
+        console.log(`  ${c.red('✗')} Unknown directive: ${directive.line} (try :help)`);
+        return;
+      case 'request':
+        await handleRequest(directive.text);
+        return;
+    }
   }
 
   // Async line loop (works for both TTY and piped stdin). Using 'line' events
@@ -295,7 +258,7 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
 
   async function confirmCreatePlan(proposal: CreatePlanConfirmation): Promise<boolean> {
     console.log(`\n${renderCreatePlanConfirmation(proposal)}`);
-    process.stdout.write(
+    io.output.write(
       proposal.environment === 'production'
         ? `Type ${PRODUCTION_CONFIRMATION_PHRASE} to execute this production create plan: `
         : 'Execute this create plan? (y/N): ',
@@ -307,7 +270,7 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
   }
 
   while (running) {
-    if (interactive) process.stdout.write(PROMPT);
+    if (interactive) io.output.write(REPL_PROMPT);
     const line = await nextLine();
     if (line === null) break;
     await handleLine(line);

@@ -11,9 +11,9 @@
 | Aspect | State |
 |---|---|
 | Version | `1.3.0` (tag `v1.3.0`; package.json bumped from a stale 1.1.1 — the v1.2.0 tag already existed since July, **do not move tags**) |
-| Tests | 932 tests / 60 files, all green (`npx vitest run`) |
+| Tests | 988 tests / 63 files, all green (`npx vitest run`) |
 | Typecheck / lint | `npx tsc --noEmit` clean; `npx biome lint src` clean |
-| Coverage | 70.04% stmts / 65.4% branch / 79.8% funcs / 70.91% lines (`npx vitest run --coverage`) |
+| Coverage | 75.79% stmts / 71.08% branch / 83.68% funcs / 76.59% lines (`npx vitest run --coverage`) |
 | Edge-case audit | **All 23 findings (EC-01–EC-23) remediated** — `audit-results/edge-case-report.md` (findings), `audit-results/code-improvement-plan.md` (batches 1–5, all marked done) |
 | Release checklist | Run for 1.3.0: build, dist smoke, live `npm run probe` (all PATH_OK) — `docs/RELEASE_CHECKLIST.md` |
 | Working tree | Clean; nothing untracked |
@@ -66,10 +66,13 @@ Each item is pinned by a named test — if you change one, flip the test conscio
 - **Do:** `npm i -D better-sqlite3`, then add round-trip tests (save/getAll/count/updateKhqrMetadata/close + corrupt-file handling) mirroring `src/__tests__/webhook-storage-factory.test.ts` (written backend-agnostic — they must keep passing with the driver installed).
 - **Done when:** coverage ≥ 71% and the full suite is green with the driver installed. **If the native build fails on Windows, revert the install and close the item — do not fight the toolchain.**
 
-### 5.2 — Agent module testability refactor (the last big coverage gap)
-`src/cli/commands/agent.ts` 28%, `src/agent/repl.ts` 4% (~460 + ~300 uncovered statements). The REPL is interactive; don't test it in-process.
-- **Do:** extract pure helpers (request summarization, capability-matrix row building, session-summary rendering) out of `repl.ts` / `agent.ts` into small modules, then unit-test those — same pattern as the `runCli` extraction.
-- **Done when:** agent.ts + repl.ts combined statements ≥ 60% without weakening existing agent tests.
+### 5.2 — Agent module testability refactor (DONE 2026-08-30)
+Pure helpers were extracted out of `agent.ts` / `repl.ts` into `src/cli/commands/agent-helpers.ts`,
+`src/agent/repl-helpers.ts` (directive classification + `:run` dispatch validation), `src/agent/progress.ts`,
+and `src/agent/ansi.ts`; the REPL loop is in-process testable via `runRepl(io)` (injected streams; `startRepl`
+still wires the real terminal). Coverage: `agent.ts` 28% → 77%, `repl.ts` 4% → 85% (DoD was ≥60% combined).
+New suites: `agent-command-helpers`, `agent-repl-helpers`, `agent-cli-inprocess`. Remaining uncovered lines
+are the TTY-only branches of `ask` / `sessions clear` and the interactive onboard hand-off.
 
 ### 5.3 — Documentation & release hygiene (quick wins)
 - Regenerate the TypeDoc API reference: `npm run docs:api` (the public API grew: `runCli`, `QR_LIFETIME_*`, `PURCHASE_LIFETIME_MIN_MINUTES`, `retryPolicy`, `allowPrivateCallbackHosts`, `verifyCallback` options).
@@ -91,7 +94,7 @@ Each item is pinned by a named test — if you change one, flip the test conscio
 
 ## 6. Testing conventions (established; follow them)
 
-- **Gates before every commit:** `npx vitest run` (932 expected), `npx tsc --noEmit`, `npx biome lint src`.
+- **Gates before every commit:** `npx vitest run` (988 expected), `npx tsc --noEmit`, `npx biome lint src`.
 - **Branch workflow:** create a branch per task → fast-forward merge to `main` after checking `main` hasn't moved (other agents work in parallel) → delete the branch. Conventional commit messages (`feat|fix|test|docs|chore(scope): …`).
 - **In-process CLI tests:** use `runCli(argv)` with captured console and save/restore `process.exitCode`; the module loads `<cwd>/.env` on import, so chdir to a temp dir *before* the dynamic import. Never use `--help`/`--version` in-process (commander calls `process.exit`) and never invoke interactive commands without `-y`/`--json`.
 - **Mock gateway:** `src/__tests__/cli-mock-commands.test.ts` shows the per-endpoint mock handler shapes (mirror sandbox-verified payloads). Note refund's `tran_id` travels inside the encrypted `merchant_auth`, so a mock cannot branch on it.
