@@ -32,6 +32,7 @@ import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/command
 import { readMaskedInput } from './cli/masked-input.js';
 import { loadPaymentLinkImage } from './cli/payment-link-image.js';
 import { PayWay } from './client.js';
+import type { PaymentLinkImage } from './client.js';
 import { hasBlockingIssues, validatePayWayEnv, validateRequiredCredentials } from './config/envValidator.js';
 import {
   activateProfile,
@@ -2017,7 +2018,7 @@ paymentLinkCmd
       return;
     }
 
-    let image;
+    let image: PaymentLinkImage | undefined;
     if (opts.image !== undefined) {
       try {
         image = loadPaymentLinkImage(opts.image);
