@@ -2,9 +2,10 @@
  * Onboarding command.
  *
  * `payway-sdk onboard` runs the guided stage machine implemented in
- * `src/agent/onboarding/stages.ts`. In a TTY it uses @clack/prompts; in a
- * non-TTY it emits a structured JSON plan (consistent with `ask`'s blocked
- * result) so scripts can detect what to configure.
+ * `src/agent/onboarding/stages.ts`. In a TTY it uses @clack/prompts (adapter
+ * in `onboard-clack-io.ts`); in a non-TTY it emits a structured JSON plan
+ * (consistent with `ask`'s blocked result) so scripts can detect what to
+ * configure.
  *
  * `runOnboardCommand(opts, deps)` is the injectable entry (2026-08-30
  * testability refactor): tests drive the full flow — interactive included —
@@ -13,19 +14,7 @@
  */
 
 import type { Command } from 'commander';
-import {
-  cancel,
-  confirm as clackConfirm,
-  intro,
-  isCancel,
-  multiselect,
-  note as clackNote,
-  outro,
-  password,
-  select as clackSelect,
-  spinner as clackSpinner,
-  text,
-} from '@clack/prompts';
+import { cancel, intro, note as clackNote, outro } from '@clack/prompts';
 import path from 'node:path';
 import { REMEDIES } from '../../agent/onboarding/remedies.js';
 import { isInteractiveTerminal } from '../../agent/terminal.js';
@@ -33,14 +22,12 @@ import { scanOnboardingState } from '../../agent/onboarding/scan.js';
 import {
   runStage,
   type OnboardingIO,
-  type ProviderPreset,
   type StageContext,
-  type StageName,
 } from '../../agent/onboarding/stages.js';
 import { serializeCommandResult } from '../../agent/output.js';
+import { OnboardCancel, buildClackIO } from './onboard-clack-io.js';
 import {
   ALL_STAGES,
-  appendEnvVar,
   missingRemedies,
   nonInteractiveResult,
   readinessRows,
@@ -49,91 +36,6 @@ import {
 } from './onboard-helpers.js';
 
 export { onboardingHintText } from './onboard-helpers.js';
-
-// ---------------------------------------------------------------------------
-// Interactive (TTY)
-// ---------------------------------------------------------------------------
-
-class OnboardCancel extends Error {}
-
-function assert<T>(value: T | symbol, message = 'Cancelled'): T {
-  if (isCancel(value)) throw new OnboardCancel(message);
-  return value as T;
-}
-
-function buildClackIO(env: NodeJS.ProcessEnv): OnboardingIO {
-  return {
-    async selectProvider() {
-      const choice = assert(
-        await clackSelect({
-          message: 'Choose an inference provider (the CLI uses it to guide you agentically)',
-          options: [
-            { value: 'opencode', label: 'OpenCode Zen', hint: 'free models, e.g. x-preview-f-free' },
-            { value: 'openrouter', label: 'OpenRouter', hint: 'one key, 400+ models' },
-            { value: 'nvidia', label: 'NVIDIA NIM', hint: 'self-hosted / NIM catalog' },
-            { value: 'openai', label: 'OpenAI', hint: 'gpt-4o etc.' },
-            { value: 'custom', label: 'Custom', hint: 'OpenAI-compatible base URL' },
-          ],
-        }),
-      );
-      return choice as ProviderPreset;
-    },
-    async inputModel(provider) {
-      const def = provider === 'openai' ? 'gpt-4o' : provider === 'nvidia' ? 'meta/llama-3.3-70b-instruct' : '';
-      return assert(await text({ message: 'Model name', placeholder: def, initialValue: def }));
-    },
-    async chooseKeyPlacement() {
-      const choice = assert(
-        await clackSelect({
-          message: 'Where should PAYWAY_AGENT_API_KEY live?',
-          options: [
-            { value: 'dotenv', label: '.env (this project)', hint: 'persisted, never committed' },
-            { value: 'session', label: 'Current shell session only' },
-            { value: 'user', label: 'User environment (persistent)' },
-          ],
-        }),
-      );
-      return choice as 'session' | 'dotenv' | 'user';
-    },
-    async secret(prompt) {
-      return assert(await password({ message: prompt }));
-    },
-    async input(prompt, fallback = '') {
-      const val = assert(await text({ message: prompt, initialValue: fallback }));
-      return val.trim();
-    },
-    async confirm(prompt, def = true) {
-      return assert(await clackConfirm({ message: prompt, initialValue: def }));
-    },
-    async multiselectKhqr() {
-      const choice = assert(
-        await multiselect({
-          message: 'Configure offline KHQR? (optional)',
-          options: [{ value: 'yes', label: 'Yes, configure ABA KHQR' }],
-        }),
-      );
-      return Array.isArray(choice) && choice.includes('yes');
-    },
-    async writeEnvVar(key, value) {
-      appendEnvVar(path.resolve(process.cwd(), '.env'), env, key, value);
-    },
-    async spinner(label, fn) {
-      const s = clackSpinner();
-      s.start(label);
-      try {
-        const result = await fn();
-        s.stop(label);
-        return result;
-      } catch (error) {
-        s.stop(`Failed: ${(error as Error).message}`);
-        throw error;
-      }
-    },
-    note(message) {
-      clackNote(message);
-    },
-  };
-}
 
 export interface OnboardCommandDeps {
   /** Force the interactive/non-interactive branch (default: TTY detection). */

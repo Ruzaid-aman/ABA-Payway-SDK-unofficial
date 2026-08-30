@@ -67,7 +67,7 @@ function makeHarness(envFile: string, input?: PassThrough): Harness {
     log: () => {},
     storageFactory: async () => storage,
     serverFactory: (_storage, opts) => {
-      state.serverOptions = opts;
+      state.serverOptions = opts ?? null;
       return server;
     },
     envFile,
