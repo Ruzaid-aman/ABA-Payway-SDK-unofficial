@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 — 2026-08-30
+
+> Edge-case audit campaign release: all 23 findings (EC-01–EC-23) from
+> `audit-results/edge-case-report.md` remediated. Sandbox verification:
+> QR lifetime boundary pinned live (179s → 400 `"04"`, 180s → OK; `scripts`-backed evidence in
+> `test-output/edge-case-probe/live-probe.log`), plus `npm run probe` re-run at release time.
 
 ### Added
 
