@@ -66,6 +66,29 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 |---|---|---|
 | 14. Full Code Snippets | [14-appendix-code-snippets.md](./14-appendix-code-snippets.md) | Reference |
 
+### Agent CLI & Operations
+| Document | File |
+|---|---|
+| Agentic PayWay CLI — User Guide | [AGENTIC-PAYWAY-CLI-USER-GUIDE.md](./AGENTIC-PAYWAY-CLI-USER-GUIDE.md) |
+| Agent Setup Playbook (manual path + maintainer gotchas) | [AGENT-SETUP-PLAYBOOK.md](./AGENT-SETUP-PLAYBOOK.md) |
+| Agentic CLI 1-Pager | [QUICK-START-1-PAGER.md](./QUICK-START-1-PAGER.md) |
+| Project Status (session log + quick reference) | [PROJECT_STATUS.md](./PROJECT_STATUS.md) |
+| Release Checklist | [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) |
+| Agent Handoff (for coding agents resuming work) | [../HANDOFF.md](../HANDOFF.md) |
+| Versioning Policy | [VERSIONING.md](./VERSIONING.md) |
+
+### Sandbox Evidence & Audits
+| Document | File |
+|---|---|
+| Sandbox Findings (§1–§13 gateway facts) | [SANDBOX-FINDINGS.md](./SANDBOX-FINDINGS.md) |
+| Close-Transaction Findings (advisory-close dossier) | [CLOSE-TRANSACTION-FINDINGS.md](./CLOSE-TRANSACTION-FINDINGS.md) |
+| Stripe-Standard DX Audit | [STRIPE-STANDARD-DX-AUDIT.md](./STRIPE-STANDARD-DX-AUDIT.md) |
+| Edge-Case Audit — Findings (EC-01–EC-23) | [../audit-results/edge-case-report.md](../audit-results/edge-case-report.md) |
+| Edge-Case Audit — Improvement Plan (batches 1–5) | [../audit-results/code-improvement-plan.md](../audit-results/code-improvement-plan.md) |
+| Open Questions for ABA (incl. token-trio HMAC) | [../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md) |
+| Cloudflare Workers Webhook Archiver | [cloudflare-free-webhook.md](./cloudflare-free-webhook.md) |
+| TypeDoc API Reference (generated) | [api/index.html](./api/index.html) |
+
 ### Diagrams
 | Diagram | File |
 |---|---|
@@ -112,6 +135,10 @@ This documentation is written for **junior to mid-level developers** who need to
 The SDK performs input validation in each domain to fail fast and give clear developer-facing errors (`PayWayConfigError`). This section summarizes the current, enforced checks so you know what the client will reject before any network call is made.
 
 - **`checkout`**: validates `transactionId` presence, max 20 characters, and charset `[a-zA-Z0-9\-]`; validates `amount` positivity and currency rules (USD ≤ 2 decimals, KHR integer); validates `returnUrl`/`cancelUrl` are base64-encoded when URLs; validates `lifetime` is a positive integer.
+- **`checkout.purchase`**: `lifetime` is measured in **minutes** with a local minimum of 3 (below that the gateway answers error 69); optional `retryPolicy: 'transient' | 'none'` controls re-sending on transient failures (default `'transient'`).
+- **`qr`**: `lifetime` (seconds) has a local minimum of 180 (the gateway rejects anything lower with HTTP 400 code `"04"`) and warns once above 120 days.
+- **Callback / return URL hosts**: loopback, private-range, and link-local addresses (localhost, 127.x, 10.x, 172.16–31.x, 192.168.x, 169.254.x, CGNAT, `.local`/`.internal`) are rejected with `PayWayConfigError` for QR `callbackUrl` and payment-link / credentials-on-file `returnUrl`/`callbackUrl` — PayWay's servers can never reach them. Opt out for on-prem gateways/tests with `allowPrivateCallbackHosts: true`.
+- **Config sanity**: `timeout <= 0` and whitespace-only credentials throw `PayWayConfigError` at construction, before any network call.
 - **`payment-link`**: requires non-empty `title` and `merchantRefNo`, `amount` > 0, and `returnUrl` must be a public HTTPS URL when provided.
 - **RSA endpoints (`refund`, `pre-auth`, `payout`, `payment-link`)**: `publicKeyPem` must be present **and** structurally valid — the SDK checks for a `-----BEGIN PUBLIC KEY-----` / `-----END PUBLIC KEY-----` pair (SPKI or RSA format; literal `\n` sequences from `.env` files are normalized first) and throws a descriptive `PayWayConfigError` before any encryption or network call. The check is exported as `isValidPublicKeyPem()` for your own pre-flight validation.
 - **URL auto-encoding**: string fields that hold URLs are base64-encoded automatically when they start with `http://`, `https://`, `//` (protocol-relative), or `www.`; other strings (tokens, raw JSON) pass through unchanged.

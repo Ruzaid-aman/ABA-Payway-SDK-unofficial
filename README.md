@@ -223,7 +223,8 @@ For a complete 16-chapter integration guide, diagrams, and runnable examples, se
 - `SECURITY.md` for responsible vulnerability disclosure
 - `docs/VERSIONING.md` for SDK versioning policy
 - `docs/RELEASE_CHECKLIST.md` for release verification and sandbox gating
-- `docs/api/README.md` for the generated API reference
+- `docs/api/index.html` for the generated TypeDoc API reference (regenerate with `npm run docs:api`)
+- `HANDOFF.md` for the agent-facing state handoff (current release, behavior contract, next work items)
 
 ### 1. Initialize the Client
 

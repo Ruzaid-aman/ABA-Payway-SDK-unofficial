@@ -30,6 +30,18 @@
 </code><button type="button">Copy</button></pre>
 
 <p>Supported agents are <code>claude</code>, <code>codex</code>, <code>opencode</code>, <code>cursor</code>, and <code>copilot</code>. Use <code>npx payway-sdk skills list</code> to inspect installed guides and <code>npx payway-sdk skills remove claude</code> to remove the ABA PayWay guides for an agent.</p>
+<h3 id="agentic-payway-cli" class="tsd-anchor-link">Agentic PayWay CLI<a href="#agentic-payway-cli" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (<code>payway-sdk ask</code>, <code>payway-sdk onboard</code>, <code>payway-sdk agent setup|doctor|sessions</code>). See the <a href="media/QUICK-START-1-PAGER.md#agentic-payway-cli">1-pager agentic guide</a> and the skill guides:</p>
+<ul>
+<li><a href="media/SKILL.md">aba-payway-agent skill</a> — provider modes, the 11 tools, risk gates, execution ledger, sessions, redaction.</li>
+<li><a href="media/SKILL-1.md">aba-payway-first-payment skill</a> — choosing QR / checkout / payment-link for a first payment.</li>
+</ul>
+<pre><code class="bash"><span class="hl-7"># Guided setup (recommended): provider -&gt; profile -&gt; callback -&gt; privacy -&gt; verify</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">onboard</span><br/><br/><span class="hl-7"># Or configure directly. Presets: opencode (free) | openai | openrouter | nvidia | custom</span><br/><span class="hl-5">export</span><span class="hl-0"> </span><span class="hl-2">PAYWAY_AGENT_API_KEY</span><span class="hl-0">=</span><span class="hl-2">sk-</span><span class="hl-0">...</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">agent</span><span class="hl-0"> </span><span class="hl-6">setup</span><span class="hl-0"> </span><span class="hl-5">--provider</span><span class="hl-0"> </span><span class="hl-6">opencode</span><span class="hl-0"> </span><span class="hl-5">--model</span><span class="hl-0"> </span><span class="hl-6">x-preview-f-free</span><span class="hl-0"> </span><span class="hl-8">\</span><br/><span class="hl-0">  </span><span class="hl-5">--max-tokens</span><span class="hl-0"> </span><span class="hl-4">8192</span><span class="hl-0"> </span><span class="hl-5">--temperature</span><span class="hl-0"> </span><span class="hl-4">0.2</span><span class="hl-0"> </span><span class="hl-5">--acknowledge-privacy</span><br/><br/><span class="hl-7"># Ask the agent (create actions require --yolo in sandbox or interactive confirmation)</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">ask</span><span class="hl-0"> </span><span class="hl-6">&quot;Generate an online QR for 3 USD&quot;</span><span class="hl-0"> </span><span class="hl-5">--yolo</span>
+</code><button type="button">Copy</button></pre>
+
+<blockquote>
+<p>The provider API key is supplied <strong>only</strong> via <code>PAYWAY_AGENT_API_KEY</code> (never stored); secrets are redacted before reaching the provider. The strict-JSON planning prompt embeds a full tool catalog, off-schema plans get one automatic repair round, and transient provider errors (429/5xx) are retried with backoff. Model-supplied callback URLs are overridden by your merchant profile's configured callback. Every agent action has a fully-supported manual equivalent. Setup requires a saved credential profile and a public HTTPS callback — see the <a href="media/AGENT-SETUP-PLAYBOOK.md">Agent Setup Playbook</a> for the field-tested path.</p>
+</blockquote>
 <h3 id="cli-commands" class="tsd-anchor-link">CLI commands<a href="#cli-commands" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <table>
 <thead>
@@ -45,7 +57,7 @@
 </tr>
 <tr>
 <td><code>payway-sdk doctor</code></td>
-<td>Validate environment configuration and connectivity</td>
+<td>Validate environment configuration and connectivity (<code>--live</code> adds a real sandbox round-trip)</td>
 </tr>
 <tr>
 <td><code>payway-sdk test</code></td>
@@ -56,20 +68,72 @@
 <td>Run the test suite with pass/fail output</td>
 </tr>
 <tr>
+<td><code>payway-sdk poll-transaction -t &lt;id&gt;</code></td>
+<td>Watch a transaction until terminal status (<code>--json</code> events for agents)</td>
+</tr>
+<tr>
 <td><code>payway-sdk status</code></td>
 <td>Display payment status codes and refund error codes reference</td>
+</tr>
+<tr>
+<td><code>payway-sdk explain [code]</code></td>
+<td>Decode a PayWay error code (e.g. <code>explain PTL36</code>, <code>explain 49</code>) with a fix hint — no credentials needed</td>
 </tr>
 <tr>
 <td><code>payway-sdk validate</code></td>
 <td>Validate a refund amount or transaction ID locally</td>
 </tr>
 <tr>
+<td><code>payway-sdk get-transactions-by-ref --merchant-ref &lt;reference&gt;</code></td>
+<td>Retrieve transactions for a merchant reference</td>
+</tr>
+<tr>
+<td><code>payway-sdk profiles add|list|use|current|remove</code></td>
+<td>Manage up to eight saved credential profiles</td>
+</tr>
+<tr>
 <td><code>payway-sdk generate-qr</code></td>
 <td>Generate a QR code (online via PayWay API or offline)</td>
 </tr>
 <tr>
-<td><code>payway-sdk generate-checkout</code></td>
-<td>Generate a checkout QR URL, QR string, and ABA deeplink (requires credentials)</td>
+<td><code>payway-sdk check-transaction -t &lt;id&gt;</code></td>
+<td>Check payment status for one transaction</td>
+</tr>
+<tr>
+<td><code>payway-sdk transaction-detail -t &lt;id&gt;</code></td>
+<td>Full transaction detail (PayWay limit: 10/min; <code>--wait &lt;seconds&gt;</code> retries the ~5s post-creation indexing lag)</td>
+</tr>
+<tr>
+<td><code>payway-sdk transaction-list --from &lt;date&gt; --to &lt;date&gt;</code></td>
+<td>List transactions in a window (<code>&quot;YYYY-MM-DD HH:mm:ss&quot;</code> dates)</td>
+</tr>
+<tr>
+<td><code>payway-sdk close-transaction -t &lt;id&gt;</code></td>
+<td>Void/close an unpaid transaction (prompts; <code>-y/--force</code> skips)</td>
+</tr>
+<tr>
+<td><code>payway-sdk refund -t &lt;id&gt; -a &lt;amount&gt; [-c &lt;currency&gt;]</code></td>
+<td>Refund with a pre-flight balance check and confirmation by default; <code>--no-preflight</code> skips only the detail lookup, <code>-y/--force</code> skips both the lookup and the prompt</td>
+</tr>
+<tr>
+<td><code>payway-sdk exchange-rate</code></td>
+<td>Fetch the live USD/KHR exchange rate</td>
+</tr>
+<tr>
+<td><code>payway-sdk generate-checkout -a &lt;amount&gt;</code></td>
+<td>Generate a checkout QR URL (requires credentials)</td>
+</tr>
+<tr>
+<td><code>payway-sdk payment-link create / detail</code></td>
+<td>Create or inspect PayWay payment links (requires RSA credentials)</td>
+</tr>
+<tr>
+<td><code>payway-sdk setup-webhook</code></td>
+<td>Start a local webhook listener for PayWay callbacks</td>
+</tr>
+<tr>
+<td><code>payway-sdk config</code></td>
+<td>Display loaded configuration and validate environment variables</td>
 </tr>
 <tr>
 <td><code>payway-sdk skills add &lt;agent&gt;</code></td>
@@ -97,26 +161,50 @@
 </tr>
 </tbody>
 </table>
-<h4 id="qr-code-generation-examples" class="tsd-anchor-link">QR Code Generation Examples<a href="#qr-code-generation-examples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
-<pre><code class="bash"><span class="hl-7"># Offline QR (no credentials needed)</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">generate-qr</span><span class="hl-0"> </span><span class="hl-5">--amount</span><span class="hl-0"> </span><span class="hl-4">10.00</span><span class="hl-0"> </span><span class="hl-5">--offline</span><span class="hl-0"> </span><span class="hl-5">--merchant-id</span><span class="hl-0"> </span><span class="hl-6">YOUR_MERCHANT_ID</span><span class="hl-0"> </span><span class="hl-5">--ref</span><span class="hl-0"> </span><span class="hl-6">&quot;Order-001&quot;</span><br/><br/><span class="hl-7"># Online QR (requires PAYWAY_MERCHANT_ID and PAYWAY_API_KEY in .env)</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">generate-qr</span><span class="hl-0"> </span><span class="hl-5">--amount</span><span class="hl-0"> </span><span class="hl-4">10.00</span><span class="hl-0"> </span><span class="hl-5">--callback-url</span><span class="hl-0"> </span><span class="hl-6">https://your-webhook.com/hook</span><br/><br/><span class="hl-7"># Online QR with custom template</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">generate-qr</span><span class="hl-0"> </span><span class="hl-5">--amount</span><span class="hl-0"> </span><span class="hl-4">10.00</span><span class="hl-0"> </span><span class="hl-5">--callback-url</span><span class="hl-0"> </span><span class="hl-6">https://your-webhook.com/hook</span><span class="hl-0"> </span><span class="hl-5">--template</span><span class="hl-0"> </span><span class="hl-6">template3</span><br/><br/><span class="hl-7"># Non-interactive mode (skip prompts - useful for scripts and CI/CD)</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">generate-qr</span><span class="hl-0"> </span><span class="hl-5">-a</span><span class="hl-0"> </span><span class="hl-4">10.00</span><span class="hl-0"> </span><span class="hl-5">--callback-url</span><span class="hl-0"> </span><span class="hl-6">https://your-webhook.com/hook</span><span class="hl-0"> </span><span class="hl-5">-y</span><span class="hl-0"> </span><span class="hl-5">--save-image</span><span class="hl-0"> </span><span class="hl-6">qr.png</span><span class="hl-0"> </span><span class="hl-5">--no-polling</span>
+<blockquote>
+<p><strong>Exit codes (all commands):</strong> <code>0</code> success · <code>1</code> validation/input error · <code>2</code> PayWay API failure · <code>3</code> network/timeout/rate-limit — so scripts and agent frameworks can branch on <code>$?</code>. Lifecycle commands also accept <code>--json</code> for structured output.</p>
+</blockquote>
+<h3 id="fastest-qr-flow" class="tsd-anchor-link">Fastest QR flow<a href="#fastest-qr-flow" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>For the fastest manual first payment in sandbox:</p>
+<pre><code class="bash"><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">doctor</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">generate-qr</span><span class="hl-0"> </span><span class="hl-5">-a</span><span class="hl-0"> </span><span class="hl-4">3.31</span><span class="hl-0"> </span><span class="hl-5">-c</span><span class="hl-0"> </span><span class="hl-6">USD</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">check-transaction</span><span class="hl-0"> </span><span class="hl-5">-t</span><span class="hl-0"> &lt;</span><span class="hl-6">i</span><span class="hl-0">d&gt;</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">transaction-detail</span><span class="hl-0"> </span><span class="hl-5">-t</span><span class="hl-0"> &lt;</span><span class="hl-6">i</span><span class="hl-0">d&gt;</span>
 </code><button type="button">Copy</button></pre>
 
-<h4 id="checkout-qr-url-generation-cli" class="tsd-anchor-link">Checkout QR URL Generation (CLI)<a href="#checkout-qr-url-generation-cli" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
-<p>The Checkout command reads credentials from the current directory's <code>.env</code> file:</p>
-<pre><code class="dotenv">PAYWAY_MERCHANT_ID=your-merchant-id
-PAYWAY_API_KEY=your-api-key
-PAYWAY_SANDBOX=true
+<p>For <strong>online QR</strong>, make sure <code>PAYWAY_CALLBACK_URL</code> is a public HTTPS URL first. If you do not already have one locally, run:</p>
+<pre><code class="bash"><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">setup-webhook</span><span class="hl-0"> </span><span class="hl-5">--tunnel</span>
 </code><button type="button">Copy</button></pre>
 
-<p>Run a purchase with <code>payment_gate: 0</code> (set automatically by the CLI) to receive a QR string, ABA deeplink, and hosted checkout QR URL:</p>
-<pre><code class="bash"><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">generate-checkout</span><span class="hl-0"> </span><span class="hl-8">\</span><br/><span class="hl-0">  </span><span class="hl-5">--amount</span><span class="hl-0"> </span><span class="hl-4">10.00</span><span class="hl-0"> </span><span class="hl-8">\</span><br/><span class="hl-0">  </span><span class="hl-5">--currency</span><span class="hl-0"> </span><span class="hl-6">USD</span><span class="hl-0"> </span><span class="hl-8">\</span><br/><span class="hl-0">  </span><span class="hl-5">--return-url</span><span class="hl-0"> </span><span class="hl-6">https://merchant.example/payment/return</span><span class="hl-0"> </span><span class="hl-8">\</span><br/><span class="hl-0">  </span><span class="hl-5">--cancel-url</span><span class="hl-0"> </span><span class="hl-6">https://merchant.example/payment/cancel</span>
+<p>Online <code>generate-qr</code> saves the QR PNG by default to <code>payway-output/&lt;transaction-id&gt;.png</code>, renders the QR in the terminal when possible, and <strong>opens the PNG with your OS default image viewer</strong> so it is immediately scannable. Image-open behavior:</p>
+<ul>
+<li><strong>Auto (default):</strong> opens only when stdout is an interactive terminal — scripts, CI, and agents are never interrupted.</li>
+<li><code>--open-image</code> — force-open regardless of environment.</li>
+<li><code>--no-open-image</code> — never open; use <code>--save-image &lt;path&gt;</code> still controls where the file lands.</li>
+</ul>
+<p>The same opener is available programmatically via the exported <a href="media/open-image.ts"><code>openImageInDefaultViewer()</code></a> helper (allowlisted per-platform command, spawned without a shell, never throws).</p>
+<h3 id="fastest-refund-follow-up" class="tsd-anchor-link">Fastest refund follow-up<a href="#fastest-refund-follow-up" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>For the fastest verified refund flow:</p>
+<pre><code class="bash"><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">refund</span><span class="hl-0"> </span><span class="hl-5">-t</span><span class="hl-0"> &lt;</span><span class="hl-6">i</span><span class="hl-0">d&gt; </span><span class="hl-5">-a</span><span class="hl-0"> </span><span class="hl-4">1.11</span><span class="hl-0"> </span><span class="hl-5">-c</span><span class="hl-0"> </span><span class="hl-6">USD</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">transaction-detail</span><span class="hl-0"> </span><span class="hl-5">-t</span><span class="hl-0"> &lt;</span><span class="hl-6">i</span><span class="hl-0">d&gt;</span>
 </code><button type="button">Copy</button></pre>
 
-<p><code>--return-url</code> and <code>--cancel-url</code> are forwarded to the Checkout Purchase API. The command accepts <code>--callback-url</code> for compatibility, but Checkout Purchase does not send that field; configure any server-to-server callback in your PayWay merchant settings instead. A return URL is a customer-browser redirect, not payment confirmation—verify a callback signature or check the transaction before fulfilling an order.</p>
-<h4 id="checkout-url-generation-via-sdk" class="tsd-anchor-link">Checkout URL Generation (via SDK)<a href="#checkout-url-generation-via-sdk" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
-<pre><code class="typescript"><span class="hl-9">import</span><span class="hl-0"> { </span><span class="hl-2">PayWay</span><span class="hl-0"> } </span><span class="hl-9">from</span><span class="hl-0"> </span><span class="hl-6">&#39;aba-payway-ts&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">payway</span><span class="hl-0"> = </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">PayWay</span><span class="hl-0">();</span><br/><br/><span class="hl-7">// Get checkout_qr_url (requires payment_gate: 0)</span><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">result</span><span class="hl-0"> = </span><span class="hl-9">await</span><span class="hl-0"> </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">checkout</span><span class="hl-0">.</span><span class="hl-1">purchase</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">transactionId:</span><span class="hl-0"> </span><span class="hl-6">&#39;order-123&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">amount:</span><span class="hl-0"> </span><span class="hl-4">15.00</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">currency:</span><span class="hl-0"> </span><span class="hl-6">&#39;USD&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">paymentOption:</span><span class="hl-0"> </span><span class="hl-6">&#39;abapay_khqr_deeplink&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">paymentGate:</span><span class="hl-0"> </span><span class="hl-4">0</span><span class="hl-0">,  </span><span class="hl-7">// Required for checkout_qr_url</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-2">console</span><span class="hl-0">.</span><span class="hl-1">log</span><span class="hl-0">(</span><span class="hl-2">result</span><span class="hl-0">.</span><span class="hl-2">checkout_qr_url</span><span class="hl-0">);</span><br/><span class="hl-7">// https://checkout-sandbox.payway.com.kh/eyJ...</span>
+<p>Interpret the follow-up detail like this:</p>
+<ul>
+<li><code>refund_amount</code> is the authoritative total refunded so far.</li>
+<li><code>transaction_operations</code> shows each refund event.</li>
+<li><code>payment_status</code> may read <code>REFUNDED</code> even after a partial refund, so do not use that field alone to infer that the original payment was fully refunded.</li>
+</ul>
+<h3 id="get-transactions-by-merchant-reference" class="tsd-anchor-link">Get transactions by merchant reference<a href="#get-transactions-by-merchant-reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Set <code>PAYWAY_MERCHANT_ID</code> and <code>PAYWAY_API_KEY</code>, then run:</p>
+<pre><code class="bash"><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">get-transactions-by-ref</span><span class="hl-0"> </span><span class="hl-5">--merchant-ref</span><span class="hl-0"> </span><span class="hl-6">INV-12345678</span>
 </code><button type="button">Copy</button></pre>
 
+<p>The command sends the signed request to PayWay and prints the JSON response. PayWay returns at most 50 matching historical transactions and limits this endpoint to 10 requests per minute.</p>
+<h3 id="credential-profiles-and-environments" class="tsd-anchor-link">Credential profiles and environments<a href="#credential-profiles-and-environments" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Use profiles to keep up to eight sandbox and production credential sets on one machine:</p>
+<pre><code class="bash"><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">profiles</span><span class="hl-0"> </span><span class="hl-6">add</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">profiles</span><span class="hl-0"> </span><span class="hl-6">list</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-6">profiles</span><span class="hl-0"> </span><span class="hl-6">use</span><span class="hl-0"> </span><span class="hl-6">sandbox-main</span><br/><span class="hl-1">payway-sdk</span><span class="hl-0"> </span><span class="hl-5">--profile</span><span class="hl-0"> </span><span class="hl-6">production-main</span><span class="hl-0"> </span><span class="hl-6">get-transactions-by-ref</span><span class="hl-0"> </span><span class="hl-5">--merchant-ref</span><span class="hl-0"> </span><span class="hl-6">INV-12345678</span>
+</code><button type="button">Copy</button></pre>
+
+<p><code>profiles add</code> prompts for a unique name, environment, merchant ID, API key, optional RSA public key/base URL, and an optional note of up to 300 characters. The first profile becomes the default. The active profile is printed before every API request and secrets are never displayed.</p>
+<p>Credential resolution order for CLI commands: explicit <code>--profile</code>, <code>PAYWAY_PROFILE</code>, the saved default profile, the current directory's <code>.env</code>, then ambient <code>PAYWAY_*</code> environment variables. Because a saved default profile applies globally, commands succeed from any working directory — run <code>payway-sdk profiles current</code> if you're unsure which source supplied the credentials.</p>
+<p>Profiles are stored as plaintext in <code>%APPDATA%\aba-payway-sdk\profiles.json</code> (or <code>~/.config/aba-payway-sdk/profiles.json</code> when <code>APPDATA</code> is unavailable). Keep that file out of source control and restrict local access. For deployed SDK applications, use an OS secret manager, a cloud secret manager, or CI/CD secret storage; never put PayWay keys in browser/mobile-client code or commit them to <code>.env</code> files.</p>
 <h3 id="sandbox-test-scripts" class="tsd-anchor-link">Sandbox test scripts<a href="#sandbox-test-scripts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <table>
 <thead>
@@ -131,8 +219,16 @@ PAYWAY_SANDBOX=true
 <td>Run full sandbox probe across all 7 API domains</td>
 </tr>
 <tr>
+<td><code>npx tsx scripts/sandbox-campaign-full-cycle.ts</code></td>
+<td>Full-cycle validation campaign: purchase → check → close → detail → list → refund + edge cases (writes <code>test-output/campaign-evidence.json</code>)</td>
+</tr>
+<tr>
 <td><code>npx tsx scripts/sandbox-probe-qr-api.ts</code></td>
 <td>Probe QR API endpoint specifically</td>
+</tr>
+<tr>
+<td><code>npx tsx scripts/sandbox-probe-txn-detail.ts</code></td>
+<td>Instrumented get-transaction-detail probe: latency, visibility lag, rate-limit contract</td>
 </tr>
 <tr>
 <td><code>npx tsx scripts/sandbox-probe-checkout-errors.ts</code></td>
@@ -167,6 +263,14 @@ PAYWAY_SANDBOX=true
 <td>QR payment flow with live transaction polling</td>
 </tr>
 <tr>
+<td><code>npx tsx scripts/online-qr-poll.ts</code></td>
+<td>One online KHQR (default $31.11 USD, 600s lifetime) → save/open PNG → poll every 5s for 10 min</td>
+</tr>
+<tr>
+<td><code>npx tsx scripts/checkout-link-poll.ts</code></td>
+<td>Create Transaction API (default $12.12 USD, 600s lifetime) → open hosted <code>checkout_qr_url</code> → poll every 5s for 10 min</td>
+</tr>
+<tr>
 <td><code>npx tsx scripts/check-qr-transactions.ts</code></td>
 <td>Fetch transactions via <code>getTransactionList</code>, query detail for each</td>
 </tr>
@@ -183,14 +287,17 @@ PAYWAY_SANDBOX=true
 <p>Results from integration scripts are written to <code>test-logs/</code> with timestamps.</p>
 <h2 id="quick-start" class="tsd-anchor-link">Quick Start<a href="#quick-start" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <h3 id="full-integration-guide" class="tsd-anchor-link">Full integration guide<a href="#full-integration-guide" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>For a complete 15-chapter integration guide, diagrams, and runnable examples, see <a href="media/README.md">docs/README.md</a>.</p>
+<p>For a complete 16-chapter integration guide, diagrams, and runnable examples, see <a href="media/README.md">docs/README.md</a>.</p>
+<blockquote>
+<p>🗺️ <strong>New to the project?</strong> Start with the <a href="media/VISUAL-GUIDE.md">Visual Guide</a> — architecture, setup paths, onboarding journey, and the payment lifecycle in one page of diagrams.</p>
+</blockquote>
 <blockquote>
 <p>Note: The SDK also performs fast client-side validation per domain. See the validation behavior section in <a href="media/README.md">docs/README.md</a> for details.</p>
 </blockquote>
 <h3 id="documentation-examples" class="tsd-anchor-link">Documentation &amp; examples<a href="#documentation-examples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul>
 <li><code>README.md</code> for a quick getting started flow</li>
-<li><code>docs/README.md</code> for the full 15-chapter integration guide</li>
+<li><code>docs/README.md</code> for the full 16-chapter integration guide</li>
 <li><code>docs/examples/</code> for runnable webhook, checkout, QR, and backend samples</li>
 <li><code>CONTRIBUTING.md</code> for contribution and testing guidance</li>
 <li><code>SECURITY.md</code> for responsible vulnerability disclosure</li>
@@ -204,7 +311,7 @@ PAYWAY_SANDBOX=true
 </code><button type="button">Copy</button></pre>
 
 <p>Set <code>debug: true</code> or <code>DEBUG_PAYWAY=true</code> to log sanitized request and response diagnostics. Sensitive values such as API keys, HMAC hashes, merchant authorization, payment tokens, and CVVs are redacted.</p>
-<pre><code class="typescript"><span class="hl-9">import</span><span class="hl-0"> { </span><span class="hl-2">PayWay</span><span class="hl-0"> } </span><span class="hl-9">from</span><span class="hl-0"> </span><span class="hl-6">&#39;aba-payway-ts&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">payway</span><span class="hl-0"> = </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">PayWay</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">merchantId:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_MERCHANT_ID</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">apiKey:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_API_KEY</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">publicKeyPem:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_PUBLIC_KEY_PEM</span><span class="hl-0">, </span><span class="hl-7">// Required for Refund, Pre-auth, Payout, and Payment Link APIs</span><br/><span class="hl-0">  </span><span class="hl-2">environment:</span><span class="hl-0"> </span><span class="hl-6">&#39;sandbox&#39;</span><span class="hl-0">, </span><span class="hl-7">// &#39;sandbox&#39; | &#39;production&#39;</span><br/><span class="hl-0">});</span>
+<pre><code class="typescript"><span class="hl-9">import</span><span class="hl-0"> { </span><span class="hl-2">PayWay</span><span class="hl-0"> } </span><span class="hl-9">from</span><span class="hl-0"> </span><span class="hl-6">&#39;aba-payway-ts&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">payway</span><span class="hl-0"> = </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">PayWay</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">merchantId:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_MERCHANT_ID</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">apiKey:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_API_KEY</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">publicKeyPem:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_RSA_PUBLIC_KEY</span><span class="hl-0">, </span><span class="hl-7">// Required for Refund, Pre-auth, Payout, and Payment Link APIs</span><br/><span class="hl-0">  </span><span class="hl-2">environment:</span><span class="hl-0"> </span><span class="hl-6">&#39;sandbox&#39;</span><span class="hl-0">, </span><span class="hl-7">// &#39;sandbox&#39; | &#39;production&#39;</span><br/><span class="hl-0">});</span>
 </code><button type="button">Copy</button></pre>
 
 <h3 id="rate-limiting-configuration" class="tsd-anchor-link">Rate Limiting Configuration<a href="#rate-limiting-configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
@@ -215,7 +322,8 @@ PAYWAY_SANDBOX=true
 <li><code>transaction-detail</code>: 10 requests/minute</li>
 <li><code>refund</code>: 500 requests/second</li>
 </ul>
-<p>This SDK applies client-side throttling for documented PayWay limits by default. You can fine-tune or disable this behavior using <code>rateLimitThrottling</code> and <code>rateLimitRules</code>.</p>
+<p>Sandbox-verified (2026-08-25): exceeding a cap returns <strong>HTTP 403 with a numeric body <code>status.code</code> of 429</strong> (&quot;Rate limit exceeded for this request. Please try again later&quot;) and no rate-limit headers. The SDK classifies this as retryable <code>PayWayRateLimitError</code> and paces retries from its own observed request window, so bursts slightly over a cap recover automatically.</p>
+<p>This SDK applies client-side throttling for documented PayWay limits by default (<code>onThrottle</code> reports each local wait). You can fine-tune or disable this behavior using <code>rateLimitThrottling</code> and <code>rateLimitRules</code>.</p>
 <pre><code class="typescript"><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">paywayWithRateLimits</span><span class="hl-0"> = </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">PayWay</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">merchantId:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_MERCHANT_ID</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">apiKey:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_API_KEY</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">environment:</span><span class="hl-0"> </span><span class="hl-6">&#39;sandbox&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">rateLimitThrottling:</span><span class="hl-0"> </span><span class="hl-5">true</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">rateLimitRules:</span><span class="hl-0"> {</span><br/><span class="hl-0">    </span><span class="hl-6">&#39;/api/payment-gateway/v1/payments/check-transaction-2&#39;</span><span class="hl-2">:</span><span class="hl-0"> {</span><br/><span class="hl-0">      </span><span class="hl-2">limit:</span><span class="hl-0"> </span><span class="hl-4">600</span><span class="hl-0">,</span><br/><span class="hl-0">      </span><span class="hl-2">intervalMs:</span><span class="hl-0"> </span><span class="hl-4">1000</span><span class="hl-0">,</span><br/><span class="hl-0">    },</span><br/><span class="hl-0">    </span><span class="hl-6">&#39;/api/payment-gateway/v1/payments/transaction-list-2&#39;</span><span class="hl-2">:</span><span class="hl-0"> {</span><br/><span class="hl-0">      </span><span class="hl-2">limit:</span><span class="hl-0"> </span><span class="hl-4">50</span><span class="hl-0">,</span><br/><span class="hl-0">      </span><span class="hl-2">intervalMs:</span><span class="hl-0"> </span><span class="hl-4">60_000</span><span class="hl-0">,</span><br/><span class="hl-0">    },</span><br/><span class="hl-0">  },</span><br/><span class="hl-0">  </span><span class="hl-1">onResponse</span><span class="hl-2">:</span><span class="hl-0"> (</span><span class="hl-2">endpoint</span><span class="hl-0">, </span><span class="hl-2">status</span><span class="hl-0">, </span><span class="hl-2">body</span><span class="hl-0">, </span><span class="hl-2">rateLimitInfo</span><span class="hl-0">) </span><span class="hl-5">=&gt;</span><span class="hl-0"> {</span><br/><span class="hl-0">    </span><span class="hl-9">if</span><span class="hl-0"> (</span><span class="hl-2">rateLimitInfo</span><span class="hl-0">) {</span><br/><span class="hl-0">      </span><span class="hl-2">console</span><span class="hl-0">.</span><span class="hl-1">log</span><span class="hl-0">(</span><span class="hl-6">`Rate limit info for </span><span class="hl-5">${</span><span class="hl-2">endpoint</span><span class="hl-5">}</span><span class="hl-6">:`</span><span class="hl-0">, </span><span class="hl-2">rateLimitInfo</span><span class="hl-0">);</span><br/><span class="hl-0">    }</span><br/><span class="hl-0">  },</span><br/><span class="hl-0">});</span>
 </code><button type="button">Copy</button></pre>
 
@@ -225,9 +333,19 @@ PAYWAY_SANDBOX=true
 
 <h3 id="retry-configuration" class="tsd-anchor-link">Retry Configuration<a href="#retry-configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p>The SDK can automatically retry transient failures (HTTP 5xx and network errors) using exponential backoff. 4xx errors and PayWay business-logic errors are never retried.</p>
-<pre><code class="typescript"><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">paywayWithRetry</span><span class="hl-0"> = </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">PayWay</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">merchantId:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_MERCHANT_ID</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">apiKey:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_API_KEY</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">environment:</span><span class="hl-0"> </span><span class="hl-6">&#39;sandbox&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">maxRetries:</span><span class="hl-0"> </span><span class="hl-4">3</span><span class="hl-0">,         </span><span class="hl-7">// Number of retry attempts (default: 0 = no retry)</span><br/><span class="hl-0">  </span><span class="hl-2">retryDelayMs:</span><span class="hl-0"> </span><span class="hl-4">1000</span><span class="hl-0">,    </span><span class="hl-7">// Base delay in ms between retries (default: 1000, doubled each attempt)</span><br/><span class="hl-0">});</span>
+<pre><code class="typescript"><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">paywayWithRetry</span><span class="hl-0"> = </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">PayWay</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">merchantId:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_MERCHANT_ID</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">apiKey:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_API_KEY</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">environment:</span><span class="hl-0"> </span><span class="hl-6">&#39;sandbox&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">maxRetries:</span><span class="hl-0"> </span><span class="hl-4">3</span><span class="hl-0">,         </span><span class="hl-7">// Number of retry attempts (default: 3)</span><br/><span class="hl-0">  </span><span class="hl-2">retryDelayMs:</span><span class="hl-0"> </span><span class="hl-4">1000</span><span class="hl-0">,    </span><span class="hl-7">// Base delay in ms between retries (default: 3000, doubled each attempt)</span><br/><span class="hl-0">});</span>
 </code><button type="button">Copy</button></pre>
 
+<blockquote>
+<p>⚠️ <strong>Non-idempotent endpoints:</strong> a <code>purchase</code>/QR creation that fails with a
+network error or 5xx is silently re-sent (up to <code>maxRetries</code>). PayWay's
+sandbox accepts duplicate <code>tran_id</code> by overwriting, so this recovers
+transparently there — but production duplicate semantics are unconfirmed
+(open question in <a href="media/SANDBOX-FINDINGS.md">SANDBOX-FINDINGS §8c</a>). If
+you need strict once-only submission, pass <code>retryPolicy: 'none'</code> to
+<code>checkout.purchase()</code> (or set <code>maxRetries: 0</code> for purchase calls) and
+handle retries in your own code with a fresh <code>tran_id</code>.</p>
+</blockquote>
 <h3 id="2-initiate-checkout-server-side" class="tsd-anchor-link">2. Initiate Checkout (Server-Side)<a href="#2-initiate-checkout-server-side" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p>Prepare transaction parameters on the server to generate a secure transaction payload with an HMAC hash signature:</p>
 <pre><code class="typescript"><span class="hl-7">// Create the transaction parameters</span><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">transaction</span><span class="hl-0"> = </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">checkout</span><span class="hl-0">.</span><span class="hl-1">createTransaction</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">transactionId:</span><span class="hl-0"> </span><span class="hl-6">`order-</span><span class="hl-5">${</span><span class="hl-2">Date</span><span class="hl-10">.</span><span class="hl-1">now</span><span class="hl-10">()</span><span class="hl-5">}</span><span class="hl-6">`</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">amount:</span><span class="hl-0"> </span><span class="hl-4">15.00</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">currency:</span><span class="hl-0"> </span><span class="hl-6">&#39;USD&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">items:</span><span class="hl-0"> [</span><br/><span class="hl-0">    { </span><span class="hl-2">name:</span><span class="hl-0"> </span><span class="hl-6">&#39;Sleek Keyboard&#39;</span><span class="hl-0">, </span><span class="hl-2">quantity:</span><span class="hl-0"> </span><span class="hl-4">1</span><span class="hl-0">, </span><span class="hl-2">price:</span><span class="hl-0"> </span><span class="hl-4">15.00</span><span class="hl-0"> }</span><br/><span class="hl-0">  ],</span><br/><span class="hl-0">  </span><span class="hl-2">returnUrl:</span><span class="hl-0"> </span><span class="hl-6">&#39;https://mywebsite.com/payment-result&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-7">// Return this payload directly to your frontend checkout form/page</span><br/><span class="hl-7">// The frontend will render an HTML form posting to PayWay&#39;s checkout URL using these fields</span>
@@ -246,7 +364,7 @@ PAYWAY_SANDBOX=true
 <li>Do not rely on client-side redirects alone for payment confirmation.</li>
 </ul>
 <blockquote>
-<p>For sandbox verification, always supply <code>PAYWAY_MERCHANT_ID</code>, <code>PAYWAY_API_KEY</code>, and <code>PAYWAY_PUBLIC_KEY_PEM</code> from environment variables, never hardcode them in source.</p>
+<p>For sandbox verification, always supply <code>PAYWAY_MERCHANT_ID</code>, <code>PAYWAY_API_KEY</code>, and <code>PAYWAY_RSA_PUBLIC_KEY</code> from environment variables, never hardcode them in source.</p>
 </blockquote>
 <hr>
 <h2 id="available-api-domains" class="tsd-anchor-link">Available API Domains<a href="#available-api-domains" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
@@ -266,44 +384,13 @@ PAYWAY_SANDBOX=true
 <pre><code class="typescript"><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">qrCode</span><span class="hl-0"> = </span><span class="hl-9">await</span><span class="hl-0"> </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">qr</span><span class="hl-0">.</span><span class="hl-1">generateQr</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">transactionId:</span><span class="hl-0"> </span><span class="hl-6">&#39;qr-order-123&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">amount:</span><span class="hl-0"> </span><span class="hl-4">1.50</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">paymentOption:</span><span class="hl-0"> </span><span class="hl-6">&#39;abapay_khqr&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">callbackUrl:</span><span class="hl-0"> </span><span class="hl-6">&#39;https://mywebsite.com/webhook&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">qrImageTemplate:</span><span class="hl-0"> </span><span class="hl-6">&#39;template2&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">});</span><br/><span class="hl-7">// Response includes &quot;qrString&quot; (for embedding/deep-linking) and &quot;qrImage&quot; (base64 image data)</span>
 </code><button type="button">Copy</button></pre>
 
-<h3 id="31-purchase-with-qr-checkout-url-" class="tsd-anchor-link">3.1 Purchase with QR + Checkout URL (<code>payway.checkout.purchase</code>)<a href="#31-purchase-with-qr-checkout-url-" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>Use <code>payment_option: 'abapay_khqr_deeplink'</code> with <code>payment_gate: 0</code> to get <code>qr_string</code>, <code>abapay_deeplink</code>, and <code>checkout_qr_url</code>:</p>
-<pre><code class="typescript"><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">result</span><span class="hl-0"> = </span><span class="hl-9">await</span><span class="hl-0"> </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">checkout</span><span class="hl-0">.</span><span class="hl-1">purchase</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">transactionId:</span><span class="hl-0"> </span><span class="hl-6">&#39;order-123&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">amount:</span><span class="hl-0"> </span><span class="hl-4">15.00</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">currency:</span><span class="hl-0"> </span><span class="hl-6">&#39;USD&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">paymentOption:</span><span class="hl-0"> </span><span class="hl-6">&#39;abapay_khqr_deeplink&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">paymentGate:</span><span class="hl-0"> </span><span class="hl-4">0</span><span class="hl-0">,  </span><span class="hl-7">// Required: routes through Checkout service</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-7">// Response:</span><br/><span class="hl-7">// {</span><br/><span class="hl-7">//   &quot;qr_string&quot;: &quot;000201010212...&quot;,</span><br/><span class="hl-7">//   &quot;abapay_deeplink&quot;: &quot;abamobilebank://ababank.com?...&quot;,</span><br/><span class="hl-7">//   &quot;checkout_qr_url&quot;: &quot;https://checkout-sandbox.payway.com.kh/eyJ...&quot;,</span><br/><span class="hl-7">//   &quot;status&quot;: { &quot;code&quot;: &quot;00&quot;, &quot;message&quot;: &quot;Success!&quot; }</span><br/><span class="hl-7">// }</span>
-</code><button type="button">Copy</button></pre>
-
-<p><strong><code>payment_gate</code> Parameter:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Routes Through</th>
-<th>Response Fields</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>0</code></td>
-<td>Checkout service</td>
-<td><code>qr_string</code>, <code>abapay_deeplink</code>, <code>checkout_qr_url</code></td>
-</tr>
-<tr>
-<td><code>1</code></td>
-<td>QR Payment API</td>
-<td><code>qrString</code>, <code>qrImage</code>, <code>abapay_deeplink</code></td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p>⚠️ <strong>Important:</strong> Use <code>payment_gate: 0</code> when you need <code>checkout_qr_url</code> for hosted checkout pages.</p>
-</blockquote>
 <h3 id="31-offline-qr-generation-" class="tsd-anchor-link">3.1 Offline QR Generation (<code>payway.khqr.generateOfflineQR</code>)<a href="#31-offline-qr-generation-" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>Generate a merchant-scannable QR string entirely offline without calling PayWay. This is useful when you need a local QR payload for QR rendering or deep linking without an API request.</p>
-<blockquote>
-<p>⚠️ <strong>Not official Bakong KHQR:</strong> this helper produces a <strong>custom TLV-encoded QR string</strong> with a CRC-16 checksum. It will <strong>not</strong> be readable by generic consumer banking apps. Use <code>payway.qr.generateQr()</code> for PayWay-issued dynamic KHQR codes.</p>
-</blockquote>
-<pre><code class="typescript"><span class="hl-9">import</span><span class="hl-0"> { </span><span class="hl-2">PayWay</span><span class="hl-0"> } </span><span class="hl-9">from</span><span class="hl-0"> </span><span class="hl-6">&#39;aba-payway-ts&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">payway</span><span class="hl-0"> = </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">PayWay</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">merchantId:</span><span class="hl-0"> </span><span class="hl-6">&#39;M001&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">apiKey:</span><span class="hl-0"> </span><span class="hl-6">&#39;secret&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">environment:</span><span class="hl-0"> </span><span class="hl-6">&#39;sandbox&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">qrString</span><span class="hl-0"> = </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">khqr</span><span class="hl-0">.</span><span class="hl-1">generateOfflineQR</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">merchantId:</span><span class="hl-0"> </span><span class="hl-6">&#39;M001&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">transactionId:</span><span class="hl-0"> </span><span class="hl-6">&#39;qr-order-123&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">amount:</span><span class="hl-0"> </span><span class="hl-4">1.50</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">currency:</span><span class="hl-0"> </span><span class="hl-6">&#39;USD&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">merchantRef:</span><span class="hl-0"> </span><span class="hl-6">&#39;REF-123&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">tipAmount:</span><span class="hl-0"> </span><span class="hl-4">0.25</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">feeAmount:</span><span class="hl-0"> </span><span class="hl-4">0.10</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">transactionType:</span><span class="hl-0"> </span><span class="hl-6">&#39;purchase&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-2">console</span><span class="hl-0">.</span><span class="hl-1">log</span><span class="hl-0">(</span><span class="hl-2">qrString</span><span class="hl-0">);</span>
+<p>Generate an official ABA KHQR payload locally, without a PayWay API call. It requires ABA-issued merchant data: it never derives tags <code>30</code> or <code>62.68</code> from PayWay API credentials. Configure those values explicitly in <code>new PayWay({ khqr: ... })</code>, through the seven <code>PAYWAY_KHQR_*</code> environment variables, or in a local CLI profile. Explicit constructor fields take priority over environment values.</p>
+<pre><code class="typescript"><span class="hl-9">import</span><span class="hl-0"> { </span><span class="hl-2">PayWay</span><span class="hl-0"> } </span><span class="hl-9">from</span><span class="hl-0"> </span><span class="hl-6">&#39;aba-payway-ts&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">payway</span><span class="hl-0"> = </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">PayWay</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">merchantId:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_MERCHANT_ID</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">apiKey:</span><span class="hl-0"> </span><span class="hl-2">process</span><span class="hl-0">.</span><span class="hl-2">env</span><span class="hl-0">.</span><span class="hl-3">PAYWAY_API_KEY</span><span class="hl-0">!,</span><br/><span class="hl-0">  </span><span class="hl-2">khqr:</span><span class="hl-0"> {</span><br/><span class="hl-0">    </span><span class="hl-2">bakongId:</span><span class="hl-0"> </span><span class="hl-6">&#39;your-bakong-id&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">    </span><span class="hl-2">abaMerchantId:</span><span class="hl-0"> </span><span class="hl-6">&#39;your-aba-merchant-id&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">    </span><span class="hl-2">acquirerName:</span><span class="hl-0"> </span><span class="hl-6">&#39;acquirer-name-provided-by-aba&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">    </span><span class="hl-2">merchantCategoryCode:</span><span class="hl-0"> </span><span class="hl-6">&#39;5999&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">    </span><span class="hl-2">merchantName:</span><span class="hl-0"> </span><span class="hl-6">&#39;your-merchant-name&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">    </span><span class="hl-2">merchantCity:</span><span class="hl-0"> </span><span class="hl-6">&#39;your-merchant-city&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">    </span><span class="hl-2">paywayData:</span><span class="hl-0"> </span><span class="hl-6">&#39;payway-template-data-provided-by-aba&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  },</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">readiness</span><span class="hl-0"> = </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">khqr</span><span class="hl-0">.</span><span class="hl-1">validateConfiguration</span><span class="hl-0">();</span><br/><span class="hl-9">if</span><span class="hl-0"> (!</span><span class="hl-2">readiness</span><span class="hl-0">.</span><span class="hl-2">ready</span><span class="hl-0">) </span><span class="hl-9">throw</span><span class="hl-0"> </span><span class="hl-5">new</span><span class="hl-0"> </span><span class="hl-1">Error</span><span class="hl-0">(</span><span class="hl-2">readiness</span><span class="hl-0">.</span><span class="hl-2">issues</span><span class="hl-0">.</span><span class="hl-1">map</span><span class="hl-0">((</span><span class="hl-2">issue</span><span class="hl-0">) </span><span class="hl-5">=&gt;</span><span class="hl-0"> </span><span class="hl-2">issue</span><span class="hl-0">.</span><span class="hl-2">code</span><span class="hl-0">).</span><span class="hl-1">join</span><span class="hl-0">(</span><span class="hl-6">&#39;, &#39;</span><span class="hl-0">));</span><br/><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">qrString</span><span class="hl-0"> = </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">khqr</span><span class="hl-0">.</span><span class="hl-1">generateOfflineQR</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">amount:</span><span class="hl-0"> </span><span class="hl-4">1.50</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">currency:</span><span class="hl-0"> </span><span class="hl-6">&#39;USD&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">merchantRef:</span><span class="hl-0"> </span><span class="hl-6">&#39;REF-123&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-2">console</span><span class="hl-0">.</span><span class="hl-1">log</span><span class="hl-0">(</span><span class="hl-2">qrString</span><span class="hl-0">);</span>
 </code><button type="button">Copy</button></pre>
 
+<p>With <code>amount</code>, the payload is dynamic (<code>01=12</code> and tag <code>54</code>); without it, it is static (<code>01=11</code>). The payload contains ABA merchant data in nested tag <code>30</code>, your reference in <code>62.01</code>, ABA-provided PayWay data in <code>62.68</code>, timestamp data in <code>99</code>, and a CRC in <code>63</code>. Generation is local only: it neither submits the QR nor confirms payment status.</p>
+<p>Earlier SDK releases emitted a private offline TLV format. This method now produces official ABA KHQR, so remove legacy <code>merchantId</code>, <code>transactionId</code>, tip, fee, and transaction-type arguments. Obtain the required fields from ABA before deploying; do not copy sample values from another merchant.</p>
 <h3 id="4-payment-link-" class="tsd-anchor-link">4. Payment Link (<code>payway.paymentLink</code>)<a href="#4-payment-link-" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p>Create and manage shareable payment links.</p>
 <pre><code class="typescript"><span class="hl-7">// Create a payment link</span><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">link</span><span class="hl-0"> = </span><span class="hl-9">await</span><span class="hl-0"> </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">paymentLink</span><span class="hl-0">.</span><span class="hl-1">create</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-2">title:</span><span class="hl-0"> </span><span class="hl-6">&#39;Invoice #1092&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">amount:</span><span class="hl-0"> </span><span class="hl-4">150.00</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">merchantRefNo:</span><span class="hl-0"> </span><span class="hl-6">&#39;inv-1092&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">  </span><span class="hl-2">description:</span><span class="hl-0"> </span><span class="hl-6">&#39;Design consultation services&#39;</span><span class="hl-0">,</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-7">// Get payment link details</span><br/><span class="hl-5">const</span><span class="hl-0"> </span><span class="hl-3">details</span><span class="hl-0"> = </span><span class="hl-9">await</span><span class="hl-0"> </span><span class="hl-2">payway</span><span class="hl-0">.</span><span class="hl-2">paymentLink</span><span class="hl-0">.</span><span class="hl-1">getDetails</span><span class="hl-0">(</span><span class="hl-2">link</span><span class="hl-0">.</span><span class="hl-2">id</span><span class="hl-0">);</span>
@@ -447,6 +534,9 @@ PAYWAY_SANDBOX=true
 <blockquote>
 <p>ℹ️ PayWay-specific error codes (like <code>PTL04</code> for refund validation) are extracted from HTTP error responses automatically. Previously these were buried in <code>rawBody</code>; now they appear in <code>error.paywayCode</code> for easy programmatic handling.</p>
 </blockquote>
+<blockquote>
+<p>⚠️ <strong>RSA endpoints validate the public key before calling PayWay.</strong> Refund, Pre-Auth, Payout, and Payment Link throw a descriptive <code>PayWayConfigError</code> when <code>publicKeyPem</code> is missing <strong>or</strong> is not a valid PEM (<code>-----BEGIN PUBLIC KEY-----</code> / <code>-----END PUBLIC KEY-----</code>). Use the exported <code>isValidPublicKeyPem()</code> helper to pre-flight your key.</p>
+</blockquote>
 <h3 id="error-type-reference" class="tsd-anchor-link">Error Type Reference<a href="#error-type-reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <table>
 <thead>
@@ -527,12 +617,12 @@ PAYWAY_SANDBOX=true
 <li>
 <ul>
 <li><a href="#install-ai-skills"><span>Install <wbr/>AI skills</span></a></li>
+<li><a href="#agentic-payway-cli"><span>Agentic <wbr/>Pay<wbr/>Way <wbr/>CLI</span></a></li>
 <li><a href="#cli-commands"><span>CLI commands</span></a></li>
-<li>
-<ul>
-<li><a href="#qr-code-generation-examples"><span>QR <wbr/>Code <wbr/>Generation <wbr/>Examples</span></a></li>
-<li><a href="#checkout-qr-url-generation-cli"><span>Checkout <wbr/>QR <wbr/>URL <wbr/>Generation (<wbr/>CLI)</span></a></li>
-<li><a href="#checkout-url-generation-via-sdk"><span>Checkout <wbr/>URL <wbr/>Generation (via <wbr/>SDK)</span></a></li></ul></li>
+<li><a href="#fastest-qr-flow"><span>Fastest <wbr/>QR flow</span></a></li>
+<li><a href="#fastest-refund-follow-up"><span>Fastest refund follow-<wbr/>up</span></a></li>
+<li><a href="#get-transactions-by-merchant-reference"><span>Get transactions by merchant reference</span></a></li>
+<li><a href="#credential-profiles-and-environments"><span>Credential profiles and environments</span></a></li>
 <li><a href="#sandbox-test-scripts"><span>Sandbox test scripts</span></a></li></ul></li>
 <li><a href="#quick-start"><span>Quick <wbr/>Start</span></a></li>
 <li>
@@ -551,7 +641,6 @@ PAYWAY_SANDBOX=true
 <li><a href="#1-checkout-"><span>1. <wbr/>Checkout ()</span></a></li>
 <li><a href="#2-credentials-on-file-tokenization-"><span>2. <wbr/>Credentials-<wbr/>on-<wbr/>File / <wbr/>Tokenization ()</span></a></li>
 <li><a href="#3-qr-api-"><span>3. <wbr/>QR <wbr/>API ()</span></a></li>
-<li><a href="#31-purchase-with-qr-checkout-url-"><span>3.1 <wbr/>Purchase with <wbr/>QR + <wbr/>Checkout <wbr/>URL ()</span></a></li>
 <li><a href="#31-offline-qr-generation-"><span>3.1 <wbr/>Offline <wbr/>QR <wbr/>Generation ()</span></a></li>
 <li><a href="#4-payment-link-"><span>4. <wbr/>Payment <wbr/>Link ()</span></a></li>
 <li><a href="#5-pre-authorization-"><span>5. <wbr/>Pre-<wbr/>Authorization ()</span></a></li>

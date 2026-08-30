@@ -20,7 +20,7 @@
 
 </div></div></section><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:416</li></ul></aside>
+<li>Defined in src/client.ts:616</li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -86,6 +86,14 @@
 <li class="tsd-parameter">
 <h5><span>baseUrl</span></h5>
 <div class="tsd-comment tsd-typography"><p>Optional override for the base API URL.</p>
+</div></li>
+<li class="tsd-parameter">
+<h5><span>maxRetries</span></h5>
+<div class="tsd-comment tsd-typography"><p>Number of retries on transient failures (429, 5xx, network). Defaults to 3.</p>
+</div></li>
+<li class="tsd-parameter">
+<h5><span>retryDelayMs</span></h5>
+<div class="tsd-comment tsd-typography"><p>Base delay in milliseconds between retries (exponential backoff). Defaults to 3000.</p>
 </div></li></ul></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">PayWay</a></h4>
 <div class="tsd-comment tsd-typography">
@@ -93,7 +101,7 @@
 <h4 class="tsd-anchor-link" id="throws">Throws<a href="#throws" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><p>If the configuration is missing or invalid.</p>
 </div></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:443</li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in src/client.ts:647</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="properties-1">Properties<a href="#properties-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -101,37 +109,37 @@
 <h3 class="tsd-anchor-link" id="checkout"><code class="tsd-tag">Readonly</code><span>checkout</span><a href="#checkout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">checkout</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/CheckoutDomain.html" class="tsd-signature-type tsd-kind-interface">CheckoutDomain</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:423</li></ul></aside></section>
+<li>Defined in src/client.ts:625</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="credentialsonfile"><code class="tsd-tag">Readonly</code><span>credentials<wbr/>On<wbr/>File</span><a href="#credentialsonfile" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">credentialsOnFile</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/CredentialsOnFileDomain.html" class="tsd-signature-type tsd-kind-interface">CredentialsOnFileDomain</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:424</li></ul></aside></section>
+<li>Defined in src/client.ts:626</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="khqr"><code class="tsd-tag">Readonly</code><span>khqr</span><a href="#khqr" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">khqr</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/KhqrDomain.html" class="tsd-signature-type tsd-kind-interface">KhqrDomain</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:429</li></ul></aside></section>
+<li>Defined in src/client.ts:631</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="paymentlink"><code class="tsd-tag">Readonly</code><span>payment<wbr/>Link</span><a href="#paymentlink" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">paymentLink</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/PaymentLinkDomain.html" class="tsd-signature-type tsd-kind-interface">PaymentLinkDomain</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:426</li></ul></aside></section>
+<li>Defined in src/client.ts:628</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="payout"><code class="tsd-tag">Readonly</code><span>payout</span><a href="#payout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">payout</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/PayoutDomain.html" class="tsd-signature-type tsd-kind-interface">PayoutDomain</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:428</li></ul></aside></section>
+<li>Defined in src/client.ts:630</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="preauth"><code class="tsd-tag">Readonly</code><span>pre<wbr/>Auth</span><a href="#preauth" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">preAuth</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/PreAuthDomain.html" class="tsd-signature-type tsd-kind-interface">PreAuthDomain</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:427</li></ul></aside></section>
+<li>Defined in src/client.ts:629</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="qr"><code class="tsd-tag">Readonly</code><span>qr</span><a href="#qr" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">qr</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/QrDomain.html" class="tsd-signature-type tsd-kind-interface">QrDomain</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:425</li></ul></aside></section></section></details>
+<li>Defined in src/client.ts:627</li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -147,12 +155,12 @@
 <li><span><span class="tsd-kind-parameter">error</span>: <span class="tsd-signature-type">unknown</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">GatewayErrorDetails</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:746</li></ul></aside></div></li></ul></section>
+<li>Defined in src/client.ts:1110</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="verifycallback"><span>verify<wbr/>Callback</span><a href="#verifycallback" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li class="">
-<div class="tsd-signature tsd-anchor-link" id="verifycallback-1"><span class="tsd-kind-call-signature">verifyCallback</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">body</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">signature</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><a href="#verifycallback-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-signature tsd-anchor-link" id="verifycallback-1"><span class="tsd-kind-call-signature">verifyCallback</span><span class="tsd-signature-symbol">(</span><br/>    <span class="tsd-kind-parameter">body</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">signature</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">stripHash</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">,</span><br/><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><a href="#verifycallback-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Verify the signature of a webhook/callback notification from PayWay.</p>
 </div>
@@ -164,11 +172,12 @@
 </div></li>
 <li><span><span class="tsd-kind-parameter">signature</span>: <span class="tsd-signature-type">string</span></span>
 <div class="tsd-comment tsd-typography"><p>The signature/hash received from the PayWay callback headers/body.</p>
-</div></li></ul></div>
+</div></li>
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">options</span>: <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">stripHash</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span> <span class="tsd-signature-symbol">}</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><p>True if the signature is valid and authentic, false otherwise.</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:742</li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in src/client.ts:1102</li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

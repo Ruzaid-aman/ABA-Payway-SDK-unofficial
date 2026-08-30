@@ -36,7 +36,14 @@ The agentic layer lives under `src/agent/` and adds one top-level command (`ask`
 | `tools.ts` / `executor.ts` | Maps each tool name to exactly one SDK call and runs it with ledger transitions. |
 | `orchestrator.ts` | The pipeline that turns a request into a result: scrub → privacy gate → propose → validate → normalize → authorize → materialize → execute. |
 | `output.ts` | Human-readable and serialized (JSON) result rendering. |
-| `repl.ts` | Interactive REPL that re-dispatches recognized manual commands and otherwise sends free-form text to the agent. |
+| `repl.ts` | Interactive REPL that re-dispatches recognized manual commands and otherwise sends free-form text to the agent. The loop is exposed as `runRepl(io)` with injected streams (in-process testable); `startRepl` wires the real terminal. |
+| `repl-helpers.ts` | Pure REPL logic: directive classification and `:run` dispatch validation (the shell-escape / agent-management security boundary), plus the static REPL texts. |
+| `progress.ts` / `ansi.ts` | Presentation helpers shared by `ask` and the REPL: progress labels, "Contacting…" banner, provider-failure hint, and ANSI styling. |
+
+The command-tree glue lives in `src/cli/commands/agent.ts` (registers `ask`,
+`agent setup|doctor|ack|sessions`); its validation and rendering are extracted
+into `src/cli/commands/agent-helpers.ts` (setup-option validation, doctor/ack/
+session output builders, interactive confirmation helpers).
 
 Two optional agent-guidance skills are also shipped under `skills/`:
 `skills/aba-payway-first-payment/SKILL.md` and `skills/aba-payway-agent/SKILL.md`.
@@ -49,7 +56,7 @@ Two optional agent-guidance skills are also shipped under `skills/`:
 npm install
 npm run build      # tsup → dist/
 npm run typecheck  # tsc --noEmit
-npm test           # vitest (787 tests)
+npm test           # vitest (988 tests)
 ```
 
 After building, the CLI binary is the SDK entry point (referenced here as `payway-sdk`).

@@ -1,6 +1,10 @@
 # PayWay SDK — Project Status
 
-> Last updated: 2026-08-26
+> Last updated: 2026-08-30
+
+> **v1.3.0 released + testability campaign (2026-08-30, committed through `d486738`).** The v1.3.0 release remediated **all 23 edge-case audit findings (EC-01–EC-23)** (lifetime minimums, empty-body guard, private-callback-host guard, `runCli` export, retry policy, … — see `CHANGELOG.md` and `audit-results/edge-case-report.md`). Since then: statement coverage raised **55% → 70% → 75.8%**, and the agent CLI/REPL testability refactor extracted the pure logic of `agent.ts`/`repl.ts` into `agent-helpers.ts`, `repl-helpers.ts`, `progress.ts`, and `ansi.ts` (REPL loop in-process testable via `runRepl(io)`). Gate: **988 tests / 63 files green, tsc clean, biome clean**; coverage 75.79% stmts / 71.08% branch / 83.68% funcs. Working tree clean. Agent-facing handoff: [HANDOFF.md](../HANDOFF.md).
+
+> The previously *uncommitted* sessions below (QR image auto-open 2026-08-26; payout hardening 2026-08-26) were subsequently committed and shipped in the v1.3.0 lineage.
 
 > **QR image auto-open session (2026-08-26, uncommitted).** `generate-qr` now opens the saved QR PNG with the OS default image viewer so it is immediately scannable: default behavior is TTY-aware (interactive terminals only; scripts/CI/agents unaffected), `--open-image` forces it, `--no-open-image` suppresses it. New SDK export `openImageInDefaultViewer()` + `defaultViewerCommandForPlatform()` in `src/open-image.ts` (allowlisted per-platform command — Windows `rundll32 url.dll,FileProtocolHandler` / macOS `open` / Linux `xdg-open` — spawned shell-less and detached, never throws, degrades to an "Open it manually" hint). Live-verified on Windows (rundll32 opened the PNG from transaction `qrmt9v6kaa288eb2`). Docs synced across README, CHANGELOG, Chapter 7, QUICK-START-1-PAGER, VISUAL-GUIDE, and `skills/aba-payway-qr` v1.3.0. Gate: **738 tests / 47 files / lint clean / typecheck clean / build clean**.
 
@@ -508,20 +512,21 @@ Tasks must be completed **in this order**:
 ## Quick Reference
 
 ```
-Package version (package.json):  1.1.1
-Recent commits:                  808dc80 (journey UX pass) / 922cf67 (docs sync) / bc4efb7 (campaign fixes) / b8ff4b6 / e6c872c / 341923d (Milestone D)
-Working tree state:              QR image auto-open session (2026-08-26) UNCOMMITTED: src/open-image.ts + export, generate-qr --open-image/--no-open-image, 11 new tests, docs/README/CHANGELOG/VISUAL-GUIDE/QUICK-START sync, aba-payway-qr skill v1.3.0
+Package version (package.json):  1.3.0 (tag v1.3.0; next release v1.4.0 — do not move tags)
+Recent commits:                  d486738 (agent testability refactor) / 47145e1 (handoff) / 6bf3afc (changelog) / 9661b16 (coverage 55→70%) / b6d15e1 (v1.3.0)
+Working tree state:              CLEAN — nothing uncommitted (QR auto-open & payout-hardening sessions shipped in v1.3.0)
 Active agent provider:           opencode (https://opencode.ai/zen/v1), model x-preview-f-free, key via PAYWAY_AGENT_API_KEY in .env
-Vitest:                          738 passing / 0 failing (47 files)
+Vitest:                          988 passing / 0 failing (63 files)
 Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck -> clean
 Lint:                            biome -> 0 errors, 0 warnings
-Build:                           clean (dist/ rebuilt)
+Build:                           clean (dist/ rebuilt + agent subprocess suite re-verified 2026-08-30)
+Coverage:                        75.79% stmts / 71.08% branch / 83.68% funcs / 76.59% lines
 Live E2E:                        doctor --live round-trip ✓; poll-transaction/list verified against sandbox (2026-08-25); openImageInDefaultViewer live-opened a real sandbox QR PNG on Windows (2026-08-26)
 Sandbox campaigns:               Milestones E+F committed; evidence in test-output/campaign-*.json + SANDBOX-FINDINGS §8–9
-Next task:                       Commit the QR auto-open changeset; ask ABA: v3 token-trio HMAC composition (findings §9a), close-transaction enforcement (CLOSE-TRANSACTION-FINDINGS §5)
+Next task:                       SQLite webhook-storage coverage (HANDOFF §5.1); ask ABA: v3 token-trio HMAC composition (§9a), close-transaction enforcement (CLOSE-TRANSACTION-FINDINGS §5); npm publish is a user decision
 ```
 
-## Recent Session — Payout hardening (2026-08-26, UNCOMMITTED)
+## Recent Session — Payout hardening (2026-08-26, committed in v1.3.0 lineage)
 
 - Enforced **payout currency must match beneficiary account currency** client-side in
   sandbox: `payout.ts` and `pre-auth.ts` (`completeWithPayout`) now call

@@ -1,12 +1,12 @@
 # Agent Handoff — aba-payway-ts
 
 **Audience:** an agent resuming work in a fresh session. Read this plus `AGENTS.md` before acting.
-**Last updated:** 2026-08-30, after the v1.3.0 release and the coverage campaign.
+**Last updated:** 2026-08-30, after the v1.3.0 release, the coverage campaign, the agent CLI/REPL testability refactor, and a docs sync.
 **Provenance:** everything below was done and verified in prior sessions; per-item evidence paths are included so you never have to re-derive or re-probe.
 
 ---
 
-## 1. Current state (verified on `main` @ `6bf3afc`)
+## 1. Current state (verified on `main` @ `d486738`; docs sync lands in the following commit)
 
 | Aspect | State |
 |---|---|
@@ -18,7 +18,7 @@
 | Release checklist | Run for 1.3.0: build, dist smoke, live `npm run probe` (all PATH_OK) — `docs/RELEASE_CHECKLIST.md` |
 | Working tree | Clean; nothing untracked |
 
-Recent commit history (oldest→newest): `0bbad8d` audit remediation batches 1–3 → `7898963` batch 4 → `dd4556f` batch 5 → `b6d15e1` release v1.3.0 → `9661b16` coverage 55→70% → `6bf3afc` changelog note.
+Recent commit history (oldest→newest): `0bbad8d` audit remediation batches 1–3 → `7898963` batch 4 → `dd4556f` batch 5 → `b6d15e1` release v1.3.0 → `9661b16` coverage 55→70% → `6bf3afc` changelog note → `d486738` agent testability refactor → docs sync (this commit).
 
 ## 2. Environment rules (violating these has caused real incidents)
 
@@ -50,10 +50,10 @@ Each item is pinned by a named test — if you change one, flip the test conscio
 ## 4. Repo map (fast orientation)
 
 - `src/client.ts` — HTTP core: `checkResponseError`, `createHttpError`, retry engine, config resolution. The most behavior-pinned file.
-- `src/cli.ts` — 40+ commands; `runCli(argv)` for in-process invocation. `src/cli/commands/*` — agent, doctor, init, onboard, setup-webhook, skills.
+- `src/cli.ts` — 40+ commands; `runCli(argv)` for in-process invocation. `src/cli/commands/*` — agent, doctor, init, onboard, setup-webhook, skills. `src/cli/commands/agent-helpers.ts` — pure setup validation + doctor/ack/session rendering behind the `agent` command tree.
 - `src/domains/*` — checkout, qr, payment-link, pre-auth, payout, credentials-on-file, khqr.
 - `src/webhook/*` — server (TD-09 verdict mode), storage (json default / sqlite optional peer dep), tunnel (cloudflared).
-- `src/agent/*` — agentic CLI REPL (25+ modules, own test suite).
+- `src/agent/*` — agentic CLI REPL (25+ modules, own test suite). `repl-helpers.ts` — pure directive classification + `:run` dispatch validation (security boundary); `progress.ts` / `ansi.ts` — shared ask/REPL presentation. The REPL loop is `runRepl(io)` with injected streams; `startRepl` wires the real terminal.
 - `src/test/index.ts` — built-in mock PayWay server + test harness (used by `payway-sdk demo`).
 - `src/__tests__/edge-case-audit.test.ts` — the error-path behavior spec; update consciously, never delete pins.
 - Docs: `docs/12-error-handling-and-debugging.md` (code tables + behavior notes), `docs/SANDBOX-FINDINGS.md` (§1–§13 gateway facts), `docs/07-qr-code-handling.md` (QR lifecycle), `docs/RELEASE_CHECKLIST.md`, `docs/02-prerequisites-and-setup.md` (credential precedence).
@@ -74,10 +74,10 @@ still wires the real terminal). Coverage: `agent.ts` 28% → 77%, `repl.ts` 4% �
 New suites: `agent-command-helpers`, `agent-repl-helpers`, `agent-cli-inprocess`. Remaining uncovered lines
 are the TTY-only branches of `ask` / `sessions clear` and the interactive onboard hand-off.
 
-### 5.3 — Documentation & release hygiene (quick wins)
-- Regenerate the TypeDoc API reference: `npm run docs:api` (the public API grew: `runCli`, `QR_LIFETIME_*`, `PURCHASE_LIFETIME_MIN_MINUTES`, `retryPolicy`, `allowPrivateCallbackHosts`, `verifyCallback` options).
-- Repo root cleanup: `q33r.png`, `q34r.png`, `dhitraj-2026-08-24-21_53.jpg`, `webhook-stdout.log`, `webhook-stderr.log` are stray artifacts — delete or move under `test-output/` (ask the user first if unsure).
-- `docs/README.md` index: add any missing links to the new audit artifacts.
+### 5.3 — Documentation & release hygiene (TypeDoc + index DONE 2026-08-30)
+- ~~Regenerate the TypeDoc API reference~~ — DONE: `npm run docs:api` re-run (covers `runCli`, `QR_LIFETIME_*`, `PURCHASE_LIFETIME_MIN_MINUTES`, `retryPolicy`, `allowPrivateCallbackHosts`, `verifyCallback` options, `runRepl`). 0 errors / 79 pre-existing warnings (referenced-but-undocumented internal types).
+- ~~`docs/README.md` index~~ — DONE: agent/ops docs, sandbox evidence, and `audit-results/*` artifacts now linked; Validation Behavior section reflects the v1.3.0 contract (lifetime minimums, private-host guard, config sanity).
+- Repo root cleanup still open: `q33r.png`, `q34r.png`, `dhitraj-2026-08-24-21_53.jpg`, `webhook-stdout.log`, `webhook-stderr.log` are stray artifacts — delete or move under `test-output/` (ask the user first if unsure).
 
 ### 5.4 — ABA dependency (blocked on external answers — do not burn time guessing)
 `audit-results/four-pillars/ABA-OPEN-QUESTIONS.md` holds Q1–Q10. The user must send these to PayWay. Answers unblock, in impact order:
@@ -97,6 +97,7 @@ are the TTY-only branches of `ask` / `sessions clear` and the interactive onboar
 - **Gates before every commit:** `npx vitest run` (988 expected), `npx tsc --noEmit`, `npx biome lint src`.
 - **Branch workflow:** create a branch per task → fast-forward merge to `main` after checking `main` hasn't moved (other agents work in parallel) → delete the branch. Conventional commit messages (`feat|fix|test|docs|chore(scope): …`).
 - **In-process CLI tests:** use `runCli(argv)` with captured console and save/restore `process.exitCode`; the module loads `<cwd>/.env` on import, so chdir to a temp dir *before* the dynamic import. Never use `--help`/`--version` in-process (commander calls `process.exit`) and never invoke interactive commands without `-y`/`--json`.
+- **In-process agent tests** (see `src/__tests__/agent-cli-inprocess.test.ts`): point `process.env.APPDATA` at a temp dir (agent paths resolve it per call), register a fresh `Command` via `registerAgentCommands`, drive with `parseAsync`; drive the REPL via `runRepl({ input, output, interactive })` with `PassThrough` streams and spy `console.log`. Strip ANSI before asserting output. Network-free provider turns ride the privacy gate: a config without `privacyAcknowledgedAt` makes `runOneShot` return `blocked`/`PRIVACY_ACK_REQUIRED` before any call.
 - **Mock gateway:** `src/__tests__/cli-mock-commands.test.ts` shows the per-endpoint mock handler shapes (mirror sandbox-verified payloads). Note refund's `tran_id` travels inside the encrypted `merchant_auth`, so a mock cannot branch on it.
 - **Behavior pins:** `edge-case-audit.test.ts` and the `FINDING:`-annotated tests document *why* behavior is pinned; a behavior change must flip the pin in the same commit.
 
@@ -118,3 +119,4 @@ are the TTY-only branches of `ask` / `sessions clear` and the interactive onboar
 - Don't bump/move existing git tags; next release is **v1.4.0** (or v1.3.1 for fix-only), via `docs/RELEASE_CHECKLIST.md`.
 - Don't commit without the three gates; don't merge without checking `main` hasn't moved.
 - Don't rewrite audit artifacts (`audit-results/*`, `docs/SANDBOX-FINDINGS.md` history) — append new sections with dates.
+- Don't test the interactive REPL through `startRepl`/`process.stdin`; use the `runRepl(io)` seam. Don't assert on raw CLI output without stripping ANSI (color codes break `toContain`).

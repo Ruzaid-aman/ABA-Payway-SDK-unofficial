@@ -14,6 +14,7 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 | **Mobile developer** | Read Chapter 1 → 2, then skip to Chapter 4 (Native) or 5 (WebView) |
 | **Backend developer** | Read Chapter 1 → 2 → 11 → 14 (code snippets) |
 | **Debugging an issue** | Jump to Chapter 12 (Error Handling) or Chapter 13 (Deployment Checklist) |
+| **Want the 1-page visual tour** | [Visual Guide](./VISUAL-GUIDE.md) — architecture → setup → onboarding → payment lifecycle |
 | **Looking for a specific term** | Check the [Glossary](./glossary.md) |
 
 > 💡 **Estimated reading time for the full guide:** ~2–3 hours  
@@ -27,7 +28,7 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 | Chapter | File | Est. Read Time |
 |---|---|---|
 | 1. Overview & Core Concepts | [01-overview-and-concepts.md](./01-overview-and-concepts.md) | 15 min |
-| 2. Prerequisites & Setup | [02-prerequisites-and-setup.md](./02-prerequisites-and-setup.md) | 15 min |
+| 2. Prerequisites, Setup & Credential Profiles | [02-prerequisites-and-setup.md](./02-prerequisites-and-setup.md) | 15 min |
 | Glossary | [glossary.md](./glossary.md) | Reference |
 
 ### Part 2 — Core Integration
@@ -50,6 +51,7 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 |---|---|---|
 | 10. UI Customization | [10-ui-customization.md](./10-ui-customization.md) | 10 min |
 | 11. Callbacks & Webhooks | [11-callbacks-and-webhooks.md](./11-callbacks-and-webhooks.md) | 15 min |
+| 16. Webhook Setup (CLI) | [16-webhook-setup-guide.md](./16-webhook-setup-guide.md) | 10 min |
 
 ### Part 5 — Production
 | Chapter | File | Est. Read Time |
@@ -99,6 +101,9 @@ This documentation is written for **junior to mid-level developers** who need to
 - [SDK Source Code](https://github.com/your-org/aba-payway-ts)
 - [Sandbox Dashboard](https://checkout-sandbox.payway.com.kh)
 - [Production Dashboard](https://checkout.payway.com.kh)
+- [Agentic PayWay CLI (1-pager)](./QUICK-START-1-PAGER.md#agentic-payway-cli) — risk-gated, provider-driven payments
+- [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md)
+- [All 24 AI skills](../skills/README.md) — task-focused agent guides; several bundle dependency-free `.cjs` tools (request signing, callback verification, KHQR decode/CRC validation, status decoding, reconciliation) under their `scripts/` folders
 
 ---
 
@@ -108,8 +113,10 @@ The SDK performs input validation in each domain to fail fast and give clear dev
 
 - **`checkout`**: validates `transactionId` presence, max 20 characters, and charset `[a-zA-Z0-9\-]`; validates `amount` positivity and currency rules (USD ≤ 2 decimals, KHR integer); validates `returnUrl`/`cancelUrl` are base64-encoded when URLs; validates `lifetime` is a positive integer.
 - **`payment-link`**: requires non-empty `title` and `merchantRefNo`, `amount` > 0, and `returnUrl` must be a public HTTPS URL when provided.
-- **`pre-auth`**: validates `transactionId` and positive `amount`; `completeWithPayout` requires a non-empty payout array.
-- **`payout`**: validates `transactionId`, `amount`, `currency`, and that `beneficiaries` is a non-empty array summing to the total amount.
+- **RSA endpoints (`refund`, `pre-auth`, `payout`, `payment-link`)**: `publicKeyPem` must be present **and** structurally valid — the SDK checks for a `-----BEGIN PUBLIC KEY-----` / `-----END PUBLIC KEY-----` pair (SPKI or RSA format; literal `\n` sequences from `.env` files are normalized first) and throws a descriptive `PayWayConfigError` before any encryption or network call. The check is exported as `isValidPublicKeyPem()` for your own pre-flight validation.
+- **URL auto-encoding**: string fields that hold URLs are base64-encoded automatically when they start with `http://`, `https://`, `//` (protocol-relative), or `www.`; other strings (tokens, raw JSON) pass through unchanged.
+- **`pre-auth`**: validates `transactionId` and positive `amount`; `completeWithPayout` requires a non-empty payout array and (in sandbox) that each `acc` is a seeded beneficiary with a matching currency (USD).
+- **`payout`**: validates `transactionId`, `amount`, `currency`, and that `beneficiaries` is a non-empty array summing to the total amount. In sandbox it additionally enforces the beneficiary allowlist **and currency match** — a KHR payout to a USD account (or any non-seeded account) throws `currency mismatch` / `not a known sandbox beneficiary` before the request; in production PayWay returns `PTL147` / `37` / `PTL146` etc. See `docs/12-error-handling-and-debugging.md`.
 - **`qr` / `khqr`**: validates `transactionId` (max 20 chars, `[a-zA-Z0-9\-]` charset), `amount`, `currency`, and `callbackUrl` as a public HTTPS URL; offline QR helper validates merchantId and amount.
 - **`credentials-on-file`**: requires `requestId`/`ctid` where applicable, validates `paymentToken` presence for Cof payments, and validates any `returnUrl`/`callbackUrl` as public HTTPS URLs.
 
