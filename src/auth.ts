@@ -52,19 +52,29 @@ export function encryptMerchantAuth(data: unknown, publicKeyPem: string): string
 
 /**
  * Verifies a webhook signature using PayWay's sorted-key signature validation algorithm.
+ *
+ * @param options.stripHash - Strip a `hash` field from the body before
+ *   verifying. Default `false` for backward compatibility: raw callback
+ *   payloads that still carry `hash` never validate unless it is removed
+ *   first (the webhook server strips it; direct callers can now opt in).
  */
 export function verifyCallbackSignature(
   body: Record<string, unknown>,
   receivedSignature: string,
   apiKey: string,
+  options?: { stripHash?: boolean },
 ): boolean {
+  const payload = options?.stripHash
+    ? Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'hash'))
+    : body;
+
   // Sort response keys ascending
-  const sortedKeys = Object.keys(body).sort();
+  const sortedKeys = Object.keys(payload).sort();
 
   // Concatenate all values, JSON-encoding any array/object values
   const concatenated = sortedKeys
     .map((key) => {
-      const val = body[key];
+      const val = payload[key];
       if (val === undefined || val === null) {
         return '';
       }

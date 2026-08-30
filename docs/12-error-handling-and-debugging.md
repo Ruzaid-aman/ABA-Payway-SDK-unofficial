@@ -483,12 +483,13 @@ The SDK retries **only** transient failures by default (`maxRetries: 3`, base de
 
 > 💡 For endpoints with a documented cap, the SDK also tracks its own recent request timestamps per endpoint. When the gateway rejects with the undocumented 403+429 shape, retries wait just long enough for the locally observed window to free a slot, then re-send — a burst slightly over the cap recovers automatically instead of failing.
 
-#### Response-shape & configuration caveats (edge-case audit, 2026-08-30)
+#### Behavior notes from the 2026-08-30 edge-case audit
 
-Pinned by `src/__tests__/edge-case-audit.test.ts`; several are candidates for
-the [code improvement plan](../audit-results/code-improvement-plan.md):
+All caveats found by the audit are fixed (see CHANGELOG "Unreleased"); the resulting behaviors worth knowing:
 
-- **Empty success bodies.** An HTTP 200 or 204 with an empty body resolves to `null` without any error — type-guard the result of low-level calls.
+- **Empty 2xx bodies are rejected** with `PayWayAPIError "Empty response body…"` — only HTTP 204 resolves to `null` (a literal JSON `null` body also resolves as `null`).
+- **Non-JSON 5xx error pages are retried** like any other 5xx: the HTTP-status check runs before the body-shape check, so CDN/load-balancer HTML pages keep their status code and retryability.
+- **Callback/return URLs pointing at private or loopback addresses** (`127.0.0.1`, `10.x`, `192.168.x`, …) are rejected client-side with `PayWayConfigError`; opt out with `allowPrivateCallbackHosts: true` for on-prem gateways.
 
 You can configure retry with:
 

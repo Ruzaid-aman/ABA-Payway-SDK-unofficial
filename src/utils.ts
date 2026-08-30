@@ -43,6 +43,9 @@ export function validatePositiveAmount(amount: number, currency: 'USD' | 'KHR'):
   }
 }
 
+/** Warned once per process for the first sub-5-char transactionId (EC-20). */
+let warnedShortTranId = false;
+
 export function validateTransactionId(transactionId: string): void {
   if (typeof transactionId !== 'string' || transactionId.length === 0) {
     throw new PayWayConfigError('transactionId is required and must be a non-empty string');
@@ -55,6 +58,15 @@ export function validateTransactionId(transactionId: string): void {
   if (!/^[a-zA-Z0-9-]+$/.test(transactionId)) {
     throw new PayWayConfigError(
       `transactionId may only contain letters, digits, and hyphens, received: "${transactionId}"`,
+    );
+  }
+  // The gateway enforces [a-zA-Z0-9]{5,24} on request_id/ctid; the equivalent
+  // minimum for tran_id is unconfirmed, so warn once instead of rejecting
+  // short IDs outright (EC-20).
+  if (!warnedShortTranId && transactionId.length < 5) {
+    warnedShortTranId = true;
+    console.warn(
+      '[payway] transactionId is shorter than 5 characters; the gateway enforces [a-zA-Z0-9]{5,24} on some identifiers — if the API rejects it, use a longer ID',
     );
   }
 }
@@ -82,18 +94,60 @@ export function validateQrLifetimeSeconds(lifetime: number | undefined): void {
   }
 }
 
-export function validatePublicHttpsUrl(url: string, fieldName: string): void {
+/**
+ * Hostnames (or IP literals) that PayWay's servers cannot reach: loopback,
+ * RFC1918/link-local/CGNAT ranges, multicast/reserved, and mDNS/internal
+ * suffixes. Used to fail fast on callback URLs that can never receive a
+ * callback (EC-19).
+ */
+function isPrivateOrReservedHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host.endsWith('.localhost') || host === 'localhost.localdomain') return true;
+  if (host === '::1' || host === '0:0:0:0:0:0:0:1') return true;
+  if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.home.arpa')) return true;
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const a = Number(ipv4[1]);
+    const b = Number(ipv4[2]);
+    if (a === 0 || a === 10 || a === 127) return true; // this-network, private, loopback
+    if (a === 172 && b >= 16 && b <= 31) return true; // RFC1918
+    if (a === 192 && b === 168) return true; // RFC1918
+    if (a === 169 && b === 254) return true; // link-local
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT (RFC6598)
+    if (a >= 224) return true; // multicast / reserved
+  }
+  return false;
+}
+
+export function validatePublicHttpsUrl(
+  url: string,
+  fieldName: string,
+  options?: { allowPrivateHosts?: boolean },
+): void {
   if (typeof url !== 'string' || url.trim() !== url) {
     throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
   }
 
+  let parsed: URL;
   try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.hostname === 'localhost') {
-      throw new Error('invalid public HTTPS URL');
-    }
+    parsed = new URL(url);
   } catch {
     throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
+  }
+  if (parsed.protocol !== 'https:' || !parsed.hostname) {
+    throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (host === 'localhost') {
+    throw new PayWayConfigError(
+      `${fieldName} must be a public HTTPS URL — localhost is unreachable from PayWay's servers`,
+    );
+  }
+  if (!options?.allowPrivateHosts && isPrivateOrReservedHostname(host)) {
+    throw new PayWayConfigError(
+      `${fieldName} points at a private/loopback address (${parsed.hostname}) that PayWay's servers cannot reach — ` +
+        'expose a public HTTPS endpoint, or set allowPrivateCallbackHosts: true if this is an on-prem gateway',
+    );
   }
 }
 
@@ -333,15 +387,17 @@ function isSensitiveKeyFuzzy(keyLower: string): boolean {
 
 function sanitizeValue(value: unknown, keyHint?: string): unknown {
   if (value === null || typeof value !== 'object') {
-    if (
-      typeof value === 'string' &&
-      keyHint !== undefined &&
-      /^[a-f0-9]{32,}$/i.test(value)
-    ) {
-      // High-entropy 32+ hex-char strings under unrecognized keys are almost
-      // certainly credentials/hashes — mask them defensively (TD-12).
-      return '***HIDDEN***';
-    }
+      if (
+        typeof value === 'string' &&
+        keyHint !== undefined &&
+        /^[a-f0-9]{40,}$/i.test(value)
+      ) {
+        // SHA-1-length-or-longer hex strings under unrecognized keys are
+        // almost certainly credentials/hashes — mask them defensively (TD-12).
+        // 32-char hex (MD5-length order refs etc.) stays visible to avoid
+        // masking benign identifiers (EC-23).
+        return '***HIDDEN***';
+      }
     return value;
   }
 

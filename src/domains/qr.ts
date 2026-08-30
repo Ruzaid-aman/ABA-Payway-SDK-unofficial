@@ -34,7 +34,9 @@ export function createQrDomain(
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency || 'USD');
       validateCurrency(params.currency);
-      validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+      validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
+        allowPrivateHosts: config.allowPrivateCallbackHosts === true,
+      });
       validateQrLifetimeSeconds(params.lifetime);
 
       return request<components['schemas']['GenerateQrResponse']>(

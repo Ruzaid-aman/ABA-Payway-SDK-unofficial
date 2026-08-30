@@ -176,6 +176,8 @@ payway-sdk --profile production-main get-transactions-by-ref --merchant-ref INV-
 
 `profiles add` prompts for a unique name, environment, merchant ID, API key, optional RSA public key/base URL, and an optional note of up to 300 characters. The first profile becomes the default. The active profile is printed before every API request and secrets are never displayed.
 
+Credential resolution order for CLI commands: explicit `--profile`, `PAYWAY_PROFILE`, the saved default profile, the current directory's `.env`, then ambient `PAYWAY_*` environment variables. Because a saved default profile applies globally, commands succeed from any working directory — run `payway-sdk profiles current` if you're unsure which source supplied the credentials.
+
 Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or `~/.config/aba-payway-sdk/profiles.json` when `APPDATA` is unavailable). Keep that file out of source control and restrict local access. For deployed SDK applications, use an OS secret manager, a cloud secret manager, or CI/CD secret storage; never put PayWay keys in browser/mobile-client code or commit them to `.env` files.
 
 ### Sandbox test scripts

@@ -6,6 +6,8 @@
 
 - **CLI startup guidance & probe generalization** — `evidence/startup-probe.ts` now accepts an arbitrary command; measured compiled artifact startup: `node dist/cli.js --help` P50 **413 ms** / P95 415 ms (under the 500 ms plan threshold; the previously reported 2041 ms was the `npx tsx` dev path only). Global-install pattern (`npm i -g .` → `payway-sdk`) documented in the CLI user guide §2.
 - **`retryPolicy: 'none'` for `checkout.purchase()` (EC-10, edge-case audit)** — per-call opt-out from the SDK's automatic re-send of transient failures (network errors, 5xx, 429) for strict once-only submission; production duplicate-`tran_id` semantics are unconfirmed while sandbox overwrites. Default `'transient'` preserves existing behavior.
+- **Private/loopback callback guard + `allowPrivateCallbackHosts` (EC-19)** — callback/return URLs pointing at `localhost`, loopback, or private-range addresses (127.0.0.1, 10.x, 172.16–31.x, 192.168.x, 169.254.x, CGNAT, `.local`/`.internal`) are now rejected client-side with `PayWayConfigError` — PayWay's servers can never reach them, so callbacks would silently never arrive. Opt out for on-prem gateways/tests with the new `allowPrivateCallbackHosts: true` config. Applies to QR `callbackUrl`, payment-link `returnUrl`, and credentials-on-file `returnUrl`/`callbackUrl` (the CLI `doctor` check stays strict).
+- **`verifyCallback(body, signature, { stripHash: true })` (EC-22)** — the sorted-key signature verifier can now strip a `hash` field before verifying, so raw callback payloads passed through as received validate. Default `false` keeps the historical strictness (the webhook server already strips `hash` itself).
 
 ### Fixed
 
@@ -20,6 +22,12 @@
 - **`PAYWAY_ENV` URL form now honored as the base URL (EC-12)** — `validatePayWayEnv()` has long accepted `PAYWAY_ENV=https://…` but the client silently ignored it and used the sandbox host. `resolveConfig` now uses a URL-valued `PAYWAY_ENV` as the base URL (config `baseUrl` and `PAYWAY_BASE_URL` still take precedence), so the validator's promise and the client agree.
 - **`timeout` ≤ 0 rejected at construction (EC-13)** — `timeout: 0` (config or `PAYWAY_TIMEOUT`) previously fired the AbortController instantly, timing out every request and burning retries. Construction now throws `PayWayConfigError: timeout must be a positive number of milliseconds`.
 - **Whitespace-only credentials rejected (EC-15)** — `merchantId`/`apiKey` are now trimmed before the required check, so `'   '` throws `PayWayConfigError` instead of being hashed and sent verbatim (which produced an opaque gateway code); surrounding whitespace on valid credentials is trimmed.
+- **`onResponse` fires for 200-wrapped business errors (EC-06)** — the observability hook (and debug log) previously ran only after business-error validation, so 200-wrapped failures were invisible to `onResponse` consumers. Hooks now fire before `checkResponseError`.
+- **Empty 2xx bodies rejected (EC-07)** — an HTTP 200 with an empty body resolved to a silent `null` success. It now throws `PayWayAPIError "Empty response body from PayWay API (HTTP …)"`; HTTP 204 (and a literal JSON `null` body) still resolve as `null`.
+- **Content-type surfaced in invalid-JSON errors (EC-08)** — `createJsonParseError` supported a `contentType` parameter that was never passed; the "Invalid JSON response…" message now includes the response's content type.
+- **Gateway codes trimmed before comparison (EC-09)** — a padded success code (`"0 "`) was misreported as a business error; codes in `checkResponseError` and `createHttpError` are trimmed first.
+- **Short `tran_id` warns once (EC-20)** — 1–4-character transaction IDs pass validation but emit a one-time `console.warn` about the gateway's `[a-zA-Z0-9]{5,24}` identifier rule until that rule is confirmed for `tran_id`.
+- **Log masking threshold raised to SHA-1 length (EC-23)** — `sanitizeForLog` masked every 32+-hex-char string, hiding benign MD5-length order refs; the heuristic now masks 40+-char hex (and key-name-based masking is unchanged).
 - **Skill example conformance (TD-06 sweep)** — `aba-payway-link-account` quick-start used `requestId: 'link-123'`, which now fails fast against the `[a-zA-Z0-9]{5,24}` gateway-parity validator; example updated, remaining skills/docs examples verified conforming.
 
 ### Changed

@@ -8,9 +8,9 @@
 3. CLI battery: malformed amounts/IDs, missing flags, unknown commands, credential-less runs.
 4. Live sandbox probes (12 calls, `test-output/edge-case-probe/live-probe.log`).
 
-> **Remediation status (2026-08-30):** EC-01–EC-05, EC-10, EC-12, EC-13, EC-15, EC-16, EC-17, EC-18 are fixed —
-> see `code-improvement-plan.md` and CHANGELOG (Unreleased). The remaining findings are open;
-> behavior-pinning tests for fixed findings have been flipped to regression tests.
+> **Remediation status (2026-08-30):** ALL findings EC-01–EC-23 are fixed (Batch 4 landed via
+> `fix/batch-4-p3-polish`) — see `code-improvement-plan.md` and CHANGELOG (Unreleased).
+> Behavior-pinning tests for fixed findings have been flipped to regression tests.
 
 Prior campaigns (§1-§12 of `docs/SANDBOX-FINDINGS.md`, `audit-results/four-pillars/`) already
 pinned the PTL-code surface, the 403+429 rate-limit shape, and close-transaction semantics.

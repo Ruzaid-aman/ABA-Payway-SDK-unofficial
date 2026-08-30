@@ -106,7 +106,7 @@ Use a saved default profile automatically, or override it only for one command:
 payway-sdk --profile production-main get-transactions-by-ref --merchant-ref INV-12345678
 ```
 
-For API-calling commands, the CLI resolves credentials in this order: explicit `--profile`, `PAYWAY_PROFILE`, the saved default profile, then the current directory's `.env` file. It prints the selected profile name and environment before the request, but never prints secrets.
+For API-calling commands, the CLI resolves credentials in this order: explicit `--profile`, `PAYWAY_PROFILE`, the saved default profile, the current directory's `.env` file, then ambient `PAYWAY_*` environment variables. It prints the selected profile name and environment before the request, but never prints secrets. Because a saved default profile applies globally, commands succeed from any working directory — run `payway-sdk profiles current` if you're unsure which source supplied the credentials (a common surprise when you expected `.env`-only credentials).
 
 The profile file is plaintext at `%APPDATA%\aba-payway-sdk\profiles.json` on Windows, or `~/.config/aba-payway-sdk/profiles.json` when `APPDATA` is unavailable. Do not commit it, do not share it, and restrict local filesystem access. Plaintext profiles are a CLI convenience only: deployed SDK applications should load keys from an OS secret manager, a cloud secret manager, or CI/CD secret storage. Never put PayWay credentials in browser or mobile application code.
 
@@ -210,6 +210,8 @@ PayWay sends callbacks from its servers to your server. If you're developing on 
 1. `localhost` only resolves to your own computer
 2. Your development machine is (probably) behind a NAT/firewall
 3. PayWay's servers are on the public internet
+
+> The SDK catches this class of mistake client-side: callback/return URLs pointing at `localhost`, loopback, or private-range addresses (`127.0.0.1`, `10.x`, `172.16–31.x`, `192.168.x`, `169.254.x`, `.local`/`.internal` hostnames) are rejected with `PayWayConfigError` before any request is sent. On-prem gateway setups can opt out with `allowPrivateCallbackHosts: true`.
 
 ### Solution: ngrok Tunnel
 

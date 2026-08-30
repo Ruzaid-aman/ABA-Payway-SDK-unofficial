@@ -399,7 +399,7 @@ describe('checkResponseError (via API calls)', () => {
     expect(result).toBeNull();
   });
 
-  it('resolves successfully when response body is empty string', async () => {
+  it('throws PayWayAPIError when response body is an empty string (EC-07 fix)', async () => {
     const emptyBodyResponse = {
       ok: true,
       status: 200,
@@ -421,8 +421,9 @@ describe('checkResponseError (via API calls)', () => {
 
     fetchSpy.mockResolvedValueOnce(emptyBodyResponse);
 
-    const result = await payway.checkout.checkTransaction('T-EMPTY');
-    expect(result).toBeNull();
+    // An empty 2xx body is no longer a silent null success (edge-case EC-07):
+    // it means a truncated or misbehaving response.
+    await expect(payway.checkout.checkTransaction('T-EMPTY')).rejects.toThrow('Empty response body');
   });
 
   it('returns gateway error details from plain object error shapes', async () => {

@@ -81,15 +81,15 @@ code change below — that is by design.
 
 | # | Item | Where | Change | Test flip |
 |---|------|-------|--------|-----------|
-| 12 | Emit `onResponse` on business errors (EC-06) | `client.ts:784-799` | Call the hook (and debug log) in the catch path for 200-wrapped business errors before rethrowing, or move the hook above `checkResponseError` | audit G1: `toHaveBeenCalled` |
-| 13 | Guard empty/204 bodies (EC-07) | `client.ts:302-313` | Throw a typed `PayWayAPIError` ("empty response body") for empty non-204 bodies; keep 204 → null but document | audit A9/A10 |
-| 14 | Pass `contentType` to `createJsonParseError` (EC-08) | `client.ts:777` | Forward `response.headers.get('content-type')` | audit A11: message contains content-type |
-| 15 | Trim success/error codes before comparing (EC-09) | `client.ts:253-255,281-284,337-341` | `String(code).trim()` | audit A3 |
-| 16 | Private-IP guard for callback/return URLs (EC-19) | `utils.ts:67-80` | Reject loopback/RFC1918/link-local hostnames (keep `localhost` check); allow opt-out via config flag for on-prem gateways | audit E3 |
-| 17 | `tran_id` minimum length (EC-20) | `utils.ts:45-59` | Warn (not throw) below 5 chars until tran_id's own server rule is confirmed | audit E2 |
-| 18 | `verifyCallback` hash-strip option (EC-22) | `auth.ts:56`, `client.ts:953` | Add optional `options?: { stripHash?: boolean }` (default false for compat); webhook server already strips | audit F2 |
-| 19 | Document CLI credential precedence (EC-14) | README setup section + `docs/02-prerequisites-and-setup.md` | One paragraph: profile store > `.env` > ambient env; `profiles current` to inspect; note commands work from any cwd once a profile exists | — (doc-only) |
-| 20 | Log-masking false positives (EC-23) | `utils.ts:312-323` | Only mask hex strings ≥ 40 chars, or only under keys already flagged; leave 32-char (MD5-length) benign IDs visible | audit H1 |
+| 12 | Emit `onResponse` on business errors (EC-06) — ✅ DONE 2026-08-30 (hooks moved before `checkResponseError`) | `client.ts` | audit G1: `toHaveBeenCalled` |
+| 13 | Guard empty/204 bodies (EC-07) — ✅ DONE 2026-08-30 (empty 2xx → `PayWayAPIError`; 204 and JSON `null` → `null`) | `client.ts` | audit A9/A10 |
+| 14 | Pass `contentType` to `createJsonParseError` (EC-08) — ✅ DONE 2026-08-30 | `client.ts` | audit A11 |
+| 15 | Trim success/error codes before comparing (EC-09) — ✅ DONE 2026-08-30 | `client.ts` | audit A3 |
+| 16 | Private-IP guard for callback/return URLs (EC-19) — ✅ DONE 2026-08-30 (opt-out: `allowPrivateCallbackHosts` config) | `utils.ts` + qr/payment-link/credentials-on-file domains | audit E3 |
+| 17 | `tran_id` minimum length (EC-20) — ✅ DONE 2026-08-30 (one-time `console.warn` below 5 chars) | `utils.ts` | audit E2 |
+| 18 | `verifyCallback` hash-strip option (EC-22) — ✅ DONE 2026-08-30 (`{ stripHash: true }`, default false) | `auth.ts`, `client.ts` | audit F2 |
+| 19 | Document CLI credential precedence (EC-14) — ✅ DONE 2026-08-30 (README profiles section + docs/02) | README, docs/02 | — (doc-only) |
+| 20 | Log-masking false positives (EC-23) — ✅ DONE 2026-08-30 (hex threshold 32 → 40) | `utils.ts` | audit H1 |
 
 ---
 
@@ -108,7 +108,7 @@ code change below — that is by design.
 1. **Batch 1 (P1, ~1 session):** items 1, 2, 4 + test flips — small, isolated, high user impact. ✅ DONE 2026-08-30
 2. **Batch 2 (P2 resilience):** items 3, 5, 6, 11 (all in `client.ts` error paths; one review). ✅ DONE 2026-08-30
 3. **Batch 3 (P2 config):** items 7, 8, 9, 10. ✅ DONE 2026-08-30 (item 7 implemented as option (a): URL-valued `PAYWAY_ENV` is now used as the base URL; item 10 shipped as `CreateTransactionParams.retryPolicy: 'transient' | 'none'`)
-4. **Batch 4 (P3):** table items 12–20, any order; item 19 is doc-only and can land with batch 1.
+4. **Batch 4 (P3):** table items 12–20, any order; item 19 is doc-only and can land with batch 1. ✅ DONE 2026-08-30 (landed on `fix/batch-4-p3-polish`, merged to main)
 
 Every batch ends with: `npx vitest run` (839+ tests), `npx tsc --noEmit`, `npx biome lint src`, and a
 CHANGELOG entry under a new `### Fixed`/`### Changed` heading (minor version bump — several items are

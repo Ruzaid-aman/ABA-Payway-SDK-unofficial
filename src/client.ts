@@ -78,6 +78,14 @@ export interface PayWayConfig {
    */
   allowUnverifiedTokenOperations?: boolean;
   /**
+   * Allow callback/return URLs pointing at private or loopback addresses
+   * (127.0.0.1, 10.x, 172.16-31.x, 192.168.x, …). PayWay's servers cannot
+   * reach those, so callbacks would never arrive — enable only for on-prem
+   * gateways or tests. Default `false` (private hosts are rejected
+   * client-side by validatePublicHttpsUrl).
+   */
+  allowPrivateCallbackHosts?: boolean;
+  /**
    * TD-07: `'full'` randomizes exponential backoff to `random(0..delay)`
    * (AWS-style full jitter) so concurrent clients do not synchronize retries
    * into a thundering herd. Default `'none'` keeps deterministic delays for
@@ -263,7 +271,9 @@ function checkResponseError(body: unknown, endpoint?: string): void {
 
   if (resp.status && typeof resp.status === 'object') {
     const statusObj = resp.status as Record<string, unknown>;
-    const code = String(statusObj.code ?? '');
+    // Codes are trimmed before comparison so padded success codes ("0 ")
+    // aren't misreported as failures (EC-09).
+    const code = String(statusObj.code ?? '').trim();
     const message = String(statusObj.message ?? 'Unknown PayWay API Error');
     if (code !== '0' && code !== '00' && code !== '') {
       throw new PayWayBusinessError(message, {
@@ -307,7 +317,7 @@ function checkResponseError(body: unknown, endpoint?: string): void {
   }
 
   if (resp.code !== undefined && resp.code !== null && typeof resp.code !== 'object') {
-    const code = String(resp.code);
+    const code = String(resp.code).trim();
     const message = String(resp.message ?? 'Unknown PayWay API Error');
     if (code !== '0' && code !== '00') {
       if (code === '429') {
@@ -343,7 +353,9 @@ function isAbortError(error: unknown): boolean {
 async function parseResponseBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) {
-    return null;
+    // undefined = "no body at all"; a literal JSON `null` body still parses
+    // to null so the two stay distinguishable downstream (EC-07).
+    return undefined;
   }
 
   try {
@@ -375,13 +387,10 @@ function createHttpError(
     const body = rawBody as Record<string, unknown>;
     const status = body.status as Record<string, unknown> | undefined;
     const rawCode = status?.code;
-    const isNonZero =
-      rawCode !== undefined &&
-      rawCode !== null &&
-      String(rawCode) !== '0' &&
-      String(rawCode) !== '00';
+    const trimmedCode = rawCode === undefined || rawCode === null ? '' : String(rawCode).trim();
+    const isNonZero = trimmedCode !== '0' && trimmedCode !== '00' && trimmedCode !== '';
     if (status && (typeof rawCode === 'string' || typeof rawCode === 'number') && isNonZero) {
-      extractedCode = String(rawCode);
+      extractedCode = trimmedCode;
       extractedMessage = typeof status.message === 'string' ? status.message : undefined;
     }
     if (extractedCode === undefined) {
@@ -389,15 +398,12 @@ function createHttpError(
       // nesting it under status, e.g. the legacy transaction-list 403 shape
       // {"code": "49", "message": "Invalid Start Date"}.
       const flatCode = body.code;
-      const flatIsNonZero =
-        flatCode !== undefined &&
-        flatCode !== null &&
-        typeof flatCode !== 'object' &&
-        String(flatCode) !== '0' &&
-        String(flatCode) !== '00' &&
-        String(flatCode) !== '';
+      const flatTrimmed = flatCode === undefined || flatCode === null || typeof flatCode === 'object'
+        ? ''
+        : String(flatCode).trim();
+      const flatIsNonZero = flatTrimmed !== '0' && flatTrimmed !== '00' && flatTrimmed !== '';
       if (flatIsNonZero) {
-        extractedCode = String(flatCode);
+        extractedCode = flatTrimmed;
         extractedMessage = typeof body.message === 'string' ? body.message : undefined;
       }
     }
@@ -880,7 +886,9 @@ export class PayWay {
         });
 
         const rateLimitInfo = parseRateLimitInfo(response.headers);
-        const parsedBody = await parseResponseBody(response);
+        const rawParsed = await parseResponseBody(response);
+        const isEmptyBody = rawParsed === undefined;
+        const parsedBody = isEmptyBody ? null : rawParsed;
 
         if (!response.ok) {
           // HTTP status BEFORE body shape: a 4xx/5xx answered with an
@@ -891,16 +899,25 @@ export class PayWay {
           throw createHttpError(response, parsedBody, endpoint, rateLimitInfo);
         }
 
-        if (typeof parsedBody === 'string') {
-          throw createJsonParseError(parsedBody, endpoint);
+        if (isEmptyBody && response.status !== 204) {
+          // 204 No Content is the only status that legitimately carries no
+          // body; an empty 2xx body on any other status means a truncated or
+          // misbehaving response, which used to resolve as a silent null
+          // success (EC-07).
+          throw new PayWayAPIError(`Empty response body from PayWay API (HTTP ${response.status})`, {
+            statusCode: response.status,
+            endpoint,
+            retryable: false,
+          });
         }
 
-        checkResponseError(parsedBody, endpoint);
+        if (typeof parsedBody === 'string') {
+          throw createJsonParseError(parsedBody, endpoint, response.headers.get('content-type') ?? undefined);
+        }
 
-        // TD-07: reaching a parsed response (even a business error) proves the
-        // transport and gateway are alive — close/reset the circuit.
-        this.breaker?.recordSuccess(endpoint);
-
+        // Observability fires before business-error validation so that
+        // 200-wrapped failures are visible to onResponse consumers and debug
+        // logs too (EC-06: hooks previously skipped business errors).
         const durationMs = Date.now() - requestStartedAt;
         try {
           if (this.config.debug) {
@@ -914,6 +931,12 @@ export class PayWay {
         } catch {
           // Logging hooks must never fail SDK execution.
         }
+
+        checkResponseError(parsedBody, endpoint);
+
+        // TD-07: reaching a parsed response (even a business error) proves the
+        // transport and gateway are alive — close/reset the circuit.
+        this.breaker?.recordSuccess(endpoint);
 
         return parsedBody as TResponse;
       } catch (error) {
@@ -1066,8 +1089,12 @@ export class PayWay {
    * @param signature - The signature/hash received from the PayWay callback headers/body.
    * @returns True if the signature is valid and authentic, false otherwise.
    */
-  public verifyCallback(body: Record<string, unknown>, signature: string): boolean {
-    return verifyCallbackSignature(body, signature, this.config.apiKey);
+  public verifyCallback(
+    body: Record<string, unknown>,
+    signature: string,
+    options?: { stripHash?: boolean },
+  ): boolean {
+    return verifyCallbackSignature(body, signature, this.config.apiKey, options);
   }
 
   public getGatewayErrorDetails(error: unknown): GatewayErrorDetails | null {

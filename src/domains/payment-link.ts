@@ -16,7 +16,7 @@ export interface PaymentLinkDomain {
 }
 
 export function createPaymentLinkDomain(
-  _config: PayWayConfig,
+  config: PayWayConfig,
   requestWithMerchantAuth: <TResponse>(
     path: string,
     authPayload: Record<string, unknown>,
@@ -51,7 +51,9 @@ export function createPaymentLinkDomain(
       if (typeof params.returnUrl !== 'string' || params.returnUrl.trim().length === 0) {
         throw new PayWayConfigError('returnUrl is required by PayWay for payment links');
       }
-      validatePublicHttpsUrl(params.returnUrl, 'returnUrl');
+      validatePublicHttpsUrl(params.returnUrl, 'returnUrl', {
+        allowPrivateHosts: config.allowPrivateCallbackHosts === true,
+      });
 
       return requestWithMerchantAuth<components['schemas']['CreatePaymentLinkResponse']>(
         ENDPOINTS.createPaymentLink,

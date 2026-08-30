@@ -149,18 +149,13 @@ describe('edge-case: 200 response-shape parsing', () => {
     }
   });
 
-  it('FINDING: nested code "0 " (trailing whitespace) throws a business error instead of succeeding', async () => {
+  it('nested code with trailing whitespace is trimmed and resolves (was FINDING EC-09, fixed)', async () => {
     await server.close();
     server = await startServer((_req, res) => jsonResponse(res, 200, { status: { code: '0 ', message: 'OK' } }));
-    // Codes are compared without trimming, so a padded success code is
-    // surfaced as a PayWayBusinessError with paywayCode '0 '.
-    try {
-      await checkTransaction(makeClient(server.url));
-      expect.unreachable('expected PayWayBusinessError');
-    } catch (e) {
-      expect(e).toBeInstanceOf(PayWayBusinessError);
-      expect((e as PayWayBusinessError).paywayCode).toBe('0 ');
-    }
+    // Codes are trimmed before comparison, so a padded success code resolves.
+    await expect(checkTransaction(makeClient(server.url))).resolves.toEqual({
+      status: { code: '0 ', message: 'OK' },
+    });
   });
 
   it('status "FAILED" without message/code yields placeholder message and no paywayCode', async () => {
@@ -212,16 +207,23 @@ describe('edge-case: 200 response-shape parsing', () => {
     await expect(checkTransaction(makeClient(server.url))).resolves.toEqual([{ transaction_id: 'T1' }]);
   });
 
-  it('FINDING: empty 200 body resolves as null success (silent)', async () => {
+  it('empty 200 body is rejected instead of resolving as null (was FINDING EC-07, fixed)', async () => {
     await server.close();
     server = await startServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end('');
     });
-    await expect(checkTransaction(makeClient(server.url))).resolves.toBeNull();
+    try {
+      await checkTransaction(makeClient(server.url));
+      expect.unreachable('expected PayWayAPIError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(PayWayAPIError);
+      expect((e as PayWayAPIError).message).toContain('Empty response body');
+      expect((e as PayWayAPIError).statusCode).toBe(200);
+    }
   });
 
-  it('FINDING: HTTP 204 resolves as null success (silent)', async () => {
+  it('HTTP 204 resolves as null success (documented exception to the empty-body guard)', async () => {
     await server.close();
     server = await startServer((_req, res) => {
       res.writeHead(204);
@@ -230,7 +232,7 @@ describe('edge-case: 200 response-shape parsing', () => {
     await expect(checkTransaction(makeClient(server.url))).resolves.toBeNull();
   });
 
-  it('HTML on HTTP 200 surfaces a JSON-parse error carrying the HTML hint', async () => {
+  it('HTML on HTTP 200 surfaces a JSON-parse error carrying HTML and content-type hints (was FINDING EC-08, fixed)', async () => {
     await server.close();
     server = await startServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -242,10 +244,7 @@ describe('edge-case: 200 response-shape parsing', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(PayWayAPIError);
       expect((e as PayWayAPIError).message).toContain('HTML page instead of JSON');
-      // FINDING: createJsonParseError supports a contentType parameter, but
-      // the call site in _executeFetch never passes it, so the advertised
-      // "(content-type: ...)" context is never included.
-      expect((e as PayWayAPIError).message).not.toContain('content-type:');
+      expect((e as PayWayAPIError).message).toContain('content-type: text/html');
     }
   });
 
@@ -557,15 +556,70 @@ describe('edge-case: input validation', () => {
     );
   });
 
-  it('FINDING: validateTransactionId accepts 1-char IDs (gateway rule is [a-zA-Z0-9]{5,24})', () => {
-    expect(() => validateTransactionId('a')).not.toThrow();
-    expect(() => validateTransactionId('ab-1')).not.toThrow(); // hyphens allowed for tran_id
+  it('short tran_id is accepted but warns once per process (was FINDING EC-20, fixed)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(() => validateTransactionId('a')).not.toThrow();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(String(warnSpy.mock.calls[0][0])).toContain('shorter than 5 characters');
+      // The warning is one-time per process, not per call.
+      expect(() => validateTransactionId('b2')).not.toThrow();
+      expect(() => validateTransactionId('c3')).not.toThrow();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
-  it('FINDING: validatePublicHttpsUrl accepts loopback/private IPs (only "localhost" is blocked)', () => {
-    expect(() => validatePublicHttpsUrl('https://127.0.0.1/cb', 'callbackUrl')).not.toThrow();
-    expect(() => validatePublicHttpsUrl('https://192.168.1.10/cb', 'callbackUrl')).not.toThrow();
-    expect(() => validatePublicHttpsUrl('https://10.0.0.1/cb', 'callbackUrl')).not.toThrow();
+  it('private/loopback callback hosts are rejected; allowPrivateHosts opts out (was FINDING EC-19, fixed)', () => {
+    expect(() => validatePublicHttpsUrl('https://127.0.0.1/cb', 'callbackUrl')).toThrow(/private\/loopback/);
+    expect(() => validatePublicHttpsUrl('https://192.168.1.10/cb', 'callbackUrl')).toThrow(PayWayConfigError);
+    expect(() => validatePublicHttpsUrl('https://10.0.0.1/cb', 'callbackUrl')).toThrow(PayWayConfigError);
+    expect(() => validatePublicHttpsUrl('https://172.16.5.5/cb', 'callbackUrl')).toThrow(PayWayConfigError);
+    expect(() => validatePublicHttpsUrl('https://169.254.1.1/cb', 'callbackUrl')).toThrow(PayWayConfigError);
+    expect(() => validatePublicHttpsUrl('https://myhost.local/cb', 'callbackUrl')).toThrow(PayWayConfigError);
+    // Opt-out for on-prem gateways / integration tests.
+    expect(() =>
+      validatePublicHttpsUrl('https://127.0.0.1/cb', 'callbackUrl', { allowPrivateHosts: true }),
+    ).not.toThrow();
+    // Public hosts and https enforcement unchanged.
+    expect(() => validatePublicHttpsUrl('https://example.com/cb', 'callbackUrl')).not.toThrow();
+    expect(() => validatePublicHttpsUrl('http://example.com/cb', 'callbackUrl')).toThrow(PayWayConfigError);
+  });
+
+  it('qr.generateQr honors allowPrivateCallbackHosts from client config', async () => {
+    const server = await startServer((_req, res) => jsonResponse(res, 200, { status: { code: '00' }, qrString: 'x' }));
+    try {
+      const strict = makeClient(server.url);
+      expect(() =>
+        strict.qr.generateQr({
+          transactionId: 'probe-qr-p1',
+          amount: 5,
+          paymentOption: 'abapay_khqr',
+          callbackUrl: 'https://10.1.2.3/cb',
+        }),
+      ).toThrow(/private\/loopback/);
+
+      const lenient = new PayWay({
+        merchantId: 'probe-merchant',
+        apiKey: 'probe-api-key',
+        environment: 'sandbox',
+        baseUrl: server.url,
+        timeout: 2000,
+        maxRetries: 0,
+        retryDelayMs: 1,
+        allowPrivateCallbackHosts: true,
+      });
+      await lenient.qr.generateQr({
+        transactionId: 'probe-qr-p2',
+        amount: 5,
+        paymentOption: 'abapay_khqr',
+        callbackUrl: 'https://10.1.2.3/cb',
+      });
+      expect(server.requests).toHaveLength(1);
+    } finally {
+      await server.close();
+    }
   });
 
   it('FINDING: validateLifetime is unbounded (accepts 1e12 seconds ≈ 31k years)', () => {
@@ -645,19 +699,15 @@ describe('edge-case: verifyCallbackSignature', () => {
     expect(verifyCallbackSignature(body, sig, apiKey)).toBe(true);
   });
 
-  it('FINDING: fails when the caller forgets to strip the hash field first', () => {
-    // The public client.verifyCallback() documents "without the hash field",
-    // but nothing strips it — a payload passed through as received (with
-    // hash) never validates.
-    const body: Record<string, string> = { tran_id: 'T1', amount: '5.00', hash: 'abc123' };
-    // Even a signature computed over the hash-less subset fails because the
-    // verifier concatenates hash too.
+  it('stripHash option verifies payloads that still carry the hash field (was FINDING EC-22, fixed)', () => {
     const withoutHash: Record<string, string> = { tran_id: 'T1', amount: '5.00' };
-    const concatenated = Object.keys(withoutHash).sort().map((k) => String(withoutHash[k])).join('');
+    const concatenated = Object.keys(withoutHash).sort().map((k) => withoutHash[k]).join('');
     const sig = crypto.createHmac('sha512', apiKey).update(concatenated).digest('base64');
-    expect(verifyCallbackSignature(body, sig, apiKey)).toBe(false);
-    // Only stripping hash first yields true.
-    expect(verifyCallbackSignature(withoutHash, sig, apiKey)).toBe(true);
+    const withHash = { ...withoutHash, hash: 'abc123' };
+    // Default (no options) stays strict: hash in the body → no valid signature.
+    expect(verifyCallbackSignature(withHash, sig, apiKey)).toBe(false);
+    // stripHash: true removes it before verifying.
+    expect(verifyCallbackSignature(withHash, sig, apiKey, { stripHash: true })).toBe(true);
   });
 
   it('empty signature is rejected via length check', () => {
@@ -677,13 +727,14 @@ describe('edge-case: verifyCallbackSignature', () => {
 // ---------------------------------------------------------------------------
 
 describe('edge-case: observability hooks', () => {
-  it('FINDING: onResponse is NOT invoked when a 200 business error is thrown', async () => {
+  it('onResponse IS invoked before a 200 business error is thrown (was FINDING EC-06, fixed)', async () => {
     const server = await startServer((_req, res) => jsonResponse(res, 200, { status: { code: '1', message: 'Wrong Hash.' } }));
     try {
       const onResponse = vi.fn();
       const client = makeClient(server.url, { onResponse });
       await expect(checkTransaction(client)).rejects.toBeInstanceOf(PayWayBusinessError);
-      expect(onResponse).not.toHaveBeenCalled();
+      expect(onResponse).toHaveBeenCalledTimes(1);
+      expect(onResponse.mock.calls[0][1]).toBe(200);
     } finally {
       await server.close();
     }
@@ -708,10 +759,15 @@ describe('edge-case: observability hooks', () => {
 // ---------------------------------------------------------------------------
 
 describe('edge-case: sanitizeForLog', () => {
-  it('FINDING: benign 32+ hex values (order IDs, content hashes) are masked defensively', async () => {
-    const input = { orderRef: 'deadbeefdeadbeefdeadbeefdeadbeef', qty: 2 };
+  it('32-char hex values are left visible; SHA-1-length+ hex is masked (was FINDING EC-23, fixed)', () => {
+    const input = {
+      orderRef: 'deadbeefdeadbeefdeadbeefdeadbeef', // 32 hex — visible now
+      digest: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', // 40 hex — still masked
+      qty: 2,
+    };
     const out = sanitizeForLog(input) as Record<string, unknown>;
-    expect(out.orderRef).toBe('***HIDDEN***');
+    expect(out.orderRef).toBe('deadbeefdeadbeefdeadbeefdeadbeef');
+    expect(out.digest).toBe('***HIDDEN***');
     expect(out.qty).toBe(2);
   });
 

@@ -68,7 +68,9 @@ export function createCredentialsOnFileDomain(
       }
 
       if (params.callbackUrl) {
-        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
+          allowPrivateHosts: config.allowPrivateCallbackHosts === true,
+        });
       }
 
       return request<components['schemas']['LinkAccountResponse']>(
@@ -109,11 +111,15 @@ export function createCredentialsOnFileDomain(
       }
 
       if (params.returnUrl) {
-        validatePublicHttpsUrl(params.returnUrl, 'returnUrl');
+        validatePublicHttpsUrl(params.returnUrl, 'returnUrl', {
+          allowPrivateHosts: config.allowPrivateCallbackHosts === true,
+        });
       }
 
       if (params.callbackUrl) {
-        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
+          allowPrivateHosts: config.allowPrivateCallbackHosts === true,
+        });
       }
 
       return request<components['schemas']['LinkCardResponse']>(
@@ -167,7 +173,9 @@ export function createCredentialsOnFileDomain(
       }
 
       if (params.callbackUrl) {
-        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl');
+        validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
+          allowPrivateHosts: config.allowPrivateCallbackHosts === true,
+        });
       }
 
       return request<components['schemas']['CofPaymentResponse']>(
