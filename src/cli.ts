@@ -30,6 +30,7 @@ import { runInit } from './cli/commands/init.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
 import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/commands/skills.js';
 import { readMaskedInput } from './cli/masked-input.js';
+import { loadPaymentLinkImage } from './cli/payment-link-image.js';
 import { PayWay } from './client.js';
 import { hasBlockingIssues, validatePayWayEnv, validateRequiredCredentials } from './config/envValidator.js';
 import {
@@ -1969,6 +1970,7 @@ paymentLinkCmd
   .option('-d, --description <text>', 'Link description (max 250 chars)')
   .option('--payment-limit <n>', 'Maximum number of payments accepted')
   .option('--expired-date <epochSeconds>', 'Expiration timestamp (epoch seconds)')
+  .option('--image <path>', 'Image file to attach to the link (jpg/jpeg/png/webp/gif)')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
     console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
@@ -2015,6 +2017,17 @@ paymentLinkCmd
       return;
     }
 
+    let image;
+    if (opts.image !== undefined) {
+      try {
+        image = loadPaymentLinkImage(opts.image);
+      } catch (e) {
+        console.log(`  ${c.red('✗')} ${String(e instanceof Error ? e.message : e)}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+
     try {
       const payway = new PayWay();
       const result = await payway.paymentLink.create({
@@ -2026,6 +2039,7 @@ paymentLinkCmd
         description: opts.description,
         paymentLimit,
         expiredDate,
+        image,
       });
 
       if (opts.json) {
