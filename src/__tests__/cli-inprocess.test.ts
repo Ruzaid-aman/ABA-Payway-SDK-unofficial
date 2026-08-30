@@ -248,4 +248,26 @@ describe('checkout-form (in-process runCli)', () => {
       vi.unstubAllEnvs();
     }
   });
+
+  it('payment-link create --image exits 1 with a clear message for a missing file', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    try {
+      const { text, exitCode } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', '5',
+        '-r', 'ref-img-1',
+        '--return-url', 'https://example.com/return',
+        '--image', 'definitely-missing-image.png',
+      ]);
+      expect(text).toContain('--image file not found');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
