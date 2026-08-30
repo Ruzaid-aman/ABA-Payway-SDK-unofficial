@@ -54,6 +54,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:sandbox": "node scripts/run-sandbox-contract.mjs",
     "docs:api": "npx typedoc --out docs/api src/index.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",

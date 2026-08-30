@@ -524,3 +524,50 @@ cleared) still reached the sandbox: the persisted global profile store
 opt-in. Precedence (profile store > `.env` > ambient env) is undocumented —
 see finding EC-14 and the improvement plan.
 
+
+## 14. Sandbox contract suite — transaction-list visibility gap + shape (2026-08-31)
+
+New opt-in suite: `src/__tests__/sandbox-contract.test.ts` (`npm run test:sandbox`,
+gate `SANDBOX_CONTRACT_TESTS=1`). First run evidence in the suite file and
+`test-output/` shell history. Facts pinned live:
+
+### 14a. transaction-list response shape + date-range cap
+
+`getTransactionList` success body is a JSON object `{ data: [...], page,
+pagination, status: { code: "00", message: "Success!", tran_id } }` — rows carry
+`transaction_id`, `payment_status`, `payment_status_code`, `original_amount`,
+`original_currency`, `transaction_date`. (The local mock in
+`cli-mock-commands.test.ts` sends a bare array — that mock shape deviates from
+the live sandbox and is kept for CLI-renderer coverage only.)
+
+A date range wider than **3 days** is rejected with **HTTP 403** and the message
+"Maximum date rang is allowed only 3 days" (sic — gateway typo) — sandbox-verified
+2026-08-31 with a 4-year window. The SDK surfaces it as `PayWayAPIError`
+(statusCode 403, message preserved).
+
+### 14b. Unpaid QR-only transactions are invisible to transaction-list (NEW)
+
+Across a wide window (`2026-01-01` → `2030-01-01`), transaction-list was rejected
+out of hand (see 14a); within a valid ≤3-day window spanning both days,
+transaction-list returned only the two checkout-created (`purchase`) transactions
+— **none** of the 16+ unpaid `generate-qr` transactions created 2026-08-30/31 by
+the suite appeared, although `check-transaction` sees them in <1 s and
+`getTransactionDetail` in ~5 s (both returned PENDING / original_amount as expected).
+
+Implication for merchants: reconciliation built on transaction-list alone will
+miss unpaid-but-open QR transactions; poll with check-transaction (per-tran)
+instead, and expect list visibility only for checkout-created or paid items.
+The contract suite pins this asymmetry as a regression test; revisit if ABA
+confirms different production semantics (ABA-OPEN-QUESTIONS Q9/Q10 territory).
+
+### 14c. Suite infrastructure notes
+
+- Gate `SANDBOX_CONTRACT_TESTS=1` (deliberately not `PAYWAY_*`-prefixed — the
+  hermetic-env setup file scrubs `PAYWAY_*` before test-file modules evaluate).
+- `.env` is parsed directly by the suite (credentials never depend on
+  `process.env`, which is scrubbed).
+- `NODE_TLS_REJECT_UNAUTHORIZED='0'` is set/restored inside the suite's
+  `beforeAll`/`afterAll` (undici reads it lazily at connect time — verified);
+  no shell prefix needed for `npm run test:sandbox`.
+- Rate budget per run: ~6 generate-qr, ~5 check-transaction, 1 detail, 1 list
+  call — inside the §4 caps (detail 10/min, list 50/min).
