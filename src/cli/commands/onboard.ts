@@ -5,6 +5,11 @@
  * `src/agent/onboarding/stages.ts`. In a TTY it uses @clack/prompts; in a
  * non-TTY it emits a structured JSON plan (consistent with `ask`'s blocked
  * result) so scripts can detect what to configure.
+ *
+ * `runOnboardCommand(opts, deps)` is the injectable entry (2026-08-30
+ * testability refactor): tests drive the full flow — interactive included —
+ * with a scripted {@link OnboardingIO} instead of @clack. The command
+ * registration delegates to it with the real terminal adapters.
  */
 
 import type { Command } from 'commander';
@@ -21,15 +26,11 @@ import {
   spinner as clackSpinner,
   text,
 } from '@clack/prompts';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { evaluateReadinessDetailed } from '../../agent/readiness.js';
 import { REMEDIES } from '../../agent/onboarding/remedies.js';
-import type { RemedyId } from '../../agent/onboarding/remedies.js';
 import { isInteractiveTerminal } from '../../agent/terminal.js';
-import { scanOnboardingState, type ScanSnapshot } from '../../agent/onboarding/scan.js';
+import { scanOnboardingState } from '../../agent/onboarding/scan.js';
 import {
-  pendingStages,
   runStage,
   type OnboardingIO,
   type ProviderPreset,
@@ -37,20 +38,17 @@ import {
   type StageName,
 } from '../../agent/onboarding/stages.js';
 import { serializeCommandResult } from '../../agent/output.js';
-import type { AgentCommandResultV1, ProviderPreset as Preset } from '../../agent/contracts.js';
+import {
+  ALL_STAGES,
+  appendEnvVar,
+  missingRemedies,
+  nonInteractiveResult,
+  readinessRows,
+  stageListFor,
+  validateStageArg,
+} from './onboard-helpers.js';
 
-const ALL_STAGES: StageName[] = ['provider', 'profile', 'callback', 'privacy', 'verify'];
-
-export function registerOnboardCommand(program: Command): void {
-  program
-    .command('onboard')
-    .description('Guided setup: scan config, configure an inference provider + PayWay profile, verify readiness')
-    .option('--stage <name>', `Run a single stage only: ${ALL_STAGES.join(' | ')}`)
-    .action(async (opts: { stage?: string }) => {
-      if (!isInteractiveTerminal()) return runNonInteractive(opts.stage);
-      await runOnboardInteractive(opts.stage);
-    });
-}
+export { onboardingHintText } from './onboard-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Interactive (TTY)
@@ -117,7 +115,7 @@ function buildClackIO(env: NodeJS.ProcessEnv): OnboardingIO {
       return Array.isArray(choice) && choice.includes('yes');
     },
     async writeEnvVar(key, value) {
-      appendEnvVar(env, key, value);
+      appendEnvVar(path.resolve(process.cwd(), '.env'), env, key, value);
     },
     async spinner(label, fn) {
       const s = clackSpinner();
@@ -137,126 +135,108 @@ function buildClackIO(env: NodeJS.ProcessEnv): OnboardingIO {
   };
 }
 
-export async function runOnboardInteractive(stageArg?: string): Promise<void> {
-  try {
-    const stage = stageArg && (ALL_STAGES.includes(stageArg as StageName) ? (stageArg as StageName) : undefined);
-    if (stageArg && !stage) {
-      throw new Error(`Unknown stage "${stageArg}". Use one of: ${ALL_STAGES.join(', ')}`);
-    }
-
-    intro('PayWay Agent Onboarding');
-
-    const snapshot = scanOnboardingState(process.env);
-    renderScan(snapshot);
-
-    const stagesToRun = stage && stage !== 'verify' ? ([stage, 'verify'] as StageName[]) : pendingStages(snapshot);
-
-    const ctx: StageContext = { env: process.env, io: buildClackIO(process.env) };
-    for (const name of stagesToRun) {
-      const result = await runStage(name, ctx);
-      if (result.notes?.length) clackNote(result.notes.join('\n'), `stage: ${name}`);
-    }
-
-    renderFinal();
-    outro('Onboarding complete. Try: payway-sdk ask "Generate an online QR for 3 USD" --yolo');
-  } catch (error) {
-    if (error instanceof OnboardCancel) {
-      cancel('Onboarding cancelled.');
-      process.exitCode = 130;
-      return;
-    }
-    cancel((error as Error).message);
-    process.exitCode = 1;
-  }
+export interface OnboardCommandDeps {
+  /** Force the interactive/non-interactive branch (default: TTY detection). */
+  interactive?: boolean;
+  /** Injected stage IO — skips @clack entirely when provided. */
+  io?: OnboardingIO;
+  /** Environment snapshot (default process.env). */
+  env?: NodeJS.ProcessEnv;
+  /** Output for the non-interactive JSON plan (default console.log). */
+  log?: (line: string) => void;
+  /** Panel renderer (default clackNote). */
+  note?: (message: string, title?: string) => void;
+  /** Banner renderers (default @clack intro/outro/cancel). */
+  banners?: {
+    intro?: (title: string) => void;
+    outro?: (message: string) => void;
+    cancel?: (message: string) => void;
+  };
+  /** Exit-code hook (default process.exitCode assignment). */
+  setExitCode?: (code: number) => void;
 }
 
-function renderScan(snapshot: ScanSnapshot): void {
-  const rows = evaluateReadinessDetailed(snapshot.context, snapshot.agentConfig ?? defaultConfig(), {
-    privacyAcknowledged: snapshot.privacyAcknowledged,
-  });
-  const lines = rows
-    .map((r) => `  ${r.state === 'ready' ? '✓' : '•'} ${r.label}`)
-    .concat(snapshot.hasAgentApiKey ? [] : ['  • Provider API key (PAYWAY_AGENT_API_KEY) missing']);
-  clackNote(lines.join('\n'), 'Current configuration');
-}
+export async function runOnboardCommand(opts: { stage?: string }, deps: OnboardCommandDeps = {}): Promise<void> {
+  const env = deps.env ?? process.env;
+  const log = deps.log ?? ((line: string) => console.log(line));
+  const note = deps.note ?? ((message: string, title?: string) => clackNote(message, title));
+  const banners = {
+    intro: deps.banners?.intro ?? ((title: string) => intro(title)),
+    outro: deps.banners?.outro ?? ((message: string) => outro(message)),
+    cancel: deps.banners?.cancel ?? ((message: string) => cancel(message)),
+  };
+  const setExitCode = deps.setExitCode ?? ((code: number) => (process.exitCode = code));
 
-function renderFinal(): void {
-  const snapshot = scanOnboardingState(process.env);
-  const rows = evaluateReadinessDetailed(snapshot.context, snapshot.agentConfig ?? defaultConfig(), {
-    privacyAcknowledged: snapshot.privacyAcknowledged,
-  });
-  const remaining = rows.filter((r) => r.state !== 'ready' && r.remedyId).map((r) => r.remedyId as RemedyId);
-  if (remaining.length === 0) {
-    clackNote('All capability rows ready.', 'Readiness');
-  } else {
-    clackNote(
-      remaining.map((id) => `  → ${REMEDIES[id].fix}`).join('\n'),
-      'Still missing (run manually or re-run onboard)',
-    );
-  }
-}
+  const interactive = deps.interactive ?? isInteractiveTerminal();
 
-// ---------------------------------------------------------------------------
-// Non-interactive (structured JSON)
-// ---------------------------------------------------------------------------
-
-function runNonInteractive(stageArg?: string): void {
-  const snapshot = scanOnboardingState(process.env);
-  const rows = evaluateReadinessDetailed(snapshot.context, snapshot.agentConfig ?? defaultConfig(), {
-    privacyAcknowledged: snapshot.privacyAcknowledged,
-  });
-  const missing = rows.filter((r) => r.state !== 'ready' && r.remedyId).map((r) => r.remedyId as RemedyId);
-  if (stageArg) {
-    console.log(JSON.stringify({ command: 'onboard', stage: stageArg, allowed: ALL_STAGES }, null, 2));
+  // Non-interactive with an explicit --stage: print the stage plan only
+  // (historical behavior — no blocked result, no exit-code change).
+  if (!interactive && opts.stage) {
+    log(JSON.stringify({ command: 'onboard', stage: opts.stage, allowed: ALL_STAGES }, null, 2));
     return;
   }
-  const result: AgentCommandResultV1 = {
-    version: 'agent-command/v1',
-    status: 'blocked',
-    request: 'onboard',
-    message: 'Onboarding requires an interactive terminal.',
-    error: {
-      code: 'AGENT_NOT_CONFIGURED',
-      message: missing.length ? `Missing: ${missing.join(', ')}` : 'No missing items.',
-    },
-  };
-  console.log(serializeCommandResult(result));
-  process.exitCode = 1;
-}
 
-// ---------------------------------------------------------------------------
-// .env writing helper
-// ---------------------------------------------------------------------------
-
-function appendEnvVar(env: NodeJS.ProcessEnv, key: string, value: string): void {
-  const envPath = path.resolve(process.cwd(), '.env');
-  const content = existsSync(envPath) ? readFileSync(envPath, 'utf8') : '';
-  const lines = content.split(/\r?\n/);
-  const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
-  if (idx >= 0) {
-    const current = lines[idx].slice(key.length + 1);
-    if (current && current !== value) {
-      throw new Error(`Refusing to overwrite existing ${key} in .env. Edit it manually to change the value.`);
-    }
-    return; // already set to the same value
+  if (!interactive) {
+    log(serializeCommandResult(nonInteractiveResult(scanOnboardingState(env))));
+    setExitCode(1);
+    return;
   }
-  lines.push(`${key}=${value}`);
-  writeFileSync(envPath, `${lines.filter((l) => l.length > 0 || content.endsWith('\n')).join('\n')}\n`, {
-    encoding: 'utf8',
-  });
-  // Make it visible to the running process too.
-  env[key] = value;
+
+  // Interactive: structured scan → stage machine → final readiness.
+  banners.intro('PayWay Agent Onboarding');
+  try {
+    const stageError = validateStageArg(opts.stage);
+    if (stageError) throw new Error(stageError);
+
+    const snapshot = scanOnboardingState(env);
+    const rows = readinessRows(snapshot);
+    const lines = rows
+      .map((r) => `  ${r.state === 'ready' ? '✓' : '•'} ${r.label}`)
+      .concat(snapshot.hasAgentApiKey ? [] : ['  • Provider API key (PAYWAY_AGENT_API_KEY) missing']);
+    note(lines.join('\n'), 'Current configuration');
+
+    const io = deps.io ?? buildClackIO(env);
+    const stagesToRun = stageListFor(opts.stage, snapshot);
+    const ctx: StageContext = { env, io };
+    for (const name of stagesToRun) {
+      const result = await runStage(name, ctx);
+      if (result.notes?.length) note(result.notes.join('\n'), `stage: ${name}`);
+    }
+
+    const finalSnapshot = scanOnboardingState(env);
+    const remaining = missingRemedies(finalSnapshot);
+    if (remaining.length === 0) {
+      note('All capability rows ready.', 'Readiness');
+    } else {
+      note(
+        remaining.map((id) => `  → ${REMEDIES[id].fix}`).join('\n'),
+        'Still missing (run manually or re-run onboard)',
+      );
+    }
+    banners.outro('Onboarding complete. Try: payway-sdk ask "Generate an online QR for 3 USD" --yolo');
+  } catch (error) {
+    if (error instanceof OnboardCancel) {
+      banners.cancel('Onboarding cancelled.');
+      setExitCode(130);
+      return;
+    }
+    banners.cancel((error as Error).message);
+    setExitCode(1);
+  }
 }
 
-/** Plain-text hint for non-wizard contexts (ask/repl unconfigured, TTY). */
-export function onboardingHintText(snapshot: ScanSnapshot): string {
-  const rows = evaluateReadinessDetailed(snapshot.context, snapshot.agentConfig ?? defaultConfig(), {
-    privacyAcknowledged: snapshot.privacyAcknowledged,
-  });
-  const missing = rows.filter((r) => r.state !== 'ready' && r.remedyId).map((r) => r.remedyId as RemedyId);
-  if (missing.length === 0) return '';
-  const bullets = missing.map((id) => `  • ${REMEDIES[id].fix}`).join('\n');
-  return `Run ${'payway-sdk onboard'} to configure. Missing:\n${bullets}`;
+export async function runOnboardInteractive(stageArg?: string): Promise<void> {
+  await runOnboardCommand({ stage: stageArg }, { interactive: true });
+}
+
+export function registerOnboardCommand(program: Command): void {
+  program
+    .command('onboard')
+    .description('Guided setup: scan config, configure an inference provider + PayWay profile, verify readiness')
+    .option('--stage <name>', `Run a single stage only: ${ALL_STAGES.join(' | ')}`)
+    .action(async (opts: { stage?: string }) => {
+      await runOnboardCommand(opts);
+    });
 }
 
 /**
@@ -270,13 +250,4 @@ export async function maybeAutoOnboard(): Promise<boolean> {
   if (process.env.PAYWAY_ONBOARD_AUTO !== '1') return false;
   await runOnboardInteractive();
   return true;
-}
-
-function defaultConfig() {
-  return {
-    version: 'agent-config/v1' as const,
-    provider: 'openai' as Preset,
-    model: '',
-    capabilityMode: 'strict-json-plan' as const,
-  };
 }
