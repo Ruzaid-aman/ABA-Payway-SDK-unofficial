@@ -73,14 +73,16 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 | Agent Setup Playbook (manual path + maintainer gotchas) | [AGENT-SETUP-PLAYBOOK.md](./AGENT-SETUP-PLAYBOOK.md) |
 | Agentic CLI 1-Pager | [QUICK-START-1-PAGER.md](./QUICK-START-1-PAGER.md) |
 | Project Status (session log + quick reference) | [PROJECT_STATUS.md](./PROJECT_STATUS.md) |
-| Release Checklist | [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) |
+| Release Checklist (+ first npm publish) | [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) |
 | Agent Handoff (for coding agents resuming work) | [../HANDOFF.md](../HANDOFF.md) |
 | Versioning Policy | [VERSIONING.md](./VERSIONING.md) |
+| Production Verification Plan (gated) | [PRODUCTION-VERIFICATION-PLAN.md](./PRODUCTION-VERIFICATION-PLAN.md) |
+| Mutation-Testing Spike (2026-08-31) | [MUTATION-SPIKE-2026-08-31.md](./MUTATION-SPIKE-2026-08-31.md) |
 
 ### Sandbox Evidence & Audits
 | Document | File |
 |---|---|
-| Sandbox Findings (§1–§13 gateway facts) | [SANDBOX-FINDINGS.md](./SANDBOX-FINDINGS.md) |
+| Sandbox Findings (§1–§14 gateway facts) | [SANDBOX-FINDINGS.md](./SANDBOX-FINDINGS.md) |
 | Close-Transaction Findings (advisory-close dossier) | [CLOSE-TRANSACTION-FINDINGS.md](./CLOSE-TRANSACTION-FINDINGS.md) |
 | Stripe-Standard DX Audit | [STRIPE-STANDARD-DX-AUDIT.md](./STRIPE-STANDARD-DX-AUDIT.md) |
 | Edge-Case Audit — Findings (EC-01–EC-23) | [../audit-results/edge-case-report.md](../audit-results/edge-case-report.md) |

@@ -22,6 +22,8 @@
 
 ### Fixed
 
+- **`doctor` framework row is advisory when no framework exists** — an SDK/CLI repo has no web framework by design, so "Framework detected: unknown" no longer renders as a red failure; the row reports an advisory with the optional install hint (DX review first-15-minutes noise).
+
 - **`skills doctor` crashed with a raw ENOENT stack** when the executable's sibling `skills/` directory was missing (e.g. source checkouts); a missing directory now reports as "no packaged skills" instead.
 - **Agent human output spacing** — failed actions rendered as `tool(E1: msg)`; now `tool (E1: msg)`.
 - **Interactive lifetime override now enforces the 180s gateway minimum before submit** — a lifetime below 180s entered in the wizard re-asks with an explanation of gateway code `"04"` (179s → HTTP 400), matching the `--lifetime` flag validation from the edge-case audit instead of failing after submit.

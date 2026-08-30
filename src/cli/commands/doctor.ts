@@ -67,9 +67,14 @@ function checkFramework(cwd: string): DoctorCheck {
   return {
     id: 'framework',
     label: 'Framework detected',
-    ok,
-    detail: `${detection.framework} (${detection.evidence.join('; ')})`,
-    fix: ok ? undefined : 'Install a supported framework: next, express, fastify, or nuxt',
+    // Advisory: an SDK/CLI repo has no web framework by design, so an
+    // unknown framework must not render as a red failure (DX review
+    // 2026-08-30 — first-15-minutes noise). The hint stays for app repos.
+    ok: true,
+    detail: ok
+      ? `${detection.framework} (${detection.evidence.join('; ')})`
+      : `unknown (advisory — no web framework needed for SDK/CLI usage; ${detection.evidence.join('; ')})`,
+    fix: ok ? undefined : 'Optional: install a supported framework: next, express, fastify, or nuxt',
   };
 }
 

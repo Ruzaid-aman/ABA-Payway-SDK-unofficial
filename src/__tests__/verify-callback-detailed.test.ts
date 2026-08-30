@@ -74,6 +74,15 @@ describe('verifyCallbackDetailed', () => {
     expect(verifyCallbackDetailed(bodyWithWrongHash, sig, API_KEY, { stripHash: true })).toEqual({ valid: true });
   });
 
+  it('canonicalizes null values to the empty string (not "null")', () => {
+    // A null field contributes nothing to the concatenated payload — the
+    // verifier must match PayWay callbacks that omit optional fields.
+    const body = { tran_id: 'CB-003', amount: '1.00', note: null };
+    const sig = crypto.createHmac('sha512', API_KEY).update('1.00CB-003').digest('base64');
+    // sorted keys: amount, note, tran_id -> '1.00' + '' + 'CB-003'
+    expect(verifyCallbackDetailed(body, sig, API_KEY)).toEqual({ valid: true });
+  });
+
   it('stays byte-compatible with verifyCallbackSignature on all outcomes', () => {
     const sig = sign(BODY);
     const cases: [Record<string, unknown>, string, string][] = [

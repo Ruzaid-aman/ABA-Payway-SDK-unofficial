@@ -11,6 +11,8 @@ import { PayWay } from '../client.js';
 describe('CircuitBreaker (TD-07)', () => {
   it('stays closed under the failure threshold', () => {
     const breaker = new CircuitBreaker({ failureThreshold: 3, resetTimeoutMs: 1_000 });
+    // A never-failed endpoint reports closed (guards the entries lookup).
+    expect(breaker.stateFor('fresh-endpoint')).toBe('closed');
     breaker.recordFailure('ep');
     breaker.recordFailure('ep');
     expect(breaker.stateFor('ep')).toBe('closed');
@@ -42,6 +44,56 @@ describe('CircuitBreaker (TD-07)', () => {
       expect(() => breaker.assertAllowed('ep')).not.toThrow();
       breaker.recordSuccess('ep');
       expect(breaker.stateFor('ep')).toBe('closed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports the exact retry window on CircuitOpenError (retryInMs math)', () => {
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({ failureThreshold: 1, resetTimeoutMs: 50 });
+      breaker.recordFailure('ep');
+      vi.advanceTimersByTime(20); // 30 ms remain
+      try {
+        breaker.assertAllowed('ep');
+        expect.unreachable('circuit must be open');
+      } catch (error) {
+        expect(error).toBeInstanceOf(CircuitOpenError);
+        expect((error as CircuitOpenError).retryInMs).toBe(30);
+        expect((error as Error).message).toContain('Retry allowed in');
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('treats the reset window boundary as half-open (>=, not >)', () => {
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({ failureThreshold: 1, resetTimeoutMs: 50 });
+      breaker.recordFailure('ep');
+      vi.advanceTimersByTime(50); // exactly the window
+      expect(breaker.stateFor('ep')).toBe('half-open');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not postpone the reset window while open, and probe success clears probe state', () => {
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({ failureThreshold: 1, resetTimeoutMs: 50 });
+      breaker.recordFailure('ep'); // opens at t=0
+      vi.advanceTimersByTime(30);
+      breaker.recordFailure('ep'); // extra failure while open must NOT reset openedAt
+      vi.advanceTimersByTime(30); // 60 ms since open — window elapsed
+      expect(breaker.stateFor('ep')).toBe('half-open');
+      breaker.recordSuccess('ep');
+      expect(breaker.stateFor('ep')).toBe('closed');
+      // recordSuccess must clear probe state too: a new failure starts a fresh count.
+      breaker.recordFailure('ep');
+      expect(breaker.stateFor('ep')).toBe('open');
     } finally {
       vi.useRealTimers();
     }

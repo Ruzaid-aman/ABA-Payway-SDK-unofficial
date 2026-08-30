@@ -1,7 +1,7 @@
 # Agent Handoff — aba-payway-ts
 
 **Audience:** an agent resuming work in a fresh session. Read this plus `AGENTS.md` before acting.
-**Last updated:** 2026-08-30, after the v1.3.0 release, the coverage campaign, the agent CLI/REPL testability refactor, and a docs sync.
+**Last updated:** 2026-08-31, after the Technical Production Review implementation (P0–P3: CI hardening, sandbox contract suite, mock-harness parity, shared test-utils, onboard/setup-webhook seams, per-call `RequestCallOptions`, `verifyCallbackDetailed`, mutation spike, production verification plan).
 **Provenance:** everything below was done and verified in prior sessions; per-item evidence paths are included so you never have to re-derive or re-probe.
 
 ---
@@ -11,9 +11,10 @@
 | Aspect | State |
 |---|---|
 | Version | `1.3.0` (tag `v1.3.0`; package.json bumped from a stale 1.1.1 — the v1.2.0 tag already existed since July, **do not move tags**) |
-| Tests | 988 tests / 63 files, all green (`npx vitest run`) |
+| Tests | 1147 tests / 75+ files, all green (`npx vitest run`; +13 opt-in sandbox contract tests skipped unless `SANDBOX_CONTRACT_TESTS=1`) |
 | Typecheck / lint | `npx tsc --noEmit` clean; `npx biome lint src` clean |
-| Coverage | 75.79% stmts / 71.08% branch / 83.68% funcs / 76.59% lines (`npx vitest run --coverage`) |
+| Coverage | ~78% stmts / ~72.5% branch (`npx vitest run --coverage`); CI enforces floors 74/69/80/74 via vitest.config.ts thresholds — ratchet upward |
+| Mutation testing | StrykerJS 10 spike on auth.ts + circuit-breaker.ts: **91.3% score** — `docs/MUTATION-SPIKE-2026-08-31.md`, `stryker.config.json` (dev-only, Node ≥ 22, not in CI) |
 | Edge-case audit | **All 23 findings (EC-01–EC-23) remediated** — `audit-results/edge-case-report.md` (findings), `audit-results/code-improvement-plan.md` (batches 1–5, all marked done) |
 | Release checklist | Run for 1.3.0: build, dist smoke, live `npm run probe` (all PATH_OK) — `docs/RELEASE_CHECKLIST.md` |
 | Working tree | Clean; nothing untracked |
@@ -46,6 +47,9 @@ Each item is pinned by a named test — if you change one, flip the test conscio
 - `checkout.purchase` accepts `retryPolicy: 'transient' | 'none'`.
 - `verifyCallback(body, sig, { stripHash: true })` available; default is unchanged (caller strips `hash`).
 - `src/cli.ts` exports `runCli(argv)` behind a main-module guard; the self-parse only fires when invoked directly. Verified against `npx tsx src/cli.ts`, `dist/cli.js`, and the child-process suite — **keep all three working if you touch it**.
+- **(2026-08-31)** Every API domain method accepts a trailing `callOptions?: { timeoutMs?, signal? }` — per-call timeout override; an aborted `signal` cancels the in-flight fetch and is never retried (`RequestCallOptions`, exported).
+- **(2026-08-31)** `verifyCallbackDetailed(body, sig, options?)` returns `{ valid, reason }` with reasons `malformed_signature` / `empty_body` / `signature_mismatch`; `verifyCallbackSignature` delegates to it (boolean behavior identical).
+- **(2026-08-31)** `doctor`'s framework row is advisory (ok=true) when no framework exists — SDK/CLI repos are not failures.
 
 ## 4. Repo map (fast orientation)
 
@@ -85,7 +89,10 @@ are the TTY-only branches of `ask` / `sessions clear` and the interactive onboar
 2. **Q9/Q10 (production `tran_id`/QR-duplicate semantics)** — decides whether `retryPolicy: 'transient'` is safe as the default for purchases.
 3. **Q4 (close-transaction enforcement)** — sandbox treats close as advisory; production behavior determines whether the SDK needs a local closed-flag helper.
 
-### 5.5 — Candidate SDK/CLI improvements (propose before building)
+### 5.5 — Production review P0–P3 (DONE 2026-08-31 — see CHANGELOG Unreleased + docs/MUTATION-SPIKE-2026-08-31.md)
+CI build-before-test + coverage floors + Node ≥20 engines + badge; `npm run test:sandbox` live contract suite; shipped mock harness routes all client status endpoints; shared `src/test/test-utils.ts`; onboard/setup-webhook injectable seams (onboard 69%, setup-webhook 85.5%); per-call `RequestCallOptions` on every domain method; `verifyCallbackDetailed`; fake-timer resilience tests + dist freshness guard; Stryker spike 91.3%; `docs/PRODUCTION-VERIFICATION-PLAN.md` (gated on production credentials); npm publish prep in RELEASE_CHECKLIST (**publishing itself remains the maintainer's call — package not on the registry**).
+
+### 5.6 — Candidate SDK/CLI improvements (propose before building)
 - CLI `doctor`: make the credential *source* (profile store vs `.env` vs env) an explicit first-class check row.
 - CLI `skills add`: the installer writes to `~/.opencode/skills` but this OpenCode build loads from `~/.config/opencode/skills` (noted in AGENTS.md) — consider a `--target`/auto-detect flag.
 - Rate-limit token-bucket rules exist only for check-transaction/detail/list/refund; add rules for `generate-qr`/payment-link only if ABA documents caps (Q5).
@@ -101,7 +108,7 @@ are the TTY-only branches of `ask` / `sessions clear` and the interactive onboar
 - **Mock gateway:** `src/__tests__/cli-mock-commands.test.ts` shows the per-endpoint mock handler shapes (mirror sandbox-verified payloads). Note refund's `tran_id` travels inside the encrypted `merchant_auth`, so a mock cannot branch on it.
 - **Behavior pins:** `edge-case-audit.test.ts` and the `FINDING:`-annotated tests document *why* behavior is pinned; a behavior change must flip the pin in the same commit.
 
-## 7. Sandbox-verified facts you must not re-probe (evidence: `docs/SANDBOX-FINDINGS.md` §1–§13, `test-output/edge-case-probe/live-probe.log`)
+## 7. Sandbox-verified facts you must not re-probe (evidence: `docs/SANDBOX-FINDINGS.md` §1–§14, `src/__tests__/sandbox-contract.test.ts` — `npm run test:sandbox`)
 
 - QR lifetime minimum is exactly 180 s; 100 000 s accepted; amounts $0.01 → $100 000 USD and KHR 4000 accepted.
 - Duplicate `tran_id` silently accepted on both `purchase` and `generate-qr` (two live QRs, different amounts, same ID).
@@ -109,6 +116,7 @@ are the TTY-only branches of `ask` / `sessions clear` and the interactive onboar
 - Gateway error shapes: HTTP 200-wrapped `status.code` (6 = not-found), 403 `PTL*` codes, 400 `"04"` binding failures, code 69 (lifetime), flat-code 403s on legacy paths.
 - Close-transaction is advisory in sandbox (closed-unpaid txns still pay and stay PENDING); no CLOSED status exists anywhere.
 - check-transaction sees new transactions in <1 s; transaction-detail needs ~5 s.
+- (§14, 2026-08-31) **Unpaid QR-only transactions are invisible to transaction-list** while check-transaction/detail see them; transaction-list rejects date ranges wider than 3 days with HTTP 403 ("Maximum date rang is allowed only 3 days"). Pinned as live tests in the sandbox contract suite.
 - v3 token trio: binding layer OK, HMAC composition black-box (60+ attempts) — capability-guarded in the SDK.
 
 ## 8. Anti-checklist (things agents got wrong before — do not repeat)

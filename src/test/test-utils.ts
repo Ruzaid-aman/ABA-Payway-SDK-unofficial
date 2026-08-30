@@ -179,6 +179,9 @@ export function isDistStale(): boolean {
  * stale. Call from `beforeAll` in suites that spawn `dist/cli.js`.
  */
 export function requireFreshDist(): void {
+  // Under mutation testing the sandbox excludes dist entirely; the guard
+  // would otherwise fail every child-process suite and false-kill mutants.
+  if (process.env.STRYKER_MUTATOR_ACTIVE) return;
   if (isDistStale()) {
     throw new Error(
       'dist/cli.js is missing or older than src/ - run `npm run build` before this suite (CI builds automatically).',
