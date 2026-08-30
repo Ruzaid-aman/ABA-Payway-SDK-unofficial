@@ -152,6 +152,30 @@ There are **two approaches** for the frontend checkout:
 | **Full-page Redirect** (default) | Auto-submit a hidden form that redirects the user to PayWay's hosted checkout page | Simple integration, best mobile UX |
 | **Popup Modal** | Open PayWay's checkout in a popup overlay using `checkout2-0.js` | Desktop-focused, feels more "in-app" |
 
+### Skip the boilerplate: `getCheckoutFormHtml()`
+
+The SDK can generate the complete signed form document for either approach — the hidden fields and HMAC are byte-identical to `createTransaction()`, and the action URL follows your configured environment/base URL. It is a local, synchronous call (no network):
+
+```typescript
+// Server-side (Express) — full-page redirect
+app.get('/checkout/:orderId', (req, res) => {
+  const html = payway.checkout.getCheckoutFormHtml({
+    transactionId: req.params.orderId,
+    amount: 15.0,
+    currency: 'USD',
+    returnUrl: 'https://mywebsite.com/payment-result',
+  }, { autoSubmit: true }); // same-tab navigation to the hosted page
+  res.type('html').send(html);
+});
+
+// Popup modal (official AbaPayway plugin UX)
+const html = payway.checkout.getCheckoutFormHtml(params, { popupMode: true });
+```
+
+Options: `autoSubmit` (submit on page load, same-tab) — mutually exclusive with `popupMode` (form targets the `aba_webservice` frame opened by `checkout2-0.js` and the submit button calls `AbaPayway.checkout()`), plus `formId`, `submitLabel`, and `omitSubmitButton`. All merchant-provided values are HTML-escaped. The CLI equivalent is `payway-sdk checkout-form -a 15.00 --return-url <url> -o form.html` (writes the same document locally; diagnostics go to stderr so `checkout-form … > form.html` stays clean).
+
+The manual markup below is what the helper generates — kept for reference and for fully custom integrations.
+
 ---
 
 ### Option A: Full-Page Redirect (Default)

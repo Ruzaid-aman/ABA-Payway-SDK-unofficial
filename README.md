@@ -105,6 +105,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk refund -t <id> -a <amount> [-c <currency>]` | Refund with a pre-flight balance check and confirmation by default; `--no-preflight` skips only the detail lookup, `-y/--force` skips both the lookup and the prompt |
 | `payway-sdk exchange-rate` | Fetch the live USD/KHR exchange rate |
 | `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (requires credentials) |
+| `payway-sdk checkout-form -a <amount> -o form.html` | Write the signed hosted-checkout HTML form (local signing, no API call) |
 | `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials) |
 | `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks |
 | `payway-sdk config` | Display loaded configuration and validate environment variables |
@@ -357,6 +358,22 @@ const transaction = payway.checkout.createTransaction({
 // Return this payload directly to your frontend checkout form/page
 // The frontend will render an HTML form posting to PayWay's checkout URL using these fields
 ```
+
+Prefer to skip the frontend form entirely? `getCheckoutFormHtml()` renders the complete signed form document — same payload, same HMAC — for the full-page redirect (`autoSubmit: true`) or the official popup plugin (`popupMode: true`):
+
+```typescript
+// Express: the browser lands on PayWay's hosted checkout page
+app.get('/checkout/:orderId', (req, res) => {
+  res.type('html').send(payway.checkout.getCheckoutFormHtml({
+    transactionId: req.params.orderId,
+    amount: 15.00,
+    currency: 'USD',
+    returnUrl: 'https://mywebsite.com/payment-result',
+  }, { autoSubmit: true }));
+});
+```
+
+The CLI can write the same document locally: `payway-sdk checkout-form -a 15.00 --return-url <url> -o form.html` (local signing only — no API call, no RSA key required).
 
 ### 3. Handle Webhook Callback
 
