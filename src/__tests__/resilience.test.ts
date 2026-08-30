@@ -33,30 +33,33 @@ describe('CircuitBreaker (TD-07)', () => {
   });
 
   it('admits a half-open probe after the reset window and closes on success', () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 1, resetTimeoutMs: 50 });
-    breaker.recordFailure('ep');
-    const openedAt = Date.now();
-    // Simulate window elapse without fake timers.
-    while (Date.now() - openedAt < 55) {
-      /* busy-wait past resetTimeout */
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({ failureThreshold: 1, resetTimeoutMs: 50 });
+      breaker.recordFailure('ep');
+      vi.advanceTimersByTime(60); // past resetTimeout — no real-clock busy-wait
+      expect(breaker.stateFor('ep')).toBe('half-open');
+      expect(() => breaker.assertAllowed('ep')).not.toThrow();
+      breaker.recordSuccess('ep');
+      expect(breaker.stateFor('ep')).toBe('closed');
+    } finally {
+      vi.useRealTimers();
     }
-    expect(breaker.stateFor('ep')).toBe('half-open');
-    expect(() => breaker.assertAllowed('ep')).not.toThrow();
-    breaker.recordSuccess('ep');
-    expect(breaker.stateFor('ep')).toBe('closed');
   });
 
   it('re-opens immediately when the half-open probe fails', () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 1, resetTimeoutMs: 50 });
-    breaker.recordFailure('ep');
-    const openedAt = Date.now();
-    while (Date.now() - openedAt < 55) {
-      /* busy-wait past resetTimeout */
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({ failureThreshold: 1, resetTimeoutMs: 50 });
+      breaker.recordFailure('ep');
+      vi.advanceTimersByTime(60);
+      breaker.assertAllowed('ep'); // admitted as probe
+      breaker.recordFailure('ep');
+      expect(breaker.stateFor('ep')).toBe('open');
+      expect(() => breaker.assertAllowed('ep')).toThrow(CircuitOpenError);
+    } finally {
+      vi.useRealTimers();
     }
-    breaker.assertAllowed('ep'); // admitted as probe
-    breaker.recordFailure('ep');
-    expect(breaker.stateFor('ep')).toBe('open');
-    expect(() => breaker.assertAllowed('ep')).toThrow(CircuitOpenError);
   });
 
   it('exposes sane defaults', () => {

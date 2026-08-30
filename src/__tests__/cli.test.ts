@@ -3,10 +3,12 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { generateTestRsaKeyPair, runDistCli, stripAnsi } from '../test/test-utils.js';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { generateTestRsaKeyPair, requireFreshDist, runDistCli, stripAnsi } from '../test/test-utils.js';
 
 const temporaryDirectories: string[] = [];
+
+beforeAll(() => requireFreshDist());
 const TEST_RSA = generateTestRsaKeyPair();
 
 const runBuiltCli = runDistCli;

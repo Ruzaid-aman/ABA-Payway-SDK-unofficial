@@ -9,6 +9,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import * as crypto from 'node:crypto';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 import { vi } from 'vitest';
 
@@ -147,3 +148,40 @@ export function generateTestRsaKeyPair(): { publicKey: string; privateKey: strin
 
 /** Minimal valid KHQR EMVCo payload prefix used across fixtures. */
 export const KHQR_SAMPLE_PREFIX = '000201010212';
+
+/**
+ * True when `dist/cli.js` is missing or older than the newest buildable
+ * source file (src/**, excluding tests and type declarations). Guards the
+ * child-process suites against silently testing a stale build.
+ */
+export function isDistStale(): boolean {
+  const distPath = distCliPath();
+  if (!existsSync(distPath)) return true;
+  const distMtime = statSync(distPath).mtimeMs;
+  let newest = 0;
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '__tests__') continue;
+        walk(full);
+      } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts') && !entry.name.endsWith('.d.ts')) {
+        newest = Math.max(newest, statSync(full).mtimeMs);
+      }
+    }
+  };
+  walk(path.join(process.cwd(), 'src'));
+  return newest > distMtime;
+}
+
+/**
+ * Fail fast (with an actionable message) when the built CLI is missing or
+ * stale. Call from `beforeAll` in suites that spawn `dist/cli.js`.
+ */
+export function requireFreshDist(): void {
+  if (isDistStale()) {
+    throw new Error(
+      'dist/cli.js is missing or older than src/ - run `npm run build` before this suite (CI builds automatically).',
+    );
+  }
+}

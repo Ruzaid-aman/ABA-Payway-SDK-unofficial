@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import * as agentCommands from '../cli/commands/agent.js';
-import { runDistCliSync, stripAnsi } from '../test/test-utils.js';
+import { requireFreshDist, runDistCliSync, stripAnsi } from '../test/test-utils.js';
 
 /**
  * TASK-011 — public agent CLI surface + REPL.
@@ -13,6 +13,8 @@ import { runDistCliSync, stripAnsi } from '../test/test-utils.js';
  */
 
 const temporaryDirectories: string[] = [];
+
+beforeAll(() => requireFreshDist());
 
 const runCli = (args: string[], env: NodeJS.ProcessEnv, input?: string) =>
   runDistCliSync(args, { env, input });
