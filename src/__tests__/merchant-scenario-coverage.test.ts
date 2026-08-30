@@ -1,22 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayWay } from '../client.js';
+import { mockJsonResponse } from '../test/test-utils.js';
 
 const TEST_CONFIG = {
   merchantId: 'test-merchant-coverage',
   apiKey: 'test-api-key-secret',
   environment: 'sandbox' as const,
 };
-
-function mockJsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: 'OK',
-    json: () => Promise.resolve(body),
-    text: () => Promise.resolve(JSON.stringify(body)),
-    headers: new Headers(),
-  } as Response;
-}
 
 describe('merchant scenario coverage', () => {
   let fetchSpy: ReturnType<typeof vi.fn>;

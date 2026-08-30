@@ -8,6 +8,7 @@ import { getAgentDataPaths } from '../agent/storage.js';
 import { runRepl, setAgentProgram } from '../agent/repl.js';
 import { registerAgentCommands } from '../cli/commands/agent.js';
 import { REPL_PROMPT } from '../agent/repl-helpers.js';
+import { stripAnsi } from '../test/test-utils.js';
 
 /**
  * In-process coverage for the agent command surface and the REPL loop.
@@ -20,9 +21,6 @@ import { REPL_PROMPT } from '../agent/repl-helpers.js';
  * gate — `runOneShot` returns `blocked`/`PRIVACY_ACK_REQUIRED` before any
  * provider or PayWay call when the config lacks `privacyAcknowledgedAt`.
  */
-
-const esc = String.fromCharCode(27);
-const stripAnsi = (s: string): string => s.replace(new RegExp(`${esc}\\[[0-9;]*m`, 'g'), '');
 
 /** Current captured output with ANSI stripped — assertions run against this. */
 const logsText = (): string => stripAnsi(logs.join('\n'));

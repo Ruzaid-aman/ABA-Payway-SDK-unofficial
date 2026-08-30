@@ -15,7 +15,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { captureConsole } from '../test/test-utils.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-inprocess-'));
 const originalCwd = process.cwd();
@@ -32,29 +33,9 @@ afterAll(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-/** Capture console output; returns joined text and a restore fn. */
-function capture(): { text: () => string; restore: () => void } {
-  const lines: string[] = [];
-  const push =
-    (target: string[]) =>
-    (...args: unknown[]) =>
-      target.push(args.map((a) => String(a)).join(' '));
-  const log = vi.spyOn(console, 'log').mockImplementation(push(lines));
-  const warn = vi.spyOn(console, 'warn').mockImplementation(push(lines));
-  const error = vi.spyOn(console, 'error').mockImplementation(push(lines));
-  return {
-    text: () => lines.join('\n'),
-    restore: () => {
-      log.mockRestore();
-      warn.mockRestore();
-      error.mockRestore();
-    },
-  };
-}
-
 /** Save/restore process.exitCode around an invocation. */
 async function run(argv: string[]): Promise<{ text: string; exitCode: typeof process.exitCode }> {
-  const captured = capture();
+  const captured = captureConsole();
   const before = process.exitCode;
   try {
     await runCli(argv);

@@ -1,9 +1,9 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as agentCommands from '../cli/commands/agent.js';
+import { runDistCliSync, stripAnsi } from '../test/test-utils.js';
 
 /**
  * TASK-011 — public agent CLI surface + REPL.
@@ -14,28 +14,8 @@ import * as agentCommands from '../cli/commands/agent.js';
 
 const temporaryDirectories: string[] = [];
 
-function stripAnsi(s: string): string {
-  const esc = String.fromCharCode(27);
-  return s.replace(new RegExp(`${esc}\\[[0-9;]*m`, 'g'), '');
-}
-
-function runCli(
-  args: string[],
-  env: NodeJS.ProcessEnv,
-  input?: string,
-): { status: number | null; stdout: string; stderr: string } {
-  const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), ...args], {
-    encoding: 'utf8',
-    cwd: process.cwd(),
-    env,
-    input,
-  });
-  return {
-    status: result.status,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
-  };
-}
+const runCli = (args: string[], env: NodeJS.ProcessEnv, input?: string) =>
+  runDistCliSync(args, { env, input });
 
 function baseEnv(appData: string): NodeJS.ProcessEnv {
   return {

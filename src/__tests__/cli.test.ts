@@ -1,54 +1,15 @@
-import { spawn, spawnSync } from 'node:child_process';
-import * as crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { generateTestRsaKeyPair, runDistCli, stripAnsi } from '../test/test-utils.js';
 
 const temporaryDirectories: string[] = [];
-const TEST_RSA = crypto.generateKeyPairSync('rsa', {
-  modulusLength: 1024,
-  publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
-  privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
-});
+const TEST_RSA = generateTestRsaKeyPair();
 
-/** Strip ANSI escape sequences so string matching works reliably. */
-function stripAnsi(s: string): string {
-  const esc = String.fromCharCode(27);
-  return s.replace(new RegExp(`${esc}\\[[0-9;]*m`, 'g'), '');
-}
-
-function runBuiltCli(
-  args: string[],
-  options: { cwd: string; env: NodeJS.ProcessEnv },
-): Promise<{ status: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), ...args], {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => (stdout += chunk));
-    child.stderr.on('data', (chunk: string) => (stderr += chunk));
-    const timeout = setTimeout(() => {
-      child.kill();
-      reject(new Error('built CLI did not exit within 4 seconds'));
-    }, 4_000);
-    child.on('error', (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-    child.on('close', (status) => {
-      clearTimeout(timeout);
-      resolve({ status, stdout, stderr });
-    });
-  });
-}
+const runBuiltCli = runDistCli;
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {

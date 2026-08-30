@@ -5,23 +5,19 @@
  * via process.env; only non-interactive flag combinations are used
  * (-y/--json/--no-polling), so nothing reads stdin and nothing leaves localhost.
  */
-import * as crypto from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { captureConsole, generateTestRsaKeyPair } from '../test/test-utils.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-mock-'));
 const originalCwd = process.cwd();
 const originalEnv: Record<string, string | undefined> = {};
 const ENV_KEYS = ['PAYWAY_BASE_URL', 'PAYWAY_ENV', 'PAYWAY_MERCHANT_ID', 'PAYWAY_API_KEY', 'PAYWAY_RSA_PUBLIC_KEY'];
 
-const TEST_RSA = crypto.generateKeyPairSync('rsa', {
-  modulusLength: 1024,
-  publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
-  privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
-});
+const TEST_RSA = generateTestRsaKeyPair();
 
 const FAKE_PNG_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString('base64');
 
@@ -126,27 +122,8 @@ afterAll(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-function capture(): { text: () => string; restore: () => void } {
-  const lines: string[] = [];
-  const push =
-    (target: string[]) =>
-    (...args: unknown[]) =>
-      target.push(args.map((a) => String(a)).join(' '));
-  const log = vi.spyOn(console, 'log').mockImplementation(push(lines));
-  const warn = vi.spyOn(console, 'warn').mockImplementation(push(lines));
-  const error = vi.spyOn(console, 'error').mockImplementation(push(lines));
-  return {
-    text: () => lines.join('\n'),
-    restore: () => {
-      log.mockRestore();
-      warn.mockRestore();
-      error.mockRestore();
-    },
-  };
-}
-
 async function run(argv: string[]): Promise<{ text: string; exitCode: typeof process.exitCode }> {
-  const captured = capture();
+  const captured = captureConsole();
   const before = process.exitCode;
   try {
     await runCli(argv);

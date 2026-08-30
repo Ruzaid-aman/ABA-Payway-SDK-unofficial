@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayWay } from '../client.js';
+import { mockJsonResponse } from '../test/test-utils.js';
 import { createCheckoutDomain } from '../domains/checkout.js';
 import { ENDPOINTS } from '../constants.js';
 import {
@@ -52,28 +53,6 @@ const CONFIG_WITH_RSA = {
   ...TEST_CONFIG,
   publicKeyPem: TEST_RSA.publicKey,
 };
-
-/** Create a mock Response that resolves to JSON. */
-function mockJsonResponse(body: unknown, status = 200, statusText = 'OK'): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    statusText,
-    json: () => Promise.resolve(body),
-    headers: new Headers(),
-    redirected: false,
-    type: 'basic',
-    url: '',
-    clone: () => ({}) as Response,
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    text: () => Promise.resolve(JSON.stringify(body)),
-    bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response;
-}
 
 // ---------------------------------------------------------------------------
 // Constructor validation

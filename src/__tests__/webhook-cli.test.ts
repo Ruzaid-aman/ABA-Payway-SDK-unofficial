@@ -6,30 +6,22 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-
-const CLI_PATH = path.resolve(__dirname, '../../dist/cli.js');
+import { distCliPath, runDistCliSync } from '../test/test-utils.js';
 
 // Only run if the CLI is built
-const cliAvailable = existsSync(CLI_PATH);
+const cliAvailable = existsSync(distCliPath());
 
 describe.skipIf(!cliAvailable)('setup-webhook CLI command', () => {
   it('appears in --help output', () => {
-    const result = spawnSync('node', [CLI_PATH, '--help'], {
-      encoding: 'utf-8',
-      timeout: 10_000,
-    });
+    const result = runDistCliSync(['--help'], { env: process.env });
 
     expect(result.stdout).toContain('setup-webhook');
     expect(result.stdout).toContain('webhook listener');
   });
 
   it('shows subcommand help with --help', () => {
-    const result = spawnSync('node', [CLI_PATH, 'setup-webhook', '--help'], {
-      encoding: 'utf-8',
-      timeout: 10_000,
-    });
+    const result = runDistCliSync(['setup-webhook', '--help'], { env: process.env });
 
     expect(result.stdout).toContain('--port');
     expect(result.stdout).toContain('--storage');
