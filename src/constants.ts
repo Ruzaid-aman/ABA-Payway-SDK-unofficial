@@ -191,4 +191,34 @@ export const PURCHASE_LIFETIME_MIN_MINUTES = 3;
 /** ABA grants linked account/card tokens a documented ~90-day validity window; renewal resets it. */
 export const TOKEN_VALIDITY_DAYS = 90;
 
+/**
+ * QR image templates accepted by the generate-qr API, all verified in sandbox
+ * (docs/SANDBOX-FINDINGS.md "QR template" section). `template2` is the API
+ * default. Powers the `--template` validator and the interactive template
+ * picker; hints describe the rendered card style.
+ */
+export const QR_TEMPLATES = [
+  { value: 'template1', label: 'template1', hint: 'Classic black & white card, no branding' },
+  { value: 'template1_color', label: 'template1_color', hint: 'Classic layout with ABA brand color' },
+  { value: 'template2', label: 'template2 (default)', hint: 'White card with ABA logo header' },
+  { value: 'template2_color', label: 'template2_color', hint: 'Default layout with brand color' },
+  { value: 'template3_color', label: 'template3_color', hint: 'Compact color design' },
+  { value: 'template4', label: 'template4', hint: 'Tall receipt style, black & white' },
+  { value: 'template4_color', label: 'template4_color', hint: 'Tall receipt style with brand color' },
+] as const;
+
+export type QrTemplateName = (typeof QR_TEMPLATES)[number]['value'];
+
+/** Raw template names (without display labels) for validation and suggestions. */
+export const QR_TEMPLATE_NAMES: readonly string[] = QR_TEMPLATES.map((template) => template.value);
+
+/**
+ * Payment options accepted by purchase/generate-qr endpoints (src/client.ts).
+ * `abapay_khqr` is the generate-qr default; `abapay_khqr_deeplink` the
+ * generate-checkout default.
+ */
+export const PAYMENT_OPTIONS = ['cards', 'abapay_khqr', 'abapay_khqr_deeplink', 'alipay', 'wechat', 'google_pay'] as const;
+
+export type PaymentOptionName = (typeof PAYMENT_OPTIONS)[number];
+
 
