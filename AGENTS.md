@@ -21,6 +21,14 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts transaction-detail -t 
 - QR PNG auto-opens in the OS default viewer on interactive TTYs only; agents/CI are unaffected. `--open-image` forces, `--no-open-image` suppresses. SDK helper: `openImageInDefaultViewer(path)` from `aba-payway-ts`.
 - Offline/static QR: add `--offline` (no API call).
 
+## Current state & handoff
+
+Read `HANDOFF.md` (repo root) before starting any task: it tracks the current
+release state (v1.3.0), the behavior contract changes from the 2026-08-30
+edge-case audit (lifetime minimums, empty-body guard, private-host guard,
+`runCli` export, …), the prioritized next items with definitions of done, and
+the anti-checklist of past agent mistakes. Deep rules: `.agents/AGENTS.md`.
+
 ## Sandbox TLS caveat
 
 The sandbox presents a self-signed cert chain → Node fetch fails with
