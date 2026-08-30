@@ -66,3 +66,5 @@ test-output/
 dist/openapi.bundled.yaml
 
 /payway-output/
+stryker-tmp/
+reports/
