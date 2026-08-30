@@ -113,7 +113,7 @@ try {
 | `"24"` | Invalid Beneficiary Data | 403 | RSA-encrypted beneficiary data is wrong | Verify public key PEM and beneficiary account format |
 | `"37"` | Payout Whitelist | 403 | Payout account not whitelisted | Call `addBeneficiary()` first (sandbox-verified) |
 | `"49"` | Invalid Request | 400/403 | Generic validation error — for lists, dates must be `"YYYY-MM-DD HH:mm:ss"` | Check all parameters against the OpenAPI spec |
-| `"69"` | Lifetime below minimum | 400 | purchase `lifetime` < 3 minutes (checkout API takes minutes; spec-documented, max 43200 = 30 days) | Send `lifetime >= 3` (minutes) |
+| `"69"` | Lifetime below minimum | 400 | purchase `lifetime` < 3 minutes (checkout API takes minutes; spec-documented, max 43200 = 30 days; the SDK now rejects sub-3-minute values locally) | Send `lifetime >= 3` (minutes) |
 | `"96"` | Payee Not Found / Invalid merchant data | 403 | Beneficiary not whitelisted, or payment-link id invalid | Whitelist the payee; verify the link id |
 
 > 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema and verified against sandbox probe responses. The full hint map ships in `GATEWAY_CODE_HINTS` and is queryable via `payway-sdk explain <code>`.

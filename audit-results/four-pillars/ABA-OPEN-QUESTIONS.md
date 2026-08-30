@@ -132,6 +132,20 @@ and fresh transactions have asymmetric visibility delays across query endpoints
 2. What is the authoritative visibility delay for check-transaction / transaction-detail after creation in production, so we can tune poller grace periods instead of guessing?
 3. Is the asymmetry between check-transaction (<1 s) and transaction-detail (~5 s) an architectural guarantee we can rely on, or incidental?
 
+## Q10 — QR lifecycle bounds & QR duplicate semantics (from edge-case audit 2026-08-30, `docs/SANDBOX-FINDINGS.md` §13) 🟢
+
+Sandbox-pinned 2026-08-30: `generate-qr` rejects `lifetime` below exactly 180 seconds with
+HTTP 400 code `"04"`, and values up to ~27 h are accepted (spec: min 3 minutes, max 120 days).
+Duplicate `tran_id` on `generate-qr` is silently accepted — the same ID at $5.00 and $7.77
+produced two live QR payloads, both code 00.
+
+**Questions:**
+1. Is the 3-minute QR lifetime minimum (and the 120-day maximum) identical in PRODUCTION?
+2. Is duplicate `tran_id` on `generate-qr` intentional in sandbox? What does PRODUCTION do on
+   reuse (reject, overwrite, or serve two concurrent QRs)? Note this extends Q9.1 from purchase
+   to the QR endpoint; the SDK now rejects sub-minimum lifetimes locally and warns above the
+   documented maximum pending this answer.
+
 ---
 
 ### Partial answers already applied in-code

@@ -9,7 +9,7 @@ import {
   formatAmount,
   formatRequestTime,
   validateCurrency,
-  validateLifetime,
+  validatePurchaseLifetimeMinutes,
   validatePositiveAmount,
   validateRefundAmount,
   validateTransactionId,
@@ -101,7 +101,7 @@ export function createCheckoutDomain(
     validateTransactionId(params.transactionId);
     validatePositiveAmount(params.amount, params.currency || 'USD');
     validateCurrency(params.currency);
-    validateLifetime(params.lifetime);
+    validatePurchaseLifetimeMinutes(params.lifetime);
 
     const time = formatRequestTime();
     const payload: Record<string, unknown> = filterParams({

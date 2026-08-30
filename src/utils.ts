@@ -1,5 +1,7 @@
 import { PayWayConfigError } from './errors.js';
 import {
+  PURCHASE_LIFETIME_MIN_MINUTES,
+  QR_LIFETIME_MAX_SECONDS,
   QR_LIFETIME_MIN_SECONDS,
   REQUEST_ID_PATTERN,
   TOKEN_FLAG_CHARGING,
@@ -46,6 +48,9 @@ export function validatePositiveAmount(amount: number, currency: 'USD' | 'KHR'):
 /** Warned once per process for the first sub-5-char transactionId (EC-20). */
 let warnedShortTranId = false;
 
+/** Warned once per process for the first QR lifetime above the spec maximum. */
+let warnedOversizedQrLifetime = false;
+
 export function validateTransactionId(transactionId: string): void {
   if (typeof transactionId !== 'string' || transactionId.length === 0) {
     throw new PayWayConfigError('transactionId is required and must be a non-empty string');
@@ -84,12 +89,36 @@ export function validateLifetime(lifetime: number | undefined): void {
  * with an opaque HTTP 400 code "04" (sandbox-pinned boundary 2026-08-30:
  * 179s → 400 "04", 180s → OK). The generic {@link validateLifetime} cannot
  * enforce this because checkout.purchase sends its lifetime in minutes.
+ *
+ * The documented 120-day maximum is NOT enforced (production parity
+ * unconfirmed); values above it emit a one-time console.warn instead.
  */
 export function validateQrLifetimeSeconds(lifetime: number | undefined): void {
   validateLifetime(lifetime);
   if (lifetime !== undefined && lifetime < QR_LIFETIME_MIN_SECONDS) {
     throw new PayWayConfigError(
       `QR lifetime must be at least ${QR_LIFETIME_MIN_SECONDS} seconds (3 minutes — PayWay gateway minimum), received: ${lifetime}`,
+    );
+  }
+  if (!warnedOversizedQrLifetime && lifetime !== undefined && lifetime > QR_LIFETIME_MAX_SECONDS) {
+    warnedOversizedQrLifetime = true;
+    console.warn(
+      `[payway] QR lifetime ${lifetime}s exceeds the documented maximum of ${QR_LIFETIME_MAX_SECONDS}s (120 days) — the gateway may reject or clamp it`,
+    );
+  }
+}
+
+/**
+ * Validate a checkout-purchase lifetime supplied in MINUTES (forwarded raw
+ * to the API, unlike the QR domain which accepts seconds). Spec: min 3
+ * (below that the gateway rejects with error 69), max 43200 (30 days, not
+ * enforced locally).
+ */
+export function validatePurchaseLifetimeMinutes(lifetime: number | undefined): void {
+  validateLifetime(lifetime);
+  if (lifetime !== undefined && lifetime < PURCHASE_LIFETIME_MIN_MINUTES) {
+    throw new PayWayConfigError(
+      `purchase lifetime must be at least ${PURCHASE_LIFETIME_MIN_MINUTES} minutes (PayWay gateway minimum — below that the gateway rejects with error 69), received: ${lifetime}`,
     );
   }
 }

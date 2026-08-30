@@ -110,6 +110,14 @@ code change below — that is by design.
 3. **Batch 3 (P2 config):** items 7, 8, 9, 10. ✅ DONE 2026-08-30 (item 7 implemented as option (a): URL-valued `PAYWAY_ENV` is now used as the base URL; item 10 shipped as `CreateTransactionParams.retryPolicy: 'transient' | 'none'`)
 4. **Batch 4 (P3):** table items 12–20, any order; item 19 is doc-only and can land with batch 1. ✅ DONE 2026-08-30 (landed on `fix/batch-4-p3-polish`, merged to main)
 
+## Batch 5 — post-audit follow-ups — ✅ DONE 2026-08-30
+
+| # | Item | Where | Status |
+|---|------|-------|--------|
+| 5.1 | `checkout.purchase` lifetime minimum (3 minutes) enforced locally, error-69 parity | `utils.ts validatePurchaseLifetimeMinutes`, `constants.ts PURCHASE_LIFETIME_MIN_MINUTES`, `domains/checkout.ts` | ✅ |
+| 5.2 | QR lifetime above the 120-day spec maximum warns once (deliberately not hard-enforced pending ABA production parity) | `utils.ts validateQrLifetimeSeconds`, `constants.ts QR_LIFETIME_MAX_SECONDS` | ✅ |
+| 5.3 | `RateLimitInfo.reset` unit ambiguity documented (epoch-seconds vs ms unconfirmed; prefer `retryAfterMs`) | `client.ts RateLimitInfo` JSDoc | ✅ |
+
 Every batch ends with: `npx vitest run` (839+ tests), `npx tsc --noEmit`, `npx biome lint src`, and a
 CHANGELOG entry under a new `### Fixed`/`### Changed` heading (minor version bump — several items are
 behavior changes to error surfaces).

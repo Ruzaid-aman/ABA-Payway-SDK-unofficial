@@ -44,9 +44,18 @@ export interface RateLimitRule {
 }
 
 export interface RateLimitInfo {
+  /** Raw `x-rate-limit-limit` header value (requests per window). */
   limit?: number;
+  /** Raw `x-rate-limit-remaining` header value. */
   remaining?: number;
+  /**
+   * Raw `x-rate-limit-reset` header value, parsed as a plain number. The
+   * unit (epoch-seconds vs milliseconds) is UNCONFIRMED — no sandbox
+   * response has carried this header — so treat it as opaque and prefer
+   * `retryAfterMs` for retry decisions.
+   */
   reset?: number;
+  /** Milliseconds to wait: `Retry-After` delta-seconds × 1000, or an HTTP-date converted to a delay. */
   retryAfterMs?: number;
   rawHeaders?: Record<string, string>;
 }
@@ -142,8 +151,9 @@ export interface CreateTransactionParams {
   additionalParams?: string | Record<string, unknown>;
   /**
    * Lifetime in MINUTES, forwarded raw to the API (unlike the QR domain,
-   * which accepts seconds). Spec: min 3, max 43200 (30 days); below 3 the
-   * gateway rejects with error 69. Not converted or minimum-enforced here.
+   * which accepts seconds). Spec: min 3 — values below 3 are rejected
+   * locally with `PayWayConfigError` (the gateway would answer error 69) —
+   * and max 43200 (30 days, not enforced locally).
    */
   lifetime?: number;
   googlePayToken?: string;

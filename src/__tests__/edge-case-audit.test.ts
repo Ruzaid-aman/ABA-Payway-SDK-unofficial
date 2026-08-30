@@ -15,6 +15,7 @@ import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayWay } from '../client.js';
+import { QR_LIFETIME_MAX_SECONDS } from '../constants.js';
 import { verifyCallbackSignature } from '../auth.js';
 import {
   PayWayAPIError,
@@ -28,6 +29,7 @@ import {
   validateBeneficiaries,
   validateLifetime,
   validatePublicHttpsUrl,
+  validatePurchaseLifetimeMinutes,
   validateQrLifetimeSeconds,
   validateTransactionId,
 } from '../utils.js';
@@ -680,6 +682,40 @@ describe('edge-case: input validation', () => {
       expect(server.requests).toHaveLength(0);
     } finally {
       await server.close();
+    }
+  });
+
+  it('checkout purchase lifetime below 3 minutes is rejected locally (gateway error-69 parity)', () => {
+    expect(() => validatePurchaseLifetimeMinutes(2)).toThrow(/at least 3 minutes/);
+    expect(() => validatePurchaseLifetimeMinutes(3)).not.toThrow();
+    // The generic validator stays unit-agnostic (checkout minutes ≠ QR seconds).
+    expect(() => validateLifetime(2)).not.toThrow();
+  });
+
+  it('checkout.purchase with sub-minimum lifetime fails locally before any network call', async () => {
+    const server = await startServer((_req, res) => jsonResponse(res, 200, { status: { code: '00' } }));
+    try {
+      const client = makeClient(server.url);
+      expect(() => client.checkout.purchase({ transactionId: 'probe-buy-3', amount: 5, lifetime: 2 })).toThrow(
+        /at least 3 minutes/,
+      );
+      expect(server.requests).toHaveLength(0);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('QR lifetime above the 120-day spec maximum warns once instead of throwing', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(() => validateQrLifetimeSeconds(QR_LIFETIME_MAX_SECONDS + 1)).not.toThrow();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(String(warnSpy.mock.calls[0][0])).toContain('documented maximum');
+      // The warning is one-time per process.
+      expect(() => validateQrLifetimeSeconds(QR_LIFETIME_MAX_SECONDS * 2)).not.toThrow();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
     }
   });
 });

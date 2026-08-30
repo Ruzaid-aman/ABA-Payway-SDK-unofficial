@@ -178,6 +178,16 @@ export const REQUEST_ID_PATTERN = /^[a-zA-Z0-9]{5,24}$/;
  */
 export const QR_LIFETIME_MIN_SECONDS = 180;
 
+/** QR lifetime documented maximum: 120 days (OpenAPI spec). Not enforced locally. */
+export const QR_LIFETIME_MAX_SECONDS = 120 * 24 * 60 * 60;
+
+/**
+ * Checkout-purchase lifetime minimum, in MINUTES. The purchase API takes
+ * minutes (unlike the QR domain, which accepts seconds) and rejects values
+ * below 3 with error 69 (OpenAPI spec).
+ */
+export const PURCHASE_LIFETIME_MIN_MINUTES = 3;
+
 /** ABA grants linked account/card tokens a documented ~90-day validity window; renewal resets it. */
 export const TOKEN_VALIDITY_DAYS = 90;
 
