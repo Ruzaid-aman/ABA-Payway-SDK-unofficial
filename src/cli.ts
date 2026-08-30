@@ -4,11 +4,24 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
-import { Command } from 'commander';
+import { Command, Help } from 'commander';
+import { confirmCheckoutSubmit } from './cli/flows/checkout-flow.js';
+import { chooseNextStep } from './cli/flows/next-steps.js';
+import { collectQrParams } from './cli/flows/qr-flow.js';
 import { loadDotEnvIntoProcess } from './cli/dotenv.js';
 import { explainAll, explainPayWayCode } from './cli/explain-code.js';
 import { renderFirstPaymentQuickstart } from './cli/first-payment.js';
+import { renderBanner } from './cli/ui/banner.js';
+import { renderGroupedHelp, unknownCommandSuggestion, unknownOptionSuggestion } from './cli/ui/help.js';
 import { formatClock, mapPollOutcomeToExitCode } from './cli/journey.js';
+import { resolvePromptMode } from './cli/ui/mode.js';
+import { withOneShotSpinner } from './cli/ui/one-shot.js';
+import { createPollDisplay } from './cli/ui/poll-display.js';
+import { CliCancelled, createClackIO } from './cli/ui/prompts.js';
+import type { PaymentIO } from './cli/ui/prompts.js';
+import { currentPalette, setColorOverride } from './cli/ui/theme.js';
+import type { AnsiPalette } from './cli/ui/theme.js';
+import { suggestMessage } from './cli/ui/suggest.js';
 import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
 import { registerAgentCommands } from './cli/commands/agent.js';
 import { registerOnboardCommand } from './cli/commands/onboard.js';
@@ -29,9 +42,11 @@ import {
   setDefaultProfile,
 } from './config/profiles.js';
 import {
+  PAYMENT_OPTIONS,
   PAYMENT_STATUS_CODES,
   PAYMENT_STATUS_LABELS,
   QR_LIFETIME_MIN_SECONDS,
+  QR_TEMPLATE_NAMES,
   REFUND_ERROR_CODES,
 } from './constants.js';
 import { listSandboxBeneficiaries } from './sandbox-beneficiaries.js';
@@ -155,16 +170,11 @@ function printApiError(e: unknown): number {
 }
 
 // ---------------------------------------------------------------------------
-// ANSI helpers (no external deps)
+// ANSI helpers (no external deps) — palette from the TUI theme layer, which
+// resolves the --no-color override, NO_COLOR/FORCE_COLOR env, and TTY state.
+// Re-resolved in the program's preAction hook once options are parsed.
 // ---------------------------------------------------------------------------
-const c = {
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-};
+let c: AnsiPalette = currentPalette();
 
 const executableDirectory = path.dirname(process.argv[1] ?? process.cwd());
 
@@ -188,18 +198,62 @@ interface GenerateQrCommandOptions {
 }
 
 // ---------------------------------------------------------------------------
-// Shared polling runner for generate-qr and generate-checkout
+// Shared polling runner for generate-qr and generate-checkout.
+// With a clack PaymentIO the loop renders through an in-place spinner
+// (createPollDisplay) and offers a next-step picker on APPROVED; with a null
+// IO the historical plain-line output is produced byte-for-byte.
 // ---------------------------------------------------------------------------
+type PollingOptions = { pollInterval?: string; pollTimeout?: string; json?: boolean };
+
+async function runNextStepPicker(
+  payway: InstanceType<typeof PayWay>,
+  transactionId: string,
+  opts: PollingOptions,
+  io: PaymentIO,
+): Promise<void> {
+  try {
+    const choice = await chooseNextStep(io, {
+      transactionId,
+      refundCommand: `payway-sdk refund -t ${transactionId} -a <amount>`,
+      approved: true,
+    });
+    if (choice === 'detail') {
+      const detail = await withOneShotSpinner(io, 'Fetching transaction detail…', () =>
+        payway.checkout.getTransactionDetail(transactionId),
+      );
+      const data = ((detail as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+      console.log(`  ${c.bold('Detail:')} ${transactionId}`);
+      for (const key of ['payment_status', 'payment_amount', 'apv', 'transaction_date']) {
+        if (data[key] !== undefined) console.log(`  ${key.padEnd(20)} ${c.cyan(String(data[key]))}`);
+      }
+      console.log();
+    } else if (choice === 'watch') {
+      await runPolling(payway, transactionId, opts, io);
+    } else if (choice === 'print-refund') {
+      console.log(`  payway-sdk refund -t ${transactionId} -a <amount>`);
+      console.log();
+    }
+  } catch (error) {
+    if (error instanceof CliCancelled) {
+      console.log('  Cancelled by user.');
+      process.exit(130);
+    }
+    throw error;
+  }
+}
+
 async function runPolling(
   payway: InstanceType<typeof PayWay>,
   transactionId: string,
-  opts: { pollInterval?: string; pollTimeout?: string; json?: boolean },
+  opts: PollingOptions,
+  io: PaymentIO | null = null,
 ): Promise<{ terminalReached: boolean; status?: string; abortedReason?: 'max_duration_exceeded' | 'max_consecutive_errors' | 'caller_aborted' }> {
   const intervalMs = opts.pollInterval ? Number(opts.pollInterval) * 1000 : 5_000;
   const maxDurationMs = opts.pollTimeout ? Number(opts.pollTimeout) * 1000 : 600_000;
   const asJson = opts.json === true;
+  const display = io === null ? null : createPollDisplay(io, { transactionId, intervalMs, maxDurationMs });
 
-  if (!asJson) {
+  if (!asJson && display === null) {
     console.log(`  ${c.bold('Polling:')} ${c.cyan(transactionId)}`);
     console.log(`    Interval:     ${c.cyan(`${intervalMs / 1000}s`)}`);
     console.log(`    Max duration: ${c.cyan(`${maxDurationMs / 1000}s`)}`);
@@ -226,6 +280,14 @@ async function runPolling(
               timestamp: result.timestamp,
             }),
           );
+        } else if (display) {
+          display.onEvent({
+            kind: 'error-attempt',
+            attempt: result.attempt,
+            paymentStatus: result.paymentStatus,
+            durationMs: result.durationMs,
+            elapsedMs: Date.now() - startTime,
+          });
         } else {
           emit(
             `${c.yellow('⚠')} [${elapsed}] Poll #${result.attempt}: ${c.yellow(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`,
@@ -246,6 +308,24 @@ async function runPolling(
               response: result.response,
             }),
           );
+        } else if (display) {
+          display.onEvent({
+            kind: 'terminal',
+            attempt: result.attempt,
+            paymentStatus: result.paymentStatus,
+            durationMs: result.durationMs,
+            elapsedMs: Date.now() - startTime,
+          });
+          emit('');
+          emit(c.green(`Payment ${result.paymentStatus.toLowerCase()}.`));
+          emit('');
+          if (result.paymentStatus === 'APPROVED') {
+            emit(c.dim(`Next: payway-sdk transaction-detail -t ${transactionId}`));
+            emit(c.dim(`      or refund it:     payway-sdk refund -t ${transactionId} -a <amount>`));
+          } else {
+            emit(c.dim(`Next: create a new transaction with generate-qr or generate-checkout.`));
+          }
+          emit('');
         } else {
           const icon = result.paymentStatus === 'APPROVED' ? c.green('✓') : c.red('✗');
           emit(`${icon} [${elapsed}] Poll #${result.attempt}: ${c.bold(result.paymentStatus)} ${c.dim(`(${result.durationMs}ms)`)}`);
@@ -260,6 +340,9 @@ async function runPolling(
           }
           emit('');
         }
+        if (display && result.paymentStatus === 'APPROVED' && io !== null) {
+          await runNextStepPicker(payway, transactionId, opts, io);
+        }
         return { terminalReached: true, status: result.paymentStatus };
       }
 
@@ -272,6 +355,13 @@ async function runPolling(
             timestamp: result.timestamp,
           }),
         );
+      } else if (display) {
+        display.onEvent({
+          kind: 'attempt',
+          attempt: result.attempt,
+          paymentStatus: result.paymentStatus,
+          elapsedMs: Date.now() - startTime,
+        });
       } else {
         const remaining = formatClock(maxDurationMs - (Date.now() - startTime));
         emit(`${c.dim('○')} [${elapsed} elapsed / ${remaining} left] Poll #${result.attempt}: ${result.paymentStatus}`);
@@ -282,6 +372,8 @@ async function runPolling(
     if (error instanceof PollingAbortedError) {
       if (asJson) {
         emit(JSON.stringify({ event: 'aborted', reason: error.reason, totalAttempts: error.totalAttempts, lastStatus: error.lastStatus }));
+      } else if (display) {
+        display.onEvent({ kind: 'aborted', reason: error.reason, totalAttempts: error.totalAttempts });
       } else {
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
         emit('');
@@ -294,6 +386,8 @@ async function runPolling(
       return { terminalReached: false, abortedReason: error.reason };
     }
     throw error;
+  } finally {
+    display?.dispose();
   }
 }
 
@@ -375,13 +469,104 @@ function getSkillsDir(): string {
 // ---------------------------------------------------------------------------
 // Commander program
 // ---------------------------------------------------------------------------
+
+/**
+ * Top-level help with the flat "Commands:" list replaced by the curated,
+ * grouped overview (src/cli/ui/help.ts). Only the program uses this subclass;
+ * subcommand help keeps commander's default rendering.
+ */
+class GroupedProgramHelp extends Help {
+  override formatHelp(cmd: Command, helper: Help): string {
+    const termWidth = helper.padWidth(cmd, helper);
+    const output: string[] = [`${helper.styleTitle('Usage:')} ${helper.styleUsage(helper.commandUsage(cmd))}`, ''];
+
+    const description = helper.commandDescription(cmd);
+    if (description.length > 0) {
+      output.push(helper.boxWrap(helper.styleCommandDescription(description), helper.helpWidth ?? 80), '');
+    }
+
+    // Grouped command overview — renderGroupedHelp keeps the curated group
+    // order and appends any ungrouped registered command under "Other:".
+    const summaries = new Map(cmd.commands.map((sub) => [sub.name(), String(helper.subcommandDescription(sub) ?? '')]));
+    const grouped = renderGroupedHelp(cmd.commands.map((sub) => sub.name()));
+    const nameWidth = grouped.reduce(
+      (max, line) => (line.startsWith('  ') ? Math.max(max, line.trim().length) : max),
+      0,
+    );
+    for (const line of grouped) {
+      if (!line.startsWith('  ')) {
+        output.push(helper.styleTitle(line));
+        continue;
+      }
+      const name = line.trim();
+      output.push(helper.formatItem(name, nameWidth, helper.styleSubcommandDescription(summaries.get(name) ?? ''), helper));
+    }
+    output.push('');
+
+    // Arguments
+    const argumentList = helper.visibleArguments(cmd).map((argument) =>
+      helper.formatItem(
+        helper.styleArgumentTerm(helper.argumentTerm(argument)),
+        termWidth,
+        helper.styleArgumentDescription(helper.argumentDescription(argument)),
+        helper,
+      ),
+    );
+    if (argumentList.length > 0) {
+      output.push(helper.styleTitle('Arguments:'), ...argumentList, '');
+    }
+
+    // Options
+    const optionList = helper.visibleOptions(cmd).map((option) =>
+      helper.formatItem(
+        helper.styleOptionTerm(helper.optionTerm(option)),
+        termWidth,
+        helper.styleOptionDescription(helper.optionDescription(option)),
+        helper,
+      ),
+    );
+    if (optionList.length > 0) {
+      output.push(helper.styleTitle('Options:'), ...optionList, '');
+    }
+
+    return output.join('\n');
+  }
+}
+
+/** Grouped command lines (with descriptions) for the interactive bare invocation. */
+function renderBareInvocationHelp(): void {
+  const palette = currentPalette();
+  for (const line of renderBanner(readPackageVersion(), palette)) {
+    console.log(line);
+  }
+  console.log();
+  const summaries = new Map(program.commands.map((sub) => [sub.name(), sub.summary() || sub.description()]));
+  const grouped = renderGroupedHelp(program.commands.map((sub) => sub.name()));
+  const nameWidth = grouped.reduce((max, line) => (line.startsWith('  ') ? Math.max(max, line.trim().length) : max), 0);
+  for (const line of grouped) {
+    if (!line.startsWith('  ')) {
+      console.log(palette.bold(line));
+      continue;
+    }
+    const name = line.trim();
+    const summary = summaries.get(name) ?? '';
+    console.log(`  ${name.padEnd(nameWidth)}${summary ? `  ${summary}` : ''}`);
+  }
+  console.log();
+  console.log(palette.dim('Exit codes: 0 success · 1 input/validation · 2 PayWay API failure · 3 network/timeout/rate-limit.'));
+  console.log();
+}
+
 const program = new Command();
+program.createHelp = () => new GroupedProgramHelp();
 
 program
   .name('payway-sdk')
   .description('CLI for the ABA PayWay TypeScript SDK')
   .version(readPackageVersion())
   .option('--profile <name>', 'Use a saved credential profile for this command')
+  .option('--no-color', 'Disable ANSI colors in output')
+  .showSuggestionAfterError()
   .addHelpText(
     'after',
     `
@@ -423,6 +608,12 @@ function activateSelectedProfile(command: Command): void {
 }
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
+  // Re-resolve the palette per command so the global --no-color flag
+  // (opts.color === false when passed; true by default via the negatable
+  // option's implicit default) takes effect before any output.
+  const optsColor = program.opts<{ color?: boolean }>().color === false ? false : undefined;
+  setColorOverride(optsColor);
+  c = currentPalette();
   activateSelectedProfile(actionCommand);
 });
 
@@ -825,6 +1016,7 @@ program
   .option('-y, --force', 'Skip confirmation prompt (for scripts/agents)')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: { transactionId: string; force?: boolean; json?: boolean }) => {
+    const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -832,9 +1024,9 @@ program
     try {
       validateTransactionId(opts.transactionId);
       if (!opts.force && !opts.json) {
-        const confirmed = await promptConfirmation(
-          `  Void/close transaction ${c.cyan(opts.transactionId)}? This cannot be undone. (y/n): `,
-        );
+        const confirmed = io
+          ? await io.confirm({ message: `Void/close transaction ${opts.transactionId}? This cannot be undone.`, initial: false })
+          : await promptConfirmation(`  Void/close transaction ${c.cyan(opts.transactionId)}? This cannot be undone. (y/n): `);
         if (!confirmed) {
           console.log(`  ${c.yellow('Cancelled by user.')}`);
           process.exitCode = EXIT_OK;
@@ -842,7 +1034,9 @@ program
         }
       }
       const payway = new PayWay();
-      const result = await payway.checkout.closeTransaction(opts.transactionId);
+      const result = io
+        ? await withOneShotSpinner(io, 'Closing transaction…', () => payway.checkout.closeTransaction(opts.transactionId))
+        : await payway.checkout.closeTransaction(opts.transactionId);
       if (opts.json) {
         console.log(JSON.stringify(result, null, 2));
         return;
@@ -852,6 +1046,10 @@ program
       console.log(`  ${c.dim(`Note: unpaid closed transactions may keep reporting PENDING — verify with: payway-sdk check-transaction -t ${opts.transactionId}`)}`);
       process.exitCode = EXIT_OK;
     } catch (error) {
+      if (error instanceof CliCancelled) {
+        console.log('  Cancelled by user.');
+        process.exit(130);
+      }
       process.exitCode = printApiError(error);
     }
   });
@@ -1025,6 +1223,7 @@ program
       preflight?: boolean;
       json?: boolean;
     }) => {
+      const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
       if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -1081,9 +1280,9 @@ program
       }
 
       if (!opts.force && !opts.json) {
-        const confirmed = await promptConfirmation(
-          `  Refund ${c.cyan(String(amount))} ${currency} from ${c.cyan(opts.transactionId)}? (y/n): `,
-        );
+        const confirmed = io
+          ? await io.confirm({ message: `Refund ${String(amount)} ${currency} from ${opts.transactionId}?`, initial: false })
+          : await promptConfirmation(`  Refund ${c.cyan(String(amount))} ${currency} from ${c.cyan(opts.transactionId)}? (y/n): `);
         if (!confirmed) {
           console.log(`  ${c.yellow('Cancelled by user.')}`);
           process.exitCode = EXIT_OK;
@@ -1093,7 +1292,11 @@ program
 
       try {
         const payway = new PayWay();
-        const result = await payway.checkout.refund(opts.transactionId, amount, currency);
+        const result = io
+          ? await withOneShotSpinner(io, 'Submitting refund…', () =>
+              payway.checkout.refund(opts.transactionId, amount, currency),
+            )
+          : await payway.checkout.refund(opts.transactionId, amount, currency);
         if (opts.json) {
           console.log(JSON.stringify(result, null, 2));
           return;
@@ -1108,6 +1311,10 @@ program
         console.log(`  ${c.dim('      Read transaction_operations = refund event history')}`);
         process.exitCode = EXIT_OK;
       } catch (error) {
+        if (error instanceof CliCancelled) {
+          console.log('  Cancelled by user.');
+          process.exit(130);
+        }
         process.exitCode = printApiError(error);
       }
     },
@@ -1196,20 +1403,22 @@ program
   });
 
 // --- generate-qr ---
+// Historical defaults (USD / abapay_khqr / template2 / 180s) are applied in
+// the action instead of here, so the clack wizard can see which flags were
+// explicitly provided and only probe what is missing.
 program
   .command('generate-qr')
   .description('Generate a QR code (online via PayWay API or offline)')
   .option('-a, --amount <number>', 'Payment amount (optional for static offline QR)')
-  .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
+  .option('-c, --currency <code>', 'Currency: USD (default) or KHR')
   .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted; online mode only)')
   .option('--offline', 'Generate official ABA KHQR offline (no API call)')
   .option('--callback-url <url>', 'Webhook callback URL (required for online mode)')
-  .option('--payment-option <option>', 'Payment option for online mode', 'abapay_khqr')
-  .option('--template <name>', 'QR image template for online mode', 'template2')
+  .option('--payment-option <option>', 'Payment option for online mode')
+  .option('--template <name>', 'QR image template for online mode')
   .option(
     '--lifetime <seconds>',
     'Transaction lifetime in seconds — minimum 180, sent to the API as whole minutes (default: 180)',
-    '180',
   )
   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
   .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
@@ -1225,11 +1434,62 @@ program
   .action(async (opts: GenerateQrCommandOptions) => {
     console.log(`\n${c.bold('ABA PayWay SDK')} — generate QR code\n`);
 
-    const amount = opts.amount === undefined ? undefined : Number(opts.amount);
-    const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
-    const transactionId = opts.transactionId ?? `qr${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    const mode = resolvePromptMode({ nonInteractive: opts.nonInteractive });
+    const io = mode === 'clack' ? createClackIO() : null;
 
-    if (!opts.offline && amount === undefined) {
+    // Wizard-resolved values. In readline/none modes these are exactly the
+    // historical flag-derived values (defaults applied here, not in commander).
+    let amount = opts.amount === undefined ? undefined : Number(opts.amount);
+    let currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
+    let transactionId = opts.transactionId ?? `qr${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    let offline = Boolean(opts.offline);
+    let ref = opts.ref;
+    let callbackUrl: string | undefined;
+    let paymentOption = opts.paymentOption ?? 'abapay_khqr';
+    let template = opts.template ?? 'template2';
+    let lifetimeSeconds = opts.lifetime ? Number(opts.lifetime) : 180;
+
+    if (io !== null) {
+      // ── Guided wizard (real interactive TTY only) ────────────────────────
+      try {
+        const flow = await collectQrParams(
+          {
+            amount: opts.amount,
+            currency: opts.currency,
+            template: opts.template,
+            paymentOption: opts.paymentOption,
+            lifetime: opts.lifetime,
+            callbackUrl: opts.callbackUrl || process.env.PAYWAY_CALLBACK_URL || undefined,
+            offline: opts.offline,
+            ref: opts.ref,
+            transactionId: opts.transactionId,
+          },
+          io,
+        );
+        if (flow.cancelled) {
+          console.log(`  ${c.yellow('Cancelled by user.')}`);
+          process.exitCode = 1;
+          return;
+        }
+        amount = flow.params.amount;
+        currency = flow.params.currency;
+        template = flow.params.template;
+        paymentOption = flow.params.paymentOption;
+        lifetimeSeconds = flow.params.lifetimeSeconds;
+        callbackUrl = flow.params.callbackUrl;
+        offline = flow.offline;
+        ref = flow.params.ref;
+        transactionId = flow.params.transactionId;
+      } catch (error) {
+        if (error instanceof CliCancelled) {
+          console.log('  Cancelled by user.');
+          process.exit(130);
+        }
+        throw error;
+      }
+    }
+
+    if (!io && !offline && amount === undefined) {
       console.log(`  ${c.red('✗')} --amount is required for online mode`);
       process.exitCode = 1;
       return;
@@ -1247,15 +1507,28 @@ program
       return;
     }
 
+    // Template typo → warning only (never a new exit code); the clack wizard
+    // already guarantees a valid value.
+    if (!io && opts.template !== undefined && !QR_TEMPLATE_NAMES.includes(opts.template)) {
+      const hint = suggestMessage(opts.template, QR_TEMPLATE_NAMES, 'QR template');
+      console.log(`  ${c.yellow('⚠')} ${hint ?? `Unknown QR template '${opts.template}'.`}`);
+    }
+
+    // Unknown payment option → hard validation error (mirrors the currency check).
+    if (!io && opts.paymentOption !== undefined && !(PAYMENT_OPTIONS as readonly string[]).includes(opts.paymentOption)) {
+      const hint = suggestMessage(opts.paymentOption, [...PAYMENT_OPTIONS], 'payment option');
+      console.log(`  ${c.red('✗')} ${hint ?? `Payment option must be one of: ${PAYMENT_OPTIONS.join(', ')}, received: ${opts.paymentOption}`}`);
+      process.exitCode = 1;
+      return;
+    }
+
     if (opts.nonInteractive) {
       console.log(`  ${c.dim('(non-interactive mode — skipping prompts)')}`);
       console.log();
     }
 
-    if (opts.offline) {
+    if (offline) {
       // ── Offline mode ──────────────────────────────────────────────────
-      const ref = opts.ref;
-
       if (!ref) {
         console.log(`  ${c.red('✗')} --ref is required for offline mode`);
         process.exitCode = 1;
@@ -1302,28 +1575,37 @@ program
         process.exitCode = 1;
         return;
       }
-      const callbackUrl = opts.callbackUrl || process.env.PAYWAY_CALLBACK_URL?.trim();
 
-      if (!callbackUrl) {
-        console.log(`  ${c.red('✗')} --callback-url is required for online mode`);
-        console.log(`  ${c.dim('Tip: use --offline for offline QR generation without credentials')}`);
-        console.log(`  ${c.dim('Or run: payway-sdk setup-webhook --tunnel to set PAYWAY_CALLBACK_URL in .env')}`);
-        process.exitCode = 1;
-        return;
+      if (!io) {
+        callbackUrl = opts.callbackUrl || process.env.PAYWAY_CALLBACK_URL?.trim();
+
+        if (!callbackUrl) {
+          console.log(`  ${c.red('✗')} --callback-url is required for online mode`);
+          console.log(`  ${c.dim('Tip: use --offline for offline QR generation without credentials')}`);
+          console.log(`  ${c.dim('Or run: payway-sdk setup-webhook --tunnel to set PAYWAY_CALLBACK_URL in .env')}`);
+          process.exitCode = 1;
+          return;
+        }
+
+        if (!Number.isFinite(lifetimeSeconds) || lifetimeSeconds <= 0 || !Number.isInteger(lifetimeSeconds)) {
+          console.log(
+            `  ${c.red('✗')} --lifetime must be a positive whole number of seconds, received: ${opts.lifetime}`,
+          );
+          process.exitCode = 1;
+          return;
+        }
+        if (lifetimeSeconds < QR_LIFETIME_MIN_SECONDS) {
+          console.log(
+            `  ${c.red('✗')} --lifetime must be at least ${QR_LIFETIME_MIN_SECONDS} seconds (3 minutes — PayWay gateway minimum; below that the API rejects with code "04"), received: ${opts.lifetime}`,
+          );
+          process.exitCode = 1;
+          return;
+        }
       }
 
-      const lifetimeSeconds = opts.lifetime ? Number(opts.lifetime) : 180;
-      if (!Number.isFinite(lifetimeSeconds) || lifetimeSeconds <= 0 || !Number.isInteger(lifetimeSeconds)) {
-        console.log(
-          `  ${c.red('✗')} --lifetime must be a positive whole number of seconds, received: ${opts.lifetime}`,
-        );
-        process.exitCode = 1;
-        return;
-      }
-      if (lifetimeSeconds < QR_LIFETIME_MIN_SECONDS) {
-        console.log(
-          `  ${c.red('✗')} --lifetime must be at least ${QR_LIFETIME_MIN_SECONDS} seconds (3 minutes — PayWay gateway minimum; below that the API rejects with code "04"), received: ${opts.lifetime}`,
-        );
+      if (callbackUrl === undefined) {
+        // Unreachable: the legacy path guards above; the clack wizard always
+        // resolves a callback URL for online payments. Kept for narrowing.
         process.exitCode = 1;
         return;
       }
@@ -1335,14 +1617,14 @@ program
 
       let finalLifetime = lifetimeSeconds;
 
-      if (!opts.nonInteractive) {
+      if (!io && !opts.nonInteractive) {
         console.log();
         console.log(`  ${c.bold('Parameters:')}`);
         console.log(`    Amount:           ${c.cyan(`${amount} ${currency}`)}`);
         console.log(`    Transaction ID:   ${c.cyan(transactionId)}`);
-        console.log(`    Payment Option:   ${c.cyan(opts.paymentOption ?? 'abapay_khqr')}`);
+        console.log(`    Payment Option:   ${c.cyan(paymentOption)}`);
         console.log(`    Callback URL:     ${c.cyan(callbackUrl)}`);
-        console.log(`    QR Template:      ${c.cyan(opts.template ?? 'template2')}`);
+        console.log(`    QR Template:      ${c.cyan(template)}`);
         console.log(`    Lifetime:         ${c.cyan(`${lifetimeSeconds} seconds`)}`);
         console.log();
 
@@ -1368,16 +1650,16 @@ program
           transactionId,
           amount,
           currency,
-          paymentOption: opts.paymentOption ?? 'abapay_khqr',
+          paymentOption,
           callbackUrl,
-          qrImageTemplate: opts.template ?? 'template2',
+          qrImageTemplate: template,
           lifetime: finalLifetime,
         });
 
         console.log(`  ${c.green('✓')} Online QR generated via PayWay API\n`);
         console.log(`  ${c.bold('Transaction ID:')}  ${c.cyan(transactionId)}`);
         console.log(`  ${c.bold('Amount:')}           ${c.cyan(`${amount} ${currency}`)}`);
-        console.log(`  ${c.bold('Payment Option:')}   ${opts.paymentOption ?? 'abapay_khqr'}`);
+        console.log(`  ${c.bold('Payment Option:')}   ${paymentOption}`);
         console.log(`  ${c.bold('Callback URL:')}     ${callbackUrl}`);
         console.log(`  ${c.bold('Lifetime:')}         ${c.cyan(`${finalLifetime} seconds`)}`);
         console.log();
@@ -1441,7 +1723,7 @@ program
 
         // ── Polling ─────────────────────────────────────────────────────
         if ((opts as Record<string, unknown>).polling !== false) {
-          await runPolling(payway, transactionId, opts);
+          await runPolling(payway, transactionId, opts, io);
         } else {
           console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
           console.log();
@@ -1471,6 +1753,7 @@ program
   .action(async (opts: Record<string, string | undefined>) => {
     console.log(`\n${c.bold('ABA PayWay SDK')} — generate checkout QR URL\n`);
 
+    const io = resolvePromptMode() === 'clack' ? createClackIO() : null;
     const amount = Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
     const transactionId = opts.transactionId ?? `ck${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
@@ -1496,6 +1779,34 @@ program
     if (!assertCredentialsPresent()) {
       process.exitCode = 1;
       return;
+    }
+
+    if (io !== null) {
+      // Guided confirmation (clack only): summary note + submit prompt.
+      try {
+        const confirmed = await confirmCheckoutSubmit(
+          {
+            transactionId,
+            amount,
+            currency,
+            paymentOption: opts.paymentOption ?? 'abapay_khqr_deeplink',
+            returnUrl: opts.returnUrl,
+            cancelUrl: opts.cancelUrl,
+          },
+          io,
+        );
+        if (!confirmed) {
+          console.log(`  ${c.yellow('Cancelled by user.')}`);
+          process.exitCode = 1;
+          return;
+        }
+      } catch (error) {
+        if (error instanceof CliCancelled) {
+          console.log('  Cancelled by user.');
+          process.exit(130);
+        }
+        throw error;
+      }
     }
 
     try {
@@ -1549,7 +1860,7 @@ program
 
       // ── Polling ─────────────────────────────────────────────────────
       if ((opts as Record<string, unknown>).polling !== false) {
-        await runPolling(payway, transactionId, opts);
+        await runPolling(payway, transactionId, opts, io);
       } else {
         console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
         console.log();
@@ -2033,6 +2344,7 @@ const preAuthComplete = new Command('complete')
       force?: boolean;
       json?: boolean;
     }) => {
+      const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
       if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -2042,11 +2354,19 @@ const preAuthComplete = new Command('complete')
         validateTransactionId(opts.transactionId);
         const originalAmount = opts.originalAmount !== undefined ? Number(opts.originalAmount) : undefined;
         const payway = new PayWay();
-        const result = await payway.preAuth.complete(opts.transactionId, amount, {
-          idempotencyKey: opts.idempotencyKey,
-          originalAmount,
-          maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
-        });
+        const result = io
+          ? await withOneShotSpinner(io, 'Completing pre-auth…', () =>
+              payway.preAuth.complete(opts.transactionId, amount, {
+                idempotencyKey: opts.idempotencyKey,
+                originalAmount,
+                maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
+              }),
+            )
+          : await payway.preAuth.complete(opts.transactionId, amount, {
+              idempotencyKey: opts.idempotencyKey,
+              originalAmount,
+              maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
+            });
         if (opts.json) {
           console.log(JSON.stringify(result, null, 2));
           return;
@@ -2055,6 +2375,10 @@ const preAuthComplete = new Command('complete')
         console.log(`  ${c.dim(JSON.stringify(result).slice(0, 200))}`);
         process.exitCode = EXIT_OK;
       } catch (error) {
+        if (error instanceof CliCancelled) {
+          console.log('  Cancelled by user.');
+          process.exit(130);
+        }
         process.exitCode = printApiError(error);
       }
     },
@@ -2082,6 +2406,7 @@ const preAuthCompletePayout = new Command('complete-payout')
       idempotencyKey?: string;
       json?: boolean;
     }) => {
+      const io = resolvePromptMode({ json: opts.json }) === 'clack' ? createClackIO() : null;
       if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -2100,11 +2425,19 @@ const preAuthCompletePayout = new Command('complete-payout')
         }
         const originalAmount = opts.originalAmount !== undefined ? Number(opts.originalAmount) : undefined;
         const payway = new PayWay();
-        const result = await payway.preAuth.completeWithPayout(opts.transactionId, amount, payout, {
-          idempotencyKey: opts.idempotencyKey,
-          originalAmount,
-          maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
-        });
+        const result = io
+          ? await withOneShotSpinner(io, 'Completing pre-auth…', () =>
+              payway.preAuth.completeWithPayout(opts.transactionId, amount, payout, {
+                idempotencyKey: opts.idempotencyKey,
+                originalAmount,
+                maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
+              }),
+            )
+          : await payway.preAuth.completeWithPayout(opts.transactionId, amount, payout, {
+              idempotencyKey: opts.idempotencyKey,
+              originalAmount,
+              maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
+            });
         if (opts.json) {
           console.log(JSON.stringify(result, null, 2));
           return;
@@ -2113,6 +2446,10 @@ const preAuthCompletePayout = new Command('complete-payout')
         console.log(`  ${c.dim(JSON.stringify(result).slice(0, 200))}`);
         process.exitCode = EXIT_OK;
       } catch (error) {
+        if (error instanceof CliCancelled) {
+          console.log('  Cancelled by user.');
+          process.exit(130);
+        }
         process.exitCode = printApiError(error);
       }
     },
@@ -2133,6 +2470,7 @@ const preAuthCancel = new Command('cancel')
       force?: boolean;
       json?: boolean;
     }) => {
+      const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
       if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -2140,9 +2478,9 @@ const preAuthCancel = new Command('cancel')
       try {
         validateTransactionId(opts.transactionId);
         if (!opts.force && !opts.json) {
-          const confirmed = await promptConfirmation(
-            `  Cancel pre-auth ${c.cyan(opts.transactionId)}? This cannot be undone. (y/n): `,
-          );
+          const confirmed = io
+            ? await io.confirm({ message: `Cancel pre-auth ${opts.transactionId}? This cannot be undone.`, initial: false })
+            : await promptConfirmation(`  Cancel pre-auth ${c.cyan(opts.transactionId)}? This cannot be undone. (y/n): `);
           if (!confirmed) {
             console.log(`  ${c.yellow('Cancelled by user.')}`);
             process.exitCode = EXIT_OK;
@@ -2150,10 +2488,17 @@ const preAuthCancel = new Command('cancel')
           }
         }
         const payway = new PayWay();
-        const result = await payway.preAuth.cancel(opts.transactionId, {
-          reason: opts.reason,
-          idempotencyKey: opts.idempotencyKey,
-        });
+        const result = io
+          ? await withOneShotSpinner(io, 'Cancelling pre-auth…', () =>
+              payway.preAuth.cancel(opts.transactionId, {
+                reason: opts.reason,
+                idempotencyKey: opts.idempotencyKey,
+              }),
+            )
+          : await payway.preAuth.cancel(opts.transactionId, {
+              reason: opts.reason,
+              idempotencyKey: opts.idempotencyKey,
+            });
         if (opts.json) {
           console.log(JSON.stringify(result, null, 2));
           return;
@@ -2162,6 +2507,10 @@ const preAuthCancel = new Command('cancel')
         console.log(`  ${c.dim(JSON.stringify(result).slice(0, 200))}`);
         process.exitCode = EXIT_OK;
       } catch (error) {
+        if (error instanceof CliCancelled) {
+          console.log('  Cancelled by user.');
+          process.exit(130);
+        }
         process.exitCode = printApiError(error);
       }
     },
@@ -2193,8 +2542,50 @@ const invokedDirectly = (() => {
   }
 })();
 
+/** All registered option flags (long and short, including --no-* forms), for suggestions. */
+function collectKnownFlags(): string[] {
+  const flags = new Set<string>();
+  const visit = (command: Command): void => {
+    for (const option of command.options) {
+      if (option.long) flags.add(option.long);
+      if (option.short) flags.add(option.short);
+    }
+    for (const sub of command.commands) visit(sub);
+  };
+  visit(program);
+  return [...flags];
+}
+
+/** All registered top-level command names, for suggestions. */
+function registeredCommandNames(): string[] {
+  return program.commands.map((command) => command.name());
+}
+
 if (invokedDirectly) {
+  // Interactive bare invocation: a guided overview screen instead of
+  // commander's help-on-stderr. Non-TTY / CI / PAYWAY_UI=classic keep the
+  // historical fall-through (commander help on stderr, exit 1).
+  if (process.argv.slice(2).length === 0 && resolvePromptMode() === 'clack') {
+    renderBareInvocationHelp();
+    process.exit(0);
+  }
+
   runCli(process.argv.slice(2)).catch((err: unknown) => {
+    if (err instanceof CliCancelled) {
+      console.log('  Cancelled by user.');
+      process.exit(130);
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    const unknownOptionMatch = /unknown option '--?([^' ]+)'/.exec(message);
+    if (unknownOptionMatch) {
+      const suggestion = unknownOptionSuggestion(`--${unknownOptionMatch[1]}`, collectKnownFlags());
+      if (suggestion) console.error(`  ${suggestion}`);
+    }
+    const unknownCommandMatch = /unknown command '?([^' ]+)'?/.exec(message);
+    if (unknownCommandMatch) {
+      const suggestion = unknownCommandSuggestion(unknownCommandMatch[1], registeredCommandNames());
+      if (suggestion) console.error(`  ${suggestion}`);
+    }
     console.error(err);
     process.exitCode = 1;
   });

@@ -275,7 +275,10 @@ async function resolveLifetimeSeconds(io: PaymentIO, provided: string | undefine
   const raw = await io.text({
     message: 'Lifetime (seconds)',
     defaultValue: '180',
-    validate: lifetimeError,
+    // Empty input means "use the default": clack runs validate() on the raw
+    // value BEFORE applying defaultValue, so a bare lifetimeError('') would
+    // turn pressing Enter for the 180s default into an endless re-ask loop.
+    validate: (value) => (value === '' ? undefined : lifetimeError(value)),
   });
   // Fallback mirrors the prompt default for IO adapters that bypass defaultValue.
   return Number(raw === '' ? '180' : raw);
