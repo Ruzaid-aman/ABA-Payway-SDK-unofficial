@@ -571,3 +571,59 @@ confirms different production semantics (ABA-OPEN-QUESTIONS Q9/Q10 territory).
   no shell prefix needed for `npm run test:sandbox`.
 - Rate budget per run: ~6 generate-qr, ~5 check-transaction, 1 detail, 1 list
   call — inside the §4 caps (detail 10/min, list 50/min).
+
+---
+
+## 15. Payment-link multipart image upload — accepted, renamed, hosted (2026-08-31)
+
+Evidence: `test-output/payment-link-image-probe/probe-*.json` (full probe matrix per run;
+`scripts/sandbox-probe-payment-link.ts` case 3c), plus a chained `payment-link/detail`
+call on the image link (`HTTP 200 code=00`).
+
+### 15a. Multipart contract
+
+- `payment-link/create` accepts **`multipart/form-data`** with exactly the four string
+  fields (`request_time`, `merchant_id`, `merchant_auth`, `hash`) plus an optional
+  top-level **`image`** binary part. HTTP 200 `code=00` "Success." on the first attempt.
+- The HMAC composition is **unchanged** when an image is attached:
+  `hash = base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key))` —
+  image bytes are never hashed. Sending the same hash as the urlencoded requests is
+  accepted verbatim.
+- No `Content-Type` header must be set by the caller (the runtime generates the
+  boundary); sending urlencoded `Content-Type` with a multipart body would fail, but
+  the SDK's multipart path omits the header entirely.
+
+### 15b. What the gateway does with the image
+
+`payment-link/detail` on the image link returned:
+
+```json
+"image": {
+  "image": "https://pw-admin-sandbox.ababank.com/merchants/transaction-photo/payment_link_image_178811415013201.png",
+  "filename": "payment_link_image_178811415013201.png",
+  "size": 0
+}
+```
+
+- The upload is **stored and hosted** — `image.image` becomes an ABA CDN URL.
+- The original filename is **not preserved**: the gateway renames to
+  `payment_link_image_<epoch-ms>.<ext>`. Do not rely on `filename` for anything
+  merchant-facing.
+- `size` is reported as `0` even after a successful upload (sandbox quirk; treat as
+  unreliable).
+- A link created **without** an image returns the empty shape
+  `{"image":"","filename":"","size":0}` — check `image.image` truthiness, not presence.
+
+### 15c. Tooling notes from this campaign
+
+- `scripts/sandbox-probe-payment-link.ts` previously parsed `.env` with a line-by-line
+  minimal parser; the repo `.env` now stores `PAYWAY_RSA_PUBLIC_KEY` as a multi-line
+  quoted PEM, which that parser truncates to the header line (`local RSA error:
+  DECODER routines::unsupported` on every case). The probe now uses the CLI's shared
+  `loadDotEnvIntoProcess` (`src/cli/dotenv.ts`) — the same fix belongs in any other
+  script that still hand-rolls dotenv parsing.
+- `npm run bundle` (Redocly) has been broken since the spec split in `017cc4d`
+  (duplicate `$ref` keys under `components.schemas`, plus duplicated schema names
+  across the split files). `payway-openapi/bundled.yaml` is maintained by hand in the
+  meantime; the `image` part is documented in both `components/schemas/payment-link.yaml`
+  and `bundled.yaml`.

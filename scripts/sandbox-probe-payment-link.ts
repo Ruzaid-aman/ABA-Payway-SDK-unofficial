@@ -11,28 +11,16 @@
  */
 
 import crypto from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // ---------------------------------------------------------------------------
-// Env loading (same minimal parser as the CLI — no dotenv dependency)
+// Env loading — the CLI's shared parser (supports multi-line quoted PEMs,
+// which the repo .env uses for PAYWAY_RSA_PUBLIC_KEY)
 // ---------------------------------------------------------------------------
-function loadDotEnv(): void {
-  const envPath = resolve(process.cwd(), '.env');
-  if (!existsSync(envPath)) return;
-  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
-    const trimmed = line.replace(/\r/g, '').trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIdx = trimmed.indexOf('=');
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    if (!(key in process.env)) {
-      process.env[key] = trimmed.slice(eqIdx + 1).trim();
-    }
-  }
-}
+import { loadDotEnvIntoProcess } from '../src/cli/dotenv.js';
 
-loadDotEnv();
+loadDotEnvIntoProcess(process.cwd());
 
 const MERCHANT_ID = process.env.PAYWAY_MERCHANT_ID ?? '';
 const API_KEY = process.env.PAYWAY_API_KEY ?? '';
@@ -104,7 +92,13 @@ function classify(http: number | 'ERR', code: string, paymentLink?: string): Ver
 async function sendCreate(
   label: string,
   authPayload: Record<string, unknown>,
-  options: { key?: string; contentType?: 'form' | 'json'; hashOverride?: string } = {},
+  options: {
+    key?: string;
+    contentType?: 'form' | 'json';
+    hashOverride?: string;
+    /** When present, the body switches to multipart/form-data with a top-level `image` part. */
+    image?: { data: Uint8Array; filename: string; contentType: string };
+  } = {},
 ): Promise<ProbeResult> {
   const requestTimeValue = requestTime();
   let merchantAuth: string;
@@ -122,11 +116,32 @@ async function sendCreate(
   };
 
   const isJson = options.contentType === 'json';
+  let headers: Record<string, string>;
+  let body: string | FormData;
+  if (options.image) {
+    // Multipart: string fields + binary part. No manual Content-Type — the
+    // runtime must generate the boundary. Image bytes are NOT hashed.
+    const form = new FormData();
+    for (const [key, value] of Object.entries(bodyObj)) form.append(key, value);
+    form.append(
+      'image',
+      new Blob([options.image.data], { type: options.image.contentType }),
+      options.image.filename,
+    );
+    headers = {};
+    body = form;
+  } else if (isJson) {
+    headers = { 'Content-Type': 'application/json' };
+    body = JSON.stringify(bodyObj);
+  } else {
+    headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    body = new URLSearchParams(bodyObj).toString();
+  }
   try {
     const response = await fetch(`${BASE_URL}/api/merchant-portal/merchant-access/payment-link/create`, {
       method: 'POST',
-      headers: { 'Content-Type': isJson ? 'application/json' : 'application/x-www-form-urlencoded' },
-      body: isJson ? JSON.stringify(bodyObj) : new URLSearchParams(bodyObj).toString(),
+      headers,
+      body,
     });
     const text = await response.text();
     let code = '';
@@ -239,6 +254,17 @@ async function main(): Promise<void> {
     ...fullPayload, expired_date: Math.floor(Date.now() / 1000) + 3600, merchant_ref_no: `ple${ts}`,
   }));
 
+  // 3c. Multipart image upload — top-level `image` part, never hashed. A 1x1
+  // PNG keeps the payload tiny; the ref must be unique per run.
+  const PROBE_PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const imageResult = await sendCreate('create — multipart with image (1x1 png)', {
+    ...fullPayload, merchant_ref_no: `pli${ts}`,
+  }, { image: { data: PROBE_PNG, filename: 'probe-1x1.png', contentType: 'image/png' } });
+  results.push(imageResult);
+
   // 4. Wrong-key control: identifies the error signature when PayWay cannot decrypt
   const wrongKey = existsSync(resolve(WRONG_KEY_PATH)) ? readFileSync(resolve(WRONG_KEY_PATH), 'utf8') : undefined;
   if (wrongKey) {
@@ -275,6 +301,15 @@ async function main(): Promise<void> {
 
   const failures = results.filter((r) => r.verdict !== 'SUCCESS' && !r.label.includes('expect'));
   console.log(`\n${failures.length === 0 ? 'ALL CORE PROBES PASSED' : `${failures.length} core probe(s) failed`}`);
+
+  // Evidence (append-style: one JSON per run) per repo probe conventions.
+  const evidenceDir = resolve('test-output', 'payment-link-image-probe');
+  mkdirSync(evidenceDir, { recursive: true });
+  writeFileSync(
+    resolve(evidenceDir, `probe-${ts}.json`),
+    JSON.stringify({ ranAt: new Date().toISOString(), baseUrl: BASE_URL, results }, null, 2),
+  );
+  console.log(`Evidence: ${resolve(evidenceDir, `probe-${ts}.json`)}`);
   process.exitCode = failures.length === 0 ? 0 : 1;
 }
 
