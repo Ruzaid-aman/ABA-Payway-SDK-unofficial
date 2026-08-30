@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Statement coverage raised 55% → 70%** (lines 70.9%, functions 79.8%) via a coverage campaign on previously untested modules: public API barrel surface, structured logger, webhook storage factory + JSON storage lifecycle, agent result rendering, credential-profile CRUD, the SDK facade (`sdk.test` / `initiate` / `runTestSuiteAndPrint`), the Cloudflare tunnel manager (fake-binary URL parsing + ENOENT path), and in-process CLI command bodies (status / explain / validate / config / doctor / profiles / skills / demo, plus every API command against a local mock gateway). New suites: `public-api`, `logger`, `webhook-storage-factory`, `webhook-server-stop`, `agent-output`, `first-payment`, `profiles-crud`, `sdk-facade-and-tunnel`, `cli-inprocess`, `cli-mock-commands`.
+
+### Added
+
+- **`runCli(argv)` exported from the CLI entry** — `src/cli.ts` now guards its self-parse behind a main-module check and exposes `runCli`, so tests and embedders can drive commands in-process (verified against the documented `npx tsx src/cli.ts` workflow, `dist/cli.js`, and the child-process `cli.test.ts` suite).
+
+### Fixed
+
+- **`skills doctor` crashed with a raw ENOENT stack** when the executable's sibling `skills/` directory was missing (e.g. source checkouts); a missing directory now reports as "no packaged skills" instead.
+- **Agent human output spacing** — failed actions rendered as `tool(E1: msg)`; now `tool (E1: msg)`.
+
 ## 1.3.0 — 2026-08-30
 
 > Edge-case audit campaign release: all 23 findings (EC-01–EC-23) from
