@@ -30,6 +30,8 @@ const REGISTERED_COMMANDS = [
   'generate-checkout',
   'checkout-form',
   'payment-link',
+  'cof',
+  'beneficiary',
   'sandbox-beneficiaries',
   'payout',
   'profiles',

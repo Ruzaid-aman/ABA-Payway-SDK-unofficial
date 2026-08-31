@@ -15,7 +15,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
   { title: 'Setup', commands: ['init', 'doctor', 'config', 'profiles', 'onboard'] },
   {
     title: 'Payments',
-    commands: ['generate-qr', 'generate-checkout', 'checkout-form', 'payment-link', 'setup-webhook'],
+    commands: ['generate-qr', 'generate-checkout', 'cof', 'checkout-form', 'payment-link', 'setup-webhook'],
   },
   {
     title: 'Transactions',
@@ -28,7 +28,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
       'close-transaction',
     ],
   },
-  { title: 'Money-out', commands: ['refund', 'payout', 'pre-auth'] },
+  { title: 'Money-out', commands: ['refund', 'payout', 'pre-auth', 'beneficiary'] },
   {
     title: 'Reference',
     commands: ['status', 'explain', 'validate', 'exchange-rate', 'sandbox-beneficiaries'],

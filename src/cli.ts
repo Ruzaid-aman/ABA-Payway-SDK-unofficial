@@ -32,7 +32,7 @@ import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/command
 import { readMaskedInput } from './cli/masked-input.js';
 import { loadPaymentLinkImage } from './cli/payment-link-image.js';
 import { PayWay } from './client.js';
-import type { PaymentLinkImage } from './client.js';
+import type { ItemEntry, PaymentLinkImage } from './client.js';
 import { hasBlockingIssues, validatePayWayEnv, validateRequiredCredentials } from './config/envValidator.js';
 import {
   activateProfile,
@@ -103,6 +103,19 @@ function assertRsaKeyPresent(): boolean {
   console.log(`  ${c.dim('Payment Link APIs require the PayWay RSA public key for merchant_auth encryption.')}`);
   console.log(`  ${c.dim('Add')} ${c.cyan('PAYWAY_RSA_PUBLIC_KEY=<pem>')} ${c.dim('to your .env file.')}\n`);
   return false;
+}
+
+// Parse a `--items`/`--custom-fields`/`--payout`/`--return-deeplink` value that
+// may be either inline JSON or a raw string (the SDK helpers accept both and
+// base64-encode object/array forms before signing). Returns `undefined` when
+// omitted, the parsed JSON value when it parses, otherwise the raw string.
+function parseJsonOrString(raw: string | undefined): unknown {
+  if (raw === undefined) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +210,16 @@ interface GenerateQrCommandOptions {
   polling?: boolean;
   pollInterval?: string;
   pollTimeout?: string;
+  // B6 parity: the 9 live-documented optional generate-qr params.
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  items?: string;
+  returnDeeplink?: string;
+  customFields?: string;
+  returnParams?: string;
+  payout?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1164,6 +1187,26 @@ program
         process.exitCode = EXIT_VALIDATION;
         return;
       }
+
+      // B6: local pre-validation of the gateway's ≤3-day window and ≤1000 page
+      // size. The gateway 403 on a wider window contains a typo, so we fail
+      // fast client-side with a clear hint instead of echoing the broken text.
+      const winFromMs = Date.parse(fromDate.replace(' ', 'T'));
+      const winToMs = Date.parse(toDate.replace(' ', 'T'));
+      if (!Number.isNaN(winFromMs) && !Number.isNaN(winToMs) && winToMs - winFromMs > 3 * 86_400_000) {
+        console.log(`  ${c.red('✗')} The requested window spans more than 3 days, which PayWay rejects.`);
+        console.log(`  ${c.dim('Split the query into ≤3-day windows (e.g. --from "2026-08-25 00:00:00" --to "2026-08-27 23:59:59").')}`);
+        console.log(`  ${c.dim('(Sandbox-verified: the gateway returns HTTP 403 for windows wider than 3 days.)')}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      const pageSize = Number(opts.pagination);
+      if (Number.isNaN(pageSize) || !Number.isInteger(pageSize) || pageSize <= 0 || pageSize > 1000) {
+        console.log(`  ${c.red('✗')} --pagination must be a whole number between 1 and 1000, received: ${String(opts.pagination)}`);
+        console.log(`  ${c.dim('PayWay caps the page size at 1000 — wider pages are rejected server-side.')}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
       try {
         const payway = new PayWay();
         const result = await payway.checkout.getTransactionList({
@@ -1511,6 +1554,15 @@ program
   .option('--open-image', 'Open the saved QR image with the OS default viewer (default: auto when interactive)')
   .option('--no-open-image', 'Never open the QR image, even in interactive terminals')
   .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
+  .option('--first-name <name>', 'Payer first name (gateway caps at 20 chars, err 16/17)')
+  .option('--last-name <name>', 'Payer last name (gateway caps at 20 chars, err 16/17)')
+  .option('--email <email>', 'Payer email (gateway caps at 50 chars, err 19)')
+  .option('--phone <phone>', 'Payer phone (gateway caps at 20 chars, err 18)')
+  .option('--items <json>', 'Item list — JSON array or string (base64-encoded, max 500 chars / 10 items)')
+  .option('--return-deeplink <value>', 'Mobile app deeplink — JSON {`ios_scheme`,`android_scheme`} or string')
+  .option('--custom-fields <json>', 'Custom fields echoed in callbacks — JSON object or string (max 255 chars)')
+  .option('--return-params <value>', 'Extra params echoed in the pushback')
+  .option('--payout <json>', 'Split-payout instructions — JSON [{`account`,`amount`}] or string (max 255 chars)')
   .option('--non-interactive, -y', 'Skip interactive prompts (no confirmation, no lifetime override)')
   .option('--polling', 'Poll transaction status after QR generation (enabled by default)', true)
   .option('--no-polling', 'Disable automatic polling after QR generation')
@@ -1739,6 +1791,18 @@ program
           callbackUrl,
           qrImageTemplate: template,
           lifetime: finalLifetime,
+          firstName: opts.firstName,
+          lastName: opts.lastName,
+          email: opts.email,
+          phone: opts.phone,
+          items: parseJsonOrString(opts.items) as ItemEntry[] | string | undefined,
+          returnDeeplink: parseJsonOrString(opts.returnDeeplink) as
+            | { ios_scheme: string; android_scheme: string }
+            | string
+            | undefined,
+          customFields: parseJsonOrString(opts.customFields) as Record<string, unknown> | string | undefined,
+          returnParams: opts.returnParams,
+          payout: parseJsonOrString(opts.payout) as Array<{ account: string; amount: number }> | string | undefined,
         });
 
         console.log(`  ${c.green('✓')} Online QR generated via PayWay API\n`);
@@ -1830,6 +1894,23 @@ program
   .option('--callback-url <url>', 'Callback endpoint configured in PayWay merchant settings')
   .option('--return-url <url>', 'Return URL after payment')
   .option('--cancel-url <url>', 'Cancel URL')
+  .option('--ctid <ctid>', 'Subscription token identifier (required with --token-flag)')
+  .option('--token-flag <flag>', 'Subscription token flag (purchase path: CITR_FIX only)')
+  .option('--frequency <code>', 'Billing frequency: 1W | 1M | 2M (required when token-flag=CITR_FIX)')
+  .option('--type <type>', 'Transaction type: purchase (default) or pre-auth')
+  .option('--firstname <name>', 'Customer first name')
+  .option('--lastname <name>', 'Customer last name')
+  .option('--email <email>', 'Customer email')
+  .option('--phone <phone>', 'Customer phone')
+  .option('--items <json>', 'Item list — JSON array or string (base64-encoded)')
+  .option('--shipping <number>', 'Shipping fee amount')
+  .option('--lifetime <minutes>', 'Lifetime in minutes (min 3, max 43200)')
+  .option('--custom-fields <json>', 'Custom fields — JSON object or string')
+  .option('--return-params <value>', 'Extra params echoed in the pushback')
+  .option('--skip-success-page <0|1>', 'Skip the success page (0 or 1)')
+  .option('--view-type <type>', 'View type: hosted_view or popup')
+  .option('--continue-success-url <url>', 'Continue-success URL (base64 target for the result page)')
+  .option('--json', 'Print the raw JSON response')
   .option('--polling', 'Poll transaction status after checkout (enabled by default)', true)
   .option('--no-polling', 'Disable automatic polling after checkout')
   .option('--poll-interval <seconds>', 'Polling interval in seconds (default: 5)', '5')
@@ -1906,7 +1987,28 @@ program
         paymentOption: (opts.paymentOption as 'abapay_khqr_deeplink') ?? 'abapay_khqr_deeplink',
         returnUrl: opts.returnUrl,
         cancelUrl: opts.cancelUrl,
+        type: opts.type === undefined ? undefined : (opts.type as 'purchase' | 'pre-auth'),
+        firstname: opts.firstname,
+        lastname: opts.lastname,
+        email: opts.email,
+        phone: opts.phone,
+        shipping: opts.shipping !== undefined ? Number(opts.shipping) : undefined,
+        lifetime: opts.lifetime !== undefined ? Number(opts.lifetime) : undefined,
+        skipSuccessPage: opts.skipSuccessPage !== undefined ? (Number(opts.skipSuccessPage) as 0 | 1) : undefined,
+        viewType: opts.viewType === undefined ? undefined : (opts.viewType as 'hosted_view' | 'popup'),
+        continueSuccessUrl: opts.continueSuccessUrl,
+        items: parseJsonOrString(opts.items) as ItemEntry[] | string | undefined,
+        customFields: parseJsonOrString(opts.customFields) as Record<string, unknown> | string | undefined,
+        returnParams: opts.returnParams,
+        ctid: opts.ctid,
+        tokenFlag: opts.tokenFlag === undefined ? undefined : (opts.tokenFlag as 'CITR_FIX'),
+        frequency: opts.frequency === undefined ? undefined : (opts.frequency as '1W' | '1M' | '2M'),
       });
+
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
 
       console.log(`  ${c.green('✓')} Checkout QR URL generated\n`);
       console.log(`  ${c.bold('Transaction ID:')}  ${c.cyan(transactionId)}`);
@@ -2245,6 +2347,300 @@ program
         if (data?.status) console.log(`  ${c.bold('Status:')} ${c.cyan(String(data.status))}`);
       }
       console.log();
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+// --- cof (credentials on file) ---
+const cofCmd = program
+  .command('cof')
+  .description('Credentials-on-file: link account/card, charge, and renew/inspect/remove tokens');
+
+cofCmd
+  .command('link-account')
+  .description('Link an ABA account for credential-on-file (COF) payments')
+  .requiredOption('-r, --request-id <id>', 'Unique request id (5-24 characters)')
+  .requiredOption('-c, --ctid <ctid>', 'Customer token identifier (5-24 alphanumeric)')
+  .requiredOption('-f, --token-flag <flag>', 'Live-documented values: CITI_FLEX | CITO_FLEX')
+  .option('--currency <code>', 'Profile-enabled currency (required by the gateway): USD or KHR', 'USD')
+  .option('--callback-url <url>', 'Webhook callback URL for the link result')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: Record<string, string | undefined>) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.credentialsOnFile.linkAccount({
+        requestId: opts.requestId as string,
+        ctid: opts.ctid as string,
+        tokenFlag: opts.tokenFlag as string,
+        currency: (opts.currency ?? 'USD') as 'KHR' | 'USD',
+        callbackUrl: opts.callbackUrl,
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Account link requested`);
+      console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
+      console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
+      console.log(`  ${c.dim('Result arrives via the callback_url; then charge with "cof charge" using --token <pwt>.')}\n`);
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+cofCmd
+  .command('link-card')
+  .description('Link a card for credential-on-file (COF) payments')
+  .requiredOption('-r, --request-id <id>', 'Unique request id (5-24 characters)')
+  .requiredOption('-c, --ctid <ctid>', 'Customer token identifier (5-24 alphanumeric)')
+  .requiredOption('-f, --token-flag <flag>', 'Live-documented values: CITI_FLEX | CITO_FLEX')
+  .option('--currency <code>', 'Payment currency: USD (default) or KHR', 'USD')
+  .option('--frequency <code>', 'Billing frequency: 1W | 1M | 2M')
+  .option('--callback-url <url>', 'Webhook callback URL for the link result')
+  .option('--continue-success-url <url>', 'Base64-encoded target of the hosted form Done button')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: Record<string, string | undefined>) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.credentialsOnFile.linkCard({
+        requestId: opts.requestId as string,
+        ctid: opts.ctid as string,
+        tokenFlag: opts.tokenFlag as string,
+        currency: (opts.currency ?? 'USD') as 'USD' | 'KHR',
+        frequency: opts.frequency === undefined ? undefined : (opts.frequency as '1W' | '1M' | '2M'),
+        callbackUrl: opts.callbackUrl,
+        continueSuccessUrl: opts.continueSuccessUrl,
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Card link requested`);
+      console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
+      console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
+      console.log(`  ${c.dim('The customer continues on the hosted form; result arrives via callback_url.')}\n`);
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+cofCmd
+  .command('charge')
+  .description('Submit a credentials-on-file (COF) payment against a linked token')
+  .requiredOption('-t, --transaction-id <id>', 'Transaction ID for this payment')
+  .requiredOption('-a, --amount <number>', 'Payment amount')
+  .requiredOption('--token <pwt>', 'Payment token (pwt) returned by a prior link/charge')
+  .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
+  .option('--ctid <ctid>', 'Customer token identifier (optional on repeat charges)')
+  .option('--token-flag <flag>', 'Charge flags: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX')
+  .option('--callback-url <url>', 'Webhook callback URL')
+  .option('--first-name <name>', 'Payer first name (gateway caps at 20 chars)')
+  .option('--last-name <name>', 'Payer last name (gateway caps at 20 chars)')
+  .option('--email <email>', 'Payer email (gateway caps at 50 chars)')
+  .option('--phone <phone>', 'Payer phone (gateway caps at 20 chars)')
+  .option('--purchase-type <type>', 'purchase (default) or pre-auth')
+  .option('--items <json>', 'Item list — JSON array or string (base64-encoded)')
+  .option('--return-params <value>', 'Extra params echoed in the pushback')
+  .option('--payout <json>', 'Split-payout instructions — JSON [{`account`,`amount`}] or string')
+  .option('--custom-fields <json>', 'Custom fields — JSON object or string')
+  .option('--shipping-fee <number>', 'Shipping fee amount')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: Record<string, string | undefined>) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    const amount = Number(opts.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.credentialsOnFile.payment({
+        transactionId: opts.transactionId as string,
+        amount,
+        paymentToken: opts.token as string,
+        currency: (opts.currency ?? 'USD') as 'USD' | 'KHR',
+        ctid: opts.ctid,
+        tokenFlag: opts.tokenFlag,
+        callbackUrl: opts.callbackUrl,
+        firstName: opts.firstName,
+        lastName: opts.lastName,
+        email: opts.email,
+        phone: opts.phone,
+        purchaseType: opts.purchaseType === undefined ? undefined : (opts.purchaseType as 'purchase' | 'pre-auth'),
+        items: parseJsonOrString(opts.items) as ItemEntry[] | string | undefined,
+        returnParams: opts.returnParams,
+        payout: parseJsonOrString(opts.payout) as Array<{ acc: string; amt: number }> | string | undefined,
+        customFields: parseJsonOrString(opts.customFields) as Record<string, unknown> | string | undefined,
+        shippingFee: opts.shippingFee !== undefined ? Number(opts.shippingFee) : undefined,
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      const data = ((result as Record<string, unknown>).data ?? result) as Record<string, unknown>;
+      console.log(`  ${c.green('✓')} COF charge submitted`);
+      if (data.tran_id) console.log(`  ${c.bold('Transaction ID:')} ${c.cyan(String(data.tran_id))}`);
+      console.log(`  ${c.dim(`Next: verify with payway-sdk check-transaction -t ${String(data.tran_id)}`)}\n`);
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+const cofTokenCmd = cofCmd.command('token').description('Renew, inspect, or remove a COF token');
+
+cofTokenCmd
+  .command('renew')
+  .description('Renew an expired (or expiring) ACCOUNT token')
+  .requiredOption('-r, --request-id <id>', 'Unique request id (5-24 characters)')
+  .requiredOption('-c, --ctid <ctid>', 'Customer token identifier')
+  .requiredOption('--token <pwt>', 'Existing payment token (pwt) to renew')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: Record<string, string | undefined>) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.credentialsOnFile.renewToken({
+        requestId: opts.requestId as string,
+        ctid: opts.ctid as string,
+        paymentToken: opts.token as string,
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Token renew requested`);
+      console.log(`  ${c.dim('Result arrives via the callback_url.')}\n`);
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+cofTokenCmd
+  .command('details')
+  .description('Retrieve stored-token details (request carries request_id ONLY)')
+  .requiredOption('-r, --request-id <id>', 'Unique request id (5-24 characters)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: Record<string, string | undefined>) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.credentialsOnFile.getTokenDetails({
+        requestId: opts.requestId as string,
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Token details returned`);
+      console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
+      console.log(`  ${c.dim(JSON.stringify(result).slice(0, 300))}\n`);
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+cofTokenCmd
+  .command('remove')
+  .description('Remove a linked account or card token (irreversible)')
+  .requiredOption('-c, --ctid <ctid>', 'Customer token identifier')
+  .requiredOption('--token <pwt>', 'Payment token (pwt) to remove')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: Record<string, string | undefined>) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.credentialsOnFile.removeToken({
+        ctid: opts.ctid as string,
+        paymentToken: opts.token as string,
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Token removed`);
+      console.log(`  ${c.bold('CTID:')} ${c.cyan(opts.ctid as string)}\n`);
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+// --- beneficiary (whitelist management, RSA-encrypted) ---
+const beneficiaryCmd = program.command('beneficiary').description('Manage payout beneficiary whitelist accounts (requires RSA key)');
+
+beneficiaryCmd
+  .command('add')
+  .description('Add a payout beneficiary to the merchant whitelist')
+  .argument('<payee>', 'Beneficiary account number (ABA account or test MID)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (payee: string, opts: { json?: boolean }) => {
+    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.payout.addBeneficiary({ payee });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Beneficiary whitelist request submitted`);
+      console.log(`  ${c.bold('Payee:')} ${c.cyan(payee)}`);
+      console.log(`  ${c.dim('Activation is usually manual/async — confirm status via beneficiary update-status.')}\n`);
+    } catch (e) {
+      process.exitCode = printApiError(e);
+    }
+  });
+
+beneficiaryCmd
+  .command('update-status')
+  .description('Update a payout beneficiary whitelist status')
+  .argument('<payee>', 'Beneficiary account number')
+  .requiredOption('-s, --status <0|1>', 'New status: 0 (deactivated) or 1 (active)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (payee: string, opts: { status: string; json?: boolean }) => {
+    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    const status = Number(opts.status);
+    if (status !== 0 && status !== 1) {
+      console.log(`  ${c.red('✗')} --status must be 0 or 1, received: ${opts.status}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.payout.updateBeneficiaryStatus({ payee, status: status as 0 | 1 });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`  ${c.green('✓')} Beneficiary status update submitted`);
+      console.log(`  ${c.bold('Payee:')}  ${c.cyan(payee)}`);
+      console.log(`  ${c.bold('Status:')} ${status === 1 ? c.green('1 (active)') : c.yellow('0 (deactivated)')}\n`);
     } catch (e) {
       process.exitCode = printApiError(e);
     }

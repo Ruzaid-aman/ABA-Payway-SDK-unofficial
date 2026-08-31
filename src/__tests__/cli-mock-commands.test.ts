@@ -72,6 +72,8 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
     }
   } else if (url.includes('generate-qr')) {
     send(200, { status: { code: '00', message: 'Success' }, qrString: '000201010212', qrImage: FAKE_PNG_BASE64 });
+  } else if (url.includes('purchase/payment-credential')) {
+    send(200, { status: { code: '00', message: 'Success' }, data: { tran_id: 'COF-1' } });
   } else if (url.includes('purchase')) {
     send(200, {
       status: { code: '00', message: 'Success' },
@@ -84,6 +86,20 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
     send(200, { status: { code: '00', message: 'Pre-auth cancelled' } });
   } else if (url.includes('get-transactions-by-mc-ref')) {
     send(404, { message: 'endpoint not available under this sandbox profile' });
+  } else if (url.includes('aof/link-account')) {
+    send(200, { status: { code: '00', message: 'Success', request_id: 'LA-1' } });
+  } else if (url.includes('cof/link-card')) {
+    send(200, { status: { code: '00', message: 'Success', request_id: 'LC-1' } });
+  } else if (url.includes('renew-expired-account-token')) {
+    send(200, { status: { code: '00', message: 'Success', request_id: 'RT-1' } });
+  } else if (url.includes('get-token-details')) {
+    send(200, { status: { code: '00', message: 'Success' }, data: { ctid: 'CTID-1', status: 'ACTIVE' } });
+  } else if (url.includes('remove-token')) {
+    send(200, { status: { code: '00', message: 'Success' } });
+  } else if (url.includes('add-whitelist-payout')) {
+    send(200, { status: { code: '00', message: 'Success' }, data: { payee: 'PAYEE-1', status: 1 } });
+  } else if (url.includes('update-whitelist-status')) {
+    send(200, { status: { code: '00', message: 'Success' }, data: { payee: 'PAYEE-1', status: 1 } });
   } else {
     send(404, { message: `unknown endpoint ${url}` });
   }
@@ -166,7 +182,7 @@ describe('CLI API commands against the local mock gateway', () => {
       '--from',
       '2026-08-01 00:00:00',
       '--to',
-      '2026-08-30 23:59:59',
+      '2026-08-02 23:59:59',
       '--json',
     ]);
     expect(text).toContain('transaction_id');
@@ -297,7 +313,7 @@ describe('CLI API commands against the local mock gateway', () => {
     const detail = await run(['transaction-detail', '-t', 'DETAIL-PRETTY']);
     expect(detail.text).toContain('APPROVED');
 
-    const list = await run(['transaction-list', '--from', '2026-08-01 00:00:00']);
+    const list = await run(['transaction-list', '--from', '2026-08-01 00:00:00', '--to', '2026-08-02 23:59:59']);
     // The pretty renderer may summarize differently from the raw array.
     expect(list.text.length).toBeGreaterThan(0);
 
@@ -352,5 +368,183 @@ describe('CLI API commands against the local mock gateway', () => {
     const { text, exitCode } = await run(['check-transaction', '-t', 'MISSING', '--json']);
     expect(text).toContain('tran_id not found');
     expect(exitCode).toBe(2);
+  });
+
+  it('cof link-account submits a link request (--json)', async () => {
+    const { text, exitCode } = await run([
+      'cof',
+      'link-account',
+      '-r',
+      'REQID001',
+      '-c',
+      'CTID0001',
+      '-f',
+      'CITI_FLEX',
+      '--json',
+    ]);
+    expect(text).toContain('"LA-1"');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('cof link-card submits a card link request (--json)', async () => {
+    const { text, exitCode } = await run([
+      'cof',
+      'link-card',
+      '-r',
+      'REQID002',
+      '-c',
+      'CTID0002',
+      '-f',
+      'CITO_FLEX',
+      '--json',
+    ]);
+    expect(text).toContain('"LC-1"');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('cof charge submits a payment against a linked token (--json)', async () => {
+    const { text, exitCode } = await run([
+      'cof',
+      'charge',
+      '-t',
+      'COF-1',
+      '-a',
+      '5.00',
+      '--token',
+      'PWT-1',
+      '--json',
+    ]);
+    expect(text).toContain('"COF-1"');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('cof token renew submits a renewal request (--json)', async () => {
+    const { text, exitCode } = await run([
+      'cof',
+      'token',
+      'renew',
+      '-r',
+      'REQID003',
+      '-c',
+      'CTID0003',
+      '--token',
+      'PWT-1',
+      '--json',
+    ]);
+    expect(text).toContain('"RT-1"');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('cof token details carries request_id only (--json)', async () => {
+    const { text, exitCode } = await run(['cof', 'token', 'details', '-r', 'REQID004', '--json']);
+    expect(text).toContain('CTID-1');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('cof token remove takes ctid + token, no request id (--json)', async () => {
+    const { text, exitCode } = await run(['cof', 'token', 'remove', '-c', 'CTID0004', '--token', 'PWT-1', '--json']);
+    expect(text).toContain('"00"');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('beneficiary add submits a whitelist request (requires RSA, --json)', async () => {
+    const { text, exitCode } = await run(['beneficiary', 'add', 'PAYEE-1', '--json']);
+    expect(text).toContain('PAYEE-1');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('beneficiary update-status updates the whitelist status (--json)', async () => {
+    const { text, exitCode } = await run(['beneficiary', 'update-status', 'PAYEE-1', '-s', '1', '--json']);
+    expect(text).toContain('PAYEE-1');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('transaction-list rejects a >3-day window locally with exit 1', async () => {
+    const { text, exitCode } = await run([
+      'transaction-list',
+      '--from',
+      '2026-08-01 00:00:00',
+      '--to',
+      '2026-08-30 23:59:59',
+    ]);
+    expect(text).toContain('more than 3 days');
+    expect(exitCode).toBe(1);
+  });
+
+  it('transaction-list rejects a pagination >1000 locally with exit 1', async () => {
+    const { text, exitCode } = await run([
+      'transaction-list',
+      '--from',
+      '2026-08-01 00:00:00',
+      '--to',
+      '2026-08-02 23:59:59',
+      '--pagination',
+      '5000',
+    ]);
+    expect(text).toContain('1000');
+    expect(exitCode).toBe(1);
+  });
+
+  it('generate-checkout forwards the expanded B6 flags (--json)', async () => {
+    const { exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-B6',
+      '--return-url',
+      'https://example.com/r',
+      '--type',
+      'pre-auth',
+      '--ctid',
+      'CTID0005',
+      '--token-flag',
+      'CITR_FIX',
+      '--frequency',
+      '1M',
+      '--firstname',
+      'John',
+      '--shipping',
+      '1',
+      '--lifetime',
+      '5',
+      '--json',
+      '--no-polling',
+      '--no-show-qr',
+    ]);
+    expect(exitCode).not.toBe(1);
+  });
+
+  it('generate-qr forwards the 9 new optional params (no polling)', async () => {
+    const { text, exitCode } = await run([
+      'generate-qr',
+      '-a',
+      '5.00',
+      '-c',
+      'USD',
+      '-t',
+      'QR-B6',
+      '--callback-url',
+      'https://example.com/cb',
+      '--lifetime',
+      '300',
+      '-y',
+      '--no-polling',
+      '--no-save-image',
+      '--no-open-image',
+      '--no-show-qr',
+      '--first-name',
+      'John',
+      '--last-name',
+      'Doe',
+      '--email',
+      'j@example.com',
+      '--items',
+      '[{"name":"Item","price":1,"quantity":1}]',
+      '--return-params',
+      'label=ok',
+    ]);
+    expect(text).toContain('QR String');
+    expect([undefined, 0]).toContain(exitCode as number);
   });
 });
