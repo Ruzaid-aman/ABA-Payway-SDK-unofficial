@@ -112,6 +112,13 @@ export interface PayWayConfig {
   logLevel?: LogLevel;
   /** Emit single-line JSON diagnostics instead of `[payway]` text lines (TD-08). */
   logFormat?: 'text' | 'json';
+  /**
+   * Escalate advisory-limit warnings (gateway length caps, enum membership,
+   * minimum amounts — see warnAdvisory) into PayWayConfigError throws.
+   * Gateway-documented REQUIRED fields always validate regardless of this
+   * flag. Also settable via PAYWAY_STRICT_VALIDATION=1.
+   */
+  strictValidation?: boolean;
 }
 
 interface ResolvedPayWayConfig extends PayWayConfig {
@@ -239,12 +246,30 @@ export interface GenerateQrParams {
   amount: number;
   paymentOption: 'abapay_khqr' | string;
   callbackUrl: string;
-  purchaseType?: 'purchase';
+  purchaseType?: 'purchase' | 'pre-auth';
   currency?: 'KHR' | 'USD';
   qrImageTemplate?: string;
   requestTime?: string;
   /** Lifetime in seconds (SDK converts to whole minutes for the API). Min 3 minutes. */
   lifetime?: number;
+  /** Item list — object/array entries are base64-encoded JSON. Max 500 chars / 10 items (advisory). */
+  items?: string | ItemEntry[];
+  /** Payer first name — gateway caps at 20 chars (err 16/17, advisory). */
+  firstName?: string;
+  /** Payer last name — gateway caps at 20 chars (err 16/17, advisory). */
+  lastName?: string;
+  /** Payer email — gateway caps at 50 chars (err 19, advisory). */
+  email?: string;
+  /** Payer phone — gateway caps at 20 chars (err 18, advisory). */
+  phone?: string;
+  /** Mobile app schemes — object form is base64-encoded JSON. Max 255 chars. */
+  returnDeeplink?: string | { ios_scheme: string; android_scheme: string };
+  /** Custom fields echoed in callbacks/details — object form is base64-encoded JSON. Max 255 chars. */
+  customFields?: string | Record<string, unknown>;
+  /** Extra params echoed in the pushback. */
+  returnParams?: string;
+  /** Split-payout instructions `[{account, amount}]` — base64-encoded JSON. Max 255 chars. */
+  payout?: string | Array<{ account: string; amount: number }>;
 }
 
 /**

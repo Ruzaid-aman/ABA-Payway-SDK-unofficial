@@ -24,6 +24,27 @@ export function formatRequestTime(date?: Date): string {
 
 const VALID_CURRENCIES: Array<'USD' | 'KHR'> = ['USD', 'KHR'];
 
+/**
+ * Advisory-limit escalation (live-docs audit 2026-08-31): gateway limits that
+ * are NOT hard requirements — length caps, enum membership, minimum amounts —
+ * warn once per distinct message by default and throw `PayWayConfigError`
+ * when `config.strictValidation` is set. Gateway-documented REQUIRED fields
+ * must NOT go through here; they validate directly.
+ */
+const advisoryWarned = new Set<string>();
+
+export function warnAdvisory(
+  config: { strictValidation?: boolean } | undefined,
+  message: string,
+): void {
+  if (config?.strictValidation) {
+    throw new PayWayConfigError(message);
+  }
+  if (advisoryWarned.has(message)) return;
+  advisoryWarned.add(message);
+  console.warn(`[payway] ${message}`);
+}
+
 export function validateCurrency(currency: 'USD' | 'KHR' | string | undefined): void {
   if (currency !== undefined && !VALID_CURRENCIES.includes(currency as 'USD' | 'KHR')) {
     throw new PayWayConfigError(`currency must be one of ${VALID_CURRENCIES.join(', ')}, received: ${currency}`);
