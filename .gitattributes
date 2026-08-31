@@ -1,0 +1,38 @@
+# Normalize the repository to LF line endings permanently.
+# Rationale: editor-induced CRLF churn produced 5000+ lines of false diff in a
+# prior session (see HANDOFF.md §8). `core.autocrlf=false` is set locally, but
+# .gitattributes makes the policy travel with the clone for every agent/OS.
+
+# Auto-detect text files; normalize to LF on checkin, check out as-is.
+* text=auto eol=lf
+
+# Explicit LF for source/config files agents touch most.
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

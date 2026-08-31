@@ -1,25 +1,26 @@
 # Agent Handoff — aba-payway-ts
 
 **Audience:** an agent resuming work in a fresh session. Read this plus `AGENTS.md` before acting.
-**Last updated:** 2026-08-31, after the Technical Production Review implementation (P0–P3: CI hardening, sandbox contract suite, mock-harness parity, shared test-utils, onboard/setup-webhook seams, per-call `RequestCallOptions`, `verifyCallbackDetailed`, mutation spike, production verification plan).
+**Last updated:** 2026-08-31, after the live API parity work on `feat/live-api-parity` (B1–B6: OpenAPI sync, CoF/QR param parity, advisory validation, COF/QR error families, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation).
 **Provenance:** everything below was done and verified in prior sessions; per-item evidence paths are included so you never have to re-derive or re-probe.
 
 ---
 
-## 1. Current state (verified on `main` @ `d486738`; docs sync lands in the following commit)
+## 1. Current state (verified on `feat/live-api-parity` @ `9396277`; main last at `d486738` + docs sync)
 
 | Aspect | State |
 |---|---|
 | Version | `1.3.0` (tag `v1.3.0`; package.json bumped from a stale 1.1.1 — the v1.2.0 tag already existed since July, **do not move tags**) |
-| Tests | 1147 tests / 75+ files, all green (`npx vitest run`; +13 opt-in sandbox contract tests skipped unless `SANDBOX_CONTRACT_TESTS=1`) |
+| Tests | 1218 tests / 79 files green (`npx vitest run` after `npm run build`; +13 opt-in sandbox contract tests skipped unless `SANDBOX_CONTRACT_TESTS=1`) |
 | Typecheck / lint | `npx tsc --noEmit` clean; `npx biome lint src` clean |
 | Coverage | ~78% stmts / ~72.5% branch (`npx vitest run --coverage`); CI enforces floors 74/69/80/74 via vitest.config.ts thresholds — ratchet upward |
 | Mutation testing | StrykerJS 10 spike on auth.ts + circuit-breaker.ts: **91.3% score** — `docs/MUTATION-SPIKE-2026-08-31.md`, `stryker.config.json` (dev-only, Node ≥ 22, not in CI) |
 | Edge-case audit | **All 23 findings (EC-01–EC-23) remediated** — `audit-results/edge-case-report.md` (findings), `audit-results/code-improvement-plan.md` (batches 1–5, all marked done) |
+| Live API parity | **B1–B6 complete** on `feat/live-api-parity` (8 commits, `c92b9cd`→`9396277`): OpenAPI 24-op coverage matrix, CoF/QR param parity, advisory validation (`strictValidation`), COF/QR error families + `PayWaySignatureError`, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation. Plan: `audit-results/live-parity-handoff.md` |
 | Release checklist | Run for 1.3.0: build, dist smoke, live `npm run probe` (all PATH_OK) — `docs/RELEASE_CHECKLIST.md` |
 | Working tree | Clean; nothing untracked |
 
-Recent commit history (oldest→newest): `0bbad8d` audit remediation batches 1–3 → `7898963` batch 4 → `dd4556f` batch 5 → `b6d15e1` release v1.3.0 → `9661b16` coverage 55→70% → `6bf3afc` changelog note → `d486738` agent testability refactor → docs sync (this commit).
+Recent commit history (oldest→newest): `0bbad8d` audit remediation batches 1–3 → `7898963` batch 4 → `dd4556f` batch 5 → `b6d15e1` release v1.3.0 → `9661b16` coverage 55→70% → `6bf3afc` changelog note → `d486738` agent testability refactor → docs sync → `c92b9cd`→`9396277` live parity B1–B6 (on `feat/live-api-parity`).
 
 ## 2. Environment rules (violating these has caused real incidents)
 
@@ -50,6 +51,13 @@ Each item is pinned by a named test — if you change one, flip the test conscio
 - **(2026-08-31)** Every API domain method accepts a trailing `callOptions?: { timeoutMs?, signal? }` — per-call timeout override; an aborted `signal` cancels the in-flight fetch and is never retried (`RequestCallOptions`, exported).
 - **(2026-08-31)** `verifyCallbackDetailed(body, sig, options?)` returns `{ valid, reason }` with reasons `malformed_signature` / `empty_body` / `signature_mismatch`; `verifyCallbackSignature` delegates to it (boolean behavior identical).
 - **(2026-08-31)** `doctor`'s framework row is advisory (ok=true) when no framework exists — SDK/CLI repos are not failures.
+- **(2026-08-31, live parity B5)** COF error family: 200/400 body `status.code "04"` + `errors{}` map → `PayWayBusinessError` carrying `fieldErrors`; `1`/`01`/`PTL02` → `PayWaySignatureError` (with endpoint hash-order hint); `98` → merchant-profile hint; `104`/`105`/`09` → token hints.
+- **(2026-08-31, live parity B5)** QR string-code family table: 1,6,8,12,16,17,18,19,21,23,32,35,44,47,48,96,102,403,429 (see `src/client.ts` `checkResponseError`).
+- **(2026-08-31, live parity B5)** `link-card` responses are ALWAYS HTML (success and error) — detected and surfaced as a structured error/hint, never a JSON-parse failure.
+- **(2026-08-31, live parity B5)** Throttle rule: `get-transactions-by-mc-ref` 10 req/60s added to the client defaults.
+- **(2026-08-31, live parity B6)** CLI `cof` group (`link-account`, `link-card`, `charge`, `token renew|details|remove`) and `beneficiary` group (`add`, `update-status`) — token trio param shapes: details takes ONLY `--request-id`; remove takes `--ctid --token`, no requestId.
+- **(2026-08-31, live parity B6)** `transaction-list` pre-validates locally: window ≤3 days (gateway 403s wider) and `--pagination` ≤1000 → exit 1 with hint, before any network call.
+- **(2026-08-31, live parity B6)** `generate-qr` accepts the 9 live-documented optional params (`--first-name --last-name --email --phone --items --return-deeplink --custom-fields --return-params --payout`); `generate-checkout` accepts the full B6 set (`--ctid --token-flag --frequency --type --firstname/--lastname/--email/--phone --items --shipping --lifetime --custom-fields --return-params --skip-success-page --view-type --continue-success-url`). `--items`/`--custom-fields`/`--payout`/`--return-deeplink` accept inline JSON or raw string via `parseJsonOrString`.
 
 ## 4. Repo map (fast orientation)
 
@@ -92,7 +100,22 @@ are the TTY-only branches of `ask` / `sessions clear` and the interactive onboar
 ### 5.5 — Production review P0–P3 (DONE 2026-08-31 — see CHANGELOG Unreleased + docs/MUTATION-SPIKE-2026-08-31.md)
 CI build-before-test + coverage floors + Node ≥20 engines + badge; `npm run test:sandbox` live contract suite; shipped mock harness routes all client status endpoints; shared `src/test/test-utils.ts`; onboard/setup-webhook injectable seams (onboard 69%, setup-webhook 85.5%); per-call `RequestCallOptions` on every domain method; `verifyCallbackDetailed`; fake-timer resilience tests + dist freshness guard; Stryker spike 91.3%; `docs/PRODUCTION-VERIFICATION-PLAN.md` (gated on production credentials); npm publish prep in RELEASE_CHECKLIST (**publishing itself remains the maintainer's call — package not on the registry**).
 
-### 5.6 — Candidate SDK/CLI improvements (propose before building)
+### 5.6 — Live API parity B1–B6 (DONE 2026-08-31 on `feat/live-api-parity`, `c92b9cd`→`9396277`)
+Full plan + evidence: `audit-results/live-parity-handoff.md`, coverage matrix `audit-results/live-api-coverage-2026-08-31.md`.
+- **B1/B2 (OpenAPI sync + CoF/QR param parity):** 24-op coverage matrix vs developer.payway.com.kh; `generateQr` gained the 9 live-documented optional params; CoF `linkAccount`/`linkCard`/`payment`/token-trio realigned to live docs; token trio UN-GATED (sandbox-verified hash orders, `allowUnverifiedTokenOperations` deprecated).
+- **B4 (advisory validation):** `strictValidation` escalation — validation is advisory by default, strict mode throws; wired into QR + checkout + CoF.
+- **B5 (error families):** COF family (`status.code "04"` + `errors{}` → `PayWayBusinessError.fieldErrors`; `1`/`01`/`PTL02` → `PayWaySignatureError`; `98`/`104`/`105`/`09` hints), QR string-code family table, `get-transactions-by-mc-ref` throttle rule (10/60s), link-card HTML-response guard.
+- **B6 (CLI parity):** `cof` group (`link-account`, `link-card`, `charge`, `token renew|details|remove`), `beneficiary` group (`add`, `update-status`), `generate-checkout` full B6 flag set, `generate-qr` 9 new params, `transaction-list` local pre-validation (≤3-day window, ≤1000 page size), `parseJsonOrString` helper for JSON-or-string flags. Tests: `src/__tests__/cli-mock-commands.test.ts` (cof/beneficiary/transaction-list/B6-flag-forwarding cases).
+- **Note:** there is NO standalone `item-entries` command in the B6 spec — `ItemEntry` is consumed by `--items` flags on `generate-qr`/`generate-checkout`/`cof charge`/`payment-link create`, all wired and tested.
+
+### 5.7 — Next: B7 docs & release (the remaining parity batch)
+Per `audit-results/live-parity-handoff.md` §B7:
+- `CHANGELOG.md` v1.4.0 with the **breaking changes** list: linkAccount/linkCard required fields; token-trio param split (`getTokenDetails` now `{requestId}`, `removeToken` now `{ctid,paymentToken}`); CoF hash orders realigned; cofPayment no longer sends `request_id`; linkCard no longer sends `returnUrl`/`returnDeeplink`; trio un-gated; khqr merchantRef error class; purchase throws when google_pay without token.
+- `docs/09-link-unlink-renew-lifecycle.md` (token lifecycle resolution), `docs/12-error-handling-and-debugging.md` (new COF/QR families, `PayWaySignatureError`), README + AGENTS.md new command examples (`cof`, `beneficiary`).
+- Version bump → 1.4.0 via `docs/RELEASE_CHECKLIST.md`. **`npm publish` is a USER decision — never publish.**
+- Then merge `feat/live-api-parity` → `main` (check main hasn't moved; ff-merge; delete branch).
+
+### 5.8 — Candidate SDK/CLI improvements (propose before building)
 - CLI `doctor`: make the credential *source* (profile store vs `.env` vs env) an explicit first-class check row.
 - CLI `skills add`: the installer writes to `~/.opencode/skills` but this OpenCode build loads from `~/.config/opencode/skills` (noted in AGENTS.md) — consider a `--target`/auto-detect flag.
 - Rate-limit token-bucket rules exist only for check-transaction/detail/list/refund; add rules for `generate-qr`/payment-link only if ABA documents caps (Q5).
@@ -101,7 +124,7 @@ CI build-before-test + coverage floors + Node ≥20 engines + badge; `npm run te
 
 ## 6. Testing conventions (established; follow them)
 
-- **Gates before every commit:** `npx vitest run` (988 expected), `npx tsc --noEmit`, `npx biome lint src`.
+- **Gates before every commit:** `npm run build` (two suites hard-require fresh `dist/cli.js`) → `npx vitest run` (1218 expected) → `npx tsc --noEmit` → `npx biome lint src`.
 - **Branch workflow:** create a branch per task → fast-forward merge to `main` after checking `main` hasn't moved (other agents work in parallel) → delete the branch. Conventional commit messages (`feat|fix|test|docs|chore(scope): …`).
 - **In-process CLI tests:** use `runCli(argv)` with captured console and save/restore `process.exitCode`; the module loads `<cwd>/.env` on import, so chdir to a temp dir *before* the dynamic import. Never use `--help`/`--version` in-process (commander calls `process.exit`) and never invoke interactive commands without `-y`/`--json`.
 - **In-process agent tests** (see `src/__tests__/agent-cli-inprocess.test.ts`): point `process.env.APPDATA` at a temp dir (agent paths resolve it per call), register a fresh `Command` via `registerAgentCommands`, drive with `parseAsync`; drive the REPL via `runRepl({ input, output, interactive })` with `PassThrough` streams and spy `console.log`. Strip ANSI before asserting output. Network-free provider turns ride the privacy gate: a config without `privacyAcknowledgedAt` makes `runOneShot` return `blocked`/`PRIVACY_ACK_REQUIRED` before any call.
