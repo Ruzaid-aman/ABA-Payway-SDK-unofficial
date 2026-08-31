@@ -4,7 +4,6 @@
  * Verifies the command registration and help output via the built CLI binary.
  */
 
-import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { distCliPath, runDistCliSync } from '../test/test-utils.js';

@@ -552,3 +552,106 @@ ExchangeRateResponse:
         as required, since PayWay could add/remove currencies.
       additionalProperties:
         $ref: '#/CurrencyRate'
+
+SubscriptionRequest:
+  type: object
+  required: [req_time, merchant_id, tran_id, amount, payment_option, ctid, hash]
+  description: >
+    2026-08-31: modeled from the live subscription-21402227e0 page. Same
+    path and response shapes as PurchaseRequest; differences: ctid /
+    token_flag / frequency added (CITR registration), payment_option
+    restricted to cards | abapay | abapay_deeplink, firstname/lastname
+    capped at 20, and the hash list omits google_pay_token while appending
+    token_flag + frequency (see x-hmac-fields on the operation).
+  properties:
+    req_time:
+      type: string
+      description: UTC request timestamp, format YYYYMMDDHHmmss.
+    merchant_id:
+      type: string
+      maxLength: 30
+    tran_id:
+      type: string
+      maxLength: 20
+    firstname:
+      type: string
+      maxLength: 20
+      description: Capped at 20 for subscription (vs 100 on Purchase).
+    lastname:
+      type: string
+      maxLength: 20
+    email:
+      type: string
+      maxLength: 50
+    phone:
+      type: string
+      maxLength: 20
+    type:
+      type: string
+      maxLength: 20
+      default: purchase
+      description: Only `purchase` documented for subscription.
+    payment_option:
+      type: string
+      maxLength: 20
+      enum: [cards, abapay, abapay_deeplink]
+      description: Subscription enum — KHQR options not documented on the live page.
+    items:
+      type: string
+      maxLength: 500
+      description: Base64-encoded JSON array of {name, quantity, price}.
+    shipping:
+      type: number
+      default: 0
+    amount:
+      type: number
+      description: Zero rejected (err 45); KHR no decimals (46) and must exceed 100 (47).
+    currency:
+      type: string
+      enum: [KHR, USD]
+    return_url:
+      type: string
+      description: Base64-encoded; must be pre-whitelisted (err 81).
+    cancel_url:
+      type: string
+    skip_success_page:
+      type: integer
+      enum: [0, 1]
+    continue_success_url:
+      type: string
+    return_deeplink:
+      type: string
+      description: Base64-encoded JSON {ios_scheme, android_scheme}.
+    custom_fields:
+      type: string
+      description: Base64-encoded JSON.
+    return_params:
+      type: string
+    view_type:
+      type: string
+      enum: [hosted_view, popup]
+    payment_gate:
+      type: integer
+    payout:
+      type: string
+      description: Base64-encoded JSON [{acc, amt}] (max 10, err 25).
+    lifetime:
+      type: integer
+      description: Minutes. Default 30 days; min 3 (err 69); max 30 days.
+    additional_params:
+      type: string
+      description: Base64-encoded JSON. Occupies a hash position per live docs though no property row exists there.
+    ctid:
+      type: string
+      description: Customer token identifier — REQUIRED for subscription.
+    token_flag:
+      type: string
+      enum: [CITR_FIX]
+      description: Fixed recurring registration (first leg of Schedule Payment).
+    frequency:
+      type: string
+      enum: [1W, 1M, 2M]
+      description: Required when token_flag=CITR_FIX.
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)).

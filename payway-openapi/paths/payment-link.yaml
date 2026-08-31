@@ -21,18 +21,20 @@
       chunk_size_bytes: 117
       plaintext_shape:
         mc_id: "same value as merchant_id"
-        title: "title of the payment link"
-        amount: "payment amount"
+        title: "title of the payment link (max 250 chars)"
+        amount: "payment amount (min 100 KHR / 0.01 USD, not null/zero)"
         currency: "USD or KHR — REQUIRED (PTL04 when omitted)"
         description: "optional description of the payment link (max 250 characters — PTL04 when exceeded)"
-        payment_limit: "optional limit on payments"
+        payment_limit: "optional limit on payments (blank = unlimited)"
+        expired_date: "expiration timestamp in seconds (a null value means no expiry; sample passes time())"
         return_url: "base64-encoded callback URL — REQUIRED (PTL04 when omitted)"
-        merchant_ref_no: "unique reference number"
-        expired_date: "optional expiration timestamp in seconds"
+        merchant_ref_no: "optional merchant-side link reference (max 50, echoed in callback)"
+        payout: "optional JSON [{acc, amt}] — total payout must equal the link amount"
       process: >
         JSON-encode the plaintext shape -> split into 117-byte chunks ->
         RSA-encrypt each chunk -> concatenate -> base64 encode into
-        merchant_auth field.
+        merchant_auth field. The optional top-level `image` (max 3MB,
+        JPG/JPEG/PNG) is sent as a multipart part and never hashed.
     requestBody:
       required: true
       content:

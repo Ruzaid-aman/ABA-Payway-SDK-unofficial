@@ -15,7 +15,6 @@
 
 import type { Command } from 'commander';
 import { cancel, intro, note as clackNote, outro } from '@clack/prompts';
-import path from 'node:path';
 import { REMEDIES } from '../../agent/onboarding/remedies.js';
 import { isInteractiveTerminal } from '../../agent/terminal.js';
 import { scanOnboardingState } from '../../agent/onboarding/scan.js';

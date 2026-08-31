@@ -203,6 +203,3 @@ components:
         See the `x-hmac-fields` extension on each operation for the
         ordered field list. This security scheme is a spec-level marker
         only; SDK codegen tooling must read `x-hmac-fields` explicitly.
-  schemas:
-    $ref: './components/schemas/ecommerce-checkout.yaml'
-    $ref: './components/schemas/shared.yaml'

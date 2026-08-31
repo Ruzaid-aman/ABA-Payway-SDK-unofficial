@@ -2,7 +2,8 @@ import { generateHmac } from '../auth.js';
 import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig, RequestCallOptions } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
-import type { components, PollTransactionOptions, PollTransactionResult } from '../types.js';
+import type { components } from '../types.js';
+import type { PollTransactionOptions, PollTransactionResult } from '../domain-types.js';
 import {
   encodeBase64IfNeeded,
   filterParams,

@@ -2,6 +2,7 @@ import type { CofPaymentParams, LinkAccountParams, LinkCardParams, PayWayConfig,
 import { ENDPOINTS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
+import type { LinkCardResponse } from '../domain-types.js';
 import {
   encodeBase64IfNeeded,
   filterParams,
@@ -22,7 +23,7 @@ export interface CredentialsOnFileDomain {
   linkCard: (
     params: LinkCardParams,
     callOptions?: RequestCallOptions,
-  ) => Promise<components['schemas']['LinkCardResponse']>;
+  ) => Promise<LinkCardResponse>;
   payment: (
     params: CofPaymentParams,
     callOptions?: RequestCallOptions,
@@ -146,7 +147,7 @@ export function createCredentialsOnFileDomain(
         });
       }
 
-      return request<components['schemas']['LinkCardResponse']>(
+      return request<LinkCardResponse>(
         ENDPOINTS.linkCard,
         filterParams({
           request_id: params.requestId,

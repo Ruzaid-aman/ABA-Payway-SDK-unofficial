@@ -12,7 +12,7 @@ import {
   PayWayRateLimitError,
   PollingAbortedError,
 } from '../errors.js';
-import type { PollTransactionResult } from '../types.js';
+import type { PollTransactionResult } from '../domain-types.js';
 import * as utils from '../utils.js';
 
 // ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ export function distCliPath(): string {
 
 /** Strip ANSI SGR escape sequences so string matching on CLI output is reliable. */
 export function stripAnsi(s: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching the ESC control character is the entire point
   return s.replace(/\x1B\[[0-9;]*m/g, '');
 }
 

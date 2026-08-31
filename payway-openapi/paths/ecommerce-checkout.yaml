@@ -65,6 +65,76 @@
             schema:
               $ref: '../components/schemas/shared.yaml#/ErrorResponse'
 
+/api/payment-gateway/v1/payments/purchase#subscription:
+  post:
+    operationId: createSubscription
+    summary: Create a subscription / recurring payment (Purchase path with CITR registration)
+    tags: [Ecommerce Checkout]
+    description: >
+      Documented by ABA as a separate operation (subscription-21402227e0)
+      on the SAME path as Purchase. Creates the first payment AND links
+      the customer's ABA account or card in one flow; the token is pushed
+      to callback_url after success (first leg of Schedule Payment,
+      token_flag CITR_FIX). Requires ctid, token_flag, and (for CITR_FIX)
+      frequency. payment_option enum differs from Purchase:
+      cards | abapay | abapay_deeplink (KHQR options not documented here).
+      Firstname/lastname are capped at 20 chars (vs 100 on Purchase).
+    x-hmac-fields:
+      # Live docs order — note: no google_pay_token position; token_flag and
+      # frequency appended at the END (after skip_success_page). additional_params
+      # occupies a hash position though no property row exists on the live page.
+      - req_time
+      - merchant_id
+      - tran_id
+      - amount
+      - items
+      - shipping
+      - firstname
+      - lastname
+      - email
+      - phone
+      - type
+      - payment_option
+      - return_url
+      - cancel_url
+      - continue_success_url
+      - return_deeplink
+      - currency
+      - custom_fields
+      - return_params
+      - payout
+      - lifetime
+      - additional_params
+      - skip_success_page
+      - token_flag
+      - frequency
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            $ref: '../components/schemas/ecommerce-checkout.yaml#/SubscriptionRequest'
+    responses:
+      '200':
+        description: >
+          Identical to Purchase: hosted checkout page (HTML) or a JSON QR
+          payload depending on payment_option.
+        content:
+          text/html:
+            schema:
+              type: string
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '../components/schemas/ecommerce-checkout.yaml#/PurchaseQrResponse'
+                - $ref: '../components/schemas/ecommerce-checkout.yaml#/ErrorStatus'
+      '4XX':
+        description: Client error (invalid hash, missing parameters, validation failure)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'
+
 /api/payment-gateway/v1/payments/check-transaction-2:
   post:
     operationId: checkTransaction

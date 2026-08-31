@@ -128,7 +128,8 @@ export type {
   PollTransactionOptions,
   PollTransactionResult,
   TerminalPaymentStatus,
-} from './types.js';
+} from './domain-types.js';
+export type { LinkCardResponse } from './domain-types.js';
 export { isValidPublicKeyPem, validateRefundAmount } from './utils.js';
 export type { KhqrPaymentNotification, ParsedKhqrPaymentNotification } from './webhook/khqr-notification.js';
 export { extractJsonPayload, parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
