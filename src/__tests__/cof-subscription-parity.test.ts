@@ -108,58 +108,60 @@ describe('linkCard continueSuccessUrl + required fields', () => {
     expect(Buffer.from(sent, 'base64').toString('utf8')).toBe('https://example.com/done');
   });
 
-  it('hash is append-compatible: unset continueSuccessUrl keeps the 10-field HMAC', async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: { code: '00' } }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    vi.stubGlobal('fetch', fetchSpy);
-    const payway = new PayWay(TEST_CONFIG);
-    await payway.credentialsOnFile.linkCard(LINK_CARD_PARAMS);
-    const body = Object.fromEntries(new URLSearchParams(fetchSpy.mock.calls[0][1].body));
-    const legacyFields = [
-      'request_time',
+  it('hash uses the §16-verified live-doc order (merchant_id first)', async () => {
+    const { domain, calls } = makeCofDomain();
+    await domain.linkCard(LINK_CARD_PARAMS);
+    expect(calls[0].hmacFields).toEqual([
       'merchant_id',
-      'request_id',
+      'request_time',
       'ctid',
-      'return_deeplink',
+      'callback_url',
+      'request_id',
       'token_flag',
       'frequency',
-      'return_url',
-      'callback_url',
+      'amount',
       'currency',
-    ];
-    const legacyHash = generateHmac(body, legacyFields, TEST_CONFIG.apiKey as string);
-    expect(body.hash).toBe(legacyHash);
-    vi.unstubAllGlobals();
+      'continue_success_url',
+    ]);
+    // amount is a hash position with no body field (live-doc quirk).
+    expect(calls[0].body.amount).toBeUndefined();
   });
 });
 
 describe('cofPayment extended params (live docs 2026-08-31)', () => {
-  it('hash is append-compatible: params absent keeps the 10-field HMAC', async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: { code: '00' } }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    vi.stubGlobal('fetch', fetchSpy);
-    const payway = new PayWay(TEST_CONFIG);
-    await payway.credentialsOnFile.payment(COF_PAYMENT_PARAMS);
-    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
-    const legacyFields = [
+  it('hash uses the §16-verified live 19-field order; request_id is NOT sent', async () => {
+    const { domain, calls } = makeCofDomain();
+    await domain.payment(COF_PAYMENT_PARAMS);
+    const body = calls[0].body as Record<string, string>;
+    expect(calls[0].hmacFields).toEqual([
       'request_time',
       'merchant_id',
-      'request_id',
       'tran_id',
       'amount',
+      'currency',
+      'items',
       'ctid',
       'pwt',
-      'token_flag',
-      'currency',
+      'first_name',
+      'last_name',
+      'email',
+      'phone',
+      'purchase_type',
       'callback_url',
-    ];
-    const legacyHash = generateHmac(body, legacyFields, TEST_CONFIG.apiKey as string);
-    expect(body.hash).toBe(legacyHash);
-    vi.unstubAllGlobals();
+      'custom_fields',
+      'return_params',
+      'payout',
+      'token_flag',
+      'shipping_fee',
+    ]);
+    expect(body.request_id).toBeUndefined();
   });
 
   it('encodes and sends the 10 new optional params', async () => {
     const { domain, calls } = makeCofDomain();
     await domain.payment({
       ...COF_PAYMENT_PARAMS,
+      requestId: undefined,
       firstName: 'Dara',
       lastName: 'Sok',
       email: 'dara@example.com',
@@ -182,18 +184,6 @@ describe('cofPayment extended params (live docs 2026-08-31)', () => {
     expect(typeof body.payout).toBe('string');
     expect(typeof body.custom_fields).toBe('string');
     expect(body.shipping_fee).toBe(0.5);
-    expect(calls[0].hmacFields.slice(-10)).toEqual([
-      'first_name',
-      'last_name',
-      'email',
-      'phone',
-      'purchase_type',
-      'items',
-      'return_params',
-      'payout',
-      'custom_fields',
-      'shipping_fee',
-    ]);
   });
 });
 

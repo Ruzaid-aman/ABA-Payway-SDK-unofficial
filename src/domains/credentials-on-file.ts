@@ -1,4 +1,13 @@
-import type { CofPaymentParams, LinkAccountParams, LinkCardParams, PayWayConfig, RequestCallOptions, TokenParams } from '../client.js';
+import type {
+  CofPaymentParams,
+  GetTokenDetailsParams,
+  LinkAccountParams,
+  LinkCardParams,
+  PayWayConfig,
+  RemoveTokenParams,
+  RenewTokenParams,
+  RequestCallOptions,
+} from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
@@ -30,18 +39,25 @@ export interface CredentialsOnFileDomain {
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['CofPaymentResponse']>;
   renewToken: (
-    params: TokenParams,
+    params: RenewTokenParams,
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['RenewTokenResponse']>;
   getTokenDetails: (
-    params: TokenParams,
+    params: GetTokenDetailsParams,
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['GetTokenDetailsResponse']>;
   removeToken: (
-    params: TokenParams,
+    params: RemoveTokenParams,
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['RemoveTokenResponse']>;
 }
+
+/**
+ * Live-documented hash orders, sandbox-verified 2026-08-31 via
+ * scripts/sandbox-probe-token-trio.ts (SANDBOX-FINDINGS §16). The gateway
+ * tightened CoF hash validation: the §9a-era SDK orders now return
+ * "01 Wrong Hash" while these orders pass the hash layer.
+ */
 
 export function createCredentialsOnFileDomain(
   config: PayWayConfig,
@@ -57,17 +73,15 @@ export function createCredentialsOnFileDomain(
   ) => Promise<TResponse>,
 ): CredentialsOnFileDomain {
   /**
-   * TD-03 capability guard: the v3 token-management trio has no ABA-confirmed
-   * HMAC composition (~60 derivable field orderings rejected in sandbox
-   * campaigns — SANDBOX-FINDINGS §9a). Blocked by default so merchants cannot
-   * ship blind; explicit opt-in is required to call through anyway.
+   * Legacy TD-03 escape hatch: the trio is allowed by default since the
+   * live-docs compositions were verified (§16); setting the flag explicitly
+   * to `false` re-blocks.
    */
   const requireVerifiedTokenOps = (): void => {
-    if (!config.allowUnverifiedTokenOperations) {
+    if (config.allowUnverifiedTokenOperations === false) {
       throw new PayWayConfigError(
-        'renewToken/getTokenDetails/removeToken are BLOCKED: ABA has not confirmed the HMAC composition for the v3 token-management endpoints ' +
-          '(see audit-results/four-pillars RTM R-04/05/06 and technical-debt-register TD-03). ' +
-          'Set allowUnverifiedTokenOperations: true in the PayWay config to force-enable while awaiting the ABA spec.',
+        'renewToken/getTokenDetails/removeToken are blocked because allowUnverifiedTokenOperations is explicitly false. ' +
+          'The live-documented HMAC compositions were sandbox-verified 2026-08-31 (SANDBOX-FINDINGS §16) — remove the flag to allow them.',
       );
     }
   };
@@ -117,15 +131,16 @@ export function createCredentialsOnFileDomain(
           callback_url: params.callbackUrl ? encodeBase64IfNeeded(params.callbackUrl) : undefined,
           request_time: params.requestTime,
         }),
+        // §16-verified live order (merchant_id first).
         [
-          'request_time',
           'merchant_id',
-          'request_id',
+          'request_time',
           'ctid',
           'return_deeplink',
+          'callback_url',
+          'request_id',
           'token_flag',
           'currency',
-          'callback_url',
         ],
         'request_time',
         undefined,
@@ -155,11 +170,11 @@ export function createCredentialsOnFileDomain(
           `tokenFlag "${params.tokenFlag}" is outside the live-documented link-card set (CITI_FLEX, CITO_FLEX) — verify the merchant profile enables it`,
         );
       }
-
-      if (params.returnUrl) {
-        validatePublicHttpsUrl(params.returnUrl, 'returnUrl', {
-          allowPrivateHosts: config.allowPrivateCallbackHosts === true,
-        });
+      if (params.returnUrl !== undefined || params.returnDeeplink !== undefined) {
+        warnAdvisory(
+          config,
+          'linkCard returnUrl/returnDeeplink are no longer sent: they are not part of the live-documented link-card request and would break the hash (use continueSuccessUrl for the hosted form Done target)',
+        );
       }
 
       if (params.callbackUrl) {
@@ -173,29 +188,26 @@ export function createCredentialsOnFileDomain(
         filterParams({
           request_id: params.requestId,
           ctid: params.ctid,
-          return_deeplink: params.returnDeeplink ? encodeBase64IfNeeded(params.returnDeeplink) : undefined,
           token_flag: params.tokenFlag,
           frequency: params.frequency,
-          return_url: params.returnUrl ? encodeBase64IfNeeded(params.returnUrl) : undefined,
           continue_success_url: params.continueSuccessUrl ? encodeBase64IfNeeded(params.continueSuccessUrl) : undefined,
           callback_url: params.callbackUrl ? encodeBase64IfNeeded(params.callbackUrl) : undefined,
           currency: params.currency ?? 'USD',
           request_time: params.requestTime,
         }),
+        // §16-aligned live order. `amount` and `frequency` are hash positions
+        // with no body field for amount (pass '' — the live doc's PHP sample
+        // references $frequency/$amount that are not request properties);
+        // `frequency` hashes the param when set.
         [
-          // Sandbox-verified order (SANDBOX-FINDINGS §9a). continue_success_url
-          // is appended at the end: unset → '' → hash byte-identical to the
-          // pre-parity list; set → included per "hash covers all posted
-          // parameters". Live-doc order differs (audit §7) — pending probe.
-          'request_time',
           'merchant_id',
-          'request_id',
+          'request_time',
           'ctid',
-          'return_deeplink',
+          'callback_url',
+          'request_id',
           'token_flag',
           'frequency',
-          'return_url',
-          'callback_url',
+          'amount',
           'currency',
           'continue_success_url',
         ],
@@ -208,10 +220,9 @@ export function createCredentialsOnFileDomain(
     },
 
     payment: (params: CofPaymentParams, callOptions?: RequestCallOptions) => {
-      if (typeof params.requestId !== 'string' || params.requestId.trim().length === 0) {
-        throw new PayWayConfigError('requestId is required and must be a non-empty string');
+      if (params.requestId !== undefined && typeof params.requestId === 'string' && params.requestId.trim().length > 0) {
+        validateRequestIdOrCtid(params.requestId, 'requestId');
       }
-      validateRequestIdOrCtid(params.requestId, 'requestId');
       if (params.ctid !== undefined) {
         validateRequestIdOrCtid(params.ctid, 'ctid');
       }
@@ -235,51 +246,48 @@ export function createCredentialsOnFileDomain(
 
       return request<components['schemas']['CofPaymentResponse']>(
         ENDPOINTS.payment,
+        // §16-verified: request_id is NOT sent (absent from the live doc; the
+        // binding layer accepted bodies without it).
         filterParams({
-          request_id: params.requestId,
           tran_id: params.transactionId,
           amount: formatAmount(params.amount, params.currency || 'USD'),
+          currency: params.currency || 'USD',
           ctid: params.ctid,
           pwt: params.paymentToken,
-          token_flag: params.tokenFlag,
-          currency: params.currency || 'USD',
-          callback_url: params.callbackUrl ? encodeBase64IfNeeded(params.callbackUrl) : undefined,
           first_name: params.firstName,
           last_name: params.lastName,
           email: params.email,
           phone: params.phone,
           purchase_type: params.purchaseType,
-          items: params.items !== undefined ? encodeBase64IfNeeded(params.items) : undefined,
+          callback_url: params.callbackUrl ? encodeBase64IfNeeded(params.callbackUrl) : undefined,
+          custom_fields: params.customFields !== undefined ? encodeBase64IfNeeded(params.customFields) : undefined,
           return_params: params.returnParams,
           payout: params.payout !== undefined ? encodeBase64IfNeeded(params.payout) : undefined,
-          custom_fields: params.customFields !== undefined ? encodeBase64IfNeeded(params.customFields) : undefined,
+          token_flag: params.tokenFlag,
           shipping_fee: params.shippingFee,
+          items: params.items !== undefined ? encodeBase64IfNeeded(params.items) : undefined,
           request_time: params.requestTime,
         }),
+        // §16-verified live order.
         [
-          // Sandbox-verified base order (SANDBOX-FINDINGS §9a). The 2026-08-31
-          // live-docs optional params (first_name … shipping_fee) are appended
-          // at the end: unset → '' → hash byte-identical to the pre-parity
-          // list. The live-doc order differs (audit §7) — pending B3 probe.
           'request_time',
           'merchant_id',
-          'request_id',
           'tran_id',
           'amount',
+          'currency',
+          'items',
           'ctid',
           'pwt',
-          'token_flag',
-          'currency',
-          'callback_url',
           'first_name',
           'last_name',
           'email',
           'phone',
           'purchase_type',
-          'items',
+          'callback_url',
+          'custom_fields',
           'return_params',
           'payout',
-          'custom_fields',
+          'token_flag',
           'shipping_fee',
         ],
         'request_time',
@@ -290,7 +298,7 @@ export function createCredentialsOnFileDomain(
       );
     },
 
-    renewToken: (params: TokenParams, callOptions?: RequestCallOptions) => {
+    renewToken: (params: RenewTokenParams, callOptions?: RequestCallOptions) => {
       requireVerifiedTokenOps();
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required');
@@ -302,12 +310,12 @@ export function createCredentialsOnFileDomain(
         ENDPOINTS.renewToken,
         filterParams({
           request_id: params.requestId,
-          request: params.request ?? params.requestId,
           ctid: params.ctid,
           pwt: params.paymentToken,
           request_time: params.requestTime,
         }),
-        ['request_time', 'merchant_id', 'request_id', 'ctid', 'pwt'],
+        // §16-verified live order (ctid leads).
+        ['ctid', 'request_time', 'pwt', 'merchant_id', 'request_id'],
         'request_time',
         undefined,
         undefined,
@@ -316,24 +324,19 @@ export function createCredentialsOnFileDomain(
       );
     },
 
-    getTokenDetails: (params: TokenParams, callOptions?: RequestCallOptions) => {
+    getTokenDetails: (params: GetTokenDetailsParams, callOptions?: RequestCallOptions) => {
       requireVerifiedTokenOps();
-      if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
-        throw new PayWayConfigError('paymentToken is required');
-      }
       validateRequestIdOrCtid(params.requestId, 'requestId');
-      validateRequestIdOrCtid(params.ctid, 'ctid');
 
       return request<components['schemas']['GetTokenDetailsResponse']>(
         ENDPOINTS.getTokenDetails,
+        // §16-verified: ONLY request_id (+ auto merchant_id/request_time) —
+        // no ctid, no pwt.
         filterParams({
           request_id: params.requestId,
-          request: params.request ?? params.requestId,
-          ctid: params.ctid,
-          pwt: params.paymentToken,
           request_time: params.requestTime,
         }),
-        ['request_time', 'merchant_id', 'request_id', 'ctid', 'pwt'],
+        ['merchant_id', 'request_time', 'request_id'],
         'request_time',
         undefined,
         undefined,
@@ -342,24 +345,23 @@ export function createCredentialsOnFileDomain(
       );
     },
 
-    removeToken: (params: TokenParams, callOptions?: RequestCallOptions) => {
+    removeToken: (params: RemoveTokenParams, callOptions?: RequestCallOptions) => {
       requireVerifiedTokenOps();
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required');
       }
-      validateRequestIdOrCtid(params.requestId, 'requestId');
       validateRequestIdOrCtid(params.ctid, 'ctid');
 
       return request<components['schemas']['RemoveTokenResponse']>(
         ENDPOINTS.removeToken,
+        // §16-verified: ctid + pwt only (+ auto merchant_id/request_time) —
+        // no request_id.
         filterParams({
-          request_id: params.requestId,
-          request: params.request ?? params.requestId,
           ctid: params.ctid,
           pwt: params.paymentToken,
           request_time: params.requestTime,
         }),
-        ['request_time', 'merchant_id', 'request_id', 'ctid', 'pwt'],
+        ['merchant_id', 'ctid', 'request_time', 'pwt'],
         'request_time',
         undefined,
         undefined,

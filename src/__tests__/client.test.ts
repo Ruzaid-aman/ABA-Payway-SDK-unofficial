@@ -988,7 +988,7 @@ describe('credentialsOnFile domain', () => {
     expect(url).toContain(ENDPOINTS.linkAccount);
   });
 
-  it('linkCard sends POST with correct fields', async () => {
+  it('linkCard sends POST with correct fields (live-doc contract: no return_url)', async () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'OK' } }));
 
     await payway.credentialsOnFile.linkCard({
@@ -1003,8 +1003,11 @@ describe('credentialsOnFile domain', () => {
     expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
     const params = new URLSearchParams(opts.body);
     expect(params.get('request_id')).toBe('REQ002');
-    // return_url should be base64 encoded
-    expect(params.get('return_url')).not.toContain('https://');
+    expect(params.get('ctid')).toBe('CTID002');
+    expect(params.get('token_flag')).toBe('CITO_FLEX');
+    // 2026-08-31 realignment: returnUrl is deprecated and NOT sent — it is
+    // not part of the live-documented link-card request/hash (§16).
+    expect(params.has('return_url')).toBe(false);
   });
 
   it('payment sends POST with amount formatted for currency', async () => {
@@ -1038,30 +1041,35 @@ describe('credentialsOnFile domain', () => {
     expect(url).toContain(ENDPOINTS.renewToken);
   });
 
-  it('getTokenDetails sends POST to get-token-details', async () => {
+  it('getTokenDetails sends POST to get-token-details (no ctid/pwt per live docs)', async () => {
     fetchSpy.mockResolvedValueOnce(
       mockJsonResponse({ status: { code: '00', message: 'OK' }, data: { token_type: 'card' } }),
     );
 
     await payway.credentialsOnFile.getTokenDetails({
       requestId: 'REQ005',
-      ctid: 'CUST005',
-      paymentToken: 'tok_abc',
     });
 
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body).toHaveProperty('request_id', 'REQ005');
+    expect(body).not.toHaveProperty('ctid');
+    expect(body).not.toHaveProperty('pwt');
     const [url] = fetchSpy.mock.calls[0];
     expect(url).toContain(ENDPOINTS.getTokenDetails);
   });
 
-  it('removeToken sends POST to remove-token', async () => {
+  it('removeToken sends POST to remove-token (no request_id per live docs)', async () => {
     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Removed' } }));
 
     await payway.credentialsOnFile.removeToken({
-      requestId: 'REQ006',
       ctid: 'CUST006',
       paymentToken: 'tok_abc',
     });
 
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body).toHaveProperty('ctid', 'CUST006');
+    expect(body).toHaveProperty('pwt', 'tok_abc');
+    expect(body).not.toHaveProperty('request_id');
     const [url] = fetchSpy.mock.calls[0];
     expect(url).toContain(ENDPOINTS.removeToken);
   });

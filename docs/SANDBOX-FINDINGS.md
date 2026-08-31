@@ -627,3 +627,50 @@ call on the image link (`HTTP 200 code=00`).
   across the split files). `payway-openapi/bundled.yaml` is maintained by hand in the
   meantime; the `image` part is documented in both `components/schemas/payment-link.yaml`
   and `bundled.yaml`.
+
+---
+
+## 16. Token-trio HMAC compositions VERIFIED from live docs; CoF family realigned (2026-08-31)
+
+**Context.** TD-03 / RTM R-04/05/06 / ABA-OPEN-QUESTIONS Q6 blocked the v3 token-management trio because
+~60 derivable HMAC compositions were rejected during the §9a campaign (2026-08-2x). The live docs at
+developer.payway.com.kh now publish **explicit per-endpoint hash orders** (each spec page embeds the Apidog
+OpenAPI definition). `scripts/sandbox-probe-token-trio.ts` (new, re-runnable) probed the documented orders plus
+the SDK baselines; evidence: `test-output/token-trio/probe-2026-08-31T00-28-10-661Z.log`.
+
+**Classification rule.** The gateway checks the HMAC before the business layer: a wrong-hash code
+(`1`/`01`/PTL02) proves rejection; ANY other business code (105 invalid token, 09 data not found, 04 invalid
+data, 104 flag not enabled, 00 success) proves the hash layer ACCEPTED the composition — synthetic
+request_id/ctid/pwt values are sufficient.
+
+### 16a. Verdicts (merchant `ec476910`, sandbox)
+
+| Endpoint | Live-documented composition | Verdict | Business code observed |
+|---|---|---|---|
+| renew-expired-account-token | `ctid.request_time.pwt.merchant_id.request_id` | **ACCEPTED** | `105` Invalid payment credential token (403) |
+| get-token-details | `merchant_id.request_time.request_id` — **no ctid/pwt anywhere** | **ACCEPTED** | `09` Data not found (403) |
+| remove-token | `merchant_id.ctid.request_time.pwt` — **no request_id** | **ACCEPTED** | `200` code `00` Success (idempotent removal of unknown token) |
+| link-account | `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency` | **ACCEPTED** | `104` Merchant not enabled token flag (403) |
+| purchase/payment-credential | `request_time.merchant_id.tran_id.amount.currency.items.ctid.pwt.first_name.last_name.email.phone.purchase_type.callback_url.custom_fields.return_params.payout.token_flag.shipping_fee` — **no request_id** | **ACCEPTED** | `105` Invalid payment credential token (403) |
+| every corresponding SDK legacy order (5 baselines) | `request_time.merchant_id.request_id.…` | **REJECTED** | `01` Wrong Hash on all five |
+
+### 16b. Consequences (behavior contract change — flip the pins consciously)
+
+1. **The gateway tightened CoF hash validation since §9a.** The §9a-era "sandbox-verified" SDK orders now
+   return `01 Wrong Hash` on the same sandbox. The live-documented compositions are the current contract;
+   the SDK is realigned to them (link-account, link-card, CoF payment, renew, details, remove).
+2. **The token trio is UN-GATED**: `allowUnverifiedTokenOperations` now defaults to allowed; setting it
+   explicitly to `false` re-blocks (escape hatch). TD-03/Q6 are resolved-by-evidence, not by ABA prose.
+3. **Per-endpoint token params replace the shared `TokenParams`**: renew needs `requestId+ctid+pwt`,
+   get-token-details needs ONLY `requestId`, remove-token needs `ctid+pwt` (no `request_id`).
+4. **`request`/`request_id` binding quirks from §9a are gone**: the binding layer accepted bodies without
+   `request` and without `request_id` (token-details, remove-token, CoF payment live-doc probes passed
+   binding and reached the business layer). The SDK no longer sends `request`; CoF payment no longer sends
+   `request_id` (param kept, deprecated, not sent).
+5. **link-card** is realigned to its live-documented composition
+   (`merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency.continue_success_url`,
+   with `amount`/`frequency` as empty hash positions) — `return_url`/`return_deeplink` are NOT part of the
+   live-documented link-card request and are no longer sent (params deprecated). Not directly probed (the
+   endpoint answers in HTML); aligned on family consistency + documented order.
+6. `npm run bundle` is FIXED as of 13f817e (duplicate `$ref` under `components.schemas` removed); §15c's
+   hand-maintained `payway-openapi/bundled.yaml` can now be regenerated (`dist/openapi.bundled.yaml`).

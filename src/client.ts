@@ -80,11 +80,11 @@ export interface PayWayConfig {
   /** ABA-issued merchant data used only for official offline KHQR generation. */
   khqr?: KhqrMerchantConfiguration;
   /**
-   * TD-03 guard: the v3 token-management trio (renewToken/getTokenDetails/
-   * removeToken) has NO ABA-confirmed HMAC composition (every derivable field
-   * ordering was rejected in sandbox campaigns) and is therefore blocked by
-   * default. Set `true` only when you accept shipping blind against the
-   * gateway's current behaviour.
+   * Escape hatch for the v3 token-management trio (renewToken/getTokenDetails/
+   * removeToken). The live-documented HMAC compositions were sandbox-verified
+   * 2026-08-31 (SANDBOX-FINDINGS §16), so the operations are allowed by
+   * DEFAULT now; set `false` to re-block them (legacy TD-03 posture).
+   * @deprecated No longer required — kept as an opt-out only.
    */
   allowUnverifiedTokenOperations?: boolean;
   /**
@@ -222,16 +222,17 @@ export interface LinkCardParams {
   requestId: string;
   /** Customer token identifier — REQUIRED per the live docs (5–24 alnum). */
   ctid: string;
+  /** @deprecated Not part of the live-documented link-card request; no longer sent. Use linkAccount for account deeplinks. */
   returnDeeplink?: string | { ios_scheme: string; android_scheme: string };
   /** REQUIRED per the live docs. Live-documented values: CITI_FLEX | CITO_FLEX. */
   tokenFlag: string;
   frequency?: '1W' | '1M' | '2M';
+  /** @deprecated Not part of the live-documented link-card request; no longer sent (the hosted form's done-target is continueSuccessUrl). */
   returnUrl?: string;
   callbackUrl?: string;
   /**
    * Base64-encoded target of the hosted form's "Done" button (live docs).
-   * Hash position appended at the end of the SDK's verified order — empty
-   * when unset keeps the previous HMAC byte-identical.
+   * Part of the live-documented hash order (last position).
    */
   continueSuccessUrl?: string;
   /**
@@ -243,7 +244,8 @@ export interface LinkCardParams {
 }
 
 export interface CofPaymentParams {
-  requestId: string;
+  /** @deprecated Not part of the live-documented request; no longer sent (verified 2026-08-31 — the binding layer no longer requires it). */
+  requestId?: string;
   transactionId: string;
   amount: number;
   ctid?: string;
@@ -252,40 +254,68 @@ export interface CofPaymentParams {
   currency?: 'KHR' | 'USD';
   callbackUrl?: string;
   requestTime?: string;
-  /** Payer name — gateway caps at 20 chars (advisory). Hash appended at end (audit §7). */
+  /** Payer name — gateway caps at 20 chars (advisory). Live-documented hash position. */
   firstName?: string;
-  /** Payer name — gateway caps at 20 chars (advisory). Hash appended at end (audit §7). */
+  /** Payer name — gateway caps at 20 chars (advisory). Live-documented hash position. */
   lastName?: string;
-  /** Payer email — gateway caps at 50 chars (advisory). Hash appended at end (audit §7). */
+  /** Payer email — gateway caps at 50 chars (advisory). Live-documented hash position. */
   email?: string;
-  /** Payer phone — gateway caps at 20 chars (advisory). Hash appended at end (audit §7). */
+  /** Payer phone — gateway caps at 20 chars (advisory). Live-documented hash position. */
   phone?: string;
-  /** 'purchase' (default) | 'pre-auth'. Hash appended at end (audit §7). */
+  /** 'purchase' (default) | 'pre-auth'. Live-documented hash position. */
   purchaseType?: 'purchase' | 'pre-auth';
-  /** Item list — base64-encoded JSON when array. Hash appended at end (audit §7). */
+  /** Item list — base64-encoded JSON when array. Live-documented hash position. */
   items?: string | ItemEntry[];
-  /** Echoed in the pushback. Hash appended at end (audit §7). */
+  /** Echoed in the pushback. Live-documented hash position. */
   returnParams?: string;
-  /** Split-payout [{acc, amt}] — base64-encoded JSON when array. Hash appended at end (audit §7). */
+  /** Split-payout [{acc, amt}] — base64-encoded JSON when array. Live-documented hash position. */
   payout?: string | { acc: string; amt: number }[];
-  /** Base64-encoded JSON when object. Hash appended at end (audit §7). */
+  /** Base64-encoded JSON when object. Live-documented hash position. */
   customFields?: string | Record<string, unknown>;
-  /** Shipping fee — 'can be any amount' per live docs. Hash appended at end (audit §7). */
+  /** Shipping fee — 'can be any amount' per live docs. Live-documented hash position. */
   shippingFee?: number;
 }
 
-export interface TokenParams {
+/**
+ * Renew an expired (or expiring) ACCOUNT token. Live-documented hash:
+ * `ctid.request_time.pwt.merchant_id.request_id` (sandbox-verified 2026-08-31,
+ * SANDBOX-FINDINGS §16).
+ */
+export interface RenewTokenParams {
   requestId: string;
   ctid: string;
   paymentToken: string;
-  /**
-   * Value for the server-required `request` field on v3 token-management
-   * endpoints (defaults to `requestId`). Sandbox binding layer rejects
-   * requests without it ("The request field is required.").
-   */
-  request?: string;
   requestTime?: string;
 }
+
+/**
+ * Retrieve stored-token details. Live-documented request carries ONLY
+ * request_time/merchant_id/request_id — no ctid, no pwt (sandbox-verified
+ * 2026-08-31, SANDBOX-FINDINGS §16).
+ */
+export interface GetTokenDetailsParams {
+  requestId: string;
+  requestTime?: string;
+}
+
+/**
+ * Remove a linked account or card token (irreversible). Live-documented
+ * request: request_time/merchant_id/ctid/pwt — no request_id
+ * (sandbox-verified 2026-08-31, SANDBOX-FINDINGS §16).
+ */
+export interface RemoveTokenParams {
+  ctid: string;
+  paymentToken: string;
+  requestTime?: string;
+}
+
+/**
+ * @deprecated Legacy shared shape for the v3 token trio. The endpoints now
+ * take per-endpoint params ({@link RenewTokenParams},
+ * {@link GetTokenDetailsParams}, {@link RemoveTokenParams}) — the old shared
+ * composition was wrong (SANDBOX-FINDINGS §16).
+ */
+export type TokenParams = RenewTokenParams;
 
 export interface GenerateQrParams {
   transactionId: string;

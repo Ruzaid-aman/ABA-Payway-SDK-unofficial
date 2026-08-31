@@ -5,6 +5,7 @@ import type {
   LinkAccountParams,
   LinkCardParams,
   PayWayConfig,
+  RemoveTokenParams,
   TokenParams,
 } from '../client.js';
 import { createCredentialsOnFileDomain } from '../domains/credentials-on-file.js';
@@ -240,19 +241,20 @@ describe('Validation: gateway-parity identifier & token-flag rules (TD-06)', () 
     ).toThrow(/a-zA-Z0-9/);
   });
 
-  it('rejects ctid violating the [a-zA-Z0-9]{5,24} rule on getTokenDetails', () => {
+  it('rejects ctid violating the [a-zA-Z0-9]{5,24} rule on removeToken', () => {
+    // 2026-08-31: getTokenDetails no longer takes ctid/pwt (live docs §16) —
+    // the ctid format rule is pinned on removeToken instead.
     expect(() =>
-      cof.getTokenDetails({ requestId: 'req01', ctid: 'CUST-005', paymentToken: 'pt' } as unknown as TokenParams),
+      cof.removeToken({ ctid: 'CUST-005', paymentToken: 'pt' } as unknown as RemoveTokenParams),
     ).toThrow(PayWayConfigError);
   });
 
   it('accepts identifiers matching the gateway rule end-to-end', async () => {
     rawSpy.mockClear();
     await cofPos.removeToken({
-      requestId: 'req01',
       ctid: 'CUST006',
       paymentToken: 'pt',
-    } as unknown as TokenParams);
+    } as unknown as RemoveTokenParams);
     expect(rawSpy).toHaveBeenCalled();
   });
 
@@ -288,31 +290,39 @@ describe('Validation: gateway-parity identifier & token-flag rules (TD-06)', () 
 });
 
 // ─── TD-03: token-trio capability guard ───────────────────────────────────
-describe('Validation: token-trio capability guard (TD-03)', () => {
-  const blocked = createCredentialsOnFileDomain({} as unknown as PayWayConfig, dummyRequest);
-  const allowed = createCredentialsOnFileDomain(
-    { allowUnverifiedTokenOperations: true } as unknown as PayWayConfig,
-    spyRequest,
+// 2026-08-31 FLIPPED: the live-documented HMAC compositions were
+// sandbox-verified (SANDBOX-FINDINGS §16), so the trio is allowed by
+// DEFAULT now and `allowUnverifiedTokenOperations: false` re-blocks.
+describe('Validation: token-trio capability guard (TD-03, flipped 2026-08-31)', () => {
+  const explicitOptOut = createCredentialsOnFileDomain(
+    { allowUnverifiedTokenOperations: false } as unknown as PayWayConfig,
+    dummyRequest,
   );
+  const allowed = createCredentialsOnFileDomain({} as unknown as PayWayConfig, spyRequest);
 
-  it('blocks renewToken by default with an actionable message', () => {
+  it('blocks the trio only when allowUnverifiedTokenOperations is explicitly false', () => {
     try {
-      blocked.renewToken({ requestId: 'req01', ctid: 'ctid01', paymentToken: 'pt' } as unknown as TokenParams);
+      explicitOptOut.renewToken({ requestId: 'req01', ctid: 'ctid01', paymentToken: 'pt' });
       expect.unreachable('should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(PayWayConfigError);
       expect((error as Error).message).toContain('allowUnverifiedTokenOperations');
-      expect((error as Error).message).toContain('TD-03');
+      expect((error as Error).message).toContain('SANDBOX-FINDINGS §16');
     }
+    expect(() =>
+      explicitOptOut.getTokenDetails({ requestId: 'req01' }),
+    ).toThrow(PayWayConfigError);
+    expect(() =>
+      explicitOptOut.removeToken({ ctid: 'ctid01', paymentToken: 'pt' }),
+    ).toThrow(PayWayConfigError);
   });
 
-  it('blocks getTokenDetails and removeToken by default', () => {
-    expect(() =>
-      blocked.getTokenDetails({ requestId: 'req01', ctid: 'ctid01', paymentToken: 'pt' } as unknown as TokenParams),
-    ).toThrow(PayWayConfigError);
-    expect(() =>
-      blocked.removeToken({ requestId: 'req01', ctid: 'ctid01', paymentToken: 'pt' } as unknown as TokenParams),
-    ).toThrow(PayWayConfigError);
+  it('allows the trio by default with the §16-verified params', async () => {
+    rawSpy.mockClear();
+    await allowed.renewToken({ requestId: 'req01', ctid: 'ctid01', paymentToken: 'pt' });
+    await allowed.getTokenDetails({ requestId: 'req01' });
+    await allowed.removeToken({ ctid: 'ctid01', paymentToken: 'pt' });
+    expect(rawSpy).toHaveBeenCalledTimes(3);
   });
 
   it('lets linking/charging endpoints work without the flag', async () => {
