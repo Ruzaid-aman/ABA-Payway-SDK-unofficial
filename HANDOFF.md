@@ -1,26 +1,26 @@
 # Agent Handoff — aba-payway-ts
 
 **Audience:** an agent resuming work in a fresh session. Read this plus `AGENTS.md` before acting.
-**Last updated:** 2026-08-31, after the live API parity work on `feat/live-api-parity` (B1–B6: OpenAPI sync, CoF/QR param parity, advisory validation, COF/QR error families, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation).
+**Last updated:** 2026-08-31, after the live API parity release **v1.3.6** (B1–B7: OpenAPI sync, CoF/QR param parity, advisory validation, COF/QR error families, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation, changelog + docs/09 + docs/12 + version bump; ff-merged to `main` at `e47ab47`).
 **Provenance:** everything below was done and verified in prior sessions; per-item evidence paths are included so you never have to re-derive or re-probe.
 
 ---
 
-## 1. Current state (verified on `feat/live-api-parity` @ `9396277`; main last at `d486738` + docs sync)
+## 1. Current state (verified on `main` @ `e47ab47` — v1.3.6 released)
 
 | Aspect | State |
 |---|---|
-| Version | `1.3.0` (tag `v1.3.0`; package.json bumped from a stale 1.1.1 — the v1.2.0 tag already existed since July, **do not move tags**) |
+| Version | `1.3.6` (released 2026-08-31; tag `v1.3.0` predates it — **do not move tags**; no `v1.3.6` tag created unless the user asks) |
 | Tests | 1218 tests / 79 files green (`npx vitest run` after `npm run build`; +13 opt-in sandbox contract tests skipped unless `SANDBOX_CONTRACT_TESTS=1`) |
 | Typecheck / lint | `npx tsc --noEmit` clean; `npx biome lint src` clean |
 | Coverage | ~78% stmts / ~72.5% branch (`npx vitest run --coverage`); CI enforces floors 74/69/80/74 via vitest.config.ts thresholds — ratchet upward |
 | Mutation testing | StrykerJS 10 spike on auth.ts + circuit-breaker.ts: **91.3% score** — `docs/MUTATION-SPIKE-2026-08-31.md`, `stryker.config.json` (dev-only, Node ≥ 22, not in CI) |
 | Edge-case audit | **All 23 findings (EC-01–EC-23) remediated** — `audit-results/edge-case-report.md` (findings), `audit-results/code-improvement-plan.md` (batches 1–5, all marked done) |
-| Live API parity | **B1–B6 complete** on `feat/live-api-parity` (8 commits, `c92b9cd`→`9396277`): OpenAPI 24-op coverage matrix, CoF/QR param parity, advisory validation (`strictValidation`), COF/QR error families + `PayWaySignatureError`, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation. Plan: `audit-results/live-parity-handoff.md` |
-| Release checklist | Run for 1.3.0: build, dist smoke, live `npm run probe` (all PATH_OK) — `docs/RELEASE_CHECKLIST.md` |
+| Live API parity | **B1–B7 complete, released as v1.3.6** (10 commits, `c92b9cd`→`e47ab47`, ff-merged to `main`): OpenAPI 24-op coverage matrix, CoF/QR param parity, advisory validation (`strictValidation`), COF/QR error families + `PayWaySignatureError`, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation, CHANGELOG + docs/09 + docs/12 updates, version bump. Plan: `audit-results/live-parity-handoff.md` |
+| Release checklist | Run for 1.3.6: build, dist smoke, full vitest (1218 green) — `docs/RELEASE_CHECKLIST.md` |
 | Working tree | Clean; nothing untracked |
 
-Recent commit history (oldest→newest): `0bbad8d` audit remediation batches 1–3 → `7898963` batch 4 → `dd4556f` batch 5 → `b6d15e1` release v1.3.0 → `9661b16` coverage 55→70% → `6bf3afc` changelog note → `d486738` agent testability refactor → docs sync → `c92b9cd`→`9396277` live parity B1–B6 (on `feat/live-api-parity`).
+Recent commit history (oldest→newest): `0bbad8d` audit remediation batches 1–3 → `7898963` batch 4 → `dd4556f` batch 5 → `b6d15e1` release v1.3.0 → `9661b16` coverage 55→70% → `6bf3afc` changelog note → `d486738` agent testability refactor → docs sync → `c92b9cd`→`9396277` live parity B1–B6 → `f8a0f14` handoff + .gitattributes → `e47ab47` B7 release v1.3.6 (all on `main` now).
 
 ## 2. Environment rules (violating these has caused real incidents)
 
@@ -108,12 +108,13 @@ Full plan + evidence: `audit-results/live-parity-handoff.md`, coverage matrix `a
 - **B6 (CLI parity):** `cof` group (`link-account`, `link-card`, `charge`, `token renew|details|remove`), `beneficiary` group (`add`, `update-status`), `generate-checkout` full B6 flag set, `generate-qr` 9 new params, `transaction-list` local pre-validation (≤3-day window, ≤1000 page size), `parseJsonOrString` helper for JSON-or-string flags. Tests: `src/__tests__/cli-mock-commands.test.ts` (cof/beneficiary/transaction-list/B6-flag-forwarding cases).
 - **Note:** there is NO standalone `item-entries` command in the B6 spec — `ItemEntry` is consumed by `--items` flags on `generate-qr`/`generate-checkout`/`cof charge`/`payment-link create`, all wired and tested.
 
-### 5.7 — Next: B7 docs & release (the remaining parity batch)
-Per `audit-results/live-parity-handoff.md` §B7:
-- `CHANGELOG.md` v1.4.0 with the **breaking changes** list: linkAccount/linkCard required fields; token-trio param split (`getTokenDetails` now `{requestId}`, `removeToken` now `{ctid,paymentToken}`); CoF hash orders realigned; cofPayment no longer sends `request_id`; linkCard no longer sends `returnUrl`/`returnDeeplink`; trio un-gated; khqr merchantRef error class; purchase throws when google_pay without token.
-- `docs/09-link-unlink-renew-lifecycle.md` (token lifecycle resolution), `docs/12-error-handling-and-debugging.md` (new COF/QR families, `PayWaySignatureError`), README + AGENTS.md new command examples (`cof`, `beneficiary`).
-- Version bump → 1.4.0 via `docs/RELEASE_CHECKLIST.md`. **`npm publish` is a USER decision — never publish.**
-- Then merge `feat/live-api-parity` → `main` (check main hasn't moved; ff-merge; delete branch).
+### 5.7 — B7 docs & release — **DONE (2026-08-31, released as v1.3.6)**
+Per `audit-results/live-parity-handoff.md` §B7 (version number per user instruction — the plan doc said v1.4.0, the user specified v1.3.6):
+- ✅ `CHANGELOG.md` v1.3.6 with the **breaking changes** list: linkAccount/linkCard required fields; token-trio param split (`getTokenDetails` now `{requestId}`, `removeToken` now `{ctid,paymentToken}`); CoF hash orders realigned; cofPayment no longer sends `request_id`; linkCard no longer sends `returnUrl`/`returnDeeplink`; trio un-gated; khqr merchantRef error class; purchase throws when google_pay without token.
+- ✅ `docs/09-link-unlink-renew-lifecycle.md` (token lifecycle resolution: trio un-gated per §16, param shapes fixed, `continueSuccessUrl`, CLI cof/beneficiary quick reference), `docs/12-error-handling-and-debugging.md` (`PayWaySignatureError` in hierarchy + section, `fieldErrors`, COF + QR family tables, link-card HTML note, mc-ref throttle, explain families).
+- ✅ Version bump → 1.3.6 (package.json + package-lock.json ×2). **`npm publish` is a USER decision — never publish.**
+- ✅ Merged `feat/live-api-parity` → `main` (ff-merge at `e47ab47`; branch deleted).
+- ⚠️ Not done (deliberately): README + AGENTS.md new command examples for `cof`/`beneficiary` — AGENTS.md already carries the canonical command list; add README examples when the docs batch next opens.
 
 ### 5.8 — Candidate SDK/CLI improvements (propose before building)
 - CLI `doctor`: make the credential *source* (profile store vs `.env` vs env) an explicit first-class check row.
@@ -140,14 +141,14 @@ Per `audit-results/live-parity-handoff.md` §B7:
 - Close-transaction is advisory in sandbox (closed-unpaid txns still pay and stay PENDING); no CLOSED status exists anywhere.
 - check-transaction sees new transactions in <1 s; transaction-detail needs ~5 s.
 - (§14, 2026-08-31) **Unpaid QR-only transactions are invisible to transaction-list** while check-transaction/detail see them; transaction-list rejects date ranges wider than 3 days with HTTP 403 ("Maximum date rang is allowed only 3 days"). Pinned as live tests in the sandbox contract suite.
-- v3 token trio: binding layer OK, HMAC composition black-box (60+ attempts) — capability-guarded in the SDK.
+- v3 token trio: binding layer OK; HMAC composition was black-box in the August campaign (60+ attempts) but **resolved 2026-08-31** — live-documented hash orders verified, trio UN-GATED (§16).
 
 ## 8. Anti-checklist (things agents got wrong before — do not repeat)
 
 - Don't set `NODE_TLS_REJECT_UNAUTHORIZED` globally; don't commit `.env`, `dist/`, `test-output/`, or profile stores.
 - Don't "fix" `validateLifetime` to enforce 180 s everywhere — checkout minutes ≠ QR seconds.
 - Don't parse `Retry-After` as milliseconds; don't skip the empty-body guard; don't un-guard private callback hosts by default.
-- Don't bump/move existing git tags; next release is **v1.4.0** (or v1.3.1 for fix-only), via `docs/RELEASE_CHECKLIST.md`.
+- Don't bump/move existing git tags; v1.3.6 shipped 2026-08-31 (no tag created — user decides); next release is **v1.4.0** (or v1.3.7 for fix-only), via `docs/RELEASE_CHECKLIST.md`.
 - Don't commit without the three gates; don't merge without checking `main` hasn't moved.
 - Don't rewrite audit artifacts (`audit-results/*`, `docs/SANDBOX-FINDINGS.md` history) — append new sections with dates.
 - Don't test the interactive REPL through `startRepl`/`process.stdin`; use the `runRepl(io)` seam. Don't assert on raw CLI output without stripping ANSI (color codes break `toContain`).
