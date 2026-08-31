@@ -188,26 +188,52 @@ export interface CreateTransactionParams {
    * overwrites duplicates).
    */
   retryPolicy?: 'transient' | 'none';
+  /**
+   * Subscription/recurring registration (live `subscription-21402227e0`
+   * operation on the purchase path): merchant-side unique customer token
+   * identifier. Required when `tokenFlag` is set.
+   */
+  ctid?: string;
+  /**
+   * Subscription token flag — currently only 'CITR_FIX' (fixed recurring)
+   * is documented on the purchase path. When set, `ctid` becomes required
+   * and `frequency` is required iff the flag is CITR_FIX. For other
+   * linking flags use `credentialsOnFile.linkAccount`/`linkCard` instead.
+   */
+  tokenFlag?: 'CITR_FIX';
+  /** Billing frequency — REQUIRED when tokenFlag='CITR_FIX' (live docs). */
+  frequency?: '1W' | '1M' | '2M';
 }
 
 export interface LinkAccountParams {
   requestId: string;
-  ctid?: string;
+  /** Customer token identifier — REQUIRED per the live docs (5–24 alnum). */
+  ctid: string;
   returnDeeplink?: string | { ios_scheme: string; android_scheme: string };
-  tokenFlag?: string;
-  currency?: 'KHR' | 'USD';
+  /** REQUIRED per the live docs. Live-documented values: CITI_FLEX | CITO_FLEX. */
+  tokenFlag: string;
+  /** REQUIRED per the live docs (profile-enabled currency). */
+  currency: 'KHR' | 'USD';
   callbackUrl?: string;
   requestTime?: string;
 }
 
 export interface LinkCardParams {
   requestId: string;
-  ctid?: string;
+  /** Customer token identifier — REQUIRED per the live docs (5–24 alnum). */
+  ctid: string;
   returnDeeplink?: string | { ios_scheme: string; android_scheme: string };
-  tokenFlag?: string;
+  /** REQUIRED per the live docs. Live-documented values: CITI_FLEX | CITO_FLEX. */
+  tokenFlag: string;
   frequency?: '1W' | '1M' | '2M';
   returnUrl?: string;
   callbackUrl?: string;
+  /**
+   * Base64-encoded target of the hosted form's "Done" button (live docs).
+   * Hash position appended at the end of the SDK's verified order — empty
+   * when unset keeps the previous HMAC byte-identical.
+   */
+  continueSuccessUrl?: string;
   /**
    * Payment currency. Required by the sandbox binding layer
    * ("The currency field is required.") — defaults to 'USD'.
@@ -226,6 +252,26 @@ export interface CofPaymentParams {
   currency?: 'KHR' | 'USD';
   callbackUrl?: string;
   requestTime?: string;
+  /** Payer name — gateway caps at 20 chars (advisory). Hash appended at end (audit §7). */
+  firstName?: string;
+  /** Payer name — gateway caps at 20 chars (advisory). Hash appended at end (audit §7). */
+  lastName?: string;
+  /** Payer email — gateway caps at 50 chars (advisory). Hash appended at end (audit §7). */
+  email?: string;
+  /** Payer phone — gateway caps at 20 chars (advisory). Hash appended at end (audit §7). */
+  phone?: string;
+  /** 'purchase' (default) | 'pre-auth'. Hash appended at end (audit §7). */
+  purchaseType?: 'purchase' | 'pre-auth';
+  /** Item list — base64-encoded JSON when array. Hash appended at end (audit §7). */
+  items?: string | ItemEntry[];
+  /** Echoed in the pushback. Hash appended at end (audit §7). */
+  returnParams?: string;
+  /** Split-payout [{acc, amt}] — base64-encoded JSON when array. Hash appended at end (audit §7). */
+  payout?: string | { acc: string; amt: number }[];
+  /** Base64-encoded JSON when object. Hash appended at end (audit §7). */
+  customFields?: string | Record<string, unknown>;
+  /** Shipping fee — 'can be any amount' per live docs. Hash appended at end (audit §7). */
+  shippingFee?: number;
 }
 
 export interface TokenParams {

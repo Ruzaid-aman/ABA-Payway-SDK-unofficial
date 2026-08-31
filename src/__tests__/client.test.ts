@@ -972,11 +972,15 @@ describe('credentialsOnFile domain', () => {
 
     await payway.credentialsOnFile.linkAccount({
       requestId: 'REQ001',
+      ctid: 'CTID001',
+      tokenFlag: 'CITI_FLEX',
       currency: 'USD',
     });
 
     const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
     expect(body).toHaveProperty('request_id', 'REQ001');
+    expect(body).toHaveProperty('ctid', 'CTID001');
+    expect(body).toHaveProperty('token_flag', 'CITI_FLEX');
     expect(body).toHaveProperty('request_time');
     expect(body).toHaveProperty('merchant_id', TEST_CONFIG.merchantId);
     expect(body).toHaveProperty('hash');
@@ -989,6 +993,8 @@ describe('credentialsOnFile domain', () => {
 
     await payway.credentialsOnFile.linkCard({
       requestId: 'REQ002',
+      ctid: 'CTID002',
+      tokenFlag: 'CITO_FLEX',
       returnUrl: 'https://example.com/return',
     });
 

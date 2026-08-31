@@ -13,6 +13,7 @@ import {
   validateRequestIdOrCtid,
   validateTokenFlag,
   validateTransactionId,
+  warnAdvisory,
 } from '../utils.js';
 
 export interface CredentialsOnFileDomain {
@@ -77,16 +78,27 @@ export function createCredentialsOnFileDomain(
         throw new PayWayConfigError('requestId is required and must be a non-empty string');
       }
       validateRequestIdOrCtid(params.requestId, 'requestId');
-      if (params.ctid !== undefined) {
-        validateRequestIdOrCtid(params.ctid, 'ctid');
+      // Live docs (link-account-19336820e0) mark ctid, token_flag, and
+      // currency as REQUIRED — enforced here for JS callers too.
+      if (typeof params.ctid !== 'string' || params.ctid.trim().length === 0) {
+        throw new PayWayConfigError('ctid is required for linkAccount (live docs; 5–24 alphanumeric chars)');
       }
-      if (params.tokenFlag !== undefined) {
-        validateTokenFlag(params.tokenFlag, 'linking');
+      validateRequestIdOrCtid(params.ctid, 'ctid');
+      if (typeof params.tokenFlag !== 'string' || params.tokenFlag.trim().length === 0) {
+        throw new PayWayConfigError('tokenFlag is required for linkAccount (live docs; CITI_FLEX | CITO_FLEX)');
+      }
+      validateTokenFlag(params.tokenFlag, 'linking');
+      if (!['CITI_FLEX', 'CITO_FLEX'].includes(params.tokenFlag)) {
+        warnAdvisory(
+          config,
+          `tokenFlag "${params.tokenFlag}" is outside the live-documented link-account set (CITI_FLEX, CITO_FLEX); sandbox additionally accepted CITO_FIX/CITR_FLEX — verify the merchant profile enables it`,
+        );
       }
 
-      if (params.currency) {
-        validateCurrency(params.currency);
+      if (params.currency === undefined) {
+        throw new PayWayConfigError('currency is required for linkAccount (live docs)');
       }
+      validateCurrency(params.currency);
 
       if (params.callbackUrl) {
         validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
@@ -128,11 +140,20 @@ export function createCredentialsOnFileDomain(
         throw new PayWayConfigError('requestId is required and must be a non-empty string');
       }
       validateRequestIdOrCtid(params.requestId, 'requestId');
-      if (params.ctid !== undefined) {
-        validateRequestIdOrCtid(params.ctid, 'ctid');
+      // Live docs (link-card-19336819e0) mark ctid and token_flag REQUIRED.
+      if (typeof params.ctid !== 'string' || params.ctid.trim().length === 0) {
+        throw new PayWayConfigError('ctid is required for linkCard (live docs; 5–24 alphanumeric chars)');
       }
-      if (params.tokenFlag !== undefined) {
-        validateTokenFlag(params.tokenFlag, 'linking');
+      validateRequestIdOrCtid(params.ctid, 'ctid');
+      if (typeof params.tokenFlag !== 'string' || params.tokenFlag.trim().length === 0) {
+        throw new PayWayConfigError('tokenFlag is required for linkCard (live docs; CITI_FLEX | CITO_FLEX)');
+      }
+      validateTokenFlag(params.tokenFlag, 'linking');
+      if (!['CITI_FLEX', 'CITO_FLEX'].includes(params.tokenFlag)) {
+        warnAdvisory(
+          config,
+          `tokenFlag "${params.tokenFlag}" is outside the live-documented link-card set (CITI_FLEX, CITO_FLEX) — verify the merchant profile enables it`,
+        );
       }
 
       if (params.returnUrl) {
@@ -156,11 +177,16 @@ export function createCredentialsOnFileDomain(
           token_flag: params.tokenFlag,
           frequency: params.frequency,
           return_url: params.returnUrl ? encodeBase64IfNeeded(params.returnUrl) : undefined,
+          continue_success_url: params.continueSuccessUrl ? encodeBase64IfNeeded(params.continueSuccessUrl) : undefined,
           callback_url: params.callbackUrl ? encodeBase64IfNeeded(params.callbackUrl) : undefined,
           currency: params.currency ?? 'USD',
           request_time: params.requestTime,
         }),
         [
+          // Sandbox-verified order (SANDBOX-FINDINGS §9a). continue_success_url
+          // is appended at the end: unset → '' → hash byte-identical to the
+          // pre-parity list; set → included per "hash covers all posted
+          // parameters". Live-doc order differs (audit §7) — pending probe.
           'request_time',
           'merchant_id',
           'request_id',
@@ -171,6 +197,7 @@ export function createCredentialsOnFileDomain(
           'return_url',
           'callback_url',
           'currency',
+          'continue_success_url',
         ],
         'request_time',
         'application/x-www-form-urlencoded',
@@ -217,9 +244,23 @@ export function createCredentialsOnFileDomain(
           token_flag: params.tokenFlag,
           currency: params.currency || 'USD',
           callback_url: params.callbackUrl ? encodeBase64IfNeeded(params.callbackUrl) : undefined,
+          first_name: params.firstName,
+          last_name: params.lastName,
+          email: params.email,
+          phone: params.phone,
+          purchase_type: params.purchaseType,
+          items: params.items !== undefined ? encodeBase64IfNeeded(params.items) : undefined,
+          return_params: params.returnParams,
+          payout: params.payout !== undefined ? encodeBase64IfNeeded(params.payout) : undefined,
+          custom_fields: params.customFields !== undefined ? encodeBase64IfNeeded(params.customFields) : undefined,
+          shipping_fee: params.shippingFee,
           request_time: params.requestTime,
         }),
         [
+          // Sandbox-verified base order (SANDBOX-FINDINGS §9a). The 2026-08-31
+          // live-docs optional params (first_name … shipping_fee) are appended
+          // at the end: unset → '' → hash byte-identical to the pre-parity
+          // list. The live-doc order differs (audit §7) — pending B3 probe.
           'request_time',
           'merchant_id',
           'request_id',
@@ -230,6 +271,16 @@ export function createCredentialsOnFileDomain(
           'token_flag',
           'currency',
           'callback_url',
+          'first_name',
+          'last_name',
+          'email',
+          'phone',
+          'purchase_type',
+          'items',
+          'return_params',
+          'payout',
+          'custom_fields',
+          'shipping_fee',
         ],
         'request_time',
         undefined,

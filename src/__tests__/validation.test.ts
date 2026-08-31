@@ -257,17 +257,19 @@ describe('Validation: gateway-parity identifier & token-flag rules (TD-06)', () 
   });
 
   it('rejects tokenFlag outside the linking enum on linkAccount', () => {
+    // 2026-08-31 live-docs parity: ctid + currency are now REQUIRED on
+    // linkAccount, so the fixture includes them to reach the tokenFlag rule.
     expect(() =>
-      cof.linkAccount({ requestId: 'req01', tokenFlag: 'MITR_FIX' } as unknown as LinkAccountParams),
+      cof.linkAccount({ requestId: 'req01', ctid: 'ctid01', currency: 'USD', tokenFlag: 'MITR_FIX' } as unknown as LinkAccountParams),
     ).toThrow(/tokenFlag/);
   });
 
   it('rejects CITR_FIX for linking but accepts CITO_FIX (RTM R-09 correction)', async () => {
     rawSpy.mockClear();
     expect(() =>
-      cof.linkCard({ requestId: 'req01', tokenFlag: 'CITR_FIX' } as unknown as LinkCardParams),
+      cof.linkCard({ requestId: 'req01', ctid: 'ctid01', tokenFlag: 'CITR_FIX' } as unknown as LinkCardParams),
     ).toThrow(PayWayConfigError);
-    await cofPos.linkCard({ requestId: 'req01', tokenFlag: 'CITO_FIX' } as unknown as LinkCardParams);
+    await cofPos.linkCard({ requestId: 'req01', ctid: 'ctid01', tokenFlag: 'CITO_FIX' } as unknown as LinkCardParams);
     expect(rawSpy).toHaveBeenCalled();
   });
 
@@ -315,7 +317,9 @@ describe('Validation: token-trio capability guard (TD-03)', () => {
 
   it('lets linking/charging endpoints work without the flag', async () => {
     rawSpy.mockClear();
-    await allowed.linkAccount({ requestId: 'req01' } as unknown as LinkAccountParams);
+    // 2026-08-31 live-docs parity: linkAccount now requires ctid, tokenFlag,
+    // and currency — the minimal fixture grew accordingly.
+    await allowed.linkAccount({ requestId: 'req01', ctid: 'ctid01', tokenFlag: 'CITI_FLEX', currency: 'USD' } as unknown as LinkAccountParams);
     expect(rawSpy).toHaveBeenCalled();
   });
 });

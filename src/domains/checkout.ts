@@ -14,6 +14,7 @@ import {
   validatePositiveAmount,
   validateRefundAmount,
   validateTransactionId,
+  warnAdvisory,
 } from '../utils.js';
 
 /**
@@ -176,6 +177,32 @@ export function createCheckoutDomain(
     validateCurrency(params.currency);
     validatePurchaseLifetimeMinutes(params.lifetime);
 
+    // Subscription/recurring registration on the purchase path (live
+    // subscription-21402227e0): tokenFlag implies ctid; frequency is
+    // required iff the flag is CITR_FIX. Other linking flags belong on the
+    // CoF link endpoints, not here.
+    if (params.tokenFlag !== undefined) {
+      if (params.ctid === undefined) {
+        throw new PayWayConfigError('ctid is required when tokenFlag is set (subscription registration)');
+      }
+      if (params.tokenFlag !== 'CITR_FIX') {
+        throw new PayWayConfigError(
+          `tokenFlag "${params.tokenFlag}" is not supported on the purchase path — only 'CITR_FIX' (subscription); use credentialsOnFile.linkAccount/linkCard for other flags`,
+        );
+      }
+      if (params.frequency === undefined) {
+        throw new PayWayConfigError("frequency is required when tokenFlag='CITR_FIX' (1W | 1M | 2M)");
+      }
+      if (params.paymentOption !== undefined && !['cards', 'abapay', 'abapay_deeplink'].includes(params.paymentOption)) {
+        warnAdvisory(
+          config,
+          `subscription payment_option "${params.paymentOption}" is outside the documented set (cards, abapay, abapay_deeplink)`,
+        );
+      }
+    } else if (params.frequency !== undefined) {
+      throw new PayWayConfigError('frequency requires tokenFlag (subscription registration)');
+    }
+
     const time = formatRequestTime();
     const payload: Record<string, unknown> = filterParams({
       tran_id: params.transactionId,
@@ -202,10 +229,17 @@ export function createCheckoutDomain(
       additional_params: params.additionalParams ? encodeBase64IfNeeded(params.additionalParams) : undefined,
       lifetime: params.lifetime,
       google_pay_token: params.googlePayToken,
+      ctid: params.ctid,
+      token_flag: params.tokenFlag,
+      frequency: params.frequency,
       req_time: time,
       merchant_id: config.merchantId,
     });
 
+    // Matches the live purchase hash order; token_flag + frequency are the
+    // live subscription additions appended after skip_success_page (empty
+    // when unset, so the hash is byte-identical to the pre-subscription
+    // list for callers that don't use them).
     const fields = [
       'req_time',
       'merchant_id',
@@ -231,6 +265,8 @@ export function createCheckoutDomain(
       'additional_params',
       'google_pay_token',
       'skip_success_page',
+      'token_flag',
+      'frequency',
     ];
 
     const hash = generateHmac(payload, fields, config.apiKey);
