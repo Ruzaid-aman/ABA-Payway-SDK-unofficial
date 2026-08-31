@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.3.6 — 2026-08-31
+
+> Live API parity release (B1–B6): the SDK's request shapes, hash orders, error
+> families, and CLI surface were realigned to the live PayWay developer docs
+> (developer.payway.com.kh) and sandbox-probe evidence. Full audit:
+> `audit-results/live-api-coverage-2026-08-31.md`; plan:
+> `audit-results/live-parity-handoff.md`; probe evidence:
+> `docs/SANDBOX-FINDINGS.md` §16, `test-output/token-trio/`.
+> **This release contains breaking changes** — see below.
+
+### Breaking changes
+
+- **`linkAccount()` / `linkCard()` required fields** — `ctid` and `tokenFlag` are now **required** (plus `currency` on `linkAccount`) per the live docs; the SDK enforces them for JS callers, not just at the gateway. Live-documented linking flags: `CITI_FLEX | CITO_FLEX` (other previously accepted values now warn).
+- **Token-trio param split** — the shared `TokenParams` shape was wrong. `getTokenDetails()` now takes `{ requestId }` **only** (no `ctid`/`pwt`); `removeToken()` now takes `{ ctid, paymentToken }` (no `requestId`); `renewToken()` keeps `{ requestId, ctid, paymentToken }`. `TokenParams` is deprecated (alias of `RenewTokenParams`).
+- **CoF hash orders realigned (sandbox-verified 2026-08-31)** — the gateway tightened CoF hash validation: every §9a-era SDK order now returns `01 Wrong Hash`, while the live-documented orders pass the hash layer. `link-account`, `link-card`, `cofPayment`, and the token trio all sign with the live orders now (`docs/SANDBOX-FINDINGS.md` §16).
+- **`cofPayment()` no longer sends `request_id`** — the param is deprecated and dropped from the request (verified live: the binding layer no longer requires it).
+- **`linkCard()` no longer sends `returnUrl` / `returnDeeplink`** — both are absent from the live-documented request; the hosted form's done-target is `continueSuccessUrl` (newly supported, hashed last). The params remain accepted-but-ignored (`@deprecated`).
+- **Token trio UN-GATED** — `allowUnverifiedTokenOperations` now defaults to **allowed** (TD-03/Q6 resolved by probe evidence: every live-documented composition is hash-accepted). Explicit `false` re-blocks as an escape hatch (deprecated).
+- **`khqr.getTransactionsByMerchantRef()` merchantRef errors are `PayWayConfigError`** (previously plain `Error`); empty/whitespace refs throw, >20 chars warn (gateway cap).
+- **`checkout.purchase()` throws when `paymentOption: 'google_pay'` without `googlePayToken`** — the token is required when the merchant manages selection for google_pay (live docs).
+
+### Added
+
+- **Full `generateQr()` parameter parity** — 9 new live-documented optional params: `items`, `firstName`, `lastName`, `email`, `phone`, `returnDeeplink`, `customFields`, `returnParams`, `payout`; `purchaseType` widened to accept `'pre-auth'`. The hash list extends to the live 19-field order — omitted optionals hash as `''`, which is concat-identical to the old 10-field subset (pinned by test).
+- **CoF payment parity** — `cofPayment()` accepts `firstName`, `lastName`, `email`, `phone`, `purchaseType`, `items`, `returnParams`, `payout`, `customFields`, `shippingFee` (body + appended hash positions; append-compat pinned).
+- **Subscription initiation on the purchase path** — `checkout.purchase()` accepts `ctid` + `tokenFlag: 'CITR_FIX'` + `frequency` per the live subscription operation: `frequency` required iff `CITR_FIX`, `ctid` required with `tokenFlag`, other flags rejected (use the CoF link endpoints); hash positions appended after `skip_success_page` matching the live order.
+- **Advisory validation framework (`strictValidation`)** — advisory limits (length caps, enums, min amounts, list windows) warn once per distinct message via `warnAdvisory()` and escalate to `PayWayConfigError` under `strictValidation: true` (config flag or `PAYWAY_STRICT_VALIDATION=1`). Gateway-REQUIRED rules always throw regardless of the flag. QR advisory rules: name/email/phone caps, `items ≤ 10`, wechat/alipay USD-only.
+- **COF/QR error families** — `status.code "04"` + `errors{}` maps (200- or 400-wrapped) now parse into `PayWayBusinessError.fieldErrors` (also in `toJSON()`); codes `1`/`01`/`PTL02` throw the new **`PayWaySignatureError`** with an endpoint hash-order hint; observed codes `98` (merchant profile), `104`/`105`/`09` (token states) append targeted hints. `payway-sdk explain` gains `cof` and `qr` code families (04, 98, 104, 105, 09, PTL02, 01; QR string codes 6, 16–19, 21, 23, 32, 35, 44, 47, 48, 96, 102, 403, 429).
+- **`link-card` HTML-response guard** — the endpoint always answers HTML (success and error); the SDK now surfaces a structured `PayWayBusinessError` ("link-card responded with an HTML page… check callback_url") instead of a JSON-parse failure.
+- **Throttle rule for `get-transactions-by-mc-ref`** — 10 req/60s added to the client's token-bucket defaults.
+- **CLI `cof` command group** — `cof link-account`, `cof link-card`, `cof charge`, `cof token renew|details|remove` mirroring the new param shapes (details takes only `--request-id`; remove takes `--ctid --token`).
+- **CLI `beneficiary` command group** — `beneficiary add <payee>` / `beneficiary update-status <payee> --status 0|1` (RSA-encrypted; asserts the RSA key is present).
+- **CLI `generate-qr` / `generate-checkout` B6 flags** — `generate-qr` gains `--first-name --last-name --email --phone --items --return-deeplink --custom-fields --return-params --payout`; `generate-checkout` gains `--ctid --token-flag --frequency --type --firstname/--lastname/--email/--phone --items --shipping --lifetime --custom-fields --return-params --skip-success-page --view-type --continue-success-url`. JSON-or-string flags (`--items`, `--custom-fields`, `--payout`, `--return-deeplink`) accept inline JSON or raw strings via `parseJsonOrString`.
+- **CLI `transaction-list` local pre-validation** — windows wider than 3 days and `--pagination` above 1000 are rejected client-side with a hint (exit 1, no network call), mirroring the gateway's HTTP 403 behavior.
+
+### Fixed
+
+- **`generate-checkout` no longer warns on `--callback-url`** — it now prints a redirect hint instead (the purchase path never sends `callback_url`).
+
 ## Unreleased
 
 ### Changed

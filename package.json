@@ -1,6 +1,6 @@
 {
   "name": "aba-payway-ts",
-  "version": "1.3.0",
+  "version": "1.3.6",
   "description": "Production-ready, fully-typed TypeScript SDK for the ABA PayWay payment gateway.",
   "license": "MIT",
   "author": "Antigravity <info@antigravity.dev> (https://antigravity.dev)",

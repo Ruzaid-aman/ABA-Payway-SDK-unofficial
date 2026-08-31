@@ -11,12 +11,13 @@ The SDK throws these error types:
 
 ```
 PayWayError (base)
-├── PayWayConfigError    — Local configuration mistake
-├── PayWayAPIError       — API returned an error
-├── PayWayBusinessError  — Business rule violation
-├── PayWayNetworkError   — Network / connectivity failure
-├── PayWayRateLimitError — Rate limit exceeded
-└── PollingAbortedError  — Transaction polling forcibly stopped
+├── PayWayConfigError     — Local configuration mistake
+├── PayWayAPIError        — API returned an error
+│   ├── PayWaySignatureError — Hash/signature rejected (codes "1", "01", "PTL02")
+│   └── PayWayBusinessError — Business rule violation (may carry fieldErrors)
+├── PayWayNetworkError    — Network / connectivity failure
+├── PayWayRateLimitError  — Rate limit exceeded
+└── PollingAbortedError   — Transaction polling forcibly stopped
 ```
 
 ### PayWayConfigError
@@ -66,6 +67,49 @@ Thrown when PayWay's API returns an error (wrong hash, invalid merchant, etc.). 
 | `rawBody` | `any` | The complete JSON response body |
 | `retryable` | `boolean` | Whether the error is transient (can be retried) |
 | `toJSON()` | method | Serialize all error fields for logging |
+
+### PayWaySignatureError *(new in v1.3.6)*
+
+A subclass of `PayWayAPIError` (`type: 'signature_error'`) thrown when the gateway rejects the HMAC hash — codes `"1"`, `"01"`, and `"PTL02"`. The message includes an **endpoint hash-order hint** so you can see exactly which fields the gateway expected, e.g.:
+
+```
+PayWaySignatureError: Wrong Hash (code 01) on cof/get-token-details.
+Hash order for this endpoint: merchant_id.request_time.request_id
+```
+
+**When you see it:** almost always a hash-order mismatch — the gateway tightened CoF hash validation (2026-08-31 probes: §9a-era orders now return `01 Wrong Hash`). If you hit this on a CoF endpoint, make sure you're on ≥ v1.3.6, which signs with the live-documented orders. Also check your API key and that you're not mutating params after the SDK builds the hash.
+
+```typescript
+import { PayWaySignatureError } from 'aba-payway-ts';
+
+try {
+  await payway.credentialsOnFile.getTokenDetails({ requestId: 'check12345' });
+} catch (error) {
+  if (error instanceof PayWaySignatureError) {
+    console.error('Hash rejected. Expected order:', error.message);
+    // The message names the endpoint's hash order — compare it with your
+    // request fields. If you're on an old SDK version, upgrade to >= 1.3.6.
+  }
+}
+```
+
+### PayWayBusinessError.fieldErrors *(new in v1.3.6)*
+
+When the binding layer rejects a CoF/QR payload with `status.code "04"` and a per-field `errors{}` map (wrapped in either HTTP 200 or 400), the SDK parses the map into `error.fieldErrors` — a `Record<string, string>` of exact field-name → gateway message. It's also included in `toJSON()`.
+
+```typescript
+import { PayWayBusinessError } from 'aba-payway-ts';
+
+try {
+  await payway.credentialsOnFile.linkAccount({ /* ... */ });
+} catch (error) {
+  if (error instanceof PayWayBusinessError && error.fieldErrors) {
+    for (const [field, msg] of Object.entries(error.fieldErrors)) {
+      console.error(`Field "${field}": ${msg}`); // e.g. "ctid": "The c t i d field is required."
+    }
+  }
+}
+```
 
 ### PollingAbortedError
 
@@ -117,6 +161,44 @@ try {
 | `"96"` | Payee Not Found / Invalid merchant data | 403 | Beneficiary not whitelisted, or payment-link id invalid | Whitelist the payee; verify the link id |
 
 > 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema and verified against sandbox probe responses. The full hint map ships in `GATEWAY_CODE_HINTS` and is queryable via `payway-sdk explain <code>`.
+
+### COF error family *(new in v1.3.6)*
+
+Codes observed on the credentials-on-file endpoints (`link-account`, `link-card`, `payment-credential`, token trio):
+
+| Code | Meaning | Hint |
+|---|---|---|
+| `"04"` | Validation failure with per-field `errors{}` map | Read `error.fieldErrors` (see above) — each entry names the exact request field |
+| `"01"` / `"1"` / `"PTL02"` | Wrong Hash | `PayWaySignatureError` with the endpoint's hash-order hint; upgrade to ≥ v1.3.6 hash orders |
+| `"98"` | Merchant profile not configured for CoF | Enable CoF on the merchant profile with ABA before linking |
+| `"104"` | Token not found / not in a usable state | Verify `ctid` + `paymentToken` match the linked token |
+| `"105"` | Token state error (e.g. expired, removed) | Renew the token or re-link the payment method |
+| `"09"` | Token operation not allowed in current state | Check the token's lifecycle state via `getTokenDetails()` |
+
+### QR error family *(new in v1.3.6)*
+
+String codes observed on `generate-qr` (KHQR). Note: `"8"` and `"12"` intentionally stay in the gateway/payout families (they are not KHQR-specific):
+
+| Code | Meaning |
+|---|---|
+| `"6"` | Invalid merchant data |
+| `"16"` | Invalid amount |
+| `"17"` | Invalid currency |
+| `"18"` | Invalid request data |
+| `"19"` | Invalid QR request |
+| `"21"` | Invalid transaction ID |
+| `"23"` | Transaction not found |
+| `"32"` | Invalid lifetime |
+| `"35"` | Invalid hash |
+| `"44"` | Invalid template |
+| `"47"` | Invalid items data |
+| `"48"` | Invalid purchase type |
+| `"96"` | Invalid merchant data / payee not found |
+| `"102"` | QR request limit exceeded |
+| `"403"` | Forbidden (merchant not enabled for this operation) |
+| `"429"` | Too many requests — throttled, retry after the window |
+
+All of these are queryable via `payway-sdk explain <code>` (the `explain` command now covers `cof` and `qr` families — `explainAll()` ships ≥ 6 CoF and 18 QR entries).
 
 ### Pre-Authorization Error Codes
 
@@ -224,6 +306,8 @@ an HTML page instead of JSON... Body starts with: <!DOCTYPE html><html...
 
 PayWay accepted the request but routed it to a web flow instead of answering with API JSON. Sandbox-verified cause: **unsupported parameter values**, e.g. `payment_gate: 0` on `/v1/payments/purchase`. Removing optional parameters resolves it. The error message includes a body snippet so you can see which page PayWay returned.
 
+> **Exception — `link-card` always answers HTML (v1.3.6):** the card-linking endpoint returns an HTML page (the hosted card-entry form) on **both success and error**. The SDK detects this shape and raises a structured `PayWayBusinessError` ("link-card responded with an HTML page… check callback_url") instead of a JSON-parse failure — so an HTML body on `link-card` is expected behavior, not this failure mode.
+
 ---
 
 ## CLI Exit Codes
@@ -249,10 +333,11 @@ Instead of searching this chapter for a code, ask the CLI — works offline, no 
 ```bash
 payway-sdk explain PTL36    # → Transaction not found: verify the original tran_id...
 payway-sdk explain 49       # → Invalid Request: list dates must be "YYYY-MM-DD HH:mm:ss"
+payway-sdk explain 104      # → CoF family: token not found / not usable (v1.3.6)
 payway-sdk explain          # list every known code
 ```
 
-The same lookup is available programmatically via `explainPayWayCode()` in `aba-payway-ts/cli/explain-code.js`.
+The same lookup is available programmatically via `explainPayWayCode()` in `aba-payway-ts/cli/explain-code.js`. As of v1.3.6 the map also covers the **`cof`** and **`qr`** code families (see the tables above).
 
 ---
 
@@ -452,7 +537,7 @@ The SDK automatically handles three different error response styles that PayWay 
 
 1. **HTTP error status (4xx/5xx)** — returned by some endpoints such as `transaction-list-2` (400/403) and `check-transaction-2` (403 for invalid hash). The SDK extracts `paywayCode` from the response body's `status.code` field when present (string **or numeric**), and maps the response to the most specific error class (`PayWayBusinessError`, `PayWayRateLimitError`, etc.).
 2. **HTTP 200 with a wrapped error** — returned by most merchant-portal and payment-gateway endpoints. The SDK inspects the body for `status.code`, `status` string (`FAILED`/`ERROR`), or a top-level `code` field and throws `PayWayAPIError` with `statusCode: 200`.
-3. **Strict rate-limit responses (sandbox-verified 2026-08-25)** — endpoints with documented caps (e.g. transaction-detail 10/min, transaction-list 50/min) answer call N+1 within the window with HTTP **403** carrying a NUMERIC body `status.code` of `429` ("Rate limit exceeded for this request. Please try again later") and **no rate-limit headers** (no `X-RateLimit-*`, no `Retry-After`). The SDK classifies this as a typed, retryable `PayWayRateLimitError` — not an opaque permission error.
+3. **Strict rate-limit responses (sandbox-verified 2026-08-25)** — endpoints with documented caps (e.g. transaction-detail 10/min, transaction-list 50/min, **get-transactions-by-mc-ref 10/60s — cap added to the SDK's throttle defaults in v1.3.6**) answer call N+1 within the window with HTTP **403** carrying a NUMERIC body `status.code` of `429` ("Rate limit exceeded for this request. Please try again later") and **no rate-limit headers** (no `X-RateLimit-*`, no `Retry-After`). The SDK classifies this as a typed, retryable `PayWayRateLimitError` — not an opaque permission error.
 
 > ℹ️ **Important:** PayWay error codes like `PTL04` (refund validation) are returned inside the response body even on HTTP 400 responses. The SDK automatically extracts these into `error.paywayCode` so you can handle them programmatically without parsing `error.rawBody` yourself.
 

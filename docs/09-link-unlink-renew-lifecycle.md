@@ -98,9 +98,9 @@ async function linkCustomerAccount() {
       // This is how you identify the customer in your system
       ctid: 'customerabc123',
 
-      // Token usage flag (required)
-      // 'CITR_FLEX' = Customer-Initiated Transaction, Recurring + Flexible
-      tokenFlag: 'CITR_FLEX',
+      // Token usage flag (required) — live-documented linking values
+      // 'CITI_FLEX' = Customer-Initiated Transaction, Initial + Flexible
+      tokenFlag: 'CITI_FLEX',
 
       // Currency for future charges
       currency: 'USD',
@@ -146,15 +146,16 @@ async function linkCustomerCard() {
       // Customer identifier (required)
       ctid: 'customerabc123',
 
-      // Token usage flag (required)
-      tokenFlag: 'CITR_FLEX',
+      // Token usage flag (required) — live-documented linking values
+      tokenFlag: 'CITI_FLEX',
 
-      // ⚠️ frequency is REQUIRED for card linking (verified in sandbox)
+      // Optional: billing frequency for card linking
       // '1W' = weekly, '1M' = monthly, '2M' = every 2 months
       frequency: '1M',
 
-      // Return URL where the customer is redirected after adding their card
-      returnUrl: `${process.env.BASE_URL}/saved-cards`,
+      // Optional: base64-encoded target of the hosted form's "Done" button
+      // (the SDK base64-encodes a plain URL automatically)
+      continueSuccessUrl: `${process.env.BASE_URL}/saved-cards`,
 
       // Optional: Callback URL
       callbackUrl: `${process.env.BASE_URL}/api/cof-callback`,
@@ -176,32 +177,26 @@ async function linkCustomerCard() {
 }
 ```
 
-> ⚠️ **Critical difference:** `linkCard()` requires `frequency` and uses `application/x-www-form-urlencoded` (the SDK handles the encoding automatically). `linkAccount()` uses JSON. This was verified in sandbox testing — sending JSON to `link-card` will be rejected without being read.
+> ⚠️ **Critical difference:** `linkCard()` uses `application/x-www-form-urlencoded` (the SDK handles the encoding automatically) and answers with an **HTML page** (the hosted card-entry form). `linkAccount()` uses JSON. This was verified in sandbox testing — sending JSON to `link-card` will be rejected without being read. Note: `returnUrl`/`returnDeeplink` are **no longer sent** on link-card (absent from the live request); the hosted form's done-target is `continueSuccessUrl`.
 
-### Sandbox-verified facts (2026-08-25 scope campaign)
+### Sandbox-verified facts (2026-08-25 scope campaign; hash orders re-verified 2026-08-31 — see §16)
 
 - **`linkCard()` also requires `currency`** — the SDK now defaults it to `'USD'`; pass the customer's currency explicitly. Server rejects without it: `"The currency field is required."`
-- **A successful `linkCard()` returns an HTTP 200 HTML page** (the hosted card-entry checkout), not JSON — redirect the customer to it / embed it. Treat "HTML body" as the success signal for this one endpoint.
+- **A successful `linkCard()` returns an HTTP 200 HTML page** (the hosted card-entry checkout), not JSON — redirect the customer to it / embed it. The SDK detects the HTML shape and treats it as the success signal for this one endpoint (a structured error is raised only when the page indicates failure).
 - **Valid `token_flag` values differ per endpoint:**
-  - Linking (`link-account`, `link-card`): `CITI_FLEX | CITO_FLEX | CITO_FIX | CITR_FLEX`
+  - Linking (`link-account`, `link-card`): `CITI_FLEX | CITO_FLEX` (live-documented set; other values warn)
   - Charging (`payment-credential`): `CITU_FLEX | MITU_FLEX | MITU_FIX | MITR_FLEX | MITR_FIX`
   - (C = customer-initiated, M = merchant-initiated; IT/TR ≈ initial transaction / recurring; FLEX/FIX = flexible or fixed amount.)
-- **Token management trio needs a `request` field**: renew/get-details/remove models require flat `request_time`, `request_id`, `request`, `ctid`, `pwt`. The SDK now sends `request` automatically (defaults to your `requestId`). Their HMAC composition remains unpublished — see [SANDBOX-FINDINGS §9a](./SANDBOX-FINDINGS.md).
-- **⚠️ Token management trio is BLOCKED by default (TD-03 capability guard):** because ABA has not confirmed the HMAC composition for `renewToken()` / `getTokenDetails()` / `removeToken()`, every derivable field ordering was rejected in sandbox (~60 attempts), and no merchant can ship them blind, the SDK throws a `PayWayConfigError` when they are called without an explicit opt-in:
-
-  ```typescript
-  const payway = new PayWay({
-    merchantId: process.env.PAYWAY_MERCHANT_ID!,
-    apiKey: process.env.PAYWAY_API_KEY!,
-    // ...other options
-    allowUnverifiedTokenOperations: true, // ← explicit opt-in required until ABA publishes the hash spec
-  });
-  ```
-
-  Linking and charging endpoints are unaffected. Remove this flag once ABA answers the composition question ([open questions](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md)).
+- **Token management trio — param shapes (live-documented, sandbox-verified 2026-08-31):**
+  - `renewToken()` takes `{ requestId, ctid, paymentToken }` — hash order `ctid.request_time.pwt.merchant_id.request_id`.
+  - `getTokenDetails()` takes **`{ requestId }` only** — no `ctid`, no `pwt` (hash order `merchant_id.request_time.request_id`).
+  - `removeToken()` takes **`{ ctid, paymentToken }`** — no `requestId` (hash order `merchant_id.ctid.request_time.pwt`).
+  - The old shared `TokenParams` shape was wrong for two of the three endpoints and is deprecated.
+- **✅ Token management trio is UN-GATED (2026-08-31):** the earlier TD-03 capability guard is resolved by probe evidence — every live-documented hash composition is **hash-ACCEPTED** by the gateway (business codes 105/09/00/104 past the hash layer), while the §9a-era SDK orders are now rejected with `01 Wrong Hash` (the gateway tightened CoF hash validation since the August campaign). `renewToken()` / `getTokenDetails()` / `removeToken()` work out of the box; `allowUnverifiedTokenOperations: false` re-blocks as a deprecated escape hatch. Evidence: `docs/SANDBOX-FINDINGS.md` §16, `test-output/token-trio/`, probe script `scripts/sandbox-probe-token-trio.ts`.
+- **CoF hash orders realigned (breaking, sandbox-verified 2026-08-31):** `link-account` hashes `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency`; `link-card` hashes the live order including empty `amount`/`frequency` positions with `continue_success_url` last; `cofPayment` hashes the live 19-field order. `linkCard()` no longer sends `returnUrl`/`returnDeeplink` (absent from the live request — use `continueSuccessUrl` for the hosted form's Done button); `cofPayment()` no longer sends `request_id` (deprecated param).
 - **Client-side identifier parity (TD-06):** `requestId`/`ctid` must match the gateway rule `[a-zA-Z0-9]{5,24}` — letters/digits only, 5–24 chars, **no hyphens or underscores**. The SDK now fails fast locally instead of surfacing the gateway's per-field errors map. `transactionId` keeps its own rule (`[a-zA-Z0-9-]{1,20}`, hyphens allowed).
 - **`tokenFlag` is enum-validated client-side** with the exact sandbox enums above; `CITR_FIX` is rejected for linking, and charging-only flags are rejected on linking endpoints.
-- PayWay's binding layer answers malformed CoF payloads with **HTTP 400 code `"04"` plus a per-field `errors{}` map** — read `error.rawBody.status.errors` for exact field messages when debugging.
+- PayWay's binding layer answers malformed CoF payloads with **HTTP 400 code `"04"` plus a per-field `errors{}` map** — the SDK parses this into `PayWayBusinessError.fieldErrors` (also visible in `toJSON()`), so you can read exact field messages programmatically.
 - The KHQR `get-transactions-by-mc-ref` endpoint returns 404 in this sandbox profile.
 
 ### 3. Charge a Saved Payment Method
@@ -212,16 +207,13 @@ Once you have a token (`pwt`), charge it:
 async function chargeSavedCard() {
   try {
     const result = await payway.credentialsOnFile.payment({
-      // Your unique request ID (required)
-      requestId: `charge${Date.now()}`,
-
       // Unique transaction ID for this charge (required)
       transactionId: `order-${Date.now()}`,
 
       // Amount to charge (required)
       amount: 25.00,
 
-      // Customer identifier — must match the linked token (required)
+      // Customer identifier — must match the linked token
       ctid: 'customerabc123',
 
       // ⚠️ The field name is 'pwt', NOT 'paymentToken' (verified in sandbox)
@@ -254,14 +246,9 @@ async function chargeSavedCard() {
 async function checkTokenStatus() {
   try {
     const details = await payway.credentialsOnFile.getTokenDetails({
-      // Your request ID (required)
+      // Your request ID (required) — this is the ONLY parameter:
+      // the live-documented request carries request_time/merchant_id/request_id
       requestId: `check${Date.now()}`,
-
-      // Customer identifier (required for token management)
-      ctid: 'customerabc123',
-
-      // The token to check (required)
-      paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]',
     });
 
     console.log('Token details:', details);
@@ -317,9 +304,6 @@ async function renewToken() {
 
       // The token to renew (required)
       paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]',
-
-      // Token usage flag
-      tokenFlag: 'CITR_FLEX',
     });
 
     console.log('Token renewed:', result);
@@ -341,10 +325,8 @@ Permanently remove a saved token:
 async function unlinkToken() {
   try {
     const result = await payway.credentialsOnFile.removeToken({
-      // Your request ID (required)
-      requestId: `unlink${Date.now()}`,
-
-      // Customer identifier (required)
+      // Customer identifier (required) — note: NO requestId on remove-token
+      // (the live-documented request is request_time/merchant_id/ctid/pwt)
       ctid: 'customerabc123',
 
       // The token to remove (required)
@@ -406,7 +388,6 @@ Tokens expire. Your application should handle this:
 async function chargeWithExpiryHandling(ctid: string, pwt: string, amount: number) {
   try {
     return await payway.credentialsOnFile.payment({
-      requestId: `charge${Date.now()}`,
       transactionId: `order-${Date.now()}`,
       amount,
       ctid,
@@ -423,7 +404,6 @@ async function chargeWithExpiryHandling(ctid: string, pwt: string, amount: numbe
           requestId: `renew${Date.now()}`,
           ctid,
           paymentToken: pwt,
-          tokenFlag: 'CITR_FLEX',
         });
         // Retry the charge after successful renewal
         return await chargeWithExpiryHandling(ctid, pwt, amount);
@@ -519,8 +499,8 @@ async function removeCardLocally(ctid: string, pwt: string) {
 // ✅ Good: Removes from PayWay AND your database
 async function removeCardProperly(ctid: string, pwt: string) {
   // Step 1: Remove from PayWay (this is the important one)
+  // Note: remove-token takes NO requestId — only ctid + paymentToken
   await payway.credentialsOnFile.removeToken({
-    requestId: `unlink${Date.now()}`,
     ctid,
     paymentToken: pwt,
   });
@@ -529,6 +509,30 @@ async function removeCardProperly(ctid: string, pwt: string) {
   await db.query('DELETE FROM saved_payments WHERE ctid = $1 AND pwt = $2', [ctid, pwt]);
 }
 ```
+
+---
+
+## CLI Quick Reference (v1.3.6)
+
+The CLI exposes the whole CoF lifecycle under the `cof` command group (mirrors the param shapes above):
+
+```sh
+# Link a bank account (CITI_FLEX | CITO_FLEX)
+npx tsx src/cli.ts cof link-account --ctid customerabc123 --token-flag CITI_FLEX --currency USD
+
+# Link a card (hosted form; --continue-success-url is the Done-button target)
+npx tsx src/cli.ts cof link-card --ctid customerabc123 --token-flag CITI_FLEX --frequency 1M
+
+# Charge a saved token
+npx tsx src/cli.ts cof charge --tran-id order-123 --amount 25.00 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38] --token-flag CITR_FLEX
+
+# Token trio (note the param split)
+npx tsx src/cli.ts cof token renew --request-id renew123 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38]
+npx tsx src/cli.ts cof token details --request-id check123          # requestId ONLY
+npx tsx src/cli.ts cof token remove --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38]   # NO requestId
+```
+
+Related: `beneficiary add <payee>` / `beneficiary update-status <payee> --status 0|1` (KHQR payout beneficiaries, RSA-encrypted). Run any command with `--help` for the full flag list.
 
 ---
 
