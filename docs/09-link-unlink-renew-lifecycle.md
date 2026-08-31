@@ -518,17 +518,17 @@ The CLI exposes the whole CoF lifecycle under the `cof` command group (mirrors t
 
 ```sh
 # Link a bank account (CITI_FLEX | CITO_FLEX)
-npx tsx src/cli.ts cof link-account --ctid customerabc123 --token-flag CITI_FLEX --currency USD
+npx tsx src/cli.ts cof link-account -r link12345 --ctid customerabc123 --token-flag CITI_FLEX --currency USD
 
 # Link a card (hosted form; --continue-success-url is the Done-button target)
-npx tsx src/cli.ts cof link-card --ctid customerabc123 --token-flag CITI_FLEX --frequency 1M
+npx tsx src/cli.ts cof link-card -r link67890 --ctid customerabc123 --token-flag CITI_FLEX --frequency 1M
 
-# Charge a saved token
-npx tsx src/cli.ts cof charge --tran-id order-123 --amount 25.00 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38] --token-flag CITR_FLEX
+# Charge a saved token (charging flags: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX)
+npx tsx src/cli.ts cof charge -t order12345 --amount 25.00 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38] --token-flag CITU_FLEX
 
 # Token trio (note the param split)
-npx tsx src/cli.ts cof token renew --request-id renew123 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38]
-npx tsx src/cli.ts cof token details --request-id check123          # requestId ONLY
+npx tsx src/cli.ts cof token renew -r renew12345 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38]
+npx tsx src/cli.ts cof token details -r check12345          # requestId ONLY
 npx tsx src/cli.ts cof token remove --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38]   # NO requestId
 ```
 

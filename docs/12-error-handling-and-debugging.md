@@ -14,9 +14,9 @@ PayWayError (base)
 ├── PayWayConfigError     — Local configuration mistake
 ├── PayWayAPIError        — API returned an error
 │   ├── PayWaySignatureError — Hash/signature rejected (codes "1", "01", "PTL02")
-│   └── PayWayBusinessError — Business rule violation (may carry fieldErrors)
-├── PayWayNetworkError    — Network / connectivity failure
-├── PayWayRateLimitError  — Rate limit exceeded
+│   ├── PayWayBusinessError — Business rule violation (may carry fieldErrors)
+│   ├── PayWayNetworkError — Network / connectivity failure (retryable)
+│   └── PayWayRateLimitError — Rate limit exceeded (retryable)
 └── PollingAbortedError   — Transaction polling forcibly stopped
 ```
 
