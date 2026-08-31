@@ -10,6 +10,7 @@ import {
   validateQrLifetimeSeconds,
   validatePositiveAmount,
   validatePublicHttpsUrl,
+  validateAmountFloor,
   validateTransactionId,
   warnAdvisory,
 } from '../utils.js';
@@ -69,6 +70,7 @@ export function createQrDomain(
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency || 'USD');
       validateCurrency(params.currency);
+      validateAmountFloor(config, params.amount, params.currency || 'USD', 'generate-qr');
       validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
         allowPrivateHosts: config.allowPrivateCallbackHosts === true,
       });

@@ -10,7 +10,8 @@ import {
 } from '../khqr-config.js';
 import { type GenerateOfflineQrParams, generateOfflineQR } from '../khqr-offline.js';
 import type { components } from '../types.js';
-import { filterParams } from '../utils.js';
+import { PayWayConfigError } from '../errors.js';
+import { filterParams, warnAdvisory } from '../utils.js';
 
 export interface KhqrDomain {
   generateOfflineQR: (params: GenerateOfflineQrParams) => string;
@@ -50,7 +51,10 @@ export function createKhqrDomain(
 
     getTransactionsByMerchantRef: (merchantRef: string, requestTime?: string, callOptions?: RequestCallOptions) => {
       if (typeof merchantRef !== 'string' || merchantRef.trim().length === 0) {
-        throw new Error('merchantRef is required and must be a non-empty string');
+        throw new PayWayConfigError('merchantRef is required and must be a non-empty string');
+      }
+      if (merchantRef.length > 20) {
+        warnAdvisory(config, `merchantRef exceeds the gateway's 20-character cap; gateway may reject with error 5`);
       }
 
       return request<components['schemas']['GetTransactionsByMcRefResponse']>(

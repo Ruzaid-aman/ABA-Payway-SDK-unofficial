@@ -855,6 +855,7 @@ export class PayWay {
     const baseUrlFromEnv = parseHttpBaseUrl(namedEnvironment);
     const timeoutFromEnv = Number.parseInt(process.env.PAYWAY_TIMEOUT ?? '', 10);
     const debugFromEnv = process.env.DEBUG_PAYWAY === 'true' || process.env.DEBUG_PAYWAY === '1';
+    const strictFromEnv = process.env.PAYWAY_STRICT_VALIDATION === '1' || process.env.PAYWAY_STRICT_VALIDATION === 'true';
     const resolvedConfig: ResolvedPayWayConfig = {
       ...config,
       merchantId: (config.merchantId ?? process.env.PAYWAY_MERCHANT_ID ?? '').trim(),
@@ -864,6 +865,7 @@ export class PayWay {
       baseUrl: config.baseUrl ?? process.env.PAYWAY_BASE_URL ?? baseUrlFromEnv,
       timeout: config.timeout ?? (Number.isNaN(timeoutFromEnv) ? undefined : timeoutFromEnv),
       debug: config.debug ?? debugFromEnv,
+      strictValidation: config.strictValidation ?? strictFromEnv,
       khqr: resolveKhqrConfiguration(config.khqr),
     };
 

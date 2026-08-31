@@ -10,6 +10,7 @@ import {
   validateBeneficiaries,
   validateCurrency,
   validatePositiveAmount,
+  validateAmountFloor,
   validateTransactionId,
 } from '../utils.js';
 
@@ -63,6 +64,7 @@ export function createPayoutDomain(
 
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency);
+      validateAmountFloor(config, params.amount, params.currency, 'payout');
       validateCurrency(params.currency);
       validateBeneficiaries(params.beneficiaries, params.amount, params.currency);
 

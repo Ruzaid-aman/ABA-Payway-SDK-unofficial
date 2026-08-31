@@ -66,6 +66,24 @@ export function validatePositiveAmount(amount: number, currency: 'USD' | 'KHR'):
   }
 }
 
+/**
+ * Gateway-documented amount floors (audit §5.9): KHR >= 100, USD >= 0.01 on
+ * payout / CoF payment / QR / payment-link. Advisory — warns (escalates to
+ * PayWayConfigError under strictValidation) because the exact enforcement
+ * surface per endpoint is not uniformly documented.
+ */
+export function validateAmountFloor(
+  config: { strictValidation?: boolean } | undefined,
+  amount: number,
+  currency: 'USD' | 'KHR',
+  context: string,
+): void {
+  const floor = currency === 'KHR' ? 100 : 0.01;
+  if (amount < floor) {
+    warnAdvisory(config, `${context}: amount ${amount} ${currency} is below the gateway minimum ${floor} ${currency}`);
+  }
+}
+
 /** Warned once per process for the first sub-5-char transactionId (EC-20). */
 let warnedShortTranId = false;
 

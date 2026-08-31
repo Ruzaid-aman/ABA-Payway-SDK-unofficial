@@ -21,6 +21,7 @@ import {
   validatePublicHttpsUrl,
   validateRequestIdOrCtid,
   validateTokenFlag,
+  validateAmountFloor,
   validateTransactionId,
   warnAdvisory,
 } from '../utils.js';
@@ -233,6 +234,7 @@ export function createCredentialsOnFileDomain(
       validateTransactionId(params.transactionId);
       validatePositiveAmount(params.amount, params.currency || 'USD');
       validateCurrency(params.currency);
+      validateAmountFloor(config, params.amount, params.currency || 'USD', 'payment-credential');
 
       if (typeof params.paymentToken !== 'string' || params.paymentToken.trim().length === 0) {
         throw new PayWayConfigError('paymentToken is required for Cof payments');

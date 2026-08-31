@@ -6,8 +6,10 @@ import {
   encodeBase64IfNeeded,
   filterParams,
   validateCurrency,
+  validateAmountFloor,
   validatePositiveAmount,
   validatePublicHttpsUrl,
+  warnAdvisory,
 } from '../utils.js';
 
 const DEFAULT_IMAGE_FILENAME = 'image.jpg';
@@ -48,6 +50,10 @@ export function createPaymentLinkDomain(
       const currency = params.currency ?? 'USD';
       validateCurrency(currency);
       validatePositiveAmount(params.amount, currency);
+      validateAmountFloor(config, params.amount, currency, 'payment-link create');
+      if (params.title.length > 250) {
+        warnAdvisory(config, `title exceeds the gateway's 250-character cap`);
+      }
 
       if (typeof params.merchantRefNo !== 'string' || params.merchantRefNo.trim().length === 0) {
         throw new PayWayConfigError('merchantRefNo is required and must be a non-empty string');

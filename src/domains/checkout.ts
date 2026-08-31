@@ -1,6 +1,6 @@
 import { generateHmac } from '../auth.js';
 import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig, RequestCallOptions } from '../client.js';
-import { ENDPOINTS } from '../constants.js';
+import { ENDPOINTS, PAYMENT_OPTIONS } from '../constants.js';
 import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
 import type { components } from '../types.js';
 import type { PollTransactionOptions, PollTransactionResult } from '../domain-types.js';
@@ -176,6 +176,46 @@ export function createCheckoutDomain(
     validatePositiveAmount(params.amount, params.currency || 'USD');
     validateCurrency(params.currency);
     validatePurchaseLifetimeMinutes(params.lifetime);
+
+    // ── Advisory gateway limits (live docs; audit §5) — warn unless
+    // strictValidation escalates. Required-field rules below throw. ──
+    if (params.lifetime !== undefined && params.lifetime > 43200) {
+      warnAdvisory(config, `lifetime ${params.lifetime} minutes exceeds the gateway maximum of 43200 (30 days)`);
+    }
+    if (params.firstname !== undefined) {
+      if (params.firstname.length > 100 || /\d|[^\p{L}\p{M}\s'.-]/u.test(params.firstname)) {
+        warnAdvisory(config, `firstname violates the gateway rules (≤100 chars, no digits/specials) — gateway may reject with error 16`);
+      }
+    }
+    if (params.lastname !== undefined && params.lastname.length > 100) {
+      warnAdvisory(config, `lastname exceeds the gateway's 100-character cap — gateway may reject with error 17`);
+    }
+    if (params.email !== undefined && params.email.length > 50) {
+      warnAdvisory(config, `email exceeds the gateway's 50-character cap — gateway may reject with error 19`);
+    }
+    if (params.phone !== undefined && params.phone.length > 20) {
+      warnAdvisory(config, `phone exceeds the gateway's 20-character cap — gateway may reject with error 18`);
+    }
+    if (params.items !== undefined) {
+      if (Array.isArray(params.items) && params.items.length > 10) {
+        warnAdvisory(config, `items carries ${params.items.length} entries; the gateway accepts at most 10`);
+      }
+      const encoded = encodeBase64IfNeeded(params.items);
+      if (encoded.length > 500) {
+        warnAdvisory(config, `items exceeds the gateway's 500-character wire cap (encoded) — gateway may reject with error 13`);
+      }
+    }
+    if (params.paymentOption !== undefined && !(PAYMENT_OPTIONS as readonly string[]).includes(params.paymentOption)) {
+      warnAdvisory(
+        config,
+        `payment_option "${params.paymentOption}" is outside the documented purchase enum (${PAYMENT_OPTIONS.join(', ')})`,
+      );
+    }
+    // Documented conditional requirement (live purchase spec): a Google Pay
+    // token is REQUIRED when the merchant manages selection for google_pay.
+    if (params.paymentOption === 'google_pay' && !params.googlePayToken) {
+      throw new PayWayConfigError('googlePayToken is required when paymentOption is "google_pay" (live docs)');
+    }
 
     // Subscription/recurring registration on the purchase path (live
     // subscription-21402227e0): tokenFlag implies ctid; frequency is
@@ -434,6 +474,39 @@ export function createCheckoutDomain(
      * @rateLimit 50 requests per minute.
      */
     getTransactionList: (params: GetTransactionListParams, callOptions?: RequestCallOptions) => {
+      // ── Advisory gateway limits (live docs, err 49-53): dates
+      // "YYYY-MM-DD HH:mm:ss", range ≤ 3 days, pagination ≤ 1000, status
+      // case-insensitive enum. ──
+      const DATE_FORMAT = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+      if (params.fromDate != null) {
+        if (typeof params.fromDate === 'string' && !DATE_FORMAT.test(params.fromDate)) {
+          warnAdvisory(config, `fromDate "${params.fromDate}" must use the format "YYYY-MM-DD HH:mm:ss" (gateway err 49)`);
+        }
+        if (params.toDate != null && typeof params.fromDate === 'string' && typeof params.toDate === 'string' && DATE_FORMAT.test(params.fromDate) && DATE_FORMAT.test(params.toDate)) {
+          const spanDays = (Date.parse(`${params.toDate.replace(' ', 'T')}Z`) - Date.parse(`${params.fromDate.replace(' ', 'T')}Z`)) / 86_400_000;
+          if (spanDays > 3) {
+            warnAdvisory(config, `date range spans ${spanDays.toFixed(1)} days; the gateway allows at most 3 days (err 52)`);
+          }
+        }
+      }
+      if (params.toDate != null && typeof params.toDate === 'string' && !DATE_FORMAT.test(params.toDate)) {
+        warnAdvisory(config, `toDate "${params.toDate}" must use the format "YYYY-MM-DD HH:mm:ss" (gateway err 50)`);
+      }
+      if (params.pagination !== undefined) {
+        const n = Number.parseInt(params.pagination, 10);
+        if (!Number.isNaN(n) && n > 1000) {
+          warnAdvisory(config, `pagination ${n} exceeds the gateway maximum of 1000`);
+        }
+      }
+      if (params.status != null) {
+        const allowed = ['APPROVED', 'PRE-AUTH', 'REFUNDED', 'PENDING', 'DECLINED', 'DECLINDED', 'CANCELLED'];
+        for (const part of String(params.status).split(',')) {
+          if (!allowed.includes(part.trim().toUpperCase())) {
+            warnAdvisory(config, `status "${part.trim()}" is outside the documented set (${allowed.join(', ')})`);
+          }
+        }
+      }
+
       return request<components['schemas']['TransactionListResponse']>(
         ENDPOINTS.getTransactionList,
         filterParams({
