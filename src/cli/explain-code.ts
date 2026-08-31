@@ -7,7 +7,7 @@ import { GATEWAY_CODE_HINTS, PAYOUT_ERROR_CODES, PRE_AUTH_ERROR_CODES, REFUND_ER
 
 export interface CodeExplanation {
   readonly code: string;
-  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status';
+  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr';
   readonly title: string;
   readonly hint: string;
 }
@@ -70,6 +70,46 @@ const PAYOUT_HINTS: Record<string, string> = {
   [PAYOUT_ERROR_CODES.AMOUNT_MISMATCH]: 'Sum of beneficiary amounts must equal the payout (transaction complete) amount.',
 };
 
+// Credentials-on-file family (live-documented codes, 2026-08-31 audit §6).
+const COF_TITLES: Record<string, string> = {
+  '1': 'Invalid hash',
+  '01': 'Invalid hash',
+  '04': 'Validation / binding failure',
+  '09': 'Token not found',
+  '98': 'Merchant ID not found',
+  '104': 'Merchant not enabled for token flag',
+  '105': 'Invalid payment credential token',
+};
+
+const COF_HINTS: Record<string, string> = {
+  '1': 'Wrong HMAC composition — check the field order for the CoF endpoint being called.',
+  '01': 'Wrong HMAC composition — check the field order for the CoF endpoint being called.',
+  '04': 'Laravel-style binding/validation layer rejected the request — inspect the errors{} field map on the thrown error.',
+  '09': 'The ctid/request_id does not reference a known account token — verify or re-link.',
+  '98': 'Merchant ID not found — verify the merchant credential (env/profile) for the target environment.',
+  '104': 'The merchant account is not enabled for this token_flag — contact PayWay to provision, or use a linking enum (CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX).',
+  '105': 'The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken.',
+};
+
+/**
+ * QR string-code family (generate-qr responses carry string codes; live docs,
+ * 2026-08-31 audit §6). Individual meanings beyond the well-known ones are not
+ * published — consult the generate-qr spec page.
+ */
+const QR_CODES = ['1', '6', '12', '16', '17', '18', '19', '21', '23', '32', '35', '44', '47', '48', '96', '102', '403', '429'] as const;
+
+const QR_TITLES: Record<string, string> = {
+  '1': 'QR request rejected (wrong hash or malformed request)',
+  '403': 'Forbidden',
+  '429': 'Rate limit exceeded',
+};
+
+const QR_HINTS: Record<string, string> = {
+  '1': 'Check the 19-field HMAC order (req_time..payout) and the API key.',
+  '403': 'Merchant credential not authorized for generate-qr in this environment.',
+  '429': 'Pace requests — the SDK throttles locally, but concurrent callers share the window.',
+};
+
 export function explainPayWayCode(rawCode: string): CodeExplanation | undefined {
   const code = rawCode.trim().toUpperCase().replace(/^PTL0+/, 'PTL0').replace(/^CODE[=: ]*/, '');
 
@@ -89,8 +129,22 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
     return { code, family: 'payout', title: PAYOUT_TITLES[code], hint: PAYOUT_HINTS[code] ?? '' };
   }
 
-  // Numeric gateway codes
+  // COF / QR families (B5, live parity) — checked before the generic numeric
+  // gateway table so codes like 04/98/104/105/PTL02 resolve to their family.
   const numeric = code.replace(/^0+(?=\d)/, '');
+  if (code in COF_TITLES) {
+    return { code, family: 'cof', title: COF_TITLES[code], hint: COF_HINTS[code] ?? '' };
+  }
+  if ((QR_CODES as readonly string[]).includes(numeric)) {
+    return {
+      code: numeric,
+      family: 'qr',
+      title: QR_TITLES[numeric] ?? `QR gateway error code ${numeric}`,
+      hint: QR_HINTS[numeric] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
+    };
+  }
+
+  // Numeric gateway codes
   const gateway = GATEWAY_CODE_HINTS[numeric];
   if (gateway) return { code: numeric, family: 'gateway', title: gateway.title, hint: gateway.hint };
 
@@ -117,6 +171,17 @@ export function explainAll(): CodeExplanation[] {
   }
   for (const code of Object.keys(PAYOUT_TITLES)) {
     all.push({ code, family: 'payout', title: PAYOUT_TITLES[code] ?? code, hint: PAYOUT_HINTS[code] ?? '' });
+  }
+  for (const [code, title] of Object.entries(COF_TITLES)) {
+    all.push({ code, family: 'cof', title, hint: COF_HINTS[code] ?? '' });
+  }
+  for (const code of QR_CODES) {
+    all.push({
+      code,
+      family: 'qr',
+      title: QR_TITLES[code] ?? `QR gateway error code ${code}`,
+      hint: QR_HINTS[code] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
+    });
   }
   return all;
 }

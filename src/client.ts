@@ -25,6 +25,7 @@ import {
   PayWayConfigError,
   PayWayNetworkError,
   PayWayRateLimitError,
+  PayWaySignatureError,
 } from './errors.js';
 import { type KhqrMerchantConfiguration, resolveKhqrConfiguration } from './khqr-config.js';
 import { createPayWayLogger, resolveLogLevel, type LogLevel } from './logger.js';
@@ -406,6 +407,100 @@ export interface GetTransactionListParams {
   requestTime?: string;
 }
 
+/**
+ * Live-documented HMAC field orders per endpoint (SANDBOX-FINDINGS §16 and the
+ * 2026-08-31 audit matrix §3). Surfaced inside PayWaySignatureError hints so a
+ * wrong-hash rejection (`1`/`01`/`PTL02`) points directly at the composition
+ * to fix instead of a bare "Wrong Hash".
+ */
+const HASH_ORDER_HINTS: Record<string, string> = {
+  [ENDPOINTS.purchase]: 'req_time.merchant_id.tran_id.amount.items Firstname Lastname Email Phone.payment_option.return_url.return_params.currency.custom_fields.skip_success_page',
+  [ENDPOINTS.checkTransaction]: 'req_time.merchant_id.tran_id',
+  [ENDPOINTS.getTransactionsByMerchantRef]: 'req_time.merchant_id.merchant_ref',
+  [ENDPOINTS.getExchangeRate]: 'req_time.merchant_id',
+  [ENDPOINTS.linkAccount]: 'merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency (live order — merchant_id first)',
+  [ENDPOINTS.linkCard]: 'merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency.continue_success_url (amount/frequency hash empty positions)',
+  [ENDPOINTS.payment]: '19-field live order, NO request_id (deprecated)',
+  [ENDPOINTS.renewToken]: 'ctid.request_time.pwt.merchant_id.request_id',
+  [ENDPOINTS.getTokenDetails]: 'merchant_id.request_time.request_id',
+  [ENDPOINTS.removeToken]: 'merchant_id.ctid.request_time.pwt',
+  [ENDPOINTS.getTransactionList]: 'req_time.merchant_id.tran_id (legacy list-2 shape)',
+  [ENDPOINTS.refund]: 'request_time.merchant_auth (RSA blob, hex/base64 per live docs)',
+};
+
+/**
+ * Codes the gateway uses for hash/signature rejections (sandbox-verified,
+ * SANDBOX-FINDINGS §16: `01` on wrong CoF compositions, `PTL02` on refunds,
+ * flat `1`/`01` on legacy paths).
+ */
+const SIGNATURE_ERROR_CODES = new Set(['1', '01']);
+
+/** Advisory hints appended to business errors for codes observed live (§16). */
+const CODE_HINTS: Record<string, string> = {
+  '98': 'Merchant ID not found — verify the merchant credential (env/profile) for the target environment.',
+  '104': 'Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX; charging: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX).',
+  '105': 'Account token invalid or expired — re-link via linkAccount/linkCard, or renew via renewToken.',
+  '09': 'Token not found — the ctid/request_id does not reference a known account token.',
+};
+
+/**
+ * B5 (live parity): classify a non-success `status.code` / flat `code` into
+ * the typed error hierarchy — signature rejections become PayWaySignatureError
+ * (with the endpoint hash-order hint), `04` + `errors{}` becomes a business
+ * error carrying `fieldErrors`, and known COF/QR codes get advisory hints.
+ * Returns the error to throw, or undefined when the code has no special
+ * classification (caller falls back to its generic error).
+ */
+function classifyBusinessCode(
+  code: string,
+  message: string,
+  rawBody: unknown,
+  endpoint?: string,
+  statusCode = 200,
+  errorsMap?: unknown,
+): PayWayAPIError | undefined {
+  if (SIGNATURE_ERROR_CODES.has(code) || code === 'PTL02') {
+    const hashHint = endpoint ? HASH_ORDER_HINTS[endpoint] : undefined;
+    const hint = hashHint
+      ? ` HMAC field order for this endpoint: ${hashHint}.`
+      : ' Check the HMAC field order against the live docs for this endpoint.';
+    return new PayWaySignatureError(`${message}.${hint}`, {
+      statusCode,
+      paywayCode: code,
+      rawBody,
+      endpoint,
+      retryable: false,
+    });
+  }
+
+  const fieldErrors =
+    errorsMap && typeof errorsMap === 'object' && !Array.isArray(errorsMap)
+      ? Object.fromEntries(
+          Object.entries(errorsMap as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+        )
+      : undefined;
+
+  const advisoryHint = CODE_HINTS[code] ? ` Hint: ${CODE_HINTS[code]}` : '';
+  const fieldHint = fieldErrors
+    ? ` Field errors: ${Object.entries(fieldErrors)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('; ')}.`
+    : '';
+
+  if (fieldErrors || fieldHint || advisoryHint) {
+    return new PayWayBusinessError(`${message}${fieldHint}${advisoryHint}`, {
+      statusCode,
+      paywayCode: code,
+      rawBody,
+      endpoint,
+      retryable: false,
+      fieldErrors,
+    });
+  }
+
+  return undefined;
+}
+
 function checkResponseError(body: unknown, endpoint?: string): void {
   if (!body || typeof body !== 'object') {
     return;
@@ -420,13 +515,17 @@ function checkResponseError(body: unknown, endpoint?: string): void {
     const code = String(statusObj.code ?? '').trim();
     const message = String(statusObj.message ?? 'Unknown PayWay API Error');
     if (code !== '0' && code !== '00' && code !== '') {
-      throw new PayWayBusinessError(message, {
-        statusCode: 200,
-        paywayCode: code,
-        rawBody: body,
-        endpoint,
-        retryable: false,
-      });
+      const classified = classifyBusinessCode(code, message, body, endpoint, 200, statusObj.errors);
+      throw (
+        classified ??
+        new PayWayBusinessError(message, {
+          statusCode: 200,
+          paywayCode: code,
+          rawBody: body,
+          endpoint,
+          retryable: false,
+        })
+      );
     }
   }
 
@@ -477,13 +576,17 @@ function checkResponseError(body: unknown, endpoint?: string): void {
           retryable: true,
         });
       }
-      throw new PayWayBusinessError(message, {
-        statusCode: 200,
-        paywayCode: code,
-        rawBody: body,
-        endpoint,
-        retryable: false,
-      });
+      const classified = classifyBusinessCode(code, message, body, endpoint, 200, resp.errors);
+      throw (
+        classified ??
+        new PayWayBusinessError(message, {
+          statusCode: 200,
+          paywayCode: code,
+          rawBody: body,
+          endpoint,
+          retryable: false,
+        })
+      );
     }
   }
 }
@@ -550,6 +653,35 @@ function createHttpError(
         extractedCode = flatTrimmed;
         extractedMessage = typeof body.message === 'string' ? body.message : undefined;
       }
+    }
+  }
+
+  // B5 (live parity): apply the COF/QR code classification to non-OK
+  // responses too — e.g. a 403 PTL02 refund rejection or a 400 "04" +
+  // errors{} binding failure get their typed errors/hints here.
+  if (extractedCode !== undefined) {
+    const classified = classifyBusinessCode(
+      extractedCode,
+      extractedMessage ?? message,
+      rawBody,
+      endpoint,
+      response.status,
+      typeof rawBody === 'object' && rawBody !== null
+        ? ((rawBody as Record<string, unknown>).errors ??
+          ((rawBody as Record<string, unknown>).status as Record<string, unknown> | undefined)?.errors)
+        : undefined,
+    );
+    if (classified) {
+      if (classified instanceof PayWaySignatureError) {
+        return new PayWaySignatureError(classified.message, {
+          statusCode: response.status,
+          paywayCode: classified.paywayCode,
+          rawBody,
+          endpoint,
+          retryable: false,
+        });
+      }
+      return classified;
     }
   }
 
@@ -808,6 +940,7 @@ export class PayWay {
       [ENDPOINTS.checkTransaction]: { limit: 600, intervalMs: 1000 },
       [ENDPOINTS.getTransactionDetail]: { limit: 10, intervalMs: 60_000 },
       [ENDPOINTS.getTransactionList]: { limit: 50, intervalMs: 60_000 },
+      [ENDPOINTS.getTransactionsByMerchantRef]: { limit: 10, intervalMs: 60_000 },
       [ENDPOINTS.refund]: { limit: 500, intervalMs: 1000 },
     };
 
@@ -1092,6 +1225,24 @@ export class PayWay {
         }
 
         if (typeof parsedBody === 'string') {
+          // B5 (live parity): link-card ALWAYS answers in HTML (success AND
+          // error) — surface a structured, actionable error instead of the
+          // generic JSON-parse failure. The real link result arrives on the
+          // callback_url the merchant supplied with the request.
+          if (endpoint === ENDPOINTS.linkCard && /<!doctype html|<html/i.test(parsedBody)) {
+            throw new PayWayBusinessError(
+              'link-card responded with an HTML page (this endpoint always does — both on success and failure). ' +
+                'The link outcome is delivered to the callback_url sent with the request; inspect that webhook ' +
+                'payload to confirm the card token. Raw body starts with: ' +
+                parsedBody.trim().slice(0, 120).replace(/\s+/g, ' '),
+              {
+                statusCode: response.status,
+                endpoint,
+                rawBody: parsedBody,
+                retryable: false,
+              },
+            );
+          }
           throw createJsonParseError(parsedBody, endpoint, response.headers.get('content-type') ?? undefined);
         }
 

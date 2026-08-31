@@ -69,7 +69,8 @@ describe('CLI in-process (runCli)', () => {
 
   it('explain normalizes padded codes and reports unknown ones', async () => {
     const { text } = await run(['explain', '04']);
-    expect(text).toContain('Invalid Data');
+    // B5: code 04 moved from the generic gateway family to the cof family.
+    expect(text).toContain('Validation / binding failure');
     const { text: unknownText } = await run(['explain', '9999']);
     expect(unknownText).toContain('Unknown or undocumented code');
   });

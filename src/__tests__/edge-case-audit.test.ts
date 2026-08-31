@@ -23,6 +23,7 @@ import {
   PayWayConfigError,
   PayWayNetworkError,
   PayWayRateLimitError,
+  PayWaySignatureError,
 } from '../errors.js';
 import {
   sanitizeForLog,
@@ -763,12 +764,12 @@ describe('edge-case: verifyCallbackSignature', () => {
 // ---------------------------------------------------------------------------
 
 describe('edge-case: observability hooks', () => {
-  it('onResponse IS invoked before a 200 business error is thrown (was FINDING EC-06, fixed)', async () => {
+  it('onResponse IS invoked before a 200 business error is thrown (was FINDING EC-06, fixed; B5: code 1 is now a PayWaySignatureError)', async () => {
     const server = await startServer((_req, res) => jsonResponse(res, 200, { status: { code: '1', message: 'Wrong Hash.' } }));
     try {
       const onResponse = vi.fn();
       const client = makeClient(server.url, { onResponse });
-      await expect(checkTransaction(client)).rejects.toBeInstanceOf(PayWayBusinessError);
+      await expect(checkTransaction(client)).rejects.toBeInstanceOf(PayWaySignatureError);
       expect(onResponse).toHaveBeenCalledTimes(1);
       expect(onResponse.mock.calls[0][1]).toBe(200);
     } finally {

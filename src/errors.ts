@@ -32,6 +32,8 @@ export interface PayWayAPIErrorOptions {
   endpoint?: string;
   retryable?: boolean;
   rateLimitInfo?: Record<string, unknown>;
+  /** Per-field validation errors from the gateway (COF family, `status.code "04"` + `errors{}`). */
+  fieldErrors?: Record<string, string>;
 }
 
 export class PayWayAPIError extends PayWayError {
@@ -41,6 +43,7 @@ export class PayWayAPIError extends PayWayError {
   public readonly endpoint?: string;
   public readonly retryable?: boolean;
   public readonly rateLimitInfo?: Record<string, unknown>;
+  public readonly fieldErrors?: Record<string, string>;
 
   constructor(message: string, options: PayWayAPIErrorOptions = {}) {
     super(message, 'api_error');
@@ -52,6 +55,7 @@ export class PayWayAPIError extends PayWayError {
     this.endpoint = options.endpoint;
     this.retryable = options.retryable;
     this.rateLimitInfo = options.rateLimitInfo;
+    this.fieldErrors = options.fieldErrors;
   }
 
   public toJSON(): Record<string, unknown> {
@@ -64,6 +68,7 @@ export class PayWayAPIError extends PayWayError {
       endpoint: this.endpoint,
       retryable: this.retryable,
       rateLimitInfo: this.rateLimitInfo,
+      fieldErrors: this.fieldErrors,
       rawBody: this.rawBody,
     };
   }
