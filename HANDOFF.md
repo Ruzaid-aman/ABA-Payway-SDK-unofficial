@@ -95,10 +95,12 @@ are the TTY-only branches of `ask` / `sessions clear` and the interactive onboar
 - Repo root cleanup still open: `q33r.png`, `q34r.png`, `dhitraj-2026-08-24-21_53.jpg`, `webhook-stdout.log`, `webhook-stderr.log` are stray artifacts — delete or move under `test-output/` (ask the user first if unsure).
 
 ### 5.4 — ABA dependency (blocked on external answers — do not burn time guessing)
-`audit-results/four-pillars/ABA-OPEN-QUESTIONS.md` holds Q1–Q10. The user must send these to PayWay. Answers unblock, in impact order:
-1. **Q6 (token-trio HMAC composition)** — the v3 token-management endpoints ship capability-guarded (`allowUnverifiedTokenOperations`) because ~60 derivable HMAC compositions all returned "Wrong Hash" (SANDBOX-FINDINGS §9a). An official sample would unlock link/renew/get-details/remove end-to-end.
-2. **Q9/Q10 (production `tran_id`/QR-duplicate semantics)** — decides whether `retryPolicy: 'transient'` is safe as the default for purchases.
-3. **Q4 (close-transaction enforcement)** — sandbox treats close as advisory; production behavior determines whether the SDK needs a local closed-flag helper.
+`audit-results/four-pillars/ABA-OPEN-QUESTIONS.md` holds **Q1–Q18** after the 2026-09-02 re-audit: Q1 (token-trio HMAC) and Q2 (subscription initiation) were **resolved by live-doc evidence 2026-08-31** (§16; trio shipped un-gated in v1.3.6), Q3–Q10 keep their 2026-08-27 bodies with refreshed statuses, and Q11–Q18 are new (transaction-list visibility gap, hash-order stability, beneficiary provisioning, payment-link image quirks, subscription management, production base URL, sandbox TLS, CoF callback schema). The user must send the open ones to PayWay. Answers unblock, in impact order:
+1. **Q9/Q10 (production `tran_id`/QR-duplicate semantics)** — decides whether `retryPolicy: 'transient'` is safe as the default for purchases.
+2. **Q4 (close-transaction enforcement)** — sandbox treats close as advisory; production behavior determines whether the SDK needs a local closed-flag helper.
+3. **Q3 + Q15 (token 90-day expiry boundary; subscription cancel/callback surface)** — unlocks precise token-lifecycle helpers and recurring-billing reconciliation.
+4. **Q12 (are the §16 hash orders frozen + production parity; sandbox `link-card` hash skipping)** — written confirmation converts the evidence-based alignments into a supported contract.
+5. **Q8 (sandbox-key rotation procedure)** — completes the TD-01 exposure remediation on ABA's side.
 
 ### 5.5 — Production review P0–P3 (DONE 2026-08-31 — see CHANGELOG Unreleased + docs/MUTATION-SPIKE-2026-08-31.md)
 CI build-before-test + coverage floors + Node ≥20 engines + badge; `npm run test:sandbox` live contract suite; shipped mock harness routes all client status endpoints; shared `src/test/test-utils.ts`; onboard/setup-webhook injectable seams (onboard 69%, setup-webhook 85.5%); per-call `RequestCallOptions` on every domain method; `verifyCallbackDetailed`; fake-timer resilience tests + dist freshness guard; Stryker spike 91.3%; `docs/PRODUCTION-VERIFICATION-PLAN.md` (gated on production credentials); npm publish prep in RELEASE_CHECKLIST (**publishing itself remains the maintainer's call — package not on the registry**).
