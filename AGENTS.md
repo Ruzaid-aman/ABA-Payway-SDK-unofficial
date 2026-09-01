@@ -65,3 +65,13 @@ scoped to the command only (same workaround as official boilerplate). Never set 
 NOTE (2026-08-26): the installer writes to `~/.opencode/skills`, but this opencode build loads from
 `~/.config/opencode/skills` — copy the `aba-payway-*` dirs there after install.
 Deeper project rules live in `.agents/AGENTS.md`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked as local markdown files under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout: one `CONTEXT.md` at the repo root with `docs/adr/`. See `docs/agents/domain.md`.
