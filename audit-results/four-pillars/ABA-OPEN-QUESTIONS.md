@@ -158,5 +158,38 @@ produced two live QR payloads, both code 00.
 
 | # | Date | ABA response | Resolution |
 |---|---|---|---|
-| Q1–Q7 | — | awaiting | — |
+| Q1 | 2026-08-31 | **Resolved by evidence, not by ABA reply** — see the 2026-08-31 addendum below | Live docs now publish the exact per-endpoint fieldLists; sandbox-verified; trio shipped in v1.3.6 |
+| Q2 | 2026-08-31 | **Resolved by evidence** — see the addendum below | `ctid`+`token_flag CITR_FIX`+`frequency` shipped on the purchase path (live `subscription-21402227e0`); dedicated management endpoints remain undocumented |
+| Q3 | — | awaiting | `get-token-details` returns `expired_at`; charging a removed token declines with purchase err 87 — exact expiry boundary still unconfirmed |
+| Q4–Q5, Q7–Q10 | — | awaiting | — |
+| Q6.3 | 2026-08-27 | ABA clarification (relay) | See "Partial answers" above |
 | Q8–Q9 | — | awaiting | — |
+
+---
+
+## Addendum — 2026-08-31: Q1 and Q2 resolved by live-doc evidence (v1.3.6)
+
+**Q1 (token-trio HMAC composition — R-04/05/06): RESOLVED, no longer a production blocker.**
+The live Apidog specs at developer.payway.com.kh now publish explicit per-endpoint hash
+orders. `scripts/sandbox-probe-token-trio.ts` verified each against the sandbox: the live
+compositions pass the hash layer (business codes 105/09/00 on synthetic tokens prove
+acceptance) while every §9a-era SDK order now returns `01 Wrong Hash` — the gateway
+tightened CoF hash validation after the August campaign. Shipped orders:
+- renew: `ctid.request_time.pwt.merchant_id.request_id` (request: requestId+ctid+pwt)
+- get-token-details: `merchant_id.request_time.request_id` (request: requestId ONLY)
+- remove-token: `merchant_id.ctid.request_time.pwt` (request: ctid+pwt, no request_id)
+
+The `request` binding quirk from §9a is gone; `request_id` is no longer forced into
+every body. The SDK capability gate is deprecated to an opt-out. Evidence:
+SANDBOX-FINDINGS §16, `test-output/token-trio/probe-2026-08-31T00-28-10-661Z.log`.
+The original questions above can still be sent to ABA for written confirmation, but
+they no longer block anything.
+
+**Q2 (subscription initiation — R-07): RESOLVED.** The live docs document a
+`subscription-21402227e0` operation on the purchase path: `ctid` (required),
+`token_flag: CITR_FIX`, `frequency (1W|1M|2M, required iff CITR_FIX)`, with
+`token_flag`+`frequency` hashed after `skip_success_page`. Shipped in
+`CreateTransactionParams` and the CLI (`generate-checkout --ctid/--token-flag/--frequency`).
+Sub-question 3 (dedicated management endpoints) remains unanswered — cancel is
+remove-token, per the live token-management docs.
+

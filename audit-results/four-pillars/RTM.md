@@ -29,3 +29,27 @@ than the plan lists.
 
 Coverage: **10/10 requirements traced**, 3 ✅, 1 ⚠️, 1 ❌ GAP (R-07), 3 🛑 BLOCKED,
 2 📝 doc corrections.
+
+---
+
+## Addendum — 2026-08-31 (live API parity release, v1.3.6)
+
+The rows above are the 2026-08-27 snapshot and are NOT rewritten (append-only
+discipline). This addendum supersedes them where v1.3.6 changed reality.
+Evidence: `docs/SANDBOX-FINDINGS.md` §16, probe
+`test-output/token-trio/probe-2026-08-31T00-28-10-661Z.log`, coverage matrix
+`audit-results/live-api-coverage-2026-08-31.md`, release notes in `CHANGELOG.md` v1.3.6.
+
+| Req | 2026-08-27 verdict | Verdict now | What changed |
+|---|---|---|---|
+| R-04 Renew Token | 🛑 BLOCKED | ✅ PASS | Live docs published the exact fieldList (`ctid.request_time.pwt.merchant_id.request_id`); sandbox probe confirmed the hash layer ACCEPTS it (business code 105 on synthetic tokens) while the shipped §9a-era order returns `01 Wrong Hash`. `RenewTokenParams {requestId, ctid, paymentToken}` shipped; the server-mandated `request` field is gone (binding layer no longer requires it). |
+| R-05 Get Token Details | 🛑 BLOCKED | ✅ PASS | Live order `merchant_id.request_time.request_id`; request carries ONLY `request_id` (+ auto fields) — **no ctid/pwt**. Probe: `09 Data not found` (hash accepted). `GetTokenDetailsParams {requestId}` shipped. |
+| R-06 Remove Token | 🛑 BLOCKED | ✅ PASS | Live order `merchant_id.ctid.request_time.pwt`; request carries ctid+pwt, **no request_id**. Probe: HTTP 200 code `00`. `RemoveTokenParams {ctid, paymentToken}` shipped. |
+| R-07 Subscription | ❌ GAP | ✅ PASS | `CreateTransactionParams` gained `ctid`, `tokenFlag: 'CITR_FIX'`, `frequency ('1W'\|'1M'\|'2M')` (live `subscription-21402227e0` operation); hash positions appended after `skip_success_page` matching the live order. CLI: `generate-checkout --ctid … --token-flag CITR_FIX --frequency 1M`. |
+| R-02 Link Card | ⚠️ PARTIAL | ✅ PASS | `continueSuccessUrl` added; `returnUrl`/`returnDeeplink` deprecated (absent from the live-documented request; not sent). HTML-always response handled by a structured guard in `client.ts`. |
+| R-03 Payment | ✅ PASS* | ✅ PASS | The asterisk is resolved: the 10 live-documented optional params (`firstName/lastName/email/phone/purchaseType/items/returnParams/payout/customFields/shippingFee`) are now on `CofPaymentParams` with the §16-verified 19-field hash order; `requestId` no longer sent (deprecated). |
+| R-01 Link Account | ✅ PASS | ✅ PASS (re-based) | Hash realigned to the live order `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency` — the §9a-era order now returns `01 Wrong Hash` (gateway tightened validation). `ctid`/`tokenFlag`/`currency` required per live docs. |
+
+Updated coverage: **10/10 traced — 10 ✅ PASS** (R-01…R-07, R-10; R-08/R-09
+enum corrections stand). The capability gate `allowUnverifiedTokenOperations`
+is deprecated as an opt-out (trio allowed by default).

@@ -14,6 +14,22 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-checkout -a 5
 # One-shot status / full detail
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts check-transaction -t <id>
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts transaction-detail -t <id>
+
+# Subscription (recurring) checkout on the purchase path: ctid + CITR_FIX + frequency
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-checkout -a 9.99 -c USD --return-url <url> --ctid customer123 --token-flag CITR_FIX --frequency 1M
+
+# Credentials-on-file: link an ABA account (QR/deeplink arrives via callback_url), then charge the returned pwt
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof link-account -r req0001 -c customer123 -f CITI_FLEX --currency USD --callback-url <url>
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof charge -t order-0001 -a 4.50 --token <pwt> --currency USD
+
+# COF token lifecycle: renew (account tokens only), details (request_id ONLY), remove (irreversible)
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token renew -r req0002 -c customer123 --token <pwt>
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token details -r req0001
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token remove -c customer123 --token <pwt>
+
+# Payout beneficiary whitelist (requires RSA key)
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary add 000999888
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary update-status 000999888 -s 1
 ```
 
 - `generate-qr` polls by default (`--no-polling` to disable); `--poll-timeout <s>` should match `--lifetime`.
@@ -22,13 +38,14 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts transaction-detail -t 
 - Offline/static QR: add `--offline` (no API call).
 - Interactive TUI (wizard, pickers, spinners) activates only on a real TTY (stdin+stdout); agents/CI and piped/non-TTY runs keep byte-identical legacy behavior.
 - `PAYWAY_UI=classic` forces the legacy output everywhere; `--no-color`/`NO_COLOR` drop ANSI colors; Ctrl-C during a prompt exits 130.
+- COF (v1.3.6, live-docs parity): `cof link-account`/`link-card` require `--request-id`, `--ctid`, `--token-flag` (CITI_FLEX|CITO_FLEX); the token result (`pwt`) arrives via `callback_url`. `cof token details` takes `--request-id` ONLY (no ctid/pwt); `cof token remove` takes `--ctid` + `--token` (no request-id) — these per-endpoint shapes are gateway-verified (SANDBOX-FINDINGS §16). `link-card` always answers with an HTML hosted form (render it); `beneficiary` commands need `PAYWAY_RSA_PUBLIC_KEY`. JSON-or-string flags (`--items`, `--payout`, `--custom-fields`) accept inline JSON or plain strings.
 
 ## Current state & handoff
 
 Read `HANDOFF.md` (repo root) before starting any task: it tracks the current
-release state (v1.3.0), the behavior contract changes from the 2026-08-30
-edge-case audit (lifetime minimums, empty-body guard, private-host guard,
-`runCli` export, …), the prioritized next items with definitions of done, and
+release state (v1.3.6), the behavior contract (lifetime minimums, empty-body guard,
+private-host guard, `runCli` export, COF live-parity hash orders, advisory
+`strictValidation`, …), the prioritized next items with definitions of done, and
 the anti-checklist of past agent mistakes. Deep rules: `.agents/AGENTS.md`.
 
 ## Sandbox TLS caveat

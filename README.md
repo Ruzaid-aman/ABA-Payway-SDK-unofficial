@@ -107,6 +107,10 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (requires credentials) |
 | `payway-sdk checkout-form -a <amount> -o form.html` | Write the signed hosted-checkout HTML form (local signing, no API call) |
 | `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image) |
+| `payway-sdk cof link-account / link-card` | Start a credentials-on-file link: returns the QR/deeplink (account) or hosted form (card); the token (`pwt`) arrives via `callback_url` |
+| `payway-sdk cof charge -t <id> -a <amount> --token <pwt>` | Charge a stored COF token (optional `--ctid`, `--token-flag`, payer fields, `--items`, `--payout`) |
+| `payway-sdk cof token renew / details / remove` | Token lifecycle — `details` takes `--request-id` only; `remove` takes `--ctid --token` (irreversible) |
+| `payway-sdk beneficiary add / update-status <payee>` | Manage the payout beneficiary whitelist (requires RSA key; `update-status -s 0\|1`) |
 | `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks |
 | `payway-sdk config` | Display loaded configuration and validate environment variables |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
@@ -460,35 +464,55 @@ const rates = await payway.checkout.getExchangeRate();
 
 ### 2. Credentials-on-File / Tokenization (`payway.credentialsOnFile`)
 
-Store card credentials and process recurring transactions securely.
+Store ABA account or card credentials and process recurring / on-demand charges securely.
 
 ```typescript
-// Link a bank account
+// Link a bank account (QR/deeplink arrives in the response; the pwt token is
+// pushed to your callback_url once the customer approves in ABA Mobile)
 const linkAcc = await payway.credentialsOnFile.linkAccount({
-  requestId: 'req-abc',
-  ctid: 'customer-123',
-  tokenFlag: 'CITR_FLEX',
+  requestId: 'reqabc123',          // 5–24 alphanumeric, unique
+  ctid: 'customer123',            // your customer identifier, 5–24 alphanumeric
+  tokenFlag: 'CITI_FLEX',          // CITI_FLEX | CITO_FLEX (live-documented)
+  currency: 'USD',
+  callbackUrl: 'https://mywebsite.com/payway/cof-callback', // optional but recommended
+});
+
+// Link a credit/debit card (form-urlencoded; the hosted form is returned as
+// HTML — render it in an iframe; the pwt arrives via callback_url)
+const linkCard = await payway.credentialsOnFile.linkCard({
+  requestId: 'reqabc124',
+  ctid: 'customer123',
+  tokenFlag: 'CITI_FLEX',
+  currency: 'USD',
+  continueSuccessUrl: 'https://mywebsite.com/cards/done', // "Done" button target
+});
+
+// Charge a stored token (pwt) — on-demand or recurring
+const charge = await payway.credentialsOnFile.payment({
+  transactionId: 'order-789',
+  amount: 25.00,
+  paymentToken: 'pwt_token_value_here',
+  ctid: 'customer123',             // optional on repeat charges
+  tokenFlag: 'CITU_FLEX',          // CITU_FLEX | MITU_FLEX | MITR_FIX (charging flags)
   currency: 'USD',
 });
 
-// Link a credit/debit card (requires urlencoded payload)
-const linkCard = await payway.credentialsOnFile.linkCard({
-  requestId: 'req-abc',
-  ctid: 'customer-123',
-  tokenFlag: 'CITR_FLEX',
-  frequency: '1M', // Recurrence frequency
-  returnUrl: 'https://mywebsite.com/cards',
+// Token lifecycle (v1.3.6 — hash compositions sandbox-verified, un-gated)
+const renewed = await payway.credentialsOnFile.renewToken({      // account tokens only
+  requestId: 'reqabc125', ctid: 'customer123', paymentToken: 'pwt…',
 });
-
-// Perform a payment using a saved token (pwt)
-const charge = await payway.credentialsOnFile.payment({
-  requestId: 'req-def',
-  transactionId: 'order-789',
-  amount: 25.00,
-  ctid: 'customer-123',
-  paymentToken: 'pwt_token_value_here',
+const details = await payway.credentialsOnFile.getTokenDetails({ // request_id ONLY
+  requestId: 'reqabc123',
+});
+const removed = await payway.credentialsOnFile.removeToken({     // no request_id; irreversible
+  ctid: 'customer123', paymentToken: 'pwt…',
 });
 ```
+
+> **Subscription/recurring registration:** start a CITR subscription on the checkout
+> purchase path with `ctid` + `tokenFlag: 'CITR_FIX'` + `frequency: '1W' | '1M' | '2M'`
+> (see `CreateTransactionParams`), or from the CLI:
+> `payway-sdk generate-checkout -a 9.99 --ctid customer123 --token-flag CITR_FIX --frequency 1M --return-url <url>`.
 
 ### 3. QR API (`payway.qr`)
 
@@ -613,7 +637,7 @@ const payoutResult = await payway.payout.payout({
   ],
 });
 
-// Whitelist management
+// Whitelist management (RSA-encrypted; CLI: `payway-sdk beneficiary add|update-status`)
 const updateStatus = await payway.payout.updateBeneficiaryStatus({ payee: '000999888', status: 1 });
 const addPayee = await payway.payout.addBeneficiary({ payee: '000999888' });
 ```
