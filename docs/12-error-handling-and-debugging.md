@@ -306,7 +306,7 @@ an HTML page instead of JSON... Body starts with: <!DOCTYPE html><html...
 
 PayWay accepted the request but routed it to a web flow instead of answering with API JSON. Sandbox-verified cause: **unsupported parameter values**, e.g. `payment_gate: 0` on `/v1/payments/purchase`. Removing optional parameters resolves it. The error message includes a body snippet so you can see which page PayWay returned.
 
-> **Exception — `link-card` always answers HTML (v1.3.6):** the card-linking endpoint returns an HTML page (the hosted card-entry form) on **both success and error**. The SDK detects this shape and raises a structured `PayWayBusinessError` ("link-card responded with an HTML page… check callback_url") instead of a JSON-parse failure — so an HTML body on `link-card` is expected behavior, not this failure mode.
+> **Exception — `link-card` always answers HTML (v1.3.6):** the card-linking endpoint returns an HTML page (the hosted card-entry form) on **both success and error**. The SDK detects this shape and raises a structured `PayWayBusinessError` ("link-card responded with an HTML page… check callback_url") instead of a JSON-parse failure — so an HTML body on `link-card` is expected behavior, not this failure mode. To get the hosted page without any server roundtrip, render the local signed form instead: `credentialsOnFile.getLinkCardFormHtml()` / `payway-sdk cof link-card-form` (a browser form POST is exactly the urlencoded wire format this endpoint requires). The CLI's `cof link-card` captures the returned page to `payway-output/link-card-<request-id>.html` and exits 0.
 
 ---
 

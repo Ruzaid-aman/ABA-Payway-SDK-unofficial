@@ -272,3 +272,119 @@ describe('checkout-form (in-process runCli)', () => {
     }
   });
 });
+
+describe('cof link-card-form (in-process runCli)', () => {
+  // Same empty-APPDATA isolation as checkout-form: keep the persisted
+  // profile store out of the picture so credentials are deterministic.
+  const emptyAppData2 = mkdtempSync(path.join(tmpdir(), 'payway-empty-appdata-'));
+
+  afterAll(() => {
+    rmSync(emptyAppData2, { recursive: true, force: true });
+  });
+
+  it('requires credentials (the signed form embeds merchant_id + hash)', async () => {
+    vi.stubEnv('APPDATA', emptyAppData2);
+    const savedMid = process.env.PAYWAY_MERCHANT_ID;
+    const savedKey = process.env.PAYWAY_API_KEY;
+    delete process.env.PAYWAY_MERCHANT_ID;
+    delete process.env.PAYWAY_API_KEY;
+    try {
+      const { text, exitCode } = await run(['cof', 'link-card-form', '-c', 'customerabc123', '-f', 'CITI_FLEX']);
+      expect(text).toContain('Missing merchant credentials');
+      expect(exitCode).toBe(1);
+    } finally {
+      if (savedMid !== undefined) process.env.PAYWAY_MERCHANT_ID = savedMid;
+      if (savedKey !== undefined) process.env.PAYWAY_API_KEY = savedKey;
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('writes a signed link-card form to --out with stubbed credentials', async () => {
+    vi.stubEnv('APPDATA', emptyAppData2);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    const outDir = mkdtempSync(path.join(tmpdir(), 'payway-link-card-form-'));
+    const outPath = path.join(outDir, 'link-card.html');
+    try {
+      const { text, exitCode } = await run([
+        'cof',
+        'link-card-form',
+        '-c', 'customerabc123',
+        '-f', 'CITI_FLEX',
+        '-r', 'link67890',
+        '--out', outPath,
+        '--no-open-page',
+      ]);
+      expect(exitCode).toBe(0);
+      expect(text).toContain('written to');
+      expect(text).toMatch(/Request ID:/);
+
+      const html = readFileSync(outPath, 'utf8');
+      expect(html).toMatch(/^<!DOCTYPE html>/);
+      expect(html).toContain('https://checkout-sandbox.payway.com.kh/api/payment-credential/v3/cof/link-card');
+      expect(html).toContain('name="merchant_id" value="inprocess-mid"');
+      expect(html).toContain('name="hash"');
+      expect(html).toContain('name="request_id" value="link67890"');
+      expect(html).toContain('name="ctid" value="customerabc123"');
+      expect(html).toContain('name="token_flag" value="CITI_FLEX"');
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('emits clean HTML on stdout and diagnostics on stderr (redirect-safe)', async () => {
+    vi.stubEnv('APPDATA', emptyAppData2);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    const stdoutChunks: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+    try {
+      const { text, exitCode } = await run([
+        'cof',
+        'link-card-form',
+        '-c', 'customerabc123',
+        '-f', 'CITO_FLEX',
+        '-r', 'stdoutreq01',
+      ]);
+      expect(exitCode).toBe(0);
+      const html = stdoutChunks.join('');
+      expect(html).toMatch(/^<!DOCTYPE html>/);
+      expect(html).toContain('name="request_id" value="stdoutreq01"');
+      expect(html).not.toContain('Request ID:'); // diagnostics never ride stdout
+      expect(text).toContain('Request ID:');
+    } finally {
+      stdoutSpy.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('warns when no --callback-url is given (the pwt only arrives via callback)', async () => {
+    vi.stubEnv('APPDATA', emptyAppData2);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    try {
+      const { text, exitCode } = await run(['cof', 'link-card-form', '-c', 'customerabc123', '-f', 'CITI_FLEX']);
+      expect(text).toContain('--callback-url');
+      expect(exitCode).toBe(0);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('surfaces domain validation errors (bad ctid) as exit 1', async () => {
+    vi.stubEnv('APPDATA', emptyAppData2);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    try {
+      const { text, exitCode } = await run(['cof', 'link-card-form', '-c', 'CUST-005', '-f', 'CITI_FLEX']);
+      expect(text).toContain('ctid');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});

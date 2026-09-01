@@ -179,6 +179,37 @@ async function linkCustomerCard() {
 
 > ⚠️ **Critical difference:** `linkCard()` uses `application/x-www-form-urlencoded` (the SDK handles the encoding automatically) and answers with an **HTML page** (the hosted card-entry form). `linkAccount()` uses JSON. This was verified in sandbox testing — sending JSON to `link-card` will be rejected without being read. Note: `returnUrl`/`returnDeeplink` are **no longer sent** on link-card (absent from the live request); the hosted form's done-target is `continueSuccessUrl`.
 
+#### Browser-form alternative: `getLinkCardFormHtml()` (no server roundtrip)
+
+Because the endpoint demands form-urlencoded and always answers with a hosted page, the natural integration for card linking is a **plain browser form POST** — the same pattern as `checkout.getCheckoutFormHtml()`. The SDK builds the full signed HTML document locally (hidden fields + §16 HMAC, byte-identical to `linkCard()`); submitting it navigates the customer straight to the hosted card-entry form:
+
+```typescript
+const html = payway.credentialsOnFile.getLinkCardFormHtml({
+  requestId: `link${Date.now()}`,
+  ctid: 'customerabc123',
+  tokenFlag: 'CITI_FLEX',
+  frequency: '1M',
+  callbackUrl: `${process.env.BASE_URL}/api/cof-callback`,
+});
+res.type('html').send(html);
+```
+
+Options: `{ formId, autoSubmit, submitLabel, omitSubmitButton }` (no `popupMode` — the AbaPayway popup plugin is documented for the purchase endpoint only). There is no `pwt` in the response either way: the token always arrives via `callbackUrl`.
+
+CLI equivalents:
+
+```sh
+# Local signed form, no API call (HTML to stdout or --out; auto-opens on TTY)
+npx tsx src/cli.ts cof link-card-form --ctid customerabc123 --token-flag CITI_FLEX \
+  --frequency 1M --callback-url https://example.com/api/cof-callback -o link-card.html
+
+# API call: saves the returned hosted page to payway-output/ and offers to open it
+npx tsx src/cli.ts cof link-card -r link67890 --ctid customerabc123 --token-flag CITI_FLEX \
+  --callback-url https://example.com/api/cof-callback
+```
+
+`cof link-card` now treats the HTML page as the success artifact it is: it saves the page to `payway-output/link-card-<request-id>.html` (openable with `--open-page`, auto on interactive terminals) and exits 0 instead of surfacing the B5 structured error. With `--json` it prints a `{ hostedHtmlPath, requestId, ctid, note }` envelope.
+
 ### Sandbox-verified facts (2026-08-25 scope campaign; hash orders re-verified 2026-08-31 — see §16)
 
 - **`linkCard()` also requires `currency`** — the SDK now defaults it to `'USD'`; pass the customer's currency explicitly. Server rejects without it: `"The currency field is required."`
@@ -522,6 +553,9 @@ npx tsx src/cli.ts cof link-account -r link12345 --ctid customerabc123 --token-f
 
 # Link a card (hosted form; --continue-success-url is the Done-button target)
 npx tsx src/cli.ts cof link-card -r link67890 --ctid customerabc123 --token-flag CITI_FLEX --frequency 1M
+
+# Local signed card-link form (no API call; the browser POSTs urlencoded to the gateway)
+npx tsx src/cli.ts cof link-card-form --ctid customerabc123 --token-flag CITI_FLEX --callback-url https://example.com/api/cof-callback -o link-card.html
 
 # Charge a saved token (charging flags: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX)
 npx tsx src/cli.ts cof charge -t order12345 --amount 25.00 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38] --token-flag CITU_FLEX

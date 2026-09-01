@@ -2403,8 +2403,10 @@ cofCmd
   .option('--frequency <code>', 'Billing frequency: 1W | 1M | 2M')
   .option('--callback-url <url>', 'Webhook callback URL for the link result')
   .option('--continue-success-url <url>', 'Base64-encoded target of the hosted form Done button')
+  .option('--open-page', 'Open the returned hosted card page with the OS default viewer (default: auto when interactive)')
+  .option('--no-open-page', 'Never open the hosted card page automatically')
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: Record<string, string | undefined>) => {
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -2417,8 +2419,8 @@ cofCmd
         tokenFlag: opts.tokenFlag as string,
         currency: (opts.currency ?? 'USD') as 'USD' | 'KHR',
         frequency: opts.frequency === undefined ? undefined : (opts.frequency as '1W' | '1M' | '2M'),
-        callbackUrl: opts.callbackUrl,
-        continueSuccessUrl: opts.continueSuccessUrl,
+        callbackUrl: opts.callbackUrl as string | undefined,
+        continueSuccessUrl: opts.continueSuccessUrl as string | undefined,
       });
       if (opts.json) {
         console.log(JSON.stringify(result, null, 2));
@@ -2429,7 +2431,138 @@ cofCmd
       console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
       console.log(`  ${c.dim('The customer continues on the hosted form; result arrives via callback_url.')}\n`);
     } catch (e) {
+      // link-card ALWAYS answers with the hosted card-entry HTML page (both
+      // success and error — SANDBOX-FINDINGS §9a/B5). The client surfaces it
+      // as a structured PayWayBusinessError with the page preserved in
+      // rawBody; capture it so the operator can actually open it instead of
+      // reading a 120-char prefix.
+      if (e instanceof PayWayBusinessError && typeof e.rawBody === 'string' && /<!doctype html|<html/i.test(e.rawBody)) {
+        const { mkdirSync, writeFileSync } = await import('node:fs');
+        const outPath = path.join(process.cwd(), 'payway-output', `link-card-${opts.requestId}.html`);
+        mkdirSync(path.dirname(outPath), { recursive: true });
+        writeFileSync(outPath, e.rawBody, 'utf8');
+        if (opts.json) {
+          // This endpoint never speaks JSON against the real gateway — the
+          // closest machine-readable result is the captured-page envelope.
+          console.log(
+            JSON.stringify(
+              {
+                hostedHtmlPath: outPath,
+                requestId: opts.requestId,
+                ctid: opts.ctid,
+                note: 'link-card always answers with the hosted card-entry page; the token (pwt) arrives via callback_url.',
+              },
+              null,
+              2,
+            ),
+          );
+          process.exitCode = EXIT_OK;
+          return;
+        }
+        console.log(`  ${c.green('✓')} Hosted card-link page received and saved`);
+        console.log(`  ${c.bold('Page:')} ${c.cyan(outPath)}`);
+        console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
+        console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
+        console.log(
+          `  ${c.dim('Open the page in a browser, complete the card form; the token (pwt) arrives via callback_url.')}`,
+        );
+        const shouldOpen = opts.openPage === true || (opts.openPage !== false && Boolean(process.stdout.isTTY));
+        if (shouldOpen) {
+          const opened = await openImageInDefaultViewer(outPath);
+          if (opened.opened) {
+            console.log(`  ${c.green('✓')} Opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
+          } else {
+            console.log(`  ${c.yellow('⚠')} Could not open automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`);
+            console.log(`  ${c.dim(`Open it manually: ${outPath}`)}`);
+          }
+        }
+        console.log();
+        process.exitCode = EXIT_OK;
+        return;
+      }
       process.exitCode = printApiError(e);
+    }
+  });
+
+// cof link-card-form — local-only render of the signed link-card browser
+// form. The form POSTs urlencoded (link-card rejects JSON, SANDBOX-FINDINGS
+// §9a) and the gateway answers its hosted card-entry page, so the customer
+// completes linking in the browser; the token arrives via --callback-url.
+// Never touches the network; HTML goes to stdout or --out, diagnostics to
+// stderr so `cof link-card-form ... > page.html` stays clean.
+cofCmd
+  .command('link-card-form')
+  .description('Generate the hosted card-link HTML form (local signing, no API call)')
+  .requiredOption('-c, --ctid <ctid>', 'Customer token identifier (5-24 alphanumeric)')
+  .requiredOption('-f, --token-flag <flag>', 'Live-documented values: CITI_FLEX | CITO_FLEX')
+  .option('-r, --request-id <id>', 'Unique request id (auto-generated if omitted)')
+  .option('--currency <code>', 'Payment currency: USD (default) or KHR', 'USD')
+  .option('--frequency <code>', 'Billing frequency: 1W | 1M | 2M')
+  .option('--callback-url <url>', 'Webhook callback URL for the link result (recommended — it is how the pwt token arrives)')
+  .option('--continue-success-url <url>', 'Base64-encoded target of the hosted form Done button')
+  .option('--auto-submit', 'Submit the form on page load (same-tab navigation to the hosted form)')
+  .option('-o, --out <path>', 'Write the HTML document to a file instead of stdout')
+  .option('--open-page', 'Open the generated page with the OS default viewer (default: auto when interactive)')
+  .option('--no-open-page', 'Never open the generated page automatically')
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
+    const say = opts.out ? console.log : console.error;
+    say(`\n${c.bold('ABA PayWay SDK')} — hosted card-link form\n`);
+
+    const requestId = (opts.requestId as string) ?? `lc${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    if (opts.callbackUrl === undefined) {
+      say(
+        `  ${c.yellow('⚠')} No --callback-url given: the link result (pwt token) can only arrive via the callback.`,
+      );
+    }
+
+    try {
+      const payway = new PayWay();
+      const html = payway.credentialsOnFile.getLinkCardFormHtml({
+        requestId,
+        ctid: opts.ctid as string,
+        tokenFlag: opts.tokenFlag as string,
+        currency: ((opts.currency as string) ?? 'USD').toUpperCase() as 'USD' | 'KHR',
+        frequency: opts.frequency === undefined ? undefined : (opts.frequency as '1W' | '1M' | '2M'),
+        callbackUrl: opts.callbackUrl as string | undefined,
+        continueSuccessUrl: opts.continueSuccessUrl as string | undefined,
+      }, { autoSubmit: Boolean(opts.autoSubmit) });
+
+      if (opts.out) {
+        const { mkdirSync, writeFileSync } = await import('node:fs');
+        mkdirSync(path.dirname(path.resolve(opts.out as string)), { recursive: true });
+        writeFileSync(opts.out as string, html, 'utf8');
+        say(`  ${c.green('✓')} Card-link form written to ${c.cyan(opts.out as string)}`);
+      } else {
+        process.stdout.write(html);
+      }
+      say(`  ${c.bold('Request ID:')} ${c.cyan(requestId)}`);
+      say(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
+      if (opts.out) {
+        const shouldOpen = opts.openPage === true || (opts.openPage === undefined && Boolean(process.stdout.isTTY));
+        if (shouldOpen) {
+          const opened = await openImageInDefaultViewer(opts.out as string);
+          if (opened.opened) {
+            say(`  ${c.green('✓')} Opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
+          } else {
+            say(`  ${c.yellow('⚠')} Could not open automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`);
+            say(`  ${c.dim(`Open it manually: ${opts.out}`)}`);
+          }
+        }
+      }
+      say(`  ${c.dim('Next: open the page in a browser and complete the card form — the pwt arrives via callback_url.')}`);
+      say(
+        `  ${c.dim(`Then charge with: payway-sdk cof charge -t <id> -a <amount> --token <pwt> --ctid ${opts.ctid}`)}`,
+      );
+      say();
+      process.exitCode = EXIT_OK;
+    } catch (e) {
+      say(`  ${c.red('✗')} ${String(e instanceof Error ? e.message : e)}`);
+      process.exitCode = classifyError(e);
     }
   });
 

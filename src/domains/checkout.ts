@@ -6,6 +6,7 @@ import type { components } from '../types.js';
 import type { PollTransactionOptions, PollTransactionResult } from '../domain-types.js';
 import {
   encodeBase64IfNeeded,
+  escapeHtmlAttribute,
   filterParams,
   formatAmount,
   formatRequestTime,
@@ -44,13 +45,6 @@ export interface CheckoutFormOptions {
 const CHECKOUT_FORM_PLUGIN_SRC = 'https://checkout.payway.com.kh/plugins/checkout2-0.js';
 const DEFAULT_FORM_ID = 'aba_merchant_request';
 const POPUP_TARGET = 'aba_webservice';
-
-function escapeHtmlAttribute(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(
-    /'/g,
-    '&#39;',
-  );
-}
 
 export interface CheckoutDomain {
   createTransaction: (params: CreateTransactionParams) => Record<string, unknown> & { hash: string };

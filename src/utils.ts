@@ -406,6 +406,18 @@ export function encodeBase64IfNeeded(val: unknown): string {
   return toBase64(JSON.stringify(val));
 }
 
+/**
+ * Escape a value for interpolation into a double-quoted HTML attribute.
+ * Shared by every form-builder (checkout + link-card): one implementation
+ * for a security-sensitive transform, tested in one place.
+ */
+export function escapeHtmlAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(
+    /'/g,
+    '&#39;',
+  );
+}
+
 export function filterParams<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const filtered: Record<string, unknown> = {};
   for (const key of Object.keys(obj)) {

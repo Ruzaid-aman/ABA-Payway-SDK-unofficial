@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`credentialsOnFile.getLinkCardFormHtml()` — browser-form card linking (no server roundtrip).** `link-card` is the one PayWay endpoint that demands `application/x-www-form-urlencoded` (JSON is rejected unread — SANDBOX-FINDINGS §9a) and always answers with the gateway's hosted card-entry page. The new method builds the full signed HTML document locally — hidden fields + §16-verified 10-position HMAC, byte-identical to the wire body `linkCard()` sends — so a plain `<form method="POST">` submit navigates the customer straight to the hosted Visa/Mastercard/JCB/UPI form, mirroring `checkout.getCheckoutFormHtml()`. Options: `{ formId?, autoSubmit?, submitLabel?, omitSubmitButton? }` (deliberately no `popupMode` — the AbaPayway popup plugin is documented for the purchase endpoint only). Validation rules and advisory warnings are shared with `linkCard()`. The `pwt` token still arrives only via `callbackUrl`. Exported type: `LinkCardFormOptions`.
+- **CLI `cof link-card-form`** — local-only render of that signed form (no API call, no RSA key needed): HTML to stdout or `--out <path>` (diagnostics to stderr so redirects stay clean), `--auto-submit`, auto-generated `--request-id` when omitted, `--open-page`/`--no-open-page` TTY auto-open like the QR image, and a warning when `--callback-url` is omitted (the token can only arrive via the callback).
+- **CLI `cof link-card` hosted-page capture.** The command now treats the endpoint's guaranteed HTML answer as the success artifact it is: the page is saved to `payway-output/link-card-<request-id>.html` (auto-opened on interactive terminals via the platform-allowlisted viewer handoff; `--open-page` forces, `--no-open-page` suppresses) and the run exits 0. `--json` prints a `{ hostedHtmlPath, requestId, ctid, note }` envelope. Previously the structured B5 `PayWayBusinessError` surfaced as a plain CLI failure and the page was truncated to a 120-char prefix in the message.
+
+### Changed
+
+- The HTML-attribute escaper used by the form builders moved from a private helper in `domains/checkout.ts` to shared `escapeHtmlAttribute()` in `utils.ts` (one implementation for a security-sensitive transform; checkout output is byte-identical).
+- `createCredentialsOnFileDomain()` accepts an optional trailing `resolvedBaseUrl` (wired by the client with its resolved base URL) used only by `getLinkCardFormHtml()` for the form action; domain-level callers that omit it get the sandbox default.
+
 ## 1.3.6 — 2026-08-31
 
 > Live API parity release (B1–B6): the SDK's request shapes, hash orders, error

@@ -5,7 +5,7 @@
  * via process.env; only non-interactive flag combinations are used
  * (-y/--json/--no-polling), so nothing reads stdin and nothing leaves localhost.
  */
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -89,7 +89,10 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('aof/link-account')) {
     send(200, { status: { code: '00', message: 'Success', request_id: 'LA-1' } });
   } else if (url.includes('cof/link-card')) {
-    send(200, { status: { code: '00', message: 'Success', request_id: 'LC-1' } });
+    // Live-gateway parity (SANDBOX-FINDINGS §9a): this endpoint ALWAYS answers
+    // with the hosted card-entry HTML page, success and error alike.
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end('<!DOCTYPE html><html><body>hosted card entry form</body></html>');
   } else if (url.includes('renew-expired-account-token')) {
     send(200, { status: { code: '00', message: 'Success', request_id: 'RT-1' } });
   } else if (url.includes('get-token-details')) {
@@ -386,7 +389,30 @@ describe('CLI API commands against the local mock gateway', () => {
     expect([undefined, 0]).toContain(exitCode as number);
   });
 
-  it('cof link-card submits a card link request (--json)', async () => {
+  it('cof link-card captures the hosted page, saves it, and exits 0', async () => {
+    const { text, exitCode } = await run([
+      'cof',
+      'link-card',
+      '-r',
+      'REQID002',
+      '-c',
+      'CTID0002',
+      '-f',
+      'CITO_FLEX',
+      '--no-open-page',
+    ]);
+    expect(text).toContain('Hosted card-link page received and saved');
+    expect(text).toContain('link-card-REQID002.html');
+    expect(text).toContain('callback_url');
+    expect([undefined, 0]).toContain(exitCode as number);
+
+    // The saved page is the real hosted-form HTML the gateway returned.
+    const savedPath = path.join(tempDir, 'payway-output', 'link-card-REQID002.html');
+    expect(existsSync(savedPath)).toBe(true);
+    expect(readFileSync(savedPath, 'utf8')).toContain('hosted card entry form');
+  });
+
+  it('cof link-card --json prints the hosted-page envelope', async () => {
     const { text, exitCode } = await run([
       'cof',
       'link-card',
@@ -398,8 +424,30 @@ describe('CLI API commands against the local mock gateway', () => {
       'CITO_FLEX',
       '--json',
     ]);
-    expect(text).toContain('"LC-1"');
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as Record<string, unknown>;
+    expect(parsed.hostedHtmlPath).toContain('link-card-REQID002.html');
+    expect(parsed.requestId).toBe('REQID002');
     expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('cof link-card-form renders a signed local form without a network call', async () => {
+    const { text, exitCode } = await run([
+      'cof',
+      'link-card-form',
+      '-r',
+      'REQID005',
+      '-c',
+      'CTID0005',
+      '-f',
+      'CITI_FLEX',
+    ]);
+    // Local-only command: diagnostics on stderr (captured), HTML on stdout.
+    expect(text).toContain('Request ID:');
+    // The server must not have been hit for a local form render — every
+    // request the mock received was from earlier tests' API commands.
+    expect(text).not.toContain('Calling PayWay API');
+    expect(exitCode).toBe(0);
+    expect(text).toContain('--callback-url'); // no callback supplied → warning
   });
 
   it('cof charge submits a payment against a linked token (--json)', async () => {
