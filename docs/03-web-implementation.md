@@ -174,6 +174,8 @@ const html = payway.checkout.getCheckoutFormHtml(params, { popupMode: true });
 
 Options: `autoSubmit` (submit on page load, same-tab) — mutually exclusive with `popupMode` (form targets the `aba_webservice` frame opened by `checkout2-0.js` and the submit button calls `AbaPayway.checkout()`), plus `formId`, `submitLabel`, and `omitSubmitButton`. All merchant-provided values are HTML-escaped. The CLI equivalent is `payway-sdk checkout-form -a 15.00 --return-url <url> -o form.html` (writes the same document locally; diagnostics go to stderr so `checkout-form … > form.html` stays clean).
 
+> **Same pattern for saving cards:** `credentialsOnFile.getLinkCardFormHtml()` builds the identical kind of locally-signed form for the `link-card` endpoint (which requires urlencoded and always answers with the gateway's hosted card-entry page). See [Chapter 9](./09-link-unlink-renew-lifecycle.md) and `payway-sdk cof link-card-form`.
+
 The manual markup below is what the helper generates — kept for reference and for fully custom integrations.
 
 ---

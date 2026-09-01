@@ -107,7 +107,8 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (requires credentials) |
 | `payway-sdk checkout-form -a <amount> -o form.html` | Write the signed hosted-checkout HTML form (local signing, no API call) |
 | `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image) |
-| `payway-sdk cof link-account / link-card` | Start a credentials-on-file link: returns the QR/deeplink (account) or hosted form (card); the token (`pwt`) arrives via `callback_url` |
+| `payway-sdk cof link-account / link-card` | Start a credentials-on-file link: returns the QR/deeplink (account); `link-card` saves the gateway's hosted card page to `payway-output/` (that page IS the success signal); the token (`pwt`) arrives via `callback_url` |
+| `payway-sdk cof link-card-form` | Write the signed card-link HTML form locally (no API call — the browser POSTs urlencoded straight to the gateway's hosted card-entry page) |
 | `payway-sdk cof charge -t <id> -a <amount> --token <pwt>` | Charge a stored COF token (optional `--ctid`, `--token-flag`, payer fields, `--items`, `--payout`) |
 | `payway-sdk cof token renew / details / remove` | Token lifecycle — `details` takes `--request-id` only; `remove` takes `--ctid --token` (irreversible) |
 | `payway-sdk beneficiary add / update-status <payee>` | Manage the payout beneficiary whitelist (requires RSA key; `update-status -s 0\|1`) |
@@ -477,8 +478,22 @@ const linkAcc = await payway.credentialsOnFile.linkAccount({
   callbackUrl: 'https://mywebsite.com/payway/cof-callback', // optional but recommended
 });
 
-// Link a credit/debit card (form-urlencoded; the hosted form is returned as
-// HTML — render it in an iframe; the pwt arrives via callback_url)
+// Link a credit/debit card — browser-form route (recommended, no server
+// roundtrip): the signed HTML document's hidden fields POST urlencoded
+// straight to the gateway, which renders its hosted card-entry page
+const cardFormHtml = payway.credentialsOnFile.getLinkCardFormHtml({
+  requestId: 'reqabc124',
+  ctid: 'customer123',
+  tokenFlag: 'CITI_FLEX',
+  currency: 'USD',
+  continueSuccessUrl: 'https://mywebsite.com/cards/done', // "Done" button target
+  callbackUrl: 'https://mywebsite.com/payway/cof-callback', // the pwt arrives here
+});
+res.type('html').send(cardFormHtml);
+
+// …or the API route: linkCard() POSTs for you; the hosted page arrives as a
+// PayWayBusinessError with the HTML in `rawBody` (this endpoint NEVER answers
+// JSON — render rawBody in an iframe; the pwt arrives via callback_url)
 const linkCard = await payway.credentialsOnFile.linkCard({
   requestId: 'reqabc124',
   ctid: 'customer123',

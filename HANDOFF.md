@@ -1,26 +1,27 @@
 # Agent Handoff — aba-payway-ts
 
 **Audience:** an agent resuming work in a fresh session. Read this plus `AGENTS.md` before acting.
-**Last updated:** 2026-08-31, after the live API parity release **v1.3.6** (B1–B7: OpenAPI sync, CoF/QR param parity, advisory validation, COF/QR error families, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation, changelog + docs/09 + docs/12 + version bump; ff-merged to `main` at `e47ab47`).
+**Last updated:** 2026-09-01, after the **link-card hosted-page feature** (`e8bcaf6` on `main`: `credentialsOnFile.getLinkCardFormHtml()` + CLI `cof link-card-form` + `cof link-card` hosted-page capture, live-verified against sandbox) and the follow-up docs/skills sync session (five COF skills → v1.2.0, README/docs/03/PROJECT_STATUS/knowledge-base updates).
 **Provenance:** everything below was done and verified in prior sessions; per-item evidence paths are included so you never have to re-derive or re-probe.
 
 ---
 
-## 1. Current state (verified on `main` @ `e47ab47` — v1.3.6 released)
+## 1. Current state (verified on `main` @ `e8bcaf6` — v1.3.6 + link-card form feature)
 
 | Aspect | State |
 |---|---|
-| Version | `1.3.6` (released 2026-08-31; tag `v1.3.0` predates it — **do not move tags**; no `v1.3.6` tag created unless the user asks) |
-| Tests | 1218 tests / 79 files green (`npx vitest run` after `npm run build`; +13 opt-in sandbox contract tests skipped unless `SANDBOX_CONTRACT_TESTS=1`) |
+| Version | `1.3.6` (released 2026-08-31; tag `v1.3.0` predates it — **do not move tags**; no `v1.3.6` tag created unless the user asks). `getLinkCardFormHtml` + `cof link-card-form` sit in CHANGELOG **Unreleased** (next release: v1.4.0 per versioning policy) |
+| Tests | 1236 tests / 80 files green (`npx vitest run` after `npm run build`; +18 from the link-card form session; +13 opt-in sandbox contract tests skipped unless `SANDBOX_CONTRACT_TESTS=1`) |
 | Typecheck / lint | `npx tsc --noEmit` clean; `npx biome lint src` clean |
-| Coverage | ~78% stmts / ~72.5% branch (`npx vitest run --coverage`); CI enforces floors 74/69/80/74 via vitest.config.ts thresholds — ratchet upward |
+| Coverage | ~78.5% stmts / ~74.2% branch (`npx vitest run --coverage`); CI enforces floors 74/69/80/74 via vitest.config.ts thresholds — ratchet upward |
 | Mutation testing | StrykerJS 10 spike on auth.ts + circuit-breaker.ts: **91.3% score** — `docs/MUTATION-SPIKE-2026-08-31.md`, `stryker.config.json` (dev-only, Node ≥ 22, not in CI) |
 | Edge-case audit | **All 23 findings (EC-01–EC-23) remediated** — `audit-results/edge-case-report.md` (findings), `audit-results/code-improvement-plan.md` (batches 1–5, all marked done) |
-| Live API parity | **B1–B7 complete, released as v1.3.6** (10 commits, `c92b9cd`→`e47ab47`, ff-merged to `main`): OpenAPI 24-op coverage matrix, CoF/QR param parity, advisory validation (`strictValidation`), COF/QR error families + `PayWaySignatureError`, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation, CHANGELOG + docs/09 + docs/12 updates, version bump. Plan: `audit-results/live-parity-handoff.md` |
-| Release checklist | Run for 1.3.6: build, dist smoke, full vitest (1218 green) — `docs/RELEASE_CHECKLIST.md` |
-| Working tree | Clean; nothing untracked |
+| Live API parity | **B1–B7 complete, released as v1.3.6** (10 commits, `c92b9cd`→`e47ab47`, ff-merged to `main`): OpenAPI 24-op coverage matrix, CoF/QR param parity, advisory validation (`strictValidation`), COF/QR error families + `PayWaySignatureError`, `cof`/`beneficiary` CLI groups, `transaction-list` pre-validation, CHANGELOG + docs/09 + docs/12 + version bump. Plan: `audit-results/live-parity-handoff.md` |
+| Link-card hosted page (2026-09-01) | **Shipped @ `e8bcaf6`** — SDK `credentialsOnFile.getLinkCardFormHtml()` (local signed browser form, §16 hash byte-identical to `linkCard()`, pinned by wire-vs-form test); CLI `cof link-card-form` (local, no API call); `cof link-card` captures the guaranteed HTML answer to `payway-output/link-card-<request-id>.html` + exit 0 (`--json` → hostedHtmlPath envelope). **Live-verified**: form fields POST as a browser → HTTP 200 + real hosted "PayWay - Checkout" page — `test-output/link-card-form-live-probe-2026-09-01.json`. Shared `escapeHtmlAttribute()` in `utils.ts` |
+| Release checklist | Run for 1.3.6: build, dist smoke, full vitest (1218 green at the time) — `docs/RELEASE_CHECKLIST.md` |
+| Working tree | This session's docs/skills edits (uncommitted when last checked): `.agents/AGENTS.md`, `README.md`, `docs/03`, `docs/PROJECT_STATUS.md`, 5× `skills/aba-payway-{link-card,link-account,token-purchase,remove-card,remove-account}/SKILL.md` — commit them before starting new work |
 
-Recent commit history (oldest→newest): `0bbad8d` audit remediation batches 1–3 → `7898963` batch 4 → `dd4556f` batch 5 → `b6d15e1` release v1.3.0 → `9661b16` coverage 55→70% → `6bf3afc` changelog note → `d486738` agent testability refactor → docs sync → `c92b9cd`→`9396277` live parity B1–B6 → `f8a0f14` handoff + .gitattributes → `e47ab47` B7 release v1.3.6 (all on `main` now).
+Recent commit history (oldest→newest): `0bbad8d` audit remediation batches 1–3 → `7898963` batch 4 → `dd4556f` batch 5 → `b6d15e1` release v1.3.0 → `9661b16` coverage 55→70% → `6bf3afc` changelog note → `d486738` agent testability refactor → docs sync → `c92b9cd`→`9396277` live parity B1–B6 → `f8a0f14` handoff + .gitattributes → `e47ab47` B7 release v1.3.6 → `40fff37` release-docs sanity corrections → `fb2a307` handoff v1.3.6 → `4e88bd9` RTM/OPEN-QUESTIONS addenda + cof/beneficiary examples (README/AGENTS) → `e8bcaf6` link-card hosted form (all on `main`).
 
 ## 2. Environment rules (violating these has caused real incidents)
 
@@ -58,6 +59,8 @@ Each item is pinned by a named test — if you change one, flip the test conscio
 - **(2026-08-31, live parity B6)** CLI `cof` group (`link-account`, `link-card`, `charge`, `token renew|details|remove`) and `beneficiary` group (`add`, `update-status`) — token trio param shapes: details takes ONLY `--request-id`; remove takes `--ctid --token`, no requestId.
 - **(2026-08-31, live parity B6)** `transaction-list` pre-validates locally: window ≤3 days (gateway 403s wider) and `--pagination` ≤1000 → exit 1 with hint, before any network call.
 - **(2026-08-31, live parity B6)** `generate-qr` accepts the 9 live-documented optional params (`--first-name --last-name --email --phone --items --return-deeplink --custom-fields --return-params --payout`); `generate-checkout` accepts the full B6 set (`--ctid --token-flag --frequency --type --firstname/--lastname/--email/--phone --items --shipping --lifetime --custom-fields --return-params --skip-success-page --view-type --continue-success-url`). `--items`/`--custom-fields`/`--payout`/`--return-deeplink` accept inline JSON or raw string via `parseJsonOrString`.
+- **(2026-09-01, link-card hosted page)** `credentialsOnFile.getLinkCardFormHtml(params, { formId?, autoSubmit?, submitLabel?, omitSubmitButton? })` renders a locally-signed browser form whose hidden fields + hash are byte-identical to `linkCard()`'s urlencoded wire body (pinned by `src/__tests__/link-card-form-html.test.ts` wire-vs-form diff). No `popupMode` (AbaPayway plugin is purchase-only). Validation rules/advisories are shared with `linkCard()` via `buildLinkCardPayload()`. `createCredentialsOnFileDomain(config, request, resolvedBaseUrl?)` — the third arg feeds only the form action URL. HTML-attribute escaping goes through the shared `escapeHtmlAttribute()` in `src/utils.ts` for BOTH checkout and link-card form builders.
+- **(2026-09-01, link-card hosted page)** CLI `cof link-card` treats the endpoint's guaranteed HTML answer as SUCCESS: the page is captured from `PayWayBusinessError.rawBody`, saved to `payway-output/link-card-<request-id>.html`, opened via the allowlisted viewer handoff on TTYs (`--open-page` forces / `--no-open-page` suppresses), and the run exits 0. `--json` prints `{ hostedHtmlPath, requestId, ctid, note }`. CLI `cof link-card-form` is local-only (no network, no RSA): stdout or `--out`, diagnostics on stderr, auto request id, warns when `--callback-url` is missing.
 
 ## 4. Repo map (fast orientation)
 
@@ -114,7 +117,15 @@ Per `audit-results/live-parity-handoff.md` §B7 (version number per user instruc
 - ✅ `docs/09-link-unlink-renew-lifecycle.md` (token lifecycle resolution: trio un-gated per §16, param shapes fixed, `continueSuccessUrl`, CLI cof/beneficiary quick reference), `docs/12-error-handling-and-debugging.md` (`PayWaySignatureError` in hierarchy + section, `fieldErrors`, COF + QR family tables, link-card HTML note, mc-ref throttle, explain families).
 - ✅ Version bump → 1.3.6 (package.json + package-lock.json ×2). **`npm publish` is a USER decision — never publish.**
 - ✅ Merged `feat/live-api-parity` → `main` (ff-merge at `e47ab47`; branch deleted).
-- ⚠️ Not done (deliberately): README + AGENTS.md new command examples for `cof`/`beneficiary` — AGENTS.md already carries the canonical command list; add README examples when the docs batch next opens.
+- ~~⚠️ Not done (deliberately): README + AGENTS.md new command examples for `cof`/`beneficiary`~~ — **DONE 2026-09-01 in `4e88bd9`** (parallel session): AGENTS.md canonical command list + README cof/beneficiary examples, verified against live `--help` output. The same session added dated addenda to `audit-results/four-pillars/RTM.md` (R-04/05/06 BLOCKED → PASS, R-07 GAP → PASS) and `ABA-OPEN-QUESTIONS.md` (Q1/Q2 resolved-by-evidence; Q3 awaiting).
+
+### 5.9 — Link-card hosted page — **DONE (2026-09-01, shipped `e8bcaf6`)**
+Learned from the checkout-with-card flow and applied the `checkout-form` local-signing pattern to link-card:
+- ✅ SDK `credentialsOnFile.getLinkCardFormHtml()` — browser-form card linking without a server roundtrip; hash byte-identical to `linkCard()` (wire-vs-form pinned); options `{ formId, autoSubmit, submitLabel, omitSubmitButton }`; exported `LinkCardFormOptions`.
+- ✅ CLI `cof link-card-form` (local, no API call) + `cof link-card` hosted-page capture (save + open + exit 0; `--json` envelope).
+- ✅ Shared `escapeHtmlAttribute()` in `utils.ts`; `buildLinkCardPayload()` shared by both link-card paths.
+- ✅ **Live-verified**: local form fields POST as a browser → HTTP 200 + real hosted "PayWay - Checkout" page (`test-output/link-card-form-live-probe-2026-09-01.json` — gitignored, lives on disk with the other probe evidence).
+- ✅ Docs/skills sync (2026-09-01 session): docs/09 form-method section, docs/12 exception note, docs/03 cross-pointer, README CLI table + COF snippet, AGENTS.md, CHANGELOG Unreleased, PROJECT_STATUS session entry, `.agents/AGENTS.md` knowledge base (Request Formatting), five COF skills → v1.2.0 (link-card, link-account, token-purchase, remove-card, remove-account — they were stale v1.3.5-era: `CITR_FLEX` as a linking flag, `returnUrl` on link-card, TD-03 gate, `requestId` on `removeToken`/`cofPayment`).
 
 ### 5.8 — Candidate SDK/CLI improvements (propose before building)
 - CLI `doctor`: make the credential *source* (profile store vs `.env` vs env) an explicit first-class check row.
@@ -122,6 +133,8 @@ Per `audit-results/live-parity-handoff.md` §B7 (version number per user instruc
 - Rate-limit token-bucket rules exist only for check-transaction/detail/list/refund; add rules for `generate-qr`/payment-link only if ABA documents caps (Q5).
 - Production base URL (`https://checkout.payway.com.kh`) is hardcoded but never verified live (SANDBOX-FINDINGS §1 "Still open") — confirm when production access exists.
 - `npm publish` readiness is complete but is a user decision (outward-facing).
+- Regenerate the TypeDoc API reference (`npm run docs:api`) in the next docs batch so `getLinkCardFormHtml` + `LinkCardFormOptions` appear in `docs/api/` (not urgent — JSDoc is already in-source).
+- Optional DX polish for the link-card form: a `--qr`/server-assist variant is NOT wanted (that's what `cof link-card` is); leave the two-path split (local form vs API capture) as the contract.
 
 ## 6. Testing conventions (established; follow them)
 
@@ -142,6 +155,7 @@ Per `audit-results/live-parity-handoff.md` §B7 (version number per user instruc
 - check-transaction sees new transactions in <1 s; transaction-detail needs ~5 s.
 - (§14, 2026-08-31) **Unpaid QR-only transactions are invisible to transaction-list** while check-transaction/detail see them; transaction-list rejects date ranges wider than 3 days with HTTP 403 ("Maximum date rang is allowed only 3 days"). Pinned as live tests in the sandbox contract suite.
 - v3 token trio: binding layer OK; HMAC composition was black-box in the August campaign (60+ attempts) but **resolved 2026-08-31** — live-documented hash orders verified, trio UN-GATED (§16).
+- (2026-09-01) **Link-card browser-form composition is gateway-accepted**: extracting the hidden fields from a `getLinkCardFormHtml()` document and POSTing them urlencoded (exactly what a browser submit does) → HTTP 200 + the real 42 KB hosted "PayWay - Checkout" card-entry page. The same request via the SDK's `linkCard()` (server-to-server) captured the identical page. Evidence: `test-output/link-card-form-live-probe-2026-09-01.json`, `payway-output/link-card-livetest001.html`. Sandbox still skips hash verification on this endpoint (§9a) — unchanged.
 
 ## 8. Anti-checklist (things agents got wrong before — do not repeat)
 
@@ -152,3 +166,5 @@ Per `audit-results/live-parity-handoff.md` §B7 (version number per user instruc
 - Don't commit without the three gates; don't merge without checking `main` hasn't moved.
 - Don't rewrite audit artifacts (`audit-results/*`, `docs/SANDBOX-FINDINGS.md` history) — append new sections with dates.
 - Don't test the interactive REPL through `startRepl`/`process.stdin`; use the `runRepl(io)` seam. Don't assert on raw CLI output without stripping ANSI (color codes break `toContain`).
+- Don't run the full suite right after a branch checkout/merge and read the failures as real: the mtime shuffle makes the dist-freshness guard reject `dist/cli.js` (`agent-cli.test.ts` + `cli.test.ts` fail with "dist/cli.js is missing or older than src/"). **Re-run `npm run build` first** — then the suite (seen 2026-09-01; the run before the merge was green).
+- Don't document CoF params from the v1.3.5-era skills/examples — five packaged skills drifted from the SDK contract and had to be re-synced 2026-09-01 (wrong linking flags, TD-03 gate, `requestId` on `removeToken`/`cofPayment`). When the SDK param shapes change, grep `skills/` + `README.md` + `docs/09` for the old shape in the SAME change.

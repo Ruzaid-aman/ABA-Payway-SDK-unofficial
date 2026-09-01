@@ -25,6 +25,12 @@
 - **Form Content-Types**:
   - Some APIs (such as Payment Link Create/Detail, Refund, Pre-auth) expect forms (`multipart/form-data` or `application/x-www-form-urlencoded`) rather than JSON.
   - The SDK must support encoding payloads into forms when making requests to these specific endpoints.
+- **`link-card` is form-urlencoded ONLY and ALWAYS answers HTML (2026-09-01, live-verified)**:
+  - Sending JSON to `/api/payment-credential/v3/cof/link-card` is rejected without being read; the response is the gateway's hosted card-entry page on BOTH success and error.
+  - Because a plain browser `<form method="POST">` submission IS `application/x-www-form-urlencoded`, the natural integration is a locally-signed HTML form (the `checkout-form` pattern): `credentialsOnFile.getLinkCardFormHtml()` / `payway-sdk cof link-card-form` build hidden fields + the §16 HMAC locally — byte-identical to `linkCard()`'s wire body — no server roundtrip needed. Live probe: the form's fields POST as a browser → HTTP 200 + the real hosted "PayWay - Checkout" page (`test-output/link-card-form-live-probe-2026-09-01.json`).
+  - On the API path, the hosted page surfaces as `PayWayBusinessError` with the page preserved in `rawBody` (string) — that page IS the success artifact, not a failure. The CLI `cof link-card` saves it to `payway-output/link-card-<request-id>.html` and exits 0.
+  - The resulting `pwt` token NEVER appears in the response — it arrives only via the `callback_url` sent with the request.
+  - HTML-attribute escaping for all form builders goes through the shared `escapeHtmlAttribute()` in `src/utils.ts` — never re-implement it locally.
 
 ## Workflow & State Tracking
 - **Always check status first**: Before beginning new work or deciding what to do next, ALWAYS read `PROJECT_STATUS.md` in the root of the workspace. This is the source of truth for what has been done and what the current priorities are.
