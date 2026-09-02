@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 — 2026-09-02
+
+> Link-card hosted-page feature release (from Unreleased) + the code-correctness
+> batch (D1, D3, D4, D5, D6) of the five-layer sync audit
+> (`audit-results/sync-audit-2026-09-01.md` §2/§6 S0).
 
 ### Added
 
@@ -12,6 +16,18 @@
 
 - The HTML-attribute escaper used by the form builders moved from a private helper in `domains/checkout.ts` to shared `escapeHtmlAttribute()` in `utils.ts` (one implementation for a security-sensitive transform; checkout output is byte-identical).
 - `createCredentialsOnFileDomain()` accepts an optional trailing `resolvedBaseUrl` (wired by the client with its resolved base URL) used only by `getLinkCardFormHtml()` for the form action; domain-level callers that omit it get the sandbox default.
+
+### Fixed
+
+- **Subscription purchases sent a hash that omitted `token_flag` + `frequency` (audit D1, HIGH).** `buildPurchasePayload()` computed the live 26-field HMAC, but `purchase()` passed a legacy 24-field list to the client, whose `request()` unconditionally overwrites the hash — so every subscription checkout (`tokenFlag`/`frequency` set, including CLI `generate-checkout --ctid --token-flag CITR_FIX --frequency …`) was gateway-rejected with "Wrong Hash". Both paths now share one exported `PURCHASE_HASH_FIELDS` constant, so the locally-built and sent hashes can never diverge. Plain purchases are byte-identical under the old and new list (omitted fields hash as `''` — append-compatibility pinned by test, including over the network path via the mock gateway).
+- **`HASH_ORDER_HINTS` (the wrong-hash debugging hints inside `PayWaySignatureError`) were wrong themselves (audit D3).** `purchase` was a garbled legacy order with spaces, `linkAccount` carried link-card's order, `getTransactionList` carried the check/detail trio, `refund` omitted `merchant_id`, and `payment` was placeholder prose. All 22 hash-bearing endpoints now carry pure dot-joined orders derived from §16-verified/live-documented compositions — purchase, linkCard, and generateQr derive from the exported domain constants; refund/payment-link/beneficiary hints derive from the hoisted `MERCHANT_AUTH_DEFAULT_HASH_FIELDS` default. A new drift-guard suite (`hash-order-hints.test.ts`) pins every hint against the field list its domain actually signs (exported constants directly, inline lists via request spies) and snapshots the key set, so hints cannot drift from the signed orders again.
+- **`cof charge --payout` help text documented `{account, amount}` keys (audit D4)** but the request sends `{acc, amt}` per the live docs — help now shows `{acc, amt}`. Per-endpoint split preserved: `generate-qr --payout` genuinely uses `{account, amount}` (its help stays), and `pre-auth complete-payout` already documented `{acc, amt}`.
+- **link-card `frequency` validated as an advisory (audit D5).** The live docs mark `frequency` "Required for Link Card" (1W|1M|2M); omitting it now warns once via `warnAdvisory` (both `linkCard()` and `getLinkCardFormHtml()` share the builder) and throws `PayWayConfigError` under `strictValidation`.
+- **payment-link image limits enforced client-side (audit D6).** The spec caps the image part at 3MB, JPG/JPEG/PNG only: the domain warns (strict → throw) on larger uploads and on content types outside `image/jpeg|image/jpg|image/png`; the CLI loader now rejects non-JPG/JPEG/PNG files outright (`--image` help updated; webp/gif no longer accepted).
+
+## Unreleased
+
+_Nothing yet — the 1.4.0 entry above absorbed everything that shipped with the version bump._
 
 ## 1.3.6 — 2026-08-31
 
