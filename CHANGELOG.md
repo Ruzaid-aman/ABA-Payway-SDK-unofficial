@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+> Skills-corpus batch (S2) of the five-layer sync audit
+> (`audit-results/sync-audit-2026-09-01.md` §3/§6 S2). Skills-layer only — no
+> SDK/CLI code paths change; the only test-visible changes are the skill-script
+> hash-order pins and the 25→29 skills discovery flip.
+
+### Fixed (skills — stale/broken content)
+
+- **`aba-payway-agent` broken imports** — both documented imports (`aba-payway-ts/agent`, `aba-payway-ts/cli/explain-code.js`) point at package subpaths that do not exist in `exports` (only `"."`). Replaced with the supported surfaces: `payway-sdk agent setup` CLI for the provider config and `payway-sdk explain` for code lookups. → v1.2.0
+- **`aba-payway-purchase` lifetime unit bug** — `lifetime: 600, // seconds` on the checkout path would silently buy a 10-hour window (purchase lifetime is MINUTES, min 3); now documented with a warning callout contrasting the QR domain's seconds. Tools section rewritten: the three referenced repo-root `scripts/*.ts` probes are not shipped in the npm package — replaced with the CLI equivalents. → v1.4.0
+- **`aba-payway-hash` bundled `sign-request.cjs` signed the legacy 24-field order** — subscription payloads (`token_flag` + `frequency`) signed by the tool produced gateway "Wrong Hash". The `checkout` preset now carries the live 26-field order (appended positions; plain purchases byte-identical — pinned by test), with new `--ctid --token-flag --frequency` flags and `ctid` emitted in the body without a hash position. → v1.2.0
+- **`aba-payway-first-payment`** — same 24-field bug in bundled `checkout-payload.cjs` (fixed identically, plus a `--lifetime <minutes>` min-3 guard and subscription trio validation mirroring the SDK) + `--lifetime <sec>` doc bug; route matrix gained the missing Subscription row; per-route inputs now list the 9 QR optional params (with the `{account, amount}` key warning), the full B6 checkout flag set, and payment-link `payout`/`image`. → v1.2.0
+- **`aba-payway-qr`** — zero mention of the 9 `generate-qr` optional params; added a Quick-Start section (SDK + CLI flags + advisory caps) and replaced the non-shipped `online-qr-poll.ts` tool reference with the CLI flow. → v1.4.0
+- **`aba-payway-sdk-configuration`** — inverted TD-03 claim ("required to call token operations… unconfirmed") corrected: the trio is UN-GATED since 2026-08-31 (`allowUnverifiedTokenOperations` is a deprecated escape hatch, default allowed); added `strictValidation`/`PAYWAY_STRICT_VALIDATION`, `allowPrivateCallbackHosts`, and the six `PAYWAY_KHQR_*` env vars. → v1.2.0
+- **`aba-payway-transaction-list`** — added the ≤3-day-window and pagination ≤1000 local pre-validation facts (CLI exits 1 before any network call) and the unpaid-QR-invisibility gap. → v1.2.0
+- **`aba-payway-check-transaction` / `aba-payway-transaction-close`** — non-shipped repo-script references (`online-qr-poll.ts`, `checkout-link-poll.ts`, `close-transaction-verify.ts`) replaced with the equivalent CLI commands. → v1.3.0 each
+
+### Added (skills — capability gaps)
+
+- **Four new skills** (audit §3 "Missing skills"): `aba-payway-cof` (link/charge + both card-linking routes + §16 hash orders + error families), `aba-payway-token-lifecycle` (trio param-shape table, 90-day expiry helpers), `aba-payway-beneficiary` (whitelist + per-endpoint payout key-shape table + seeded sandbox fixtures), `aba-payway-subscription` (purchase-path trio rules, 26-field hash, MIT follow-up charges). All cross-linked with the five previously-fixed COF skills. → v1.0.0 each
+- **`skills/README.md` rewritten** — all 29 skills listed in six sections; install line fixed (`npx payway-sdk` resolves to an unrelated third-party package — use the repo-relative `npx tsx src/cli.ts skills add <agent>`); documents the opencode `~/.opencode/skills` vs `~/.config/opencode/skills` loader mismatch and which five skills bundle `.cjs` tools.
+
+### Tests
+
+- `skills.test.ts`: discovery pin 25 → 29 (+ the four new skill names). `skill-scripts.test.ts`: the two bundled signing tools are now pinned to the live 26-field order (plain-purchase append-compatibility + subscription concatenation + `ctid`-unhashed + trio validation + lifetime-minutes guard). Full suite: 1280 passed / 13 skipped.
+
 ## 1.5.0 — 2026-09-02
 
 > SDK/CLI param-completion batch (S1) of the five-layer sync audit
@@ -49,10 +76,6 @@
 - **`cof charge --payout` help text documented `{account, amount}` keys (audit D4)** but the request sends `{acc, amt}` per the live docs — help now shows `{acc, amt}`. Per-endpoint split preserved: `generate-qr --payout` genuinely uses `{account, amount}` (its help stays), and `pre-auth complete-payout` already documented `{acc, amt}`.
 - **link-card `frequency` validated as an advisory (audit D5).** The live docs mark `frequency` "Required for Link Card" (1W|1M|2M); omitting it now warns once via `warnAdvisory` (both `linkCard()` and `getLinkCardFormHtml()` share the builder) and throws `PayWayConfigError` under `strictValidation`.
 - **payment-link image limits enforced client-side (audit D6).** The spec caps the image part at 3MB, JPG/JPEG/PNG only: the domain warns (strict → throw) on larger uploads and on content types outside `image/jpeg|image/jpg|image/png`; the CLI loader now rejects non-JPG/JPEG/PNG files outright (`--image` help updated; webp/gif no longer accepted).
-
-## Unreleased
-
-_Nothing yet — the 1.4.0 entry above absorbed everything that shipped with the version bump._
 
 ## 1.3.6 — 2026-08-31
 

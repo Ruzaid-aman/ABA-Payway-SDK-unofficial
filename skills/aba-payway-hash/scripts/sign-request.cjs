@@ -11,13 +11,17 @@
  *   node sign-request.cjs --preset check-transaction --tran-id "order-123"
  *   node sign-request.cjs --preset checkout --tran-id "order-123" --amount 10 --currency USD \
  *        --return-url https://example.com/success
+ *   node sign-request.cjs --preset checkout --tran-id order-1 --amount 9.99 --currency USD \
+ *        --ctid customer123 --token-flag CITR_FIX --frequency 1M   (subscription)
  *   node sign-request.cjs --fields req_time,merchant_id,merchant_ref \
  *        --data '{"req_time":"20250213084236","merchant_id":"ec000002","merchant_ref":"17394277693"}'
  *
  * Credentials: --merchant-id / --api-key flags or PAYWAY_MERCHANT_ID / PAYWAY_API_KEY env.
  *
- * Presets (field order mirrors src/domains/*.ts):
- *   checkout           req_time..skip_success_page (24 fields, purchase endpoint)
+ * Presets (field order mirrors src/domains/checkout.ts PURCHASE_HASH_FIELDS):
+ *   checkout           req_time..frequency (26 fields, purchase endpoint — live
+ *                      order adds token_flag + frequency after skip_success_page;
+ *                      omitted fields hash as '' so plain purchases stay identical)
  *   check-transaction  req_time, merchant_id, tran_id
  *   get-mc-ref         req_time, merchant_id, merchant_ref   (get-transactions-by-mc-ref)
  *   exchange-rate      req_time, merchant_id
@@ -50,6 +54,8 @@ const PRESETS = {
     'additional_params',
     'google_pay_token',
     'skip_success_page',
+    'token_flag',
+    'frequency',
   ],
   'check-transaction': ['req_time', 'merchant_id', 'tran_id'],
   'get-mc-ref': ['req_time', 'merchant_id', 'merchant_ref'],
@@ -98,6 +104,9 @@ function buildSignedPayload(preset, data, apiKey) {
     if (data[f] !== undefined && data[f] !== null) payload[f] = data[f];
   }
   const { concatenated, hash } = generateHmac(payload, fields, apiKey);
+  // ctid travels in the request body but has NO hash position (the live
+  // 26-field purchase order covers subscriptions via token_flag alone).
+  if (data.ctid !== undefined && data.ctid !== null) payload.ctid = data.ctid;
   return { payload: { ...payload, hash }, concatenated, fields, hash };
 }
 
@@ -167,6 +176,9 @@ function main() {
     ['lastname', 'lastname'],
     ['email', 'email'],
     ['phone', 'phone'],
+    ['ctid', 'ctid'],
+    ['token-flag', 'token_flag'],
+    ['frequency', 'frequency'],
   ]) {
     if (args[flag] !== undefined) data[field] = field.endsWith('_url') ? encodeBase64IfNeeded(args[flag]) : args[flag];
   }

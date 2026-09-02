@@ -81,14 +81,39 @@ describe('sign-request.cjs (HMAC-SHA512 request signing)', () => {
     expect(payload.hash).toBe(createHmac('sha512', 'k').update(concatenated).digest('base64'));
   });
 
-  it('substitutes empty string for missing checkout fields (24-field order)', () => {
+  it('substitutes empty string for missing checkout fields (live 26-field order)', () => {
     const { concatenated } = signer.buildSignedPayload(
       'checkout',
       { req_time: 't', merchant_id: 'm', tran_id: 'x', amount: '10.00', currency: 'USD' },
       'k',
     );
-    // req_time|merchant_id|tran_id|amount → 12 empty fields → currency → 7 empty fields
+    // req_time|merchant_id|tran_id|amount → 12 empty fields → currency → 8 empty
+    // fields (incl. the appended token_flag/frequency — plain purchases stay
+    // byte-identical to the legacy 24-field HMAC; audit S2 fix).
     expect(concatenated).toBe('tmx10.00USD');
+  });
+
+  it('signs subscription payloads over the appended token_flag.frequency positions', () => {
+    const { payload, concatenated } = signer.buildSignedPayload(
+      'checkout',
+      {
+        req_time: 't',
+        merchant_id: 'm',
+        tran_id: 'sub-1',
+        amount: '9.99',
+        currency: 'USD',
+        token_flag: 'CITR_FIX',
+        frequency: '1M',
+        ctid: 'customer123',
+      },
+      'k',
+    );
+    // The live 26-field order appends token_flag + frequency AFTER
+    // skip_success_page; ctid travels in the body with NO hash position.
+    expect(concatenated).toBe('tmsub-19.99USDCITR_FIX1M');
+    expect(payload.token_flag).toBe('CITR_FIX');
+    expect(payload.frequency).toBe('1M');
+    expect(payload.ctid).toBe('customer123');
   });
 
   it('generates UTC req_time in YYYYMMDDHHmmss format', () => {
@@ -170,7 +195,7 @@ describe('decode-status.cjs (status/error decoding)', () => {
 });
 
 describe('checkout-payload.cjs (signed checkout payload + HTML form)', () => {
-  it('builds a payload matching the SDK 24-field signing order', () => {
+  it('builds a payload matching the SDK 26-field signing order', () => {
     const { payload, concatenated } = checkout.buildCheckoutPayload({
       tranId: 'order-123',
       amount: 10,
@@ -184,6 +209,50 @@ describe('checkout-payload.cjs (signed checkout payload + HTML form)', () => {
     expect(payload.amount).toBe('10.00');
     expect(payload.return_url).toBe(Buffer.from('https://example.com/success').toString('base64'));
     expect(payload.hash).toBe(createHmac('sha512', 'k').update(concatenated).digest('base64'));
+  });
+
+  it('signs the subscription trio in the live appended positions and emits ctid un-hashed', () => {
+    const { payload, concatenated } = checkout.buildCheckoutPayload({
+      tranId: 'sub-1',
+      amount: 9.99,
+      currency: 'USD',
+      merchantId: 'm',
+      apiKey: 'k',
+      reqTime: 't',
+      ctid: 'customer123',
+      tokenFlag: 'CITR_FIX',
+      frequency: '1M',
+    });
+    expect(payload.ctid).toBe('customer123');
+    expect(payload.token_flag).toBe('CITR_FIX');
+    expect(payload.frequency).toBe('1M');
+    // token_flag + frequency hash after skip_success_page (the tool always sets
+    // type: 'purchase'); ctid has NO hash position.
+    expect(concatenated).toBe('tmsub-19.99purchaseUSDCITR_FIX1M');
+  });
+
+  it('rejects lifetime below 3 minutes (purchase lifetime is MINUTES, min 3)', () => {
+    expect(() =>
+      checkout.buildCheckoutPayload({ tranId: 'ok', amount: 5, merchantId: 'm', apiKey: 'k', lifetime: 1 }),
+    ).toThrow(/MINUTES/);
+    expect(() =>
+      checkout.buildCheckoutPayload({ tranId: 'ok', amount: 5, merchantId: 'm', apiKey: 'k', lifetime: 600 }),
+    ).not.toThrow();
+  });
+
+  it('rejects subscription shapes that violate the SDK trio rules', () => {
+    // tokenFlag without ctid:
+    expect(() =>
+      checkout.buildCheckoutPayload({ tranId: 'ok', amount: 5, merchantId: 'm', apiKey: 'k', tokenFlag: 'CITR_FIX', frequency: '1M' }),
+    ).toThrow(/ctid is required/);
+    // non-CITR_FIX flag on the purchase path:
+    expect(() =>
+      checkout.buildCheckoutPayload({ tranId: 'ok', amount: 5, merchantId: 'm', apiKey: 'k', ctid: 'c123', tokenFlag: 'CITI_FLEX', frequency: '1M' }),
+    ).toThrow(/CITR_FIX/);
+    // frequency without tokenFlag:
+    expect(() =>
+      checkout.buildCheckoutPayload({ tranId: 'ok', amount: 5, merchantId: 'm', apiKey: 'k', frequency: '1M' }),
+    ).toThrow(/frequency requires token-flag/);
   });
 
   it('emits an HTML auto-post form containing all payload fields', () => {

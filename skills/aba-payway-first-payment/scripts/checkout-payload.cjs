@@ -16,12 +16,16 @@
  *
  * Flags: --tran-id (≤20 chars [a-zA-Z0-9-], auto-generated if absent), --amount (required),
  *   --currency USD|KHR, --return-url, --cancel-url, --payment-option cards|abapay_khqr|...,
- *   --firstname --lastname --email --phone --lifetime <sec>,
+ *   --firstname --lastname --email --phone --lifetime <minutes> (min 3 — purchase lifetime is MINUTES, unlike the QR domain's seconds),
+ *   --ctid --token-flag CITR_FIX --frequency 1W|1M|2M (subscription registration),
  *   --env sandbox|production (for the form action URL), --html <file> (write form), --api-key/--merchant-id or env.
  */
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 
+// Live 26-field purchase order (src/domains/checkout.ts PURCHASE_HASH_FIELDS):
+// token_flag + frequency are appended after skip_success_page; omitted fields
+// hash as '' so plain purchases are byte-identical to the legacy 24-field HMAC.
 const FIELD_ORDER = [
   'req_time',
   'merchant_id',
@@ -47,6 +51,8 @@ const FIELD_ORDER = [
   'additional_params',
   'google_pay_token',
   'skip_success_page',
+  'token_flag',
+  'frequency',
 ];
 const CHECKOUT_URLS = {
   sandbox: 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase',
@@ -108,12 +114,33 @@ function buildCheckoutPayload(params) {
   if (params.paymentOption) data.payment_option = params.paymentOption;
   if (params.returnUrl) data.return_url = encodeBase64IfNeeded(params.returnUrl);
   if (params.cancelUrl) data.cancel_url = encodeBase64IfNeeded(params.cancelUrl);
-  if (params.lifetime) data.lifetime = String(params.lifetime);
+  if (params.lifetime) {
+    const minutes = Number(params.lifetime);
+    if (!Number.isFinite(minutes) || minutes < 3)
+      throw new Error('lifetime is in MINUTES (min 3 — the purchase path rejects less; the QR domain is the seconds-based one)');
+    data.lifetime = String(minutes);
+  }
+  // Subscription registration (live docs): tokenFlag implies ctid, and
+  // frequency is required iff tokenFlag is CITR_FIX. Mirrors SDK validation.
+  if (params.tokenFlag) {
+    if (!params.ctid) throw new Error('ctid is required when token-flag is set (subscription registration)');
+    if (params.tokenFlag !== 'CITR_FIX')
+      throw new Error('token-flag on the purchase path supports CITR_FIX only (other linking flags belong to cof link-account/link-card)');
+    if (!params.frequency) throw new Error("frequency is required when token-flag=CITR_FIX (1W | 1M | 2M)");
+    data.ctid = params.ctid;
+    data.token_flag = params.tokenFlag;
+    data.frequency = params.frequency;
+  } else if (params.frequency) {
+    throw new Error('frequency requires token-flag (subscription registration)');
+  }
 
   const concatenated = FIELD_ORDER.map((f) => (data[f] === undefined ? '' : String(data[f]))).join('');
   const hash = crypto.createHmac('sha512', params.apiKey).update(concatenated).digest('base64');
   const payload = {};
   for (const f of FIELD_ORDER) if (data[f] !== undefined) payload[f] = data[f];
+  // ctid travels in the request body but has NO hash position (the live
+  // 26-field order covers it via token_flag alone — SANDBOX-FINDINGS §16).
+  if (data.ctid !== undefined) payload.ctid = data.ctid;
   return { payload: { ...payload, hash }, concatenated };
 }
 
@@ -187,6 +214,9 @@ function main() {
       email: typeof args.email === 'string' ? args.email : undefined,
       phone: typeof args.phone === 'string' ? args.phone : undefined,
       lifetime: args.lifetime ? Number(args.lifetime) : undefined,
+      ctid: typeof args.ctid === 'string' ? args.ctid : undefined,
+      tokenFlag: typeof args['token-flag'] === 'string' ? args['token-flag'] : undefined,
+      frequency: typeof args.frequency === 'string' ? args.frequency : undefined,
     });
   } catch (e) {
     console.error(`Validation error: ${e.message}`);

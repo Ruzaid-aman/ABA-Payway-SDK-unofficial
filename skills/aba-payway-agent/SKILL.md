@@ -1,7 +1,7 @@
 ---
 name: aba-payway-agent
 description: Operate the agentic PayWay CLI safely — provider modes, the 11 tools, risk gates, the execution ledger, sessions, and secret redaction.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # ABA PayWay Agent (Agentic CLI)
@@ -25,12 +25,16 @@ payway-sdk agent setup --provider opencode --model x-preview-f-free --capability
 payway-sdk ask "Generate a $3 online QR for sandbox" --yolo
 ```
 
-The provider config shape (stored as plaintext, no secrets) is:
+The provider config shape (stored as plaintext, no secrets; managed by
+`payway-sdk agent setup` — you normally never write it by hand) is:
 
 ```ts
-import type { ProviderConfigV1, CapabilityMode } from 'aba-payway-ts/agent';
-
-const config: ProviderConfigV1 = {
+// ProviderConfigV1 lives in the SDK source (src/agent/contracts.ts).
+// The package exports only the root entrypoint ("."), so import the
+// PayWay client from 'aba-payway-ts' and manage agent config via the CLI:
+//   payway-sdk agent setup --provider opencode --model x-preview-f-free \
+//     --capability-mode strict-json-plan
+const config = {
   version: 'agent-config/v1',
    provider: 'opencode',               // 'opencode' | 'openai' | 'openrouter' | 'nvidia' | 'custom'
    model: 'x-preview-f-free',
@@ -253,8 +257,9 @@ payway-sdk explain PTL36                    # decode any code offline
 network/timeout/rate-limit. Polling reaching ANY terminal status (including
 DECLINED) is `0`; read `payment_status` from the final JSON event.
 
-Programmatic lookups without spawning the CLI:
-```ts
-import { explainPayWayCode } from 'aba-payway-ts/cli/explain-code.js';
-explainPayWayCode('PTL36'); // { family:'refund', title:'Transaction not found', hint:'...' }
+Programmatic code lookups without spawning the CLI:
+```sh
+# The CLI is the supported surface — no subpath imports exist in package exports.
+payway-sdk explain PTL36   # { family:'refund', title:'Transaction not found', hint:'...' }
+payway-sdk explain         # list every known code + family
 ```

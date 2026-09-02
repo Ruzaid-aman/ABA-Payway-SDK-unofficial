@@ -1,7 +1,7 @@
 ---
 name: aba-payway-transaction-list
 description: List ABA PayWay transactions with date, amount, and status filters.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Transaction List
@@ -20,8 +20,14 @@ This endpoint is capped at 50 requests per minute; cache dashboard results inste
 ## Sandbox Facts
 - Date filters accept **only** `"YYYY-MM-DD HH:mm:ss"` — compact (`20260825`),
   ISO-date, and epoch forms all fail with HTTP 403 code `49` "Invalid Start Date".
+- **Date windows wider than 3 days are rejected** — the gateway answers HTTP 403
+  ("Maximum date rang is allowed only 3 days", sandbox-verified 2026-08-31). The
+  CLI **pre-validates locally** and exits 1 with a hint before any network call.
+- **`pagination` above 1000 is rejected locally too** (CLI exit 1, no network).
 - The array is the top-level `data` value; entries use `transaction_id`,
   `payment_status`, `original_amount`, `original_currency`.
+- **Unpaid QR-only transactions are invisible to this endpoint** while
+  check-transaction/detail see them — use check-transaction for unpaid-QR status.
 - Duplicate merchant references are accepted by PayWay (links/transactions) —
   enforce uniqueness on your side.
 

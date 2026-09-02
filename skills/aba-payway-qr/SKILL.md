@@ -1,7 +1,7 @@
 ---
 name: aba-payway-qr
 description: Generate an online ABA PayWay KHQR payment QR code.
-version: 1.3.0
+version: 1.4.0
 ---
 
 # ABA PayWay QR
@@ -14,6 +14,25 @@ const qr = await payway.qr.generateQr({ transactionId: 'order-123', amount: 10, 
 ```
 
 Use an HTTPS callback URL and save the transaction ID before displaying the returned QR data.
+
+## Optional params (v1.3.6 parity, all live-documented)
+
+`generateQr` accepts nine optional params beyond the basics — all are hash positions (omitted fields hash as `''`):
+
+```ts
+const qr = await payway.qr.generateQr({
+  transactionId: 'order-123', amount: 10, currency: 'USD',
+  paymentOption: 'abapay_khqr', callbackUrl: 'https://merchant.example/payway/callback',
+  firstName: 'John', lastName: 'Doe', email: 'j@example.com', phone: '+855…',
+  items: [{ name: 'Item', price: 10, quantity: 1 }],        // ≤10 items, base64-encoded when an array
+  returnDeeplink: { ios_scheme: 'myapp://done', android_scheme: 'myapp://done' },
+  customFields: { orderId: 'A-123' },
+  returnParams: 'label=ok',
+  payout: [{ account: '000999888', amount: 10 }],          // ⚠️ {account, amount} keys HERE —
+});                                                         // the purchase path uses {acc, amt} instead
+```
+
+CLI flags (all JSON-or-string flags accept inline JSON or raw strings): `--first-name --last-name --email --phone --items --return-deeplink --custom-fields --return-params --payout`. Advisory caps (warn; throw under `strictValidation`): names ≤20 chars, email ≤50, phone ≤20, `items` ≤10 entries / ≤500 chars encoded, wechat/alipay USD-only.
 
 ## CLI: QR Image Auto-Open
 `payway-sdk generate-qr` saves the PNG to `payway-output/<txId>.png` and can pop it straight into the OS default image viewer:
@@ -41,14 +60,20 @@ try { await payway.qr.generateQr(params); }
 catch (error) { if (error instanceof PayWayAPIError) console.error(error.statusCode); }
 ```
 
-## Tools (scripts/)
+## Tools
 
-- **`online-qr-poll.ts`** — one-command live flow: generates ONE online KHQR for an amount (default $31.11), saves + auto-opens the PNG, then polls status every 5s for 10 minutes using `checkout.pollTransactionStatus`.
-  ```sh
-  npx tsx scripts/online-qr-poll.ts            # 31.11 USD, 600s lifetime, 10-min poll
-  npx tsx scripts/online-qr-poll.ts 5 KHR      # custom amount/currency
-  ```
-  Artifacts land in `test-logs/qr-payment/<txId>-*` (PNG, KHQR payload, deeplink). Requires `PAYWAY_MERCHANT_ID`, `PAYWAY_API_KEY`, `PAYWAY_CALLBACK_URL` in `.env`.
+The QR flow needs no bundled scripts — the CLI covers the whole lifecycle:
+
+```sh
+# Generate + auto-poll (lifetime in SECONDS here, min 180):
+payway-sdk generate-qr -a 31.11 -c USD --callback-url https://merchant.example/cb -y
+# Watch a payment until terminal:
+payway-sdk poll-transaction -t <txId>
+```
+
+> Repo-clone note: `scripts/online-qr-poll.ts` is a development probe in the SDK
+> repository's `scripts/` directory (not shipped in the npm package) — the
+> `generate-qr` + polling flow above is the supported equivalent.
 
 ## Related Skills
 - [Offline QR](../aba-payway-offline-qr/SKILL.md)

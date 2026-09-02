@@ -1,7 +1,7 @@
 ---
 name: aba-payway-hash
 description: Verify ABA PayWay webhook signatures with timing-safe HMAC verification.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Hash and Webhooks
@@ -21,7 +21,7 @@ if (!isValid) return res.status(400).send('Invalid PayWay signature');
 ## Tools (scripts/)
 
 - **`verify-callback.cjs`** — verify a real callback offline: `node scripts/verify-callback.cjs --body-file cb.json --sig "<header>"` (or pipe the raw body). Exit 0 = valid, 1 = INVALID (do not process). Uses the SDK's exact sorted-key → HMAC-SHA512 → Base64 → timing-safe algorithm.
-- **`sign-request.cjs`** — build a correctly-signed request payload: `node scripts/sign-request.cjs --preset get-mc-ref --merchant-ref "INV-1"` (presets: `checkout`, `check-transaction`, `get-mc-ref`, `exchange-rate`, or `--fields a,b,c`). The fastest way to debug `status.code 1` (Wrong Hash).
+- **`sign-request.cjs`** — build a correctly-signed request payload: `node scripts/sign-request.cjs --preset get-mc-ref --merchant-ref "INV-1"` (presets: `checkout`, `check-transaction`, `get-mc-ref`, `exchange-rate`, or `--fields a,b,c`). The fastest way to debug `status.code 1` (Wrong Hash). The `checkout` preset signs the live 26-field purchase order — subscription payloads (`--ctid --token-flag CITR_FIX --frequency 1M`) sign correctly; omitted fields hash as `''` so plain purchases are unchanged.
 - **`mock-callback.cjs`** — send a correctly-signed fake callback to your local webhook: `node scripts/mock-callback.cjs --url http://localhost:3000/payway/callback --tran-id order-1 --amount 10`. Test handlers without the ABA Simulator app.
 
 All scripts are dependency-free, read `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY` from env (or flags), and export their functions for tests.

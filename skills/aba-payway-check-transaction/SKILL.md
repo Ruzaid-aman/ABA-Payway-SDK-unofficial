@@ -1,7 +1,7 @@
 ---
 name: aba-payway-check-transaction
 description: Check the current status of an ABA PayWay transaction.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # Check Transaction
@@ -46,15 +46,12 @@ catch (error) { if (error instanceof PayWayBusinessError) console.error(error.pa
   cat response.json | node scripts/decode-status.cjs
   ```
 
-- **`online-qr-poll.ts`** — end-to-end: generate ONE online QR (default $31.11 USD, 600s lifetime), save/open PNG, then poll every 5s for up to 10 minutes via `pollTransactionStatus`.
-  ```sh
-  npx tsx scripts/online-qr-poll.ts [amount] [currency]
-  ```
+For end-to-end live flows use the CLI itself (the repo's `scripts/online-qr-poll.ts` / `scripts/checkout-link-poll.ts` are development probes, not shipped in the npm package):
 
-- **`checkout-link-poll.ts`** — end-to-end: create a transaction (`checkout.purchase` with `paymentGate: 0`), auto-open the hosted `checkout_qr_url`, then poll every 5s for up to 10 minutes.
-  ```sh
-  npx tsx scripts/checkout-link-poll.ts [amount] [currency]
-  ```
+```sh
+payway-sdk generate-qr -a 5 -c USD --callback-url <url> -y   # online QR + auto-poll
+payway-sdk generate-checkout -a 5 -c USD --return-url <url> # checkout link + auto-poll
+```
 
 ## Related Skills
 - [Hash and Webhooks](../aba-payway-hash/SKILL.md)

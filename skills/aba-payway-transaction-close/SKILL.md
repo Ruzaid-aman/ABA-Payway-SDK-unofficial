@@ -1,7 +1,7 @@
 ---
 name: aba-payway-transaction-close
 description: Close an ABA PayWay transaction after processing it.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # Close Transaction
@@ -41,11 +41,16 @@ Additionally, **neither check-transaction nor transaction-detail exposes a CLOSE
 
 Production enforcement of rejection/reversal is an open question for ABA (#13) — until confirmed, never assume close prevents payment.
 
-## Tools (scripts/)
-- **`close-transaction-verify.ts`** — reusable close + verify (CLI or import `closeOrReport()` / `statusOf()` / `closeAndVerify()`); prints this interpretation table automatically.
-  ```sh
-  npx tsx scripts/close-transaction-verify.ts <txId>
-  ```
+## Tools
+
+No bundled script needed — the CLI covers close + verify:
+
+```sh
+payway-sdk close-transaction -t <txId> -y     # close (skip prompt)
+payway-sdk check-transaction -t <txId>        # verify the settled view
+```
+
+> Repo-clone note: `scripts/close-transaction-verify.ts` (exports `closeOrReport()` / `statusOf()` / `closeAndVerify()`) is a development probe in the SDK repository, not shipped in the npm package — the two commands above are the supported equivalent.
 
 ## Error Handling
 ```ts
