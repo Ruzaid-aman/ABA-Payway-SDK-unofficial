@@ -46,6 +46,44 @@ const CHECKOUT_FORM_PLUGIN_SRC = 'https://checkout.payway.com.kh/plugins/checkou
 const DEFAULT_FORM_ID = 'aba_merchant_request';
 const POPUP_TARGET = 'aba_webservice';
 
+/**
+ * Live-documented hash order for the purchase endpoint (developer.payway.com.kh
+ * purchase docs). `token_flag` + `frequency` are the live subscription
+ * additions appended after `skip_success_page`; omitted optional fields hash as
+ * '' (they vanish under concatenation), so this list produces the exact same
+ * HMAC as the previous 24-field list for callers that don't pass the
+ * subscription params (pinned by test). Shared by the local payload builder
+ * AND the network path so the locally-built and sent hashes can never diverge.
+ */
+export const PURCHASE_HASH_FIELDS = [
+  'req_time',
+  'merchant_id',
+  'tran_id',
+  'amount',
+  'items',
+  'shipping',
+  'firstname',
+  'lastname',
+  'email',
+  'phone',
+  'type',
+  'payment_option',
+  'return_url',
+  'cancel_url',
+  'continue_success_url',
+  'return_deeplink',
+  'currency',
+  'custom_fields',
+  'return_params',
+  'payout',
+  'lifetime',
+  'additional_params',
+  'google_pay_token',
+  'skip_success_page',
+  'token_flag',
+  'frequency',
+] as const;
+
 export interface CheckoutDomain {
   createTransaction: (params: CreateTransactionParams) => Record<string, unknown> & { hash: string };
   purchase: (
@@ -270,38 +308,7 @@ export function createCheckoutDomain(
       merchant_id: config.merchantId,
     });
 
-    // Matches the live purchase hash order; token_flag + frequency are the
-    // live subscription additions appended after skip_success_page (empty
-    // when unset, so the hash is byte-identical to the pre-subscription
-    // list for callers that don't use them).
-    const fields = [
-      'req_time',
-      'merchant_id',
-      'tran_id',
-      'amount',
-      'items',
-      'shipping',
-      'firstname',
-      'lastname',
-      'email',
-      'phone',
-      'type',
-      'payment_option',
-      'return_url',
-      'cancel_url',
-      'continue_success_url',
-      'return_deeplink',
-      'currency',
-      'custom_fields',
-      'return_params',
-      'payout',
-      'lifetime',
-      'additional_params',
-      'google_pay_token',
-      'skip_success_page',
-      'token_flag',
-      'frequency',
-    ];
+    const fields = [...PURCHASE_HASH_FIELDS];
 
     const hash = generateHmac(payload, fields, config.apiKey);
     return { ...payload, hash };
@@ -378,36 +385,14 @@ export function createCheckoutDomain(
 
     purchase: (params: CreateTransactionParams, callOptions?: RequestCallOptions) => {
       const payload = buildPurchasePayload(params);
-      const fields = [
-        'req_time',
-        'merchant_id',
-        'tran_id',
-        'amount',
-        'items',
-        'shipping',
-        'firstname',
-        'lastname',
-        'email',
-        'phone',
-        'type',
-        'payment_option',
-        'return_url',
-        'cancel_url',
-        'continue_success_url',
-        'return_deeplink',
-        'currency',
-        'custom_fields',
-        'return_params',
-        'payout',
-        'lifetime',
-        'additional_params',
-        'google_pay_token',
-        'skip_success_page',
-      ];
+      // The injected request() re-hashes fullBody with these fields
+      // (client.ts request()), so they MUST be the live 26-field order —
+      // passing a divergent list here overwrites the locally-built hash with
+      // one that omits token_flag/frequency (audit D1: gateway "Wrong Hash").
       return request<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>(
         ENDPOINTS.purchase,
         payload,
-        fields,
+        [...PURCHASE_HASH_FIELDS],
         'req_time',
         'application/json',
         undefined,

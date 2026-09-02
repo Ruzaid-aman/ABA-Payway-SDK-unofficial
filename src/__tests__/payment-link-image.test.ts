@@ -6,6 +6,11 @@
  * enter the hash (per ABA's official PHP sample and the spec's
  * x-hmac-fields). The multipart part name is `image`, top-level, next to
  * the four string fields.
+ *
+ * Spec limits (payway-openapi/paths/payment-link.yaml:33–37): JPG/JPEG/PNG
+ * only, max 3MB — enforced as an advisory in the domain (warns, escalates
+ * to PayWayConfigError under strictValidation) and as a hard loader error
+ * for unsupported extensions in the CLI helper.
  */
 import * as crypto from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,25 +18,37 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { contentTypeForImageFile, loadPaymentLinkImage } from '../cli/payment-link-image.js';
+import type { PayWayConfig } from '../client.js';
 import { PayWay } from '../client.js';
+import { ENDPOINTS } from '../constants.js';
 import { createPaymentLinkDomain } from '../domains/payment-link.js';
 import { PayWayConfigError } from '../errors.js';
-import { ENDPOINTS } from '../constants.js';
 import { mockJsonResponse } from '../test/test-utils.js';
-import type { PayWayConfig } from '../client.js';
 
 // ---------------------------------------------------------------------------
 // CLI helper: content-type inference + file loading
 // ---------------------------------------------------------------------------
 
 describe('loadPaymentLinkImage (CLI helper)', () => {
-  it('infers content types from file extensions', () => {
+  it('infers content types from file extensions (spec set: JPG/JPEG/PNG only)', () => {
     expect(contentTypeForImageFile('a.jpg')).toBe('image/jpeg');
     expect(contentTypeForImageFile('a.JPEG')).toBe('image/jpeg');
     expect(contentTypeForImageFile('a.png')).toBe('image/png');
-    expect(contentTypeForImageFile('a.webp')).toBe('image/webp');
-    expect(contentTypeForImageFile('a.gif')).toBe('image/gif');
-    expect(contentTypeForImageFile('a.svg')).toBe('application/octet-stream');
+  });
+
+  it('rejects extensions outside the spec JPG/JPEG/PNG set', () => {
+    // Spec (payway-openapi/paths/payment-link.yaml:33–37): payment-link
+    // images are JPG/JPEG/PNG only — webp/gif/svg now throw instead of
+    // mapping to their MIME types / falling back to octet-stream.
+    expect(() => contentTypeForImageFile('a.webp')).toThrow(
+      "--image: unsupported image type '.webp' — the spec allows JPG/JPEG/PNG only",
+    );
+    expect(() => contentTypeForImageFile('a.gif')).toThrow(
+      "--image: unsupported image type '.gif' — the spec allows JPG/JPEG/PNG only",
+    );
+    expect(() => contentTypeForImageFile('a.svg')).toThrow(
+      "--image: unsupported image type '.svg' — the spec allows JPG/JPEG/PNG only",
+    );
   });
 
   it('rejects missing and empty files with clear messages', () => {
@@ -47,15 +64,37 @@ describe('loadPaymentLinkImage (CLI helper)', () => {
     }
   });
 
-  it('loads bytes with basename filename and inferred content type', () => {
+  it('throws the spec message for unsupported extensions when loading', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'payway-link-image-'));
     try {
-      const filePath = path.join(dir, 'banner.png');
-      writeFileSync(filePath, new Uint8Array([1, 2, 3, 4]));
-      const image = loadPaymentLinkImage(filePath);
-      expect(image.filename).toBe('banner.png');
-      expect(image.contentType).toBe('image/png');
-      expect(Array.from(image.data)).toEqual([1, 2, 3, 4]);
+      for (const ext of ['webp', 'gif', 'svg', 'bmp']) {
+        const filePath = path.join(dir, `banner.${ext}`);
+        writeFileSync(filePath, new Uint8Array([1, 2, 3, 4]));
+        expect(() => loadPaymentLinkImage(filePath)).toThrow(
+          `--image: unsupported image type '.${ext}' — the spec allows JPG/JPEG/PNG only`,
+        );
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('loads png/jpg files with basename filename and inferred content type', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'payway-link-image-'));
+    try {
+      const pngPath = path.join(dir, 'banner.png');
+      writeFileSync(pngPath, new Uint8Array([1, 2, 3, 4]));
+      const png = loadPaymentLinkImage(pngPath);
+      expect(png.filename).toBe('banner.png');
+      expect(png.contentType).toBe('image/png');
+      expect(Array.from(png.data)).toEqual([1, 2, 3, 4]);
+
+      const jpgPath = path.join(dir, 'banner.jpg');
+      writeFileSync(jpgPath, new Uint8Array([5, 6]));
+      const jpg = loadPaymentLinkImage(jpgPath);
+      expect(jpg.filename).toBe('banner.jpg');
+      expect(jpg.contentType).toBe('image/jpeg');
+      expect(Array.from(jpg.data)).toEqual([5, 6]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -81,9 +120,9 @@ describe('paymentLink.create image validation (domain)', () => {
       throw new Error('requestWithMerchantAuth must not be called for invalid images');
     });
     expect(() => domain.create({ ...VALID_PARAMS, image: { data: new Uint8Array(0) } })).toThrow(PayWayConfigError);
-    expect(() =>
-      domain.create({ ...VALID_PARAMS, image: { data: 'not-bytes' as unknown as Uint8Array } }),
-    ).toThrow(PayWayConfigError);
+    expect(() => domain.create({ ...VALID_PARAMS, image: { data: 'not-bytes' as unknown as Uint8Array } })).toThrow(
+      PayWayConfigError,
+    );
   });
 
   it('applies filename/content-type defaults and names the part "image"', async () => {
@@ -99,8 +138,18 @@ describe('paymentLink.create image validation (domain)', () => {
       image: { data: new Uint8Array([9]), filename: 'p.png', contentType: 'image/png' },
     });
 
-    expect(captured[0]).toEqual({ name: 'image', filename: 'image.jpg', contentType: 'image/jpeg', data: new Uint8Array([9]) });
-    expect(captured[1]).toEqual({ name: 'image', filename: 'p.png', contentType: 'image/png', data: new Uint8Array([9]) });
+    expect(captured[0]).toEqual({
+      name: 'image',
+      filename: 'image.jpg',
+      contentType: 'image/jpeg',
+      data: new Uint8Array([9]),
+    });
+    expect(captured[1]).toEqual({
+      name: 'image',
+      filename: 'p.png',
+      contentType: 'image/png',
+      data: new Uint8Array([9]),
+    });
   });
 
   it('sends no multipartFile when no image is given', async () => {
@@ -110,6 +159,75 @@ describe('paymentLink.create image validation (domain)', () => {
     // The options object always carries callOptions now (per-call options
     // threading, 2026-08-30) — no multipartFile means it is undefined here.
     expect(authSpy).toHaveBeenCalledWith(expect.any(String), expect.anything(), { callOptions: undefined });
+  });
+});
+
+describe('paymentLink.create image limits (domain, advisory)', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('warns (once per message) when the image exceeds the documented 3MB limit', async () => {
+    const domain = createPaymentLinkDomain(DUMMY_CONFIG, () => Promise.resolve({} as never));
+    const oversized = new Uint8Array(3 * 1024 * 1024 + 1);
+
+    await domain.create({ ...VALID_PARAMS, image: { data: oversized } });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^\[payway\] image\.data is \d+ bytes, exceeding the documented 3MB/),
+    );
+  });
+
+  it('throws PayWayConfigError for an oversized image under strictValidation', () => {
+    const strictDomain = createPaymentLinkDomain({ strictValidation: true } as unknown as PayWayConfig, () => {
+      throw new Error('requestWithMerchantAuth must not be called');
+    });
+    expect(() =>
+      strictDomain.create({ ...VALID_PARAMS, image: { data: new Uint8Array(3 * 1024 * 1024 + 1) } }),
+    ).toThrow(PayWayConfigError);
+    expect(() =>
+      strictDomain.create({ ...VALID_PARAMS, image: { data: new Uint8Array(3 * 1024 * 1024 + 1) } }),
+    ).toThrow(/exceeding the documented 3MB/);
+  });
+
+  it('warns for an explicitly-passed contentType outside the JPG/JPEG/PNG set', async () => {
+    const domain = createPaymentLinkDomain(DUMMY_CONFIG, () => Promise.resolve({} as never));
+
+    await domain.create({ ...VALID_PARAMS, image: { data: new Uint8Array([9]), contentType: 'image/gif' } });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[payway] image contentType "image/gif" is outside the documented JPG/JPEG/PNG set (image/jpeg, image/jpg, image/png) — the gateway may reject the upload',
+    );
+  });
+
+  it('throws PayWayConfigError for an unsupported contentType under strictValidation', () => {
+    const strictDomain = createPaymentLinkDomain({ strictValidation: true } as unknown as PayWayConfig, () => {
+      throw new Error('requestWithMerchantAuth must not be called');
+    });
+    expect(() =>
+      strictDomain.create({ ...VALID_PARAMS, image: { data: new Uint8Array([9]), contentType: 'image/gif' } }),
+    ).toThrow(PayWayConfigError);
+    expect(() =>
+      strictDomain.create({ ...VALID_PARAMS, image: { data: new Uint8Array([9]), contentType: 'image/gif' } }),
+    ).toThrow(/image contentType "image\/gif"/);
+  });
+
+  it('does not warn at exactly 3MB or with the image/jpg misspelling', async () => {
+    const domain = createPaymentLinkDomain(DUMMY_CONFIG, () => Promise.resolve({} as never));
+
+    await domain.create({ ...VALID_PARAMS, image: { data: new Uint8Array(3 * 1024 * 1024) } });
+    await domain.create({ ...VALID_PARAMS, image: { data: new Uint8Array([9]), contentType: 'image/jpg' } });
+    await domain.create({ ...VALID_PARAMS, image: { data: new Uint8Array([9]), contentType: 'image/png' } });
+
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -182,7 +300,7 @@ describe('paymentLink.create multipart wire format (client)', () => {
       image: { data: new Uint8Array(64).fill(7), filename: 'bytes.bin', contentType: 'application/octet-stream' },
     });
 
-    const form = (fetchSpy.mock.calls[0][1].body as FormData);
+    const form = fetchSpy.mock.calls[0][1].body as FormData;
     const requestTime = form.get('request_time') as string;
     const merchantAuth = form.get('merchant_auth') as string;
     const expectedHash = crypto

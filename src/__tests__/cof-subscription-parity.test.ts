@@ -14,6 +14,7 @@ import { generateHmac } from '../auth.js';
 import { PayWay } from '../client.js';
 import { createCredentialsOnFileDomain } from '../domains/credentials-on-file.js';
 import { PayWayConfigError } from '../errors.js';
+import { mockJsonResponse } from '../test/test-utils.js';
 import type { CofPaymentParams, LinkAccountParams, LinkCardParams, PayWayConfig } from '../client.js';
 
 const TEST_CONFIG = {
@@ -309,5 +310,117 @@ describe('purchase subscription trio (live subscription operation)', () => {
         paymentOption: 'abapay_khqr',
       }),
     ).toThrow(PayWayConfigError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// purchase() NETWORK path — the SENT hash (audit D1).
+//
+// The local builder (createTransaction) already hashes over the live 26-field
+// order, but purchase() used to pass its own legacy 24-field list to the
+// injected request(), which UNCONDITIONALLY re-hashes (client.ts request()).
+// Subscription purchases therefore SENT a hash computed without
+// token_flag/frequency → gateway "Wrong Hash". These tests pin the hash that
+// actually travels over the wire, stubbing global fetch like
+// payment-link-image.test.ts does.
+// ---------------------------------------------------------------------------
+
+// Deliberate INDEPENDENT copy of the live 26-field purchase hash order
+// (req_time … skip_success_page, then the live subscription additions
+// token_flag + frequency). Do NOT import PURCHASE_HASH_FIELDS here: a
+// regression in that constant must fail these assertions, not follow it.
+const LIVE_PURCHASE_HASH_FIELDS = [
+  'req_time',
+  'merchant_id',
+  'tran_id',
+  'amount',
+  'items',
+  'shipping',
+  'firstname',
+  'lastname',
+  'email',
+  'phone',
+  'type',
+  'payment_option',
+  'return_url',
+  'cancel_url',
+  'continue_success_url',
+  'return_deeplink',
+  'currency',
+  'custom_fields',
+  'return_params',
+  'payout',
+  'lifetime',
+  'additional_params',
+  'google_pay_token',
+  'skip_success_page',
+  'token_flag',
+  'frequency',
+];
+
+// Deliberate INDEPENDENT copy of the legacy 24-field order (the live list
+// minus token_flag/frequency) — used to pin append-compatibility.
+const LEGACY_PURCHASE_HASH_FIELDS = LIVE_PURCHASE_HASH_FIELDS.filter(
+  (field) => field !== 'token_flag' && field !== 'frequency',
+);
+
+const PURCHASE_SUCCESS_BODY = {
+  status: { code: '00', message: 'Success' },
+  qrString: '000201010212',
+  abapay_deeplink: 'aba://mobile/pay',
+};
+
+describe('purchase() network path — sent hash', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let payway: PayWay;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    fetchSpy.mockResolvedValue(mockJsonResponse(PURCHASE_SUCCESS_BODY));
+    vi.stubGlobal('fetch', fetchSpy);
+    payway = new PayWay(TEST_CONFIG);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends the subscription trio hashed over the live 26-field order', async () => {
+    const response = await payway.checkout.purchase({
+      transactionId: 'SUB-NET-1',
+      amount: 9.99,
+      currency: 'USD',
+      returnUrl: 'https://example.com/return',
+      ctid: 'CTID-SUB',
+      tokenFlag: 'CITR_FIX',
+      frequency: '1M',
+    });
+    expect(response).toEqual(PURCHASE_SUCCESS_BODY);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const sentBody = JSON.parse(String(fetchSpy.mock.calls[0][1].body)) as Record<string, unknown>;
+    expect(sentBody.token_flag).toBe('CITR_FIX');
+    expect(sentBody.frequency).toBe('1M');
+    // The hash that actually left the machine must cover token_flag/frequency.
+    expect(sentBody.hash).toBe(generateHmac(sentBody, LIVE_PURCHASE_HASH_FIELDS, TEST_CONFIG.apiKey));
+  });
+
+  it('sends a plain-purchase hash byte-identical to the legacy 24-field order', async () => {
+    await payway.checkout.purchase({
+      transactionId: 'PLAIN-NET-1',
+      amount: 5,
+      currency: 'USD',
+      returnUrl: 'https://example.com/return',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const sentBody = JSON.parse(String(fetchSpy.mock.calls[0][1].body)) as Record<string, unknown>;
+    expect(sentBody.token_flag).toBeUndefined();
+    expect(sentBody.frequency).toBeUndefined();
+    // Live order…
+    expect(sentBody.hash).toBe(generateHmac(sentBody, LIVE_PURCHASE_HASH_FIELDS, TEST_CONFIG.apiKey));
+    // …must remain append-compatible with the legacy 24-field order when the
+    // subscription fields are unset (unset fields hash as '').
+    expect(sentBody.hash).toBe(generateHmac(sentBody, LEGACY_PURCHASE_HASH_FIELDS, TEST_CONFIG.apiKey));
   });
 });

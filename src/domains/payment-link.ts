@@ -15,6 +15,16 @@ import {
 const DEFAULT_IMAGE_FILENAME = 'image.jpg';
 const DEFAULT_IMAGE_CONTENT_TYPE = 'image/jpeg';
 
+/**
+ * Spec (payway-openapi/paths/payment-link.yaml:33–37): the optional top-level
+ * `image` part is capped at 3MB and must be JPG/JPEG/PNG. Both are advisory
+ * here — the gateway may still accept edge cases, and `strictValidation`
+ * escalates the warning to a `PayWayConfigError`.
+ */
+const PAYMENT_LINK_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
+/** `image/jpg` is the common misspelling of `image/jpeg` — allowed. */
+const PAYMENT_LINK_IMAGE_CONTENT_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/jpg', 'image/png']);
+
 export interface PaymentLinkDomain {
   create: (
     params: CreatePaymentLinkParams,
@@ -88,10 +98,23 @@ export function createPaymentLinkDomain(
         if (typeof filename !== 'string' || filename.trim().length === 0) {
           throw new PayWayConfigError('image.filename must be a non-empty string when provided');
         }
+        const contentType = image.contentType ?? DEFAULT_IMAGE_CONTENT_TYPE;
+        if (image.data.byteLength > PAYMENT_LINK_IMAGE_MAX_BYTES) {
+          warnAdvisory(
+            config,
+            `image.data is ${image.data.byteLength} bytes, exceeding the documented 3MB (${PAYMENT_LINK_IMAGE_MAX_BYTES} bytes) payment-link image limit — the gateway may reject the upload`,
+          );
+        }
+        if (!PAYMENT_LINK_IMAGE_CONTENT_TYPES.has(contentType)) {
+          warnAdvisory(
+            config,
+            `image contentType "${contentType}" is outside the documented JPG/JPEG/PNG set (image/jpeg, image/jpg, image/png) — the gateway may reject the upload`,
+          );
+        }
         multipartFile = {
           name: 'image',
           filename,
-          contentType: image.contentType ?? DEFAULT_IMAGE_CONTENT_TYPE,
+          contentType,
           data: image.data,
         };
       }

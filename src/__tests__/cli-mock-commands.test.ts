@@ -10,6 +10,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { generateHmac } from '../auth.js';
 import { captureConsole, generateTestRsaKeyPair } from '../test/test-utils.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-mock-'));
@@ -20,6 +21,43 @@ const ENV_KEYS = ['PAYWAY_BASE_URL', 'PAYWAY_ENV', 'PAYWAY_MERCHANT_ID', 'PAYWAY
 const TEST_RSA = generateTestRsaKeyPair();
 
 const FAKE_PNG_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString('base64');
+
+// Bodies received by the mock's plain `purchase` branch (NOT the CoF
+// `purchase/payment-credential` endpoint — that branch stays first and never
+// pushes here). Lets tests assert what the CLI actually SENT, hash included.
+const capturedPurchaseBodies: Array<Record<string, unknown>> = [];
+
+// Deliberate INDEPENDENT copy of the live 26-field purchase hash order
+// (audit D1). Do NOT import PURCHASE_HASH_FIELDS here: a regression in that
+// constant must fail these assertions, not follow it.
+const LIVE_PURCHASE_HASH_FIELDS = [
+  'req_time',
+  'merchant_id',
+  'tran_id',
+  'amount',
+  'items',
+  'shipping',
+  'firstname',
+  'lastname',
+  'email',
+  'phone',
+  'type',
+  'payment_option',
+  'return_url',
+  'cancel_url',
+  'continue_success_url',
+  'return_deeplink',
+  'currency',
+  'custom_fields',
+  'return_params',
+  'payout',
+  'lifetime',
+  'additional_params',
+  'google_pay_token',
+  'skip_success_page',
+  'token_flag',
+  'frequency',
+];
 
 let server: Server;
 let baseUrl = '';
@@ -75,6 +113,10 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('purchase/payment-credential')) {
     send(200, { status: { code: '00', message: 'Success' }, data: { tran_id: 'COF-1' } });
   } else if (url.includes('purchase')) {
+    // Capture what the CLI sent so tests can pin the network-path hash
+    // (audit D1). Only THIS branch: the CoF payment-credential endpoint above
+    // also matches 'purchase' and must not pollute the capture.
+    capturedPurchaseBodies.push(parsed);
     send(200, {
       status: { code: '00', message: 'Success' },
       qrString: '000201010212',
@@ -534,6 +576,7 @@ describe('CLI API commands against the local mock gateway', () => {
   });
 
   it('generate-checkout forwards the expanded B6 flags (--json)', async () => {
+    capturedPurchaseBodies.length = 0;
     const { exitCode } = await run([
       'generate-checkout',
       '-a',
@@ -561,6 +604,15 @@ describe('CLI API commands against the local mock gateway', () => {
       '--no-show-qr',
     ]);
     expect(exitCode).not.toBe(1);
+
+    // Audit D1: the hash SENT over the network must cover the subscription
+    // additions (token_flag/frequency) — purchase() used to re-hash with the
+    // legacy 24-field list, producing a gateway "Wrong Hash".
+    expect(capturedPurchaseBodies.length).toBeGreaterThan(0);
+    const body = capturedPurchaseBodies[capturedPurchaseBodies.length - 1];
+    expect(body.token_flag).toBe('CITR_FIX');
+    expect(body.frequency).toBe('1M');
+    expect(body.hash).toBe(generateHmac(body, LIVE_PURCHASE_HASH_FIELDS, 'a'.repeat(32)));
   });
 
   it('generate-qr forwards the 9 new optional params (no polling)', async () => {

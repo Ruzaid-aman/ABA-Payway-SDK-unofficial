@@ -52,8 +52,12 @@ export interface LinkCardFormOptions {
   omitSubmitButton?: boolean;
 }
 
-/** §16-verified live hash order — shared by linkCard() and getLinkCardFormHtml(). */
-const LINK_CARD_HMAC_FIELDS = [
+/**
+ * §16-verified live hash order — shared by linkCard() and getLinkCardFormHtml().
+ * Exported (audit D3) so the hash-order-hint drift-guard test can pin the
+ * client.ts hint against the order actually signed.
+ */
+export const LINK_CARD_HMAC_FIELDS = [
   'merchant_id',
   'request_time',
   'ctid',
@@ -198,6 +202,13 @@ export function createCredentialsOnFileDomain(
       validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
         allowPrivateHosts: config.allowPrivateCallbackHosts === true,
       });
+    }
+
+    if (params.frequency === undefined) {
+      warnAdvisory(
+        config,
+        'link-card frequency is live-documented as required for Link Card (1W|1M|2M); card linking may fail without it',
+      );
     }
 
     const body: Record<string, unknown> = {

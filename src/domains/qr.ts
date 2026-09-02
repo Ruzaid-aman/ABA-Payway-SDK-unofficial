@@ -29,8 +29,11 @@ export interface QrDomain {
  * strings vanish under concatenation, this list produces the exact same
  * HMAC as the previous 10-field list for callers that don't pass the new
  * optional params (pinned by test).
+ *
+ * Exported (audit D3) so the hash-order-hint drift-guard test can pin the
+ * client.ts hint against the order actually signed.
  */
-const GENERATE_QR_HASH_FIELDS = [
+export const GENERATE_QR_HASH_FIELDS = [
   'req_time',
   'merchant_id',
   'tran_id',

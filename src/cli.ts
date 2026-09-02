@@ -2073,7 +2073,7 @@ paymentLinkCmd
   .option('-d, --description <text>', 'Link description (max 250 chars)')
   .option('--payment-limit <n>', 'Maximum number of payments accepted')
   .option('--expired-date <epochSeconds>', 'Expiration timestamp (epoch seconds)')
-  .option('--image <path>', 'Image file to attach to the link (jpg/jpeg/png/webp/gif)')
+  .option('--image <path>', 'Image file to attach to the link (jpg/jpeg/png, max 3MB)')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
     console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
@@ -2583,7 +2583,7 @@ cofCmd
   .option('--purchase-type <type>', 'purchase (default) or pre-auth')
   .option('--items <json>', 'Item list — JSON array or string (base64-encoded)')
   .option('--return-params <value>', 'Extra params echoed in the pushback')
-  .option('--payout <json>', 'Split-payout instructions — JSON [{`account`,`amount`}] or string')
+  .option('--payout <json>', 'Split-payout instructions — JSON [{`acc`,`amt`}] or string')
   .option('--custom-fields <json>', 'Custom fields — JSON object or string')
   .option('--shipping-fee <number>', 'Shipping fee amount')
   .option('--json', 'Print the raw JSON response')

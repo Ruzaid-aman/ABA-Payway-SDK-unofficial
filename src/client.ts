@@ -4,7 +4,12 @@ import type { CallbackVerificationResult } from './auth.js';
 import { BASE_URLS, ENDPOINTS } from './constants.js';
 import { CircuitBreaker, type CircuitBreakerOptions } from './circuit-breaker.js';
 import type { CheckoutDomain } from './domains/checkout.js';
+// Audit D3: the hash-order hints derive from the domain constants so the
+// drift-guard test (src/__tests__/hash-order-hints.test.ts) can pin hint ↔
+// actually-signed order in both directions.
+import { PURCHASE_HASH_FIELDS } from './domains/checkout.js';
 import type { CredentialsOnFileDomain } from './domains/credentials-on-file.js';
+import { LINK_CARD_HMAC_FIELDS } from './domains/credentials-on-file.js';
 import {
   createCheckoutDomain,
   createCredentialsOnFileDomain,
@@ -14,6 +19,7 @@ import {
   createPreAuthDomain,
   createQrDomain,
 } from './domains/index.js';
+import { GENERATE_QR_HASH_FIELDS } from './domains/qr.js';
 import type { KhqrDomain } from './domains/khqr.js';
 import type { PaymentLinkDomain } from './domains/payment-link.js';
 import type { PayoutDomain } from './domains/payout.js';
@@ -408,24 +414,79 @@ export interface GetTransactionListParams {
 }
 
 /**
- * Live-documented HMAC field orders per endpoint (SANDBOX-FINDINGS §16 and the
- * 2026-08-31 audit matrix §3). Surfaced inside PayWaySignatureError hints so a
- * wrong-hash rejection (`1`/`01`/`PTL02`) points directly at the composition
- * to fix instead of a bare "Wrong Hash".
+ * Effective HMAC hash order when a requestWithMerchantAuth caller passes no
+ * `hmacFields` override — the composition actually signed for refund,
+ * payment-link create/details (and any other merchant-auth call that omits
+ * the override). Hoisted to a named constant (audit D3) so the
+ * HASH_ORDER_HINTS drift-guard test can pin the hints against the real
+ * default instead of a copy of it.
  */
-const HASH_ORDER_HINTS: Record<string, string> = {
-  [ENDPOINTS.purchase]: 'req_time.merchant_id.tran_id.amount.items Firstname Lastname Email Phone.payment_option.return_url.return_params.currency.custom_fields.skip_success_page',
+export const MERCHANT_AUTH_DEFAULT_HASH_FIELDS: readonly string[] = ['request_time', 'merchant_id', 'merchant_auth'];
+
+/**
+ * Live-documented HMAC field orders per endpoint (SANDBOX-FINDINGS §16 and
+ * the 2026-08-31 audit matrix §3). Surfaced inside PayWaySignatureError hints
+ * so a wrong-hash rejection (`1`/`01`/`PTL02`) points directly at the
+ * composition to fix instead of a bare "Wrong Hash".
+ *
+ * Values are pure dot-joined field lists — no prose, no parentheticals, no
+ * spaces (a hint containing a space breaks the dot-joined contract and the
+ * drift-guard test rejects it). Endpoint-specific quirks live here in the
+ * comments instead:
+ * - purchase: the live 26-field order (adds the subscription `token_flag` +
+ *   `frequency` positions after `skip_success_page`). Pinned to the exported
+ *   `PURCHASE_HASH_FIELDS` constant by the drift-guard test.
+ * - linkCard: `frequency` and `amount` are hash positions with no
+ *   corresponding body field — they hash as '' (live-doc quirk). Pinned to
+ *   the exported `LINK_CARD_HMAC_FIELDS`.
+ * - payment (CoF charge): live 19-field order; `request_id` is NOT part of it
+ *   (deprecated field, never sent).
+ * - getTransactionList: the live list-2 shape is the 9-field
+ *   from/to/status/page/pagination composition (NOT the check/detail trio).
+ * - refund / createPaymentLink / getPaymentLinkDetails: these domains pass no
+ *   `hmacFields` override to requestWithMerchantAuth, so the EFFECTIVE order
+ *   is `MERCHANT_AUTH_DEFAULT_HASH_FIELDS` above.
+ * - payout: the only hex-encoded hash in the SDK (every other endpoint is
+ *   base64).
+ * - generateQr: pinned to the exported `GENERATE_QR_HASH_FIELDS`.
+ *
+ * Drift guard: `src/__tests__/hash-order-hints.test.ts` pins every hint
+ * against the hmacFields the corresponding domain actually passes (exported
+ * constants directly, inline lists via request spies) and snapshots the key
+ * set — adding an endpoint with a hash list but no hint entry, or letting a
+ * hint drift from its domain's real order, fails that test. The object is
+ * exported for those tests only; it is NOT re-exported from src/index.ts
+ * (public API surface is pinned by public-api.test.ts).
+ */
+export const HASH_ORDER_HINTS: Record<string, string> = {
+  [ENDPOINTS.purchase]: PURCHASE_HASH_FIELDS.join('.'),
   [ENDPOINTS.checkTransaction]: 'req_time.merchant_id.tran_id',
+  [ENDPOINTS.closeTransaction]: 'req_time.merchant_id.tran_id',
+  [ENDPOINTS.getTransactionDetail]: 'req_time.merchant_id.tran_id',
+  [ENDPOINTS.getTransactionList]: 'req_time.merchant_id.from_date.to_date.from_amount.to_amount.status.page.pagination',
   [ENDPOINTS.getTransactionsByMerchantRef]: 'req_time.merchant_id.merchant_ref',
   [ENDPOINTS.getExchangeRate]: 'req_time.merchant_id',
-  [ENDPOINTS.linkAccount]: 'merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency (live order — merchant_id first)',
-  [ENDPOINTS.linkCard]: 'merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency.continue_success_url (amount/frequency hash empty positions)',
-  [ENDPOINTS.payment]: '19-field live order, NO request_id (deprecated)',
+  [ENDPOINTS.refund]: MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'),
+  [ENDPOINTS.linkAccount]: 'merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency',
+  // linkCard: amount/frequency are hash positions with no body field — they
+  // hash as '' (the drift-guard test pins this against LINK_CARD_HMAC_FIELDS).
+  [ENDPOINTS.linkCard]: LINK_CARD_HMAC_FIELDS.join('.'),
+  [ENDPOINTS.payment]:
+    'request_time.merchant_id.tran_id.amount.currency.items.ctid.pwt.first_name.last_name.email.phone.purchase_type.callback_url.custom_fields.return_params.payout.token_flag.shipping_fee',
   [ENDPOINTS.renewToken]: 'ctid.request_time.pwt.merchant_id.request_id',
   [ENDPOINTS.getTokenDetails]: 'merchant_id.request_time.request_id',
   [ENDPOINTS.removeToken]: 'merchant_id.ctid.request_time.pwt',
-  [ENDPOINTS.getTransactionList]: 'req_time.merchant_id.tran_id (legacy list-2 shape)',
-  [ENDPOINTS.refund]: 'request_time.merchant_auth (RSA blob, hex/base64 per live docs)',
+  [ENDPOINTS.generateQr]: GENERATE_QR_HASH_FIELDS.join('.'),
+  // Refund/payment-link paths pass no hmacFields override → the effective
+  // order is MERCHANT_AUTH_DEFAULT_HASH_FIELDS (request_time.merchant_id.merchant_auth).
+  [ENDPOINTS.createPaymentLink]: MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'),
+  [ENDPOINTS.getPaymentLinkDetails]: MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'),
+  [ENDPOINTS.completePreAuth]: 'merchant_auth.request_time.merchant_id',
+  [ENDPOINTS.cancelPreAuth]: 'merchant_id.merchant_auth.request_time',
+  // Payout: hex-encoded hash (unique among endpoints); beneficiaries are RSA-encrypted.
+  [ENDPOINTS.payout]: 'merchant_id.tran_id.beneficiaries.amount.custom_fields.currency',
+  [ENDPOINTS.addBeneficiary]: 'request_time.merchant_auth',
+  [ENDPOINTS.updateBeneficiaryStatus]: 'request_time.merchant_auth',
 };
 
 /**
@@ -1410,7 +1471,7 @@ export class PayWay {
       request_time: requestTime,
     };
 
-    const hmacFields = options.hmacFields ?? ['request_time', 'merchant_id', 'merchant_auth'];
+    const hmacFields = options.hmacFields ?? [...MERCHANT_AUTH_DEFAULT_HASH_FIELDS];
     body.hash = generateHmac(body, hmacFields, this.config.apiKey);
     const contentType = options.contentType ?? 'application/x-www-form-urlencoded';
 
