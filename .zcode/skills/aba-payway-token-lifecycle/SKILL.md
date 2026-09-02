@@ -1,0 +1,70 @@
+---
+name: aba-payway-token-lifecycle
+description: Manage ABA PayWay stored tokens — renew, inspect details, remove, and track the 90-day expiry.
+version: 1.0.0
+---
+
+# Token Lifecycle
+
+Account tokens (CITI_FLEX/CITO_FLEX) expire **90 days** after linking, renewal,
+or the last successful transaction (whichever is most recent). Card tokens
+cannot be renewed. The token-management trio is UN-GATED since 2026-08-31
+(the live-documented HMAC compositions are sandbox-verified — SANDBOX-FINDINGS §16).
+
+## Quick Start
+```ts
+import { computeTokenExpiry, daysUntilTokenExpiry, TOKEN_VALIDITY_DAYS } from 'aba-payway-ts';
+
+// 1. Renew an expiring ACCOUNT token (a callback is expected within 3 minutes;
+//    if it never arrives, fall back to getTokenDetails).
+const renewed = await payway.credentialsOnFile.renewToken({
+  requestId: 'req-renew-1', ctid: 'customer123', paymentToken: pwt,
+});
+
+// 2. Inspect a token (takes ONLY requestId — no ctid/pwt).
+const details = await payway.credentialsOnFile.getTokenDetails({ requestId: 'req-detail-1' });
+
+// 3. Remove a token (IRREVERSIBLE — takes ctid + pwt, NO requestId;
+//    future charges decline with purchase error 87; the ABA Mobile user is notified).
+await payway.credentialsOnFile.removeToken({ ctid: 'customer123', paymentToken: pwt });
+
+// Expiry helpers (90-day window):
+const expiresAt = computeTokenExpiry(new Date());       // Date 90 days out
+const daysLeft = daysUntilTokenExpiry(linkedAt);        // number — renew when low
+```
+
+## Per-endpoint param shapes (gateway-verified §16 — do NOT mix them)
+| Operation | Params | Hash order |
+|---|---|---|
+| renew (account tokens only) | `requestId` + `ctid` + `paymentToken` | `ctid.request_time.pwt.merchant_id.request_id` |
+| get details | `requestId` ONLY | `merchant_id.request_time.request_id` (no ctid/pwt anywhere) |
+| remove (irreversible) | `ctid` + `paymentToken` (no requestId) | `merchant_id.ctid.request_time.pwt` |
+
+`allowUnverifiedTokenOperations` is a deprecated escape hatch — the trio is
+allowed by default; only an explicit `false` re-blocks.
+
+## Error Hints
+- `105` — token invalid or expired → re-link via linkAccount/linkCard, or renew.
+- `104` — merchant not enabled for the token flag → check the merchant profile.
+- `09` — token/ctid not found → wrong ctid or the token was removed.
+- `1`/`01` — Wrong Hash → `PayWaySignatureError` carries the endpoint's hash-order hint.
+
+## CLI
+```sh
+payway-sdk cof token renew   -r req-renew-1  -c customer123 --token <pwt>
+payway-sdk cof token details -r req-detail-1                  # requestId ONLY
+payway-sdk cof token remove  -c customer123  --token <pwt>     # NO requestId; irreversible
+```
+
+## Error Handling
+```ts
+import { PayWayBusinessError } from 'aba-payway-ts';
+try { await payway.credentialsOnFile.renewToken(params); }
+catch (error) { if (error instanceof PayWayBusinessError) console.error(error.paywayCode, error.message); }
+```
+
+## Related Skills
+- [Link Account](../aba-payway-link-account/SKILL.md)
+- [Link Card](../aba-payway-link-card/SKILL.md)
+- [Token Purchase](../aba-payway-token-purchase/SKILL.md)
+- [Credentials on File](../aba-payway-cof/SKILL.md)
