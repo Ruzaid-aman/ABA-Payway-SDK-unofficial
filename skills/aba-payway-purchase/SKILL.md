@@ -1,7 +1,7 @@
 ---
 name: aba-payway-purchase
 description: Create a signed ABA PayWay checkout purchase with aba-payway-ts.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # ABA PayWay Purchase
@@ -29,7 +29,16 @@ const res = await payway.checkout.purchase({
 const url = (res as any).checkout_qr_url; // hosted page — open in browser/app
 ```
 
-Caution: POSTing the same payload as a browser form with `payment_gate=0` answers with an HTML page instead of JSON — that's why `generate-checkout` CLI omits it.
+Caution: POSTing the same payload as a browser form with `payment_gate=0` answers with an HTML page instead of JSON — that's why `generate-checkout` CLI deliberately omits a `--payment-gate` flag (the SDK-only `purchase({ paymentGate: 0 })` JSON path is the supported route; the omission is documented in the command's help text).
+
+## CLI flag set (generate-checkout)
+`generate-checkout` forwards the full purchase param surface:
+`--ctid --token-flag --frequency --type --firstname --lastname --email --phone --items --shipping --lifetime <minutes> --custom-fields --return-params --skip-success-page --view-type --continue-success-url --payout --additional-params --google-pay-token --return-deeplink`.
+
+- `--payout` is JSON `[{acc, amt}]` or string (purchase-path keys — NOT the standalone payout domain's `{account, amount}`).
+- `--additional-params` is a JSON object or string; `--return-deeplink` is JSON `{ios_scheme, android_scheme}` or string (both base64-encoded before hashing).
+- `--google-pay-token` is required by the gateway when `--payment-option google_pay` (the SDK throws without it).
+- `--payment-gate` is deliberately absent (see Caution above); `paymentGate` remains SDK-only.
 
 ### Card-payment response matrix (`paymentOption: 'cards'`, sandbox-verified 2026-08-25)
 | Request | Response |

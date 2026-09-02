@@ -104,10 +104,10 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk close-transaction -t <id>` | Void/close an unpaid transaction (prompts; `-y/--force` skips) |
 | `payway-sdk refund -t <id> -a <amount> [-c <currency>]` | Refund with a pre-flight balance check and confirmation by default; `--no-preflight` skips only the detail lookup, `-y/--force` skips both the lookup and the prompt |
 | `payway-sdk exchange-rate` | Fetch the live USD/KHR exchange rate |
-| `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (requires credentials) |
+| `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (full purchase flag set incl. `--payout`, `--additional-params`, `--google-pay-token`, `--return-deeplink`; requires credentials) |
 | `payway-sdk checkout-form -a <amount> -o form.html` | Write the signed hosted-checkout HTML form (local signing, no API call) |
-| `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image) |
-| `payway-sdk cof link-account / link-card` | Start a credentials-on-file link: returns the QR/deeplink (account); `link-card` saves the gateway's hosted card page to `payway-output/` (that page IS the success signal); the token (`pwt`) arrives via `callback_url` |
+| `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image, `create --payout <json>` adds split-payout beneficiaries `[{acc, amt}]` — total must equal the amount) |
+| `payway-sdk cof link-account / link-card` | Start a credentials-on-file link: returns the QR/deeplink (account; optional `--return-deeplink` for app deeplinks); `link-card` saves the gateway's hosted card page to `payway-output/` (that page IS the success signal); the token (`pwt`) arrives via `callback_url` |
 | `payway-sdk cof link-card-form` | Write the signed card-link HTML form locally (no API call — the browser POSTs urlencoded straight to the gateway's hosted card-entry page) |
 | `payway-sdk cof charge -t <id> -a <amount> --token <pwt>` | Charge a stored COF token (optional `--ctid`, `--token-flag`, payer fields, `--items`, `--payout`) |
 | `payway-sdk cof token renew / details / remove` | Token lifecycle — `details` takes `--request-id` only; `remove` takes `--ctid --token` (irreversible) |
@@ -476,6 +476,7 @@ const linkAcc = await payway.credentialsOnFile.linkAccount({
   tokenFlag: 'CITI_FLEX',          // CITI_FLEX | CITO_FLEX (live-documented)
   currency: 'USD',
   callbackUrl: 'https://mywebsite.com/payway/cof-callback', // optional but recommended
+  returnDeeplink: { ios_scheme: 'myapp://linked', android_scheme: 'myapp://linked' }, // optional app deeplink (§16 hash position)
 });
 
 // Link a credit/debit card — browser-form route (recommended, no server
@@ -618,6 +619,26 @@ const linkWithImage = await payway.paymentLink.create({
 // Gateway-hosted copy of the uploaded image:
 const details = await payway.paymentLink.getDetails(linkWithImage.data.id);
 console.log(details.data?.image?.image); // https://…/payment_link_image_<epoch-ms>.png
+```
+
+Split the payment across payout beneficiaries (travels inside the RSA-encrypted `merchant_auth`; the documented rule requires the payout total to equal the link amount — enforced as an advisory warning, or a throw under `strictValidation`):
+
+```typescript
+const linkWithPayout = await payway.paymentLink.create({
+  title: 'Invoice #1092',
+  amount: 150.00,
+  merchantRefNo: 'inv-1092',
+  returnUrl: 'https://mywebsite.com/invoice/1092',
+  payout: [
+    { acc: '000111222', amt: 100.00 }, // ⚠️ keys are {acc, amt} here (purchase-path
+    { acc: '000999888', amt: 50.00 },   // shape) — NOT the payout domain's {account, amount}
+  ],
+});
+
+// CLI equivalent:
+// payway-sdk payment-link create -t "Invoice #1092" -a 150.00 -r inv-1092 \
+//   --return-url https://mywebsite.com/invoice/1092 \
+//   --payout '[{"acc":"000111222","amt":100.00},{"acc":"000999888","amt":50.00}]'
 ```
 
 ### 5. Pre-Authorization (`payway.preAuth`)

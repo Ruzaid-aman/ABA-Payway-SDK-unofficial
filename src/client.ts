@@ -381,6 +381,14 @@ export interface CreatePaymentLinkParams {
   expiredDate?: number;
   /** Payment currency. Required by PayWay; defaults to 'USD'. */
   currency?: 'USD' | 'KHR';
+  /**
+   * Optional split-payout beneficiary list — travels INSIDE the RSA-encrypted
+   * `merchant_auth` (spec: `payway-openapi/paths/payment-link.yaml`). Shape:
+   * `[{acc, amt}]` (same keys as the purchase path; NOT the standalone payout
+   * domain's `{account, amount}`). The total `amt` must equal the link amount
+   * — advisory warn by default, `PayWayConfigError` under `strictValidation`.
+   */
+  payout?: string | { acc: string; amt: number }[];
   /** Optional image shown with the link (multipart upload; not hashed). */
   image?: PaymentLinkImage;
 }

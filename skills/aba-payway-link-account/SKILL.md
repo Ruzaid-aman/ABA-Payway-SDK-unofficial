@@ -1,7 +1,7 @@
 ---
 name: aba-payway-link-account
 description: Link an ABA PayWay account for future credential-on-file payments.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # Link Account
@@ -20,6 +20,7 @@ const result = await payway.credentialsOnFile.linkAccount({
   tokenFlag: 'CITI_FLEX',        // CITI_FLEX | CITO_FLEX (live-documented)
   currency: 'USD',              // profile-enabled currency (required)
   callbackUrl: 'https://merchant.example/payway/callback',
+  returnDeeplink: { ios_scheme: 'myapp://linked', android_scheme: 'myapp://linked' }, // optional app deeplink
 });
 // result carries the QR/deeplink for the customer; the pwt arrives via callback.
 ```
@@ -28,11 +29,14 @@ The callback URL must be public HTTPS. Store returned credential identifiers sec
 
 Hash order (§16-verified, merchant_id first):
 `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency`.
+`returnDeeplink` (SDK) / `--return-deeplink` (CLI, JSON-or-string) is optional
+but IS a hash position — it is base64-encoded before hashing.
 
 CLI:
 ```sh
 npx tsx src/cli.ts cof link-account -r linkacct001 --ctid customerabc \
-  --token-flag CITI_FLEX --currency USD --callback-url https://merchant.example/payway/callback
+  --token-flag CITI_FLEX --currency USD --callback-url https://merchant.example/payway/callback \
+  --return-deeplink '{"ios_scheme":"myapp://linked","android_scheme":"myapp://linked"}'
 ```
 
 ## Error Handling

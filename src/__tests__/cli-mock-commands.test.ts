@@ -27,6 +27,10 @@ const FAKE_PNG_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0
 // pushes here). Lets tests assert what the CLI actually SENT, hash included.
 const capturedPurchaseBodies: Array<Record<string, unknown>> = [];
 
+// Bodies received by the mock's `aof/link-account` branch (audit S1 D7: the
+// CLI --return-deeplink flag must reach the urlencoded wire body base64-encoded).
+const capturedLinkAccountBodies: Array<Record<string, unknown>> = [];
+
 // Deliberate INDEPENDENT copy of the live 26-field purchase hash order
 // (audit D1). Do NOT import PURCHASE_HASH_FIELDS here: a regression in that
 // constant must fail these assertions, not follow it.
@@ -129,6 +133,7 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('get-transactions-by-mc-ref')) {
     send(404, { message: 'endpoint not available under this sandbox profile' });
   } else if (url.includes('aof/link-account')) {
+    capturedLinkAccountBodies.push(parsed);
     send(200, { status: { code: '00', message: 'Success', request_id: 'LA-1' } });
   } else if (url.includes('cof/link-card')) {
     // Live-gateway parity (SANDBOX-FINDINGS §9a): this endpoint ALWAYS answers
@@ -613,6 +618,67 @@ describe('CLI API commands against the local mock gateway', () => {
     expect(body.token_flag).toBe('CITR_FIX');
     expect(body.frequency).toBe('1M');
     expect(body.hash).toBe(generateHmac(body, LIVE_PURCHASE_HASH_FIELDS, 'a'.repeat(32)));
+  });
+
+  it('generate-checkout forwards the S1 flags (payout/additional-params/google-pay-token/return-deeplink)', async () => {
+    capturedPurchaseBodies.length = 0;
+    const { exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-S1',
+      '--return-url',
+      'https://example.com/r',
+      '--payout',
+      '[{"acc":"000111222","amt":5.00}]',
+      '--additional-params',
+      '{"note":"gift"}',
+      '--google-pay-token',
+      'gpay-tok-1',
+      '--return-deeplink',
+      '{"ios_scheme":"myapp://done","android_scheme":"myapp://done"}',
+      '--json',
+      '--no-polling',
+      '--no-show-qr',
+    ]);
+    expect(exitCode).not.toBe(1);
+    expect(capturedPurchaseBodies.length).toBeGreaterThan(0);
+    const body = capturedPurchaseBodies[capturedPurchaseBodies.length - 1];
+    // purchase() base64-encodes array/object flags before signing; the deeplink
+    // object form is JSON-inside-base64.
+    expect(body.payout).toBe(Buffer.from('[{"acc":"000111222","amt":5}]', 'utf8').toString('base64'));
+    expect(body.additional_params).toBe(Buffer.from('{"note":"gift"}', 'utf8').toString('base64'));
+    expect(body.google_pay_token).toBe('gpay-tok-1');
+    expect(Buffer.from(String(body.return_deeplink), 'base64').toString('utf8')).toBe(
+      '{"ios_scheme":"myapp://done","android_scheme":"myapp://done"}',
+    );
+    // The S1 flags are hash positions in the live 26-field order — the sent
+    // hash must cover them.
+    expect(body.hash).toBe(generateHmac(body, LIVE_PURCHASE_HASH_FIELDS, 'a'.repeat(32)));
+  });
+
+  it('cof link-account forwards --return-deeplink into the wire body', async () => {
+    capturedLinkAccountBodies.length = 0;
+    const { exitCode } = await run([
+      'cof',
+      'link-account',
+      '-r',
+      'REQID010',
+      '-c',
+      'CTID0010',
+      '-f',
+      'CITI_FLEX',
+      '--return-deeplink',
+      '{"ios_scheme":"myapp://linked","android_scheme":"myapp://linked"}',
+      '--json',
+    ]);
+    expect([undefined, 0]).toContain(exitCode as number);
+    expect(capturedLinkAccountBodies.length).toBeGreaterThan(0);
+    const body = capturedLinkAccountBodies[capturedLinkAccountBodies.length - 1];
+    expect(Buffer.from(String(body.return_deeplink), 'base64').toString('utf8')).toBe(
+      '{"ios_scheme":"myapp://linked","android_scheme":"myapp://linked"}',
+    );
   });
 
   it('generate-qr forwards the 9 new optional params (no polling)', async () => {

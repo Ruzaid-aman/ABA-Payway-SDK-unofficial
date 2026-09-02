@@ -1,7 +1,7 @@
 ---
 name: aba-payway-sandbox-beneficiaries
 description: Seeded sandbox-only beneficiary accounts and test MIDs for PayWay payout / split-payout testing.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Sandbox Beneficiaries (test fixtures)
@@ -9,6 +9,9 @@ version: 1.1.0
 Seeded, sandbox-only test accounts and MIDs the SDK uses to validate payout /
 split-payout calls. They are **never valid in production** — enforcement is gated
 behind `environment: 'sandbox'`.
+
+Both helpers are exported from the package barrel (v1.5.0; previously
+package-internal — the import below used to fail at runtime).
 
 ## Quick Start
 ```ts

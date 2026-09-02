@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.5.0 — 2026-09-02
+
+> SDK/CLI param-completion batch (S1) of the five-layer sync audit
+> (`audit-results/sync-audit-2026-09-01.md` §2 D2/D7/D8 + §6 S1) — closes the
+> last parameter gaps in the 24-operation coverage matrix
+> (`audit-results/live-api-coverage-2026-08-31.md`). Additive; no breaking changes.
+
+### Added
+
+- **`paymentLink.create({ payout })` — split-payout beneficiaries on payment links (audit D2).** The spec's optional `payout` field travels INSIDE the RSA-encrypted `merchant_auth` with `[{acc, amt}]` keys (the purchase-path shape — NOT the standalone payout domain's `{account, amount}`). Arrays are JSON-encoded once into the auth plaintext (a raw pre-encoded string passes through unchanged); the documented total-payout-equals-link-amount rule is enforced as an advisory warning that throws under `strictValidation`. New CLI flag `payment-link create --payout <json>` (JSON-or-string via `parseJsonOrString`) with local validation: wrong entry shape or a total ≠ `--amount` exits 1 before any network call. Pins: `payment-link-payout` (new suite), `cli-inprocess`.
+- **`generate-checkout` completes the purchase flag surface (audit D7).** New flags: `--payout` (JSON `[{acc, amt}]` or string), `--additional-params` (JSON object or string), `--google-pay-token`, `--return-deeplink` (JSON `{ios_scheme, android_scheme}` or string) — all four were already `CreateTransactionParams` members and hash positions in the live 26-field order; the CLI now forwards them. The deliberate `--payment-gate` omission is documented in the command description (browser-form POST with `payment_gate=0` answers HTML, not JSON — the SDK-only `purchase({ paymentGate: 0 })` JSON path remains the supported route).
+- **`cof link-account --return-deeplink` (audit D7).** `LinkAccountParams.returnDeeplink` existed and holds a §16 hash position; the CLI flag now forwards it (JSON-or-string, base64-encoded by the SDK before hashing).
+- **`listSandboxBeneficiaries()` / `validateSandboxBeneficiary()` exported from the package barrel** (audit S2.1 fold-in). Both helpers existed internally (used by pre-auth/payout validation and the `sandbox-beneficiaries` CLI) but were not exported, so the `aba-payway-sandbox-beneficiaries` skill's documented import failed at runtime. Also exports their types (`SandboxBeneficiary`, `SandboxCurrency`, `BeneficiaryKind`, `ValidateSandboxBeneficiaryOptions`). Runtime export count 54 → 57 (release-checklist smoke updated).
+
+### Fixed
+
+- **OpenAPI ground truth re-synced to the §16 verdicts (audit D8).** `payway-openapi/paths/credentials-on-file.yaml` still carried §9a-era `x-hmac-fields` for link-account/link-card/CoF-payment (superseded orders the gateway now rejects with `01 Wrong Hash`) and marked the token trio "not yet sandbox-verified" (it IS verified — §16, 2026-08-31). All six operations now document the sandbox-verified live orders. `components/schemas/credentials-on-file.yaml`: `CofPaymentRequest` no longer lists `request_id` as required (the wire body doesn't send it); `LinkCardRequest` drops `return_deeplink`/`return_url` (not part of the live-documented request) and documents `amount` as the hash-position-only quirk. `src/types.ts` regenerated from the corrected spec via `npm run bundle && npm run generate-types` (`CofPaymentRequest.request_id` removed; link-card `return_deeplink`/`return_url` removed).
+
+### Docs & skills (same-change surface sync)
+
+- README: CLI table rows for the new `generate-checkout`/`payment-link create`/`cof link-account` flags, a payment-link payout snippet (with the `{acc, amt}` key-shape warning), and `returnDeeplink` in the `linkAccount` example.
+- AGENTS.md: payment-link `--payout` canonical example, per-endpoint payout key-split rule, `--payment-gate` omission note, expanded JSON-or-string flag list.
+- docs/09: `--return-deeplink` in the `cof link-account` CLI quick reference. docs/QUICK-START: `generate-checkout` row names the new flags.
+- Skills: `aba-payway-payment-link` → v1.2.0 (payout section + CLI example), `aba-payway-link-account` → v1.3.0 (`returnDeeplink` in Quick Start + CLI), `aba-payway-purchase` → v1.3.0 (full `generate-checkout` flag set + `--payment-gate` omission), `aba-payway-sandbox-beneficiaries` → v1.2.0 (imports now resolve).
+
 ## 1.4.0 — 2026-09-02
 
 > Link-card hosted-page feature release (from Unreleased) + the code-correctness

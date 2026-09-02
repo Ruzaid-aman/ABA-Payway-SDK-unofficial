@@ -16,6 +16,23 @@ const DEFAULT_IMAGE_FILENAME = 'image.jpg';
 const DEFAULT_IMAGE_CONTENT_TYPE = 'image/jpeg';
 
 /**
+ * Sum of `amt` across payout entries, or `undefined` when the shape is not a
+ * numeric-keyed list (a raw string passes through unvalidated — it may be an
+ * operator's pre-encoded JSON, and the equality rule can't be checked).
+ */
+function payoutTotal(payout: string | { acc: string; amt: number }[]): number | undefined {
+  if (!Array.isArray(payout)) return undefined;
+  let total = 0;
+  for (const entry of payout) {
+    if (entry === null || typeof entry !== 'object' || typeof (entry as { amt?: unknown }).amt !== 'number') {
+      return undefined;
+    }
+    total += (entry as { amt: number }).amt;
+  }
+  return total;
+}
+
+/**
  * Spec (payway-openapi/paths/payment-link.yaml:33–37): the optional top-level
  * `image` part is capped at 3MB and must be JPG/JPEG/PNG. Both are advisory
  * here — the gateway may still accept edge cases, and `strictValidation`
@@ -85,6 +102,32 @@ export function createPaymentLinkDomain(
         allowPrivateHosts: config.allowPrivateCallbackHosts === true,
       });
 
+      // Spec: `payout` travels inside the RSA-encrypted merchant_auth with
+      // [{acc, amt}] keys and the documented total-payout-equals-link-amount
+      // rule (payway-openapi/paths/payment-link.yaml). Advisory warn — the
+      // gateway is the final arbiter — with strictValidation escalating.
+      if (params.payout !== undefined) {
+        if (Array.isArray(params.payout)) {
+          for (const entry of params.payout) {
+            if (entry === null || typeof entry !== 'object' || typeof entry.acc !== 'string' || entry.acc.trim().length === 0) {
+              throw new PayWayConfigError('payout entries must be objects with a non-empty string "acc" key');
+            }
+            if (typeof entry.amt !== 'number' || !Number.isFinite(entry.amt) || entry.amt < 0) {
+              throw new PayWayConfigError('payout entries must carry a non-negative numeric "amt" key');
+            }
+          }
+          const total = payoutTotal(params.payout);
+          if (total !== undefined && Math.abs(total - params.amount) > 1e-9) {
+            warnAdvisory(
+              config,
+              `payout total ${total} does not equal the link amount ${params.amount} — the documented rule requires them to match`,
+            );
+          }
+        } else if (typeof params.payout !== 'string' || params.payout.trim().length === 0) {
+          throw new PayWayConfigError('payout must be a [{acc, amt}] array or a non-empty pre-encoded string');
+        }
+      }
+
       // Optional image travels as a top-level multipart part (never inside
       // merchant_auth, never hashed) — sandbox probe evidence in
       // docs/SANDBOX-FINDINGS.md §14.
@@ -130,6 +173,11 @@ export function createPaymentLinkDomain(
           return_url: encodeBase64IfNeeded(params.returnUrl),
           merchant_ref_no: params.merchantRefNo,
           expired_date: params.expiredDate,
+          // Payout travels as JSON text (string) inside the merchant_auth
+          // plaintext — encryptMerchantAuth JSON-encodes the whole payload, so
+          // an array value would double-encode. Pre-encoded strings pass
+          // through unchanged; arrays are JSON.stringify'd once, here.
+          payout: params.payout === undefined ? undefined : typeof params.payout === 'string' ? params.payout : JSON.stringify(params.payout),
         }),
         multipartFile ? { multipartFile, callOptions } : { callOptions },
       );

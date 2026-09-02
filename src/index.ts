@@ -131,6 +131,17 @@ export type {
 } from './domain-types.js';
 export type { LinkCardResponse } from './domain-types.js';
 export { isValidPublicKeyPem, validateRefundAmount } from './utils.js';
+// ─── Sandbox beneficiary registry (used by pre-auth/payout validation) ─────
+// Exported because the aba-payway-sandbox-beneficiaries skill (and integrators
+// writing sandbox probes) need the seeded-account list and the structural
+// validator without reaching into package internals (audit S2.1 fold-in).
+export { listSandboxBeneficiaries, validateSandboxBeneficiary } from './sandbox-beneficiaries.js';
+export type {
+  BeneficiaryKind,
+  SandboxBeneficiary,
+  SandboxCurrency,
+  ValidateSandboxBeneficiaryOptions,
+} from './sandbox-beneficiaries.js';
 export type { KhqrPaymentNotification, ParsedKhqrPaymentNotification } from './webhook/khqr-notification.js';
 export { extractJsonPayload, parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
 export type { KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './webhook/storage.js';

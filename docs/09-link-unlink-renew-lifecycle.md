@@ -548,8 +548,10 @@ async function removeCardProperly(ctid: string, pwt: string) {
 The CLI exposes the whole CoF lifecycle under the `cof` command group (mirrors the param shapes above):
 
 ```sh
-# Link a bank account (CITI_FLEX | CITO_FLEX)
-npx tsx src/cli.ts cof link-account -r link12345 --ctid customerabc123 --token-flag CITI_FLEX --currency USD
+# Link a bank account (CITI_FLEX | CITO_FLEX); --return-deeplink is optional
+# (JSON {ios_scheme, android_scheme} or string — a §16 hash position)
+npx tsx src/cli.ts cof link-account -r link12345 --ctid customerabc123 --token-flag CITI_FLEX --currency USD \
+  --return-deeplink '{"ios_scheme":"myapp://linked","android_scheme":"myapp://linked"}'
 
 # Link a card (hosted form; --continue-success-url is the Done-button target)
 npx tsx src/cli.ts cof link-card -r link67890 --ctid customerabc123 --token-flag CITI_FLEX --frequency 1M

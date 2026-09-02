@@ -271,6 +271,50 @@ describe('checkout-form (in-process runCli)', () => {
       vi.unstubAllEnvs();
     }
   });
+
+  it('payment-link create --payout exits 1 when the total does not equal the amount', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    try {
+      const { text, exitCode } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', '5',
+        '-r', 'ref-payout-1',
+        '--return-url', 'https://example.com/return',
+        '--payout', '[{"acc":"000111222","amt":4}]',
+      ]);
+      expect(text).toContain('must equal the payment-link amount');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('payment-link create --payout exits 1 for a wrong entry shape', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    try {
+      const { text, exitCode } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', '5',
+        '-r', 'ref-payout-2',
+        '--return-url', 'https://example.com/return',
+        '--payout', '[{"account":"000111222","amount":5}]',
+      ]);
+      expect(text).toContain('--payout must be a JSON array of {acc, amt} objects');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe('cof link-card-form (in-process runCli)', () => {

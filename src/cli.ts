@@ -1886,7 +1886,10 @@ program
 // --- generate-checkout ---
 program
   .command('generate-checkout')
-  .description('Generate a checkout QR URL (requires sandbox/production credentials)')
+  .description(
+    'Generate a checkout QR URL (requires sandbox/production credentials). ' +
+      'Note: the SDK-only purchase param paymentGate (send 0 for a checkout_qr_url) is deliberately not a flag — use checkout.purchase() with a JSON request for that path.',
+  )
   .requiredOption('-a, --amount <number>', 'Payment amount')
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
   .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
@@ -1910,6 +1913,10 @@ program
   .option('--skip-success-page <0|1>', 'Skip the success page (0 or 1)')
   .option('--view-type <type>', 'View type: hosted_view or popup')
   .option('--continue-success-url <url>', 'Continue-success URL (base64 target for the result page)')
+  .option('--payout <json>', 'Split-payout beneficiaries — JSON array [{acc, amt}] or string')
+  .option('--additional-params <json>', 'Additional purchase parameters — JSON object or string')
+  .option('--google-pay-token <token>', 'Google Pay token (required by the gateway when --payment-option google_pay)')
+  .option('--return-deeplink <json>', 'App deeplink — JSON {ios_scheme, android_scheme} or string')
   .option('--json', 'Print the raw JSON response')
   .option('--polling', 'Poll transaction status after checkout (enabled by default)', true)
   .option('--no-polling', 'Disable automatic polling after checkout')
@@ -2000,6 +2007,13 @@ program
         items: parseJsonOrString(opts.items) as ItemEntry[] | string | undefined,
         customFields: parseJsonOrString(opts.customFields) as Record<string, unknown> | string | undefined,
         returnParams: opts.returnParams,
+        payout: parseJsonOrString(opts.payout) as Array<{ acc: string; amt: number }> | string | undefined,
+        additionalParams: parseJsonOrString(opts.additionalParams) as Record<string, unknown> | string | undefined,
+        googlePayToken: opts.googlePayToken,
+        returnDeeplink: parseJsonOrString(opts.returnDeeplink) as
+          | { ios_scheme: string; android_scheme: string }
+          | string
+          | undefined,
         ctid: opts.ctid,
         tokenFlag: opts.tokenFlag === undefined ? undefined : (opts.tokenFlag as 'CITR_FIX'),
         frequency: opts.frequency === undefined ? undefined : (opts.frequency as '1W' | '1M' | '2M'),
@@ -2074,6 +2088,10 @@ paymentLinkCmd
   .option('--payment-limit <n>', 'Maximum number of payments accepted')
   .option('--expired-date <epochSeconds>', 'Expiration timestamp (epoch seconds)')
   .option('--image <path>', 'Image file to attach to the link (jpg/jpeg/png, max 3MB)')
+  .option(
+    '--payout <json>',
+    'Split-payout beneficiaries — JSON array [{acc, amt}] or string; total amt must equal --amount',
+  )
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
     console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
@@ -2115,6 +2133,44 @@ paymentLinkCmd
       }
     }
 
+    // Payout: inline JSON array [{acc, amt}] or raw string (parseJsonOrString).
+    const payout = parseJsonOrString(opts.payout) as
+      | Array<{ acc: string; amt: number }>
+      | string
+      | undefined;
+    if (Array.isArray(payout)) {
+      let total = 0;
+      let shapeOk = true;
+      for (const entry of payout) {
+        if (
+          entry === null ||
+          typeof entry !== 'object' ||
+          typeof (entry as { acc?: unknown }).acc !== 'string' ||
+          typeof (entry as { amt?: unknown }).amt !== 'number'
+        ) {
+          shapeOk = false;
+          break;
+        }
+        total += (entry as { amt: number }).amt;
+      }
+      if (!shapeOk) {
+        console.log(`  ${c.red('✗')} --payout must be a JSON array of {acc, amt} objects`);
+        process.exitCode = 1;
+        return;
+      }
+      if (Math.abs(total - amount) > 1e-9) {
+        console.log(
+          `  ${c.red('✗')} --payout total ${total} must equal the payment-link amount ${amount} (documented gateway rule)`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+    } else if (payout !== undefined && String(payout).trim().length === 0) {
+      console.log(`  ${c.red('✗')} --payout must be a JSON array [{acc, amt}] or a non-empty pre-encoded string`);
+      process.exitCode = 1;
+      return;
+    }
+
     if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
       process.exitCode = 1;
       return;
@@ -2142,6 +2198,7 @@ paymentLinkCmd
         description: opts.description,
         paymentLimit,
         expiredDate,
+        payout,
         image,
       });
 
@@ -2365,6 +2422,7 @@ cofCmd
   .requiredOption('-f, --token-flag <flag>', 'Live-documented values: CITI_FLEX | CITO_FLEX')
   .option('--currency <code>', 'Profile-enabled currency (required by the gateway): USD or KHR', 'USD')
   .option('--callback-url <url>', 'Webhook callback URL for the link result')
+  .option('--return-deeplink <json>', 'App deeplink (hash position) — JSON {ios_scheme, android_scheme} or string')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
     if (!assertCredentialsPresent()) {
@@ -2379,6 +2437,10 @@ cofCmd
         tokenFlag: opts.tokenFlag as string,
         currency: (opts.currency ?? 'USD') as 'KHR' | 'USD',
         callbackUrl: opts.callbackUrl,
+        returnDeeplink: parseJsonOrString(opts.returnDeeplink) as
+          | { ios_scheme: string; android_scheme: string }
+          | string
+          | undefined,
       });
       if (opts.json) {
         console.log(JSON.stringify(result, null, 2));

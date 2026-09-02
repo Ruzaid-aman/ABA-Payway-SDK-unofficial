@@ -878,20 +878,18 @@ export interface components {
             merchant_id: string;
             /** @description Customer token identifier. 5–24 chars, letters+digits only. Required per live docs. */
             ctid: string;
-            /** @description Base64-encoded JSON {ios_scheme, android_scheme}. (SDK extension — not on the live param table.) */
-            return_deeplink?: string;
             /**
              * @description Live docs list CITI_FLEX / CITO_FLEX for link-card.
              * @enum {string}
              */
             token_flag: "CITI_FLEX" | "CITO_FLEX";
             /**
-             * @description Required for Link Card. Billing frequency.
+             * @description Marked 'Required for Link Card' in live docs; the SDK warns when omitted (§16 realignment). Billing frequency.
              * @enum {string}
              */
             frequency?: "1W" | "1M" | "2M";
-            /** @description Base64-encoded URL. (SDK extension — not on the live param table.) */
-            return_url?: string;
+            /** @description Hash position ONLY (§16) — it participates in the HMAC (hashes as '') but has NO request body field. Listed here to document the quirk; do not send it. */
+            amount?: string;
             /** @description Base64-encoded URL — target of the hosted form's "Done" button. */
             continue_success_url?: string;
             /** @description Base64-encoded token pushback URL; defaults to the profile pushback_url. */
@@ -904,8 +902,6 @@ export interface components {
             hash: string;
         };
         CofPaymentRequest: {
-            /** @description 5–24 chars, letters+digits only. Present in the SDK's sandbox-verified calls; ABSENT from the live Apidog page. */
-            request_id: string;
             /** @description UTC timestamp, YYYYMMDDHHmmss. */
             request_time: string;
             merchant_id: string;
