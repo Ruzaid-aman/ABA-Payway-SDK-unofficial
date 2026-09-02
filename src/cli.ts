@@ -65,7 +65,7 @@ import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConf
 import { openImageInDefaultViewer } from './open-image.js';
 import { sdk } from './sdk.js';
 import { formatTestReport } from './test/index.js';
-import { validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
+import { payoutEntriesTotal, validatePayoutEntryShape, validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (shared parser; supports multi-line quoted PEMs)
@@ -2134,30 +2134,26 @@ paymentLinkCmd
     }
 
     // Payout: inline JSON array [{acc, amt}] or raw string (parseJsonOrString).
+    // Shape validation is the SHARED domain validator (validatePayoutEntryShape)
+    // so CLI and SDK can never drift; the CLI additionally hard-rejects a
+    // total≠amount locally (exit 1) where the domain only warns — the CLI has
+    // both values and the mismatch is always a caller error, never a
+    // gateway-tolerated edge (pinned by cli-inprocess tests).
     const payout = parseJsonOrString(opts.payout) as
       | Array<{ acc: string; amt: number }>
       | string
       | undefined;
     if (Array.isArray(payout)) {
-      let total = 0;
-      let shapeOk = true;
       for (const entry of payout) {
-        if (
-          entry === null ||
-          typeof entry !== 'object' ||
-          typeof (entry as { acc?: unknown }).acc !== 'string' ||
-          typeof (entry as { amt?: unknown }).amt !== 'number'
-        ) {
-          shapeOk = false;
-          break;
+        try {
+          validatePayoutEntryShape(entry);
+        } catch {
+          console.log(`  ${c.red('✗')} --payout must be a JSON array of {acc, amt} objects`);
+          process.exitCode = 1;
+          return;
         }
-        total += (entry as { amt: number }).amt;
       }
-      if (!shapeOk) {
-        console.log(`  ${c.red('✗')} --payout must be a JSON array of {acc, amt} objects`);
-        process.exitCode = 1;
-        return;
-      }
+      const total = payoutEntriesTotal(payout);
       if (Math.abs(total - amount) > 1e-9) {
         console.log(
           `  ${c.red('✗')} --payout total ${total} must equal the payment-link amount ${amount} (documented gateway rule)`,

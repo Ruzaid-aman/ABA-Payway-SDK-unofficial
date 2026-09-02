@@ -72,14 +72,21 @@ describe('paymentLink.create payout (audit D2)', () => {
     expect(calls[0].authPayload.payout).toBeUndefined();
   });
 
-  it('throws for entries missing acc or with a non-numeric amt', () => {
+  it('throws for entries missing acc, empty acc, non-numeric amt, or negative amt', () => {
     const { domain } = makeDomain();
+    // missing acc
     expect(() => domain.create({ ...VALID_PARAMS, payout: [{ amt: 5 } as { acc: string; amt: number }] })).toThrow(
       PayWayConfigError,
     );
+    // empty acc — the shared validator (validatePayoutEntryShape) rejects it;
+    // the pre-refactor CLI copy used to let it through.
+    expect(() => domain.create({ ...VALID_PARAMS, payout: [{ acc: '', amt: 5 }] })).toThrow(/non-empty string "acc"/);
+    // non-numeric amt
     expect(() => domain.create({ ...VALID_PARAMS, payout: [{ acc: '000', amt: '5' } as unknown as { acc: string; amt: number }] })).toThrow(
       PayWayConfigError,
     );
+    // negative amt — same shared-validator gap the old CLI copy missed.
+    expect(() => domain.create({ ...VALID_PARAMS, payout: [{ acc: '000', amt: -5 }] })).toThrow(/non-negative numeric "amt"/);
   });
 
   it('throws for an empty payout string', () => {

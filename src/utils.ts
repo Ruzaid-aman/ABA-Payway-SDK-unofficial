@@ -84,6 +84,41 @@ export function validateAmountFloor(
   }
 }
 
+/**
+ * Split-payout entry shape: `{acc, amt}` (purchase-path keys — purchase /
+ * `cof charge` / pre-auth complete-payout / payment-link). One validator for
+ * the domain and the CLI so the two checks can never drift apart (the
+ * code-review follow-up to the S1 duplication finding).
+ *
+ * @throws PayWayConfigError on a malformed entry — empty/whitespace `acc`,
+ *   non-finite or negative `amt`, or an entry that is not an object.
+ */
+export function validatePayoutEntryShape(entry: unknown): asserts entry is { acc: string; amt: number } {
+  if (entry === null || typeof entry !== 'object') {
+    throw new PayWayConfigError('payout entries must be objects with a non-empty string "acc" key and a numeric "amt" key');
+  }
+  const { acc, amt } = entry as { acc?: unknown; amt?: unknown };
+  if (typeof acc !== 'string' || acc.trim().length === 0) {
+    throw new PayWayConfigError('payout entries must be objects with a non-empty string "acc" key');
+  }
+  if (typeof amt !== 'number' || !Number.isFinite(amt) || amt < 0) {
+    throw new PayWayConfigError('payout entries must carry a non-negative numeric "amt" key');
+  }
+}
+
+/**
+ * Sum of `amt` across payout entries. Precondition: every entry already
+ * passed {@link validatePayoutEntryShape} — malformed entries throw there,
+ * so this function only walks well-formed lists.
+ */
+export function payoutEntriesTotal(payout: ReadonlyArray<{ acc: string; amt: number }>): number {
+  let total = 0;
+  for (const entry of payout) {
+    total += entry.amt;
+  }
+  return total;
+}
+
 /** Warned once per process for the first sub-5-char transactionId (EC-20). */
 let warnedShortTranId = false;
 

@@ -5,32 +5,17 @@ import type { components } from '../types.js';
 import {
   encodeBase64IfNeeded,
   filterParams,
+  payoutEntriesTotal,
   validateCurrency,
   validateAmountFloor,
   validatePositiveAmount,
+  validatePayoutEntryShape,
   validatePublicHttpsUrl,
   warnAdvisory,
 } from '../utils.js';
 
 const DEFAULT_IMAGE_FILENAME = 'image.jpg';
 const DEFAULT_IMAGE_CONTENT_TYPE = 'image/jpeg';
-
-/**
- * Sum of `amt` across payout entries, or `undefined` when the shape is not a
- * numeric-keyed list (a raw string passes through unvalidated — it may be an
- * operator's pre-encoded JSON, and the equality rule can't be checked).
- */
-function payoutTotal(payout: string | { acc: string; amt: number }[]): number | undefined {
-  if (!Array.isArray(payout)) return undefined;
-  let total = 0;
-  for (const entry of payout) {
-    if (entry === null || typeof entry !== 'object' || typeof (entry as { amt?: unknown }).amt !== 'number') {
-      return undefined;
-    }
-    total += (entry as { amt: number }).amt;
-  }
-  return total;
-}
 
 /**
  * Spec (payway-openapi/paths/payment-link.yaml:33–37): the optional top-level
@@ -104,20 +89,18 @@ export function createPaymentLinkDomain(
 
       // Spec: `payout` travels inside the RSA-encrypted merchant_auth with
       // [{acc, amt}] keys and the documented total-payout-equals-link-amount
-      // rule (payway-openapi/paths/payment-link.yaml). Advisory warn — the
-      // gateway is the final arbiter — with strictValidation escalating.
+      // rule (payway-openapi/paths/payment-link.yaml). Entry SHAPE throws
+      // (shared validatePayoutEntryShape — same validator the CLI uses); the
+      // total rule is advisory — the gateway is the final arbiter — with
+      // strictValidation escalating. Pre-encoded strings pass through
+      // unvalidated (the equality rule can't be checked for them).
       if (params.payout !== undefined) {
         if (Array.isArray(params.payout)) {
           for (const entry of params.payout) {
-            if (entry === null || typeof entry !== 'object' || typeof entry.acc !== 'string' || entry.acc.trim().length === 0) {
-              throw new PayWayConfigError('payout entries must be objects with a non-empty string "acc" key');
-            }
-            if (typeof entry.amt !== 'number' || !Number.isFinite(entry.amt) || entry.amt < 0) {
-              throw new PayWayConfigError('payout entries must carry a non-negative numeric "amt" key');
-            }
+            validatePayoutEntryShape(entry);
           }
-          const total = payoutTotal(params.payout);
-          if (total !== undefined && Math.abs(total - params.amount) > 1e-9) {
+          const total = payoutEntriesTotal(params.payout);
+          if (Math.abs(total - params.amount) > 1e-9) {
             warnAdvisory(
               config,
               `payout total ${total} does not equal the link amount ${params.amount} — the documented rule requires them to match`,

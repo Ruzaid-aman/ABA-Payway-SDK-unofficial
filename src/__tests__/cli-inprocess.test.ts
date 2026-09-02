@@ -315,6 +315,53 @@ describe('checkout-form (in-process runCli)', () => {
       vi.unstubAllEnvs();
     }
   });
+
+  // The pre-refactor CLI copy only checked acc:string + amt:number, letting
+  // empty acc / negative amt through local validation (the SDK throw rescued
+  // it). The shared validatePayoutEntryShape closes that gap — pinned here.
+  it('payment-link create --payout exits 1 for an empty acc (shared validator, full shape)', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    try {
+      const { text, exitCode } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', '5',
+        '-r', 'ref-payout-3',
+        '--return-url', 'https://example.com/return',
+        '--payout', '[{"acc":"","amt":5}]',
+      ]);
+      expect(text).toContain('--payout must be a JSON array of {acc, amt} objects');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('payment-link create --payout exits 1 for a negative amt (shared validator, full shape)', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    try {
+      const { text, exitCode } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', '5',
+        '-r', 'ref-payout-4',
+        '--return-url', 'https://example.com/return',
+        '--payout', '[{"acc":"000111222","amt":-5}]',
+      ]);
+      expect(text).toContain('--payout must be a JSON array of {acc, amt} objects');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe('cof link-card-form (in-process runCli)', () => {
