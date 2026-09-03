@@ -1,7 +1,7 @@
 # Agent Handoff — aba-payway-ts
 
 **Audience:** an agent resuming work in a fresh session. Read this plus `AGENTS.md` before acting.
-**Last updated:** 2026-09-02, after the **sync-audit S2 skills-corpus batch** (8 stale/broken skills fixed — agent subpath imports, purchase lifetime unit, both bundled 24-field signing tools, QR params, sdk-configuration TD-03 inversion, transaction-list pre-validation, non-shipped script refs; 4 new capability skills (cof, token-lifecycle, beneficiary, subscription); `skills/README.md` rewritten for all 29; CHANGELOG Unreleased). Kept Unreleased — **not released** (user: don't publish yet; no version bump). Next: S3 usage guides per `audit-results/sync-audit-2026-09-01.md` §6.
+**Last updated:** 2026-09-03, after the **full 29-skill execution audit** (3 parallel agents, every documented flag/script/offline example verified against live CLI+SDK; ~30 authorized sandbox calls, zero money-movement executed). Verdicts: 28/29 PASS, 1 live FAIL (subscription trio → gateway `Wrong Hash`). **Read `.scratch/skills-audit/NEXT-SESSION.md` FIRST** — it holds the prioritized next items extracted from that audit (T1 blocker triage, T2 doc-drift one-liners, T3 script/CLI bugs, T4 external questions, T5 enhancement proposals, T6 carry-forward facts); full evidence in `.scratch/skills-audit/REPORT.md` + 3 group files. Prior: sync-audit S2 skills-corpus batch (Unreleased — user: don't publish yet; no version bump). S3 usage guides per `audit-results/sync-audit-2026-09-01.md` §6 remain queued behind the audit fixes.
 **Provenance:** everything below was done and verified in prior sessions; per-item evidence paths are included so you never have to re-derive or re-probe.
 
 ---
