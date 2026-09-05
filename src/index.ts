@@ -66,6 +66,20 @@ export {
 export type { CircuitBreakerOptions, CircuitState } from './circuit-breaker.js';
 export { createPayWayLogger, resolveLogLevel } from './logger.js';
 export type { LogLevel, LogSink, PayWayLogger, PayWayLoggerOptions } from './logger.js';
+// ─── Transaction Journal (audit-results/transaction-data-audit REPORT §14) ──
+export type {
+  JournalContext,
+  JournalEmitterInput,
+  JournalErrorInfo,
+  JournalEventKind,
+  JournalEventV1,
+  JournalMode,
+  JournalOptions,
+  JournalSink,
+} from './journal/types.js';
+export { DEFAULT_JOURNAL_DIR_NAME, DEFAULT_JOURNAL_FILE_NAME, JOURNAL_VERSION } from './journal/types.js';
+export { createJournalEmitter, JsonlJournalSink, pruneJournal, resolveJournalConfig } from './journal/writer.js';
+export type { JournalPruneResult } from './journal/writer.js';
 export { computeTokenExpiry, daysUntilTokenExpiry } from './utils.js';
 export {
   PURCHASE_LIFETIME_MIN_MINUTES,

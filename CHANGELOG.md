@@ -11,6 +11,23 @@
 
 ### Added
 
+- **Transaction Journal — Phase 1 Observability** (roadmap in
+  `audit-results/transaction-data-audit/REPORT.md` §17; closes audit gaps
+  G1/G3/G4/G11): opt-in append-only JSONL record of every API exchange under
+  `<cwd>/payway-data/journal.jsonl` — per-attempt `execution.request`,
+  `execution.response` (incl. 200-wrapped business failures), and
+  `execution.error` (the thrown paths where no hook fires), each carrying the
+  SDK correlation id, attempt number, endpoint, durationMs, gateway
+  `status.trace`, `tran_id`/merchantRef extraction, httpStatus/paywayCode,
+  and a redacted body digest. Enable with config `journal: true |
+  { dir, mode }` or `PAYWAY_JOURNAL=1` (+ `PAYWAY_JOURNAL_DIR`,
+  `PAYWAY_JOURNAL_MODE` — all registered in the env validator). `digest`
+  mode (default) allow-lists non-secret transactional fields; `full` mode
+  runs bodies through `sanitizeForLog` with a 16 KB cap. Writes are
+  fail-open, schema-validated (strict Ajv, `additionalProperties: false`),
+  and the barrel exports `pruneJournal` (atomic, parse-safe rewrite).
+  Default OFF — a library must never write files silently. Docs:
+  `docs/18-transaction-journal.md`.
 - **Payment-link documentation & consistency batch (2026-09-06)** — new full
   lifecycle chapter `docs/17-payment-link.md` (parameter tables with datatype
   reality notes — the official docs declare several numeric fields as strings

@@ -27,6 +27,9 @@ const KNOWN_VARS: ReadonlySet<string> = new Set([
   'PAYWAY_PROFILE',
   'PAYWAY_LOG_LEVEL',
   'PAYWAY_ONBOARD_AUTO',
+  'PAYWAY_JOURNAL',
+  'PAYWAY_JOURNAL_DIR',
+  'PAYWAY_JOURNAL_MODE',
 ]);
 
 /** Validate env-only vars actually carry values that appear in the env map. */
