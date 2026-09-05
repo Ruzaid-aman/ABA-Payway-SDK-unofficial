@@ -40,7 +40,14 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary update-sta
 
 # Payment link with split payout (payout keys {acc, amt}; total must equal --amount)
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link create -t "Invoice 1" -a 5.00 -r inv-001 --return-url <url> --payout '[{"acc":"500000001","amt":5.00}]'
+# Payment-link detail by Link ID (-i ONLY — data.id from create, NOT merchant ref/slug; --json error envelope on failure)
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link detail -i <link-id> --json
 ```
+
+- `payment-link create`: `--image <path>` (JPG/JPEG/PNG ≤3MB, enforced locally),
+  `--no-show-qr` suppresses the TTY QR; under `--json` BOTH payment-link
+  commands emit the `{ error: { kind, exitCode, … } }` envelope on any failure
+  (local validation included). Full guide: `docs/17-payment-link.md`.
 
 - `generate-qr` polls by default (`--no-polling` to disable); `--poll-timeout <s>` should match `--lifetime`.
 - `-y` skips interactive prompts; PNG saves to `payway-output/<txId>.png` by default.

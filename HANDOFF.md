@@ -207,3 +207,22 @@ Learned from the checkout-with-card flow and applied the `checkout-form` local-s
 - Don't treat check-transaction PENDING as proof a QR is scannable (W5-1): a record can be PENDING while its QR is scan-dead (scan-validity window ≠ record lifetime; expiry reads PENDING forever per W4-1). In interactive campaigns, create each scan target immediately before its user step — 10-min lifetimes expire mid-session, and long lifetimes don't extend scan validity.
 - Don't record a user-reported "paid" without gateway verification: this session had one approval that needed a retry (w2u2003 reported paid while still PENDING) and one that never existed (w2u6001 — the popup plugin POST never fired; the "paid transaction" was a false memory). check/detail are the only record of truth.
 - Don't run probe code via `npx tsx -e` (silently swallows output on this Windows box) or `node -x` heredocs (invalid flag) — write a script file under `.scratch/<slug>/` and run `npx tsx <file>`. And remember CLI evidence JSON carries the `Using profile:` line first — parse from the first `{`.
+
+---
+
+## 9. Payment-link enhancement batch (2026-09-06, branch `feat/payment-link-enhancements`)
+
+Scope-review follow-up (plan: `.scratch/payment-link-docs-review/PLAN.md`; official doc copies in the same folder). All gates green: build, vitest 1322/13-skip, tsc, biome.
+
+**Shipped (Unreleased — not yet versioned):**
+1. `payment-link create`/`detail` `--json` error envelopes (T5.4 parity) — gateway rejections AND local validation branches; banner suppressed in `--json` mode.
+2. CLI `--image` loader hard-exits on >3MB (parity with `--payout` total rule; domain stays advisory).
+3. `merchantRefNo` >50-char advisory (strict → throw).
+4. `payment-link create --no-show-qr`.
+5. Agent: `create_payment_link` forwards `payout`; NEW read-only `get_payment_link_details` tool (catalog is now **12** — the provider count pin flipped 11→12 in `agent-provider.test.ts`).
+6. OpenAPI: detail `pushback_url`, create-schema `payout` property, `tran_id` `number|string`, totals do-not-rely notes; `src/types.ts` regenerated.
+7. Docs: **`docs/17-payment-link.md`** (full lifecycle chapter — the first numbered payment-link guide), payment-link error table in docs/12, README §4 + CLI-table row + docs/17 pointer, `aba-payway-payment-link` skill **v1.4.0** (image/pushback/lifecycle/envelope/agent coverage; `.zcode` copy synced), agent skill + skills/README 11→12-tool references, AGENTS.md `payment-link detail` canonical line.
+
+**Open verification items (from the plan — probe before treating as fact):** V-1 pushback body carries no `hash` in the documented sample (does a real one?); V-2 response `payout` placement (apidog top-level vs ABA sample inside `data`); V-4 expired_date expiry behavior (no EXPIRED status documented). Probe evidence goes to `docs/SANDBOX-FINDINGS.md` as a new dated section.
+
+**Anti-checklist additions:** when the agent tool catalog changes, the 12-tool count appears in `agent-provider.test.ts` (pin), `skills/aba-payway-agent/SKILL.md` (+`.zcode` sync), `skills/README.md`, and `docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md` — update all in the SAME change. Note: the agent-guide tool table (docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md:361) still shows the 11-tool-era `create_payment_link` param set (no payout row) — sync it when that guide is next touched (folded into S3).

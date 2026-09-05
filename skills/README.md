@@ -65,11 +65,11 @@ referenced in some guides are development-only and ship nowhere.
 - [aba-payway-sdk-configuration](./aba-payway-sdk-configuration/SKILL.md) — constructor options, every `PAYWAY_*` env var, `strictValidation`, the KHQR env set.
 - [aba-payway-hash](./aba-payway-hash/SKILL.md) — webhook signature verification + the request-signing/verify/mock-callback tools.
 - [aba-payway-test-harness](./aba-payway-test-harness/SKILL.md) — the built-in mock PayWay server.
-- [aba-payway-agent](./aba-payway-agent/SKILL.md) — the agentic, risk-gated CLI (provider modes, 11 tools, execution ledger).
+- [aba-payway-agent](./aba-payway-agent/SKILL.md) — the agentic, risk-gated CLI (provider modes, 12 tools, execution ledger).
 
 ## Agentic CLI skills
 
-- [aba-payway-agent](./aba-payway-agent/SKILL.md) — provider modes, the 11 tools, risk gates, execution ledger, sessions, and redaction.
+- [aba-payway-agent](./aba-payway-agent/SKILL.md) — provider modes, the 12 tools, risk gates, execution ledger, sessions, and redaction.
 - [aba-payway-first-payment](./aba-payway-first-payment/SKILL.md) — QR / checkout / subscription / payment-link route decision matrix and result handling (the agentic entrypoint).
 
 ## Bundled script exit-code contract

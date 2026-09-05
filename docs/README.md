@@ -52,6 +52,7 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 | 10. UI Customization | [10-ui-customization.md](./10-ui-customization.md) | 10 min |
 | 11. Callbacks & Webhooks | [11-callbacks-and-webhooks.md](./11-callbacks-and-webhooks.md) | 15 min |
 | 16. Webhook Setup (CLI) | [16-webhook-setup-guide.md](./16-webhook-setup-guide.md) | 10 min |
+| 17. Payment Link API | [17-payment-link.md](./17-payment-link.md) | 15 min |
 
 ### Part 5 — Production
 | Chapter | File | Est. Read Time |

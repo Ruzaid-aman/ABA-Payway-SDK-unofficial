@@ -281,6 +281,21 @@ Payouts (`payway.payout.payout`) go through the direct payout API and have their
 >
 > 💡 **CLI:** `payway-sdk payout -t <txId> -a 10 -c USD -b "500000001:10"` validates currency/whitelist locally in sandbox and prints payout-specific hints on failure. Use `payway-sdk sandbox-beneficiaries` to list the seeded test accounts.
 
+### Payment Link error codes
+
+The payment-link endpoints (`create`, `detail`) use the `PTL*` family in `status.code` — extracted into `error.paywayCode` automatically:
+
+| Code | Meaning | How to Fix |
+|---|---|---|
+| `PTL02` | Wrong hash | Hash covers `request_time + merchant_id + merchant_auth` ONLY — the optional image is never hashed (use `paymentLink.create()`; hand-rolled multipart is the usual cause) |
+| `PTL04` | Parameter validation required | `currency` / `return_url` missing, or `description` >250 chars (sandbox-verified; NOT in the official docs' code list) |
+| `PTL05` | Parameter invalid format | Check datatypes (amounts are numbers in the SDK; the official docs' `string` declarations are wrong) |
+| `PTL99` | Merchant invalid currency | Currency not enabled for the merchant profile |
+| `PTL132` | Invalid payment link | `detail` got the wrong `id` — pass the opaque `data.id` from create, NOT `merchant_ref_no`, NOT the URL slug |
+| `96` | Link not found (detail) | Verify the Link ID |
+
+Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](./17-payment-link.md)**.
+
 ### Interpreting a successful refund
 
 After a successful CLI or SDK refund, verify with:

@@ -11,6 +11,38 @@
 
 ### Added
 
+- **Payment-link documentation & consistency batch (2026-09-06)** — new full
+  lifecycle chapter `docs/17-payment-link.md` (parameter tables with datatype
+  reality notes — the official docs declare several numeric fields as strings
+  and disagree with their own samples; permutations & recipes; pushback
+  receiver; error-code table incl. the undocumented sandbox-discovered
+  `PTL04`; troubleshooting), a payment-link code table in docs/12, and
+  `aba-payway-payment-link` skill v1.4.0 (image limits, pushback, status
+  lifecycle, `--json` envelope, agent tools). OpenAPI spec synced:
+  detail response gains `pushback_url`, `payout` listed as a create schema
+  property, `tran_id` typed `number | string`, totals typed with
+  do-not-rely notes — `src/types.ts` regenerated.
+- **`payment-link create`/`detail --json` error envelopes (T5.4 parity)** —
+  both commands now print the machine-parseable
+  `{ error: { kind, exitCode, type, message, paywayCode, … } }` envelope on
+  gateway rejections AND local validation failures (payout total mismatch,
+  bad amount/currency, image loader errors); banner suppressed in `--json`
+  mode. Same contract as check-transaction / transaction-detail /
+  generate-checkout.
+- **Agent: `create_payment_link` forwards `payout`** (plan schema + executor
+  + provider prompt) and a new read-only **`get_payment_link_details`** tool
+  (12-tool catalog) resolves a Link ID to normalized
+  `{paymentLinkId, status, totalTrxn, totalAmount, paymentLink, raw}` —
+  wired through contracts, plan/ledger schemas, planning/risk READONLY sets
+  (no approval gate), and the provider tool listing.
+- **`payment-link create --no-show-qr`** — suppresses the TTY auto-QR of the
+  share URL (parity with generate-qr / generate-checkout).
+- **`paymentLink.create` merchantRefNo cap advisory** — >50 chars warns
+  (spec-documented max; `strictValidation` → throw); 50 exactly passes.
+- **CLI `--image` loader enforces the 3MB cap** — over-limit files exit 1
+  locally (parity with the `--payout` total-equals-amount rule; the SDK domain
+  stays advisory — the gateway is the final arbiter).
+
 - **`checkout.purchaseHosted()` — typed hosted-checkout purchase** — sets
   `paymentGate: 0` for you and returns a structured `PurchaseHostedHtmlResult`
   (`{ hosted_checkout: true, content_type, html }`): the gateway answers a

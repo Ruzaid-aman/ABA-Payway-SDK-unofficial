@@ -641,6 +641,8 @@ const linkWithPayout = await payway.paymentLink.create({
 //   --payout '[{"acc":"500000001","amt":100.00},{"acc":"500000002","amt":50.00}]'
 ```
 
+Full lifecycle guide — parameter tables, datatype reality notes, pushback receiver, permutations & recipes, troubleshooting: **[docs/17-payment-link.md](./docs/17-payment-link.md)**.
+
 ### 5. Pre-Authorization (`payway.preAuth`)
 
 Hold funds on a card and capture/cancel them later.
