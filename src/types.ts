@@ -1159,7 +1159,7 @@ export interface components {
             merchant_ref_no?: string;
             outlet_id?: string;
             outlet_name?: string;
-            /** @description Payout details (null when none). The official apidog create schema places a top-level payout array of {acc, amt, acc_name}; the official overview sample response shows it inside data as an array. Placement/shape verified per sandbox evidence. */
+            /** @description Payout details (null when none). PLACEMENT IS UNVERIFIED: the official apidog create schema places a top-level payout array of {acc, amt, acc_name}; the official overview sample response shows it inside data as an array. oneOf both shapes until probe V-2 settles it (see HANDOFF §9 open items) — do not rely on either. */
             payout?: Record<string, never> | unknown[] | null;
             /** @description Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N). */
             payment_link?: string;

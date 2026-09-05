@@ -34,7 +34,11 @@
   (12-tool catalog) resolves a Link ID to normalized
   `{paymentLinkId, status, totalTrxn, totalAmount, paymentLink, raw}` —
   wired through contracts, plan/ledger schemas, planning/risk READONLY sets
-  (no approval gate), and the provider tool listing.
+  (no approval gate), and the provider tool listing. NOTE: the plan's P2 also
+  listed `image` forwarding — deliberately NOT wired into the agent tool
+  (the provider plan schema is JSON; shipping raw image bytes through an
+  LLM plan adds noise and secret-scrubbing risk for little utility). Create
+  image-bearing links via the SDK/CLI; revisit only if a real workflow asks.
 - **`payment-link create --no-show-qr`** — suppresses the TTY auto-QR of the
   share URL (parity with generate-qr / generate-checkout).
 - **`paymentLink.create` merchantRefNo cap advisory** — >50 chars warns

@@ -219,7 +219,7 @@ Scope-review follow-up (plan: `.scratch/payment-link-docs-review/PLAN.md`; offic
 2. CLI `--image` loader hard-exits on >3MB (parity with `--payout` total rule; domain stays advisory).
 3. `merchantRefNo` >50-char advisory (strict → throw).
 4. `payment-link create --no-show-qr`.
-5. Agent: `create_payment_link` forwards `payout`; NEW read-only `get_payment_link_details` tool (catalog is now **12** — the provider count pin flipped 11→12 in `agent-provider.test.ts`).
+5. Agent: `create_payment_link` forwards `payout`; NEW read-only `get_payment_link_details` tool (catalog is now **12** — the provider count pin flipped 11→12 in `agent-provider.test.ts`). The plan's P2 also listed `image` forwarding — **deliberately scoped out** (JSON provider plans are a bad carrier for image bytes: size + secret-scrubbing risk; create image links via SDK/CLI instead — recorded in CHANGELOG Unreleased too).
 6. OpenAPI: detail `pushback_url`, create-schema `payout` property, `tran_id` `number|string`, totals do-not-rely notes; `src/types.ts` regenerated.
 7. Docs: **`docs/17-payment-link.md`** (full lifecycle chapter — the first numbered payment-link guide), payment-link error table in docs/12, README §4 + CLI-table row + docs/17 pointer, `aba-payway-payment-link` skill **v1.4.0** (image/pushback/lifecycle/envelope/agent coverage; `.zcode` copy synced), agent skill + skills/README 11→12-tool references, AGENTS.md `payment-link detail` canonical line.
 

@@ -527,6 +527,38 @@ describe('CLI API commands against the local mock gateway', () => {
     expect([undefined, 0]).toContain(exitCode as number);
   });
 
+  // --no-show-qr (P6, 2026-09-06): the flag must be REGISTERED on the command
+  // (commander errors on unknown options, so a completed create proves it)
+  // and must reach the same TTY gate generate-qr/generate-checkout use —
+  // shouldAutoRenderQr(stdout, false) is false even on a TTY. The gate itself
+  // is unit-pinned here because the in-process stdout is never a TTY, so the
+  // TTY-auto branch can't be observed through runCli directly.
+  it('payment-link create accepts --no-show-qr and the flag forces the gate off', async () => {
+    const { text, exitCode } = await run([
+      'payment-link',
+      'create',
+      '-t', 'Mock link',
+      '-a', '5.00',
+      '-r', 'PL-MOCK-REF-NOSHOW',
+      '--return-url', 'https://example.com/return',
+      '--no-show-qr',
+    ]);
+    // Flag accepted (no "unknown option" error) and the create succeeded.
+    expect(text).toContain('Payment link created');
+    expect(text).not.toContain('unknown option');
+    expect(text).not.toContain('error:'); // commander's unknown-option prefix
+    expect([undefined, 0]).toContain(exitCode as number);
+
+    // The gate contract shared with generate-qr/generate-checkout: an explicit
+    // false wins over TTY, an explicit true wins without one, unset follows
+    // the stream.
+    const { shouldAutoRenderQr } = await import('../cli/terminal-qr.js');
+    expect(shouldAutoRenderQr({ isTTY: true }, false)).toBe(false);
+    expect(shouldAutoRenderQr({ isTTY: false }, true)).toBe(true);
+    expect(shouldAutoRenderQr({ isTTY: true }, undefined)).toBe(true);
+    expect(shouldAutoRenderQr({ isTTY: false }, undefined)).toBe(false);
+  });
+
   it('cof link-account submits a link request (--json)', async () => {
     const { text, exitCode } = await run([
       'cof',
