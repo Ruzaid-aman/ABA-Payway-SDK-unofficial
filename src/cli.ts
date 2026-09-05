@@ -2368,24 +2368,39 @@ paymentLinkCmd
     '--payout <json>',
     'Split-payout beneficiaries — JSON array [{acc, amt}] or string; total amt must equal --amount',
   )
+  .option('--no-show-qr', 'Do not render the shareable-link QR in the terminal (auto-enabled for interactive terminals)')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
-    console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
 
     const amount = Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase();
 
     if (!Number.isFinite(amount) || amount <= 0) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`Amount must be a positive number, received: ${String(opts.amount)}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
       process.exitCode = 1;
       return;
     }
     if (currency !== 'USD' && currency !== 'KHR') {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`Currency must be USD or KHR, received: ${currency}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${c.red(currency)}`);
       process.exitCode = 1;
       return;
     }
     if (opts.description && opts.description.length > 250) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(
+          `Description must be at most 250 characters, received: ${opts.description.length}`,
+        );
+        return;
+      }
       console.log(`  ${c.red('✗')} Description must be at most 250 characters, received: ${opts.description.length}`);
       process.exitCode = 1;
       return;
@@ -2394,6 +2409,10 @@ paymentLinkCmd
     if (opts.expiredDate !== undefined) {
       expiredDate = Number(opts.expiredDate);
       if (!Number.isInteger(expiredDate) || expiredDate <= 0) {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson('--expired-date must be a positive whole number of epoch seconds');
+          return;
+        }
         console.log(`  ${c.red('✗')} --expired-date must be a positive whole number of epoch seconds`);
         process.exitCode = 1;
         return;
@@ -2403,6 +2422,10 @@ paymentLinkCmd
     if (opts.paymentLimit !== undefined) {
       paymentLimit = Number(opts.paymentLimit);
       if (!Number.isInteger(paymentLimit) || paymentLimit < 0) {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson('--payment-limit must be a non-negative whole number');
+          return;
+        }
         console.log(`  ${c.red('✗')} --payment-limit must be a non-negative whole number`);
         process.exitCode = 1;
         return;
@@ -2424,6 +2447,10 @@ paymentLinkCmd
         try {
           validatePayoutEntryShape(entry);
         } catch {
+          if (opts.json) {
+            process.exitCode = printValidationErrorJson('--payout must be a JSON array of {acc, amt} objects');
+            return;
+          }
           console.log(`  ${c.red('✗')} --payout must be a JSON array of {acc, amt} objects`);
           process.exitCode = 1;
           return;
@@ -2431,6 +2458,12 @@ paymentLinkCmd
       }
       const total = payoutEntriesTotal(payout);
       if (Math.abs(total - amount) > 1e-9) {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson(
+            `--payout total ${total} must equal the payment-link amount ${amount} (documented gateway rule)`,
+          );
+          return;
+        }
         console.log(
           `  ${c.red('✗')} --payout total ${total} must equal the payment-link amount ${amount} (documented gateway rule)`,
         );
@@ -2438,6 +2471,10 @@ paymentLinkCmd
         return;
       }
     } else if (payout !== undefined && String(payout).trim().length === 0) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson('--payout must be a JSON array [{acc, amt}] or a non-empty pre-encoded string');
+        return;
+      }
       console.log(`  ${c.red('✗')} --payout must be a JSON array [{acc, amt}] or a non-empty pre-encoded string`);
       process.exitCode = 1;
       return;
@@ -2453,6 +2490,10 @@ paymentLinkCmd
       try {
         image = loadPaymentLinkImage(opts.image);
       } catch (e) {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson(String(e instanceof Error ? e.message : e));
+          return;
+        }
         console.log(`  ${c.red('✗')} ${String(e instanceof Error ? e.message : e)}`);
         process.exitCode = 1;
         return;
@@ -2485,7 +2526,11 @@ paymentLinkCmd
       console.log(`  ${c.bold('Share this link:')}`);
       console.log(`  ${c.cyan(shareLink)}\n`);
 
-      if (typeof shareLink === 'string' && shareLink.startsWith('http') && shouldAutoRenderQr(process.stdout)) {
+      if (
+        typeof shareLink === 'string' &&
+        shareLink.startsWith('http') &&
+        shouldAutoRenderQr(process.stdout, asBoolFlag((opts as Record<string, unknown>).showQr))
+      ) {
         try {
           const terminalQr = await renderQrToTerminal(shareLink);
           console.log(terminalQr);
@@ -2504,6 +2549,13 @@ paymentLinkCmd
       console.log(`  ${c.bold('Transaction:')}    ${result.tran_id ?? result.status?.tran_id ?? '-'}`);
       console.log();
     } catch (e) {
+      // Same agent envelope contract as check-transaction / transaction-detail /
+      // generate-checkout (T5.4): under --json branch on the structured
+      // `{ error: { kind, exitCode, … } }` envelope, not on human text.
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(e);
+        return;
+      }
       process.exitCode = printApiError(e);
     }
   });
@@ -2514,7 +2566,7 @@ paymentLinkCmd
   .requiredOption('-i, --id <id>', 'Payment link id (data.id returned by create)')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: { id: string; json?: boolean }) => {
-    console.log(`\n${c.bold('ABA PayWay SDK')} — payment link details\n`);
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — payment link details\n`);
 
     if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
       process.exitCode = 1;
@@ -2542,6 +2594,10 @@ paymentLinkCmd
       console.log(`  ${c.bold('Link:')}        ${c.cyan(data?.payment_link ?? '-')}`);
       console.log();
     } catch (e) {
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(e);
+        return;
+      }
       process.exitCode = printApiError(e);
     }
   });

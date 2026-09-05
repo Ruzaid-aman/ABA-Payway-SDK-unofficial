@@ -125,3 +125,30 @@ describe('paymentLink.create payout (audit D2)', () => {
     expect(console.warn).not.toHaveBeenCalled();
   });
 });
+
+describe('payment-link merchantRefNo 50-char cap (advisory, strict escalates)', () => {
+  // Spec (payway-openapi/paths/payment-link.yaml plaintext_shape): the
+  // merchant-side link reference is optional with a documented max length of
+  // 50. The SDK requires it non-empty (stricter than the official "optional")
+  // but the LENGTH cap stays advisory — the gateway is the final arbiter —
+  // with strictValidation escalating the warn to a throw.
+  it('warns when merchantRefNo exceeds 50 characters (advisory)', async () => {
+    const { domain, calls } = makeDomain();
+    await domain.create({ ...VALID_PARAMS, merchantRefNo: 'r'.repeat(51) });
+
+    expect(calls).toHaveLength(1);
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("merchantRefNo exceeds the gateway's 50-character cap"));
+  });
+
+  it('does not warn at exactly 50 characters', async () => {
+    const { domain } = makeDomain();
+    await domain.create({ ...VALID_PARAMS, merchantRefNo: 'r'.repeat(50) });
+
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('throws under strictValidation when merchantRefNo exceeds 50 characters', () => {
+    const { domain } = makeDomain({ strictValidation: true } as unknown as PayWayConfig);
+    expect(() => domain.create({ ...VALID_PARAMS, merchantRefNo: 'r'.repeat(51) })).toThrow(PayWayConfigError);
+  });
+});

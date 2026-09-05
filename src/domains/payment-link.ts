@@ -70,6 +70,11 @@ export function createPaymentLinkDomain(
       if (typeof params.merchantRefNo !== 'string' || params.merchantRefNo.trim().length === 0) {
         throw new PayWayConfigError('merchantRefNo is required and must be a non-empty string');
       }
+      // Spec: merchant_ref_no max length 50 (payway-openapi/paths/payment-link.yaml).
+      // Advisory — the gateway is the final arbiter; strictValidation escalates.
+      if (params.merchantRefNo.length > 50) {
+        warnAdvisory(config, `merchantRefNo exceeds the gateway's 50-character cap`);
+      }
 
       // Sandbox-verified: PayWay rejects descriptions over 250 characters (PTL04).
       if (params.description !== undefined && params.description.length > 250) {

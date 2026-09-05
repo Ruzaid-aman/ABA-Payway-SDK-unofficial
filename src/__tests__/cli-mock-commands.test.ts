@@ -152,6 +152,24 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
     send(200, { status: { code: '00', message: 'Success' }, data: { payee: 'PAYEE-1', status: 1 } });
   } else if (url.includes('update-whitelist-status')) {
     send(200, { status: { code: '00', message: 'Success' }, data: { payee: 'PAYEE-1', status: 1 } });
+  } else if (url.includes('payment-link/create')) {
+    send(200, {
+      status: { code: '00', message: 'Success!' },
+      tran_id: 1681357410,
+      data: {
+        id: 'PLINK-MOCK-1==',
+        title: 'Mock link',
+        amount: '5.00',
+        currency: 'USD',
+        status: 'OPEN',
+        total_trxn: 0,
+        total_amount: 0,
+        payment_link: `${baseUrl}/ABAPAYMOCK1`,
+      },
+    });
+  } else if (url.includes('payment-link/detail')) {
+    // Sandbox parity: an unknown link id answers code PTL132 (invalid link).
+    send(200, { status: { code: 'PTL132', message: 'Invalid payment link' } });
   } else {
     send(404, { message: `unknown endpoint ${url}` });
   }
@@ -464,6 +482,49 @@ describe('CLI API commands against the local mock gateway', () => {
     expect(parsed.error.exitCode).toBe(2);
     expect(text).not.toContain('✗');
     expect(exitCode).toBe(2);
+  });
+
+  // Payment-link envelope parity (T5.4 extension, 2026-09-06): both commands
+  // print the same `{ error: { kind, exitCode, … } }` contract on gateway
+  // rejections under --json — branch on the envelope, never on stdout text.
+  it('payment-link detail --json prints the PTL132 body as a JSON error envelope', async () => {
+    const { text, exitCode } = await run(['payment-link', 'detail', '-i', 'PLINK-UNKNOWN==', '--json']);
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { error: { message: string; paywayCode: string; kind: string; exitCode: number } };
+    expect(parsed.error.message).toContain('Invalid payment link');
+    expect(parsed.error.paywayCode).toBe('PTL132');
+    expect(parsed.error.kind).toBe('api');
+    expect(parsed.error.exitCode).toBe(2);
+    expect(text).not.toContain('✗');
+    expect(exitCode).toBe(2);
+  });
+
+  it('payment-link detail (human mode) still prints the human ✗ block for PTL132', async () => {
+    const { text, exitCode } = await run(['payment-link', 'detail', '-i', 'PLINK-UNKNOWN==']);
+    expect(text).toContain('✗');
+    expect(text).toContain('Invalid payment link');
+    expect(text).not.toContain('"kind"');
+    expect(exitCode).toBe(2);
+  });
+
+  it('payment-link create --json prints the raw response on success (no envelope)', async () => {
+    const { text, exitCode } = await run([
+      'payment-link',
+      'create',
+      '-t', 'Mock link',
+      '-a', '5.00',
+      '-r', 'PL-MOCK-REF-1',
+      '--return-url', 'https://example.com/return',
+      '--json',
+    ]);
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
+      status: { code: string };
+      data: { id: string; payment_link: string };
+    };
+    expect(parsed.status.code).toBe('00');
+    expect(parsed.data.id).toBe('PLINK-MOCK-1==');
+    expect(parsed.data.payment_link).toContain('ABAPAYMOCK1');
+    expect(text).not.toContain('"error"');
+    expect([undefined, 0]).toContain(exitCode as number);
   });
 
   it('cof link-account submits a link request (--json)', async () => {
