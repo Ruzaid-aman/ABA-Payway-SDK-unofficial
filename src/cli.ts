@@ -1188,7 +1188,7 @@ program
 const DATE_FMT = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 program
   .command('transaction-list')
-  .description('List transactions in a time window (rate limit: 50/min; defaults to today)')
+  .description('List transactions in a time window (rate limit: 50/min; defaults to today). Dates are GATEWAY time UTC+7 — a UTC/local-derived window silently returns 0 rows.')
   .option('--from <date>', 'Start date "YYYY-MM-DD HH:mm:ss" (default: today 00:00:00)')
   .option('--to <date>', 'End date "YYYY-MM-DD HH:mm:ss" (default: today 23:59:59)')
   .option('--status <status>', 'Filter: APPROVED, PENDING, DECLINED, REFUNDED, CANCELLED')

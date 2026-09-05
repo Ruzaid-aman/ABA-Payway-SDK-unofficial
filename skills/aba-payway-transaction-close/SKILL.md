@@ -25,15 +25,15 @@ Official contract (developer.payway.com.kh/close-transaction): *"Once a transact
 
 **API-side, sandbox never exposes a CLOSED status** (unchanged): closed-unpaid keeps reporting `PENDING` — keep a local `closed` flag.
 
-**Customer-side enforcement differs by path:**
-- **QR/KHQR path — ENFORCED (live 2026-09-05, SANDBOX-FINDINGS §19):** a QR closed while PENDING (close answered code 00) was then scanned in the ABA Simulator ~1 minute later — the app refused with **"transaction expired"** and payment was impossible, even though the API still said PENDING and the 900 s lifetime had ~8 minutes left.
-- **Checkout/card path — NOT enforced (live 2026-08-25):** two closed-unpaid transactions were paid on the still-open hosted page → APPROVED (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206). The official contract was violated there; the gateway may have changed since, or the behavior is path-specific.
+**Customer-side enforcement is channel-dependent** (dossier §2a/§2b/§9):
+- **QR/KHQR channel — ENFORCED (3 live observations: 2026-08-25, 2026-09-05 ×2):** QRs closed while PENDING were then scanned in the ABA app — refused with **"transaction expired"**, even minutes before natural lifetime expiry, while the API kept saying PENDING.
+- **Hosted card/checkout channel — NOT enforced (2026-08-25):** two closed-unpaid transactions were paid on the still-open hosted page → APPROVED (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206). Hypothesis: the page carries a checkout session issued before the close that the gateway accepts without re-validation.
 
 **Always follow a successful close with `checkTransaction`** and interpret via:
 
 | Close result | Check afterwards | Meaning |
 |---|---|---|
-| code 00 | `PENDING` | closed-unpaid OR still open — indistinguishable remotely; keep a local `closed` flag. QR path: customers can no longer pay it; checkout path: payment could still land (Aug evidence) |
+| code 00 | `PENDING` | closed-unpaid OR still open — indistinguishable remotely; keep a local `closed` flag. QR channel: customers can no longer pay it; checkout channel: payment could still land (Aug evidence) |
 | code 00 | `APPROVED` | payment landed AFTER close (checkout path, 2026-08-25 evidence) — go to refund path |
 | code `5` / 403 | — | unknown tran_id |
 

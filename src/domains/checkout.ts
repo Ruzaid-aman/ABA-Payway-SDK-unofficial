@@ -123,11 +123,29 @@ export interface CheckoutDomain {
     requestTime?: string,
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['CheckTransactionResponse']>;
+  /**
+   * Close an open transaction before payment. Sandbox-verified (2026-09-05,
+   * docs/CLOSE-TRANSACTION-FINDINGS.md §2b/§9): enforcement is CHANNEL-dependent —
+   * the KHQR/QR channel refuses closed transactions at scan time ("transaction
+   * expired"), while two hosted-card sessions accepted payment AFTER a code-00
+   * close. No read API ever exposes a CLOSED status (closed-unpaid keeps
+   * reporting PENDING), so keep an authoritative local `closed` flag and watch
+   * for late APPROVED-after-close on the checkout path.
+   */
   closeTransaction: (
     transactionId: string,
     requestTime?: string,
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['CloseTransactionResponse']>;
+  /**
+   * Get full detail for one transaction (~5 s indexing lag after creation; the
+   * list endpoints use the UTC+7 gateway clock). On UNPAID transactions
+   * `original_currency` reports the merchant credential currency (not the
+   * transaction currency), `payment_amount` is 0 and `transaction_operations`
+   * is empty — parse currency/amounts only on PAID transactions. After a
+   * PARTIAL refund `payment_status` reads REFUNDED (coarse flag);
+   * `refund_amount` is the authoritative returned total.
+   */
   getTransactionDetail: (
     transactionId: string,
     requestTime?: string,

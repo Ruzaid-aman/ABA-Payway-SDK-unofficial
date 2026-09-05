@@ -167,3 +167,32 @@ and the skills; summarized so a future agent has one place to start:
   `transaction-detail --wait <s>` handles the ~5s detail-indexing lag (check sees txns <1s).
 - **Latency**: check ≈ detail ≈ 130–750ms warm; unknown IDs → HTTP 200 `status.code 6`
   on both endpoints.
+
+---
+
+## 9. Re-confirmation pass — KHQR-channel enforcement repeatable (2026-09-05, user-driven ABA Simulator)
+
+Two more KHQR-channel observations upgrading §2b from "single sample" to
+**three consistent observations** (§2c per-channel hypothesis now
+well-supported):
+
+| # | Transaction | Amount | Sequence | Outcome |
+|---|---|---|---|---|
+| 1 | `qrmtoaywyqb13a72` | USD 33.12 (900 s) | PENDING → close code 00 → user scanned ~1 min later (~8 min before natural expiry) | **App refused: "transaction expired"** — API stayed PENDING, no CLOSED status, `transaction_operations: []` |
+| 2 | `qrmretest02usd` | USD 0.75 (900 s) | PENDING → close code 00 → user scanned ~1 min later (controlled retest) | **App refused: "transaction expired"** again — repeatable |
+
+Companion retest (§20, `test-output/qr-lifecycle-retest-2026-09-05.md`): the
+paid sibling QR in the same window WAS list-visible while the closed-unpaid
+one never appeared — §14's visibility gap is unpaid-QR-only.
+
+Notes:
+- The scan-time refusal message is the generic **"transaction expired"** —
+  indistinguishable from natural lifetime expiry at scan time. Customers
+  cannot tell a closed QR from an expired one.
+- §2c hypothesis stands: KHQR apps re-validate transaction state server-side
+  at pay time; the risk remains **stale pre-rendered hosted/card sessions**
+  (§2a's two APPROVED-after-close violations, 2026-08-25).
+- §7 validation checklist items remain unchecked — the card-path
+  close→pay re-verification still needs a live attempt to distinguish
+  "per-channel by design" from "gateway changed since August" on the hosted
+  page.

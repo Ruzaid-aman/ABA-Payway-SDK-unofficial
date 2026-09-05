@@ -35,9 +35,17 @@
 ## Workflow & State Tracking
 - **Always check status first**: Before beginning new work or deciding what to do next, ALWAYS read `PROJECT_STATUS.md` in the root of the workspace. This is the source of truth for what has been done and what the current priorities are.
 - **Understand the API quirks**: Read `SANDBOX-FINDINGS.md` to understand API behaviors we have verified during our sandbox probes.
-- **Close Transaction escalation (open)**: `docs/CLOSE-TRANSACTION-FINDINGS.md` documents that sandbox close is NOT enforced (paid-after-close → APPROVED, twice) and closure is unqueryable. Read it before ANY work involving `closeTransaction`, and re-run its §7 validation checklist when ABA ships a fix.
+- **Close Transaction channel dependence (open escalation)**: `docs/CLOSE-TRANSACTION-FINDINGS.md` documents that closure enforcement is CHANNEL-dependent in sandbox — the KHQR/QR channel refuses closed transactions at scan time (3 observations: 2026-08-25 + 2026-09-05 ×2, "transaction expired"), while two hosted-card sessions accepted payment AFTER a code-00 close (APPROVED). Closure is unqueryable: no CLOSED status in check/detail ever — keep a local `closed` flag. Read the dossier before ANY work involving `closeTransaction`, and re-run its §7 validation checklist when ABA ships a fix.
 - **When probing endpoints**: When tasked to probe a sandbox endpoint, write a script in the `scripts/` folder to execute and verify the endpoint exists and validates formatting correctly, similar to prior probes.
 - **Update status continuously**: Keep `PROJECT_STATUS.md` updated as tasks are completed.
+
+## Sandbox Channel & Status Facts (2026-09-05, user-driven simulator campaigns — SANDBOX-FINDINGS §17–§20)
+- **Purchase hash signs `ctid` after `items` (live 27-field order, §17)**: the live docs' subscription operation omits ctid and is gateway-rejected with Wrong Hash; `PURCHASE_HASH_FIELDS` carries the verified order. The gateway's wrong-hash hint prints the DOC list, not the enforced one — never treat the hint as authoritative.
+- **Subscription registrations need a subscription-enabled profile**: with the correct hash the trio passes the hash layer and answers `104` "Merchant not enabled token flag"; the sandbox profile is NOT enabled (external blocker — see `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md`).
+- **Transaction-list/detail timestamps are UTC+7 (gateway clock)**: a UTC- or local-derived `--from/--to` window silently returns 0 rows (no error). Omit the dates for the full gateway day, or convert.
+- **List visibility is unpaid-QR-only asymmetric (§14/§20)**: paid transactions ARE list-visible; unpaid QR-only ones never appear (check-transaction/detail see them); unpaid checkout-path transactions DO appear.
+- **`payment_status` is a coarse flag after refunds**: a PARTIAL refund flips status to REFUNDED while `refund_amount` stays the authoritative returned-total. Parse `original_currency` only on PAID transactions — unpaid detail reports the merchant credential currency (KHR) regardless of transaction currency.
+- **Simulator latency**: scan→approve ≈60–90 s from QR creation; check-transaction sees APPROVED <1 s after approval; detail lags creation ~5 s.
 
 ## SDK Usage Examples
 - Prefer the facade for a complete merchant flow: `const session = await sdk.initiate(payload, config);` followed by `await sdk.handle(session, { target: '#payway-container' });`.
@@ -67,7 +75,7 @@
 | `DEBUG_PAYWAY` | `true` or `1` enables sanitized diagnostic logging. |
 
 ## Skills Directory
-- The packaged `skills/` directory contains 25 focused `aba-payway-*` guides.
+- The packaged `skills/` directory contains 29 focused `aba-payway-*` guides.
 - Several guides bundle dependency-free `.cjs` tools under their `scripts/` folder (KHQR decode/CRC validation, request signing, callback verification, mock callbacks, reconciliation cron, checkout payload builder, status decoder) — each SKILL.md documents its own tools.
 - Install all of them (including bundled scripts) with `npx payway-sdk skills add <agent>`, where agent is `claude`, `codex`, `opencode`, `cursor`, or `copilot`.
 

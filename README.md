@@ -100,8 +100,8 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk generate-qr` | Generate a QR code (online via PayWay API or offline) |
 | `payway-sdk check-transaction -t <id>` | Check payment status for one transaction |
 | `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min; `--wait <seconds>` retries the ~5s post-creation indexing lag) |
-| `payway-sdk transaction-list --from <date> --to <date>` | List transactions in a window (`"YYYY-MM-DD HH:mm:ss"` dates) |
-| `payway-sdk close-transaction -t <id>` | Void/close an unpaid transaction (prompts; `-y/--force` skips) |
+| `payway-sdk transaction-list --from <date> --to <date>` | List transactions in a window (`"YYYY-MM-DD HH:mm:ss"` dates in **gateway time UTC+7** — a UTC-derived window silently returns 0 rows; omit both for the full gateway day) |
+| `payway-sdk close-transaction -t <id>` | Void/close an unpaid transaction (prompts; `-y/--force` skips). Kills QRs customer-side; hosted-card sessions may still pay — see `docs/CLOSE-TRANSACTION-FINDINGS.md` |
 | `payway-sdk refund -t <id> -a <amount> [-c <currency>]` | Refund with a pre-flight balance check and confirmation by default; `--no-preflight` skips only the detail lookup, `-y/--force` skips both the lookup and the prompt |
 | `payway-sdk exchange-rate` | Fetch the live USD/KHR exchange rate |
 | `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (full purchase flag set incl. `--payout`, `--additional-params`, `--google-pay-token`, `--return-deeplink`; requires credentials) |
