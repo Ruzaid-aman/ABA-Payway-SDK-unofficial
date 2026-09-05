@@ -827,3 +827,9 @@ Full evidence: `test-output/purchase-test-campaign/` (WAVE5-captures.md, REPORT.
 11. **(W5-11) `generate-checkout` poll timeout exits 0** (human warning only; `--json` prints just the create response) — machine-invisible, contrast generate-qr's exit-3 `{event: aborted}` envelope. DX follow-up.
 12. **(W5-12) The AbaPayway popup plugin (`checkout2-0.js`) modal renders blank** from a locally-opened (file://) form page — popup flows need an http(s) origin; mechanism live-verified 2026-08-25.
 13. CLI poll semantics (H1): `generate-checkout` blocks + polls by default (5 s), exits 0 on APPROVED with a final block; first poll often NOT_FOUND (indexing lag); check latency ~282 ms.
+
+**§21 addenda (same session, post-report sweep):**
+
+14. **(W5-13) `transaction-detail.transaction_date` and the `transaction-list` date column are DIFFERENT events** (both UTC+7): detail carries the **creation** timestamp — it stays fixed even when approval lands much later (w2u12001: transaction_date 22:17:24, approval ~22:40 via the dupprobe form) — while the list column carries the **payment completion** time (matches the `Completed` op timestamp on 4/4 paid samples). Reconciliation windows keyed on the list date window the payment time, not creation. Gateway clock can also precede the client wall clock by 2–28 s.
+15. **Scan→approve latency varies** (22 s this pass vs §18's 60–90 s) — poll for ≥2 min, never hard-code.
+16. **`generate-checkout` saves NO QR PNG in non-TTY mode**; the human-mode `abapay_deeplink` embeds the URL-encoded qrString (`&qrcode=<payload>`) — extractable and renderable with the `qrcode` package when a scannable PNG is needed. JSON mode carries `qrString` directly.

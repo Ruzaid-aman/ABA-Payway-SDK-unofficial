@@ -47,6 +47,17 @@
 - **`payment_status` is a coarse flag after refunds**: a PARTIAL refund flips status to REFUNDED while `refund_amount` stays the authoritative returned-total. Parse `original_currency` only on PAID transactions — unpaid detail reports the merchant credential currency (KHR) regardless of transaction currency.
 - **Simulator latency**: scan→approve ≈60–90 s from QR creation; check-transaction sees APPROVED <1 s after approval; detail lags creation ~5 s.
 
+## Purchase API Campaign Facts (2026-09-05 evening — SANDBOX-FINDINGS §21, W5-1…W5-13)
+- **Scan-validity ≠ record lifetime (W5-1)**: purchase KHQRs have a server-side scan-time window (payload embeds no expiry); a record-PENDING QR with hours of lifetime left was scan-refused at 2h15m. Scan promptly; create scan targets immediately before user steps. Check-transaction PENDING does NOT prove scannability.
+- **The hosted checkout page renders ONLY as a browser form-POST response (W5-3/W5-4)**: the gate-0 HTML is a Nuxt app with relative `/_nuxt/*` assets and client-side QR hydration — saved standalone it is blank. Use `getCheckoutFormHtml()` (add `paymentGate: 0` for the hosted view); gate-less form POSTs answer raw JSON in the browser. Popup plugin (`checkout2-0.js`) needs an http(s) origin — blank modal from file:// (W5-12).
+- **`payment_type` and ops differ by method (W5-5)**: KHQR → `"ABA Pay"` + ops `[Completed]`; card → scheme (`MC`/`VISA`) + `card_source ONUS` + ops `[Create Order, Completed]`.
+- **`payment_amount`/`payment_currency` = the PAYER's actual debit (W5-6)**: may differ in currency from the request (4000 KHR → 1 USD; 1.20 USD → 4800 KHR). Reconcile on `original_*`/`total_amount`; list shows the request.
+- **Duplicate `tran_id` (W5-7)**: silently accepted on the JSON path but resulting QRs scan-refuse "Transaction not found"; hosted-page re-POST of a PENDING dup renders and pays the FORM's amount; CLOSED-id re-POST → code 4 once, then page. Never reuse tran_ids.
+- **Close validation is three-way (W5-2/W5-8)**: never-created → code 00; PENDING → code 00 no-op; paid → 403 code 2. Closed gate-0 CARD sessions still pay (H7 ×3); close is scan-enforced only on the KHQR channel.
+- **Scan-refusal messages are generic (W5-9)**: "Transaction expired" covers expired, window-exceeded, and already-paid; "Transaction not found" = duplicate IDs only.
+- **Dates are different events (W5-13)**: detail `transaction_date` = creation (fixed); list date = payment completion. Both UTC+7; gateway clock can trail the client wall clock by seconds.
+- **Hosted-page continuation needs `continue_success_url` (W5-10)**: plain `return_url` does not move the browser. `generate-checkout` poll timeout exits 0 and is machine-invisible in `--json` (W5-11 — follow-up).
+
 ## SDK Usage Examples
 - Prefer the facade for a complete merchant flow: `const session = await sdk.initiate(payload, config);` followed by `await sdk.handle(session, { target: '#payway-container' });`.
 - Use `new PayWay()` for domain APIs when `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY` are configured in the environment.
