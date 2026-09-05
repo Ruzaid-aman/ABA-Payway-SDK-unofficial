@@ -1118,6 +1118,207 @@ program
     }
   });
 
+// --- tx-batch ---
+interface TxBatchItem {
+  id: string;
+  ok: boolean;
+  code?: string;
+  status?: string;
+  error?: string;
+}
+
+const TX_BATCH_PACE_MS: Record<string, number> = {
+  // transaction-detail is rate-limited to 10/min by the gateway (403 code 429
+  // when exceeded) — pace the batch under that ceiling. check-transaction
+  // allows 600/s; close has no documented cap (small politeness delay).
+  check: 0,
+  close: 250,
+  detail: 6100,
+};
+
+function collectRepeatable(value: string, previous: string[] | undefined): string[] {
+  const acc = previous ?? [];
+  acc.push(value);
+  return acc;
+}
+
+function resolveTxBatchIds(opts: { transactionId?: string[]; idsFile?: string }): string[] {
+  const ids: string[] = [];
+  for (const id of opts.transactionId ?? []) ids.push(id.trim());
+  if (opts.idsFile) {
+    for (const line of readFileSync(opts.idsFile, 'utf8').split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      ids.push(trimmed);
+    }
+  }
+  // Dedupe, preserving first-seen order.
+  return [...new Set(ids)];
+}
+
+function txBatchSummary(operation: string, items: TxBatchItem[]): string {
+  const ok = items.filter((i) => i.ok).length;
+  const failed = items.length - ok;
+  return `  ${c.bold(operation)} batch: ${items.length} target(s) — ${c.green(`${ok} ok`)}${failed ? `, ${c.red(`${failed} failed`)}` : ''}`;
+}
+
+function txBatchExitCode(items: TxBatchItem[]): number {
+  if (items.length === 0 || items.every((i) => i.ok)) return EXIT_OK;
+  return items.some((i) => i.ok) ? EXIT_VALIDATION : EXIT_API_FAILURE;
+}
+
+function renderTxBatchReport(operation: string, items: TxBatchItem[], extras: Record<string, string>): string {
+  const lines: string[] = [
+    `# tx-batch ${operation} — ${new Date().toISOString()}`,
+    '',
+    ...Object.entries(extras).map(([k, v]) => `${k}: ${v}`),
+    '',
+    '| id | ok | code | status | error |',
+    '|---|---|---|---|---|',
+  ];
+  for (const item of items) {
+    lines.push(`| ${item.id} | ${item.ok ? 'yes' : 'NO'} | ${item.code ?? '—'} | ${item.status ?? '—'} | ${item.error ?? '—'} |`);
+  }
+  const ok = items.filter((i) => i.ok).length;
+  lines.push('', `Summary: ${ok}/${items.length} ok.`);
+  return `${lines.join('\n')}\n`;
+}
+
+program
+  .command('tx-batch')
+  .description('Run one transaction operation (close | check | detail) over a set of IDs')
+  .argument('<operation>', 'Operation: close, check, or detail')
+  .option('-t, --transaction-id <id>', 'Transaction ID (repeatable)', collectRepeatable)
+  .option('--ids-file <path>', 'File with one transaction ID per line (# comments and blank lines ignored)')
+  .option('--dry-run', 'List resolved targets and exit 0 without any network call')
+  .option('-y, --force', 'close: skip the confirmation prompt (required for scripts/agents)')
+  .option('--json', 'Print per-item JSON envelopes plus a summary')
+  .option('--pace <ms>', 'Override the inter-call delay (default: endpoint-appropriate — detail 6100ms, close 250ms, check 0)')
+  .option('--report <path>', 'Write a markdown evidence report to this path')
+  .action(
+    async (
+      operation: string,
+      opts: {
+        transactionId?: string[];
+        idsFile?: string;
+        dryRun?: boolean;
+        force?: boolean;
+        json?: boolean;
+        pace?: string;
+        report?: string;
+      },
+    ) => {
+      const op = operation.toLowerCase();
+      if (!['close', 'check', 'detail'].includes(op)) {
+        console.log(`  ${c.red('✗')} Unknown operation "${operation}" — expected close, check, or detail`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      let ids: string[];
+      try {
+        ids = resolveTxBatchIds(opts);
+      } catch (error) {
+        console.log(`  ${c.red('✗')} Cannot read --ids-file: ${(error as Error).message}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      if (ids.length === 0) {
+        console.log(`  ${c.red('✗')} No transaction IDs given — pass -t <id> (repeatable) or --ids-file <path>`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      if (opts.dryRun) {
+        for (const id of ids) console.log(`  ${c.cyan('·')} ${id}`);
+        console.log(`  ${c.bold('dry-run')}: ${ids.length} target(s) for "${op}" — no calls made`);
+        process.exitCode = EXIT_OK;
+        return;
+      }
+      if (!assertCredentialsPresent()) {
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      if (op === 'close' && !opts.force && !opts.json) {
+        const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
+        const message = `Close ${ids.length} transaction(s)? This cannot be undone (KHQR scans will be refused; hosted-card sessions may still pay).`;
+        const confirmed = io
+          ? await io.confirm({ message, initial: false })
+          : await promptConfirmation(`  ${message} (y/n): `);
+        if (!confirmed) {
+          console.log(`  ${c.yellow('Cancelled by user.')}`);
+          process.exitCode = EXIT_OK;
+          return;
+        }
+      } else if (op === 'close' && !opts.force) {
+        console.log(`  ${c.red('✗')} Batch close requires -y/--force when running non-interactively (--json)`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+
+      const paceOverride = Number.parseInt(opts.pace ?? '', 10);
+      const paceMs = Number.isNaN(paceOverride) ? (TX_BATCH_PACE_MS[op] ?? 0) : Math.max(0, paceOverride);
+
+      // Local validation first: invalid IDs are reported as failed items
+      // without consuming rate limit budget.
+      const items: TxBatchItem[] = [];
+      const valid: string[] = [];
+      for (const id of ids) {
+        try {
+          validateTransactionId(id);
+          valid.push(id);
+        } catch (error) {
+          items.push({ id, ok: false, error: (error as Error).message });
+        }
+      }
+
+      const payway = new PayWay();
+      for (const [index, id] of valid.entries()) {
+        if (index > 0 && paceMs > 0) await new Promise((resolve) => setTimeout(resolve, paceMs));
+        try {
+          if (op === 'close') {
+            const result = (await payway.checkout.closeTransaction(id)) as { status?: { code?: string; message?: string } };
+            const code = result.status?.code;
+            items.push({ id, ok: code === '00', code, status: code === '00' ? 'CLOSE_ACCEPTED' : 'UNEXPECTED', error: code === '00' ? undefined : JSON.stringify(result).slice(0, 160) });
+          } else if (op === 'check') {
+            const result = (await payway.checkout.checkTransaction(id)) as { data?: { payment_status?: string; payment_status_code?: number } };
+            const status = result.data?.payment_status;
+            items.push({ id, ok: !!status, status, code: result.data?.payment_status_code !== undefined ? String(result.data.payment_status_code) : undefined, error: status ? undefined : 'no payment_status in response' });
+          } else {
+            const result = (await payway.checkout.getTransactionDetail(id)) as { data?: Record<string, unknown>; status?: { code?: string } };
+            const data = result.data;
+            items.push({ id, ok: !!data, code: result.status?.code, status: data ? String(data.payment_status ?? 'UNKNOWN') : 'NOT_FOUND', error: data ? undefined : 'empty detail data' });
+          }
+        } catch (error) {
+          const err = error as Error & { paywayCode?: string };
+          items.push({ id, ok: false, code: err.paywayCode, error: err.message.slice(0, 160) });
+        }
+      }
+
+      if (opts.report) {
+        try {
+          writeFileSync(opts.report, renderTxBatchReport(op, items, { pace_ms: String(paceMs) }));
+          console.log(`  ${c.dim(`Report written: ${opts.report}`)}`);
+        } catch (error) {
+          console.log(`  ${c.red('✗')} Cannot write --report: ${(error as Error).message}`);
+          process.exitCode = EXIT_VALIDATION;
+          return;
+        }
+      }
+
+      if (opts.json) {
+        const ok = items.filter((i) => i.ok).length;
+        console.log(JSON.stringify({ operation: op, total: items.length, ok, failed: items.length - ok, results: items }, null, 2));
+      } else {
+        for (const item of items) {
+          const icon = item.ok ? c.green('✓') : c.red('✗');
+          const detailBits = [item.status, item.error].filter(Boolean).join(' — ');
+          console.log(`  ${icon} ${c.bold(item.id)}${detailBits ? ` ${c.dim(detailBits)}` : ''}`);
+        }
+        console.log(txBatchSummary(op, items));
+      }
+      process.exitCode = txBatchExitCode(items);
+    },
+  );
+
 // --- transaction-detail ---
 program
   .command('transaction-detail')

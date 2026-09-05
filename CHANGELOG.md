@@ -9,6 +9,16 @@
 > merchant profile is not subscription-enabled (`104`), which remains an
 > external blocker for end-to-end subscription testing.
 
+### Added
+
+- **CLI `tx-batch` command** — run one transaction operation (`close` | `check` | `detail`)
+  over a set of IDs (`-t` repeatable and/or `--ids-file`). Per-item result envelopes
+  (`{id, ok, code, status, error}`) with no fail-fast; endpoint-appropriate rate-limit
+  pacing (detail 6100 ms under the 10/min gateway cap, close 250 ms, check 0);
+  `--dry-run` target preview; batch `close` requires `-y/--force` when non-interactive;
+  `--report <path>` markdown evidence output; exit codes 0 all-ok / 1 partial / 2 all-failed.
+  Packaged skill `aba-payway-bulk-operations` (skills now 30) documents the workflow.
+
 ### Fixed
 
 - **Subscription purchases rejected with `Wrong Hash` (code 1)** — `ctid` now

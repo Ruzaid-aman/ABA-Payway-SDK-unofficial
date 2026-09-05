@@ -21,6 +21,7 @@ const REGISTERED_COMMANDS = [
   'check-transaction',
   'poll-transaction',
   'close-transaction',
+  'tx-batch',
   'transaction-detail',
   'transaction-list',
   'refund',

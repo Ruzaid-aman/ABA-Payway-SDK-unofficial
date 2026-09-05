@@ -26,6 +26,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
       'transaction-list',
       'get-transactions-by-ref',
       'close-transaction',
+      'tx-batch',
     ],
   },
   { title: 'Money-out', commands: ['refund', 'payout', 'pre-auth', 'beneficiary'] },

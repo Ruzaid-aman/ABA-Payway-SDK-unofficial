@@ -5,7 +5,7 @@
  * via process.env; only non-interactive flag combinations are used
  * (-y/--json/--no-polling), so nothing reads stdin and nothing leaves localhost.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -732,5 +732,91 @@ describe('CLI API commands against the local mock gateway', () => {
     ]);
     expect(text).toContain('QR String');
     expect([undefined, 0]).toContain(exitCode as number);
+  });
+});
+
+describe('tx-batch command', () => {
+  it('check --json yields per-item envelopes and exit 1 on partial failure', async () => {
+    const { text, exitCode } = await run([
+      'tx-batch', 'check', '-t', 'APPROVED-1', '-t', 'MISSING', '--json',
+    ]);
+    expect(text).toContain('"operation": "check"');
+    expect(text).toContain('"total": 2');
+    expect(text).toContain('"failed": 1');
+    expect(text).toContain('MISSING');
+    expect(exitCode).toBe(1);
+  });
+
+  it('check human output lists every target and exits 0 when all ok', async () => {
+    const { text, exitCode } = await run(['tx-batch', 'check', '-t', 'A-1', '-t', 'A-2']);
+    expect(text).toContain('A-1');
+    expect(text).toContain('A-2');
+    expect(text).toContain('2 ok');
+    expect(exitCode).toBe(0);
+  });
+
+  it('close with -y succeeds for every target (--json)', async () => {
+    const { text, exitCode } = await run(['tx-batch', 'close', '-t', 'C-1', '-t', 'C-2', '-y', '--json']);
+    expect(text).toContain('"ok": 2');
+    expect(text).toContain('CLOSE_ACCEPTED');
+    expect(exitCode).toBe(0);
+  });
+
+  it('close refuses to run non-interactively without -y', async () => {
+    const { text, exitCode } = await run(['tx-batch', 'close', '-t', 'C-1', '--json']);
+    expect(text).toContain('-y/--force');
+    expect(exitCode).toBe(1);
+  });
+
+  it('dry-run lists targets without any network call', async () => {
+    const { text, exitCode } = await run(['tx-batch', 'close', '-t', 'DRY-1', '-t', 'DRY-2', '--dry-run']);
+    expect(text).toContain('DRY-1');
+    expect(text).toContain('dry-run');
+    expect(text).toContain('no calls made');
+    expect(exitCode).toBe(0);
+  });
+
+  it('--ids-file parses IDs, skips comments and blank lines, and dedupes', async () => {
+    const idsFile = path.join(tempDir, 'tx-batch-ids.txt');
+    writeFileSync(idsFile, '# campaign ids\n\nBATCH-1\nBATCH-2\nBATCH-1\n', 'utf8');
+    const { text, exitCode } = await run(['tx-batch', 'check', '--ids-file', idsFile, '--json']);
+    expect(text).toContain('"total": 2');
+    expect(exitCode).toBe(0);
+  });
+
+  it('detail reports a failed item for a missing transaction (partial → exit 1)', async () => {
+    const { text, exitCode } = await run(['tx-batch', 'detail', '-t', 'APPROVED-1', '-t', 'MISSING', '--pace', '0', '--json']);
+    expect(text).toContain('"operation": "detail"');
+    expect(text).toContain('"failed": 1');
+    expect(exitCode).toBe(1);
+  });
+
+  it('locally invalid IDs fail without network and all-failed exits 2', async () => {
+    const { text, exitCode } = await run(['tx-batch', 'check', '-t', 'has space', '--json']);
+    expect(text).toContain('transactionId may only contain letters, digits, and hyphens');
+    expect(text).toContain('"failed": 1');
+    expect(exitCode).toBe(2);
+  });
+
+  it('unknown operation exits 1 with a hint', async () => {
+    const { text, exitCode } = await run(['tx-batch', 'refund', '-t', 'X']);
+    expect(text).toContain('expected close, check, or detail');
+    expect(exitCode).toBe(1);
+  });
+
+  it('no IDs exits 1', async () => {
+    const { text, exitCode } = await run(['tx-batch', 'check']);
+    expect(text).toContain('No transaction IDs given');
+    expect(exitCode).toBe(1);
+  });
+
+  it('--report writes a markdown evidence file', async () => {
+    const reportPath = path.join(tempDir, 'tx-batch-report.md');
+    const { exitCode } = await run(['tx-batch', 'check', '-t', 'APPROVED-1', '--report', reportPath]);
+    const report = readFileSync(reportPath, 'utf8');
+    expect(report).toContain('# tx-batch check');
+    expect(report).toContain('| APPROVED-1 | yes |');
+    expect(report).toContain('Summary: 1/1 ok.');
+    expect(exitCode).toBe(0);
   });
 });

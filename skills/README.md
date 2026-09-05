@@ -1,6 +1,6 @@
 # ABA PayWay SDK Skills
 
-29 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
+30 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
 them for a supported coding agent:
 
 ```sh
@@ -58,6 +58,7 @@ referenced in some guides are development-only and ship nowhere.
 - [aba-payway-transaction-list](./aba-payway-transaction-list/SKILL.md) — date/amount/status windows (3-day cap, local pre-validation).
 - [aba-payway-transaction-by-merchant-ref](./aba-payway-transaction-by-merchant-ref/SKILL.md) — lookups by merchant reference + reconciliation cron tool.
 - [aba-payway-transaction-close](./aba-payway-transaction-close/SKILL.md) — close/void unpaid transactions (advisory in sandbox).
+- [aba-payway-bulk-operations](./aba-payway-bulk-operations/SKILL.md) — `tx-batch close/check/detail` over many IDs (per-item envelopes, pacing, `--report`).
 
 ## Platform & tooling
 
