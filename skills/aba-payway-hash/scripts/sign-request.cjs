@@ -131,9 +131,29 @@ function parseArgs(argv) {
   return args;
 }
 
+/** Minimal .env loader (same semantics as the CLI: cwd/.env, never overrides real env). */
+function loadDotEnv() {
+  try {
+    const raw = require('node:fs').readFileSync(require('node:path').join(process.cwd(), '.env'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (m && process.env[m[1]] === undefined) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      }
+    }
+  } catch {
+    /* no .env — flags or exported env still work */
+  }
+}
+
 function main() {
+  loadDotEnv();
   const args = parseArgs(process.argv.slice(2));
   const preset = args.preset || 'get-mc-ref';
+  if (!PRESETS[preset]) {
+    console.error(`Unknown preset "${preset}". Valid: ${Object.keys(PRESETS).join(', ')}`);
+    process.exit(2);
+  }
   const merchantId = args['merchant-id'] || process.env.PAYWAY_MERCHANT_ID;
   const apiKey = args['api-key'] || process.env.PAYWAY_API_KEY;
   if (!merchantId || !apiKey) {

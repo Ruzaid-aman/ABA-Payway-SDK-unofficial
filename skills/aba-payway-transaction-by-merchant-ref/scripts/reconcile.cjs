@@ -217,7 +217,23 @@ function saveSeen(file, txns) {
   fs.writeFileSync(stateFileFor(file), JSON.stringify({ transaction_ids: capped }, null, 2));
 }
 
+/** Minimal .env loader (same semantics as the CLI: cwd/.env, never overrides real env). */
+function loadDotEnv() {
+  try {
+    const raw = fs.readFileSync(path.join(process.cwd(), '.env'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (m && process.env[m[1]] === undefined) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      }
+    }
+  } catch {
+    /* no .env — flags or exported env still work */
+  }
+}
+
 async function main() {
+  loadDotEnv();
   const args = parseArgs(process.argv.slice(2));
   const merchantRef = args['merchant-ref'] || args['customer-id'];
   if (!merchantRef) {
@@ -249,7 +265,14 @@ async function main() {
   };
 
   if (!args.watch) {
-    process.exit(await runOnce(opts));
+    try {
+      process.exit(await runOnce(opts));
+    } catch (e) {
+      // One-shot runtime/API failure (network, non-JSON body, unhandled):
+      // clean message + exit 1 — the watch loop's catch semantics, without the loop.
+      console.error(`reconcile failed: ${e.message}`);
+      process.exit(1);
+    }
   }
 
   console.log(`Watching ${baseUrl} every ${interval}s for merchant_ref=${merchantRef}. Ctrl+C to stop.`);

@@ -70,3 +70,21 @@ referenced in some guides are development-only and ship nowhere.
 
 - [aba-payway-agent](./aba-payway-agent/SKILL.md) — provider modes, the 11 tools, risk gates, execution ledger, sessions, and redaction.
 - [aba-payway-first-payment](./aba-payway-first-payment/SKILL.md) — QR / checkout / subscription / payment-link route decision matrix and result handling (the agentic entrypoint).
+
+## Bundled script exit-code contract
+
+Every dependency-free `.cjs` tool shipped under `skills/*/scripts/` follows one
+contract (agents should branch on exit code, not parse stderr):
+
+- **`0`** — the tool ran successfully. Includes informative negatives: an
+  INVALID CRC verdict, `No QR detected`, unknown status codes, a reconcile run
+  with no new rows.
+- **`1`** — runtime/API failure at execution time (network error, HTTP error,
+  non-JSON body) — printed as one clean `… failed: <message>` line, never a
+  stack trace.
+- **`2`** — the invocation or environment is wrong: usage errors, unknown
+  preset, invalid `--status`/`--currency`/amount/lifetime, missing
+  credentials.
+
+All scripts auto-load a `.env` from the current working directory (exported
+env wins) and read `PAYWAY_MERCHANT_ID` / `PAYWAY_API_KEY`.

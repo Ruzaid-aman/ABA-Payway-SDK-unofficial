@@ -128,7 +128,23 @@ function parseArgs(argv) {
   return args;
 }
 
+/** Minimal .env loader (same semantics as the CLI: cwd/.env, never overrides real env). */
+function loadDotEnv() {
+  try {
+    const raw = require('node:fs').readFileSync(require('node:path').join(process.cwd(), '.env'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (m && process.env[m[1]] === undefined) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      }
+    }
+  } catch {
+    /* no .env — flags or exported env still work */
+  }
+}
+
 async function main() {
+  loadDotEnv();
   const args = parseArgs(process.argv.slice(2));
   if (args.example) {
     console.log(JSON.stringify(buildCallbackBody({ 'tran-id': 'order-123', amount: 10 }), null, 2));
@@ -146,7 +162,17 @@ async function main() {
     process.exit(2);
   }
 
-  const body = buildCallbackBody(args);
+  let body;
+  try {
+    body = buildCallbackBody(args);
+  } catch (e) {
+    // Bad flag values (--status, ...) are usage errors: clean message, exit 2.
+    console.error(e.message);
+    console.error(
+      'Usage: node mock-callback.cjs --url <http(s)://host/path> [--tran-id x] [--amount 10] [--status APPROVED]',
+    );
+    process.exit(2);
+  }
   const sig = signBody(body, apiKey);
   console.log('=== SENDING MOCK CALLBACK ===');
   console.log(`url:    ${args.url}`);

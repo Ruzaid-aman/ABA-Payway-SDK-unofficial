@@ -24,6 +24,10 @@ const STATUS_LABELS = {
   3: 'DECLINED — rejected by issuer/gateway',
   4: 'REFUNDED — fully refunded',
   7: 'CANCELLED — cancelled or expired',
+  // Poller-only synthetic status (NOT in PAYMENT_STATUS_CODES): check-transaction
+  // answers gateway status.code 6 during the creation grace period / unknown tran_id,
+  // which pollTransactionStatus() surfaces as paymentStatus 'NOT_FOUND'.
+  6: 'NOT_FOUND — tran_id not yet visible (creation grace period) or unknown tran_id (poller-only status)',
 };
 
 const TERMINAL = new Set(['APPROVED', 'DECLINED', 'CANCELLED', 'REFUNDED']);

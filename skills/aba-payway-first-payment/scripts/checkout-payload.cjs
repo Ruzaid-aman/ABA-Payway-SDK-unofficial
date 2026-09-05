@@ -183,18 +183,39 @@ function parseArgs(argv) {
   return args;
 }
 
+/** Minimal .env loader (same semantics as the CLI: cwd/.env, never overrides real env). */
+function loadDotEnv() {
+  try {
+    const raw = require('node:fs').readFileSync(require('node:path').join(process.cwd(), '.env'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (m && process.env[m[1]] === undefined) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      }
+    }
+  } catch {
+    /* no .env — flags or exported env still work */
+  }
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  loadDotEnv();
   const merchantId = args['merchant-id'] || process.env.PAYWAY_MERCHANT_ID;
   const apiKey = args['api-key'] || process.env.PAYWAY_API_KEY;
   if (!merchantId || !apiKey) {
-    console.error('Missing credentials. Pass --merchant-id/--api-key or set PAYWAY_MERCHANT_ID / PAYWAY_API_KEY.');
+    console.error('Missing credentials. Pass --merchant-id/--api-key or set PAYWAY_MERCHANT_ID / PAYWAY_API_KEY (a .env in the cwd is loaded automatically).');
     process.exit(2);
   }
   if (args.amount === undefined) {
     console.error(
       'Usage: node checkout-payload.cjs --amount 10 [--tran-id order-123] [--currency USD] [--return-url https://...] [--html out.html]',
     );
+    process.exit(2);
+  }
+  // Currency domain check (mirrors the CLI/SDK): USD or KHR only.
+  if (args.currency !== undefined && !['USD', 'KHR'].includes(String(args.currency).toUpperCase())) {
+    console.error(`Validation error: Currency must be USD or KHR, received: ${args.currency}`);
     process.exit(2);
   }
 
