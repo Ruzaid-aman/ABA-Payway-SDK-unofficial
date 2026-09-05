@@ -190,12 +190,22 @@ afterAll(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-async function run(argv: string[]): Promise<{ text: string; exitCode: typeof process.exitCode }> {
+async function run(argv: string[]): Promise<{
+  text: string;
+  stdout: string;
+  stderr: string;
+  exitCode: typeof process.exitCode;
+}> {
   const captured = captureConsole();
   const before = process.exitCode;
   try {
     await runCli(argv);
-    return { text: captured.text(), exitCode: process.exitCode };
+    return {
+      text: captured.text(),
+      stdout: captured.stdout(),
+      stderr: captured.stderr(),
+      exitCode: process.exitCode,
+    };
   } finally {
     captured.restore();
     process.exitCode = before;
@@ -296,6 +306,118 @@ describe('CLI API commands against the local mock gateway', () => {
     ]);
     expect(text).toContain('aba://mobile/pay');
     expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('generate-checkout --output json emits one stable result and saves a QR PNG', async () => {
+    const imagePath = path.join(tempDir, 'checkout-structured.png');
+    const { stdout, exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-STRUCTURED-1',
+      '--output',
+      'json',
+      '--no-polling',
+      '--save-image',
+      imagePath,
+      '--no-open-image',
+      '--no-show-qr',
+    ]);
+
+    const result = JSON.parse(stdout) as Record<string, any>;
+    expect(result).toMatchObject({
+      schemaVersion: '1.0',
+      command: 'generate-checkout',
+      transactionId: 'CO-STRUCTURED-1',
+      context: { environment: 'sandbox' },
+      creation: { outcome: 'accepted' },
+      poll: { outcome: 'not_requested', attempts: 0 },
+      artifacts: { qrPngPath: path.resolve(imagePath) },
+    });
+    expect(result.context).not.toHaveProperty('apiKey');
+    expect(existsSync(imagePath)).toBe(true);
+    expect(readFileSync(imagePath).subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('generate-checkout --output ndjson streams creation, poll, and final records', async () => {
+    const { stdout, exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-STRUCTURED-2',
+      '--output',
+      'ndjson',
+      '--poll-interval',
+      '0.001',
+      '--poll-timeout',
+      '1',
+      '--no-save-image',
+      '--no-open-image',
+      '--no-show-qr',
+    ]);
+
+    const records = stdout.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, any>);
+    expect(records.map((record) => record.event)).toEqual(['creation', 'poll', 'final']);
+    expect(records[1]).toMatchObject({ event: 'poll', paymentStatus: 'APPROVED', terminal: true });
+    expect(records[2]).toMatchObject({
+      event: 'final',
+      result: { payment: { status: 'APPROVED', terminal: true }, poll: { outcome: 'terminal' } },
+    });
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('generate-qr --output json uses the same stable envelope', async () => {
+    const { stdout, exitCode } = await run([
+      'generate-qr',
+      '-a',
+      '5.00',
+      '-t',
+      'QR-STRUCTURED-1',
+      '--callback-url',
+      'https://example.com/cb',
+      '--lifetime',
+      '300',
+      '-y',
+      '--output',
+      'json',
+      '--no-polling',
+      '--no-save-image',
+      '--no-open-image',
+      '--no-show-qr',
+    ]);
+
+    const result = JSON.parse(stdout) as Record<string, any>;
+    expect(result).toMatchObject({
+      schemaVersion: '1.0',
+      command: 'generate-qr',
+      transactionId: 'QR-STRUCTURED-1',
+      creation: { outcome: 'accepted' },
+      poll: { outcome: 'not_requested', attempts: 0 },
+    });
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('generate-checkout --output json keeps validation failures machine-readable', async () => {
+    const { stdout, exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '0',
+      '-t',
+      'CO-STRUCTURED-BAD',
+      '--output',
+      'json',
+    ]);
+    const result = JSON.parse(stdout) as Record<string, any>;
+    expect(result).toMatchObject({
+      schemaVersion: '1.0',
+      transactionId: 'CO-STRUCTURED-BAD',
+      creation: { outcome: 'rejected', error: { kind: 'validation', exitCode: 1 } },
+      nextAction: { kind: 'fix_input' },
+    });
+    expect(exitCode).toBe(1);
   });
 
   it('generate-checkout --json emits an error envelope for pre-flight validation failures (T5.4)', async () => {

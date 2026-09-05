@@ -113,7 +113,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk close-transaction -t <id>` | Void/close an unpaid transaction (prompts; `-y/--force` skips). Kills QRs customer-side; hosted-card sessions may still pay — see `docs/CLOSE-TRANSACTION-FINDINGS.md` |
 | `payway-sdk refund -t <id> -a <amount> [-c <currency>]` | Refund with a pre-flight balance check and confirmation by default; `--no-preflight` skips only the detail lookup, `-y/--force` skips both the lookup and the prompt |
 | `payway-sdk exchange-rate` | Fetch the live USD/KHR exchange rate |
-| `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (full purchase flag set incl. `--payout`, `--additional-params`, `--google-pay-token`, `--return-deeplink`; requires credentials) |
+| `payway-sdk generate-checkout -a <amount>` | Create a checkout, render its QR to PNG, and optionally poll it (`--payment-gate 0` requests the hosted QR URL) |
 | `payway-sdk checkout-form -a <amount> -o form.html` | Write the signed hosted-checkout HTML form (local signing, no API call) |
 | `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image, `create --payout <json>` adds split-payout beneficiaries `[{acc, amt}]` — total must equal the amount) |
 | `payway-sdk cof link-account / link-card` | Start a credentials-on-file link: returns the QR/deeplink (account; optional `--return-deeplink` for app deeplinks); `link-card` saves the gateway's hosted card page to `payway-output/` (that page IS the success signal); the token (`pwt`) arrives via `callback_url` |
@@ -130,7 +130,14 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk --help` | Show usage guide |
 | `payway-sdk --version` | Print SDK version |
 
-> **Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit — so scripts and agent frameworks can branch on `$?`. Lifecycle commands also accept `--json` for structured output.
+> **Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit — so scripts and agent frameworks can branch on `$?`. `generate-qr` and `generate-checkout` accept `--output json` for one versioned final result or `--output ndjson` for creation, polling, and final event records. Existing `--json` flags retain their command-specific raw-response behavior.
+
+Machine output includes the transaction ID, non-secret environment/profile context, creation outcome, normalized payment and polling state, saved QR path, and a safe next action. On a network failure during checkout creation, the outcome is `unknown` and the next action tells the caller to reconcile the same transaction ID before creating again.
+
+```bash
+payway-sdk generate-checkout -a 5.00 -t order-123 --output json --no-polling
+payway-sdk generate-checkout -a 5.00 -t order-124 --output ndjson --save-image ./checkout.png
+```
 
 ### Interactive experience
 
@@ -163,7 +170,7 @@ For **online QR**, make sure `PAYWAY_CALLBACK_URL` is a public HTTPS URL first. 
 payway-sdk setup-webhook --tunnel
 ```
 
-Online `generate-qr` saves the QR PNG by default to `payway-output/<transaction-id>.png`, renders the QR in the terminal when possible, and **opens the PNG with your OS default image viewer** so it is immediately scannable. Image-open behavior:
+Online `generate-qr` and `generate-checkout` save a QR PNG by default to `payway-output/<transaction-id>.png` when the response contains QR data. They render the QR in the terminal when possible and **open the PNG with your OS default image viewer** so it is immediately scannable. Image-open behavior:
 
 - **Auto (default):** opens only when stdout is an interactive terminal — scripts, CI, and agents are never interrupted.
 - `--open-image` — force-open regardless of environment.
