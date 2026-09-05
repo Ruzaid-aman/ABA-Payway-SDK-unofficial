@@ -29,12 +29,16 @@
 const crypto = require('node:crypto');
 
 const PRESETS = {
+  // Live 27-field purchase order (SANDBOX-FINDINGS §17, 2026-09-05): the
+  // gateway signs ctid between items and shipping on the subscription path;
+  // the live docs' 26-field list omits it and is rejected with Wrong Hash.
   checkout: [
     'req_time',
     'merchant_id',
     'tran_id',
     'amount',
     'items',
+    'ctid',
     'shipping',
     'firstname',
     'lastname',
@@ -104,9 +108,9 @@ function buildSignedPayload(preset, data, apiKey) {
     if (data[f] !== undefined && data[f] !== null) payload[f] = data[f];
   }
   const { concatenated, hash } = generateHmac(payload, fields, apiKey);
-  // ctid travels in the request body but has NO hash position (the live
-  // 26-field purchase order covers subscriptions via token_flag alone).
-  if (data.ctid !== undefined && data.ctid !== null) payload.ctid = data.ctid;
+  // ctid HAS a hash position on the purchase path (after items, §17) and is
+  // already covered by the checkout preset above when set.
+  if (data.ctid !== undefined && data.ctid !== null && !fields.includes('ctid')) payload.ctid = data.ctid;
   return { payload: { ...payload, hash }, concatenated, fields, hash };
 }
 

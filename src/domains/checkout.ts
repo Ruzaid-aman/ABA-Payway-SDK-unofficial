@@ -47,13 +47,17 @@ const DEFAULT_FORM_ID = 'aba_merchant_request';
 const POPUP_TARGET = 'aba_webservice';
 
 /**
- * Live-documented hash order for the purchase endpoint (developer.payway.com.kh
- * purchase docs). `token_flag` + `frequency` are the live subscription
- * additions appended after `skip_success_page`; omitted optional fields hash as
- * '' (they vanish under concatenation), so this list produces the exact same
- * HMAC as the previous 24-field list for callers that don't pass the
- * subscription params (pinned by test). Shared by the local payload builder
- * AND the network path so the locally-built and sent hashes can never diverge.
+ * Live hash order for the purchase endpoint. `token_flag` + `frequency` are
+ * the live subscription additions appended after `skip_success_page`; `ctid`
+ * sits between `items` and `shipping` — the gateway signs `ctid` on the
+ * subscription path even though the live docs' subscription operation omits it
+ * (SANDBOX-FINDINGS §17, 2026-09-05: the documented 26-field order is rejected
+ * with Wrong Hash; inserting ctid after items is accepted by the hash layer,
+ * pinned by probes C1/C2 with a non-empty items position). Omitted optional
+ * fields hash as '' (they vanish under concatenation), so this list produces
+ * the exact same HMAC as the 26-field list for plain purchases without ctid
+ * (pinned by test). Shared by the local payload builder AND the network path
+ * so the locally-built and sent hashes can never diverge.
  */
 export const PURCHASE_HASH_FIELDS = [
   'req_time',
@@ -61,6 +65,7 @@ export const PURCHASE_HASH_FIELDS = [
   'tran_id',
   'amount',
   'items',
+  'ctid',
   'shipping',
   'firstname',
   'lastname',
@@ -386,9 +391,10 @@ export function createCheckoutDomain(
     purchase: (params: CreateTransactionParams, callOptions?: RequestCallOptions) => {
       const payload = buildPurchasePayload(params);
       // The injected request() re-hashes fullBody with these fields
-      // (client.ts request()), so they MUST be the live 26-field order —
-      // passing a divergent list here overwrites the locally-built hash with
-      // one that omits token_flag/frequency (audit D1: gateway "Wrong Hash").
+      // (client.ts request()), so they MUST be the live 27-field order
+      // (ctid after items, §17) — passing a divergent list here overwrites
+      // the locally-built hash with one that omits ctid/token_flag/frequency
+      // (audit D1 + §17: gateway "Wrong Hash").
       return request<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>(
         ENDPOINTS.purchase,
         payload,

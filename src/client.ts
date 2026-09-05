@@ -441,8 +441,10 @@ export const MERCHANT_AUTH_DEFAULT_HASH_FIELDS: readonly string[] = ['request_ti
  * spaces (a hint containing a space breaks the dot-joined contract and the
  * drift-guard test rejects it). Endpoint-specific quirks live here in the
  * comments instead:
- * - purchase: the live 26-field order (adds the subscription `token_flag` +
- *   `frequency` positions after `skip_success_page`). Pinned to the exported
+ * - purchase: the live 27-field order (`ctid` signed after `items` per
+ *   SANDBOX-FINDINGS §17 — the live docs' subscription page omits it; plus the
+ *   subscription `token_flag` + `frequency` positions after
+ *   `skip_success_page`). Pinned to the exported
  *   `PURCHASE_HASH_FIELDS` constant by the drift-guard test.
  * - linkCard: `frequency` and `amount` are hash positions with no
  *   corresponding body field — they hash as '' (live-doc quirk). Pinned to
@@ -507,7 +509,7 @@ const SIGNATURE_ERROR_CODES = new Set(['1', '01']);
 /** Advisory hints appended to business errors for codes observed live (§16). */
 const CODE_HINTS: Record<string, string> = {
   '98': 'Merchant ID not found — verify the merchant credential (env/profile) for the target environment.',
-  '104': 'Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX; charging: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX).',
+  '104': 'Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX; charging: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX). For purchase-path subscriptions (CITR_FIX) it means the merchant profile is NOT enabled for subscription/token registration — the sandbox profile is not (SANDBOX-FINDINGS §17); ask ABA to enable it.',
   '105': 'Account token invalid or expired — re-link via linkAccount/linkCard, or renew via renewToken.',
   '09': 'Token not found — the ctid/request_id does not reference a known account token.',
 };

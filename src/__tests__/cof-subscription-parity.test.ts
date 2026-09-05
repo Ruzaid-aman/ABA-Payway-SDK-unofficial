@@ -277,9 +277,12 @@ describe('purchase subscription trio (live subscription operation)', () => {
     expect(sub.token_flag).toBe('CITR_FIX');
     expect(sub.frequency).toBe('2M');
     expect(sub.ctid).toBe('CTID-SUB');
+    // Live order (SANDBOX-FINDINGS §17, 2026-09-05): the gateway signs ctid
+    // between items and shipping on the subscription path — the live docs'
+    // 26-field list omits it and is rejected with Wrong Hash.
     const withSub = generateHmac(
       sub,
-      [...legacyFields, 'token_flag', 'frequency'],
+      [...legacyFields.slice(0, 5), 'ctid', ...legacyFields.slice(5), 'token_flag', 'frequency'],
       TEST_CONFIG.apiKey,
     );
     expect(sub.hash).toBe(withSub);
@@ -316,8 +319,9 @@ describe('purchase subscription trio (live subscription operation)', () => {
 // ---------------------------------------------------------------------------
 // purchase() NETWORK path — the SENT hash (audit D1).
 //
-// The local builder (createTransaction) already hashes over the live 26-field
-// order, but purchase() used to pass its own legacy 24-field list to the
+// The local builder (createTransaction) already hashes over the live 27-field
+// order (ctid signed after items per SANDBOX-FINDINGS §17), but purchase()
+// used to pass its own legacy 24-field list to the
 // injected request(), which UNCONDITIONALLY re-hashes (client.ts request()).
 // Subscription purchases therefore SENT a hash computed without
 // token_flag/frequency → gateway "Wrong Hash". These tests pin the hash that
@@ -325,8 +329,10 @@ describe('purchase subscription trio (live subscription operation)', () => {
 // payment-link-image.test.ts does.
 // ---------------------------------------------------------------------------
 
-// Deliberate INDEPENDENT copy of the live 26-field purchase hash order
-// (req_time … skip_success_page, then the live subscription additions
+// Deliberate INDEPENDENT copy of the live 27-field purchase hash order
+// (req_time … skip_success_page, ctid between items and shipping — the
+// gateway signs ctid on the subscription path even though the live docs omit
+// it, SANDBOX-FINDINGS §17 2026-09-05 — then the subscription additions
 // token_flag + frequency). Do NOT import PURCHASE_HASH_FIELDS here: a
 // regression in that constant must fail these assertions, not follow it.
 const LIVE_PURCHASE_HASH_FIELDS = [
@@ -335,6 +341,7 @@ const LIVE_PURCHASE_HASH_FIELDS = [
   'tran_id',
   'amount',
   'items',
+  'ctid',
   'shipping',
   'firstname',
   'lastname',
@@ -359,9 +366,9 @@ const LIVE_PURCHASE_HASH_FIELDS = [
 ];
 
 // Deliberate INDEPENDENT copy of the legacy 24-field order (the live list
-// minus token_flag/frequency) — used to pin append-compatibility.
+// minus ctid/token_flag/frequency) — used to pin append-compatibility.
 const LEGACY_PURCHASE_HASH_FIELDS = LIVE_PURCHASE_HASH_FIELDS.filter(
-  (field) => field !== 'token_flag' && field !== 'frequency',
+  (field) => field !== 'ctid' && field !== 'token_flag' && field !== 'frequency',
 );
 
 const PURCHASE_SUCCESS_BODY = {
@@ -385,7 +392,7 @@ describe('purchase() network path — sent hash', () => {
     vi.unstubAllGlobals();
   });
 
-  it('sends the subscription trio hashed over the live 26-field order', async () => {
+  it('sends the subscription trio hashed over the live 27-field order', async () => {
     const response = await payway.checkout.purchase({
       transactionId: 'SUB-NET-1',
       amount: 9.99,

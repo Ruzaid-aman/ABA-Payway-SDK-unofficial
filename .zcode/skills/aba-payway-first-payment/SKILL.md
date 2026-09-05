@@ -1,7 +1,7 @@
 ---
 name: aba-payway-first-payment
 description: Choose the right first-payment route (QR, checkout, subscription, or payment link) for an ABA PayWay integration and handle the result safely.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # ABA PayWay First Payment
@@ -157,7 +157,7 @@ agentic, risk-gated path to choose and run these routes.
 
 ## Tools (scripts/)
 
-- **`checkout-payload.cjs`** — fastest first payment: builds the locally-signed checkout payload (exact SDK 26-field signing order/formatting) and can emit a ready-to-open HTML auto-post form. No network call.
+- **`checkout-payload.cjs`** — fastest first payment: builds the locally-signed checkout payload (exact SDK 27-field signing order/formatting) and can emit a ready-to-open HTML auto-post form. No network call.
   ```sh
   node scripts/checkout-payload.cjs --tran-id order-123 --amount 10 --currency USD \
       --return-url https://example.com/success --html checkout.html

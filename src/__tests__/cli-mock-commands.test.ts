@@ -31,8 +31,9 @@ const capturedPurchaseBodies: Array<Record<string, unknown>> = [];
 // CLI --return-deeplink flag must reach the urlencoded wire body base64-encoded).
 const capturedLinkAccountBodies: Array<Record<string, unknown>> = [];
 
-// Deliberate INDEPENDENT copy of the live 26-field purchase hash order
-// (audit D1). Do NOT import PURCHASE_HASH_FIELDS here: a regression in that
+// Deliberate INDEPENDENT copy of the live 27-field purchase hash order
+// (audit D1 + §17: ctid signed after items — the live docs' list omits it).
+// Do NOT import PURCHASE_HASH_FIELDS here: a regression in that
 // constant must fail these assertions, not follow it.
 const LIVE_PURCHASE_HASH_FIELDS = [
   'req_time',
@@ -40,6 +41,7 @@ const LIVE_PURCHASE_HASH_FIELDS = [
   'tran_id',
   'amount',
   'items',
+  'ctid',
   'shipping',
   'firstname',
   'lastname',

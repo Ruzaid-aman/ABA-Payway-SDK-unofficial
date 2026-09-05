@@ -23,15 +23,19 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 
-// Live 26-field purchase order (src/domains/checkout.ts PURCHASE_HASH_FIELDS):
-// token_flag + frequency are appended after skip_success_page; omitted fields
-// hash as '' so plain purchases are byte-identical to the legacy 24-field HMAC.
+// Live 27-field purchase order (src/domains/checkout.ts PURCHASE_HASH_FIELDS):
+// ctid sits between items and shipping (the gateway signs it on the
+// subscription path — SANDBOX-FINDINGS §17, 2026-09-05; the live docs' list
+// omits it), token_flag + frequency are appended after skip_success_page;
+// omitted fields hash as '' so plain purchases are byte-identical to the
+// legacy 24-field HMAC.
 const FIELD_ORDER = [
   'req_time',
   'merchant_id',
   'tran_id',
   'amount',
   'items',
+  'ctid',
   'shipping',
   'firstname',
   'lastname',
@@ -138,9 +142,8 @@ function buildCheckoutPayload(params) {
   const hash = crypto.createHmac('sha512', params.apiKey).update(concatenated).digest('base64');
   const payload = {};
   for (const f of FIELD_ORDER) if (data[f] !== undefined) payload[f] = data[f];
-  // ctid travels in the request body but has NO hash position (the live
-  // 26-field order covers it via token_flag alone — SANDBOX-FINDINGS §16).
-  if (data.ctid !== undefined) payload.ctid = data.ctid;
+  // ctid HAS a hash position on the purchase path (after items — §17) and is
+  // already included above when set.
   return { payload: { ...payload, hash }, concatenated };
 }
 

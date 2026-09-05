@@ -674,3 +674,54 @@ request_id/ctid/pwt values are sufficient.
    endpoint answers in HTML); aligned on family consistency + documented order.
 6. `npm run bundle` is FIXED as of 13f817e (duplicate `$ref` under `components.schemas` removed); §15c's
    hand-maintained `payway-openapi/bundled.yaml` can now be regenerated (`dist/openapi.bundled.yaml`).
+
+## 17. Subscription trio "Wrong Hash" root-caused: gateway signs `ctid`; docs omit it; profile not subscription-enabled (2026-09-05)
+
+**Context.** The 2026-09-03 skills audit (T1 blocker) live-reproduced `Wrong Hash`
+(code 1, HTTP 403) for `purchase` with the subscription trio
+(`ctid` + `token_flag=CITR_FIX` + `frequency`) on every documented
+`payment_option`, while the SAME body without the trio succeeds. The gateway's
+wrong-hash hint prints the documented 26-field order — which matches
+`PURCHASE_HASH_FIELDS` byte-for-byte — yet the hash is rejected. Re-probed and
+confirmed live 2026-09-05.
+
+**Method.** `scripts/sandbox-probe-subscription.ts` (new, re-runnable, per-case
+filter args) builds the exact SDK body via `checkout.createTransaction()`, then
+re-signs it with candidate hash orders and POSTs to `/payments/purchase`.
+Classification per §16: wrong-hash codes prove rejection; ANY other business
+code proves the hash layer ACCEPTED. Evidence:
+`test-output/subscription-hash/probe-2026-09-05T10-35-35-445Z.log` (A–B6) and
+`probe-2026-09-05T10-37-53-177Z.log` (C1/C2 disambiguation).
+
+**Findings.**
+
+1. **The live docs' subscription hash order is WRONG: it omits `ctid`.** With
+   `ctid` inserted after `items`, the hash layer ACCEPTS (business code
+   observed); the documented 26-field order (and 4 other ctid placements:
+   before token_flag, after frequency, after merchant_id, body-only) are all
+   rejected with code 1. Probe C1/C2 (items present, non-empty) disambiguated
+   the position: ctid AFTER items accepted (104), ctid BEFORE items (right
+   after amount) rejected. The live composition is the **27-field order**
+   `req_time.merchant_id.tran_id.amount.items.ctid.shipping.…
+   .skip_success_page.token_flag.frequency` — the same `ctid`-after-`items`
+   motif as the §16 payment-credential composition.
+2. **The gateway's wrong-hash hint prints the DOC list, not the enforcement
+   list** — it shows 26 fields (no ctid) while enforcement includes ctid. Do
+   not treat the hint as authoritative; it is a static template.
+3. **Merchant profile `ec476910` is NOT subscription-enabled.** With the
+   correct (ctid-signed) composition the gateway answers **`104` "Merchant not
+   enabled token flag"** (HTTP 403) — the §16 rule in action: past the hash
+   layer, business layer refuses. A green end-to-end subscription checkout is
+   impossible on this profile until ABA enables subscription/token
+   registration. The CODE_HINTS entry for `104` now says so.
+4. **Fix shipped:** `ctid` added to `PURCHASE_HASH_FIELDS` after `items` (one
+   shared order — for plain purchases `ctid` is absent from the body, hashes as
+   `''`, and the HMAC is byte-identical to the 26-field order, so plain
+   purchases are unaffected; pinned by tests). The OpenAPI subscription
+   operation documents the gateway divergence. Bundled skill scripts
+   (`sign-request.cjs`, `checkout-payload.cjs`) realigned to the 27-field
+   order in the same change.
+5. Probe note: the probe script initially classified numeric codes against a
+   string set (`WRONG_HASH_CODES.has(1)` vs `'1'`) and mislabeled verdicts in
+   the first run's SUMMARY — the raw codes in the log are authoritative; the
+   script now String()s the code before classification.

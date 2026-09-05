@@ -108,9 +108,10 @@ describe('sign-request.cjs (HMAC-SHA512 request signing)', () => {
       },
       'k',
     );
-    // The live 26-field order appends token_flag + frequency AFTER
-    // skip_success_page; ctid travels in the body with NO hash position.
-    expect(concatenated).toBe('tmsub-19.99USDCITR_FIX1M');
+    // The live 27-field order (§17, 2026-09-05) signs ctid AFTER items —
+    // empty positions (items/shipping/…) vanish; token_flag + frequency are
+    // appended after skip_success_page (the tool always sets type: 'purchase').
+    expect(concatenated).toBe('tmsub-19.99customer123USDCITR_FIX1M');
     expect(payload.token_flag).toBe('CITR_FIX');
     expect(payload.frequency).toBe('1M');
     expect(payload.ctid).toBe('customer123');
@@ -211,7 +212,7 @@ describe('checkout-payload.cjs (signed checkout payload + HTML form)', () => {
     expect(payload.hash).toBe(createHmac('sha512', 'k').update(concatenated).digest('base64'));
   });
 
-  it('signs the subscription trio in the live appended positions and emits ctid un-hashed', () => {
+  it('signs the subscription trio in the live appended positions with ctid after items', () => {
     const { payload, concatenated } = checkout.buildCheckoutPayload({
       tranId: 'sub-1',
       amount: 9.99,
@@ -226,9 +227,10 @@ describe('checkout-payload.cjs (signed checkout payload + HTML form)', () => {
     expect(payload.ctid).toBe('customer123');
     expect(payload.token_flag).toBe('CITR_FIX');
     expect(payload.frequency).toBe('1M');
-    // token_flag + frequency hash after skip_success_page (the tool always sets
-    // type: 'purchase'); ctid has NO hash position.
-    expect(concatenated).toBe('tmsub-19.99purchaseUSDCITR_FIX1M');
+    // ctid hashes after items (§17 — the gateway signs it on the subscription
+    // path); token_flag + frequency hash after skip_success_page (the tool
+    // always sets type: 'purchase').
+    expect(concatenated).toBe('tmsub-19.99customer123purchaseUSDCITR_FIX1M');
   });
 
   it('rejects lifetime below 3 minutes (purchase lifetime is MINUTES, min 3)', () => {

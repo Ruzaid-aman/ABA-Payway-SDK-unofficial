@@ -11,12 +11,15 @@
     x-hmac-fields:
       # Exact order PayWay's reference implementation concatenates.
       # Every position must be present even if the caller left the
-      # field unset (substitute '').
+      # field unset (substitute ''). ctid is signed AFTER items on this
+      # endpoint (SANDBOX-FINDINGS §17, 2026-09-05) even for plain
+      # purchases — unset, it hashes as '' and vanishes.
       - req_time
       - merchant_id
       - tran_id
       - amount
       - items
+      - ctid
       - shipping
       - firstname
       - lastname
@@ -79,15 +82,24 @@
       frequency. payment_option enum differs from Purchase:
       cards | abapay | abapay_deeplink (KHQR options not documented here).
       Firstname/lastname are capped at 20 chars (vs 100 on Purchase).
+      GATEWAY DIVERGENCE (sandbox-verified 2026-09-05, SANDBOX-FINDINGS §17):
+      the live docs' hash order for this operation OMITS ctid, but the
+      gateway signs ctid between items and shipping — the documented
+      26-field list is rejected with Wrong Hash. Also: the merchant profile
+      must be subscription-enabled, else the business layer answers 104
+      "Merchant not enabled token flag" (the sandbox profile is not).
     x-hmac-fields:
       # Live docs order — note: no google_pay_token position; token_flag and
       # frequency appended at the END (after skip_success_page). additional_params
       # occupies a hash position though no property row exists on the live page.
+      # GATEWAY DIVERGENCE: ctid IS signed (after items) even though the live
+      # page omits it — sandbox-verified 2026-09-05 (§17 probes A–C2).
       - req_time
       - merchant_id
       - tran_id
       - amount
       - items
+      - ctid
       - shipping
       - firstname
       - lastname

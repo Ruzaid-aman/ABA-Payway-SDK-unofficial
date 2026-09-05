@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+> Subscription "Wrong Hash" root cause (skills-audit T1, SANDBOX-FINDINGS §17,
+> 2026-09-05): the gateway signs `ctid` on the purchase path (between `items`
+> and `shipping`) even though the live docs' subscription operation omits it —
+> the documented 26-field order is rejected with Wrong Hash. Also: the sandbox
+> merchant profile is not subscription-enabled (`104`), which remains an
+> external blocker for end-to-end subscription testing.
+
+### Fixed
+
+- **Subscription purchases rejected with `Wrong Hash` (code 1)** — `ctid` now
+  hashes after `items` in `PURCHASE_HASH_FIELDS` (live 27-field order,
+  sandbox-verified via `scripts/sandbox-probe-subscription.ts` probes A–C2;
+  evidence `test-output/subscription-hash/`). One shared order: for plain
+  purchases `ctid` is absent from the body, hashes as `''`, and the HMAC is
+  byte-identical to the previous 26-field order (pinned). The gateway's
+  wrong-hash hint prints the DOC list, not the enforcement list — do not trust
+  it as authoritative.
+- **`104` hint extended** — on the purchase path `104` "Merchant not enabled
+  token flag" means the merchant profile is not subscription-enabled (the
+  sandbox profile `ec476910` is not, live 2026-09-05); not an integration bug.
+- **OpenAPI** — `purchase`/`purchase#subscription` `x-hmac-fields` now carry
+  `ctid` after `items`, with the gateway-vs-docs divergence documented
+  (annotation-only change; `src/types.ts` unaffected).
+- **Skills** — `aba-payway-subscription` v1.1.0: 27-field hash order, profile
+  gate section, CLI example gains `--payment-option` (the default
+  `abapay_khqr_deeplink` is outside the documented subscription set);
+  `aba-payway-hash` v1.3.0 + `aba-payway-first-payment` v1.3.0 bundled scripts
+  realigned to the 27-field order. New re-runnable probe script
+  `scripts/sandbox-probe-subscription.ts`.
+
 > Skills-corpus batch (S2) of the five-layer sync audit
 > (`audit-results/sync-audit-2026-09-01.md` §3/§6 S2). Skills-layer only — no
 > SDK/CLI code paths change; the only test-visible changes are the skill-script
