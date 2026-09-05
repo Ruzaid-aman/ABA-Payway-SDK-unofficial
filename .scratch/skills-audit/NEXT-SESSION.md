@@ -6,6 +6,7 @@
 > - **T3.1–T3.4 DONE** (`0027d58`) — script exit-code contract (0 ok · 1 runtime/API · 2 usage/env, documented in skills/README.md), .env auto-load, code-6 decode sync. T3.5 DONE (`3e27bb4`) — --json error envelopes for check-transaction + transaction-detail. **T3.6/T3.7 closed as already-correct** — `config` exits 1 on error-severity issues and `validate` exits 1 on invalid values; the audit's exit-0 claims do not reproduce (live-verified 2026-09-05).
 > - **T4** — questions drafted in [ABA-QUESTIONS-2026-09-05.md](ABA-QUESTIONS-2026-09-05.md) (Q-A subscription, Q-B model, Q-C mc-ref 404, Q-D carried).
 > - **T5.2/T5.3** — still PROPOSED, not built (needs user go-ahead per HANDOFF §5.8). T5.1 DONE (contract written into skills/README.md). T5.5/T5.6 were folded into T2 edits.
+> - **NEXT (2026-09-05 evening): all audit items closed — the next session's primary task is the Purchase API test campaign**: `.scratch/purchase-api-test-plan/TEST-PLAN.md` (KHQR + card × 4 routes, H1–H8, waves 1–4, user-manual steps U1–U12). See HANDOFF.md "Last updated" + §5.1.
 
 **Provenance:** extracted from the full skills audit ([REPORT.md](REPORT.md), 29/29 skills tested by 3 parallel agents; evidence in [group-A-payments.md](group-A-payments.md), [group-B-cof-tokens.md](group-B-cof-tokens.md), [group-C-transactions-payout.md](group-C-transactions-payout.md)). Do not re-probe what §6 below already answers — the evidence files carry commands + outputs.
 
