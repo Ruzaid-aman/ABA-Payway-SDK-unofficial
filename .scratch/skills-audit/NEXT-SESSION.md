@@ -1,5 +1,12 @@
 # Next-Session Work List — from the 2026-09-03 skills audit
 
+> **STATUS (2026-09-05 session):**
+> - **T1 DONE** — root-caused + fixed in `3f54398`: the gateway signs `ctid` between `items` and `shipping` (27-field order); the docs' 26-field list omits ctid and is rejected. With the fix the gateway answers `104` "Merchant not enabled token flag" — the sandbox profile is NOT subscription-enabled (external blocker; question drafted in [ABA-QUESTIONS-2026-09-05.md](ABA-QUESTIONS-2026-09-05.md)). Evidence: `test-output/subscription-hash/`, SANDBOX-FINDINGS §17, `scripts/sandbox-probe-subscription.ts`.
+> - **T2 DONE** (`e1e778d`) — 9 skill one-liners + AGENTS.md/README payout account swap; audit greps re-run clean; `.zcode/skills` re-synced.
+> - **T3.1–T3.4 DONE** (`0027d58`) — script exit-code contract (0 ok · 1 runtime/API · 2 usage/env, documented in skills/README.md), .env auto-load, code-6 decode sync. T3.5 DONE (`3e27bb4`) — --json error envelopes for check-transaction + transaction-detail. **T3.6/T3.7 closed as already-correct** — `config` exits 1 on error-severity issues and `validate` exits 1 on invalid values; the audit's exit-0 claims do not reproduce (live-verified 2026-09-05).
+> - **T4** — questions drafted in [ABA-QUESTIONS-2026-09-05.md](ABA-QUESTIONS-2026-09-05.md) (Q-A subscription, Q-B model, Q-C mc-ref 404, Q-D carried).
+> - **T5.2/T5.3** — still PROPOSED, not built (needs user go-ahead per HANDOFF §5.8). T5.1 DONE (contract written into skills/README.md). T5.5/T5.6 were folded into T2 edits.
+
 **Provenance:** extracted from the full skills audit ([REPORT.md](REPORT.md), 29/29 skills tested by 3 parallel agents; evidence in [group-A-payments.md](group-A-payments.md), [group-B-cof-tokens.md](group-B-cof-tokens.md), [group-C-transactions-payout.md](group-C-transactions-payout.md)). Do not re-probe what §6 below already answers — the evidence files carry commands + outputs.
 
 **Rule of thumb:** items are ordered by user impact. T1 fixes a broken documented flow; T2 is cheap one-line doc truth; T3 is script hygiene; T4/T5 need external answers — timebox, don't guess.
