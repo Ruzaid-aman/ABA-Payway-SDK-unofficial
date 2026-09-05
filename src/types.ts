@@ -1101,10 +1101,12 @@ export interface components {
             request_time: string;
             /** @description Merchant key issued by ABA Bank. */
             merchant_id: string;
-            /** @description Base64 of RSA-encrypted, chunked JSON containing transaction details (title, amount, currency, description, payment_limit, return_url, merchant_ref_no, expired_date). */
+            /** @description Base64 of RSA-encrypted, chunked JSON containing transaction details (title, amount, currency, description, payment_limit, return_url, merchant_ref_no, expired_date, payout). */
             merchant_auth: string;
             /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
             hash: string;
+            /** @description Optional split-payout instructions INSIDE the merchant_auth plaintext (JSON array "[{acc, amt}]" as a string value — the whole auth payload is JSON-encoded, so an array value would double-encode). Documented rule: the total payout amt must equal the link amount. Officially optional. Listed here as a top-level property so schema tooling can see it; the wire format is the merchant_auth plaintext shape (see x-merchant-auth-encryption). */
+            payout?: string;
             /**
              * Format: binary
              * @description Optional image shown with the payment link (top-level multipart part, not part of the hash). The created PaymentLink echoes it back as the `image` object.
@@ -1136,9 +1138,13 @@ export interface components {
             status?: string;
             description?: string;
             payment_limit?: number;
+            /** @description Total payment amount before refunds (official schema says string; observed numeric — do not rely on the type). */
             total_amount_org?: number;
+            /** @description Total refunded amount (official create schema: number; official detail schema: string — observed numeric; do not rely on the type). */
             total_refund?: number;
+            /** @description Total amount after refunds. */
             total_amount?: number;
+            /** @description The total number of completed payment transactions (0 on create). */
             total_trxn?: number;
             /** @description YYYY-MM-DD HH:mm:ss */
             created_at?: string;
@@ -1148,18 +1154,20 @@ export interface components {
             expired_date?: number | string;
             /** @description Decoded callback URL. */
             return_url?: string;
+            /** @description The URL the gateway calls to send payment status updates (detail endpoint; official detail schema — may mirror return_url). */
+            pushback_url?: string;
             merchant_ref_no?: string;
             outlet_id?: string;
             outlet_name?: string;
-            /** @description Payout details (null when none). */
-            payout?: Record<string, never> | null;
+            /** @description Payout details (null when none). The official apidog create schema places a top-level payout array of {acc, amt, acc_name}; the official overview sample response shows it inside data as an array. Placement/shape verified per sandbox evidence. */
+            payout?: Record<string, never> | unknown[] | null;
             /** @description Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N). */
             payment_link?: string;
         };
         CreatePaymentLinkResponse: {
             status?: components["schemas"]["PaymentLinkStatus"];
-            /** @description Numeric gateway transaction id (also present as a string in status.tran_id). */
-            tran_id?: number;
+            /** @description Gateway log id. Official schemas say string; the official overview sample shows an integer — coerce, do not rely on the type. */
+            tran_id?: number | string;
             data?: components["schemas"]["PaymentLink"];
         };
         GetPaymentLinkDetailsRequest: {
@@ -1173,8 +1181,8 @@ export interface components {
         };
         GetPaymentLinkDetailsResponse: {
             status?: components["schemas"]["PaymentLinkStatus"];
-            /** @description Numeric gateway transaction id (also present as a string in status.tran_id). */
-            tran_id?: number;
+            /** @description Gateway log id. Official schemas say string; observed integer — coerce, do not rely on the type. */
+            tran_id?: number | string;
             data?: components["schemas"]["PaymentLink"];
         };
         /** @description Uses RSA-encrypted merchant_auth. NOTE: uses request_time (not req_time), same convention as the Refund endpoint. */

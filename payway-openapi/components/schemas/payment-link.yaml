@@ -23,10 +23,20 @@ CreatePaymentLinkRequest:
       description: >
         Base64 of RSA-encrypted, chunked JSON containing transaction
         details (title, amount, currency, description, payment_limit,
-        return_url, merchant_ref_no, expired_date).
+        return_url, merchant_ref_no, expired_date, payout).
     hash:
       type: string
       description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+    payout:
+      type: string
+      description: >
+        Optional split-payout instructions INSIDE the merchant_auth
+        plaintext (JSON array "[{acc, amt}]" as a string value — the whole
+        auth payload is JSON-encoded, so an array value would
+        double-encode). Documented rule: the total payout amt must equal
+        the link amount. Officially optional. Listed here as a top-level
+        property so schema tooling can see it; the wire format is the
+        merchant_auth plaintext shape (see x-merchant-auth-encryption).
     image:
       type: string
       format: binary
@@ -60,10 +70,18 @@ PaymentLink:
       description: Link status (e.g. OPEN).
     description: { type: string }
     payment_limit: { type: integer }
-    total_amount_org: { type: number }
-    total_refund: { type: number }
-    total_amount: { type: number }
-    total_trxn: { type: integer }
+    total_amount_org:
+      type: number
+      description: "Total payment amount before refunds (official schema says string; observed numeric — do not rely on the type)."
+    total_refund:
+      type: number
+      description: "Total refunded amount (official create schema: number; official detail schema: string — observed numeric; do not rely on the type)."
+    total_amount:
+      type: number
+      description: Total amount after refunds.
+    total_trxn:
+      type: integer
+      description: The total number of completed payment transactions (0 on create).
     created_at:
       type: string
       description: "YYYY-MM-DD HH:mm:ss"
@@ -76,12 +94,24 @@ PaymentLink:
     return_url:
       type: string
       description: Decoded callback URL.
+    pushback_url:
+      type: string
+      description: >
+        The URL the gateway calls to send payment status updates (detail
+        endpoint; official detail schema — may mirror return_url).
     merchant_ref_no: { type: string }
     outlet_id: { type: string }
     outlet_name: { type: string }
     payout:
-      type: ['object', 'null']
-      description: Payout details (null when none).
+      oneOf:
+        - type: object
+        - type: array
+        - type: 'null'
+      description: >
+        Payout details (null when none). The official apidog create schema
+        places a top-level payout array of {acc, amt, acc_name}; the
+        official overview sample response shows it inside data as an
+        array. Placement/shape verified per sandbox evidence.
     payment_link:
       type: string
       description: Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N).
@@ -101,8 +131,10 @@ CreatePaymentLinkResponse:
     status:
       $ref: '#/PaymentLinkStatus'
     tran_id:
-      type: integer
-      description: Numeric gateway transaction id (also present as a string in status.tran_id).
+      description: >
+        Gateway log id. Official schemas say string; the official overview
+        sample shows an integer — coerce, do not rely on the type.
+      oneOf: [{ type: integer }, { type: string }]
     data:
       $ref: '#/PaymentLink'
 
@@ -125,7 +157,9 @@ GetPaymentLinkDetailsResponse:
     status:
       $ref: '#/PaymentLinkStatus'
     tran_id:
-      type: integer
-      description: Numeric gateway transaction id (also present as a string in status.tran_id).
+      description: >
+        Gateway log id. Official schemas say string; observed integer —
+        coerce, do not rely on the type.
+      oneOf: [{ type: integer }, { type: string }]
     data:
       $ref: '#/PaymentLink'
