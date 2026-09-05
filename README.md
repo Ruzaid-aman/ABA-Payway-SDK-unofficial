@@ -72,7 +72,7 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Fro
 
 ### Agentic PayWay CLI
 
-The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk onboard`, `payway-sdk agent setup|doctor|sessions`). See the [1-pager agentic guide](./docs/QUICK-START-1-PAGER.md#agentic-payway-cli) and the skill guides:
+The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk onboard`, `payway-sdk agent setup|doctor|sessions`). See the [versioned 1-pager agentic guide](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/QUICK-START-1-PAGER.md#agentic-payway-cli) and the packaged skill guides:
 
 - [aba-payway-agent skill](./skills/aba-payway-agent/SKILL.md) — provider modes, the 11 tools, risk gates, execution ledger, sessions, redaction.
 - [aba-payway-first-payment skill](./skills/aba-payway-first-payment/SKILL.md) — choosing QR / checkout / payment-link for a first payment.
@@ -90,7 +90,7 @@ payway-sdk agent setup --provider openrouter --model <provider-model-id> \
 payway-sdk ask "Generate an online QR for 3 USD" --yolo
 ```
 
-> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. The strict-JSON planning prompt embeds a full tool catalog, off-schema plans get one automatic repair round, and transient provider errors (429/5xx) are retried with backoff. Model-supplied callback URLs are overridden by your merchant profile's configured callback. Every agent action has a fully-supported manual equivalent. Setup requires a saved credential profile and a public HTTPS callback — see the [Agent Setup Playbook](./docs/AGENT-SETUP-PLAYBOOK.md) for the field-tested path.
+> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. The strict-JSON planning prompt embeds a full tool catalog, off-schema plans get one automatic repair round, and transient provider errors (429/5xx) are retried with backoff. Model-supplied callback URLs are overridden by your merchant profile's configured callback. Every agent action has a fully-supported manual equivalent. Setup requires a saved credential profile and a public HTTPS callback — see the [versioned Agent Setup Playbook](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/AGENT-SETUP-PLAYBOOK.md).
 
 ### CLI commands
 
@@ -176,7 +176,7 @@ Online `generate-qr` and `generate-checkout` save a QR PNG by default to `payway
 - `--open-image` — force-open regardless of environment.
 - `--no-open-image` — never open; use `--save-image <path>` still controls where the file lands.
 
-The same opener is available programmatically via the exported [`openImageInDefaultViewer()`](src/open-image.ts) helper (allowlisted per-platform command, spawned without a shell, never throws).
+The same opener is available programmatically via the exported [`openImageInDefaultViewer()`](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/src/open-image.ts) helper (allowlisted per-platform command, spawned without a shell, never throws).
 
 ### Fastest refund follow-up
 
@@ -220,39 +220,15 @@ Credential resolution order for CLI commands: explicit `--profile`, `PAYWAY_PROF
 
 Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or `~/.config/aba-payway-sdk/profiles.json` when `APPDATA` is unavailable). Keep that file out of source control and restrict local access. For deployed SDK applications, use an OS secret manager, a cloud secret manager, or CI/CD secret storage; never put PayWay keys in browser/mobile-client code or commit them to `.env` files.
 
-### Sandbox test scripts
-
-| Script | Description |
-|---|---|
-| `npx tsx scripts/sandbox-probe.ts` | Run full sandbox probe across all 7 API domains |
-| `npx tsx scripts/sandbox-campaign-full-cycle.ts` | Full-cycle validation campaign: purchase → check → close → detail → list → refund + edge cases (writes `test-output/campaign-evidence.json`) |
-| `npx tsx scripts/sandbox-probe-qr-api.ts` | Probe QR API endpoint specifically |
-| `npx tsx scripts/sandbox-probe-txn-detail.ts` | Instrumented get-transaction-detail probe: latency, visibility lag, rate-limit contract |
-| `npx tsx scripts/sandbox-probe-checkout-errors.ts` | Probe checkout error handling |
-| `npx tsx scripts/sandbox-probe-cof.ts` | Probe credentials-on-file endpoints |
-| `npx tsx scripts/sandbox-probe-pre-auth.ts` | Probe pre-authorization endpoints |
-| `npx tsx scripts/sandbox-probe-payout.ts` | Probe payout/beneficiary endpoints |
-| `npx tsx scripts/sandbox-probe-khqr.ts` | Probe KHQR endpoints |
-| `npx tsx scripts/sandbox-integration-test.ts` | Full lifecycle test — QR → poll → refund → exchange rate |
-| `npx tsx scripts/post-payment-test.ts` | Post-payment operations (refund, close, check) |
-| `npx tsx scripts/qr-payment-test.ts` | QR payment flow with live transaction polling |
-| `npx tsx scripts/online-qr-poll.ts` | One online KHQR (default $31.11 USD, 600s lifetime) → save/open PNG → poll every 5s for 10 min |
-| `npx tsx scripts/checkout-link-poll.ts` | Create Transaction API (default $12.12 USD, 600s lifetime) → open hosted `checkout_qr_url` → poll every 5s for 10 min |
-| `npx tsx scripts/check-qr-transactions.ts` | Fetch transactions via `getTransactionList`, query detail for each |
-| `npx tsx scripts/test-all-qr-templates.ts` | Internal sandbox probe for QR template variants; the public SDK currently accepts the seven values listed by `payway-sdk generate-qr --help` |
-| `npx tsx scripts/zero-logic-purchase-flow.ts` | End-to-end purchase flow with no business logic (demo) |
-
-Results from integration scripts are written to `test-logs/` with timestamps.
-
 ## Quick Start
 
 ### Full integration guide
 
-For a complete 16-chapter integration guide, diagrams, and runnable examples, see [docs/README.md](./docs/README.md).
+Start with the packaged [QUICKSTART.md](./QUICKSTART.md). For the complete 16-chapter integration guide, diagrams, and runnable examples, see the [versioned documentation index](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/README.md).
 
-> 🗺️ **New to the project?** Start with the [Visual Guide](./docs/VISUAL-GUIDE.md) — architecture, setup paths, onboarding journey, and the payment lifecycle in one page of diagrams.
+> 🗺️ **New to the project?** Use the [versioned Visual Guide](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/VISUAL-GUIDE.md) for architecture, setup paths, onboarding, and the payment lifecycle.
 
-> Note: The SDK also performs fast client-side validation per domain. See the validation behavior section in [docs/README.md](./docs/README.md) for details.
+> Note: The SDK also performs fast client-side validation per domain. See the validation section in the versioned documentation index for details.
 
 > [!CAUTION]
 > **Observed PayWay limitations (sandbox, 2026-09-05):** create a fresh transaction ID for every attempt and reconcile an ambiguous create response before starting another payment. A PENDING record does not prove that an older QR still scans. Closing a transaction is not exposed by read APIs and did not stop already-rendered hosted card sessions, so keep a local closed flag and still accept late verified payment. The hosted page must be reached as the response to its signed browser form POST; saving or embedding the returned HTML can leave relative assets and QR hydration blank. Reconcile the requested amount/currency separately from the payer debit, use `refund_amount` for partial refunds, and interpret gateway timestamps in UTC+7. These are dated sandbox observations, not guaranteed production behavior.
@@ -267,7 +243,6 @@ For a complete 16-chapter integration guide, diagrams, and runnable examples, se
 - `docs/VERSIONING.md` for SDK versioning policy
 - `docs/RELEASE_CHECKLIST.md` for release verification and sandbox gating
 - `docs/api/index.html` for the generated TypeDoc API reference (regenerate with `npm run docs:api`)
-- `HANDOFF.md` for the agent-facing state handoff (current release, behavior contract, next work items)
 
 ### 1. Initialize the Client
 
@@ -358,7 +333,7 @@ const paywayWithRetry = new PayWay({
 > network error or 5xx is silently re-sent (up to `maxRetries`). PayWay's
 > sandbox accepts duplicate `tran_id` by overwriting, so this recovers
 > transparently there — but production duplicate semantics are unconfirmed
-> (open question in [SANDBOX-FINDINGS §8c](./docs/SANDBOX-FINDINGS.md)). If
+> (an open provider-contract question as of 2026-09-05). If
 > you need strict once-only submission, pass `retryPolicy: 'none'` to
 > `checkout.purchase()`. If the response is lost, query the persisted
 > transaction ID before authorizing a new attempt; never blindly create a
@@ -621,7 +596,7 @@ const link = await payway.paymentLink.create({
 const details = await payway.paymentLink.getDetails(link.id);
 ```
 
-Attach an image (sent as a top-level `multipart/form-data` part; the image bytes are **not** part of the HMAC hash — sandbox-verified 2026-08-31, see [SANDBOX-FINDINGS §15](./docs/SANDBOX-FINDINGS.md)):
+Attach an image as a top-level `multipart/form-data` part. The image bytes are **not** part of the HMAC hash (sandbox-verified 2026-08-31):
 
 ```typescript
 import { readFileSync } from 'node:fs';

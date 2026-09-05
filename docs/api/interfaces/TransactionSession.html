@@ -15,9 +15,7 @@
 by the Client module. The Test Harness generates mock variations of this
 object.</p>
 </div></section>
-<div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">TransactionSession</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#expiresat">expiresAt</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#raw">raw</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#responsepayload">responsePayload</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#responsetype">responseType</a><span class="tsd-signature-symbol">:</span> <a href="../types/ResponseType.html" class="tsd-signature-type tsd-kind-type-alias">ResponseType</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#sessionid">sessionId</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#status">status</a><span class="tsd-signature-symbol">:</span> <a href="../types/SessionStatus.html" class="tsd-signature-type tsd-kind-type-alias">SessionStatus</a><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
-<ul>
-<li>Defined in src/schema.ts:46</li></ul></aside>
+<div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">TransactionSession</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#expiresat">expiresAt</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#raw">raw</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#responsepayload">responsePayload</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#responsetype">responseType</a><span class="tsd-signature-symbol">:</span> <a href="../types/ResponseType.html" class="tsd-signature-type tsd-kind-type-alias">ResponseType</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#sessionid">sessionId</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#status">status</a><span class="tsd-signature-symbol">:</span> <a href="../types/SessionStatus.html" class="tsd-signature-type tsd-kind-type-alias">SessionStatus</a><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -38,17 +36,15 @@ object.</p>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="expiresat"><span>expires<wbr/>At</span><a href="#expiresat" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">expiresAt</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
-<div class="tsd-comment tsd-typography"><p>ISO-8601 timestamp when this session expires.</p>
-</div><aside class="tsd-sources">
-<ul>
-<li>Defined in src/schema.ts:63</li></ul></aside></section>
+<div class="tsd-comment tsd-typography"><p>Merchant-side deadline derived from the requested <code>lifetime</code> (60 minutes by
+default). This is scheduling metadata; only a status check or callback can
+establish whether PayWay still accepts payment for the transaction.</p>
+</div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="raw"><code class="tsd-tag">Optional</code><span>raw</span><a href="#raw" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">raw</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">unknown</span></div>
 <div class="tsd-comment tsd-typography"><p>The original, unmodified PayWay response for advanced/debug use.</p>
-</div><aside class="tsd-sources">
-<ul>
-<li>Defined in src/schema.ts:65</li></ul></aside></section>
+</div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="responsepayload"><span>response<wbr/>Payload</span><a href="#responsepayload" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">responsePayload</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
@@ -60,30 +56,22 @@ object.</p>
 <li><code>url</code>       : string (checkout URL)</li>
 <li><code>html</code>      : string (HTML snippet)</li>
 </ul>
-</div><aside class="tsd-sources">
-<ul>
-<li>Defined in src/schema.ts:61</li></ul></aside></section>
+</div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="responsetype"><span>response<wbr/>Type</span><a href="#responsetype" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">responseType</span><span class="tsd-signature-symbol">:</span> <a href="../types/ResponseType.html" class="tsd-signature-type tsd-kind-type-alias">ResponseType</a></div>
 <div class="tsd-comment tsd-typography"><p>Discriminator the client uses to pick the correct rendering strategy.</p>
-</div><aside class="tsd-sources">
-<ul>
-<li>Defined in src/schema.ts:52</li></ul></aside></section>
+</div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="sessionid"><span>session<wbr/>Id</span><a href="#sessionid" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">sessionId</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Merchant/SDK-generated unique session identifier.</p>
-</div><aside class="tsd-sources">
-<ul>
-<li>Defined in src/schema.ts:48</li></ul></aside></section>
+</div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="status"><span>status</span><a href="#status" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">status</span><span class="tsd-signature-symbol">:</span> <a href="../types/SessionStatus.html" class="tsd-signature-type tsd-kind-type-alias">SessionStatus</a></div>
 <div class="tsd-comment tsd-typography"><p>Current lifecycle status of the session.</p>
-</div><aside class="tsd-sources">
-<ul>
-<li>Defined in src/schema.ts:50</li></ul></aside></section></section></details></div>
+</div></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -101,7 +89,7 @@ object.</p>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary>
 <div><a href="#expiresat"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>expires<wbr/>At</span></a><a href="#raw"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>raw</span></a><a href="#responsepayload"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>response<wbr/>Payload</span></a><a href="#responsetype"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>response<wbr/>Type</span></a><a href="#sessionid"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>session<wbr/>Id</span></a><a href="#status"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>status</span></a></div></details></div></details></div>
 <div class="site-menu">
-<nav class="tsd-navigation"><a href="../modules.html">aba-payway-ts</a>
+<nav class="tsd-navigation"><a href="../index.html">aba-payway-ts</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
 <li>Loading...</li></ul></nav></div></div></div><footer>
 <p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>

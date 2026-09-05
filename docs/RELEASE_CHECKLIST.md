@@ -19,12 +19,23 @@ npm run typecheck
 
 - [ ] Verify documentation links and examples.
 
+- [ ] Verify the npm and generated-docs boundaries:
+
+```bash
+npm run check:package
+npm run docs:api
+npm run check:public-docs
+npm run smoke:package
+```
+
+The package check requires `LICENSE`, `CHANGELOG.md`, `QUICKSTART.md`, runtime/declaration files, and all 30 skill guides. It rejects source maps, internal evidence paths, logs, raw artifacts, private keys, and local-machine paths. The docs check rejects copied investigation files and local-machine references.
+
 - [ ] Confirm new or changed API behavior is documented in `README.md` and relevant `docs/` chapters.
 - [ ] If CLI commands were added or changed, rebuild the CLI and verify `--help` output:
 
 ```bash
 npm run build
-npx payway-sdk --help
+node dist/cli.js --help
 ```
 
 ## Sandbox Verification
@@ -58,7 +69,7 @@ npm run docs:api
 
 ## First Public npm Publish (one-time, maintainer decision)
 
-The package is publish-ready (`files: ["dist", "skills"]`, `prepublishOnly` clean-builds) but is **not yet on the registry** (`npm view aba-payway-ts` → 404 as of 2026-08-30). Publishing is outward-facing and requires registry credentials, so it is deliberately left as a maintainer-executed step.
+The package is **not yet on the registry** (`npm view aba-payway-ts` returned 404 during the 2026-09-05 review). Publishing is outward-facing and remains a maintainer-executed step.
 
 - [ ] Verify the exact tarball contents **without** publishing:
 
@@ -66,9 +77,9 @@ The package is publish-ready (`files: ["dist", "skills"]`, `prepublishOnly` clea
 npm publish --dry-run
 ```
 
-Confirm only `dist/` and `skills/` ship, no `.env`, profile stores, `test-output/`, or audit artifacts appear in the file list, and the tarball size is sane.
+Confirm the allowlisted runtime, declarations, skills, README, QUICKSTART, CHANGELOG, LICENSE, and package metadata ship. No `.env`, profile store, source map, internal evidence, log, raw transaction artifact, or local path may appear.
 
 - [ ] Confirm registry identity and name rights: `npm whoami`; the `aba-payway-ts` name must be free or already owned by the org.
 - [ ] Publish with 2FA: `npm publish`.
-- [ ] Post-publish smoke: `npm view aba-payway-ts version`, then in a clean temp directory `npm i aba-payway-ts` and `node -e "console.log(Object.keys(require('aba-payway-ts')).length)"` (expect 57 exports — v1.5.0 count: +2 sandbox-beneficiary helpers; recount after any barrel change).
+- [ ] Post-publish smoke: `npm view aba-payway-ts version`, then install the exact package in a clean temporary directory and verify ESM import, CJS require, declarations, and `npm exec --package=aba-payway-ts -- payway-sdk --help`. Do not pin a brittle export count; validate the documented public names.
 - [ ] If publishing from CI later, add `--provenance` (requires an OIDC-linked workflow) and pin the release to a tag build, not `main` pushes.

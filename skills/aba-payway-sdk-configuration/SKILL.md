@@ -20,7 +20,7 @@ Constructor-only / validation options:
 - `strictValidation: true` (or `PAYWAY_STRICT_VALIDATION=1`) — escalates every advisory warning (length caps, enum membership, payout-total mismatches, image limits) to `PayWayConfigError`. Default is advisory: warn once.
 - `allowPrivateCallbackHosts: true` — permits private/loopback callback hosts (local dev); rejected by default.
 - Resilience/observability (see docs/12): `logLevel`, `logFormat: 'json'`, `backoffJitter: 'full' | 'none'` (default `'none'`), `circuitBreaker: { failureThreshold, resetTimeoutMs }`.
-- `allowUnverifiedTokenOperations` — **DEPRECATED escape hatch, default ALLOWED**: the token trio (renew/get-details/remove) was un-gated 2026-08-31 after its live-documented HMAC compositions were sandbox-verified (SANDBOX-FINDINGS §16). Setting it explicitly to `false` re-blocks; you never need to set it to `true`.
+- `allowUnverifiedTokenOperations` — **DEPRECATED escape hatch, default ALLOWED**: the token trio (renew/get-details/remove) was un-gated after its live-documented HMAC compositions were sandbox-verified on 2026-08-31. Setting it explicitly to `false` re-blocks; you never need to set it to `true`.
 
 ## Error Handling
 ```ts

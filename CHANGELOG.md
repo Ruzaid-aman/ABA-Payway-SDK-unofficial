@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-> Subscription "Wrong Hash" root cause (skills-audit T1, SANDBOX-FINDINGS §17,
-> 2026-09-05): the gateway signs `ctid` on the purchase path (between `items`
+> Subscription "Wrong Hash" root cause (sandbox-verified 2026-09-05): the
+> gateway signs `ctid` on the purchase path (between `items`
 > and `shipping`) even though the live docs' subscription operation omits it —
 > the documented 26-field order is rejected with Wrong Hash. Also: the sandbox
 > merchant profile is not subscription-enabled (`104`), which remains an
@@ -11,6 +11,18 @@
 
 ### Added
 
+- **Versioned payment-command output** — `generate-qr` and `generate-checkout`
+  accept `--output json` for one final result or `--output ndjson` for creation,
+  polling, and final records. Results include non-secret context, explicit
+  creation/payment/wait states, artifact paths, and a safe reconciliation step.
+- **Checkout QR artifact parity** — `generate-checkout` normalizes camelCase and
+  snake_case QR fields and can render the payload to a PNG with the same
+  non-interactive image controls as `generate-qr`.
+- **Hosted form controls** — `checkout-form` now forwards `--payment-gate`,
+  `--skip-success-page`, and `--continue-success-url` into the signed form.
+- **Curated distribution boundary** — the package now includes `LICENSE`,
+  `QUICKSTART.md`, and this changelog; automated checks validate packaged files,
+  embedded text, Markdown links, generated docs, and a clean tarball install.
 - **`checkout.purchaseHosted()` — typed hosted-checkout purchase** — sets
   `paymentGate: 0` for you and returns a structured `PurchaseHostedHtmlResult`
   (`{ hosted_checkout: true, content_type, html }`): the gateway answers a
@@ -36,6 +48,15 @@
 
 ### Fixed
 
+- **Ambiguous facade creates are not replayed by default** —
+  `server.initiateTransaction()` uses a no-retry purchase policy unless the
+  caller explicitly selects `retryPolicy: 'transient'`. Its `expiresAt` field is
+  documented as a merchant-side scheduling deadline, not proof that a QR is
+  still payable.
+- **Portable release tooling** — `npm run clean` is repository-scoped and works
+  on Windows and POSIX systems. Public builds omit source maps that embedded
+  source and internal evidence comments; TypeDoc no longer copies Markdown into
+  `docs/api/media`.
 - **Gate-0 hosted-page success no longer misclassified as an error (W2-2)** —
   `checkout.purchase()` with `paymentGate: 0` used to throw
   `PayWayAPIError: Invalid JSON response` even though the transaction WAS
@@ -62,8 +83,7 @@
   warning now says exactly that instead of implying enforcement.
 - **Subscription purchases rejected with `Wrong Hash` (code 1)** — `ctid` now
   hashes after `items` in `PURCHASE_HASH_FIELDS` (live 27-field order,
-  sandbox-verified via `scripts/sandbox-probe-subscription.ts` probes A–C2;
-  evidence `test-output/subscription-hash/`). One shared order: for plain
+  sandbox-verified with controlled subscription probes). One shared order: for plain
   purchases `ctid` is absent from the body, hashes as `''`, and the HMAC is
   byte-identical to the previous 26-field order (pinned). The gateway's
   wrong-hash hint prints the DOC list, not the enforcement list — do not trust
@@ -92,7 +112,7 @@
   v1.4.0: closure enforcement is PATH-DEPENDENT — on the QR/KHQR path a closed
   QR is refused by the simulator ("transaction expired", live 2026-09-05)
   while the API keeps reporting PENDING; the 2026-08-25 "closed-unpaid still
-  pays" evidence is scoped to the checkout/card path. HANDOFF §7 bullet
+  pays" evidence is scoped to the checkout/card path. The public skill was
   rescoped accordingly.
 - **`--json` error envelopes** (skills-audit T3.5) — `check-transaction --json`
   and `transaction-detail --json` now print a machine-parseable
@@ -161,7 +181,7 @@
 
 ### Added
 
-- **`credentialsOnFile.getLinkCardFormHtml()` — browser-form card linking (no server roundtrip).** `link-card` is the one PayWay endpoint that demands `application/x-www-form-urlencoded` (JSON is rejected unread — SANDBOX-FINDINGS §9a) and always answers with the gateway's hosted card-entry page. The new method builds the full signed HTML document locally — hidden fields + §16-verified 10-position HMAC, byte-identical to the wire body `linkCard()` sends — so a plain `<form method="POST">` submit navigates the customer straight to the hosted Visa/Mastercard/JCB/UPI form, mirroring `checkout.getCheckoutFormHtml()`. Options: `{ formId?, autoSubmit?, submitLabel?, omitSubmitButton? }` (deliberately no `popupMode` — the AbaPayway popup plugin is documented for the purchase endpoint only). Validation rules and advisory warnings are shared with `linkCard()`. The `pwt` token still arrives only via `callbackUrl`. Exported type: `LinkCardFormOptions`.
+- **`credentialsOnFile.getLinkCardFormHtml()` — browser-form card linking (no server roundtrip).** `link-card` requires `application/x-www-form-urlencoded` and always answers with the gateway's hosted card-entry page (sandbox-verified 2026-08-31). The new method builds the full signed HTML document locally — hidden fields plus the verified 10-position HMAC, byte-identical to the wire body `linkCard()` sends — so a plain `<form method="POST">` submit navigates the customer straight to the hosted Visa/Mastercard/JCB/UPI form, mirroring `checkout.getCheckoutFormHtml()`. Options: `{ formId?, autoSubmit?, submitLabel?, omitSubmitButton? }` (deliberately no `popupMode` — the AbaPayway popup plugin is documented for the purchase endpoint only). Validation rules and advisory warnings are shared with `linkCard()`. The `pwt` token still arrives only via `callbackUrl`. Exported type: `LinkCardFormOptions`.
 - **CLI `cof link-card-form`** — local-only render of that signed form (no API call, no RSA key needed): HTML to stdout or `--out <path>` (diagnostics to stderr so redirects stay clean), `--auto-submit`, auto-generated `--request-id` when omitted, `--open-page`/`--no-open-page` TTY auto-open like the QR image, and a warning when `--callback-url` is omitted (the token can only arrive via the callback).
 - **CLI `cof link-card` hosted-page capture.** The command now treats the endpoint's guaranteed HTML answer as the success artifact it is: the page is saved to `payway-output/link-card-<request-id>.html` (auto-opened on interactive terminals via the platform-allowlisted viewer handoff; `--open-page` forces, `--no-open-page` suppresses) and the run exits 0. `--json` prints a `{ hostedHtmlPath, requestId, ctid, note }` envelope. Previously the structured B5 `PayWayBusinessError` surfaced as a plain CLI failure and the page was truncated to a 120-char prefix in the message.
 
@@ -182,17 +202,14 @@
 
 > Live API parity release (B1–B6): the SDK's request shapes, hash orders, error
 > families, and CLI surface were realigned to the live PayWay developer docs
-> (developer.payway.com.kh) and sandbox-probe evidence. Full audit:
-> `audit-results/live-api-coverage-2026-08-31.md`; plan:
-> `audit-results/live-parity-handoff.md`; probe evidence:
-> `docs/SANDBOX-FINDINGS.md` §16, `test-output/token-trio/`.
+> (developer.payway.com.kh) and controlled sandbox probes dated 2026-08-31.
 > **This release contains breaking changes** — see below.
 
 ### Breaking changes
 
 - **`linkAccount()` / `linkCard()` required fields** — `ctid` and `tokenFlag` are now **required** (plus `currency` on `linkAccount`) per the live docs; the SDK enforces them for JS callers, not just at the gateway. Live-documented linking flags: `CITI_FLEX | CITO_FLEX` (other previously accepted values now warn).
 - **Token-trio param split** — the shared `TokenParams` shape was wrong. `getTokenDetails()` now takes `{ requestId }` **only** (no `ctid`/`pwt`); `removeToken()` now takes `{ ctid, paymentToken }` (no `requestId`); `renewToken()` keeps `{ requestId, ctid, paymentToken }`. `TokenParams` is deprecated (alias of `RenewTokenParams`).
-- **CoF hash orders realigned (sandbox-verified 2026-08-31)** — the gateway tightened CoF hash validation: every §9a-era SDK order now returns `01 Wrong Hash`, while the live-documented orders pass the hash layer. `link-account`, `link-card`, `cofPayment`, and the token trio all sign with the live orders now (`docs/SANDBOX-FINDINGS.md` §16).
+- **CoF hash orders realigned (sandbox-verified 2026-08-31)** — the gateway tightened CoF hash validation: every earlier SDK order now returns `01 Wrong Hash`, while the live-documented orders pass the hash layer. `link-account`, `link-card`, `cofPayment`, and the token trio all sign with the live orders now.
 - **`cofPayment()` no longer sends `request_id`** — the param is deprecated and dropped from the request (verified live: the binding layer no longer requires it).
 - **`linkCard()` no longer sends `returnUrl` / `returnDeeplink`** — both are absent from the live-documented request; the hosted form's done-target is `continueSuccessUrl` (newly supported, hashed last). The params remain accepted-but-ignored (`@deprecated`).
 - **Token trio UN-GATED** — `allowUnverifiedTokenOperations` now defaults to **allowed** (TD-03/Q6 resolved by probe evidence: every live-documented composition is hash-accepted). Explicit `false` re-blocks as an escape hatch (deprecated).
@@ -215,7 +232,7 @@
 - **CLI `transaction-list` local pre-validation** — windows wider than 3 days and `--pagination` above 1000 are rejected client-side with a hint (exit 1, no network call), mirroring the gateway's HTTP 403 behavior.
 - **Per-call request options (`RequestCallOptions`)** — every API domain method now accepts an optional trailing `callOptions` argument: `{ timeoutMs?, signal? }`. `timeoutMs` overrides the client-wide request timeout for that single call; `signal` (an `AbortSignal`) cancels the in-flight fetch and is never retried. Threading covers checkout (purchase, checkTransaction, closeTransaction, getTransactionDetail, getTransactionList, refund, getExchangeRate), qr.generateQr, pre-auth (complete, completeWithPayout, cancel), payout (payout, updateBeneficiaryStatus, addBeneficiary), payment-link (create, getDetails), credentials-on-file (all six), and khqr.getTransactionsByMerchantRef. Additive and backward compatible.
 - **`verifyCallbackDetailed(body, signature, options?)`** — diagnostic webhook-verification variant returning `{ valid, reason }` with reasons `malformed_signature` / `empty_body` / `signature_mismatch` so integrators can self-diagnose failed callbacks. Canonicalization and timing-safe comparison are unchanged (`verifyCallbackSignature` now delegates to it; boolean behavior identical). Available as a standalone export and as `payway.verifyCallbackDetailed()` on the client.
-- **`paymentLink.create({ image })` — multipart image upload** — the optional image part of `payment-link/create` is now supported: `image: { data, filename?, contentType? }` (defaults `image.jpg` / `image/jpeg`; bytes must be non-empty `Uint8Array`/`Buffer`). `requestWithMerchantAuth` gained a `multipartFile` option that sends the four signed string fields plus the binary part as `FormData` **without a manual `Content-Type`** (the runtime generates the boundary); the HMAC composition is unchanged — image bytes are never hashed. Sandbox-verified live (2026-08-31): HTTP 200 `code=00`; the gateway hosts the stored file on its CDN under a renamed `payment_link_image_<epoch-ms>.<ext>` and reports `size: 0` regardless (SANDBOX-FINDINGS §15). `onRequest`/debug logging keep their string signatures via a multipart summary (part names only, never bytes). New CLI flag `payment-link create --image <path>` (extension-based content-type inference; clean exit 1 on missing/empty files). Also fixed in passing: `scripts/sandbox-probe-payment-link.ts` now uses the CLI's shared dotenv parser — the minimal line parser truncated the multi-line quoted PEM in `.env`. Pins: `payment-link-image`, `cli-inprocess`.
+- **`paymentLink.create({ image })` — multipart image upload** — the optional image part of `payment-link/create` is now supported: `image: { data, filename?, contentType? }` (defaults `image.jpg` / `image/jpeg`; bytes must be non-empty `Uint8Array`/`Buffer`). `requestWithMerchantAuth` gained a `multipartFile` option that sends the four signed string fields plus the binary part as `FormData` **without a manual `Content-Type`** (the runtime generates the boundary); the HMAC composition is unchanged — image bytes are never hashed. Sandbox-verified live (2026-08-31): HTTP 200 `code=00`; the gateway hosts the stored file on its CDN under a renamed `payment_link_image_<epoch-ms>.<ext>` and reports `size: 0` regardless. `onRequest`/debug logging keep their string signatures via a multipart summary (part names only, never bytes). New CLI flag `payment-link create --image <path>` (extension-based content-type inference; clean exit 1 on missing/empty files). The probe now uses the CLI's shared dotenv parser so multi-line quoted PEM values are preserved. Pins: `payment-link-image`, `cli-inprocess`.
 - **`checkout.getCheckoutFormHtml()` — hosted-checkout form builder** — renders the complete signed checkout form as a standalone HTML document (local, synchronous, no network call). Hidden fields and the 24-field HMAC are byte-identical to `createTransaction()`; the action URL follows the configured environment/`baseUrl`. Options: `autoSubmit` (same-tab submit on page load; mutually exclusive with `popupMode`, enforced as `PayWayConfigError`) and `popupMode` (official AbaPayway popup plugin: `target="aba_webservice"` + `checkout2-0.js` + `AbaPayway.checkout()` wiring), plus `formId`, `submitLabel`, `omitSubmitButton`. All merchant-provided values are HTML-escaped. New CLI command `payway-sdk checkout-form` writes the same document to stdout (redirect-safe; diagnostics on stderr) or `--out <path>` — local signing only, no RSA key needed. Pins: `checkout-form-html`, `cli-inprocess`, `public-api`, `cli-help`.
 - **CI pipeline hardening** — the existing GitHub Actions workflow now builds `dist/` before the unit suite (the child-process suites `cli.test.ts` / `agent-cli.test.ts` spawn `dist/cli.js`, which does not exist on a fresh checkout), runs a coverage job on Node 22 that enforces floor thresholds from `vitest.config.ts` (74% stmts / 69% branch / 80% funcs / 74% lines — ratchet upward as testability work lands), uploads the coverage artifact, and deduplicates concurrent runs per ref. CI badge added to the README.
 - **`runCli(argv)` exported from the CLI entry** — `src/cli.ts` now guards its self-parse behind a main-module check and exposes `runCli`, so tests and embedders can drive commands in-process (verified against the documented `npx tsx src/cli.ts` workflow, `dist/cli.js`, and the child-process `cli.test.ts` suite).
@@ -243,7 +260,7 @@ _Nothing yet — the 1.3.6 entry above absorbed everything that shipped with the
 > Edge-case audit campaign release: all 23 findings (EC-01–EC-23) from
 > `audit-results/edge-case-report.md` remediated. Sandbox verification:
 > QR lifetime boundary pinned live (179s → 400 `"04"`, 180s → OK; `scripts`-backed evidence in
-> `test-output/edge-case-probe/live-probe.log`), plus `npm run probe` re-run at release time.
+> controlled edge-case probes, plus `npm run probe` re-run at release time.
 
 ### Added
 
@@ -294,7 +311,7 @@ _Nothing yet — the 1.3.6 entry above absorbed everything that shipped with the
 - **Hermetic vitest environment** — registered setup file scrubs ambient `PAYWAY_*` variables once per test file so host machines exporting real credentials can no longer flip suite outcomes (post-audit follow-up to TD-02).
 
 - **QR image auto-open** — `generate-qr` now opens the saved QR PNG (`payway-output/<txId>.png`) with the OS default image viewer so it is immediately scannable. Default is TTY-aware (interactive terminals only; scripts/CI/agents unaffected); force with `--open-image`, suppress with `--no-open-image`. Backed by the new exported helper `openImageInDefaultViewer()` / `defaultViewerCommandForPlatform()` (`src/open-image.ts`): per-platform allowlisted command (Windows `rundll32 url.dll,FileProtocolHandler` / macOS `open` / Linux `xdg-open`), spawned shell-less and detached, never throws — failures degrade to an "Open it manually" hint.
-- **Close-Transaction violation dossier** (`docs/CLOSE-TRANSACTION-FINDINGS.md`) — full evidence that sandbox close is advisory only: two live card payments completed AFTER a code-00 close (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206 → both APPROVED), closure is invisible in check/detail (no CLOSED status, no operation marker), close is idempotent (re-close returns 00), plus reproduction commands, five questions for ABA, merchant mitigations, and a post-fix validation checklist. Cross-linked from SANDBOX-FINDINGS §12 and agent rules.
+- **Close-transaction behavior documented** — sandbox card payments were observed completing after a code-00 close; closure was not visible in check/detail, and repeated close calls returned success. Public guidance now treats local closure and gateway payment prevention as separate states and requires late-payment reconciliation.
 - **Cards-checkout lifecycle tools** — `scripts/checkout-cards-close.ts` (official checkout2-0.js modal OR hosted page; `--no-close` supported) and reusable `scripts/close-transaction-verify.ts` (`closeOrReport`/`statusOf`/`closeAndVerify`, flags `--raw/--json/--status-only/--delay`) with the post-close interpretation table.
 - **End-to-end live-flow scripts** — `scripts/online-qr-poll.ts` (one online KHQR → save/open PNG → poll 10 min) and `scripts/checkout-link-poll.ts` (Create Transaction API with `paymentGate: 0` → open hosted `checkout_qr_url` → poll 10 min). Registered as tools in the QR, purchase, and check-transaction skills; sandbox-paid and verified 2026-08-25 ($31.11 APPROVED ~37s, $12.12 APPROVED ~32s).
 - **Transaction-lifecycle CLI commands** — `check-transaction`, `poll-transaction` (NDJSON event stream; exit 0 terminal / 2 API error / 3 timeout), `transaction-detail`, `transaction-list` (defaults to today, aligned table), `close-transaction -y/--force`, `refund` with pre-flight refundable-balance check via transaction-detail, and `exchange-rate`. All accept `--json`.
@@ -325,10 +342,10 @@ _Nothing yet — the 1.3.6 entry above absorbed everything that shipped with the
 ### Changed
 
 - **`scripts/online-qr-poll.ts` accepts `[amount] [currency] [lifetimeSeconds] [template]`** — the poll window now equals the QR lifetime instead of a fixed 10 minutes, and the visual template is configurable (default `template2_color`).
-- **Rate-limit responses are typed and retryable** - the strict caps (e.g. transaction-detail 10/min) are enforced by the sandbox as HTTP 403 with a NUMERIC body `status.code` 429 ("Rate limit exceeded...") and no rate-limit headers; numeric codes now pass error extraction so this maps to `PayWayRateLimitError` instead of an opaque non-retryable `api_error`. Rate-limited retries pace from the SDK's own observed request window (1-10s) rather than blind exponential backoff; verified live end-to-end (SANDBOX-FINDINGS §11).
+- **Rate-limit responses are typed and retryable** - the strict caps (e.g. transaction-detail 10/min) are enforced by the sandbox as HTTP 403 with a NUMERIC body `status.code` 429 ("Rate limit exceeded...") and no rate-limit headers; numeric codes now pass error extraction so this maps to `PayWayRateLimitError` instead of an opaque non-retryable `api_error`. Rate-limited retries pace from the SDK's own observed request window (1-10s) rather than blind exponential backoff; verified live end-to-end.
 - **Local throttle transparency** - new optional `onThrottle({ endpoint, waitMs })` hook (plus debug logging) fires when a request is queued by a documented-limit token bucket.
 - **`transaction-detail --wait <seconds>`** - retries every 2s while the gateway reports code 6; sandbox-measured detail lag after creation is ~5s vs <1s for check-transaction. The command (and `printApiError`) now print targeted hints for both the lag and the 403+429 cap shape, pointing to check-transaction (600 req/s) as the fast status read.
-- **`pollTransactionStatus` tolerates the creation grace period** — a check right after creation can answer HTTP 200 / `status.code 6` ("tran_id not found") for a few seconds; the poller now yields `paymentStatus: 'NOT_FOUND'` without counting it toward `maxConsecutiveErrors`, so legitimate purchase flows are never aborted by propagation delay (sandbox-verified 2026-08-25, see SANDBOX-FINDINGS §10).
+- **`pollTransactionStatus` tolerates the creation grace period** — a check right after creation can answer HTTP 200 / `status.code 6` ("tran_id not found") for a few seconds; the poller now yields `paymentStatus: 'NOT_FOUND'` without counting it toward `maxConsecutiveErrors`, so legitimate purchase flows are never aborted by propagation delay (sandbox-verified 2026-08-25).
 - **`payment_gate=0` contract documented** — on the JSON Create Transaction path, gate 0 (+ `hosted_view`) is what makes the response include the hosted `checkout_qr_url`; JSDoc on `CreateTransactionParams.paymentGate`, `GenerateQrParams.lifetime` (seconds, min 3 min), and the OpenAPI types now state this.
 - **`generate-checkout` no longer sends `payment_gate: 0`** — sandbox answers that value with an HTTP 200 HTML page instead of JSON.
 - **Non-JSON responses are diagnosable** — "Invalid JSON response" errors now include content-type, an HTML-detection hint ("parameter rejected server-side"), and a body snippet.
@@ -365,7 +382,7 @@ _Nothing yet — the 1.3.6 entry above absorbed everything that shipped with the
 
 ### Known open item
 
-- v3 token-management endpoints (`renew-expired-account-token`, `get-token-details`, `remove-token`) reject all derivable HMAC compositions (~60 tried; SANDBOX-FINDINGS §9a) — awaiting ABA's official signature spec. Requests now pass the binding layer but fail at the hash layer.
+- v3 token-management endpoints (`renew-expired-account-token`, `get-token-details`, `remove-token`) rejected the tested HMAC compositions during the earlier sandbox investigation. Requests passed the binding layer but failed at the hash layer; later release entries document the verified correction.
 
 ## 1.3.0
 
@@ -400,7 +417,7 @@ _Nothing yet — the 1.3.6 entry above absorbed everything that shipped with the
 
 ### Changed
 
-- Updated `docs/SANDBOX-FINDINGS.md` with QR template generation and transaction status verification findings.
+- Updated compatibility guidance with QR template generation and transaction status verification findings.
 - Updated `docs/PROJECT_STATUS.md` with QR template verification milestone.
 
 ## 1.0.0

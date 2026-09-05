@@ -69,7 +69,7 @@ npx tsx src/cli.ts cof link-card -r link001 --ctid customerabc --token-flag CITI
   (1W|1M|2M, recurring profiles).
 - Live-verified 2026-09-01: the locally-built form's hidden fields POST
   exactly like a browser → HTTP 200 + the real 42 KB hosted "PayWay -
-  Checkout" page. Evidence: `test-output/link-card-form-live-probe-2026-09-01.json`.
+  Checkout" page (sandbox-verified 2026-09-01).
 - Hash order (§16-verified, merchant_id first):
   `merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency.continue_success_url`
   — `amount` is a hash position with NO body field (live-doc quirk; hashes '').

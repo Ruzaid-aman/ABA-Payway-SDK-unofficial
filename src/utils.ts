@@ -200,7 +200,7 @@ export function validatePurchaseLifetimeMinutes(lifetime: number | undefined): v
 /**
  * The current gateway-day window in the gateway's clock (UTC+7): the
  * transaction-list endpoints interpret `from_date`/`to_date` as gateway
- * time (SANDBOX-FINDINGS §18), so a local/UTC-derived "today" silently
+ * time (sandbox-verified 2026-09-05), so a local/UTC-derived "today" silently
  * misses rows whenever the two clocks disagree. Returns `"YYYY-MM-DD
  * 00:00:00" → "YYYY-MM-DD 23:59:59"` for the day it currently is in
  * Phnom Penh. Used as the CLI `transaction-list` default; the gateway

@@ -255,7 +255,7 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
       }
 
       // Status/reference endpoints — same shapes as the live sandbox
-      // (SANDBOX-FINDINGS §6, §14a). Tran-ID conventions:
+      // (sandbox verification dated 2026-08-25). Tran-ID conventions:
       //   • `e2e-approved-*` → APPROVED (payment_status_code 0, paid amount 5.00)
       //   • ids containing "missing" → 200-wrapped business error, status.code 6
       //   • anything else → PENDING (payment_status_code 2)

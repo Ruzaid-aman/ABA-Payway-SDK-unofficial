@@ -9,7 +9,7 @@ version: 1.0.0
 Account tokens (CITI_FLEX/CITO_FLEX) expire **90 days** after linking, renewal,
 or the last successful transaction (whichever is most recent). Card tokens
 cannot be renewed. The token-management trio is UN-GATED since 2026-08-31
-(the live-documented HMAC compositions are sandbox-verified — SANDBOX-FINDINGS §16).
+(the live-documented HMAC compositions were sandbox-verified on 2026-08-31).
 
 ## Quick Start
 ```ts

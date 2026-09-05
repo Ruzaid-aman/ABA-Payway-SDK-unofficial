@@ -23,7 +23,7 @@ payway-sdk transaction-detail -t <tran_id>
 After the follow-up `transaction-detail`, read:
 - `refund_amount` for the total refunded so far
 - `transaction_operations` for the refund event history
-- `payment_status` as a coarse lifecycle flag only; PayWay shows `REFUNDED` even after a partial refund (live-confirmed 2026-09-05, SANDBOX-FINDINGS §18: $0.50 paid → $0.10 refund → status REFUNDED, `refund_amount 0.1`), so do not use that field alone to infer a full refund
+- `payment_status` as a coarse lifecycle flag only; PayWay shows `REFUNDED` even after a partial refund (sandbox-verified 2026-09-05: $0.50 paid → $0.10 refund → status REFUNDED, `refund_amount 0.1`), so do not use that field alone to infer a full refund
 
 ## Error Handling
 ```ts

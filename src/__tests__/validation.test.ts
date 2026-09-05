@@ -307,7 +307,7 @@ describe('Validation: token-trio capability guard (TD-03, flipped 2026-08-31)', 
     } catch (error) {
       expect(error).toBeInstanceOf(PayWayConfigError);
       expect((error as Error).message).toContain('allowUnverifiedTokenOperations');
-      expect((error as Error).message).toContain('SANDBOX-FINDINGS §16');
+      expect((error as Error).message).toContain('sandbox-verified 2026-08-31');
     }
     expect(() =>
       explicitOptOut.getTokenDetails({ requestId: 'req01' }),

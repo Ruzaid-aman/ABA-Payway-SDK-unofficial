@@ -3242,7 +3242,7 @@ cofCmd
       console.log(`  ${c.dim('The customer continues on the hosted form; result arrives via callback_url.')}\n`);
     } catch (e) {
       // link-card ALWAYS answers with the hosted card-entry HTML page (both
-      // success and error — SANDBOX-FINDINGS §9a/B5). The client surfaces it
+      // success and error — sandbox-verified 2026-08-31). The client surfaces it
       // as a structured PayWayBusinessError with the page preserved in
       // rawBody; capture it so the operator can actually open it instead of
       // reading a 120-char prefix.
@@ -3295,8 +3295,8 @@ cofCmd
   });
 
 // cof link-card-form — local-only render of the signed link-card browser
-// form. The form POSTs urlencoded (link-card rejects JSON, SANDBOX-FINDINGS
-// §9a) and the gateway answers its hosted card-entry page, so the customer
+// form. The form POSTs urlencoded (link-card rejected JSON during the
+// 2026-08-31 sandbox verification) and the gateway answers its hosted page, so the customer
 // completes linking in the browser; the token arrives via --callback-url.
 // Never touches the network; HTML goes to stdout or --out, diagnostics to
 // stderr so `cof link-card-form ... > page.html` stays clean.

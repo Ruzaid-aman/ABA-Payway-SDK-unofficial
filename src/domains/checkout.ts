@@ -52,7 +52,7 @@ const POPUP_TARGET = 'aba_webservice';
  * the live subscription additions appended after `skip_success_page`; `ctid`
  * sits between `items` and `shipping` — the gateway signs `ctid` on the
  * subscription path even though the live docs' subscription operation omits it
- * (SANDBOX-FINDINGS §17, 2026-09-05: the documented 26-field order is rejected
+ * (sandbox-verified 2026-09-05: the documented 26-field order is rejected
  * with Wrong Hash; inserting ctid after items is accepted by the hash layer,
  * pinned by probes C1/C2 with a non-empty items position). Omitted optional
  * fields hash as '' (they vanish under concatenation), so this list produces

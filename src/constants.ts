@@ -174,7 +174,7 @@ export const REQUEST_ID_PATTERN = /^[a-zA-Z0-9]{5,24}$/;
  * PayWay generate-qr lifetime minimum, in seconds. The API takes whole
  * minutes and rejects anything below 3 with an opaque HTTP 400 code "04"
  * (sandbox-pinned boundary 2026-08-30: 179s → 400 "04", 180s → OK; see
- * docs/SANDBOX-FINDINGS.md §13a).
+ * sandbox verification dated 2026-08-30).
  */
 export const QR_LIFETIME_MIN_SECONDS = 180;
 
@@ -193,7 +193,7 @@ export const TOKEN_VALIDITY_DAYS = 90;
 
 /**
  * QR image templates accepted by the generate-qr API, all verified in sandbox
- * (docs/SANDBOX-FINDINGS.md "QR template" section). `template2` is the API
+ * (sandbox template verification dated 2026-08-30). `template2` is the API
  * default. Powers the `--template` validator and the interactive template
  * picker; hints describe the rendered card style.
  */
@@ -220,5 +220,4 @@ export const QR_TEMPLATE_NAMES: readonly string[] = QR_TEMPLATES.map((template) 
 export const PAYMENT_OPTIONS = ['cards', 'abapay_khqr', 'abapay_khqr_deeplink', 'alipay', 'wechat', 'google_pay'] as const;
 
 export type PaymentOptionName = (typeof PAYMENT_OPTIONS)[number];
-
 
