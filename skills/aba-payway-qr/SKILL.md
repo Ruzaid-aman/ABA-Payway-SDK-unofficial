@@ -1,7 +1,7 @@
 ---
 name: aba-payway-qr
 description: Generate an online ABA PayWay KHQR payment QR code.
-version: 1.4.0
+version: 1.5.0
 ---
 
 # ABA PayWay QR
@@ -70,6 +70,15 @@ payway-sdk generate-qr -a 31.11 -c USD --callback-url https://merchant.example/c
 # Watch a payment until terminal:
 payway-sdk poll-transaction -t <txId>
 ```
+
+**Agent flags that matter (live lesson 2026-09-05):** always pass `-y` — an
+agent harness can present an interactive-looking stdin, and without `-y`
+`generate-qr` stops at the `Modify lifetime?` prompt and never calls the API
+(silent hang, no transaction created). For one-shot scripted runs add
+`--no-polling --no-open-image` so the command returns immediately with the
+QR string + PNG path, then poll explicitly. Simulator scans take ~60–90 s
+from creation to approval; `check-transaction` sees the APPROVED status
+instantly after approval.
 
 > Repo-clone note: `scripts/online-qr-poll.ts` is a development probe in the SDK
 > repository's `scripts/` directory (not shipped in the npm package) — the

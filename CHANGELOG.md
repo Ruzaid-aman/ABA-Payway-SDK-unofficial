@@ -31,6 +31,14 @@
   `aba-payway-hash` v1.3.0 + `aba-payway-first-payment` v1.3.0 bundled scripts
   realigned to the 27-field order. New re-runnable probe script
   `scripts/sandbox-probe-subscription.ts`.
+- **Skills (paid-lifecycle learnings, §18)** — `aba-payway-transaction-list`
+  v1.3.0: gateway `transaction_date` is UTC+7 (UTC-derived windows silently
+  return 0 rows; default = full gateway day), unpaid checkout-path txns ARE
+  visible (§14 gap is unpaid-QR-only), list shows coarse REFUNDED after a
+  partial refund. `aba-payway-refund` v1.3.0: coarse-status rule marked
+  live-confirmed with the $0.50/$0.10 example. `aba-payway-qr` v1.5.0: always
+  pass `-y` as an agent (interactive lifetime prompt can block without it) +
+  one-shot flag recipe + simulator latency notes.
 - **`--json` error envelopes** (skills-audit T3.5) — `check-transaction --json`
   and `transaction-detail --json` now print a machine-parseable
   `{ "error": { kind, exitCode, type, message, paywayCode, httpStatus,
