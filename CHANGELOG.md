@@ -39,6 +39,12 @@
   live-confirmed with the $0.50/$0.10 example. `aba-payway-qr` v1.5.0: always
   pass `-y` as an agent (interactive lifetime prompt can block without it) +
   one-shot flag recipe + simulator latency notes.
+- **Skills (close-enforcement nuance, §19)** — `aba-payway-transaction-close`
+  v1.4.0: closure enforcement is PATH-DEPENDENT — on the QR/KHQR path a closed
+  QR is refused by the simulator ("transaction expired", live 2026-09-05)
+  while the API keeps reporting PENDING; the 2026-08-25 "closed-unpaid still
+  pays" evidence is scoped to the checkout/card path. HANDOFF §7 bullet
+  rescoped accordingly.
 - **`--json` error envelopes** (skills-audit T3.5) — `check-transaction --json`
   and `transaction-detail --json` now print a machine-parseable
   `{ "error": { kind, exitCode, type, message, paywayCode, httpStatus,

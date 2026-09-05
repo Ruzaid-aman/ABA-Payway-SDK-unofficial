@@ -164,7 +164,7 @@ Learned from the checkout-with-card flow and applied the `checkout-form` local-s
 - Duplicate `tran_id` silently accepted on both `purchase` and `generate-qr` (two live QRs, different amounts, same ID).
 - Rate limits: detail 10/min, list 50/min — enforced as **HTTP 403 with numeric body `status.code` 429** and no headers.
 - Gateway error shapes: HTTP 200-wrapped `status.code` (6 = not-found), 403 `PTL*` codes, 400 `"04"` binding failures, code 69 (lifetime), flat-code 403s on legacy paths.
-- Close-transaction is advisory in sandbox (closed-unpaid txns still pay and stay PENDING); no CLOSED status exists anywhere.
+- Close-transaction: **no CLOSED status exists anywhere** (API keeps reporting PENDING after a successful close). Customer-side enforcement is PATH-DEPENDENT: QR path — close IS enforced (§19, 2026-09-05: simulator refused the closed QR with "transaction expired"); checkout/card path — closed-unpaid txns still paid (§12, 2026-08-25). Keep a local `closed` flag; whether the path split or a gateway change explains the difference is open.
 - check-transaction sees new transactions in <1 s; transaction-detail needs ~5 s.
 - (§14, 2026-08-31) **Unpaid QR-only transactions are invisible to transaction-list** while check-transaction/detail see them; transaction-list rejects date ranges wider than 3 days with HTTP 403 ("Maximum date rang is allowed only 3 days"). Pinned as live tests in the sandbox contract suite.
 - v3 token trio: binding layer OK; HMAC composition was black-box in the August campaign (60+ attempts) but **resolved 2026-08-31** — live-documented hash orders verified, trio UN-GATED (§16).

@@ -750,3 +750,41 @@ partial refund `-a 0.10 -y` accepted (`code 00`) → detail shows
    guidance.
 3. Simulator scan→approve latency ≈ 60–90 s from QR creation; check-transaction
    saw the APPROVED status immediately after approval (<1 s, §7 holds).
+
+## 19. Close-transaction IS enforced customer-side on the QR path — nuancing §7/§12 (2026-09-05)
+
+**Context.** §7/§12 (2026-08-25) pinned: "Close-transaction is advisory in
+sandbox — closed-unpaid transactions still pay and stay PENDING; no CLOSED
+status exists anywhere." That evidence came from the checkout/card path
+(hosted page payments). Today's user-driven simulator test adds the QR path.
+
+**Test.** `generate-qr -a 33.12 USD --lifetime 900` → tran `qrmtoaywyqb13a72`
+(created 18:31:49 gateway, expires 18:46:49). `check-transaction` PENDING,
+detail PENDING/unpaid. One minute later: `close-transaction -y` → code 00
+Success. Detail after close: still PENDING, no CLOSED status,
+`transaction_operations` empty — API-side unchanged from §7.
+
+**New fact.** The user then scanned the closed QR in the ABA Simulator
+(~18:38, ~8 minutes BEFORE natural lifetime expiry) — the app refused with
+**"transaction expired"** and payment could not be completed. Customer-side,
+the close IS effective on the QR/KHQR path.
+
+**Consequences.**
+
+1. §7's "closed-unpaid txns still pay" must be scoped to the checkout/card
+   path (2026-08-25 evidence). Whether the gateway changed since August or the
+   behavior is path-specific is OPEN — re-verify with a checkout-path
+   close→pay before relying on either direction.
+2. The customer-facing close signal on the QR path is the generic
+   "transaction expired" message — indistinguishable from natural lifetime
+   expiry at scan time.
+3. API-side guidance is unchanged: no CLOSED status exists remotely, so keep
+   a local `closed` flag; a PENDING status after close cannot distinguish
+   closed-unpaid from still-open.
+
+**Also noted.** `transaction-detail --json` on this unpaid txn shows
+`original_currency: "KHR"` (the merchant credential currency) while
+`payment_currency: ""` and `payment_amount: 0` — for USD-created QRs the
+unpaid detail carries the credential currency in `original_currency`, not the
+transaction currency. Cosmetic, but agents parsing `original_currency` on
+unpaid transactions should not treat it as the payment currency.
