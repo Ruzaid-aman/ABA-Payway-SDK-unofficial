@@ -21,6 +21,7 @@ export type AgentToolName =
   | 'create_checkout_payload'
   | 'create_checkout_purchase'
   | 'create_payment_link'
+  | 'get_payment_link_details'
   | 'check_transaction'
   | 'check_transaction_by_merchant_ref'
   | 'poll_transaction'
@@ -92,6 +93,19 @@ export interface CreatePaymentLinkParams {
   description?: string;
   paymentLimit?: number;
   expiredDate?: number;
+  /**
+   * Split-payout beneficiaries — same shape/keys as the SDK domain and the
+   * CLI `--payout` flag: `[{acc, amt}]` with Σamt = amount (the shared
+   * domain validator + advisory equality rule apply).
+   */
+  payout?: Array<{ acc: string; amt: number }>;
+  rationale?: string;
+}
+
+export interface GetPaymentLinkDetailsParams {
+  tool: 'get_payment_link_details';
+  /** The opaque Link ID from create (`data.id`) — NOT merchant_ref_no, NOT the URL slug. */
+  paymentLinkId: string;
   rationale?: string;
 }
 
@@ -144,6 +158,7 @@ export type AgentActionParams =
   | CreateCheckoutPayloadParams
   | CreateCheckoutPurchaseParams
   | CreatePaymentLinkParams
+  | GetPaymentLinkDetailsParams
   | CheckTransactionParams
   | CheckTransactionByMerchantRefParams
   | PollTransactionParams

@@ -74,6 +74,10 @@ function makePayWay(): PayWay {
     },
     paymentLink: {
       create: fn(async () => ({ status: { code: '0' }, data: { id: 'pl1' }, tran_id: 123 })),
+      getDetails: fn(async () => ({
+        status: { code: '00', message: 'Success' },
+        data: { id: 'pl1', status: 'OPEN', total_trxn: 0, total_amount: 0, payment_link: 'https://link/pl1' },
+      })),
     },
   } as unknown as PayWay;
 }
@@ -161,6 +165,7 @@ function createAction(tool: AgentToolName): MaterializedAgentAction {
         currency: 'USD',
         merchantRefNo: 'mref',
         returnUrl: 'https://ret',
+        payout: [{ acc: '000111222', amt: 20 }],
       } as unknown as MaterializedAgentAction;
     default:
       throw new Error('not a create tool');
@@ -180,6 +185,10 @@ const READ_ACTIONS: Array<[AgentToolName, () => MaterializedAgentAction]> = [
         merchantRef: 'mref',
         requestTime: '20240101',
       }) as unknown as MaterializedAgentAction,
+  ],
+  [
+    'get_payment_link_details',
+    () => ({ tool: 'get_payment_link_details', paymentLinkId: 'pl1' }) as unknown as MaterializedAgentAction,
   ],
   [
     'poll_transaction',
@@ -216,6 +225,8 @@ function domainCalls(tool: AgentToolName, pw: PayWay): number {
       return (pw.checkout.purchase as ReturnType<typeof vi.fn>).mock.calls.length;
     case 'create_payment_link':
       return (pw.paymentLink.create as ReturnType<typeof vi.fn>).mock.calls.length;
+    case 'get_payment_link_details':
+      return (pw.paymentLink.getDetails as ReturnType<typeof vi.fn>).mock.calls.length;
     default:
       return 0;
   }
@@ -294,7 +305,7 @@ describe('TASK-009 tool registry + executor', () => {
     expect(result.data).toMatchObject({ qrString: 'Q', deeplink: 'D', hostedQrUrl: 'U' });
   });
 
-  it('create_payment_link passes mapped params', async () => {
+  it('create_payment_link passes mapped params incl. payout', async () => {
     const ctx = makeExecContext(payway, makeRecord('confirmed', { tool: 'create_payment_link' }));
     await executeAction(createAction('create_payment_link'), ctx);
     const call = (payway.paymentLink.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
@@ -304,7 +315,25 @@ describe('TASK-009 tool registry + executor', () => {
       currency: 'USD',
       merchantRefNo: 'mref',
       returnUrl: 'https://ret',
+      payout: [{ acc: '000111222', amt: 20 }],
     });
+  });
+
+  it('get_payment_link_details resolves the read tool with normalized fields', async () => {
+    const ctx = makeExecContext(payway, makeRecord('confirmed', { tool: 'get_payment_link_details' }));
+    const result = await executeAction(
+      { tool: 'get_payment_link_details', paymentLinkId: 'pl1' } as unknown as MaterializedAgentAction,
+      ctx,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.tool).toBe('get_payment_link_details');
+    expect(result.data).toMatchObject({
+      paymentLinkId: 'pl1',
+      status: 'OPEN',
+      totalTrxn: 0,
+      paymentLink: 'https://link/pl1',
+    });
+    expect((payway.paymentLink.getDetails as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('pl1');
   });
 
   it('outcome_unknown on simulated network timeout', async () => {

@@ -36,6 +36,7 @@ import type {
   CreatePaymentLinkParams,
   GenerateOfflineKhqrParams,
   GenerateOnlineQrParams,
+  GetPaymentLinkDetailsParams,
   MaterializedAgentAction,
   OpenArtifactParams,
   PollTransactionParams,
@@ -202,6 +203,7 @@ async function runCreatePaymentLink(action: MaterializedAgentAction, client: Pay
       returnUrl: params.returnUrl,
       merchantRefNo: params.merchantRefNo,
       expiredDate: params.expiredDate,
+      payout: params.payout,
     });
 
     const asRecord = response as Record<string, unknown>;
@@ -251,6 +253,28 @@ async function runCheckTransactionByMerchantRef(
     ok: true,
     tool: 'check_transaction_by_merchant_ref',
     data: { merchantRef: params.merchantRef, raw: response },
+  };
+}
+
+async function runGetPaymentLinkDetails(
+  action: MaterializedAgentAction,
+  client: PayWay,
+): Promise<ToolExecutionResult> {
+  const params = action as unknown as GetPaymentLinkDetailsParams;
+  const response = await client.paymentLink.getDetails(params.paymentLinkId);
+  const asRecord = response as Record<string, unknown>;
+  const data = asRecord.data as Record<string, unknown> | undefined;
+  return {
+    ok: true,
+    tool: 'get_payment_link_details',
+    data: {
+      paymentLinkId: params.paymentLinkId,
+      status: data?.status,
+      totalTrxn: data?.total_trxn,
+      totalAmount: data?.total_amount,
+      paymentLink: data?.payment_link,
+      raw: response,
+    },
   };
 }
 
@@ -354,6 +378,7 @@ export const toolRegistry: Record<
   create_checkout_payload: runCreateCheckoutPayload,
   create_checkout_purchase: runCreateCheckoutPurchase,
   create_payment_link: runCreatePaymentLink,
+  get_payment_link_details: runGetPaymentLinkDetails,
   check_transaction: runCheckTransaction,
   check_transaction_by_merchant_ref: runCheckTransactionByMerchantRef,
   poll_transaction: runPollTransaction,

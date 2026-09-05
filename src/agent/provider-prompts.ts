@@ -159,6 +159,19 @@ function buildToolDefinitions(): ToolDefinition[] {
             description: opt({ type: 'string', maxLength: 250, description: 'Optional description.' }),
             paymentLimit: opt({ type: 'integer', minimum: 0, description: 'Max number of payments.' }),
             expiredDate: opt({ type: 'integer', exclusiveMinimum: 0, description: 'Expiry as unix seconds.' }),
+            payout: opt({
+              type: 'array',
+              minItems: 1,
+              description: 'Optional split-payout beneficiaries; total amt must equal amount.',
+              items: {
+                type: 'object',
+                required: ['acc', 'amt'],
+                properties: {
+                  acc: str('Beneficiary account number or MID.'),
+                  amt: num('Payout amount for this beneficiary.'),
+                },
+              },
+            }),
             rationale: opt(str('Why this action is being proposed.')),
           },
           required: ['title', 'amount', 'currency', 'merchantRefNo', 'returnUrl'],
@@ -195,6 +208,22 @@ function buildToolDefinitions(): ToolDefinition[] {
             rationale: opt(str('Why this action is being proposed.')),
           },
           required: ['merchantRef'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_payment_link_details',
+        description: 'Get the status and details of a payment link by its opaque Link ID (data.id from create — not the merchant ref, not the URL slug).',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            paymentLinkId: str('Payment link id (data.id returned by create).'),
+            rationale: opt(str('Why this action is being proposed.')),
+          },
+          required: ['paymentLinkId'],
         },
       },
     },

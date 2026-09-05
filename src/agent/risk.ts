@@ -13,6 +13,7 @@ export interface RiskDecision {
 const READONLY_TOOLS = new Set([
   'check_transaction',
   'check_transaction_by_merchant_ref',
+  'get_payment_link_details',
   'poll_transaction',
   'save_artifact',
   'open_artifact',
