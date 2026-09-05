@@ -31,6 +31,14 @@
   `aba-payway-hash` v1.3.0 + `aba-payway-first-payment` v1.3.0 bundled scripts
   realigned to the 27-field order. New re-runnable probe script
   `scripts/sandbox-probe-subscription.ts`.
+- **`--json` error envelopes** (skills-audit T3.5) — `check-transaction --json`
+  and `transaction-detail --json` now print a machine-parseable
+  `{ "error": { kind, exitCode, type, message, paywayCode, httpStatus,
+  retryable, hint? } }` envelope on failure instead of the human ✗ block (exit
+  codes unchanged). Shared `printApiErrorJson()` helper — other `--json`
+  commands adopt it incrementally. Bundled scripts also got a written
+  exit-code contract (0 ok · 1 runtime/API · 2 usage/env) in
+  `skills/README.md`.
 
 > Skills-corpus batch (S2) of the five-layer sync audit
 > (`audit-results/sync-audit-2026-09-01.md` §3/§6 S2). Skills-layer only — no

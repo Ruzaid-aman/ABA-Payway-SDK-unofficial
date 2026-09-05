@@ -416,9 +416,27 @@ describe('CLI API commands against the local mock gateway', () => {
     expect(exitCode).toBe(2);
   }, 30_000);
 
-  it('check-transaction --json prints the not-found body and exits 2', async () => {
+  it('transaction-detail --json prints a JSON error envelope and exits 2', async () => {
+    const { text, exitCode } = await run(['transaction-detail', '-t', 'MISSING', '--json']);
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { error: { message: string; paywayCode: string; kind: string; exitCode: number } };
+    expect(parsed.error.message).toContain('tran_id not found');
+    expect(parsed.error.paywayCode).toBe('6');
+    expect(parsed.error.kind).toBe('api');
+    expect(parsed.error.exitCode).toBe(2);
+    expect(text).not.toContain('✗');
+    expect(exitCode).toBe(2);
+  });
+
+  it('check-transaction --json prints the not-found body as a JSON error envelope and exits 2', async () => {
     const { text, exitCode } = await run(['check-transaction', '-t', 'MISSING', '--json']);
-    expect(text).toContain('tran_id not found');
+    // T3.5: the --json path prints a machine-parseable envelope (the human
+    // message stays inside it), never the ✗-prefixed block.
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { error: { message: string; paywayCode: string; kind: string; exitCode: number } };
+    expect(parsed.error.message).toContain('tran_id not found');
+    expect(parsed.error.paywayCode).toBe('6');
+    expect(parsed.error.kind).toBe('api');
+    expect(parsed.error.exitCode).toBe(2);
+    expect(text).not.toContain('✗');
     expect(exitCode).toBe(2);
   });
 

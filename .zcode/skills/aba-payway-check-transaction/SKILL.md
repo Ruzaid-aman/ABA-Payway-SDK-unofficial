@@ -31,6 +31,17 @@ payway-sdk poll-transaction -t <id> --json    # watch until terminal status;
                                               # exit 0 terminal / 2 API error / 3 timeout
 ```
 
+**`--json` error contract:** on failure the JSON path prints a parseable
+envelope (not the human ✗ block) — branch on `error.exitCode` / `error.kind`
+(`api`|`network`|`validation`), read `error.paywayCode`:
+
+```json
+{ "error": { "kind": "api", "exitCode": 2, "type": "PayWayBusinessError",
+  "message": "tran_id not found", "paywayCode": "6", "httpStatus": 200, "retryable": false } }
+```
+The `Using profile: …` line may still precede the JSON on stdout (documented
+EC-14 behavior) — parse from the first `{`.
+
 ## Error Handling
 ```ts
 import { PayWayBusinessError } from 'aba-payway-ts';

@@ -141,47 +141,82 @@ function classifyError(e: unknown): number {
 // ---------------------------------------------------------------------------
 // Shared API error printer (includes PayWay code hints). Returns exit code.
 // ---------------------------------------------------------------------------
+function apiErrorHint(e: PayWayAPIError): string | undefined {
+  if (e.paywayCode === 'PTL04') {
+    return 'currency and return_url are required; description max 250 chars.';
+  }
+  if (e.paywayCode === '96') {
+    return 'check the link id — use the data.id value returned by create.';
+  }
+  if (e.paywayCode === '49') {
+    return 'transaction-list dates must be "YYYY-MM-DD HH:mm:ss" (sandbox-verified format).';
+  }
+  if (e.paywayCode === '8' || e.paywayCode === '15' || e.paywayCode === '26') {
+    return 'PayWay rejected the merchant identity — verify PAYWAY_MERCHANT_ID (env or active profile) and that it belongs to this environment. Run: payway-sdk profiles list';
+  }
+  if (e.paywayCode === '429' || e instanceof PayWayRateLimitError) {
+    return 'strict documented cap hit (sandbox sends HTTP 403 + body code 429). Wait for the window to reset, or use check-transaction (600 req/s) for status-only reads.';
+  }
+  if (/HTML page instead of JSON/.test(e.message)) {
+    return 'a parameter value was rejected server-side — try removing optional params (e.g. payment_gate).';
+  }
+  if (e.paywayCode === '12' || e.paywayCode === 'PTL147') {
+    return 'payout currency must match the beneficiary account currency AND your merchant credential currency — send USD to a USD account, KHR to a KHR account.';
+  }
+  if (e.paywayCode === '37' || e.paywayCode === 'PTL146' || e.paywayCode === 'PTL-PAYOUT-37' || e.paywayCode === 'PTL46') {
+    return 'the payout beneficiary is not whitelisted — register it first via addBeneficiary() (or the payment-link whitelist).';
+  }
+  if (e.paywayCode === 'PTL-PAYOUT-36') {
+    return 'the sum of beneficiary amounts must equal the payout (transaction complete) amount.';
+  }
+  if (e.statusCode === 415) {
+    return 'the direct payout API requires Content-Type: application/json — ensure the request body is JSON, not form-encoded.';
+  }
+  return undefined;
+}
+
 function printApiError(e: unknown): number {
   if (e instanceof PayWayAPIError) {
     console.log(`  ${c.red('✗')} ${e.message}`);
     if (e.paywayCode) console.log(`  ${c.dim(`PayWay code: ${e.paywayCode}`)}`);
-    if (e.paywayCode === 'PTL04') {
-      console.log(`  ${c.dim('Hint: currency and return_url are required; description max 250 chars.')}`);
-    } else if (e.paywayCode === '96') {
-      console.log(`  ${c.dim('Hint: check the link id — use the data.id value returned by create.')}`);
-    } else if (e.paywayCode === '49') {
-      console.log(`  ${c.dim('Hint: transaction-list dates must be "YYYY-MM-DD HH:mm:ss" (sandbox-verified format).')}`);
-    } else if (e.paywayCode === '8' || e.paywayCode === '15' || e.paywayCode === '26') {
-      console.log(
-        `  ${c.dim('Hint: PayWay rejected the merchant identity — verify PAYWAY_MERCHANT_ID (env or active profile) and that it belongs to this environment. Run: payway-sdk profiles list')}`,
-      );
-    } else if (e.paywayCode === '429' || e instanceof PayWayRateLimitError) {
-      console.log(
-        `  ${c.dim('Hint: strict documented cap hit (sandbox sends HTTP 403 + body code 429). Wait for the window to reset, or use check-transaction (600 req/s) for status-only reads.')}`,
-      );
-    } else if (/HTML page instead of JSON/.test(e.message)) {
-      console.log(`  ${c.dim('Hint: a parameter value was rejected server-side — try removing optional params (e.g. payment_gate).')}`);
-    } else if (e.paywayCode === '12' || e.paywayCode === 'PTL147') {
-      console.log(
-        `  ${c.dim('Hint: payout currency must match the beneficiary account currency AND your merchant credential currency — send USD to a USD account, KHR to a KHR account.')}`,
-      );
-    } else if (e.paywayCode === '37' || e.paywayCode === 'PTL146' || e.paywayCode === 'PTL-PAYOUT-37' || e.paywayCode === 'PTL46') {
-      console.log(
-        `  ${c.dim('Hint: the payout beneficiary is not whitelisted — register it first via addBeneficiary() (or the payment-link whitelist).')}`,
-      );
-    } else if (e.paywayCode === 'PTL-PAYOUT-36') {
-      console.log(
-        `  ${c.dim('Hint: the sum of beneficiary amounts must equal the payout (transaction complete) amount.')}`,
-      );
-    } else if (e.statusCode === 415) {
-      console.log(
-        `  ${c.dim('Hint: the direct payout API requires Content-Type: application/json — ensure the request body is JSON, not form-encoded.')}`,
-      );
-    }
+    const hint = apiErrorHint(e);
+    if (hint) console.log(`  ${c.dim(`Hint: ${hint}`)}`);
     return classifyError(e);
   }
   console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
   return classifyError(e);
+}
+
+/**
+ * JSON-mode error printer (agent contract, T3.5): the `--json` paths print a
+ * machine-parseable envelope to STDOUT instead of the human block — agents
+ * branch on the envelope, not on scraping ANSI text. Exit code is identical
+ * to the human printer (classifyError). Adopted so far by the commands whose
+ * catches call it; new `--json` commands should do the same.
+ */
+function printApiErrorJson(e: unknown): number {
+  const exit = classifyError(e);
+  const kind = exit === EXIT_NETWORK ? 'network' : exit === EXIT_API_FAILURE ? 'api' : 'validation';
+  const type = e instanceof Error ? e.constructor.name : typeof e;
+  if (e instanceof PayWayAPIError) {
+    const payload: Record<string, unknown> = {
+      kind,
+      exitCode: exit,
+      type,
+      message: e.message,
+      paywayCode: e.paywayCode,
+      httpStatus: e.statusCode,
+      retryable: e.retryable,
+    };
+    const hint = apiErrorHint(e);
+    if (hint) payload.hint = hint;
+    console.log(JSON.stringify({ error: payload }, null, 2));
+    return exit;
+  }
+  console.log(
+    JSON.stringify({ error: { kind, exitCode: exit, type, message: e instanceof Error ? e.message : String(e) } }, null, 2),
+  );
+  return exit;
 }
 
 // ---------------------------------------------------------------------------
@@ -989,6 +1024,10 @@ program
         console.log(`  ${c.dim(`status code: ${String(data.payment_status_code)} (${PAYMENT_STATUS_LABELS[Number(data.payment_status_code)] ?? '?'})`)}`);
       }
     } catch (error) {
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(error);
+        return;
+      }
       if (error instanceof Error && !(error instanceof PayWayError)) {
         // Local validation failure
         console.log(`  ${c.red('✗')} ${error.message}`);
@@ -1141,7 +1180,7 @@ program
         if (data?.[key] !== undefined) console.log(`  ${key.padEnd(20)} ${c.cyan(String(data[key]))}`);
       }
     } catch (error) {
-      process.exitCode = printApiError(error);
+      process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
     }
   });
 

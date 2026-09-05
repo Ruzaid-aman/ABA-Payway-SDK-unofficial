@@ -29,6 +29,11 @@ payway-sdk transaction-detail -t <id> [--json]
 payway-sdk transaction-detail -t <id> --wait 15   # retry the ~5s indexing lag every 2s
 ```
 
+**`--json` error contract:** failures print a parseable envelope on stdout —
+`{ "error": { "kind": "api", "exitCode": 2, "type": "…", "message": "…",
+"paywayCode": "6", "httpStatus": 200, "retryable": false } }` — not the human
+✗ block. The `Using profile: …` line may precede it (parse from the first `{`).
+
 ## Error Handling
 ```ts
 import { PayWayRateLimitError } from 'aba-payway-ts';
