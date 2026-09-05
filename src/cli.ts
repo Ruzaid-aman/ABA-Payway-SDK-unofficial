@@ -1719,8 +1719,11 @@ program
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
   .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
   .option('--payment-option <option>', 'Payment option (omit to let PayWay show all options)')
+  .option('--payment-gate <0|1>', 'Hosted checkout gate; use 0 for the browser-hosted payment page')
   .option('--return-url <url>', 'Return URL after payment')
   .option('--cancel-url <url>', 'Cancel URL')
+  .option('--skip-success-page <0|1>', 'Skip the PayWay success page (0 or 1)')
+  .option('--continue-success-url <url>', 'Destination used by the hosted page Continue action')
   .option('--firstname <name>', 'Customer first name')
   .option('--lastname <name>', 'Customer last name')
   .option('--email <email>', 'Customer email')
@@ -1746,6 +1749,18 @@ program
       process.exitCode = EXIT_VALIDATION;
       return;
     }
+    const paymentGate = opts.paymentGate === undefined ? undefined : Number(opts.paymentGate);
+    if (paymentGate !== undefined && paymentGate !== 0 && paymentGate !== 1) {
+      say(`  ${c.red('✗')} --payment-gate must be 0 or 1, received: ${c.red(String(opts.paymentGate))}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    const skipSuccessPage = opts.skipSuccessPage === undefined ? undefined : Number(opts.skipSuccessPage);
+    if (skipSuccessPage !== undefined && skipSuccessPage !== 0 && skipSuccessPage !== 1) {
+      say(`  ${c.red('✗')} --skip-success-page must be 0 or 1, received: ${c.red(String(opts.skipSuccessPage))}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -1759,8 +1774,11 @@ program
           amount,
           currency,
           ...(opts.paymentOption ? { paymentOption: opts.paymentOption } : {}),
+          ...(paymentGate === undefined ? {} : { paymentGate }),
           ...(opts.returnUrl ? { returnUrl: opts.returnUrl } : {}),
           ...(opts.cancelUrl ? { cancelUrl: opts.cancelUrl } : {}),
+          ...(skipSuccessPage === undefined ? {} : { skipSuccessPage: skipSuccessPage as 0 | 1 }),
+          ...(opts.continueSuccessUrl ? { continueSuccessUrl: opts.continueSuccessUrl } : {}),
           ...(opts.firstname ? { firstname: opts.firstname } : {}),
           ...(opts.lastname ? { lastname: opts.lastname } : {}),
           ...(opts.email ? { email: opts.email } : {}),
