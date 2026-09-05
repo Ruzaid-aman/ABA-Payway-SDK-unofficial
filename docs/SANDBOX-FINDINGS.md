@@ -725,3 +725,28 @@ code proves the hash layer ACCEPTED. Evidence:
    string set (`WRONG_HASH_CODES.has(1)` vs `'1'`) and mislabeled verdicts in
    the first run's SUMMARY — the raw codes in the log are authoritative; the
    script now String()s the code before classification.
+
+## 18. First full paid lifecycle end-to-end: QR → ABA simulator → APPROVED → list-visible → partial refund → REFUNDED (2026-09-05)
+
+**Context.** The 2026-09-03 skills audit executed zero money movement; every
+prior transaction stayed PENDING. With the user running the ABA Simulator app,
+a complete paid lifecycle was executed on merchant `ec476910`.
+
+**Flow.** `generate-qr -a 0.50 -c USD --lifetime 900 -y` → tran
+`qrmtoab02ufd0f32` → user scanned + approved in the simulator (~18:13:54
+gateway time) → `check-transaction` APPROVED (code 0) within seconds →
+partial refund `-a 0.10 -y` accepted (`code 00`) → detail shows
+`refund_amount 0.1`, `payment_status REFUNDED` (code 4).
+
+**Confirmations (nothing contradicts existing pins).**
+
+1. **Paid transactions ARE visible in transaction-list** (§14's invisibility
+   gap applies to UNPAID QR-only transactions only) — the paid txn appears
+   with its APPROVED status. Watch the timezone: gateway `transaction_date`
+   is UTC+7; a UTC-derived window misses it.
+2. **Partial refund flips the WHOLE payment_status to REFUNDED** in sandbox
+   while `refund_amount` (0.10) stays the source of truth for how much was
+   returned — confirms the refund skill's "payment_status is a coarse flag"
+   guidance.
+3. Simulator scan→approve latency ≈ 60–90 s from QR creation; check-transaction
+   saw the APPROVED status immediately after approval (<1 s, §7 holds).
