@@ -59,7 +59,11 @@ export interface TransactionSession {
    * - `html`      : string (HTML snippet)
    */
   responsePayload: string;
-  /** ISO-8601 timestamp when this session expires. */
+  /**
+   * Merchant-side deadline derived from the requested `lifetime` (60 minutes by
+   * default). This is scheduling metadata; only a status check or callback can
+   * establish whether PayWay still accepts payment for the transaction.
+   */
   expiresAt: string;
   /** The original, unmodified PayWay response for advanced/debug use. */
   raw?: unknown;
@@ -85,9 +89,8 @@ export interface InitiateTransactionPayload {
   /** Optional buyer phone. */
   phone?: string;
   /**
-   * Payment option. When omitted, PayWay auto-displays all supported options
-   * and returns an HTML hosted checkout page. Use `abapay_khqr_deeplink` to
-   * receive a JSON payload with qr_string + deeplink.
+   * Payment option. The response shape also depends on merchant configuration
+   * and purchase flags, so handle the returned `responseType` discriminator.
    */
   paymentOption?: 'cards' | 'abapay_khqr' | 'abapay_khqr_deeplink' | 'alipay' | 'wechat' | 'google_pay' | string;
   /** Optional shipping fee (additive to amount). */
@@ -102,6 +105,13 @@ export interface InitiateTransactionPayload {
   viewType?: 'hosted_view' | 'popup';
   /** Optional lifetime in minutes (min 3, max 43200). */
   lifetime?: number;
+  /**
+   * Retry policy for the purchase request. Defaults to `none` because a
+   * transport failure can happen after PayWay accepted the transaction. Use
+   * `transient` only when the caller will reconcile the transaction id before
+   * another create attempt.
+   */
+  retryPolicy?: 'none' | 'transient';
 }
 
 /**

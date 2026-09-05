@@ -12,7 +12,7 @@
  */
 
 import type { Server as HttpServer } from 'node:http';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PayWay } from '../client.js';
 import type { PayWayConfig } from '../client.js';
 import { PayWayBusinessError } from '../errors.js';
@@ -202,6 +202,41 @@ describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {
     await expect(
       server.initiateTransaction({ transactionId: 'x' } as any, config),
     ).rejects.toThrow(/amount/);
+  });
+
+  it('does not replay a purchase after an ambiguous transport failure by default', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('socket reset'));
+    try {
+      await expect(
+        server.initiateTransaction(
+          { transactionId: 'ambiguous-create-1', amount: 10, paymentOption: 'abapay_khqr_deeplink' },
+          { ...config, maxRetries: 2, retryDelayMs: 1 },
+        ),
+      ).rejects.toThrow();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('allows transient purchase retries only when the caller opts in', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('socket reset'));
+    try {
+      await expect(
+        server.initiateTransaction(
+          {
+            transactionId: 'explicit-retry-1',
+            amount: 10,
+            paymentOption: 'abapay_khqr_deeplink',
+            retryPolicy: 'transient',
+          },
+          { ...config, maxRetries: 2, retryDelayMs: 1 },
+        ),
+      ).rejects.toThrow();
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 
