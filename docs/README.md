@@ -122,13 +122,13 @@ This documentation is written for **junior to mid-level developers** who need to
 ## Quick Links
 
 - [ABA PayWay Developer Portal](https://developer.payway.com.kh)
-- [SDK npm Package](https://www.npmjs.com/package/aba-payway-ts)
-- [SDK Source Code](https://github.com/your-org/aba-payway-ts)
+- SDK npm package — publication pending; install a locally built tarball as described in the root README
+- [SDK Source Code](https://github.com/antigravity-google/aba-payway-ts)
 - [Sandbox Dashboard](https://checkout-sandbox.payway.com.kh)
 - [Production Dashboard](https://checkout.payway.com.kh)
 - [Agentic PayWay CLI (1-pager)](./QUICK-START-1-PAGER.md#agentic-payway-cli) — risk-gated, provider-driven payments
 - [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md)
-- [All 29 AI skills](../skills/README.md) — task-focused agent guides; five bundle dependency-free `.cjs` tools (request signing, callback verification, KHQR decode/CRC validation, status decoding, reconciliation) under their `scripts/` folders
+- [All 30 AI skills](../skills/README.md) — task-focused agent guides; several bundle dependency-free `.cjs` tools under their `scripts/` folders
 
 ---
 
@@ -150,4 +150,3 @@ The SDK performs input validation in each domain to fail fast and give clear dev
 - **`credentials-on-file`**: requires `requestId`/`ctid` where applicable, validates `paymentToken` presence for Cof payments, and validates any `returnUrl`/`callbackUrl` as public HTTPS URLs.
 
 If validation fails, the SDK throws `PayWayConfigError` with a descriptive message. For integrators, validate inputs client-side before calling SDK methods or catch `PayWayConfigError` to present a clear error to users.
-

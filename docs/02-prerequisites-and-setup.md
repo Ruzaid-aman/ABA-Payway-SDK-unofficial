@@ -41,7 +41,7 @@ Before you start coding, you need to obtain these from ABA PayWay. You'll get se
 Verify your installation:
 
 ```bash
-node --version   # Should show v18.x.x or higher
+node --version   # Should show v20.x.x or higher
 npm --version    # Should show 9.x.x or higher
 ```
 
@@ -270,60 +270,13 @@ Whenever you restart ngrok, you'll get a **new random URL**, so you'll need to u
 
 ## Verification Step: "Hello, PayWay"
 
-Before building your full integration, run this simple script to confirm your credentials work and you can reach the PayWay sandbox:
-
-```typescript
-// verify-credentials.ts
-import 'dotenv/config';
-import { PayWay, PayWayAPIError } from 'aba-payway-ts';
-
-async function verify() {
-  const payway = new PayWay({
-    merchantId: process.env.PAYWAY_MERCHANT_ID!,
-    apiKey: process.env.PAYWAY_API_KEY!,
-    environment: 'sandbox',
-  });
-
-  try {
-    // getExchangeRate() is the simplest PayWay endpoint — no params, just auth
-    const rates = await payway.checkout.getExchangeRate();
-    console.log('✅ Connected to PayWay Sandbox successfully!');
-    console.log('Exchange rates:', rates);
-  } catch (error) {
-    if (error instanceof PayWayAPIError) {
-      console.error('❌ PayWay rejected the request:');
-      console.error('  Error Code:', error.paywayCode);
-      console.error('  Status Code:', error.statusCode);
-      console.error('  Message:', error.message);
-
-      if (error.paywayCode === '15') {
-        console.error('\n💡 Hint: "Invalid Merchant" — check your PAYWAY_MERCHANT_ID');
-      } else if (error.paywayCode === '1') {
-        console.error('\n💡 Hint: "Wrong Hash" — check your PAYWAY_API_KEY');
-      }
-    } else {
-      console.error('❌ Network or system error:');
-      console.error(' ', error);
-      console.error('\n💡 Hint: Check your internet connection and firewall settings.');
-    }
-  }
-}
-
-verify();
-```
-
-Run it:
+Use the installed CLI to validate configuration and make one read-only sandbox request. This avoids maintaining a separate credential script:
 
 ```bash
-npx tsx verify-credentials.ts
+payway-sdk doctor --live
 ```
 
-**Expected output (success):**
-
-```
-✅ Connected to PayWay Sandbox successfully!
-Exchange rates: { ... }
-```
+The command reports the selected environment and configuration checks without printing API keys. A successful run ends with `All credential & connectivity checks passed.`
 
 ### Troubleshooting the Verification Step
 
@@ -333,7 +286,7 @@ Exchange rates: { ... }
 | `"Invalid Merchant"` (code 15) | Incorrect Merchant ID | Verify `PAYWAY_MERCHANT_ID` in your `.env` file |
 | Network timeout | Firewall blocking outbound traffic | Allow outbound HTTPS to `checkout-sandbox.payway.com.kh` |
 | `ECONNREFUSED` | No internet connection | Check your network connection |
-| `tsx: command not found` | `tsx` not installed | Install with `npm install --save-dev tsx` or use `npx ts-node` |
+| `payway-sdk: command not found` | Package or local tarball is not installed | Install the SDK package, or run the built checkout with `node dist/cli.js doctor --live` |
 
 ---
 

@@ -431,7 +431,7 @@ echo json_encode(['received' => true]);
 
         // Populate and submit hidden form to PayWay
         const form = document.getElementById('paywayForm');
-        form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/checkout`;
+        form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/purchase`;
         form.innerHTML = '';
         Object.entries(data.payload).forEach(([key, value]) => {
           form.innerHTML += `<input type="hidden" name="${key}" value="${value}">`;
@@ -459,7 +459,7 @@ echo json_encode(['received' => true]);
 
 ```bash
 # Clone the project
-git clone https://github.com/your-org/aba-payway-ts
+git clone https://github.com/antigravity-google/aba-payway-ts.git
 cd aba-payway-ts
 
 # Install dependencies

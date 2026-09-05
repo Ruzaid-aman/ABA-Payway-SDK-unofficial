@@ -335,7 +335,7 @@ This is a single HTML file served by your backend. It initializes the Telegram W
 
           // Step 2: Populate the hidden form with signed fields
           const form = document.getElementById('paywayForm');
-          form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/checkout`;
+          form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/purchase`;
 
           // Clear any previous fields
           form.innerHTML = '';

@@ -146,7 +146,7 @@ try {
 | Code | Message | HTTP Status | Meaning | How to Fix |
 |---|---|---|---|---|
 | `"1"` | Wrong Hash | 403 | HMAC signature doesn't match | Check API key, field ordering, encoding (Base64 vs hex) |
-| `"04"` | The given data was invalid | 400 | String form of the binding/validation code — observed on `generate-qr` when `lifetime` is below the 3-minute minimum (the SDK now rejects sub-180s locally) | Send `lifetime >= 180` seconds; if you still hit `"04"`, another field is malformed — compare against the OpenAPI request schema |
+| `"04"` | The given data was invalid | 400 | String form of the binding/validation code — observed on `generate-qr` when its lifetime is below the 180-second minimum | Send QR `lifetime >= 180` seconds. Purchase checkout lifetime uses minutes and has a separate minimum of 3. |
 | `"7"` | Invalid Request Data | 400/403 | Missing or malformed field | Check parameter types and required fields |
 | `"15"` | Invalid Merchant | 403 | Merchant ID not recognized | Verify `merchantId` in your config |
 | `"16"` | Invalid Amount | 400 | Amount format is wrong | Use `formatAmount()` helper; check decimal places |
@@ -607,10 +607,10 @@ echo $PAYWAY_API_KEY
 ### 2. Run the Verification Script
 
 ```bash
-npx tsx verify-credentials.ts
+payway-sdk doctor --live
 ```
 
-If this fails, your credentials or network are the issue. (See Chapter 2 for the script.)
+If this fails, follow the command's configuration, credential, or connectivity remedy. See Chapter 2 for setup.
 
 ### 3. Enable Debug Hooks
 

@@ -47,19 +47,28 @@ For a secure integration, separate your payment flow into distinct Backend and F
 
 ## Installation
 
+The package is not yet published to the public npm registry. Build a local tarball from this checkout, then install that tarball in your application:
+
 ```bash
-npm install aba-payway-ts
+npm ci
+npm run build
+npm pack
+
+# Run in your application directory; adjust the relative path as needed.
+npm install ../aba-payway-ts/aba-payway-ts-1.5.0.tgz
 ```
+
+After the package is published, the explicit package/binary form will be `npm exec --package=aba-payway-ts -- payway-sdk --help`. Do not run bare `npx payway-sdk`: that name currently resolves to an unrelated public package.
 
 ### Install AI skills
 
 Install the SDK's task-focused skill guides for supported coding agents:
 
 ```bash
-npx payway-sdk skills add claude copilot
+node dist/cli.js skills add claude copilot
 ```
 
-Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use `npx payway-sdk skills list` to inspect installed guides and `npx payway-sdk skills remove claude` to remove the ABA PayWay guides for an agent.
+Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. From this checkout, use `node dist/cli.js skills list` to inspect installed guides and `node dist/cli.js skills remove claude` to remove the ABA PayWay guides for an agent.
 
 ### Agentic PayWay CLI
 
@@ -72,9 +81,9 @@ The SDK ships an agentic CLI that lets a supported provider propose and run PayW
 # Guided setup (recommended): provider -> profile -> callback -> privacy -> verify
 payway-sdk onboard
 
-# Or configure directly. Presets: opencode (free) | openai | openrouter | nvidia | custom
+# Or configure directly. Use a model ID currently offered by your provider.
 export PAYWAY_AGENT_API_KEY=sk-...
-payway-sdk agent setup --provider opencode --model x-preview-f-free \
+payway-sdk agent setup --provider openrouter --model <provider-model-id> \
   --max-tokens 8192 --temperature 0.2 --acknowledge-privacy
 
 # Ask the agent (create actions require --yolo in sandbox or interactive confirmation)
@@ -223,7 +232,7 @@ Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or
 | `npx tsx scripts/online-qr-poll.ts` | One online KHQR (default $31.11 USD, 600s lifetime) → save/open PNG → poll every 5s for 10 min |
 | `npx tsx scripts/checkout-link-poll.ts` | Create Transaction API (default $12.12 USD, 600s lifetime) → open hosted `checkout_qr_url` → poll every 5s for 10 min |
 | `npx tsx scripts/check-qr-transactions.ts` | Fetch transactions via `getTransactionList`, query detail for each |
-| `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 10 PayWay templates, save PNGs + QR strings to `test-logs/qr-images/` |
+| `npx tsx scripts/test-all-qr-templates.ts` | Internal sandbox probe for QR template variants; the public SDK currently accepts the seven values listed by `payway-sdk generate-qr --help` |
 | `npx tsx scripts/zero-logic-purchase-flow.ts` | End-to-end purchase flow with no business logic (demo) |
 
 Results from integration scripts are written to `test-logs/` with timestamps.
@@ -237,6 +246,9 @@ For a complete 16-chapter integration guide, diagrams, and runnable examples, se
 > 🗺️ **New to the project?** Start with the [Visual Guide](./docs/VISUAL-GUIDE.md) — architecture, setup paths, onboarding journey, and the payment lifecycle in one page of diagrams.
 
 > Note: The SDK also performs fast client-side validation per domain. See the validation behavior section in [docs/README.md](./docs/README.md) for details.
+
+> [!CAUTION]
+> **Observed PayWay limitations (sandbox, 2026-09-05):** create a fresh transaction ID for every attempt and reconcile an ambiguous create response before starting another payment. A PENDING record does not prove that an older QR still scans. Closing a transaction is not exposed by read APIs and did not stop already-rendered hosted card sessions, so keep a local closed flag and still accept late verified payment. The hosted page must be reached as the response to its signed browser form POST; saving or embedding the returned HTML can leave relative assets and QR hydration blank. Reconcile the requested amount/currency separately from the payer debit, use `refund_amount` for partial refunds, and interpret gateway timestamps in UTC+7. These are dated sandbox observations, not guaranteed production behavior.
 
 ### Documentation & examples
 
@@ -341,8 +353,9 @@ const paywayWithRetry = new PayWay({
 > transparently there — but production duplicate semantics are unconfirmed
 > (open question in [SANDBOX-FINDINGS §8c](./docs/SANDBOX-FINDINGS.md)). If
 > you need strict once-only submission, pass `retryPolicy: 'none'` to
-> `checkout.purchase()` (or set `maxRetries: 0` for purchase calls) and
-> handle retries in your own code with a fresh `tran_id`.
+> `checkout.purchase()`. If the response is lost, query the persisted
+> transaction ID before authorizing a new attempt; never blindly create a
+> replacement payment after a timeout.
 
 ### 2. Initiate Checkout (Server-Side)
 
@@ -373,12 +386,14 @@ app.get('/checkout/:orderId', (req, res) => {
     transactionId: req.params.orderId,
     amount: 15.00,
     currency: 'USD',
+    paymentGate: 0,
+    retryPolicy: 'none',
     returnUrl: 'https://mywebsite.com/payment-result',
   }, { autoSubmit: true }));
 });
 ```
 
-The CLI can write the same document locally: `payway-sdk checkout-form -a 15.00 --return-url <url> -o form.html` (local signing only — no API call, no RSA key required).
+The CLI can write the same document locally: `node dist/cli.js checkout-form -a 15.00 --return-url <url> -o form.html` (local signing only — no API call, no RSA key required). Open it through an HTTP(S) origin and let the form POST navigate the browser; the returned hosted page is not a portable standalone HTML file.
 
 ### 3. Handle Webhook Callback
 
@@ -434,7 +449,7 @@ await payway.checkout.checkTransaction(tranId, undefined, {
 PayWay does not currently expose Stripe-style per-request `Idempotency-Key` support in its public API. Instead, use a unique `tran_id` for every checkout attempt, persist transaction events durably, and deduplicate duplicate webhook callbacks or repeated return URL checks on your backend.
 
 - Use `tran_id` as your primary duplicate-detection key.
-- Treat webhook callbacks as the trusted final source of truth.
+- Verify callback authenticity, persist it idempotently, and reconcile with a status API before fulfillment.
 - Do not rely on client-side redirects alone for payment confirmation.
 
 > For sandbox verification, always supply `PAYWAY_MERCHANT_ID`, `PAYWAY_API_KEY`, and `PAYWAY_RSA_PUBLIC_KEY` from environment variables, never hardcode them in source.

@@ -164,7 +164,7 @@ class PaymentViewController: UIViewController, WKNavigationDelegate {
                 <p>Redirecting to payment...</p>
             </div>
             <form id="payway-form" method="POST"
-                  action="\(checkoutURL)/api/payment-gateway/v1/payments/checkout">
+                  action="\(checkoutURL)/api/payment-gateway/v1/payments/purchase">
                 \(hiddenInputs)
             </form>
             <script>
@@ -451,7 +451,7 @@ class PaymentActivity : AppCompatActivity() {
                 <div class="spinner"></div>
                 <p>Redirecting to payment...</p>
                 <form id="payway-form" method="POST"
-                      action="$checkoutURL/api/payment-gateway/v1/payments/checkout">
+                      action="$checkoutURL/api/payment-gateway/v1/payments/purchase">
                     $hiddenInputs
                 </form>
                 <script>

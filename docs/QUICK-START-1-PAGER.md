@@ -285,7 +285,7 @@ Profile storage is plaintext at `%APPDATA%\aba-payway-sdk\profiles.json`; do not
 
 ## Agentic PayWay CLI
 
-Let a supported provider propose and run PayWay actions through a risk-gated pipeline. Full detail lives in the skill guides: [aba-payway-agent](./skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment](./skills/aba-payway-first-payment/SKILL.md).
+Let a supported provider propose and run PayWay actions through a risk-gated pipeline. Full detail lives in the skill guides: [aba-payway-agent](../skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment](../skills/aba-payway-first-payment/SKILL.md).
 
 ### Provider setup
 
@@ -323,7 +323,7 @@ Before any plan is proposed, a privacy acknowledgement gate must be satisfied (`
 
 ### First-payment selection
 
-The agent picks one of four routes — checkout, online QR, offline KHQR, or payment link — based on readiness (credentials, callback URL, RSA key, KHQR merchant data). See the [first-payment decision matrix](./skills/aba-payway-first-payment/SKILL.md) for required inputs and result handling per route.
+The agent picks one of four routes — checkout, online QR, offline KHQR, or payment link — based on readiness (credentials, callback URL, RSA key, KHQR merchant data). See the [first-payment decision matrix](../skills/aba-payway-first-payment/SKILL.md) for required inputs and result handling per route.
 
 ### Polling vs. webhook
 
@@ -339,4 +339,4 @@ The agent picks one of four routes — checkout, online QR, offline KHQR, or pay
 
 ### Manual escape paths
 
-Every agent action maps to a fully-supported manual SDK/CLI command. If the agentic path is unavailable, use the underlying call directly — nothing is gated behind the agent. See [aba-payway-purchase](./skills/aba-payway-purchase/SKILL.md) for the checkout contract (`createTransaction()` builds a LOCAL signed payload; `purchase()` performs the NETWORK request).
+Every agent action maps to a fully-supported manual SDK/CLI command. If the agentic path is unavailable, use the underlying call directly — nothing is gated behind the agent. See [aba-payway-purchase](../skills/aba-payway-purchase/SKILL.md) for the checkout contract (`createTransaction()` builds a LOCAL signed payload; `purchase()` performs the NETWORK request).

@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { createCheckoutPayload } from '../../docs/examples/backend/checkout-signing.ts';
+import { createCheckoutPayload, createHostedCheckoutForm } from '../../docs/examples/backend/checkout-signing.ts';
 import { extractWebhookSignature, removeHashField } from '../../docs/examples/backend/webhook-verification.ts';
+import { createWebhookServer } from 'aba-payway-ts';
 
 describe('Documentation examples', () => {
   const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -56,6 +57,34 @@ describe('Documentation examples', () => {
     expect(payload).toHaveProperty('hash');
     expect(typeof payload.hash).toBe('string');
     expect(payload).toHaveProperty('merchant_id', 'SANDBOX_MERCHANT');
+  });
+
+  it('builds the documented hosted checkout with the public package API and purchase form route', () => {
+    const html = createHostedCheckoutForm({
+      transactionId: 'order-123',
+      amount: 15,
+      currency: 'USD',
+      returnUrl: 'https://example.com/success',
+      cancelUrl: 'https://example.com/cancel',
+    });
+
+    expect(html).toContain('action="https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase"');
+    expect(html).toContain('name="payment_gate" value="0"');
+    expect(html).toContain("document.getElementById('aba_merchant_request').submit()");
+    expect(createWebhookServer).toBeTypeOf('function');
+  });
+
+  it.each(['README.md', 'docs/README.md', 'docs/QUICK-START-1-PAGER.md'])('resolves repository-relative links from %s', (docPath) => {
+    const markdown = readDoc(docPath);
+    const docDir = dirname(join(repoRoot, docPath));
+    const missing = [...markdown.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g)]
+      .map((match) => match[1].trim().replace(/^<|>$/g, ''))
+      .filter((target) => !/^(?:[a-z][a-z\d+.-]*:|#)/i.test(target))
+      .map((target) => decodeURIComponent(target.split('#', 1)[0].split('?', 1)[0]))
+      .filter((target) => target.length > 0)
+      .filter((target) => !existsSync(resolve(docDir, target)));
+
+    expect(missing).toEqual([]);
   });
 
   it('documents official offline ABA KHQR configuration and its dedicated callback route', () => {

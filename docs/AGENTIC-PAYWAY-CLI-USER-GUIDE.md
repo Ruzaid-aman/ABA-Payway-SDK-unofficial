@@ -6,7 +6,7 @@ audited PayWay operations. It covers what is implemented, every command, the saf
 and how to configure both the agent's LLM provider and your PayWay credentials.
 
 > The agentic layer is **additive** — it never changes the behavior of the existing manual
-> commands (`generate-qr`, `create-checkout`, `check-transaction`, …). Those commands remain
+> commands (`generate-qr`, `generate-checkout`, `check-transaction`, …). Those commands remain
 > the single source of truth and are re-dispatched by the interactive REPL.
 
 ---
@@ -56,7 +56,7 @@ Two optional agent-guidance skills are also shipped under `skills/`:
 npm install
 npm run build      # tsup → dist/
 npm run typecheck  # tsc --noEmit
-npm test           # vitest (988 tests)
+npm test           # run the current Vitest suite
 ```
 
 After building, the CLI binary is the SDK entry point (referenced here as `payway-sdk`).
@@ -82,8 +82,8 @@ payway-sdk --help       # runs dist/cli.js directly, no npx/tsx
 ```bash
 # 1. Configure the agent's LLM provider (key stays in the environment, never stored)
 export PAYWAY_AGENT_API_KEY=sk-...
-# Free option (OpenCode Zen):
-payway-sdk agent setup --provider opencode --model x-preview-f-free --acknowledge-privacy \
+# Choose a model ID currently offered by your provider:
+payway-sdk agent setup --provider openrouter --model <provider-model-id> --acknowledge-privacy \
   --max-tokens 8192 --temperature 0.2
 # Or OpenAI:
 # payway-sdk agent setup --provider openai --model gpt-4o --acknowledge-privacy
@@ -151,7 +151,7 @@ Configures the provider (non-secret settings only).
 | Option | Meaning |
 | --- | --- |
 | `--provider <preset>` | `openai` \| `openrouter` \| `nvidia` \| `opencode` \| `custom`. |
-| `--model <name>` | Model id, e.g. `gpt-4o` or `x-preview-f-free`. |
+| `--model <name>` | Model ID currently offered by the selected provider. |
 | `--base-url <url>` | Custom endpoint (required when `--provider custom`). |
 | `--capability-mode <mode>` | `native-tools` \| `strict-json-plan`. |
 | `--timeout <ms>` | Provider request timeout (positive integer). |
@@ -165,7 +165,7 @@ Provider presets and their base URLs:
 
 | Preset | Base URL |
 | --- | --- |
-| `opencode` | `https://opencode.ai/zen/v1` (free models, e.g. `x-preview-f-free`) |
+| `opencode` | `https://opencode.ai/zen/v1` (query the provider for currently supported model IDs) |
 | `openai` | `https://api.openai.com/v1` |
 | `openrouter` | `https://openrouter.ai/api/v1` |
 | `nvidia` | `https://integrate.api.nvidia.com/v1` |
@@ -270,8 +270,8 @@ Example (produced by `agent setup`):
 ```json
 {
   "version": "agent-config/v1",
-  "provider": "opencode",
-  "model": "x-preview-f-free",
+  "provider": "openrouter",
+  "model": "provider-model-id",
   "capabilityMode": "strict-json-plan",
   "timeoutMs": 30000,
   "maxTokens": 8192,

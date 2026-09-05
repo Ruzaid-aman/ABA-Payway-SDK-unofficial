@@ -262,8 +262,7 @@ $ npx payway-sdk setup-webhook --tunnel
 You can also use the webhook components directly in your Node.js code:
 
 ```typescript
-import { createStorage, type WebhookStorage } from 'aba-payway-ts';
-import { createWebhookServer } from 'aba-payway-ts/webhook/server';
+import { createStorage, createWebhookServer, type WebhookStorage } from 'aba-payway-ts';
 
 // Create storage (auto-detects best backend)
 const storage = await createStorage('auto', './my-callbacks.jsonl');
@@ -311,10 +310,9 @@ npx payway-sdk setup-webhook --tunnel
 ### Step 2: Generate a QR code with the webhook URL
 
 ```bash
-npx payway-sdk generate-qr \
+payway-sdk generate-qr \
   --amount 5.00 \
-  --callback-url https://abc-123.trycloudflare.com/aba-payway-webhook \
-  --merchant-id YOUR_MERCHANT_ID
+  --callback-url https://abc-123.trycloudflare.com/aba-payway-webhook
 ```
 
 ### Step 3: Scan the QR code and complete payment

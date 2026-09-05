@@ -29,7 +29,7 @@ Every parameter you pass to `createTransaction()` affects how the checkout page 
 | **Payment Option** | `paymentOption` | `'cards'`, `'abapay_khqr'`, `'alipay'`, `'wechat'`, `'google_pay'`, `'abapay_khqr_deeplink'` | Which payment methods appear on the checkout page |
 | **View Type** | `viewType` | `'hosted_view'` (default) or `'popup'` | Full-page redirect vs. popup overlay |
 | **Language** | `[TBD]` | `[TBD: research from official docs]` | Locale/language of the checkout page |
-| **QR Image Template** | `qrImageTemplate` (QR API only) | `'template1'`, `'template2'` | Visual style of generated QR codes |
+| **QR Image Template** | `qrImageTemplate` (QR API only) | `template1`, `template1_color`, `template2`, `template2_color`, `template3_color`, `template4`, `template4_color` | Visual style of generated QR codes |
 
 ### Flow-Control Parameters
 
