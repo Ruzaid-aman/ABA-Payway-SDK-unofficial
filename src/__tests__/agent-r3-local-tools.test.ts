@@ -15,6 +15,7 @@ vi.mock('node:child_process', async () => {
 });
 
 const temporaryDirectories: string[] = [];
+const temporaryLinks: Array<{ link: string; root: string }> = [];
 let originalCwd = '';
 const spawned: Array<{ command: string; args: string[] }> = [];
 
@@ -52,6 +53,13 @@ beforeEach(() => {
 
 afterEach(() => {
   process.chdir(originalCwd);
+  for (const { link, root } of temporaryLinks.splice(0)) {
+    const relativeLink = path.relative(root, link);
+    if (relativeLink === '' || relativeLink.startsWith('..') || path.isAbsolute(relativeLink)) {
+      throw new Error(`Refusing to remove test link outside its fixture root: ${link}`);
+    }
+    rmSync(link, { force: true });
+  }
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -106,6 +114,7 @@ describe('R3 active-session artifact policy', () => {
     writeFileSync(path.join(outside, 'secret.json'), '{}');
     const link = path.join(root, 'escape-link');
     symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+    temporaryLinks.push({ link, root: process.cwd() });
     const escaped = path.join(link, 'secret.json');
 
     await expect(
@@ -120,6 +129,7 @@ describe('R3 active-session artifact policy', () => {
     mkdirSync(outside, { recursive: true });
     writeFileSync(path.join(outside, 'secret.json'), '{}');
     symlinkSync(outside, root, process.platform === 'win32' ? 'junction' : 'dir');
+    temporaryLinks.push({ link: root, root: process.cwd() });
     const escaped = path.join(root, 'secret.json');
 
     await expect(
