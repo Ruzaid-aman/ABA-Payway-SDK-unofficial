@@ -65,7 +65,7 @@ import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConf
 import { openImageInDefaultViewer } from './open-image.js';
 import { sdk } from './sdk.js';
 import { formatTestReport } from './test/index.js';
-import { payoutEntriesTotal, validatePayoutEntryShape, validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
+import { gatewayDayWindow, payoutEntriesTotal, validatePayoutEntryShape, validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (shared parser; supports multi-line quoted PEMs)
@@ -217,6 +217,22 @@ function printApiErrorJson(e: unknown): number {
     JSON.stringify({ error: { kind, exitCode: exit, type, message: e instanceof Error ? e.message : String(e) } }, null, 2),
   );
   return exit;
+}
+
+/**
+ * Validation-failure envelope for commands whose local checks run BEFORE the
+ * try block (generate-checkout's amount/currency pre-flight) — same shape
+ * printApiErrorJson emits, so agents branch on one envelope contract (T5.4).
+ */
+function printValidationErrorJson(message: string): number {
+  console.log(
+    JSON.stringify(
+      { error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message } },
+      null,
+      2,
+    ),
+  );
+  return EXIT_VALIDATION;
 }
 
 // ---------------------------------------------------------------------------
@@ -1414,11 +1430,15 @@ program
         return;
       }
 
-      // Default window = today (sandbox-verified date format)
-      const now = new Date();
-      const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const fromDate = opts.from ?? `${day} 00:00:00`;
-      const toDate = opts.to ?? `${day} 23:59:59`;
+      // Default window = the current gateway day in the gateway's clock
+      // (UTC+7, §18). A local-derived "today" silently misses rows whenever
+      // the local clock is behind UTC+7 (the transaction_date values are
+      // gateway time). Omitting --from/--to entirely would also work (the
+      // gateway answers a date-less list with the current gateway day), but
+      // the explicit window keeps the printed "Window:" line deterministic.
+      const { fromDate: gwFrom, toDate: gwTo } = gatewayDayWindow();
+      const fromDate = opts.from ?? gwFrom;
+      const toDate = opts.to ?? gwTo;
 
       if (!DATE_FMT.test(fromDate) || !DATE_FMT.test(toDate)) {
         console.log(`  ${c.red('✗')} Dates must use "YYYY-MM-DD HH:mm:ss"`);
@@ -2172,12 +2192,20 @@ program
     const transactionId = opts.transactionId ?? `ck${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
 
     if (!Number.isFinite(amount) || amount <= 0) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`Amount must be a positive number, received: ${String(opts.amount)}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
       process.exitCode = 1;
       return;
     }
 
     if (!['USD', 'KHR'].includes(currency)) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`Currency must be USD or KHR, received: ${String(currency)}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${c.red(currency)}`);
       process.exitCode = 1;
       return;
@@ -2307,6 +2335,14 @@ program
         console.log();
       }
     } catch (e) {
+      // T5.4 (H6-confirmed): the envelope contract from check-transaction /
+      // transaction-detail now covers generate-checkout — gateway
+      // rejections (04/35/104) and SDK-local validation both emit
+      // `{ error: { kind, exitCode, … } }` under --json.
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(e);
+        return;
+      }
       process.exitCode = printApiError(e);
     }
   });

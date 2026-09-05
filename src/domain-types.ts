@@ -58,3 +58,23 @@ export interface LinkCardResponse {
     message?: string;
   };
 }
+
+// ─────────────────────── Hosted Checkout (payment_gate 0) ───────────────────────
+
+/**
+ * Structured success for a hosted-checkout purchase: with `paymentGate: 0`
+ * the gateway answers HTTP 200 with the full hosted "PayWay - Checkout"
+ * HTML page as the response BODY — there is no `checkout_qr_url` JSON
+ * field on today's gateway (campaign W2-1/W2-2, 2026-09-05). The
+ * transaction IS created and PENDING at this point; the payment outcome
+ * arrives through the merchant's return_url / return_params flow (or
+ * `pollTransactionStatus()` / `check-transaction`).
+ */
+export interface PurchaseHostedHtmlResult {
+  /** Discriminator: this object is a hosted-page success, not a QR JSON. */
+  hosted_checkout: true;
+  /** Content-Type of the gateway response (normally `text/html`). */
+  content_type: string;
+  /** The complete hosted checkout page — render it, redirect to it, or embed it. */
+  html: string;
+}

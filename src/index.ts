@@ -127,6 +127,7 @@ export type {
   PendingPaymentStatus,
   PollTransactionOptions,
   PollTransactionResult,
+  PurchaseHostedHtmlResult,
   TerminalPaymentStatus,
 } from './domain-types.js';
 export type { LinkCardResponse } from './domain-types.js';

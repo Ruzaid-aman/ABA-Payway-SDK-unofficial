@@ -198,6 +198,24 @@ export function validatePurchaseLifetimeMinutes(lifetime: number | undefined): v
 }
 
 /**
+ * The current gateway-day window in the gateway's clock (UTC+7): the
+ * transaction-list endpoints interpret `from_date`/`to_date` as gateway
+ * time (SANDBOX-FINDINGS §18), so a local/UTC-derived "today" silently
+ * misses rows whenever the two clocks disagree. Returns `"YYYY-MM-DD
+ * 00:00:00" → "YYYY-MM-DD 23:59:59"` for the day it currently is in
+ * Phnom Penh. Used as the CLI `transaction-list` default; the gateway
+ * itself answers a date-less list with the same gateway day (re-verified
+ * 2026-09-05 — the campaign W2-12 "SDK no-dates → 0 rows" observation did
+ * not reproduce: it was list-indexing lag, not gateway semantics).
+ */
+export function gatewayDayWindow(now: Date = new Date()): { fromDate: string; toDate: string } {
+  const gateway = new Date(now.getTime() + 7 * 3_600_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${gateway.getUTCFullYear()}-${pad(gateway.getUTCMonth() + 1)}-${pad(gateway.getUTCDate())}`;
+  return { fromDate: `${day} 00:00:00`, toDate: `${day} 23:59:59` };
+}
+
+/**
  * Hostnames (or IP literals) that PayWay's servers cannot reach: loopback,
  * RFC1918/link-local/CGNAT ranges, multicast/reserved, and mDNS/internal
  * suffixes. Used to fail fast on callback URLs that can never receive a

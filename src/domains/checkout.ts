@@ -3,7 +3,7 @@ import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig, R
 import { ENDPOINTS, PAYMENT_OPTIONS } from '../constants.js';
 import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
 import type { components } from '../types.js';
-import type { PollTransactionOptions, PollTransactionResult } from '../domain-types.js';
+import type { PollTransactionOptions, PollTransactionResult, PurchaseHostedHtmlResult } from '../domain-types.js';
 import {
   encodeBase64IfNeeded,
   escapeHtmlAttribute,
@@ -13,6 +13,7 @@ import {
   validateCurrency,
   validatePurchaseLifetimeMinutes,
   validatePositiveAmount,
+  validatePayoutEntryShape,
   validateRefundAmount,
   validateTransactionId,
   warnAdvisory,
@@ -91,10 +92,59 @@ export const PURCHASE_HASH_FIELDS = [
 
 export interface CheckoutDomain {
   createTransaction: (params: CreateTransactionParams) => Record<string, unknown> & { hash: string };
+  /**
+   * Create a purchase transaction (KHQR JSON by default).
+   *
+   * With `paymentGate: 0` the gateway answers HTTP 200 with the hosted
+   * "PayWay - Checkout" HTML page as the response BODY — there is no
+   * `checkout_qr_url` JSON field (campaign W2-1/W2-2, 2026-09-05). That
+   * success used to be misclassified as `PayWayAPIError: Invalid JSON
+   * response`; it now resolves to a {@link PurchaseHostedHtmlResult}
+   * (the transaction IS created and PENDING). For a dedicated, typed
+   * hosted-checkout call use {@link CheckoutDomain.purchaseHosted}.
+   *
+   * @returns The QR-style JSON (`qrString`/`qrImage`/`abapay_deeplink`),
+   *   an `ErrorStatus` envelope, or — with `paymentGate: 0` — the
+   *   structured hosted-page success.
+   */
   purchase: (
     params: CreateTransactionParams,
     callOptions?: RequestCallOptions,
-  ) => Promise<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>;
+  ) => Promise<
+    | components['schemas']['PurchaseQrResponse']
+    | components['schemas']['ErrorStatus']
+    | PurchaseHostedHtmlResult
+  >;
+  /**
+   * Create a purchase transaction and get the HOSTED checkout page
+   * (`paymentGate: 0` is set for you).
+   *
+   * The gateway answers with the full hosted "PayWay - Checkout" HTML page
+   * as the response body (sandbox-verified 2026-09-05 for both `cards` and
+   * `abapay_khqr`, with or without `viewType`). The transaction is created
+   * and PENDING the moment this resolves — confirm via
+   * `checkTransaction()`/`pollTransactionStatus()`; the browser outcome
+   * arrives through the merchant's `returnUrl`/`returnParams` flow. This
+   * mirrors the link-card HTML guard from v1.3.6, but as a SUCCESS surface
+   * (the page is the deliverable, not an error).
+   *
+   * @throws `PayWayAPIError` if the gateway unexpectedly answers JSON
+   *   instead of the hosted page (the JSON body rides on `rawBody`).
+   * @example
+   * ```ts
+   * const page = await payway.checkout.purchaseHosted({
+   *   transactionId: 'order-123',
+   *   amount: 15,
+   *   paymentOption: 'cards',
+   *   returnUrl: 'https://mywebsite.com/payment-result',
+   * });
+   * res.type(page.content_type).send(page.html); // Express
+   * ```
+   */
+  purchaseHosted: (
+    params: CreateTransactionParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<PurchaseHostedHtmlResult>;
   /**
    * Build a complete hosted-checkout HTML document (local-only, no network call).
    *
@@ -234,8 +284,14 @@ export function createCheckoutDomain(
 
     // ── Advisory gateway limits (live docs; audit §5) — warn unless
     // strictValidation escalates. Required-field rules below throw. ──
+    // The 43200 max is DOCUMENTED but not gateway-enforced (W1-1, 2026-09-05:
+    // the sandbox accepted 43201 with code 00) — advisory only; the
+    // PURCHASE_LIFETIME_MIN_MINUTES minimum above is the hard local gate.
     if (params.lifetime !== undefined && params.lifetime > 43200) {
-      warnAdvisory(config, `lifetime ${params.lifetime} minutes exceeds the gateway maximum of 43200 (30 days)`);
+      warnAdvisory(
+        config,
+        `lifetime ${params.lifetime} minutes exceeds the documented maximum of 43200 (30 days) — advisory only: the sandbox gateway accepted values above it (2026-09-05), so this is not enforced locally`,
+      );
     }
     if (params.firstname !== undefined) {
       if (params.firstname.length > 100 || /\d|[^\p{L}\p{M}\s'.-]/u.test(params.firstname)) {
@@ -265,6 +321,17 @@ export function createCheckoutDomain(
         config,
         `payment_option "${params.paymentOption}" is outside the documented purchase enum (${PAYMENT_OPTIONS.join(', ')})`,
       );
+    }
+    // Split-payout entries use the purchase-path keys {acc, amt} (NOT the
+    // QR/payout-domain {account, amount}). Before W1-5 (2026-09-05) wrong-key
+    // objects sailed through local validation and only failed at the gateway
+    // with HTTP 403 code 35 "Payout Info is invalid." — the shape check now
+    // throws locally (same validator payment-link uses). Pre-encoded strings
+    // pass through unvalidated, mirroring payment-link.
+    if (Array.isArray(params.payout)) {
+      for (const entry of params.payout) {
+        validatePayoutEntryShape(entry);
+      }
     }
     // Documented conditional requirement (live purchase spec): a Google Pay
     // token is REQUIRED when the merchant manages selection for google_pay.
@@ -337,6 +404,32 @@ export function createCheckoutDomain(
     return { ...payload, hash };
   }
 
+  function purchaseRequest(
+    params: CreateTransactionParams,
+    callOptions?: RequestCallOptions,
+  ): Promise<
+    components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus'] | PurchaseHostedHtmlResult
+  > {
+    const payload = buildPurchasePayload(params);
+    // The injected request() re-hashes fullBody with these fields
+    // (client.ts request()), so they MUST be the live 27-field order
+    // (ctid after items, §17) — passing a divergent list here overwrites
+    // the locally-built hash with one that omits ctid/token_flag/frequency
+    // (audit D1 + §17: gateway "Wrong Hash").
+    return request<
+      components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus'] | PurchaseHostedHtmlResult
+    >(
+      ENDPOINTS.purchase,
+      payload,
+      [...PURCHASE_HASH_FIELDS],
+      'req_time',
+      'application/json',
+      undefined,
+      { retry: params.retryPolicy === 'none' ? 'none' : undefined },
+      callOptions,
+    );
+  }
+
   return {
     createTransaction: (params: CreateTransactionParams): Record<string, unknown> & { hash: string } => {
       return buildPurchasePayload(params);
@@ -406,22 +499,27 @@ export function createCheckoutDomain(
 `;
     },
 
-    purchase: (params: CreateTransactionParams, callOptions?: RequestCallOptions) => {
-      const payload = buildPurchasePayload(params);
-      // The injected request() re-hashes fullBody with these fields
-      // (client.ts request()), so they MUST be the live 27-field order
-      // (ctid after items, §17) — passing a divergent list here overwrites
-      // the locally-built hash with one that omits ctid/token_flag/frequency
-      // (audit D1 + §17: gateway "Wrong Hash").
-      return request<components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus']>(
-        ENDPOINTS.purchase,
-        payload,
-        [...PURCHASE_HASH_FIELDS],
-        'req_time',
-        'application/json',
-        undefined,
-        { retry: params.retryPolicy === 'none' ? 'none' : undefined },
-        callOptions,
+    purchase: purchaseRequest,
+
+    purchaseHosted: async (
+      params: CreateTransactionParams,
+      callOptions?: RequestCallOptions,
+    ): Promise<PurchaseHostedHtmlResult> => {
+      const result = await purchaseRequest({ ...params, paymentGate: 0 }, callOptions);
+      if (
+        result &&
+        typeof result === 'object' &&
+        'hosted_checkout' in result &&
+        (result as PurchaseHostedHtmlResult).hosted_checkout === true
+      ) {
+        return result as PurchaseHostedHtmlResult;
+      }
+      // Gate 0 normally always yields the hosted page (W2-1: verified for
+      // cards AND abapay_khqr, with/without viewType) — a JSON answer here
+      // means the gateway deviated; hand the body back for inspection.
+      throw new PayWayAPIError(
+        'purchaseHosted expected the hosted checkout HTML page (payment_gate 0) but the gateway answered JSON — inspect rawBody; the transaction may still have been created',
+        { endpoint: ENDPOINTS.purchase, rawBody: result, retryable: false },
       );
     },
 
@@ -474,6 +572,14 @@ export function createCheckoutDomain(
 
     /**
      * List transactions that match the supplied filters.
+     *
+     * Window semantics (sandbox re-verified 2026-09-05): omitting BOTH dates
+     * returns the current gateway day (UTC+7 clock) — campaign W2-12's "SDK
+     * no-dates → 0 rows" did not reproduce (it was list-indexing lag: the
+     * same call returned 32 rows minutes later). A local/UTC-derived window
+     * can still silently miss rows when the clocks disagree (§18) — build
+     * windows from the gateway clock, and keep them ≤ 3 days (err 52).
+     *
      * @rateLimit 50 requests per minute.
      */
     getTransactionList: (params: GetTransactionListParams, callOptions?: RequestCallOptions) => {

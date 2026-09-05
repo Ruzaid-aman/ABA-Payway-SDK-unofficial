@@ -298,6 +298,32 @@ describe('CLI API commands against the local mock gateway', () => {
     expect([undefined, 0]).toContain(exitCode as number);
   });
 
+  it('generate-checkout --json emits an error envelope for pre-flight validation failures (T5.4)', async () => {
+    const { text, exitCode } = await run(['generate-checkout', '-a', '0', '--json']);
+    expect(text).toContain('"kind": "validation"');
+    expect(text).toContain('"exitCode": 1');
+    expect(text).toContain('Amount must be a positive number');
+    expect(exitCode).toBe(1);
+  });
+
+  it('generate-checkout --json emits an error envelope for SDK-local rejections like lifetime < 3 (T5.4)', async () => {
+    const { text, exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '1.00',
+      '-t',
+      'CO-T54-1',
+      '--lifetime',
+      '2',
+      '--json',
+      '--no-polling',
+      '--no-show-qr',
+    ]);
+    expect(text).toContain('"kind": "validation"');
+    expect(text).toContain('lifetime');
+    expect(exitCode).toBe(1);
+  });
+
   it('pre-auth complete enforces the over-capture ceiling and completes within it', async () => {
     // 120% of the original exceeds the default 110% ceiling → local rejection.
     const { text: overText, exitCode: overExit } = await run([

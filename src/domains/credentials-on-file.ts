@@ -21,6 +21,7 @@ import {
   formatRequestTime,
   validateCurrency,
   validatePositiveAmount,
+  validatePayoutEntryShape,
   validatePublicHttpsUrl,
   validateRequestIdOrCtid,
   validateTokenFlag,
@@ -388,6 +389,15 @@ export function createCredentialsOnFileDomain(
         validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
           allowPrivateHosts: config.allowPrivateCallbackHosts === true,
         });
+      }
+
+      // Purchase-path payout keys {acc, amt} — same local shape check the
+      // purchase domain got for W1-5 (wrong {account, amount} keys used to
+      // fail only at the gateway with HTTP 403 code 35).
+      if (Array.isArray(params.payout)) {
+        for (const entry of params.payout) {
+          validatePayoutEntryShape(entry);
+        }
       }
 
       return request<components['schemas']['CofPaymentResponse']>(

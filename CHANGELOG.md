@@ -11,6 +11,21 @@
 
 ### Added
 
+- **`checkout.purchaseHosted()` — typed hosted-checkout purchase** — sets
+  `paymentGate: 0` for you and returns a structured `PurchaseHostedHtmlResult`
+  (`{ hosted_checkout: true, content_type, html }`): the gateway answers a
+  gate-0 purchase with the full hosted "PayWay - Checkout" HTML page as the
+  response body; there is NO `checkout_qr_url` JSON field on today's gateway
+  (sandbox-verified 2026-09-05 for `cards` AND `abapay_khqr`, with/without
+  `viewType`). The transaction is created and PENDING the moment the call
+  resolves — confirm via `checkTransaction()`/`pollTransactionStatus()`; the
+  browser outcome arrives through `returnUrl`/`returnParams`. Throws
+  `PayWayAPIError` (with `rawBody`) if the gateway unexpectedly answers JSON.
+- **`generate-checkout --json` error envelopes (T5.4)** — gateway rejections
+  (04/35/104) and local validation failures (amount/currency pre-flight,
+  SDK `PayWayConfigError`s like lifetime < 3 or the subscription trio) now
+  emit the same `{ error: { kind, exitCode, type, message, paywayCode, … } }`
+  envelope as `check-transaction`/`transaction-detail` (campaign H6/T5.4).
 - **CLI `tx-batch` command** — run one transaction operation (`close` | `check` | `detail`)
   over a set of IDs (`-t` repeatable and/or `--ids-file`). Per-item result envelopes
   (`{id, ok, code, status, error}`) with no fail-fast; endpoint-appropriate rate-limit
@@ -21,6 +36,30 @@
 
 ### Fixed
 
+- **Gate-0 hosted-page success no longer misclassified as an error (W2-2)** —
+  `checkout.purchase()` with `paymentGate: 0` used to throw
+  `PayWayAPIError: Invalid JSON response` even though the transaction WAS
+  created (verified PENDING). An HTTP-200 HTML body on the purchase endpoint
+  now resolves to `PurchaseHostedHtmlResult` (the link-card HTML guard and
+  every other endpoint are unchanged).
+- **Payout entry shape validated on the purchase path (W1-5)** —
+  `payout: [{account, amount}]` (the QR-domain keys) used to sail through
+  local validation and fail only at the gateway with HTTP 403 code 35
+  "Payout Info is invalid." `checkout` purchase and `credentialsOnFile.payment()`
+  now run the shared `validatePayoutEntryShape` (`{acc, amt}`) locally —
+  malformed/wrong-key entries throw `PayWayConfigError` before any network
+  call. Pre-encoded strings pass through (payment-link parity).
+- **CLI `transaction-list` default window uses the gateway clock (UTC+7)** —
+  the previous default computed "today" on the merchant's LOCAL clock; on
+  non-UTC+7 hosts that window silently misses rows (§18). New shared
+  `gatewayDayWindow()` helper. Retest note: a date-less
+  `getTransactionList({})` DOES return the current gateway day (campaign
+  W2-12's "SDK no-dates → 0 rows" did not reproduce — it was list-indexing
+  lag), so the SDK keeps its no-dates behavior (documented on the method).
+- **Purchase lifetime maximum (43200 min) warning reworded as advisory-only
+  (W1-1)** — the sandbox gateway accepted `lifetime: 43201` with code 00; only
+  the 3-minute minimum is a hard local throw (gateway error 69 below it). The
+  warning now says exactly that instead of implying enforcement.
 - **Subscription purchases rejected with `Wrong Hash` (code 1)** — `ctid` now
   hashes after `items` in `PURCHASE_HASH_FIELDS` (live 27-field order,
   sandbox-verified via `scripts/sandbox-probe-subscription.ts` probes A–C2;

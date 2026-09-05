@@ -1272,7 +1272,9 @@ export class PayWay {
         const rateLimitInfo = parseRateLimitInfo(response.headers);
         const rawParsed = await parseResponseBody(response);
         const isEmptyBody = rawParsed === undefined;
-        const parsedBody = isEmptyBody ? null : rawParsed;
+        // `let`: the purchase gate-0 HTML-success branch (W2-2) rewrites the
+        // string body into the structured PurchaseHostedHtmlResult object.
+        let parsedBody = isEmptyBody ? null : rawParsed;
 
         if (!response.ok) {
           // HTTP status BEFORE body shape: a 4xx/5xx answered with an
@@ -1314,7 +1316,21 @@ export class PayWay {
               },
             );
           }
-          throw createJsonParseError(parsedBody, endpoint, response.headers.get('content-type') ?? undefined);
+          // W2-2 (2026-09-05): a purchase with payment_gate 0 answers HTTP
+          // 200 with the hosted "PayWay - Checkout" HTML page as the BODY —
+          // the transaction IS created (verified PENDING afterwards). Return
+          // a structured hosted-checkout success instead of the misleading
+          // "Invalid JSON response" error. (response.ok is guaranteed here:
+          // non-2xx already threw as createHttpError above.)
+          if (endpoint === ENDPOINTS.purchase && /<!doctype html|<html/i.test(parsedBody)) {
+            parsedBody = {
+              hosted_checkout: true,
+              content_type: response.headers.get('content-type') ?? 'text/html',
+              html: parsedBody,
+            };
+          } else {
+            throw createJsonParseError(parsedBody, endpoint, response.headers.get('content-type') ?? undefined);
+          }
         }
 
         // Observability fires before business-error validation so that
