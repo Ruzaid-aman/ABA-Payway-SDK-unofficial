@@ -788,3 +788,24 @@ the close IS effective on the QR/KHQR path.
 unpaid detail carries the credential currency in `original_currency`, not the
 transaction currency. Cosmetic, but agents parsing `original_currency` on
 unpaid transactions should not treat it as the payment currency.
+
+## 20. QR lifecycle retest — §18/§19 confirmed with a second controlled pass (2026-09-05, user-driven)
+
+Two back-to-back QRs (QR-1 `qrmretest01usd` $2.50, QR-2 `qrmretest02usd`
+$0.75; both 900 s, created 18:42 gateway): full matrix of 10 expectations met
+— evidence: `test-output/qr-lifecycle-retest-2026-09-05.md`. Highlights:
+
+1. **§14 demonstrated within ONE list response:** after payment, QR-1 appears
+   (APPROVED) while the closed-unpaid QR-2 — same day, same merchant — stays
+   absent. The visibility gap is unpaid-only, not merchant/day-related.
+2. **§19 repeatable:** the closed-unpaid QR was scan-refused by the simulator
+   with "transaction expired" for the SECOND time (~1 min after close, ~13
+   min before natural expiry). QR-path close enforcement is a stable
+   behavior, not a one-off.
+3. **§18 repeatable:** partial refund ($1.00 of $2.50) → whole status flips
+   REFUNDED, `refund_amount 1` authoritative.
+4. **Currency quirk resolved (§19 addendum):** unpaid detail's
+   `original_currency` carries the merchant CREDENTIAL currency (KHR);
+   after payment it reflects the REAL transaction currency (USD). Parse
+   `original_currency` only on paid transactions.
+5. Simulator scan→approve latency this pass: ~60 s from creation.
