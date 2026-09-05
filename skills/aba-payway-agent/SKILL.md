@@ -1,7 +1,7 @@
 ---
 name: aba-payway-agent
 description: Operate the agentic PayWay CLI safely — provider modes, the 11 tools, risk gates, the execution ledger, sessions, and secret redaction.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # ABA PayWay Agent (Agentic CLI)
@@ -17,7 +17,7 @@ materialized through the execution ledger.**
 # 1. Configure the provider (API key stays in the environment, never stored).
 #    Presets: opencode (free) | openai | openrouter | nvidia | custom
 export PAYWAY_AGENT_API_KEY=sk-...
-payway-sdk agent setup --provider opencode --model x-preview-f-free --capability-mode strict-json-plan \
+payway-sdk agent setup --provider opencode --model deepseek-v4-flash-free --capability-mode strict-json-plan \
   --max-tokens 8192 --temperature 0.2
 # For NVIDIA thinking models add: --extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
 
@@ -32,12 +32,12 @@ The provider config shape (stored as plaintext, no secrets; managed by
 // ProviderConfigV1 lives in the SDK source (src/agent/contracts.ts).
 // The package exports only the root entrypoint ("."), so import the
 // PayWay client from 'aba-payway-ts' and manage agent config via the CLI:
-//   payway-sdk agent setup --provider opencode --model x-preview-f-free \
+//   payway-sdk agent setup --provider opencode --model deepseek-v4-flash-free \
 //     --capability-mode strict-json-plan
 const config = {
   version: 'agent-config/v1',
    provider: 'opencode',               // 'opencode' | 'openai' | 'openrouter' | 'nvidia' | 'custom'
-   model: 'x-preview-f-free',
+   model: 'deepseek-v4-flash-free',    // rotate as the provider's catalog changes — a dead model fails with 401 "not supported"
   capabilityMode: 'strict-json-plan', // 'native-tools' | 'strict-json-plan'
   privacyAcknowledgedAt: new Date().toISOString(),
 };
@@ -228,9 +228,12 @@ Common failures: `AGENT_NOT_CONFIGURED` (run `agent setup`/`onboard`), `PRIVACY_
   `--max-tokens`, or switch to a stronger model.
 In a TTY, `ask`/`agent` print a `· Contacting <provider> (<model>) to propose a plan…`
 line plus per-stage progress and a remediation hint; in non-TTY the provider message is
-**redacted** to `[REDACTED]` for safety, so diagnose interactively or via `agent doctor`.
-`agent doctor` reports the provider row as `blocked` when `PAYWAY_AGENT_API_KEY` is unset
-(it no longer trusts the unauthenticated `/models` ping).
+**usually redacted** to `[REDACTED]` — but live testing (2026-09-03) showed some non-TTY
+provider errors (e.g. HTTP 401 "Model … is not supported" wrapped in
+`PROVIDER_PROPOSAL_FAILED`) can surface verbatim, so do not treat non-TTY output as
+secret-free by contract. Diagnose interactively or via `agent doctor`; that command
+reports the provider row as `blocked` when `PAYWAY_AGENT_API_KEY` is unset (it no longer
+trusts the unauthenticated `/models` ping).
 
 ## Related Skills
 

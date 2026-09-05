@@ -1,7 +1,7 @@
 ---
 name: aba-payway-transaction-by-merchant-ref
 description: Retrieve ABA PayWay transactions by merchant reference through the SDK or CLI.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Get transactions by merchant reference
@@ -42,5 +42,5 @@ The command reads `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`, signs the request, 
   node scripts/reconcile.cjs --merchant-ref "dt-one-8989" --env sandbox          # one-shot
   node scripts/reconcile.cjs --merchant-ref "dt-one-8989" --watch --interval 300 --csv payments.csv
   ```
-  Rate limit (10/min) and pagination constraints are enforced; exit 0 on success even with no new rows.
+  Rate limit (10/min) and pagination constraints are enforced. Exit codes: **0** success (even with no new rows) · **1** API/network failure (clean message, no stack trace) · **2** usage error / missing credentials. Credentials come from `--merchant-id/--api-key`, `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY`, or a `.env` in the cwd (loaded automatically; exported env wins).
 

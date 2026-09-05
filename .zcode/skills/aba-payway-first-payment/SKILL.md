@@ -106,8 +106,9 @@ requirements and a different result-handling contract.
   the trusted final source of truth.
 - **Polling** (`check_transaction` / `poll_transaction`) is a read-only lookup you
   initiate. It is useful in sandbox or for reconciliation, but it is not a
-  substitute for the webhook. The agentic CLI *offers* polling after an online QR
-  is created and never auto-polls.
+  substitute for the webhook. Plain CLI `generate-qr` and `generate-checkout`
+  **poll by default** (`--no-polling` to disable); only the `agent` REPL
+  *offers* polling and never auto-polls.
 
 ## User-facing explanations
 
@@ -159,9 +160,11 @@ agentic, risk-gated path to choose and run these routes.
 
 - **`checkout-payload.cjs`** — fastest first payment: builds the locally-signed checkout payload (exact SDK 27-field signing order/formatting) and can emit a ready-to-open HTML auto-post form. No network call.
   ```sh
+  # Credentials required: pass --merchant-id/--api-key or export PAYWAY_MERCHANT_ID / PAYWAY_API_KEY first
+  # (the script does NOT load .env). Missing creds → exit 2.
   node scripts/checkout-payload.cjs --tran-id order-123 --amount 10 --currency USD \
       --return-url https://example.com/success --html checkout.html
-  # Subscription registration (signs token_flag + frequency correctly):
+  # Subscription registration (signs ctid + token_flag + frequency correctly):
   node scripts/checkout-payload.cjs --tran-id order-124 --amount 9.99 --currency USD \
       --ctid customer123 --token-flag CITR_FIX --frequency 1M
   ```

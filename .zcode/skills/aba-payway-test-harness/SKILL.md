@@ -1,7 +1,7 @@
 ---
 name: aba-payway-test-harness
 description: Run the built-in aba-payway-ts contract test harness and mock PayWay flow.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Test Harness
@@ -14,6 +14,15 @@ if (!report.success) throw new Error('PayWay test suite failed');
 ```
 
 The harness verifies the SDK response contract without merchant-specific production credentials.
+
+## CLI wrappers
+
+The same harness is reachable without writing code (true offline mock server — CI-usable, no credentials):
+
+```sh
+npx tsx src/cli.ts test    # run the PayWay sandbox test suite
+npx tsx src/cli.ts demo    # run the suite with pass/fail output
+```
 
 ## Error Handling
 ```ts

@@ -32,12 +32,14 @@ npx tsx src/cli.ts cof link-card-form -c customer123 -f CITI_FLEX --callback-url
 # link-card API call: saves the hosted page to payway-output/ and opens it (TTY auto)
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof link-card -r req0003 -c customer123 -f CITI_FLEX --callback-url <url>
 
-# Payout beneficiary whitelist (requires RSA key)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary add 000999888
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary update-status 000999888 -s 1
+# Payout beneficiary whitelist (requires RSA key) — use seeded sandbox accounts
+# (500000001 etc., see `sandbox-beneficiaries`); 000999888 is NOT in the sandbox
+# whitelist and live payout calls to it 403 "Payout accounts are not in whitelist"
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary add 500000001
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary update-status 500000001 -s 1
 
 # Payment link with split payout (payout keys {acc, amt}; total must equal --amount)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link create -t "Invoice 1" -a 5.00 -r inv-001 --return-url <url> --payout '[{"acc":"000999888","amt":5.00}]'
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link create -t "Invoice 1" -a 5.00 -r inv-001 --return-url <url> --payout '[{"acc":"500000001","amt":5.00}]'
 ```
 
 - `generate-qr` polls by default (`--no-polling` to disable); `--poll-timeout <s>` should match `--lifetime`.

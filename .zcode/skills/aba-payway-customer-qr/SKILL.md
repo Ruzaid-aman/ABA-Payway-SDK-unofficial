@@ -1,7 +1,7 @@
 ---
 name: aba-payway-customer-qr
 description: Handle Merchant Portal Customer Module static QRs (Printed QR channel) — decoded payload anatomy, callback handling, and reconciliation via get-transactions-by-mc-ref.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Customer Module QR (Merchant Portal)
@@ -65,6 +65,8 @@ const result = await payway.khqr.getTransactionsByMerchantRef('dt-one-8989');
   NODE_PATH=~/.payway-qr-deps/node_modules node skills/aba-payway-customer-qr/scripts/decode-khqr.cjs path/to/customer-qr.jpg
   ```
   Sample output: `stored=9955 computed=9955 → VALID ✓`, plus flags for static/dynamic, fixed/open amount, currency, and presence of PayWay routing tags. The script is `.cjs` on purpose — the repo `package.json` sets `"type": "module"`.
+  **Image-mode caveat:** jsQR cannot read the styled/template PayWay PNGs (logo overlay, `template3_color`-style output) — you get `No QR detected in image.`. Plain/terminal-style QR images decode fine; for template QRs decode the KHQR **string** instead.
+  **Windows note:** `npm i` in `~/.payway-qr-deps` can silently install into `~/` if a stray `~/package.json` exists (npm walks up) — verify the install landed in the scratch folder.
 - **`qr-manifest.cjs`** — batch audit a folder of downloaded customer QR JPGs into a CSV/table manifest (bakong ID, account, outlet code, merchant ID, profile ID, CRC status) for print/audit workflows:
   ```sh
   NODE_PATH=~/.payway-qr-deps/node_modules node scripts/qr-manifest.cjs ./qr-downloads --csv manifest.csv

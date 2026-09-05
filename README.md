@@ -630,15 +630,15 @@ const linkWithPayout = await payway.paymentLink.create({
   merchantRefNo: 'inv-1092',
   returnUrl: 'https://mywebsite.com/invoice/1092',
   payout: [
-    { acc: '000111222', amt: 100.00 }, // ⚠️ keys are {acc, amt} here (purchase-path
-    { acc: '000999888', amt: 50.00 },   // shape) — NOT the payout domain's {account, amount}
-  ],
+    { acc: '500000001', amt: 100.00 }, // ⚠️ keys are {acc, amt} here (purchase-path
+    { acc: '500000002', amt: 50.00 },   // shape) — NOT the payout domain's {account, amount};
+  ],                                    // in sandbox the account must be a seeded beneficiary
 });
 
 // CLI equivalent:
 // payway-sdk payment-link create -t "Invoice #1092" -a 150.00 -r inv-1092 \
 //   --return-url https://mywebsite.com/invoice/1092 \
-//   --payout '[{"acc":"000111222","amt":100.00},{"acc":"000999888","amt":50.00}]'
+//   --payout '[{"acc":"500000001","amt":100.00},{"acc":"500000002","amt":50.00}]'
 ```
 
 ### 5. Pre-Authorization (`payway.preAuth`)
@@ -669,7 +669,7 @@ const payoutResult = await payway.payout.payout({
   amount: 100.00,
   currency: 'USD',
   beneficiaries: [
-    { account: '000999888', amount: 100.00 }
+    { account: '500000001', amount: 100.00 } // seeded sandbox beneficiary (USD)
   ],
 });
 

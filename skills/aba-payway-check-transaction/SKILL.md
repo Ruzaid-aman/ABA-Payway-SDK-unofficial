@@ -1,7 +1,7 @@
 ---
 name: aba-payway-check-transaction
 description: Check the current status of an ABA PayWay transaction.
-version: 1.3.0
+version: 1.4.0
 ---
 
 # Check Transaction

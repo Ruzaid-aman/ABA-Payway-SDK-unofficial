@@ -1,7 +1,7 @@
 ---
 name: aba-payway-payment-link
 description: Create and inspect hosted ABA PayWay payment links.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # ABA PayWay Payment Link
@@ -36,6 +36,14 @@ npx tsx src/cli.ts payment-link create -t "Invoice 123" -a 150 -r invoice-123 \
 import { PayWayConfigError } from 'aba-payway-ts';
 try { await payway.paymentLink.getDetails('link-id'); }
 catch (error) { if (error instanceof PayWayConfigError) console.error(error.message); }
+```
+
+## Inspecting a link (CLI)
+
+`payment-link detail` takes the link id via **`-i` only** (a positional id is rejected):
+
+```sh
+npx tsx src/cli.ts payment-link detail -i <link-id>   # the opaque base64 Link ID from create — NOT the merchant ref
 ```
 
 ## Related Skills
