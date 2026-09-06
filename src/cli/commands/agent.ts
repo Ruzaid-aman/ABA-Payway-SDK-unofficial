@@ -19,7 +19,7 @@ import type { Command } from 'commander';
 import { readAgentConfig, updateAgentConfig } from '../../agent/config.js';
 import { resolvePayWayContext } from '../../agent/context.js';
 import type { ProviderConfigV1 } from '../../agent/contracts.js';
-import { findUnfinishedExecutions } from '../../agent/ledger.js';
+import { findUnfinishedExecutions, pruneLedgerRecords } from '../../agent/ledger.js';
 import { AgentOrchestrator, renderHumanResult, serializeCommandResult } from '../../agent/orchestrator.js';
 import { createProviderAdapter, type ProviderConnectivity } from '../../agent/provider.js';
 import { evaluateReadinessDetailed } from '../../agent/readiness.js';
@@ -362,5 +362,30 @@ export function registerAgentCommands(program: Command): void {
         }
       }
       console.log(`\n  ${c.dim('Create actions are NEVER replayed automatically — verify the outcome manually.')}\n`);
+    });
+
+  // ─── agent ledger prune (I-13 — retention parity with `journal prune`) ────
+  ledgerCmd
+    .command('prune')
+    .description('Delete FINISHED (succeeded/failed) execution records older than a cutoff. Unfinished records are never removed.')
+    .option('--before <cutoff>', 'Days back (e.g. 30) or ISO-8601 timestamp', '30')
+    .option('--json', 'Machine-readable output')
+    .action((opts: { before?: string; json?: boolean }) => {
+      const raw = opts.before ?? '30';
+      const days = Number.parseFloat(raw);
+      const before = Number.isFinite(days) && !raw.includes('T')
+        ? new Date(Date.now() - days * 86_400_000)
+        : new Date(raw);
+      if (Number.isNaN(before.getTime())) {
+        console.log(`  Invalid --before value: ${raw}`);
+        process.exitCode = 1;
+        return;
+      }
+      const result = pruneLedgerRecords(before);
+      if (opts.json) {
+        console.log(JSON.stringify({ before: before.toISOString(), ...result }, null, 2));
+        return;
+      }
+      console.log(`\n  ${c.green('✓')} Pruned ${result.removed} finished record(s); ${result.kept} kept (incl. all unfinished).\n`);
     });
 }

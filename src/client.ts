@@ -179,8 +179,10 @@ export interface PayWayConfig {
    * opt-in append-only JSONL record of every API exchange — correlation id,
    * attempts, duration, gateway trace id, redacted request/response digests.
    * `true` uses the defaults (`<cwd>/payway-data/journal.jsonl`, digest
-   * mode); pass `{ dir, mode }` to override. `PAYWAY_JOURNAL=1` +
-   * `PAYWAY_JOURNAL_DIR` + `PAYWAY_JOURNAL_MODE` fill any omitted part.
+   * mode); pass `{ dir, mode, maxAgeDays }` to override. `PAYWAY_JOURNAL=1`
+   * + `PAYWAY_JOURNAL_DIR` + `PAYWAY_JOURNAL_MODE` +
+   * `PAYWAY_JOURNAL_MAX_AGE_DAYS` fill any omitted part; `maxAgeDays` prunes
+   * old events on write (best-effort retention guard).
    * Default: disabled — a library must never write files silently.
    */
   journal?: boolean | JournalOptions;
@@ -1040,6 +1042,7 @@ export class PayWay {
   private readonly breaker: CircuitBreaker | undefined;
   private readonly journalContext: JournalContext | undefined;
   private lastCid: string | undefined;
+  private lastTrace: string | undefined;
 
   // --- Sub-Clients ---
   public readonly checkout: CheckoutDomain;
@@ -1117,6 +1120,14 @@ export class PayWay {
    */
   get lastCorrelationId(): string | undefined {
     return this.lastCid;
+  }
+
+  /**
+   * Gateway `status.trace` of the most recent successful exchange, when the
+   * envelope carried one (improvement I-2: surfaced for stdout↔journal joins).
+   */
+  get lastTraceId(): string | undefined {
+    return this.lastTrace;
   }
 
   /**
@@ -1313,6 +1324,7 @@ export class PayWay {
     const url = `${this.baseUrl}${endpoint}`;
     const correlationId = randomBytes(8).toString('hex');
     this.lastCid = correlationId;
+    this.lastTrace = undefined;
     const requestStartedAt = Date.now();
 
     // TD-07: fail fast while the endpoint's circuit is open (half-open probes
@@ -1464,6 +1476,7 @@ export class PayWay {
         if (this.journalContext) {
           // Fires for every parsed 2xx — including 200-wrapped business
           // failures (EC-06 semantics), which the integrator hooks also see.
+          this.lastTrace = toTraceString(extractTraceId(parsedBody));
           this.journalContext.emit({
             kind: 'execution.response',
             correlationId,

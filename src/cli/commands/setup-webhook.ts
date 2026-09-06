@@ -20,6 +20,7 @@ import type { Readable, Writable } from 'node:stream';
 import { createWebhookServer, type WebhookServerResult } from '../../webhook/server.js';
 import { createStorage, type StorageType } from '../../webhook/storage-factory.js';
 import { createTunnelManager, findCloudflared, type TunnelManager } from '../../webhook/tunnel.js';
+import { appendEnvVar } from './onboard-helpers.js';
 import {
   cloudflaredMissingLines,
   computeWebhookUrl,
@@ -45,6 +46,12 @@ export interface SetupWebhookOptions {
   storage?: StorageType;
   tunnel?: boolean;
   url?: string;
+  /**
+   * Improvement I-7: append PAYWAY_JOURNAL=1 to the target .env (appendEnvVar
+   * semantics — refuses to clobber an existing value) so `journal reconcile`
+   * works out of the box. Sets process.env too for this process.
+   */
+  journal?: boolean;
 }
 
 export interface SetupWebhookDeps {
@@ -193,6 +200,16 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     // Also set in process.env so subsequent commands in the same session pick it up
     process.env.PAYWAY_CALLBACK_URL = webhookUrl;
     log(`  ${c.green('✓')} Saved callback URL to .env as ${c.cyan(`PAYWAY_CALLBACK_URL=${webhookUrl}`)}`);
+    log('');
+  }
+
+  // ── Step 5b: journaling onboarding (I-7) ─────────────────────────────────
+  if (opts.journal) {
+    const appended = appendEnvVar(envFile, process.env, 'PAYWAY_JOURNAL', '1');
+    log(
+      `  ${appended.action === 'kept' ? c.dim('PAYWAY_JOURNAL already set in .env') : `${c.green('✓')} Appended PAYWAY_JOURNAL=1 to .env`}`,
+    );
+    log(`  ${c.dim('Callbacks will now emit callback.received journal events — journal reconcile works out of the box.')}`);
     log('');
   }
 

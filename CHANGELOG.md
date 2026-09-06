@@ -11,7 +11,19 @@
 
 ### Added
 
-- **Transaction Journal — Phase 4 Analytics** (roadmap §17): `computeJournalStats`
+- **Transaction-journal improvement batch (I-1..I-13, backlog
+  `.scratch/transaction-data-journal/IMPROVEMENTS.md`)**: poll outcomes map to
+  exit codes on generate-qr/generate-checkout (W5-11 fixed — timeout exits 3,
+  machine-visible); every `--json` success envelope carries
+  `correlationId`/`traceId` join keys; duplicate-tran_id advisory (W5-7) on
+  the three create commands via the journal, `--allow-duplicate-id` to
+  suppress; `doctor` journal row + 50 MB retention warning; journal retention
+  `maxAgeDays` / `PAYWAY_JOURNAL_MAX_AGE_DAYS` (prune on write, best-effort);
+  `journal timeline --with-webhooks` (verdict/matched-status/replay from raw
+  captures); `setup-webhook --journal` (.env upsert, never clobbers); REPL
+  unfinished-creates banner (`PAYWAY_AGENT_NO_RECOVER_HINT` opt-out);
+  `agent ledger prune --before` (finished-only, unfinished never removed);
+  docs/12 Pattern 3b (hook meta + onError + journal join).- **Transaction Journal — Phase 4 Analytics** (roadmap §17): `computeJournalStats`
   (exported) + **`journal stats`** CLI — latency percentiles (p50/p90/p99/max) per
   endpoint over successful responses, retry rates per correlation-id-grouped
   exchange, top provider/HTTP/transport errors with per-day counts, and the

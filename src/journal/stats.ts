@@ -83,7 +83,8 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, index)];
 }
 
-function isReadEndpoint(endpoint: string): boolean {
+/** True for endpoints that only READ state (check/detail/list/by-ref/exchange-rate). */
+export function isReadEndpoint(endpoint: string): boolean {
   return READ_ENDPOINT_MARKERS.some((marker) => endpoint.includes(marker));
 }
 

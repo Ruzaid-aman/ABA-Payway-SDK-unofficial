@@ -472,6 +472,43 @@ const payway = new PayWay({
 });
 ```
 
+### Pattern 3b: Correlation metadata, error hooks, and the transaction journal
+
+The hooks are additively enriched (existing two-argument handlers keep
+working): `onRequest`/`onResponse` receive a trailing `meta` object with the
+per-exchange **correlation id**, the **attempt** number (retries included),
+the **duration** and the gateway **trace id** where available. A new
+`onError` hook fires on every *failed* attempt — the paths `onResponse`
+never sees (HTTP errors, network, timeout, business failures):
+
+```typescript
+const payway = new PayWay({
+  // …credentials…
+  onResponse: (endpoint, status, body, rateLimit, meta) => {
+    // meta.correlationId / meta.attempt / meta.durationMs / meta.traceId
+    console.log(`[PayWay] ← ${endpoint} ${status} in ${meta?.durationMs}ms (cid=${meta?.correlationId})`);
+  },
+  onError: (info) => {
+    // info.endpoint / correlationId / attempt / statusCode / paywayCode / message / retryable
+    console.error(`[PayWay] ${info.endpoint} attempt #${info.attempt} failed: ${info.message}`);
+  },
+});
+```
+
+The same correlation id (`payway.lastCorrelationId` after the call, or the
+`correlationId` field in `--json` envelopes) joins the **transaction
+journal** — the opt-in append-only record of every exchange, poll, observed
+status, artifact, and captured callback:
+
+```sh
+payway-sdk --journal generate-qr -a 5.00 -c USD --no-polling -y   # record one invocation
+grep '<correlationId>' payway-data/journal.jsonl                   # reconstruct the exchange
+payway-sdk journal timeline -t <tran-id>                            # full transaction history
+```
+
+Full journal guide (modes, redaction, queries, reconcile, anomalies):
+`docs/18-transaction-journal.md`.
+
 ### Pattern 4: Graceful Degradation
 
 ```typescript

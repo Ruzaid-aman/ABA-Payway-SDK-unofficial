@@ -29,6 +29,11 @@ function parseMode(value: string | undefined): JournalMode {
   return value?.trim().toLowerCase() === 'full' ? 'full' : 'digest';
 }
 
+function parseMaxAgeDays(value: string | undefined): number | undefined {
+  const parsed = Number.parseFloat(value ?? '');
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 function defaultJournalDir(): string {
   return path.join(process.cwd(), DEFAULT_JOURNAL_DIR_NAME);
 }
@@ -48,15 +53,26 @@ export function resolveJournalConfig(
 ): ResolvedJournalConfig | undefined {
   if (setting === false) return undefined;
   if (setting === true) {
-    return { dir: resolveDir(undefined, env), mode: parseMode(env.PAYWAY_JOURNAL_MODE) };
+    return {
+      dir: resolveDir(undefined, env),
+      mode: parseMode(env.PAYWAY_JOURNAL_MODE),
+      maxAgeDays: parseMaxAgeDays(env.PAYWAY_JOURNAL_MAX_AGE_DAYS),
+    };
   }
   if (setting === undefined) {
     const enabled = TRUTHY_ENV_VALUES.has((env.PAYWAY_JOURNAL ?? '').trim().toLowerCase());
-    return enabled ? { dir: resolveDir(undefined, env), mode: parseMode(env.PAYWAY_JOURNAL_MODE) } : undefined;
+    return enabled
+      ? {
+          dir: resolveDir(undefined, env),
+          mode: parseMode(env.PAYWAY_JOURNAL_MODE),
+          maxAgeDays: parseMaxAgeDays(env.PAYWAY_JOURNAL_MAX_AGE_DAYS),
+        }
+      : undefined;
   }
   return {
     dir: resolveDir(setting.dir, env),
     mode: setting.mode ?? parseMode(env.PAYWAY_JOURNAL_MODE),
+    maxAgeDays: setting.maxAgeDays ?? parseMaxAgeDays(env.PAYWAY_JOURNAL_MAX_AGE_DAYS),
   };
 }
 
@@ -64,9 +80,12 @@ export class JsonlJournalSink implements JournalSink {
   readonly filePath: string;
   private dirReady = false;
   private warned = false;
+  private readonly maxAgeDays: number | undefined;
+  private lastPruneDay: string | undefined;
 
   constructor(config: ResolvedJournalConfig) {
     this.filePath = path.join(config.dir, DEFAULT_JOURNAL_FILE_NAME);
+    this.maxAgeDays = config.maxAgeDays;
   }
 
   emit(event: JournalEventV1): void {
@@ -76,6 +95,19 @@ export class JsonlJournalSink implements JournalSink {
         this.dirReady = true;
       }
       appendFileSync(this.filePath, `${JSON.stringify(event)}\n`, 'utf8');
+      // I-5 retention guard: best-effort prune once per process per UTC day;
+      // failures are swallowed (the next emit retries).
+      if (this.maxAgeDays !== undefined) {
+        const today = event.ts.slice(0, 10);
+        if (this.lastPruneDay !== today) {
+          this.lastPruneDay = today;
+          try {
+            pruneJournal(new Date(Date.now() - this.maxAgeDays * 86_400_000), this.filePath);
+          } catch {
+            // Retention must never break journaling.
+          }
+        }
+      }
     } catch (error) {
       if (this.warned) return;
       this.warned = true;

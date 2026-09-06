@@ -6,12 +6,14 @@
  * (never fatal) so a partially-written or evolving journal stays queryable.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Command } from 'commander';
 import {
   DEFAULT_JOURNAL_FILE_NAME,
   type JournalEventV1,
 } from '../../journal/types.js';
+import type { WebhookRecord } from '../../webhook/storage.js';
 import { explainTransaction, detectJournalAnomalies } from '../../journal/intelligence.js';
 import { reconcileTransactions } from '../../journal/reconcile.js';
 import { computeJournalStats } from '../../journal/stats.js';
@@ -31,6 +33,31 @@ function eventLine(event: JournalEventV1): string {
     event.status ?? (event.httpStatus !== undefined ? String(event.httpStatus) : ''),
   ];
   return parts.join('  ');
+}
+
+/**
+ * I-6: load the raw webhook capture store keyed by record id — a
+ * `callback.received` journal event's correlationId IS the record id, so the
+ * timeline can show the persisted signature verdict / matched status /
+ * replay marker behind each callback step.
+ */
+function loadWebhookRecordsById(): Map<string, WebhookRecord> {
+  const file = path.join(
+    process.env.PAYWAY_WEBHOOK_DIR?.trim() || path.join(process.cwd(), 'webhook_data'),
+    'callbacks.jsonl',
+  );
+  const byId = new Map<string, WebhookRecord>();
+  if (!existsSync(file)) return byId;
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (line.trim().length === 0) continue;
+    try {
+      const record = JSON.parse(line) as WebhookRecord;
+      if (record?.id) byId.set(record.id, record);
+    } catch {
+      // Malformed captures are skipped — the timeline still renders.
+    }
+  }
+  return byId;
 }
 
 export function registerJournalCommands(program: Command): void {
@@ -73,13 +100,30 @@ export function registerJournalCommands(program: Command): void {
     .description('Reconstruct the chronological history of one transaction')
     .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
     .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--with-webhooks', 'Enrich callback steps with the persisted signature verdict/matched status from the webhook capture store')
     .option('--json', 'Machine-readable output')
-    .action((opts: { transactionId: string; dir?: string; json?: boolean }) => {
+    .action((opts: { transactionId: string; dir?: string; withWebhooks?: boolean; json?: boolean }) => {
       const c = currentPalette();
       const { file, events } = readJournalFile(resolveJournalDir(opts.dir));
-      const timeline = events
+      let timeline = events
         .filter((e) => e.transactionId === opts.transactionId)
         .sort((a, b) => a.ts.localeCompare(b.ts));
+
+      // I-6: join callback.received events to the raw captures via record id.
+      let webhookRecords: Map<string, WebhookRecord> | undefined;
+      if (opts.withWebhooks) {
+        webhookRecords = loadWebhookRecordsById();
+        timeline = timeline.map((event) => {
+          if (event.kind !== 'callback.received') return event;
+          const record = webhookRecords?.get(event.correlationId);
+          if (!record) return event;
+          const detail = `${record.signatureVerdict ?? 'no-verdict'}`;
+          const extras: string[] = [`verdict=${detail}`];
+          if (record.matchedStatus) extras.push(`status=${record.matchedStatus}`);
+          if (record.replay) extras.push('replay');
+          return { ...event, status: [event.status, extras.join(' ')].filter(Boolean).join(' · ') };
+        });
+      }
 
       if (opts.json) {
         console.log(JSON.stringify({ file, transactionId: opts.transactionId, events: timeline }, null, 2));

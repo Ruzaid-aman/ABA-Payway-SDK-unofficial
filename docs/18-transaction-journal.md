@@ -111,6 +111,37 @@ on. Packaged skill: `aba-payway-journal` (install with the rest:
 The environment knob `PAYWAY_WEBHOOK_DIR` (registered) relocates the webhook capture
 store for `journal reconcile`.
 
+## Improvements batch (2026-09-06, backlog items I-1..I-13)
+
+- **I-1 (W5-11 fixed)**: `generate-qr` / `generate-checkout` now map the poll
+  outcome to the exit code (terminal 0, consecutive-errors 2, timeout 3) — a
+  poll timeout is no longer machine-invisible under `--json`.
+- **I-2**: every `--json` success envelope carries `correlationId` and, when
+  present, `traceId` — grep either value in `payway-data/journal.jsonl` to
+  reconstruct the exchange from the journal.
+- **I-3 (W5-7 codified)**: `generate-qr`, `generate-checkout`, and `cof charge`
+  warn when the journal already holds a create for the same transaction id
+  (duplicates are gateway-accepted but can be unpayable); `--allow-duplicate-id`
+  suppresses. No warning when journaling is off.
+- **I-4**: `doctor` shows a journal row (enabled? size? last event) and warns
+  above 50 MB with the prune recipe.
+- **I-5**: retention guard — `journal: { maxAgeDays }` / `PAYWAY_JOURNAL_MAX_AGE_DAYS`
+  prunes old events on write (once per process per UTC day, best-effort, never
+  fails a journaling call).
+- **I-6**: `journal timeline --with-webhooks` enriches callback steps with the
+  persisted signature verdict / matched status / replay marker from the raw
+  capture store (joined via the webhook record id).
+- **I-7**: `setup-webhook --journal` appends `PAYWAY_JOURNAL=1` to `.env` so
+  reconcile works out of the box (appendEnvVar semantics — never clobbers).
+- **I-12**: the agent REPL prints a lookup-only banner when the most recent
+  prior session has unfinished creates (`PAYWAY_AGENT_NO_RECOVER_HINT=1` to
+  suppress).
+- **I-13**: `agent ledger prune --before` removes FINISHED (succeeded/failed)
+  records older than a cutoff; unfinished records are never removed and
+  unparseable files are left untouched — retention parity with `journal prune`.
+- Remaining backlog (I-9/I-10/I-11): profiles encryption, `--json-safe`
+  redacted output, optional SQLite journal backend — larger, deferred.
+
 Join keys on every event: `correlationId` (the SDK per-exchange cid), `attempt`,
 `endpoint`, `transactionId`/`merchantRef` when the request or response carries them,
 `traceId` (the gateway's `status.trace`), `httpStatus`, `paywayCode`, `durationMs`,

@@ -82,6 +82,12 @@ export interface JournalOptions {
   dir?: string;
   /** `'digest'` (default) or `'full'`. Also `PAYWAY_JOURNAL_MODE`. */
   mode?: JournalMode;
+  /**
+   * Retention guard (improvement I-5): events older than this many days are
+   * pruned on write via `pruneJournal`. Also `PAYWAY_JOURNAL_MAX_AGE_DAYS`.
+   * Pruning is best-effort and never blocks or fails the emitting call.
+   */
+  maxAgeDays?: number;
 }
 
 export interface ResolvedJournalConfig extends JournalOptions {

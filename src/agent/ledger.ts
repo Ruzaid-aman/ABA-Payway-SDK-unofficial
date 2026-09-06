@@ -9,7 +9,8 @@
  */
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, unlinkSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import type { AgentToolName, ExecutionRecordV1, ExecutionStatus } from './contracts.js';
 import { scrubSensitive } from './privacy.js';
@@ -220,6 +221,48 @@ export function attachCorrelation(id: string, correlation: string): ExecutionRec
 /** Loads one record by id (throws LedgerNotFoundError when missing/invalid). */
 export function loadExecutionRecord(executionId: string): ExecutionRecordV1 {
   return loadRecord(executionId);
+}
+
+/**
+ * I-13: delete FINISHED records (succeeded/failed) for all sessions whose
+ * `updatedAt` predates the cutoff — the ledger counterpart of
+ * `journal prune`. Unfinished records are NEVER removed (they may still be
+ * recoverable), and unparseable files are left untouched. Atomic per file.
+ */
+export function pruneLedgerRecords(
+  before: Date,
+  appDataDirectory: string = process.env.APPDATA ?? path.join(homedir(), '.config'),
+): { removed: number; kept: number } {
+  const dir = path.join(getAgentDataPaths(appDataDirectory).ledgerDir);
+  if (!existsSync(dir)) return { removed: 0, kept: 0 };
+  const cutoff = before.toISOString();
+  let removed = 0;
+  let kept = 0;
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.json')) continue;
+    const file = path.join(dir, name);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+      kept += 1; // unparseable — never destroy what we cannot read
+      continue;
+    }
+    if (!validateLedger(raw) || !('updatedAt' in (raw as ExecutionRecordV1))) {
+      kept += 1;
+      continue;
+    }
+    const record = raw as ExecutionRecordV1;
+    if (record.status === 'succeeded' || record.status === 'failed') {
+      if (record.updatedAt < cutoff) {
+        unlinkSync(file);
+        removed += 1;
+        continue;
+      }
+    }
+    kept += 1;
+  }
+  return { removed, kept };
 }
 
 /**

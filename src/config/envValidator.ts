@@ -30,6 +30,7 @@ const KNOWN_VARS: ReadonlySet<string> = new Set([
   'PAYWAY_JOURNAL',
   'PAYWAY_JOURNAL_DIR',
   'PAYWAY_JOURNAL_MODE',
+  'PAYWAY_JOURNAL_MAX_AGE_DAYS',
   'PAYWAY_WEBHOOK_DIR',
 ]);
 

@@ -10,7 +10,8 @@
 import { randomBytes } from 'node:crypto';
 import type { Command } from 'commander';
 import type { PayWay } from '../client.js';
-import { createJournalEmitter } from '../journal/writer.js';
+import { isReadEndpoint } from '../journal/stats.js';
+import { createJournalEmitter, readJournalEvents } from '../journal/writer.js';
 import type { JournalContext, JournalEmitterInput } from '../journal/types.js';
 
 let standalone: JournalContext | undefined;
@@ -72,4 +73,22 @@ export function emitStatusObserved(
     status: info.status,
     responseDigest: info.responseDigest,
   });
+}
+
+/**
+ * Improvement I-3 (codifies W5-7): true when the journal already holds a
+ * CREATE request for this transaction id — the gateway accepts duplicate
+ * tran_ids silently but the resulting QR can be unpayable. Always false when
+ * journaling is off (nothing to consult, no warning).
+ */
+export function journalSawCreateFor(transactionId: string): boolean {
+  if (!cliJournal()) return false;
+  const { events } = readJournalEvents();
+  return events.some(
+    (event) =>
+      event.kind === 'execution.request' &&
+      event.transactionId === transactionId &&
+      event.endpoint !== undefined &&
+      !isReadEndpoint(event.endpoint),
+  );
 }

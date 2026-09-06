@@ -25,7 +25,12 @@ import { suggestMessage } from './cli/ui/suggest.js';
 import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
 import { registerAgentCommands } from './cli/commands/agent.js';
 import { registerJournalCommands } from './cli/commands/journal.js';
-import { emitCliCommandStarted, emitCliJournal, emitStatusObserved } from './cli/journal-cli.js';
+import {
+  emitCliCommandStarted,
+  emitCliJournal,
+  emitStatusObserved,
+  journalSawCreateFor,
+} from './cli/journal-cli.js';
 import { buildResponseDigest } from './journal/digest.js';
 import { registerOnboardCommand } from './cli/commands/onboard.js';
 import { runDoctor } from './cli/commands/doctor.js';
@@ -129,6 +134,38 @@ const EXIT_OK = 0;
 const EXIT_VALIDATION = 1;
 const EXIT_API_FAILURE = 2;
 const EXIT_NETWORK = 3;
+
+/**
+ * --json success envelope (improvement I-2): the raw response plus the
+ * correlation join keys — grep either value in payway-data/journal.jsonl to
+ * reconstruct the exchange from the transaction journal.
+ */
+function printApiResultJson(result: unknown, payway?: PayWay): void {
+  if (result === null || typeof result !== 'object') {
+    console.log(JSON.stringify(result ?? null, null, 2));
+    return;
+  }
+  const envelope = { ...(result as Record<string, unknown>) };
+  if (payway?.lastCorrelationId !== undefined) envelope.correlationId = payway.lastCorrelationId;
+  if (payway?.lastTraceId !== undefined) envelope.traceId = payway.lastTraceId;
+  console.log(JSON.stringify(envelope, null, 2));
+}
+
+/**
+ * Improvement I-3 (codifies W5-7): warn when the journal already holds a
+ * CREATE request for this transaction id — the gateway accepts duplicate
+ * tran_ids silently but the resulting QR can be unpayable. Advisory only
+ * (never blocks); `--allow-duplicate-id` suppresses it.
+ */
+function warnDuplicateTransactionId(transactionId: string, opts: { allowDuplicateId?: boolean }): void {
+  if (opts.allowDuplicateId) return;
+  if (!journalSawCreateFor(transactionId)) return;
+  console.log(
+    `  ${c.yellow('⚠')} Transaction ID ${c.bold(transactionId)} already appears in the local journal` +
+      ` (W5-7: the gateway accepts duplicate tran_ids but the duplicate QR can be unpayable).`,
+  );
+  console.log(`  ${c.dim('Use a fresh id, or pass --allow-duplicate-id to silence this warning.')}`);
+}
 
 function classifyError(e: unknown): number {
   if (e instanceof PollingAbortedError) return e.reason === 'max_consecutive_errors' ? EXIT_API_FAILURE : EXIT_NETWORK;
@@ -274,6 +311,7 @@ interface GenerateQrCommandOptions {
   customFields?: string;
   returnParams?: string;
   payout?: string;
+  allowDuplicateId?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1037,7 +1075,7 @@ program
     try {
       const payway = new PayWay();
       const result = await payway.khqr.getTransactionsByMerchantRef(opts.merchantRef, opts.requestTime);
-      console.log(JSON.stringify(result, null, 2));
+      printApiResultJson(result, payway);
     } catch (error) {
       process.exitCode = printApiError(error);
     }
@@ -1065,7 +1103,7 @@ program
         responseDigest: buildResponseDigest(result, 'digest'),
       });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       const data = (result as Record<string, unknown>).data as Record<string, unknown> | undefined;
@@ -1155,7 +1193,7 @@ program
         ? await withOneShotSpinner(io, 'Closing transaction…', () => payway.checkout.closeTransaction(opts.transactionId))
         : await payway.checkout.closeTransaction(opts.transactionId);
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Close request accepted for ${c.bold(opts.transactionId)}`);
@@ -1422,7 +1460,7 @@ program
       });
 
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       const data = (result as Record<string, unknown>).data as Record<string, unknown> | undefined;
@@ -1523,7 +1561,7 @@ program
           pagination: opts.pagination,
         });
         if (opts.json) {
-          console.log(JSON.stringify(result, null, 2));
+          printApiResultJson(result, payway);
           return;
         }
         const raw = result as unknown as Record<string, unknown>;
@@ -1647,7 +1685,7 @@ program
             )
           : await payway.checkout.refund(opts.transactionId, amount, currency);
         if (opts.json) {
-          console.log(JSON.stringify(result, null, 2));
+          printApiResultJson(result, payway);
           return;
         }
         const status = (result as Record<string, unknown>).status as Record<string, unknown> | undefined;
@@ -1683,7 +1721,7 @@ program
       const payway = new PayWay();
       const result = await payway.checkout.getExchangeRate();
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Exchange rate:`);
@@ -1762,6 +1800,7 @@ program
   .requiredOption('-a, --amount <number>', 'Payment amount')
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
   .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
+  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--payment-option <option>', 'Payment option (omit to let PayWay show all options)')
   .option('--return-url <url>', 'Return URL after payment')
   .option('--cancel-url <url>', 'Cancel URL')
@@ -1857,6 +1896,7 @@ program
   .option('--no-save-image', 'Do not save the QR image PNG to payway-output/<transaction-id>.png by default')
   .option('--open-image', 'Open the saved QR image with the OS default viewer (default: auto when interactive)')
   .option('--no-open-image', 'Never open the QR image, even in interactive terminals')
+  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
   .option('--first-name <name>', 'Payer first name (gateway caps at 20 chars, err 16/17)')
   .option('--last-name <name>', 'Payer last name (gateway caps at 20 chars, err 16/17)')
@@ -1883,6 +1923,7 @@ program
     let amount = opts.amount === undefined ? undefined : Number(opts.amount);
     let currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
     let transactionId = opts.transactionId ?? `qr${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    warnDuplicateTransactionId(transactionId, opts);
     let offline = Boolean(opts.offline);
     let ref = opts.ref;
     let callbackUrl: string | undefined;
@@ -2176,7 +2217,11 @@ program
 
         // ── Polling ─────────────────────────────────────────────────────
         if ((opts as Record<string, unknown>).polling !== false) {
-          await runPolling(payway, transactionId, opts, io);
+          // W5-11 (improvement I-1): a poll timeout/consecutive-error abort
+          // must be machine-visible — map the outcome to the exit code
+          // (terminal 0, consecutive errors 2, timeout 3). runPolling already
+          // emits the `aborted` NDJSON event under --json.
+          process.exitCode = mapPollOutcomeToExitCode(await runPolling(payway, transactionId, opts, io));
         } else {
           console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
           console.log();
@@ -2234,6 +2279,7 @@ program
     const amount = Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
     const transactionId = opts.transactionId ?? `ck${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    warnDuplicateTransactionId(transactionId, opts);
 
     if (!Number.isFinite(amount) || amount <= 0) {
       if (opts.json) {
@@ -2332,7 +2378,7 @@ program
       });
 
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
 
@@ -2373,7 +2419,8 @@ program
 
       // ── Polling ─────────────────────────────────────────────────────
       if ((opts as Record<string, unknown>).polling !== false) {
-        await runPolling(payway, transactionId, opts, io);
+        // W5-11 (improvement I-1): poll outcome -> exit code (see generate-qr).
+        process.exitCode = mapPollOutcomeToExitCode(await runPolling(payway, transactionId, opts, io));
       } else {
         console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
         console.log();
@@ -2560,7 +2607,7 @@ paymentLinkCmd
       });
 
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
 
@@ -2622,7 +2669,7 @@ paymentLinkCmd
       const result = await payway.paymentLink.getDetails(opts.id);
 
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
 
@@ -2768,7 +2815,7 @@ program
       });
 
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
       } else {
         const data = ((result as Record<string, unknown>).data ?? result) as Record<string, unknown>;
         console.log(`  ${c.green('✓')} Payout submitted`);
@@ -2815,7 +2862,7 @@ cofCmd
           | undefined,
       });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Account link requested`);
@@ -2857,7 +2904,7 @@ cofCmd
         continueSuccessUrl: opts.continueSuccessUrl as string | undefined,
       });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Card link requested`);
@@ -3008,6 +3055,7 @@ cofCmd
   .requiredOption('--token <pwt>', 'Payment token (pwt) returned by a prior link/charge')
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
   .option('--ctid <ctid>', 'Customer token identifier (optional on repeat charges)')
+  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--token-flag <flag>', 'Charge flags: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX')
   .option('--callback-url <url>', 'Webhook callback URL')
   .option('--first-name <name>', 'Payer first name (gateway caps at 20 chars)')
@@ -3026,6 +3074,7 @@ cofCmd
       process.exitCode = EXIT_VALIDATION;
       return;
     }
+    warnDuplicateTransactionId(opts.transactionId as string, opts);
     const amount = Number(opts.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
@@ -3054,7 +3103,7 @@ cofCmd
         shippingFee: opts.shippingFee !== undefined ? Number(opts.shippingFee) : undefined,
       });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       const data = ((result as Record<string, unknown>).data ?? result) as Record<string, unknown>;
@@ -3088,7 +3137,7 @@ cofTokenCmd
         paymentToken: opts.token as string,
       });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Token renew requested`);
@@ -3114,7 +3163,7 @@ cofTokenCmd
         requestId: opts.requestId as string,
       });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Token details returned`);
@@ -3143,7 +3192,7 @@ cofTokenCmd
         paymentToken: opts.token as string,
       });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Token removed`);
@@ -3170,7 +3219,7 @@ beneficiaryCmd
       const payway = new PayWay();
       const result = await payway.payout.addBeneficiary({ payee });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Beneficiary whitelist request submitted`);
@@ -3202,7 +3251,7 @@ beneficiaryCmd
       const payway = new PayWay();
       const result = await payway.payout.updateBeneficiaryStatus({ payee, status: status as 0 | 1 });
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Beneficiary status update submitted`);
@@ -3372,12 +3421,14 @@ program
   .option('--storage <type>', 'Storage backend: json or sqlite (default: auto)')
   .option('--tunnel', 'Automatically start Cloudflare Tunnel (skip prompt)')
   .option('--url <url>', 'Public webhook URL (skip prompt, no tunnel)')
-  .action(async (opts: { port?: string; storage?: string; tunnel?: boolean; url?: string }) => {
+  .option('--journal', 'Also enable the transaction journal in .env (PAYWAY_JOURNAL=1) so reconcile works out of the box')
+  .action(async (opts: { port?: string; storage?: string; tunnel?: boolean; url?: string; journal?: boolean }) => {
     await runSetupWebhook({
       port: opts.port,
       storage: opts.storage as 'json' | 'sqlite' | undefined,
       tunnel: opts.tunnel,
       url: opts.url,
+      journal: opts.journal,
     });
   });
 
@@ -3430,7 +3481,7 @@ const preAuthComplete = new Command('complete')
               maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
             });
         if (opts.json) {
-          console.log(JSON.stringify(result, null, 2));
+          printApiResultJson(result, payway);
           return;
         }
         console.log(`  ${c.green('✓')} Pre-auth completed for ${c.bold(opts.transactionId)}`);
@@ -3501,7 +3552,7 @@ const preAuthCompletePayout = new Command('complete-payout')
               maxOverCapturePct: Number(opts.maxOverCapturePct ?? 110),
             });
         if (opts.json) {
-          console.log(JSON.stringify(result, null, 2));
+          printApiResultJson(result, payway);
           return;
         }
         console.log(`  ${c.green('✓')} Pre-auth completed with payout for ${c.bold(opts.transactionId)}`);
@@ -3562,7 +3613,7 @@ const preAuthCancel = new Command('cancel')
               idempotencyKey: opts.idempotencyKey,
             });
         if (opts.json) {
-          console.log(JSON.stringify(result, null, 2));
+          printApiResultJson(result, payway);
           return;
         }
         console.log(`  ${c.green('✓')} Pre-auth cancelled for ${c.bold(opts.transactionId)}`);
