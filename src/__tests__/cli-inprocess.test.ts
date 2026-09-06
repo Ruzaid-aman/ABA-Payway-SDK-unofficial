@@ -12,7 +12,7 @@
  * switched to an empty temp dir BEFORE the dynamic import — keeping the
  * hermetic test environment free of ambient credentials.
  */
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -73,6 +73,22 @@ describe('CLI in-process (runCli)', () => {
     expect(text).toContain('Validation / binding failure');
     const { text: unknownText } = await run(['explain', '9999']);
     expect(unknownText).toContain('Unknown or undocumented code');
+  });
+
+  // Codification C6 (2026-09-06): the payment-link PTL family has its own
+  // explain entries, with the sandbox-vs-official caveats baked into the hint.
+  it('explain decodes the payment-link PTL132/PTL05/PTL99 family', async () => {
+    const ptl132 = await run(['explain', 'PTL132']);
+    expect(ptl132.text).toContain('Invalid Payment Link');
+    expect(ptl132.text).toContain('data.id');
+    expect(ptl132.text).toContain('96');
+
+    const ptl05 = await run(['explain', 'PTL05']);
+    expect(ptl05.text).toContain('Parameter Invalid Format');
+    expect(ptl05.text).toContain('PTL04');
+
+    const ptl99 = await run(['explain', 'PTL99']);
+    expect(ptl99.text).toContain('Merchant Invalid Currency');
   });
 
   it('validate accepts a valid amount and transaction id', async () => {
@@ -359,6 +375,125 @@ describe('checkout-form (in-process runCli)', () => {
       expect(text).toContain('--payout must be a JSON array of {acc, amt} objects');
       expect(exitCode).toBe(1);
     } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  // T5.4 envelope contract (payment-link parity with check-transaction /
+  // transaction-detail / generate-checkout): under --json a local validation
+  // failure prints the machine-parseable `{ error: { kind, exitCode, … } }`
+  // envelope — never the human ✗ block — and no banner noise before it.
+  it('payment-link create --json prints a validation error envelope for a bad payout total', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    try {
+      const { text, exitCode } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', '5',
+        '-r', 'ref-json-envelope-1',
+        '--return-url', 'https://example.com/return',
+        '--payout', '[{"acc":"000111222","amt":4}]',
+        '--json',
+      ]);
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
+        error: { kind: string; exitCode: number; type: string; message: string };
+      };
+      expect(parsed.error.kind).toBe('validation');
+      expect(parsed.error.exitCode).toBe(1);
+      expect(parsed.error.type).toBe('PayWayConfigError');
+      expect(parsed.error.message).toContain('must equal the payment-link amount');
+      expect(text).not.toContain('✗');
+      expect(text).not.toContain('ABA PayWay SDK');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('payment-link create --json prints a validation error envelope for a bad amount', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    try {
+      const { text, exitCode } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', 'not-a-number',
+        '-r', 'ref-json-envelope-2',
+        '--return-url', 'https://example.com/return',
+        '--json',
+      ]);
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
+        error: { kind: string; exitCode: number; message: string };
+      };
+      expect(parsed.error.kind).toBe('validation');
+      expect(parsed.error.exitCode).toBe(1);
+      expect(parsed.error.message).toContain('Amount must be a positive number');
+      expect(text).not.toContain('✗');
+      expect(exitCode).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  // The CLI is deliberately stricter than the domain on the 3MB image cap
+  // (parity with the --payout total rule): the loader hard-exits before the
+  // network instead of surfacing the domain's advisory warn.
+  it('payment-link create --image exits 1 for a file exceeding the 3MB cap', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    const oversized = path.join(tempDir, 'oversized.png');
+    try {
+      writeFileSync(oversized, Buffer.alloc(3 * 1024 * 1024 + 1, 1));
+      const { text, exitCode } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', '5',
+        '-r', 'ref-img-cap-1',
+        '--return-url', 'https://example.com/return',
+        '--image', oversized,
+      ]);
+      expect(text).toContain('exceeding the documented 3MB payment-link image limit');
+      expect(exitCode).toBe(1);
+    } finally {
+      rmSync(oversized, { force: true });
+      vi.unstubAllEnvs();
+    }
+  });
+
+  // Edge of the cap: exactly 3MB passes the loader (advisory semantics keep
+  // the boundary inclusive — the domain warns only ABOVE the cap).
+  it('payment-link create --image accepts a file at exactly 3MB', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    vi.stubEnv('PAYWAY_RSA_PUBLIC_KEY', '-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQ\n-----END PUBLIC KEY-----\n');
+    const exact = path.join(tempDir, 'exact-3mb.png');
+    try {
+      writeFileSync(exact, Buffer.alloc(3 * 1024 * 1024, 1));
+      const { text } = await run([
+        'payment-link',
+        'create',
+        '-t', 'T',
+        '-a', '5',
+        '-r', 'ref-img-cap-2',
+        '--return-url', 'https://example.com/return',
+        '--image', exact,
+      ]);
+      // No local rejection: the failure (if any) comes from the gateway call,
+      // never from the size check.
+      expect(text).not.toContain('3MB payment-link image limit');
+    } finally {
+      rmSync(exact, { force: true });
       vi.unstubAllEnvs();
     }
   });

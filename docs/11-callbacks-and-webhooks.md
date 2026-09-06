@@ -45,6 +45,22 @@ For the documented **online checkout callback**, PayWay signs the delivery with 
 
 > ⚠️ **Verified for online checkout in sandbox:** PayWay uses **HMAC-SHA512** (not SHA-256). Some older documentation may incorrectly reference SHA-256. Our sandbox probes confirm SHA-512 with Base64 encoding and sorted-key verification.
 
+### SDK helpers for verification (beyond the boolean)
+
+- **`verifyCallback(body, sig)`** — boolean, what the snippets below use.
+- **`verifyCallbackDetailed(body, sig, options?)`** (v1.3.0+) — returns
+  `{ valid, reason }` so you can log WHY a delivery failed:
+  `malformed_signature` | `empty_body` | `signature_mismatch`. Same options
+  object (`stripHash: true` strips the `hash` field before verifying).
+- **Wrong-hash diagnostics on API calls:** a gateway hash rejection throws
+  **`PayWaySignatureError`** — a `PayWayAPIError` subclass whose message
+  includes the endpoint's documented hash-field order (the hint that prevents
+  the classic "which fields went into the HMAC" debugging session). COF/QR
+  families: codes `1`/`01`/`PTL02` map here.
+- **Binding failures:** COF `04`-family rejections carry per-field messages —
+  catch `PayWayBusinessError` and read **`error.fieldErrors`**
+  (`Record<string, string>`).
+
 ---
 
 ## Implementation: Express.js Webhook Handler
@@ -429,3 +445,29 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 - **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](./03-web-implementation.md)
 
 > ← [Previous: UI Customization](./10-ui-customization.md) | [Next: Error Handling →](./12-error-handling-and-debugging.md)
+
+---
+
+## Payment Link pushbacks (`return_url`) — no HMAC
+
+Payment links do **not** use the checkout webhook contract. On payment, PayWay
+POSTs directly to the link's decoded `return_url` (live-captured 2026-09-06):
+
+```json
+POST <return_url>
+Content-Type: application/json; charset=utf-8
+User-Agent: PayWayApp/3.0
+
+{ "tran_id": "178865526240157", "status": 0, "merchant_ref_no": "plvr-v1-mtp34wx4" }
+```
+
+- **No `hash` field — live-verified.** Treat the pushback as a notification and
+  verify the payment via `check-transaction(tran_id)`; `verifyCallback()` does
+  not apply.
+- `status` is the numeric `0` (APPROVED), not the `"00"` string the official
+  sample shows — accept both. One pushback per completed payment.
+- Receiver requirements: accept `POST` + `application/json`, answer 200 fast.
+
+Receiver setup (tunnel, storage, routes) is covered in
+[16. Webhook Setup](./16-webhook-setup-guide.md); the full payment-link
+lifecycle in [17. Payment Link API](./17-payment-link.md) §17.6.

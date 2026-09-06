@@ -36,12 +36,18 @@ import type {
   CreatePaymentLinkParams,
   GenerateOfflineKhqrParams,
   GenerateOnlineQrParams,
+  GetPaymentLinkDetailsParams,
   MaterializedAgentAction,
   OpenArtifactParams,
   PollTransactionParams,
+  QueryJournalParams,
   SaveArtifactParams,
 } from './contracts.js';
 import type { ExecutionContext, ToolExecutionResult } from './executor.js';
+import { detectJournalAnomalies, explainTransaction } from '../journal/intelligence.js';
+import { reconcileTransactions } from '../journal/reconcile.js';
+import { computeJournalStats } from '../journal/stats.js';
+import { readJournalEvents } from '../journal/writer.js';
 import { copyToClipboard, openArtifact } from './local-tools.js';
 
 /**
@@ -202,6 +208,7 @@ async function runCreatePaymentLink(action: MaterializedAgentAction, client: Pay
       returnUrl: params.returnUrl,
       merchantRefNo: params.merchantRefNo,
       expiredDate: params.expiredDate,
+      payout: params.payout,
     });
 
     const asRecord = response as Record<string, unknown>;
@@ -219,6 +226,9 @@ async function runCreatePaymentLink(action: MaterializedAgentAction, client: Pay
       tool: 'create_payment_link',
       data: {
         paymentLinkId: (asRecord.data as Record<string, unknown> | undefined)?.id,
+        // Codification C8: the share URL is the field providers consume most —
+        // surface it so plans don't have to dig through `raw`.
+        shareUrl: (asRecord.data as Record<string, unknown> | undefined)?.payment_link,
         transactionId: asRecord.tran_id,
         status,
         raw: response,
@@ -251,6 +261,28 @@ async function runCheckTransactionByMerchantRef(
     ok: true,
     tool: 'check_transaction_by_merchant_ref',
     data: { merchantRef: params.merchantRef, raw: response },
+  };
+}
+
+async function runGetPaymentLinkDetails(
+  action: MaterializedAgentAction,
+  client: PayWay,
+): Promise<ToolExecutionResult> {
+  const params = action as unknown as GetPaymentLinkDetailsParams;
+  const response = await client.paymentLink.getDetails(params.paymentLinkId);
+  const asRecord = response as Record<string, unknown>;
+  const data = asRecord.data as Record<string, unknown> | undefined;
+  return {
+    ok: true,
+    tool: 'get_payment_link_details',
+    data: {
+      paymentLinkId: params.paymentLinkId,
+      status: data?.status,
+      totalTrxn: data?.total_trxn,
+      totalAmount: data?.total_amount,
+      paymentLink: data?.payment_link,
+      raw: response,
+    },
   };
 }
 
@@ -343,6 +375,83 @@ async function runCopyToClipboard(action: MaterializedAgentAction, _client: PayW
   return { ok: true, tool: 'copy_to_clipboard', data: { length: params.text.length } };
 }
 
+/**
+ * Phase 5: read-only journal queries — the AI layer over the transaction
+ * journal. Never touches the network; it only sees what was recorded while
+ * journaling was enabled (PAYWAY_JOURNAL / --journal).
+ */
+async function runQueryJournal(action: MaterializedAgentAction, _client: PayWay): Promise<ToolExecutionResult> {
+  const params = action as unknown as QueryJournalParams;
+
+  if (params.query === 'timeline') {
+    if (!params.transactionId) {
+      return {
+        ok: false,
+        tool: 'query_journal',
+        error: { code: 'VALIDATION', message: 'query "timeline" requires transactionId' },
+      };
+    }
+    // Local RCA narrative (Phase 6): verdict + step-by-step reconstruction.
+    const rca = explainTransaction(params.transactionId);
+    const { events } = readJournalEvents();
+    const filtered = events
+      .filter((e) => e.transactionId === params.transactionId && (!params.kind || e.kind === params.kind))
+      .sort((a, b) => a.ts.localeCompare(b.ts));
+    const capped = params.last ?? 100;
+    return {
+      ok: true,
+      tool: 'query_journal',
+      data: {
+        query: 'timeline',
+        transactionId: params.transactionId,
+        totalEvents: filtered.length,
+        events: filtered.slice(Math.max(0, filtered.length - capped)),
+        verdict: rca.verdict,
+        steps: rca.steps,
+        hints: rca.hints,
+      },
+    };
+  }
+
+  if (params.query === 'stats') {
+    const report = computeJournalStats();
+    return {
+      ok: true,
+      tool: 'query_journal',
+      data: {
+        query: 'stats',
+        window: report.window,
+        exchanges: report.exchanges,
+        latency: report.latency.slice(0, 10),
+        topErrors: report.topErrors,
+        funnel: report.funnel,
+      },
+    };
+  }
+
+  if (params.query === 'reconcile') {
+    const report = reconcileTransactions();
+    return {
+      ok: true,
+      tool: 'query_journal',
+      data: {
+        query: 'reconcile',
+        summary: report.summary,
+        withoutCallback: report.transactions.filter((t) => !t.callbackReceived).map((t) => t.transactionId),
+        transactions: report.transactions,
+      },
+    };
+  }
+
+  // anomalies
+  const report = detectJournalAnomalies();
+  return {
+    ok: true,
+    tool: 'query_journal',
+    data: { query: 'anomalies', anomalies: report.anomalies, heuristics: report.heuristics },
+  };
+}
+
 // ─── Closed typed registry ──────────────────────────────────────────────────
 
 export const toolRegistry: Record<
@@ -354,6 +463,8 @@ export const toolRegistry: Record<
   create_checkout_payload: runCreateCheckoutPayload,
   create_checkout_purchase: runCreateCheckoutPurchase,
   create_payment_link: runCreatePaymentLink,
+  get_payment_link_details: runGetPaymentLinkDetails,
+  query_journal: runQueryJournal,
   check_transaction: runCheckTransaction,
   check_transaction_by_merchant_ref: runCheckTransactionByMerchantRef,
   poll_transaction: runPollTransaction,

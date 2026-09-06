@@ -223,7 +223,7 @@ Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or
 | `npx tsx scripts/online-qr-poll.ts` | One online KHQR (default $31.11 USD, 600s lifetime) → save/open PNG → poll every 5s for 10 min |
 | `npx tsx scripts/checkout-link-poll.ts` | Create Transaction API (default $12.12 USD, 600s lifetime) → open hosted `checkout_qr_url` → poll every 5s for 10 min |
 | `npx tsx scripts/check-qr-transactions.ts` | Fetch transactions via `getTransactionList`, query detail for each |
-| `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 10 PayWay templates, save PNGs + QR strings to `test-logs/qr-images/` |
+| `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 7 validator-supported PayWay templates (`QR_TEMPLATES`), save PNGs + QR strings to `test-logs/qr-images/` |
 | `npx tsx scripts/zero-logic-purchase-flow.ts` | End-to-end purchase flow with no business logic (demo) |
 
 Results from integration scripts are written to `test-logs/` with timestamps.
@@ -639,6 +639,16 @@ const linkWithPayout = await payway.paymentLink.create({
 // payway-sdk payment-link create -t "Invoice #1092" -a 150.00 -r inv-1092 \
 //   --return-url https://mywebsite.com/invoice/1092 \
 //   --payout '[{"acc":"500000001","amt":100.00},{"acc":"500000002","amt":50.00}]'
+```
+
+Full lifecycle guide — parameter tables, datatype reality notes, pushback receiver, permutations & recipes, troubleshooting: **[docs/17-payment-link.md](./docs/17-payment-link.md)**.
+
+```sh
+# Inspecting a link from the CLI — the opaque Link ID from create's data.id:
+payway-sdk payment-link detail -i "UD/8Hl…Ht1xQdhlw=="
+# Human output: Link ID / title / amount / status / payments / created / expires / share URL.
+# --json prints the raw response; on ANY failure both commands print the
+# machine-parseable { "error": { kind, exitCode, type, message, paywayCode, … } } envelope.
 ```
 
 ### 5. Pre-Authorization (`payway.preAuth`)

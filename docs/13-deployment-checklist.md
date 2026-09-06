@@ -127,6 +127,13 @@ Go through **every** item before switching from sandbox to production. A missed 
 - [ ] **App kill/restore flow tested** (mobile apps)  
   What happens if the user background's the app during payment? Test this.
 
+- [ ] **Payment-link flows (if used) have the RSA key + a public POST receiver**
+  `paymentLink.create` requires `PAYWAY_RSA_PUBLIC_KEY`; the link's
+  `return_url` must be public HTTPS accepting `POST application/json` (the
+  pushback carries no hash — verify via `check-transaction`). Run
+  `payway-sdk doctor` to confirm the key. See
+  [17. Payment Link API](./17-payment-link.md).
+
 ### QR Codes
 
 - [ ] **QR images render correctly on low-bandwidth connections (< 3G)**  
@@ -181,7 +188,7 @@ Go through **every** item before switching from sandbox to production. A missed 
 
 ```bash
 # 1. Verify production credentials work
-npx tsx verify-credentials.ts  # (with production env vars)
+npx payway-sdk doctor --live  # (with production env vars)
 
 # 2. Check webhook endpoint is accessible
 curl -I https://your-production-domain.com/api/payway-webhook
@@ -233,7 +240,7 @@ Print this and keep it handy during launch:
 │  ABA Support: [email / phone]                               │
 ├─────────────────────────────────────────────────────────────┤
 │  Quick Commands                                              │
-│  Test auth:   npx tsx verify-credentials.ts                 │
+│  Test auth:   npx payway-sdk doctor --live                    │
 │  Check webhook: curl -I https://your-domain.com/api/webhook │
 │  View errors:  tail -f error.log | grep PayWay              │
 │  Rollback:     git revert <last-deploy-commit>              │

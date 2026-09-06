@@ -35,14 +35,14 @@ Before you start coding, you need to obtain these from ABA PayWay. You'll get se
 
 | Requirement | Minimum Version |
 |---|---|
-| **Node.js** | ≥18.0.0 (uses `node:crypto` and Web Streams API) |
-| **npm** | ≥9.0.0 (comes with Node.js 18+) |
+| **Node.js** | ≥20.0.0 (uses `node:crypto` and Web Streams API — matches `engines`; v1.3.6 raised the floor from 18) |
+| **npm** | ≥10.0.0 (comes with Node.js 20+) |
 
 Verify your installation:
 
 ```bash
-node --version   # Should show v18.x.x or higher
-npm --version    # Should show 9.x.x or higher
+node --version   # Should show v20.x.x or higher
+npm --version    # Should show 10.x.x or higher
 ```
 
 ### 2. Install the SDK
@@ -67,6 +67,7 @@ MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC...
 
 > **Note:** The SDK reads `PAYWAY_RSA_PUBLIC_KEY` from the environment when the `publicKeyPem` constructor option is not provided. If your `.env` stores the PEM as a single line with literal `\n` escapes, the SDK normalizes them automatically.
 >
+> **Other supported `PAYWAY_*` variables:** `PAYWAY_BASE_URL` (explicit base URL; beats `PAYWAY_ENV`), `PAYWAY_ENV` (`sandbox` | `production` | a full base URL), `PAYWAY_CALLBACK_URL` (online QR default callback), `PAYWAY_ALLOW_PRIVATE_CALLBACK_HOSTS=1` (un-gate localhost/private callback hosts for local testing), `PAYWAY_STRICT_VALIDATION=1` (escalate advisory warnings to throws — see the validation-behavior section below), `PAYWAY_PROFILE` (select a persisted credential profile), and the offline-KHQR `PAYWAY_KHQR_*` set (see docs/07).
 > 🧪 **Sandbox-verified (2026-08-25):** The CLI's built-in `.env` loader now supports the **multi-line quoted PEM format shown above** (value spanning several lines wrapped in quotes) as well as `\n`-escaped single-line values. Earlier CLI versions silently truncated multi-line PEMs to just `"-----BEGIN PUBLIC KEY-----`, which made every RSA-encrypted endpoint (refunds, payment links, pre-auth, payout) fail with a misleading *"publicKeyPem does not look like a public key PEM"* error. If you still see that error: make sure the value starts with `-----BEGIN PUBLIC KEY-----` and ends with `-----END PUBLIC KEY-----` after quote-stripping.
 
 
@@ -270,10 +271,15 @@ Whenever you restart ngrok, you'll get a **new random URL**, so you'll need to u
 
 ## Verification Step: "Hello, PayWay"
 
-Before building your full integration, run this simple script to confirm your credentials work and you can reach the PayWay sandbox:
+Before building your full integration, confirm your credentials work and you can reach the PayWay sandbox. The quickest path is the built-in doctor:
+
+```bash
+npx payway-sdk doctor --live
+```
+
+If you want the equivalent logic inside your own codebase instead, save this script as `verify-credentials.ts` **before** running it:
 
 ```typescript
-// verify-credentials.ts
 import 'dotenv/config';
 import { PayWay, PayWayAPIError } from 'aba-payway-ts';
 
@@ -312,7 +318,18 @@ async function verify() {
 verify();
 ```
 
-Run it:
+### Validation behavior (advisory vs. strict)
+
+Most SDK-local checks are **advisory warnings** by default (`console.warn`) —
+the gateway is the final arbiter. Set `strictValidation: true` on the `PayWay`
+config or `PAYWAY_STRICT_VALIDATION=1` to escalate them to hard
+`PayWayConfigError` throws: payout totals ≠ amount, payment-link image >3MB /
+wrong type, `merchantRefNo` >50 chars, expired/past `expired_date`, QR/purchase
+lifetime bounds, KHQR merchant-config sanity. Hard throws (non-negotiable) stay
+hard in both modes: empty title/`tran_id`, non-HTTPS callback hosts, malformed
+payout entries, sub-minimum purchase lifetimes.
+
+Run it (after saving the file):
 
 ```bash
 npx tsx verify-credentials.ts

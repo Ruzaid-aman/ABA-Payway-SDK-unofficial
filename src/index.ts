@@ -41,7 +41,12 @@ export {
 export type { CheckoutDomain, CheckoutFormOptions } from './domains/checkout.js';
 export type { CredentialsOnFileDomain, LinkCardFormOptions } from './domains/credentials-on-file.js';
 export type { KhqrDomain } from './domains/khqr.js';
-export type { PaymentLinkDomain } from './domains/payment-link.js';
+export type {
+  PaymentLinkDomain,
+  PaymentLinkPushback,
+  PaymentLinkPushbackStatus,
+} from './domains/payment-link.js';
+export { PAYMENT_LINK_EXPIRY_MIN_SECONDS, parsePaymentLinkPushback } from './domains/payment-link.js';
 export type { PayoutDomain } from './domains/payout.js';
 export type { PreAuthDomain } from './domains/pre-auth.js';
 export type { QrDomain } from './domains/qr.js';
@@ -66,6 +71,39 @@ export {
 export type { CircuitBreakerOptions, CircuitState } from './circuit-breaker.js';
 export { createPayWayLogger, resolveLogLevel } from './logger.js';
 export type { LogLevel, LogSink, PayWayLogger, PayWayLoggerOptions } from './logger.js';
+// ─── Transaction Journal (audit-results/transaction-data-audit REPORT §14) ──
+export type {
+  JournalContext,
+  JournalEmitterInput,
+  JournalErrorInfo,
+  JournalEventKind,
+  JournalEventV1,
+  JournalMode,
+  JournalOptions,
+  JournalSink,
+} from './journal/types.js';
+export { DEFAULT_JOURNAL_DIR_NAME, DEFAULT_JOURNAL_FILE_NAME, JOURNAL_VERSION } from './journal/types.js';
+export { createJournalEmitter, JsonlJournalSink, pruneJournal, readJournalEvents, resolveJournalConfig } from './journal/writer.js';
+export type { JournalFileRead, JournalPruneResult } from './journal/writer.js';
+export { reconcileTransactions } from './journal/reconcile.js';
+export type { ReconcileEntry, ReconcileOptions, ReconcileReport } from './journal/reconcile.js';
+export { computeJournalStats } from './journal/stats.js';
+export type {
+  JournalErrorRow,
+  JournalFunnel,
+  JournalLatencyRow,
+  JournalRetryRow,
+  JournalStatsOptions,
+  JournalStatsReport,
+} from './journal/stats.js';
+export { detectJournalAnomalies, explainTransaction } from './journal/intelligence.js';
+export type {
+  AnomaliesReport,
+  JournalAnomaly,
+  RcaOptions,
+  RcaReport,
+  RcaStep,
+} from './journal/intelligence.js';
 export { computeTokenExpiry, daysUntilTokenExpiry } from './utils.js';
 export {
   PURCHASE_LIFETIME_MIN_MINUTES,

@@ -431,7 +431,7 @@ echo json_encode(['received' => true]);
 
         // Populate and submit hidden form to PayWay
         const form = document.getElementById('paywayForm');
-        form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/checkout`;
+        form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/purchase`;
         form.innerHTML = '';
         Object.entries(data.payload).forEach(([key, value]) => {
           form.innerHTML += `<input type="hidden" name="${key}" value="${value}">`;
@@ -449,6 +449,81 @@ echo json_encode(['received' => true]);
   </script>
 </body>
 </html>
+```
+
+---
+
+## Payment Link: Create, Share, Reconcile
+
+Full lifecycle reference: [17. Payment Link API](./17-payment-link.md). `paymentLink` requires the RSA public key; `returnUrl` is gateway-required and base64-encoded automatically.
+
+```typescript
+import { PayWay } from 'aba-payway-ts';
+
+const payway = new PayWay(); // credentials via env / profile
+
+// Create a shareable hosted link (currency defaults 'USD')
+const link = await payway.paymentLink.create({
+  title: 'Invoice INV-2026-041',
+  amount: 49.5,
+  merchantRefNo: 'INV-2026-041',
+  returnUrl: 'https://merchant.example/payway/pushback',
+  description: 'Website retainer — March',
+  paymentLimit: 1, // one payment; omit = unlimited
+});
+const shareUrl = link.data?.payment_link; // send to the customer
+const linkId = link.data?.id;             // save — detail takes THIS, not the ref/slug
+```
+
+Split payout (keys are `{acc, amt}` — NOT the payout domain's `{account, amount}`; total must equal the amount; beneficiaries must be whitelisted):
+
+```typescript
+const split = await payway.paymentLink.create({
+  title: 'Marketplace order 88',
+  amount: 150,
+  merchantRefNo: 'ord-88',
+  returnUrl: 'https://merchant.example/payway/pushback',
+  payout: [{ acc: '500000001', amt: 150 }],
+});
+```
+
+Branded image (top-level multipart part, never hashed; JPG/JPEG/PNG ≤3MB — over-limit warns, strict throws; the CLI `--image` rejects locally):
+
+```typescript
+import { readFileSync } from 'node:fs';
+const branded = await payway.paymentLink.create({
+  title: 'Festival passes',
+  amount: 20,
+  merchantRefNo: 'fest-2026',
+  returnUrl: 'https://merchant.example/payway/pushback',
+  image: { data: readFileSync('./poster.jpg'), filename: 'poster.jpg', contentType: 'image/jpeg' },
+});
+```
+
+Pushback receiver + verification through check-transaction (the documented pushback carries no hash — verify the payment itself):
+
+```typescript
+// POST https://merchant.example/payway/pushback  (Content-Type: application/json)
+app.post('/payway/pushback', express.json(), async (req, res) => {
+  res.sendStatus(200); // ACK first
+  const { tran_id, merchant_ref_no } = req.body as { tran_id: string; merchant_ref_no: string };
+  const check = await payway.checkout.checkTransaction(tran_id);
+  if (check.data?.payment_status === 'APPROVED') markPaid(merchant_ref_no);
+});
+```
+
+Inspecting status (OPEN while `payment_limit > total_trxn`, then PAID; no EXPIRED status exists):
+
+```typescript
+const details = await payway.paymentLink.getDetails(linkId);
+const { status, total_trxn, total_amount, total_refund } = details.data ?? {};
+```
+
+CLI equivalents:
+
+```sh
+payway-sdk payment-link create -t "Invoice INV-041" -a 49.50 -r INV-2026-041   --return-url https://merchant.example/payway/pushback --payment-limit 1
+payway-sdk payment-link detail -i "<data.id from create>"
 ```
 
 ---

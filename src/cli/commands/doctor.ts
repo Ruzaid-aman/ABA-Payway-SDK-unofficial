@@ -1,9 +1,11 @@
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
 import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
 import { isValidPublicKeyPem, validatePublicHttpsUrl } from '../../utils.js';
 import { parseDotEnvFile } from '../dotenv.js';
+
+const TRUTHY_ENV = new Set(['1', 'true', 'yes', 'on']);
 
 export interface DoctorOptions {
   readonly cwd?: string;
@@ -127,6 +129,54 @@ function checkEnvVars(env: NodeJS.ProcessEnv): DoctorCheck[] {
   return checks;
 }
 
+/** Advisory-only journal health (improvement I-4): never a red failure — recording is opt-in. */
+function checkJournal(cwd: string, env: NodeJS.ProcessEnv): DoctorCheck[] {
+  const enabled =
+    TRUTHY_ENV.has((env.PAYWAY_JOURNAL ?? '').trim().toLowerCase()) || env.PAYWAY_JOURNAL_DIR !== undefined;
+  const dir = env.PAYWAY_JOURNAL_DIR?.trim() || path.join(cwd, 'payway-data');
+  const journalPath = path.join(dir, 'journal.jsonl');
+
+  if (!enabled) {
+    return [
+      {
+        id: 'journal',
+        label: 'Transaction journal',
+        ok: true,
+        detail: 'recording off (opt-in)',
+        fix: 'Enable with --journal or PAYWAY_JOURNAL=1 to keep a local record of every exchange (docs/18)',
+      },
+    ];
+  }
+
+  if (!existsSync(journalPath)) {
+    return [
+      {
+        id: 'journal',
+        label: 'Transaction journal',
+        ok: true,
+        detail: `enabled, no events yet (${journalPath})`,
+      },
+    ];
+  }
+
+  const stats = statSync(journalPath);
+  const sizeMb = stats.size / (1024 * 1024);
+  const RETENTION_WARNING_MB = 50;
+  const detail = `enabled, ${(sizeMb).toFixed(1)} MB${env.PAYWAY_JOURNAL_DIR ? ` (${journalPath})` : ''}`;
+  if (sizeMb > RETENTION_WARNING_MB) {
+    return [
+      {
+        id: 'journal',
+        label: 'Transaction journal',
+        ok: false,
+        detail,
+        fix: 'Journal exceeds 50 MB — set journal.maxAgeDays / PAYWAY_JOURNAL_MAX_AGE_DAYS, or run `payway-sdk journal prune --before <days>`',
+      },
+    ];
+  }
+  return [{ id: 'journal', label: 'Transaction journal', ok: true, detail }];
+}
+
 function checkCallbackUrl(env: NodeJS.ProcessEnv): DoctorCheck {
   const callbackUrl = env.PAYWAY_CALLBACK_URL?.trim();
   if (!callbackUrl) {
@@ -173,9 +223,17 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
   const frameworkCheck = checkFramework(cwd);
   const envVarChecks = checkEnvVars(mergedEnv);
   const callbackCheck = checkCallbackUrl(mergedEnv);
+  const journalChecks = checkJournal(cwd, mergedEnv);
   const rsaCheck = checkRsaPem(mergedEnv);
 
-  const checks = [envFileCheck, frameworkCheck, ...envVarChecks, callbackCheck, ...(rsaCheck ? [rsaCheck] : [])];
+  const checks = [
+    envFileCheck,
+    frameworkCheck,
+    ...envVarChecks,
+    callbackCheck,
+    ...journalChecks,
+    ...(rsaCheck ? [rsaCheck] : []),
+  ];
   const envIssues = validatePayWayEnv(mergedEnv);
   const detection = detectFramework(cwd);
 

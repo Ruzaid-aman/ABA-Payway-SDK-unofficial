@@ -156,6 +156,7 @@ export function validateSessionContract(session: unknown): string | null {
  */
 export function startMockPaywayServer(port = 0): Promise<HttpServer> {
   return new Promise((resolve, reject) => {
+    const createdPaymentLinks = new Set<string>();
     const server = createServer((req, res) => {
       // Health check.
       if (req.url === '/health') {
@@ -237,6 +238,100 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(envelope));
+        });
+        return;
+      }
+
+      // Payment-link endpoints — mirrors of the live shapes learned in the
+      // 2026-09-06 docs-review campaign (SANDBOX-FINDINGS §22): numeric
+      // tran_id, `expired_date: "0"` string echo when unset, `status: OPEN`,
+      // empty-image `{"image":"","filename":"","size":0}`. Detail is
+      // stateful within one server lifetime: it echoes the first link
+      // created on this server (the encrypted merchant_auth hides which id
+      // was requested) and answers code 96 for a bogus id when none exist —
+      // the sandbox's observed bogus-id behavior.
+      if (req.url === '/api/merchant-portal/merchant-access/payment-link/create') {
+        // Drain the request (merchant_auth is opaque to the mock) and answer
+        // on end.
+        req.on('data', () => {});
+        req.on('end', () => {
+          const id = Buffer.from(`plmock-${Date.now()}`).toString('base64');
+          createdPaymentLinks.add(id);
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              status: { code: '00', message: 'Success!' },
+              tran_id: Date.now(),
+              data: {
+                id,
+                title: 'Mock payment link',
+                image: { image: '', filename: '', size: 0 },
+                amount: '1.50',
+                currency: 'USD',
+                status: 'OPEN',
+                description: 'Mock payment link from the test harness',
+                payment_limit: 0,
+                total_amount_org: 0,
+                total_refund: 0,
+                total_amount: 0,
+                total_trxn: 0,
+                created_at: now,
+                updated_at: now,
+                expired_date: '0',
+                return_url: 'https://merchant.example/return',
+                merchant_ref_no: `PLMOCK-${Date.now().toString(36)}`,
+                outlet_id: 'MOCKOUTLETID==',
+                outlet_name: 'Mock Outlet',
+                payout: null,
+                payment_link: `https://link-sandbox.payway.com.kh/ABAPAY${Date.now().toString(36).toUpperCase().slice(-8)}`,
+              },
+            }),
+          );
+        });
+        return;
+      }
+
+      if (req.url === '/api/merchant-portal/merchant-access/payment-link/detail') {
+        req.on('data', () => {});
+        req.on('end', () => {
+          const firstId = createdPaymentLinks.values().next().value as string | undefined;
+          if (!firstId) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: { code: '96', message: 'Invalid merchant data' } }));
+            return;
+          }
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              status: { code: '00', message: 'Success' },
+              tran_id: Date.now(),
+              data: {
+                id: firstId,
+                title: 'Mock payment link',
+                image: { image: '', filename: '', size: 0 },
+                amount: '1.50',
+                currency: 'USD',
+                status: 'OPEN',
+                description: 'Mock payment link from the test harness',
+                payment_limit: 0,
+                total_amount_org: 0,
+                total_refund: 0,
+                total_amount: 0,
+                total_trxn: 0,
+                created_at: now,
+                updated_at: now,
+                expired_date: '0',
+                return_url: 'https://merchant.example/return',
+                merchant_ref_no: 'PLMOCK-REF',
+                outlet_id: 'MOCKOUTLETID==',
+                outlet_name: 'Mock Outlet',
+                payout: null,
+                payment_link: 'https://link-sandbox.payway.com.kh/ABAPAYMOCK01',
+              },
+            }),
+          );
         });
         return;
       }

@@ -21,6 +21,15 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
 const SUPPORTED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png'];
 
 /**
+ * Spec (payway-openapi/paths/payment-link.yaml:33–37): payment-link images
+ * are capped at 3MB. The domain only warns (advisory — the gateway is the
+ * final arbiter), but the CLI hard-rejects, mirroring the `--payout`
+ * total-equals-amount local rule: both values are known at the CLI boundary
+ * and a mismatch is always a caller error.
+ */
+const PAYMENT_LINK_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
+
+/**
  * Reject a payment-link image path whose extension is outside the
  * spec-allowed JPG/JPEG/PNG set. Throws a plain Error — the command renders
  * loader errors with exit 1.
@@ -56,6 +65,11 @@ export function loadPaymentLinkImage(filePath: string): PaymentLinkImage {
   const data = readFileSync(filePath);
   if (data.byteLength === 0) {
     throw new Error(`--image file is empty: ${filePath}`);
+  }
+  if (data.byteLength > PAYMENT_LINK_IMAGE_MAX_BYTES) {
+    throw new Error(
+      `--image file is ${(data.byteLength / 1024 / 1024).toFixed(2)}MB, exceeding the documented 3MB payment-link image limit`,
+    );
   }
   return {
     data,

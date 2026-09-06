@@ -113,3 +113,18 @@ Remove surrounding whitespace, use a public stable HTTPS endpoint, and retry wit
 ## TC-028 — OTP
 
 OTP is **Merchant-profile dependent**. If enabled, submit its UI and error states for review; payment-state reconciliation is unchanged.
+
+## TC-029 — Recurring subscription (first charge + registration)
+
+**Merchant-profile dependent.** The subscription route runs on the purchase
+path: `checkout.purchase()` with the trio `ctid` (customer token id) +
+`tokenFlag: 'CITR_FIX'` + `frequency` (`1W`|`1M`|`2M`). CLI:
+`payway-sdk generate-checkout -a 9.99 --ctid customer123 --token-flag CITR_FIX --frequency 1M --return-url <url>`.
+
+Scenario evidence: first charge completes, the subscription token registers,
+and recurring charges reconcile through the standard webhook. **Sandbox
+caveats (2026-09-05):** the gateway signs `ctid` in the 27-field purchase hash
+(the live docs' subscription page omits it — see docs/09/SANDBOX-FINDINGS
+§17), and the current sandbox profile answers `104` "Merchant not enabled
+token flag" — subscription enablement is an ABA-side prerequisite for this
+scenario. See the `aba-payway-subscription` skill.

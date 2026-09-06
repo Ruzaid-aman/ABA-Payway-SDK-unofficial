@@ -281,6 +281,28 @@ Payouts (`payway.payout.payout`) go through the direct payout API and have their
 >
 > 💡 **CLI:** `payway-sdk payout -t <txId> -a 10 -c USD -b "500000001:10"` validates currency/whitelist locally in sandbox and prints payout-specific hints on failure. Use `payway-sdk sandbox-beneficiaries` to list the seeded test accounts.
 
+### Payment Link error codes
+
+The payment-link endpoints (`create`, `detail`) use the `PTL*` family in `status.code` — extracted into `error.paywayCode` automatically:
+
+| Code | Meaning | How to Fix |
+|---|---|---|
+| `PTL02` | Wrong hash | Hash covers `request_time + merchant_id + merchant_auth` ONLY — the optional image is never hashed (use `paymentLink.create()`; hand-rolled multipart is the usual cause) |
+| `PTL04` | Parameter validation required | `currency` / `return_url` missing, or `description` >250 chars (sandbox-verified; NOT in the official docs' code list) |
+| `PTL05` | Parameter invalid format | Check datatypes (amounts are numbers in the SDK; the official docs' `string` declarations are wrong). Sandbox probes (2026-09-06): malformed values answered PTL04 — PTL05 not yet reproduced |
+| `PTL99` | Merchant invalid currency | Currency not enabled for the merchant profile. Sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile |
+| `PTL132` | Invalid payment link (officially documented) | `detail` got the wrong `id` — pass the opaque `data.id` from create, NOT `merchant_ref_no`, NOT the URL slug. NOT reproduced on the sandbox profile (2026-09-06): a bogus id answers **96** |
+| `96` | Invalid link id (detail) — sandbox-observed | Verify the Link ID (HTTP 403 "Invalid merchant data") |
+
+> 🧪 **Sandbox-verified (2026-09-06, payment-link probes):** `expired_date`
+> in the past or under ~5 minutes out → PTL04 at create; **no EXPIRED status
+> exists** — after expiry, detail keeps reporting OPEN and the hosted page
+> still answers 200. Evidence:
+> `test-output/payment-link-docs-review/` (gitignored, on disk) +
+> SANDBOX-FINDINGS §22.
+
+Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](./17-payment-link.md)**.
+
 ### Interpreting a successful refund
 
 After a successful CLI or SDK refund, verify with:
@@ -457,6 +479,43 @@ const payway = new PayWay({
 });
 ```
 
+### Pattern 3b: Correlation metadata, error hooks, and the transaction journal
+
+The hooks are additively enriched (existing two-argument handlers keep
+working): `onRequest`/`onResponse` receive a trailing `meta` object with the
+per-exchange **correlation id**, the **attempt** number (retries included),
+the **duration** and the gateway **trace id** where available. A new
+`onError` hook fires on every *failed* attempt — the paths `onResponse`
+never sees (HTTP errors, network, timeout, business failures):
+
+```typescript
+const payway = new PayWay({
+  // …credentials…
+  onResponse: (endpoint, status, body, rateLimit, meta) => {
+    // meta.correlationId / meta.attempt / meta.durationMs / meta.traceId
+    console.log(`[PayWay] ← ${endpoint} ${status} in ${meta?.durationMs}ms (cid=${meta?.correlationId})`);
+  },
+  onError: (info) => {
+    // info.endpoint / correlationId / attempt / statusCode / paywayCode / message / retryable
+    console.error(`[PayWay] ${info.endpoint} attempt #${info.attempt} failed: ${info.message}`);
+  },
+});
+```
+
+The same correlation id (`payway.lastCorrelationId` after the call, or the
+`correlationId` field in `--json` envelopes) joins the **transaction
+journal** — the opt-in append-only record of every exchange, poll, observed
+status, artifact, and captured callback:
+
+```sh
+payway-sdk --journal generate-qr -a 5.00 -c USD --no-polling -y   # record one invocation
+grep '<correlationId>' payway-data/journal.jsonl                   # reconstruct the exchange
+payway-sdk journal timeline -t <tran-id>                            # full transaction history
+```
+
+Full journal guide (modes, redaction, queries, reconcile, anomalies):
+`docs/18-transaction-journal.md`.
+
 ### Pattern 4: Graceful Degradation
 
 ```typescript
@@ -607,7 +666,7 @@ echo $PAYWAY_API_KEY
 ### 2. Run the Verification Script
 
 ```bash
-npx tsx verify-credentials.ts
+npx payway-sdk doctor --live
 ```
 
 If this fails, your credentials or network are the issue. (See Chapter 2 for the script.)

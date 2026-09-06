@@ -19,6 +19,7 @@ import type { Command } from 'commander';
 import { readAgentConfig, updateAgentConfig } from '../../agent/config.js';
 import { resolvePayWayContext } from '../../agent/context.js';
 import type { ProviderConfigV1 } from '../../agent/contracts.js';
+import { findUnfinishedExecutions, pruneLedgerRecords } from '../../agent/ledger.js';
 import { AgentOrchestrator, renderHumanResult, serializeCommandResult } from '../../agent/orchestrator.js';
 import { createProviderAdapter, type ProviderConnectivity } from '../../agent/provider.js';
 import { evaluateReadinessDetailed } from '../../agent/readiness.js';
@@ -295,5 +296,96 @@ export function registerAgentCommands(program: Command): void {
       }
       clearSessions(idOrAll);
       console.log(`\n  ${c.green('✓')} Cleared session(s): ${c.cyan(idOrAll)}\n`);
+    });
+
+  // ─── agent ledger recover ─────────────────────────────────────────────────
+  // Phase 2: findUnfinishedExecutions existed and was tested, but no CLI
+  // surface reached it (audit gap G10). Recovery is LOOKUP ONLY — creates are
+  // never replayed; the operator checks the recorded transaction id instead.
+  const ledgerCmd = agentCmd
+    .command('ledger')
+    .description('Inspect the execution ledger (create-action lifecycle)');
+
+  ledgerCmd
+    .command('recover')
+    .description(
+      'List unfinished executions for a session (planned/confirmed/submitted/outcome_unknown). Never auto-replays — verify each transaction id with check-transaction.',
+    )
+    // NOTE: deliberately --session-id, NOT --session — the `agent` group
+    // itself defines --session (REPL resume) and would swallow the value.
+    .option('--session-id <id>', 'Session id to inspect (defaults to the most recent session)')
+    .option('--json', 'Machine-readable output')
+    .action((opts: { sessionId?: string; json?: boolean }) => {
+      const sessionId =
+        opts.sessionId ?? listSessions().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.sessionId;
+      if (!sessionId) {
+        if (opts.json) {
+          console.log(JSON.stringify({ sessionId: null, unfinished: [] }, null, 2));
+          return;
+        }
+        console.log(`\n  ${c.yellow('No agent sessions found.')}\n`);
+        return;
+      }
+      const unfinished = findUnfinishedExecutions(sessionId);
+      if (opts.json) {
+        console.log(
+          JSON.stringify(
+            {
+              sessionId,
+              unfinished: unfinished.map((r) => ({
+                executionId: r.executionId,
+                tool: r.tool,
+                transactionId: r.transactionId,
+                merchantRef: r.merchantRef,
+                status: r.status,
+                createdAt: r.createdAt,
+                updatedAt: r.updatedAt,
+                correlation: r.correlation,
+              })),
+            },
+            null,
+            2,
+          ),
+        );
+        return;
+      }
+      if (unfinished.length === 0) {
+        console.log(`\n  ${c.green('✓')} Session ${c.cyan(sessionId)} has no unfinished executions.\n`);
+        return;
+      }
+      console.log(`\n  ${c.bold('Unfinished executions')} in session ${c.cyan(sessionId)}:\n`);
+      for (const r of unfinished) {
+        const tx = r.transactionId ? `tx=${r.transactionId}` : 'tx=(not yet assigned)';
+        console.log(`  ${c.yellow('•')} ${c.cyan(r.executionId)}  ${r.tool}  ${tx}  status=${r.status}`);
+        if (r.transactionId) {
+          console.log(`    ${c.dim(`recover: payway-sdk check-transaction -t ${r.transactionId}`)}`);
+        }
+      }
+      console.log(`\n  ${c.dim('Create actions are NEVER replayed automatically — verify the outcome manually.')}\n`);
+    });
+
+  // ─── agent ledger prune (I-13 — retention parity with `journal prune`) ────
+  ledgerCmd
+    .command('prune')
+    .description('Delete FINISHED (succeeded/failed) execution records older than a cutoff. Unfinished records are never removed.')
+    .option('--before <cutoff>', 'Days back (e.g. 30) or ISO-8601 timestamp', '30')
+    .option('--json', 'Machine-readable output')
+    .action((opts: { before?: string; json?: boolean }) => {
+      const raw = opts.before ?? '30';
+      const days = Number.parseFloat(raw);
+      const before = Number.isFinite(days) && !raw.includes('T')
+        ? new Date(Date.now() - days * 86_400_000)
+        : new Date(raw);
+      if (Number.isNaN(before.getTime())) {
+        console.log(`  Invalid --before value: ${raw}`);
+        process.exitCode = 1;
+        return;
+      }
+      const result = pruneLedgerRecords(before);
+      if (opts.json) {
+        console.log(JSON.stringify({ before: before.toISOString(), ...result }, null, 2));
+        return;
+      }
+      console.log(`\n  ${c.green('✓')} Pruned ${result.removed} finished record(s); ${result.kept} kept (incl. all unfinished).\n`);
     });
 }

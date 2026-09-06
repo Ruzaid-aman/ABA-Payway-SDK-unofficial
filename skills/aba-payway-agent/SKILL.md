@@ -1,6 +1,6 @@
 ---
 name: aba-payway-agent
-description: Operate the agentic PayWay CLI safely — provider modes, the 11 tools, risk gates, the execution ledger, sessions, and secret redaction.
+description: Operate the agentic PayWay CLI safely — provider modes, the 12 tools, risk gates, the execution ledger, sessions, and secret redaction.
 version: 1.3.0
 ---
 
@@ -53,7 +53,7 @@ const config = {
 
 Both modes funnel through the same safety pipeline; only the plan source differs.
 
-## The 11 tools
+## The 12 tools
 
 | # | Tool | Create? | Purpose / key inputs |
 |---|---|---|---|
@@ -61,13 +61,14 @@ Both modes funnel through the same safety pipeline; only the plan source differs
 | 2 | `generate_offline_khqr` | yes | Local-only ABA KHQR. `amount?`, `currency`, `merchantRef` |
 | 3 | `create_checkout_payload` | yes | LOCAL signed checkout payload (no network). `amount`, `currency`, `transactionId?` |
 | 4 | `create_checkout_purchase` | yes | NETWORK checkout request to PayWay. `amount`, `currency`, `transactionId?` |
-| 5 | `create_payment_link` | yes | Shareable link (needs RSA). `title`, `amount`, `currency`, `merchantRefNo`, `returnUrl` |
-| 6 | `check_transaction` | no | Read-only status lookup by `transactionId` |
-| 7 | `check_transaction_by_merchant_ref` | no | Read-only lookup by `merchantRef` |
-| 8 | `poll_transaction` | no | Read-only repeated lookup (sandbox verification) by `transactionId` |
-| 9 | `save_artifact` | no | Persist a produced artifact to `./payway-output` |
-| 10 | `open_artifact` | no | Open a saved artifact |
-| 11 | `copy_to_clipboard` | no | Copy an artifact value to the clipboard |
+| 5 | `create_payment_link` | yes | Shareable link (needs RSA). `title`, `amount`, `currency`, `merchantRefNo`, `returnUrl`, `payout?` |
+| 6 | `get_payment_link_details` | no | Read-only payment-link lookup by `paymentLinkId` (the opaque Link ID from create) |
+| 7 | `check_transaction` | no | Read-only status lookup by `transactionId` |
+| 8 | `check_transaction_by_merchant_ref` | no | Read-only lookup by `merchantRef` |
+| 9 | `poll_transaction` | no | Read-only repeated lookup (sandbox verification) by `transactionId` |
+| 10 | `save_artifact` | no | Persist a produced artifact to `./payway-output` |
+| 11 | `open_artifact` | no | Open a saved artifact |
+| 12 | `copy_to_clipboard` | no | Copy an artifact value to the clipboard |
 
 > `create_checkout_payload` builds a **local** signed payload; `create_checkout_purchase`
 > performs the actual **network** request. Treat them as distinct tools.

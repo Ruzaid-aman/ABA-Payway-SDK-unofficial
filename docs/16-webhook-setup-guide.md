@@ -173,6 +173,39 @@ Content-Type: application/json
 { "acknowledged": true }
 ```
 
+### Payment Link pushbacks (`return_url`)
+
+Payment links do NOT use the checkout webhook contract: PayWay POSTs the
+payment notification directly to the link's decoded `return_url` as
+`Content-Type: application/json`. The webhook server now exposes a matching
+**`/aba-payway-pushback`** route — set your link's `return_url` to
+`<your-public-url>/aba-payway-pushback` and the delivery lands in the same
+storage as every other callback (`parsePaymentLinkPushback()` metadata included):
+
+```json
+{ "tran_id": "123456789", "status": "00", "merchant_ref_no": "ref0001" }
+```
+
+Differences from checkout webhooks (live-captured 2026-09-06, real payment):
+
+- **The pushback carries NO `hash` field — live-confirmed** (`User-Agent: PayWayApp/3.0`,
+  `Content-Type: application/json; charset=utf-8`, body
+  `{"tran_id":"…","status":0,"merchant_ref_no":"…"}`). Treat it as a
+  notification and verify the payment itself via `checkTransaction(tran_id)`
+  before fulfilling — `verifyCallback()` does not apply.
+- `status` arrives as the **numeric `0`** (APPROVED), not the `"00"` string
+  the official sample shows — accept both.
+- The receiver must accept **POST + `application/json`** and answer 200.
+- A multi-payment link (`payment_limit > 1`) fires one pushback **per
+  completed payment**.
+
+```sh
+# Receiver smoke test once your URL is live:
+curl -X POST https://your-host/payway/pushback   -H 'Content-Type: application/json'   -d '{"tran_id":"123456789","status":"00","merchant_ref_no":"ref0001"}'
+```
+
+Full lifecycle: [17. Payment Link API](./17-payment-link.md) §17.6.
+
 ### Online Checkout Signature Logging and Offline KHQR Notifications
 
 For the **online checkout route**, the server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then logs HMAC-SHA512 verification using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../src/auth.ts)).
@@ -262,8 +295,7 @@ $ npx payway-sdk setup-webhook --tunnel
 You can also use the webhook components directly in your Node.js code:
 
 ```typescript
-import { createStorage, type WebhookStorage } from 'aba-payway-ts';
-import { createWebhookServer } from 'aba-payway-ts/webhook/server';
+import { createStorage, createWebhookServer, type WebhookStorage } from 'aba-payway-ts';
 
 // Create storage (auto-detects best backend)
 const storage = await createStorage('auto', './my-callbacks.jsonl');
@@ -313,8 +345,9 @@ npx payway-sdk setup-webhook --tunnel
 ```bash
 npx payway-sdk generate-qr \
   --amount 5.00 \
-  --callback-url https://abc-123.trycloudflare.com/aba-payway-webhook \
-  --merchant-id YOUR_MERCHANT_ID
+  --callback-url https://abc-123.trycloudflare.com/aba-payway-webhook
+# Merchant credentials come from the active profile / PAYWAY_* env (docs/02) —
+# generate-qr has no --merchant-id flag.
 ```
 
 ### Step 3: Scan the QR code and complete payment

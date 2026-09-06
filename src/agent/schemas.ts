@@ -96,6 +96,39 @@ function buildActionSchemas(materialized: boolean): Array<Record<string, unknown
         description: { type: 'string', maxLength: 250 },
         paymentLimit: { type: 'integer', minimum: 0 },
         expiredDate: { type: 'integer', exclusiveMinimum: 0 },
+        payout: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            required: ['acc', 'amt'],
+            properties: {
+              acc: { type: 'string', minLength: 1 },
+              amt: { type: 'number', exclusiveMinimum: 0 },
+            },
+          },
+        },
+        rationale: { type: 'string' },
+      },
+    },
+    {
+      ...base,
+      required: ['tool', 'paymentLinkId'],
+      properties: {
+        tool: { const: 'get_payment_link_details' },
+        paymentLinkId: { type: 'string', minLength: 1 },
+        rationale: { type: 'string' },
+      },
+    },
+    {
+      ...base,
+      required: ['tool', 'query'],
+      properties: {
+        tool: { const: 'query_journal' },
+        query: { enum: ['timeline', 'stats', 'reconcile', 'anomalies'] },
+        transactionId: { type: 'string', minLength: 1 },
+        kind: { type: 'string', minLength: 1 },
+        last: { type: 'integer', minimum: 1, maximum: 500 },
         rationale: { type: 'string' },
       },
     },
@@ -300,6 +333,8 @@ const ledgerSchema = {
         'create_checkout_payload',
         'create_checkout_purchase',
         'create_payment_link',
+        'get_payment_link_details',
+        'query_journal',
         'check_transaction',
         'check_transaction_by_merchant_ref',
         'poll_transaction',
@@ -322,6 +357,7 @@ const ledgerSchema = {
       properties: { code: { type: 'string' }, message: { type: 'string' } },
       required: ['message'],
     },
+    resultSummary: { type: 'object' },
   },
 };
 
@@ -342,6 +378,7 @@ const artifactSchema = {
     currency: CURRENCY,
     transactionId: { type: 'string' },
     executionId: { type: 'string' },
+    correlationId: { type: 'string' },
   },
 };
 

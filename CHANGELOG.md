@@ -11,6 +11,182 @@
 
 ### Added
 
+- **Transaction-journal improvement batch (I-1..I-13, backlog
+  `.scratch/transaction-data-journal/IMPROVEMENTS.md`)**: poll outcomes map to
+  exit codes on generate-qr/generate-checkout (W5-11 fixed — timeout exits 3,
+  machine-visible); every `--json` success envelope carries
+  `correlationId`/`traceId` join keys; duplicate-tran_id advisory (W5-7) on
+  the three create commands via the journal, `--allow-duplicate-id` to
+  suppress; `doctor` journal row + 50 MB retention warning; journal retention
+  `maxAgeDays` / `PAYWAY_JOURNAL_MAX_AGE_DAYS` (prune on write, best-effort);
+  `journal timeline --with-webhooks` (verdict/matched-status/replay from raw
+  captures); `setup-webhook --journal` (.env upsert, never clobbers); REPL
+  unfinished-creates banner (`PAYWAY_AGENT_NO_RECOVER_HINT` opt-out);
+  `agent ledger prune --before` (finished-only, unfinished never removed);
+  docs/12 Pattern 3b (hook meta + onError + journal join).
+- **Transaction Journal — Phase 4 Analytics** (roadmap §17): `computeJournalStats`
+  (exported) + **`journal stats`** CLI — latency percentiles (p50/p90/p99/max) per
+  endpoint over successful responses, retry rates per correlation-id-grouped
+  exchange, top provider/HTTP/transport errors with per-day counts, and the
+  creation → status → callback funnel (read-endpoint heuristic documented;
+  reports the local record only, never gateway truth).
+- **Transaction Journal — Phase 5 AI Layer**: new read-only **`query_journal`**
+  agent tool (13-tool catalog; planner/risk READONLY sets, provider listing, plan
+  + ledger schemas updated) with `timeline` (RCA steps + verdict), `stats`,
+  `reconcile`, and `anomalies` queries — no network, no approval gate. Packaged
+  skill **`aba-payway-journal`** v1.0.0 (skills README + discovery pin 30→31).
+  `PAYWAY_WEBHOOK_DIR` env var (registered) relocates the webhook capture store
+  for reconciliation.
+- **Transaction Journal — Phase 6 Intelligence**: `explainTransaction` +
+  **`journal explain -t <id>`** root-cause narrative (verdict, chronological step
+  reconstruction, sandbox-verified hints incl. gateway code hints and the
+  PENDING-forever/no-retry caveats) and `detectJournalAnomalies` +
+  **`journal anomalies`** — error spikes, retry bursts (leave-one-out baseline:
+  a day at ≥ 3× the mean of the OTHER active days), and latency outliers (p99 ≥ 3×
+  p50 over ≥ 5 samples). This completes the 6-phase transaction-data roadmap.
+- **Transaction Journal — Phase 3 Callback/Event Capture** (roadmap §17; closes gaps
+  G7/G8, mitigates G9): the webhook sink now **persists the signature verdict** it
+  previously computed-then-dropped — `signatureVerdict` (`verified`/`invalid`/
+  `unsigned`) + `verificationReason` on every online-route record, extracted
+  **`matchedTransactionId`/`matchedStatus`** (online body or KHQR parsed
+  notification) as the correlation join key, and a **`replay`** marker when a prior
+  record carries the same (transactionId, status) pair for idempotent processing.
+  Every delivery emits a `callback.received` journal event (correlationId = webhook
+  record id). SQLite stores migrate in place via `ensureCallbackMetadataColumns`
+  (5 additive columns, duplicate-tolerant); JSONL needs no migration. New
+  **`journal reconcile`** command joins the journal with the webhook store per
+  transaction: with-callback / **without-callback** / webhook-only buckets plus
+  duplicate-delivery flags — with the standing caveat that a missing callback is
+  not proof of non-payment (PayWay never retries missed deliveries).
+- **Transaction Journal — Phase 2 Transaction History** (roadmap §17; closes gaps
+  G5/G6/G10/G12/G16/G17): new **`journal show|timeline|prune`** CLI query surface
+  over the JSONL file (show filters by kind/transaction with `--last`, timeline
+  reconstructs one transaction's chronological history, prune deletes by cutoff —
+  parse-safe, atomic). **`agent ledger recover --session-id <id>`** finally exposes
+  the orphaned `findUnfinishedExecutions` (lookup only, never auto-replays) with a
+  per-record `check-transaction` recovery hint. New event kinds:
+  `execution.started` (every CLI command via a new global `--journal` flag that arms
+  the whole invocation), `poll.attempt` (every poll — previously stdout-only),
+  `status.observed` (check-transaction/transaction-detail/terminal poll),
+  `artifact.written` (agent artifacts). Ledger records gain **`resultSummary`** — a
+  scrubbed allow-listed digest of what successful creates returned (checkout URLs,
+  ids); session `tool_result` events carry the same digest in `data`; the dormant
+  `'ledger'` session event is now emitted with final status + correlation. Hooks are
+  additively enriched: `onRequest`/`onResponse` receive trailing
+  `meta {correlationId, attempt, durationMs?, traceId?}` (old handlers unaffected)
+  and a new **`onError`** hook fires on every failed attempt. Option-name note: the
+  recover flag is `--session-id` because the `agent` group's own `--session` (REPL
+  resume) swallows the value on subcommands.
+- **Transaction Journal — Phase 1 Observability** (roadmap in
+  `audit-results/transaction-data-audit/REPORT.md` §17; closes audit gaps
+  G1/G3/G4/G11): opt-in append-only JSONL record of every API exchange under
+  `<cwd>/payway-data/journal.jsonl` — per-attempt `execution.request`,
+  `execution.response` (incl. 200-wrapped business failures), and
+  `execution.error` (the thrown paths where no hook fires), each carrying the
+  SDK correlation id, attempt number, endpoint, durationMs, gateway
+  `status.trace`, `tran_id`/merchantRef extraction, httpStatus/paywayCode,
+  and a redacted body digest. Enable with config `journal: true |
+  { dir, mode }` or `PAYWAY_JOURNAL=1` (+ `PAYWAY_JOURNAL_DIR`,
+  `PAYWAY_JOURNAL_MODE` — all registered in the env validator). `digest`
+  mode (default) allow-lists non-secret transactional fields; `full` mode
+  runs bodies through `sanitizeForLog` with a 16 KB cap. Writes are
+  fail-open, schema-validated (strict Ajv, `additionalProperties: false`),
+  and the barrel exports `pruneJournal` (atomic, parse-safe rewrite).
+  Default OFF — a library must never write files silently. Correlation is
+  propagated end-to-end: new `PayWay.lastCorrelationId` getter, the agent
+  executor attaches the cid to the ledger record (`attachCorrelation`,
+  first-write-wins — the unused `correlation` field is now populated), and
+  artifact sidecars carry `correlationId` (contracts + strict Ajv schema
+  updated). Docs: `docs/18-transaction-journal.md`.
+- **Payment-link codification C1–C3 (2026-09-06, third session)** — the
+  live-learned gateway contracts are now encoded in the SDK:
+  **(C1)** exported `parsePaymentLinkPushback()` + `PaymentLinkPushback` /
+  `PaymentLinkPushbackStatus` types — coerces the captured pushback body
+  (`status` numeric `0`/`"0"`/`"00"` → `'APPROVED'`, unknown → `'UNKNOWN'`
+  with the raw value preserved; `tran_id` → string; throws on structurally
+  invalid bodies). **(C2)** webhook server route **`/aba-payway-pushback`**
+  (configurable via `pushback.path`): stores the raw delivery first, attaches
+  `parsePaymentLinkPushback` metadata (JSON + SQLite backends), ACKs 200 —
+  no HMAC is attempted because pushbacks carry no hash; `setup-webhook`
+  prints the route. **(C3)** `paymentLink.create` warns locally when
+  `expiredDate` is past or under ~5 minutes out (gateway PTL04,
+  sandbox-verified; boundary bracketed (150s, 300s]) — new exported constant
+  `PAYMENT_LINK_EXPIRY_MIN_SECONDS = 300`; advisory by default,
+  `strictValidation` escalates. Barrel +2 runtime exports (57 → 59; +2 type-only;
+  release-checklist smoke updated). Remaining backlog: `.scratch/payment-link-docs-review/CODIFY-BACKLOG.md`.
+- **Payment-link codification C4–C9 (2026-09-06, third session)** —
+  **(C4)** the mock harness (`startMockPaywayServer`, `payway-sdk demo`)
+  now serves the payment-link create/detail endpoints with the live-learned
+  shapes (numeric `tran_id`, `expired_date: "0"` string echo, `status: OPEN`,
+  empty-image shape; detail echoes a created link per server lifetime and
+  answers the sandbox-observed code 96 for a bogus id). **(C5)**
+  `payment-link detail` human output prints a "PAST expiry" warning when
+  `expired_date` is past — the gateway keeps reporting OPEN (no EXPIRED
+  status exists), so the CLI surfaces the computed state; `--json` stays
+  raw. **(C6)** new `payway-sdk explain` family for the payment-link PTL
+  codes not claimed by other families (PTL05/PTL99/PTL132, with the
+  sandbox-vs-official caveats in the hints) + `apiErrorHint` rows for
+  PTL132/PTL05/PTL99. **(C7)** copy-runnable pushback receivers
+  (`docs/examples/backend/payment-link-pushback-receiver.{js,php}`) on the
+  live no-hash contract, wired into the docs-examples suite. **(C8)** agent
+  `create_payment_link` result now surfaces `shareUrl` directly. **(C9)**
+  reusable callback-capture recipe (`docs/agents/callback-capture-recipe.md`)
+  extracted from the V-1 rig.
+- **Payment-link follow-up batch (2026-09-06, second session)** — Batch-A
+  probes executed (SANDBOX-FINDINGS §22): `tran_id` observed as a NUMBER on
+  both endpoints; **no EXPIRED status** (expired links read OPEN + hosted
+  page 200 — enforce expiry merchant-side); create rejects past/under-5-min
+  `expired_date` with PTL04; bogus detail id answers **96** (PTL132 not
+  reproduced); PTL04 is the catch-all create rejection (EUR/omitted
+  currency/non-numeric amount). V-1 (real pushback body) and V-2 (payout
+  placement) — **V-1 CLOSED live**: the pushback carries NO hash field
+  (live-captured through a real simulator payment; body
+  `{"tran_id":"…","status":0,"merchant_ref_no":"…"}`, `User-Agent:
+  PayWayApp/3.0`, `status` numeric 0, `tran_id` string — verification is
+  check-transaction, not verifyCallback; docs/17 §17.6 + docs/16 + skill
+  updated). V-2 remains externally blocked: the sandbox profile has no
+  payout-whitelist service (code 32). Doc deliverables completed:
+  docs/14 snippets, docs/16 pushback section, docs/13 checklist row,
+  README CLI detail example, agent user-guide 12-tool table,
+  `docs/examples/backend/payment-link-create.ts` (+ docs-examples wiring),
+  TypeDoc regen; probe findings folded into docs/17, docs/12, the OpenAPI
+  spec (`src/types.ts` regenerated), and the packaged skill.
+- **Payment-link documentation & consistency batch (2026-09-06)** — new full
+  lifecycle chapter `docs/17-payment-link.md` (parameter tables with datatype
+  reality notes — the official docs declare several numeric fields as strings
+  and disagree with their own samples; permutations & recipes; pushback
+  receiver; error-code table incl. the undocumented sandbox-discovered
+  `PTL04`; troubleshooting), a payment-link code table in docs/12, and
+  `aba-payway-payment-link` skill v1.4.0 (image limits, pushback, status
+  lifecycle, `--json` envelope, agent tools). OpenAPI spec synced:
+  detail response gains `pushback_url`, `payout` listed as a create schema
+  property, `tran_id` typed `number | string`, totals typed with
+  do-not-rely notes — `src/types.ts` regenerated.
+- **`payment-link create`/`detail --json` error envelopes (T5.4 parity)** —
+  both commands now print the machine-parseable
+  `{ error: { kind, exitCode, type, message, paywayCode, … } }` envelope on
+  gateway rejections AND local validation failures (payout total mismatch,
+  bad amount/currency, image loader errors); banner suppressed in `--json`
+  mode. Same contract as check-transaction / transaction-detail /
+  generate-checkout.
+- **Agent: `create_payment_link` forwards `payout`** (plan schema + executor
+  + provider prompt) and a new read-only **`get_payment_link_details`** tool
+  (12-tool catalog) resolves a Link ID to normalized
+  `{paymentLinkId, status, totalTrxn, totalAmount, paymentLink, raw}` —
+  wired through contracts, plan/ledger schemas, planning/risk READONLY sets
+  (no approval gate), and the provider tool listing. NOTE: the plan's P2 also
+  listed `image` forwarding — deliberately NOT wired into the agent tool
+  (the provider plan schema is JSON; shipping raw image bytes through an
+  LLM plan adds noise and secret-scrubbing risk for little utility). Create
+  image-bearing links via the SDK/CLI; revisit only if a real workflow asks.
+- **`payment-link create --no-show-qr`** — suppresses the TTY auto-QR of the
+  share URL (parity with generate-qr / generate-checkout).
+- **`paymentLink.create` merchantRefNo cap advisory** — >50 chars warns
+  (spec-documented max; `strictValidation` → throw); 50 exactly passes.
+- **CLI `--image` loader enforces the 3MB cap** — over-limit files exit 1
+  locally (parity with the `--payout` total-equals-amount rule; the SDK domain
+  stays advisory — the gateway is the final arbiter).
+
 - **`checkout.purchaseHosted()` — typed hosted-checkout purchase** — sets
   `paymentGate: 0` for you and returns a structured `PurchaseHostedHtmlResult`
   (`{ hosted_checkout: true, content_type, html }`): the gateway answers a

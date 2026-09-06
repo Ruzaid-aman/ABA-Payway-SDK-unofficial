@@ -21,6 +21,8 @@ export type AgentToolName =
   | 'create_checkout_payload'
   | 'create_checkout_purchase'
   | 'create_payment_link'
+  | 'get_payment_link_details'
+  | 'query_journal'
   | 'check_transaction'
   | 'check_transaction_by_merchant_ref'
   | 'poll_transaction'
@@ -92,6 +94,35 @@ export interface CreatePaymentLinkParams {
   description?: string;
   paymentLimit?: number;
   expiredDate?: number;
+  /**
+   * Split-payout beneficiaries — same shape/keys as the SDK domain and the
+   * CLI `--payout` flag: `[{acc, amt}]` with Σamt = amount (the shared
+   * domain validator + advisory equality rule apply).
+   */
+  payout?: Array<{ acc: string; amt: number }>;
+  rationale?: string;
+}
+
+/**
+ * Phase 5: read-only queries over the local Transaction Journal. Never hits
+ * the network — the journal only knows what was recorded while it was on.
+ */
+export interface QueryJournalParams {
+  tool: 'query_journal';
+  query: 'timeline' | 'stats' | 'reconcile' | 'anomalies';
+  /** Required for `timeline`. */
+  transactionId?: string;
+  /** `timeline`/`stats`: filter events by kind. */
+  kind?: string;
+  /** `timeline`: cap the returned events (default 100). */
+  last?: number;
+  rationale?: string;
+}
+
+export interface GetPaymentLinkDetailsParams {
+  tool: 'get_payment_link_details';
+  /** The opaque Link ID from create (`data.id`) — NOT merchant_ref_no, NOT the URL slug. */
+  paymentLinkId: string;
   rationale?: string;
 }
 
@@ -144,6 +175,7 @@ export type AgentActionParams =
   | CreateCheckoutPayloadParams
   | CreateCheckoutPurchaseParams
   | CreatePaymentLinkParams
+  | GetPaymentLinkDetailsParams
   | CheckTransactionParams
   | CheckTransactionByMerchantRefParams
   | PollTransactionParams
@@ -277,6 +309,8 @@ export interface ExecutionRecordV1 {
   createdAt: string;
   updatedAt: string;
   error?: { code?: string; message: string };
+  /** Phase 2: scrubbed, allow-listed digest of a successful tool result (ids, URLs — never payloads/secrets). */
+  resultSummary?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,4 +332,6 @@ export interface ArtifactMetadataV1 {
   currency?: Currency;
   transactionId?: string;
   executionId?: string;
+  /** SDK correlation id (cid) of the exchange that produced this artifact — joins the sidecar with the transaction journal. */
+  correlationId?: string;
 }

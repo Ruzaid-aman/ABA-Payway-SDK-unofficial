@@ -1,7 +1,7 @@
 ---
 name: aba-payway-agent
-description: Operate the agentic PayWay CLI safely — provider modes, the 11 tools, risk gates, the execution ledger, sessions, and secret redaction.
-version: 1.1.0
+description: Operate the agentic PayWay CLI safely — provider modes, the 12 tools, risk gates, the execution ledger, sessions, and secret redaction.
+version: 1.3.0
 ---
 
 # ABA PayWay Agent (Agentic CLI)
@@ -17,7 +17,7 @@ materialized through the execution ledger.**
 # 1. Configure the provider (API key stays in the environment, never stored).
 #    Presets: opencode (free) | openai | openrouter | nvidia | custom
 export PAYWAY_AGENT_API_KEY=sk-...
-payway-sdk agent setup --provider opencode --model x-preview-f-free --capability-mode strict-json-plan \
+payway-sdk agent setup --provider opencode --model deepseek-v4-flash-free --capability-mode strict-json-plan \
   --max-tokens 8192 --temperature 0.2
 # For NVIDIA thinking models add: --extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
 
@@ -25,15 +25,19 @@ payway-sdk agent setup --provider opencode --model x-preview-f-free --capability
 payway-sdk ask "Generate a $3 online QR for sandbox" --yolo
 ```
 
-The provider config shape (stored as plaintext, no secrets) is:
+The provider config shape (stored as plaintext, no secrets; managed by
+`payway-sdk agent setup` — you normally never write it by hand) is:
 
 ```ts
-import type { ProviderConfigV1, CapabilityMode } from 'aba-payway-ts/agent';
-
-const config: ProviderConfigV1 = {
+// ProviderConfigV1 lives in the SDK source (src/agent/contracts.ts).
+// The package exports only the root entrypoint ("."), so import the
+// PayWay client from 'aba-payway-ts' and manage agent config via the CLI:
+//   payway-sdk agent setup --provider opencode --model deepseek-v4-flash-free \
+//     --capability-mode strict-json-plan
+const config = {
   version: 'agent-config/v1',
    provider: 'opencode',               // 'opencode' | 'openai' | 'openrouter' | 'nvidia' | 'custom'
-   model: 'x-preview-f-free',
+   model: 'deepseek-v4-flash-free',    // rotate as the provider's catalog changes — a dead model fails with 401 "not supported"
   capabilityMode: 'strict-json-plan', // 'native-tools' | 'strict-json-plan'
   privacyAcknowledgedAt: new Date().toISOString(),
 };
@@ -49,7 +53,7 @@ const config: ProviderConfigV1 = {
 
 Both modes funnel through the same safety pipeline; only the plan source differs.
 
-## The 11 tools
+## The 12 tools
 
 | # | Tool | Create? | Purpose / key inputs |
 |---|---|---|---|
@@ -57,13 +61,14 @@ Both modes funnel through the same safety pipeline; only the plan source differs
 | 2 | `generate_offline_khqr` | yes | Local-only ABA KHQR. `amount?`, `currency`, `merchantRef` |
 | 3 | `create_checkout_payload` | yes | LOCAL signed checkout payload (no network). `amount`, `currency`, `transactionId?` |
 | 4 | `create_checkout_purchase` | yes | NETWORK checkout request to PayWay. `amount`, `currency`, `transactionId?` |
-| 5 | `create_payment_link` | yes | Shareable link (needs RSA). `title`, `amount`, `currency`, `merchantRefNo`, `returnUrl` |
-| 6 | `check_transaction` | no | Read-only status lookup by `transactionId` |
-| 7 | `check_transaction_by_merchant_ref` | no | Read-only lookup by `merchantRef` |
-| 8 | `poll_transaction` | no | Read-only repeated lookup (sandbox verification) by `transactionId` |
-| 9 | `save_artifact` | no | Persist a produced artifact to `./payway-output` |
-| 10 | `open_artifact` | no | Open a saved artifact |
-| 11 | `copy_to_clipboard` | no | Copy an artifact value to the clipboard |
+| 5 | `create_payment_link` | yes | Shareable link (needs RSA). `title`, `amount`, `currency`, `merchantRefNo`, `returnUrl`, `payout?` |
+| 6 | `get_payment_link_details` | no | Read-only payment-link lookup by `paymentLinkId` (the opaque Link ID from create) |
+| 7 | `check_transaction` | no | Read-only status lookup by `transactionId` |
+| 8 | `check_transaction_by_merchant_ref` | no | Read-only lookup by `merchantRef` |
+| 9 | `poll_transaction` | no | Read-only repeated lookup (sandbox verification) by `transactionId` |
+| 10 | `save_artifact` | no | Persist a produced artifact to `./payway-output` |
+| 11 | `open_artifact` | no | Open a saved artifact |
+| 12 | `copy_to_clipboard` | no | Copy an artifact value to the clipboard |
 
 > `create_checkout_payload` builds a **local** signed payload; `create_checkout_purchase`
 > performs the actual **network** request. Treat them as distinct tools.
@@ -224,9 +229,12 @@ Common failures: `AGENT_NOT_CONFIGURED` (run `agent setup`/`onboard`), `PRIVACY_
   `--max-tokens`, or switch to a stronger model.
 In a TTY, `ask`/`agent` print a `· Contacting <provider> (<model>) to propose a plan…`
 line plus per-stage progress and a remediation hint; in non-TTY the provider message is
-**redacted** to `[REDACTED]` for safety, so diagnose interactively or via `agent doctor`.
-`agent doctor` reports the provider row as `blocked` when `PAYWAY_AGENT_API_KEY` is unset
-(it no longer trusts the unauthenticated `/models` ping).
+**usually redacted** to `[REDACTED]` — but live testing (2026-09-03) showed some non-TTY
+provider errors (e.g. HTTP 401 "Model … is not supported" wrapped in
+`PROVIDER_PROPOSAL_FAILED`) can surface verbatim, so do not treat non-TTY output as
+secret-free by contract. Diagnose interactively or via `agent doctor`; that command
+reports the provider row as `blocked` when `PAYWAY_AGENT_API_KEY` is unset (it no longer
+trusts the unauthenticated `/models` ping).
 
 ## Related Skills
 
@@ -253,8 +261,9 @@ payway-sdk explain PTL36                    # decode any code offline
 network/timeout/rate-limit. Polling reaching ANY terminal status (including
 DECLINED) is `0`; read `payment_status` from the final JSON event.
 
-Programmatic lookups without spawning the CLI:
-```ts
-import { explainPayWayCode } from 'aba-payway-ts/cli/explain-code.js';
-explainPayWayCode('PTL36'); // { family:'refund', title:'Transaction not found', hint:'...' }
+Programmatic code lookups without spawning the CLI:
+```sh
+# The CLI is the supported surface — no subpath imports exist in package exports.
+payway-sdk explain PTL36   # { family:'refund', title:'Transaction not found', hint:'...' }
+payway-sdk explain         # list every known code + family
 ```

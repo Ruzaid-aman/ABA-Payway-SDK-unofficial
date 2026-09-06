@@ -18,7 +18,7 @@ import type { PayWay } from '../client.js';
 import type { ResolvedPayWayContext } from './context.js';
 import { createAgentPayWay, resolvedSensitiveValues } from './context.js';
 import type { AgentSessionV1, AgentToolName, ExecutionRecordV1, MaterializedAgentAction } from './contracts.js';
-import { markFailed, markOutcomeUnknown, markSubmitted, markSucceeded } from './ledger.js';
+import { attachCorrelation, markFailed, markOutcomeUnknown, markSubmitted, markSucceeded } from './ledger.js';
 import { toolRegistry } from './tools.js';
 import { scrubSensitive } from './privacy.js';
 
@@ -28,6 +28,8 @@ export interface ExecutionContext {
   session?: AgentSessionV1;
   execution: ExecutionRecordV1;
   payway?: PayWay;
+  /** Populated by the executor after a create action's SDK call — joins the artifact sidecar with the transaction journal. */
+  correlationId?: string;
 }
 
 export interface ToolExecutionResult {
@@ -121,6 +123,7 @@ export async function executeAction(
       code: safeError.code,
       message: safeError.message,
     }, sensitiveValues);
+    recordCorrelation(executionContext, executionId, client);
     return {
       ok: false,
       tool,
@@ -136,7 +139,11 @@ export async function executeAction(
   }
 
   if (result.ok) {
-    markSucceeded(executionId);
+    const summary = summarizeToolData(result.data);
+    markSucceeded(
+      executionId,
+      summary ? (scrubSensitive(summary, sensitiveValues) as Record<string, unknown>) : undefined,
+    );
   } else if (result.error?.code === 'OUTCOME_UNKNOWN') {
     markOutcomeUnknown(executionId, {
       code: result.error.code,
@@ -149,5 +156,64 @@ export async function executeAction(
     }, sensitiveValues);
   }
 
+  recordCorrelation(executionContext, executionId, client);
+
   return result;
+}
+
+/**
+ * Allow-listed digest of a tool result (Phase 2): ids and gateway-returned
+ * URLs survive; payloads, base64 blobs and secrets do not. Shared by the
+ * ledger resultSummary and the session tool_result events.
+ */
+const RESULT_SUMMARY_FIELDS: ReadonlySet<string> = new Set([
+  'transactionId',
+  'tran_id',
+  'checkout_qr_url',
+  'abapay_deeplink',
+  'url',
+  'paymentLinkId',
+  'payment_status',
+  'status',
+  'code',
+  'message',
+  'artifactId',
+  'path',
+]);
+
+const SUMMARY_STRING_CAP = 200;
+
+export function summarizeToolData(data: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!data) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(data)) {
+    if (!RESULT_SUMMARY_FIELDS.has(key)) continue;
+    const value = data[key];
+    if (typeof value === 'string') {
+      out[key] = value.length > SUMMARY_STRING_CAP ? `${value.slice(0, SUMMARY_STRING_CAP)}…[capped]` : value;
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      out[key] = value;
+    } else if (Array.isArray(value)) {
+      out[key] = { type: 'array', length: value.length };
+    } else if (value && typeof value === 'object') {
+      out[key] = { type: 'object' };
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Joins the ledger record (and, via the execution context, the artifact
+ * sidecar) with the SDK correlation id of the exchange that just ran —
+ * the same cid every transaction-journal event carries. First-write-wins.
+ */
+function recordCorrelation(
+  executionContext: ExecutionContext,
+  executionId: string,
+  client: PayWay,
+): void {
+  const cid = client.lastCorrelationId;
+  if (!cid) return;
+  executionContext.correlationId = cid;
+  attachCorrelation(executionId, cid);
 }

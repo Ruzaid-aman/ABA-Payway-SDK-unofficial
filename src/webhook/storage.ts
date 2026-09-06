@@ -1,3 +1,4 @@
+import type { PaymentLinkPushback } from '../domains/payment-link.js';
 import type { ParsedKhqrPaymentNotification } from './khqr-notification.js';
 
 /**
@@ -6,6 +7,13 @@ import type { ParsedKhqrPaymentNotification } from './khqr-notification.js';
  * Provides a generic persistence layer for raw PayWay callback payloads.
  * Two implementations: JSON file (zero deps, default) and SQLite (optional peer dep).
  */
+
+/**
+ * Signature verification outcome for the online checkout callback route
+ * (Phase 3 — the verdict is now part of the durable record; previously it
+ * was computed, logged, then dropped: audit gap G7).
+ */
+export type WebhookSignatureVerdict = 'verified' | 'invalid' | 'unsigned';
 
 export interface WebhookRecord {
   /** Auto-generated unique identifier. */
@@ -20,6 +28,21 @@ export interface WebhookRecord {
   readonly sourceIp?: string;
   /** Offline KHQR parsing metadata. The raw body remains the audit source. */
   readonly khqr?: KhqrWebhookMetadata;
+  /**
+   * Online-route signature verification outcome. Unset on records stored by
+   * older versions; the KHQR route never sets it (no published auth contract).
+   */
+  readonly signatureVerdict?: WebhookSignatureVerdict;
+  /** Why verification failed — only present when `signatureVerdict === 'invalid'`. */
+  readonly verificationReason?: 'signature_mismatch' | 'malformed_signature' | 'empty_body';
+  /** `tran_id`/`transaction_id` extracted best-effort from the raw body — the correlation join key (gap G8). */
+  readonly matchedTransactionId?: string;
+  /** Status field extracted alongside the transaction id (drives replay detection). */
+  readonly matchedStatus?: string;
+  /** True when a prior stored record already carries the same (matchedTransactionId, matchedStatus) — a replay marker for idempotent processing. */
+  readonly replay?: boolean;
+  /** Payment-link pushback parsing metadata. The raw body remains the audit source. */
+  readonly paymentLinkPushback?: PaymentLinkPushbackMetadata;
 }
 
 export interface KhqrWebhookMetadata {
@@ -27,6 +50,13 @@ export interface KhqrWebhookMetadata {
   readonly parseError?: string;
   /** A prior captured notification had the same ABA transaction ID. */
   readonly duplicateTransactionId?: boolean;
+}
+
+export interface PaymentLinkPushbackMetadata {
+  /** Parsed pushback (see `parsePaymentLinkPushback`). The raw body is the audit source. */
+  readonly parsed?: PaymentLinkPushback;
+  /** Why the body could not be parsed, when parsing failed. */
+  readonly parseError?: string;
 }
 
 export interface WebhookStorage {
@@ -38,6 +68,9 @@ export interface WebhookStorage {
 
   /** Attach offline-KHQR parse metadata after the raw delivery is durable. */
   updateKhqrMetadata?(id: string, khqr: KhqrWebhookMetadata): WebhookRecord;
+
+  /** Attach payment-link pushback parse metadata after the raw delivery is durable. */
+  updatePaymentLinkPushbackMetadata?(id: string, pushback: PaymentLinkPushbackMetadata): WebhookRecord;
 
   /** Retrieve all stored records, ordered by insertion time. */
   getAll(): WebhookRecord[];

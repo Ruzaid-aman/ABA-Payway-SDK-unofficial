@@ -17,6 +17,7 @@ import readline from 'node:readline';
 import type { Command } from 'commander';
 import { readAgentConfig } from './config.js';
 import { resolvePayWayContext } from './context.js';
+import { findUnfinishedExecutions } from './ledger.js';
 import {
   AgentOrchestrator,
   renderCreatePlanConfirmation,
@@ -25,6 +26,7 @@ import {
   type CreatePlanConfirmation,
 } from './orchestrator.js';
 import { createProviderAdapter } from './provider.js';
+import { listSessions } from './sessions.js';
 import { scanOnboardingState } from './onboarding/scan.js';
 import { maybeAutoOnboard, onboardingHintText } from '../cli/commands/onboard.js';
 import { isInteractiveTerminal, PRODUCTION_CONFIRMATION_PHRASE } from './terminal.js';
@@ -87,6 +89,30 @@ export async function runRepl(
   console.log(`\n${c.bold('Agentic PayWay REPL')} ${c.dim('(type :help for directives, :exit to quit)')}\n`);
   if (!interactive) {
     console.log(`${c.dim('(non-interactive: reading directives from stdin)')}\n`);
+  }
+
+  // I-12: unfinished creates from the most recent prior session — a
+  // lookup-only banner (the agent NEVER replays create actions). Suppress
+  // with PAYWAY_AGENT_NO_RECOVER_HINT=1.
+  if (!process.env.PAYWAY_AGENT_NO_RECOVER_HINT) {
+    try {
+      const sessions = listSessions().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const previous = sessionId ? sessions.find((s) => s.sessionId !== sessionId) : sessions[0];
+      if (previous) {
+        const unfinished = findUnfinishedExecutions(previous.sessionId);
+        if (unfinished.length > 0) {
+          console.log(
+            `  ${c.yellow('⚠')} Session ${c.cyan(previous.sessionId)} has ${unfinished.length} unfinished create execution(s).`,
+          );
+          console.log(
+            `    ${c.dim(`Run: payway-sdk agent ledger recover --session-id ${previous.sessionId} (creates are never replayed — verify each transaction id)`)}`,
+          );
+          console.log();
+        }
+      }
+    } catch {
+      // The banner is advisory — ledger/session read failures must never block the REPL.
+    }
   }
 
   async function dispatch(rest: string): Promise<void> {

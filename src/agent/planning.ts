@@ -19,6 +19,8 @@ const GENERIC_QR_EXPLANATION =
 const READONLY_TOOLS = new Set([
   'check_transaction',
   'check_transaction_by_merchant_ref',
+  'get_payment_link_details',
+  'query_journal',
   'poll_transaction',
   'save_artifact',
   'open_artifact',

@@ -34,6 +34,16 @@ import {
   PayWaySignatureError,
 } from './errors.js';
 import { type KhqrMerchantConfiguration, resolveKhqrConfiguration } from './khqr-config.js';
+import {
+  buildRequestDigest,
+  buildResponseDigest,
+  extractMerchantRefFrom,
+  extractTransactionIdFrom,
+  parseRequestBodyPayload,
+  toTraceString,
+} from './journal/digest.js';
+import { createJournalEmitter } from './journal/writer.js';
+import type { JournalContext, JournalOptions } from './journal/types.js';
 import { createPayWayLogger, resolveLogLevel, type LogLevel } from './logger.js';
 import { formatRequestTime, isValidPublicKeyPem, normalizePem, sanitizeForLog } from './utils.js';
 
@@ -68,6 +78,29 @@ export interface RateLimitInfo {
   rawHeaders?: Record<string, string>;
 }
 
+/** Correlation metadata attached (Phase 2) to the observability hooks. */
+export interface PayWayHookMeta {
+  /** Per-exchange correlation id — same value every journal event carries. */
+  correlationId: string;
+  /** 0-based attempt number (retries included). */
+  attempt: number;
+  /** Total elapsed ms since the exchange started (response hooks only). */
+  durationMs?: number;
+  /** Gateway `status.trace` when the response carried one. */
+  traceId?: string;
+}
+
+/** Payload of the Phase 2 `onError` hook — fires on every failed attempt. */
+export interface PayWayOnErrorInfo {
+  endpoint: string;
+  correlationId: string;
+  attempt: number;
+  statusCode?: number;
+  paywayCode?: string;
+  message: string;
+  retryable?: boolean;
+}
+
 export interface PayWayConfig {
   merchantId?: string;
   apiKey?: string;
@@ -80,8 +113,23 @@ export interface PayWayConfig {
   rateLimitThrottling?: boolean; // Default: true for endpoints with documented limits
   rateLimitRules?: Record<string, RateLimitRule>;
   debug?: boolean;
-  onRequest?: (endpoint: string, bodyPayload: string) => void;
-  onResponse?: (endpoint: string, statusCode: number, body: unknown, rateLimitInfo?: RateLimitInfo) => void;
+  /**
+   * Phase 2: receives per-exchange correlation metadata (cid, attempt) as a
+   * trailing argument — existing two-argument handlers keep working.
+   */
+  onRequest?: (endpoint: string, bodyPayload: string, meta?: PayWayHookMeta) => void;
+  onResponse?: (
+    endpoint: string,
+    statusCode: number,
+    body: unknown,
+    rateLimitInfo?: RateLimitInfo,
+    meta?: PayWayHookMeta,
+  ) => void;
+  /**
+   * Phase 2: fires on every failed attempt (HTTP errors, network, timeout,
+   * business failures) — the paths `onResponse` never sees. Fail-open.
+   */
+  onError?: (info: PayWayOnErrorInfo) => void;
   /** Called when a request is delayed locally by the token-bucket throttle for an endpoint with a documented limit. */
   onThrottle?: (info: { endpoint: string; waitMs: number }) => void;
   /** ABA-issued merchant data used only for official offline KHQR generation. */
@@ -126,6 +174,18 @@ export interface PayWayConfig {
    * flag. Also settable via PAYWAY_STRICT_VALIDATION=1.
    */
   strictValidation?: boolean;
+  /**
+   * Transaction Journal (audit-results/transaction-data-audit REPORT §14):
+   * opt-in append-only JSONL record of every API exchange — correlation id,
+   * attempts, duration, gateway trace id, redacted request/response digests.
+   * `true` uses the defaults (`<cwd>/payway-data/journal.jsonl`, digest
+   * mode); pass `{ dir, mode, maxAgeDays }` to override. `PAYWAY_JOURNAL=1`
+   * + `PAYWAY_JOURNAL_DIR` + `PAYWAY_JOURNAL_MODE` +
+   * `PAYWAY_JOURNAL_MAX_AGE_DAYS` fill any omitted part; `maxAgeDays` prunes
+   * old events on write (best-effort retention guard).
+   * Default: disabled — a library must never write files silently.
+   */
+  journal?: boolean | JournalOptions;
 }
 
 interface ResolvedPayWayConfig extends PayWayConfig {
@@ -949,6 +1009,13 @@ function extractTraceId(body: unknown): unknown {
   return resp.trace;
 }
 
+// --- Journal event helpers (error fields are size-capped and never throw) ---
+
+function cappedErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.length > 500 ? `${message.slice(0, 500)}…[capped]` : message;
+}
+
 /** Return the value as an http(s) base URL, or undefined when it isn't one. */
 function parseHttpBaseUrl(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -973,6 +1040,9 @@ export class PayWay {
   private rateLimitState = new Map<string, { tokens: number; lastRefill: number }>();
   private recentCallsByEndpoint = new Map<string, number[]>();
   private readonly breaker: CircuitBreaker | undefined;
+  private readonly journalContext: JournalContext | undefined;
+  private lastCid: string | undefined;
+  private lastTrace: string | undefined;
 
   // --- Sub-Clients ---
   public readonly checkout: CheckoutDomain;
@@ -1023,6 +1093,11 @@ export class PayWay {
     // TD-07: opt-in transport circuit breaker (per-endpoint state).
     this.breaker = this.config.circuitBreaker ? new CircuitBreaker(this.config.circuitBreaker) : undefined;
 
+    // Transaction Journal (audit-results/transaction-data-audit §14): opt-in
+    // JSONL record of every API exchange. Undefined unless configured or
+    // PAYWAY_JOURNAL is set — the library never writes files silently.
+    this.journalContext = createJournalEmitter(this.config.journal, process.env);
+
     // Initialize domain sub-clients
     this.checkout = createCheckoutDomain(
       this.config,
@@ -1036,6 +1111,32 @@ export class PayWay {
     this.preAuth = createPreAuthDomain(this.config, this.requestWithMerchantAuth.bind(this));
     this.payout = createPayoutDomain(this.config, this.request.bind(this), this.requestWithMerchantAuth.bind(this));
     this.khqr = createKhqrDomain(this.config, this.request.bind(this));
+  }
+
+  /**
+   * Correlation id (cid) of the most recent API exchange. Callers and the
+   * agent layer use it to join their own records with the transaction
+   * journal (every journal event carries the same cid).
+   */
+  get lastCorrelationId(): string | undefined {
+    return this.lastCid;
+  }
+
+  /**
+   * Gateway `status.trace` of the most recent successful exchange, when the
+   * envelope carried one (improvement I-2: surfaced for stdout↔journal joins).
+   */
+  get lastTraceId(): string | undefined {
+    return this.lastTrace;
+  }
+
+  /**
+   * The client's journal emitter — undefined unless journaling is enabled
+   * (config `journal` / `PAYWAY_JOURNAL`). Lets hosts (CLI, agent) emit
+   * command-level events into the same journal file as the transport events.
+   */
+  get journal(): JournalContext | undefined {
+    return this.journalContext;
   }
 
   private static resolveConfig(config: Partial<PayWayConfig> | null): ResolvedPayWayConfig {
@@ -1104,17 +1205,17 @@ export class PayWay {
       ...resolvedConfig,
       // Debug logging (correlation id + duration) is emitted by _executeFetch so
       // each request gets a stable cid and an accurate timing measurement.
-      onRequest: (endpoint, bodyPayload) => {
-        onRequest?.(endpoint, bodyPayload);
+      onRequest: (endpoint, bodyPayload, meta) => {
+        onRequest?.(endpoint, bodyPayload, meta);
       },
-      onResponse: (endpoint, statusCode, body, rateLimitInfo) => {
+      onResponse: (endpoint, statusCode, body, rateLimitInfo, meta) => {
         const traceId = extractTraceId(body);
         if (traceId !== undefined) {
           // TD-08: PayWay envelopes carry `status.trace` / `trace`; surface it
           // so merchants can correlate SDK diagnostics with gateway support.
           paywayLogger.info(`[payway] trace_id=${String(traceId)} endpoint=${endpoint}`);
         }
-        onResponse?.(endpoint, statusCode, body, rateLimitInfo);
+        onResponse?.(endpoint, statusCode, body, rateLimitInfo, meta);
       },
     };
   }
@@ -1222,6 +1323,8 @@ export class PayWay {
     const retriesDisabled = options?.retry === 'none';
     const url = `${this.baseUrl}${endpoint}`;
     const correlationId = randomBytes(8).toString('hex');
+    this.lastCid = correlationId;
+    this.lastTrace = undefined;
     const requestStartedAt = Date.now();
 
     // TD-07: fail fast while the endpoint's circuit is open (half-open probes
@@ -1257,9 +1360,24 @@ export class PayWay {
                 : sanitizeForLog(describeMultipartBody(bodyPayload));
             console.debug(`[payway] -> POST ${endpoint} (cid=${correlationId})`, loggedBody);
           }
-          this.config.onRequest?.(endpoint, describeBodyForHook(bodyPayload));
+          this.config.onRequest?.(endpoint, describeBodyForHook(bodyPayload), { correlationId, attempt });
         } catch {
           // Logging hooks must never fail SDK execution.
+        }
+
+        if (this.journalContext) {
+          // Journal fires per attempt (retries included) so forensics can
+          // distinguish send #1 from send #N — data the hooks don't carry.
+          const parsedRequest = parseRequestBodyPayload(bodyPayload);
+          this.journalContext.emit({
+            kind: 'execution.request',
+            correlationId,
+            attempt,
+            endpoint,
+            transactionId: extractTransactionIdFrom(parsedRequest),
+            merchantRef: extractMerchantRefFrom(parsedRequest),
+            requestDigest: buildRequestDigest(bodyPayload, parsedRequest, this.journalContext.mode),
+          });
         }
 
         const response = await fetch(url, {
@@ -1345,11 +1463,37 @@ export class PayWay {
               rateLimitInfo,
             );
           }
-          this.config.onResponse?.(endpoint, response.status, parsedBody, rateLimitInfo);
+          this.config.onResponse?.(endpoint, response.status, parsedBody, rateLimitInfo, {
+            correlationId,
+            attempt,
+            durationMs,
+            traceId: toTraceString(extractTraceId(parsedBody)),
+          });
         } catch {
           // Logging hooks must never fail SDK execution.
         }
 
+        if (this.journalContext) {
+          // Fires for every parsed 2xx — including 200-wrapped business
+          // failures (EC-06 semantics), which the integrator hooks also see.
+          this.lastTrace = toTraceString(extractTraceId(parsedBody));
+          this.journalContext.emit({
+            kind: 'execution.response',
+            correlationId,
+            attempt,
+            endpoint,
+            httpStatus: response.status,
+            durationMs,
+            traceId: toTraceString(extractTraceId(parsedBody)),
+            transactionId: extractTransactionIdFrom(parsedBody),
+            merchantRef: extractMerchantRefFrom(parsedBody),
+            responseDigest: buildResponseDigest(parsedBody, this.journalContext.mode),
+          });
+        }
+
+        // 200-wrapped business failures: the response event above recorded
+        // the gateway's answer; the shared catch below emits the paired
+        // execution.error (business errors flow through it un-retried).
         checkResponseError(parsedBody, endpoint);
 
         // TD-07: reaching a parsed response (even a business error) proves the
@@ -1367,6 +1511,35 @@ export class PayWay {
               ? // Caller-requested cancellation is never retried.
                 new PayWayNetworkError('Request aborted by caller signal', { endpoint, retryable: false })
               : createNetworkError(error, timeoutMs, endpoint);
+
+        // Error-path journaling: HTTP errors, empty-body guard, link-card
+        // HTML, JSON-parse failures, network/timeout/abort. No integrator
+        // hook fires on these paths — the journal is the only witness.
+        this.journalContext?.emit({
+          kind: 'execution.error',
+          correlationId,
+          attempt,
+          endpoint,
+          httpStatus: paywayError.statusCode,
+          paywayCode: paywayError.paywayCode,
+          durationMs: Date.now() - requestStartedAt,
+          error: { code: paywayError.type, message: cappedErrorMessage(paywayError) },
+        });
+        try {
+          // Phase 2 hook enrichment: integrators finally see error attempts
+          // (the onResponse hook never fires on thrown paths).
+          this.config.onError?.({
+            endpoint,
+            correlationId,
+            attempt,
+            statusCode: paywayError.statusCode,
+            paywayCode: paywayError.paywayCode,
+            message: cappedErrorMessage(paywayError),
+            retryable: paywayError.retryable,
+          });
+        } catch {
+          // Logging hooks must never fail SDK execution.
+        }
 
         // TD-07: count network failures and 5xx against the breaker; anything
         // with a sub-500 HTTP status means the gateway responded → success
