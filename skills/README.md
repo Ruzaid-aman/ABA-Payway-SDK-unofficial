@@ -1,6 +1,6 @@
 # ABA PayWay SDK Skills
 
-30 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
+31 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
 them for a supported coding agent:
 
 ```sh
@@ -64,6 +64,7 @@ referenced in some guides are development-only and ship nowhere.
 
 - [aba-payway-sdk-configuration](./aba-payway-sdk-configuration/SKILL.md) — constructor options, every `PAYWAY_*` env var, `strictValidation`, the KHQR env set.
 - [aba-payway-hash](./aba-payway-hash/SKILL.md) — webhook signature verification + the request-signing/verify/mock-callback tools.
+- [aba-payway-journal](./aba-payway-journal/SKILL.md) — query the local transaction journal: timelines, stats, reconcile, anomalies, RCA (`journal` CLI + agent `query_journal` tool).
 - [aba-payway-test-harness](./aba-payway-test-harness/SKILL.md) — the built-in mock PayWay server.
 - [aba-payway-agent](./aba-payway-agent/SKILL.md) — the agentic, risk-gated CLI (provider modes, 12 tools, execution ledger).
 

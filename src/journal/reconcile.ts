@@ -107,7 +107,8 @@ function extractDelivery(record: {
 
 export function reconcileTransactions(options: ReconcileOptions = {}): ReconcileReport {
   const journalDir = options.journalDir ?? resolveJournalConfig(undefined, process.env)?.dir ?? path.join(process.cwd(), 'payway-data');
-  const webhookDir = options.webhookDir ?? path.join(process.cwd(), DEFAULT_WEBHOOK_DIR_NAME);
+  const webhookDir =
+    options.webhookDir ?? (process.env.PAYWAY_WEBHOOK_DIR?.trim() || path.join(process.cwd(), DEFAULT_WEBHOOK_DIR_NAME));
 
   const journal = readJournalEvents(journalDir);
   const webhookFile = path.join(webhookDir, 'callbacks.jsonl');

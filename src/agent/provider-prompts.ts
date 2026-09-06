@@ -214,6 +214,25 @@ function buildToolDefinitions(): ToolDefinition[] {
     {
       type: 'function',
       function: {
+        name: 'query_journal',
+        description: 'Query the local transaction journal (no network): the chronological timeline of one transaction, aggregate stats (latency/retries/errors/funnel), reconcile creations vs webhook callbacks, or detect anomalies. Only knows what was journaled while recording was on.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            query: str('One of: timeline | stats | reconcile | anomalies.'),
+            transactionId: opt(str('Required for timeline: the transaction id to reconstruct.')),
+            kind: opt(str('Optional event-kind filter, e.g. execution.error.')),
+            last: opt({ type: 'integer', minimum: 1, description: 'Optional cap on returned timeline events (default 100).' }),
+            rationale: opt(str('Why this action is being proposed.')),
+          },
+          required: ['query'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'get_payment_link_details',
         description: 'Get the status and details of a payment link by its opaque Link ID (data.id from create — not the merchant ref, not the URL slug).',
         parameters: {

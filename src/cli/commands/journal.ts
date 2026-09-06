@@ -9,21 +9,14 @@
 import path from 'node:path';
 import type { Command } from 'commander';
 import {
-  DEFAULT_JOURNAL_DIR_NAME,
   DEFAULT_JOURNAL_FILE_NAME,
   type JournalEventV1,
 } from '../../journal/types.js';
+import { explainTransaction, detectJournalAnomalies } from '../../journal/intelligence.js';
 import { reconcileTransactions } from '../../journal/reconcile.js';
-import { pruneJournal, readJournalEvents, resolveJournalConfig } from '../../journal/writer.js';
+import { computeJournalStats } from '../../journal/stats.js';
+import { pruneJournal, readJournalEvents, resolveJournalDir } from '../../journal/writer.js';
 import { currentPalette } from '../ui/theme.js';
-
-function resolveJournalDir(explicit: string | undefined): string {
-  return (
-    explicit ??
-    resolveJournalConfig(undefined, process.env)?.dir ??
-    path.join(process.cwd(), DEFAULT_JOURNAL_DIR_NAME)
-  );
-}
 
 function readJournalFile(dir: string) {
   return readJournalEvents(dir);
@@ -165,5 +158,100 @@ export function registerJournalCommands(program: Command): void {
       console.log(
         `\n  ${c.dim('A missing callback is NOT proof of non-payment — PayWay never retries missed deliveries. Re-check with check-transaction.')}`,
       );
+    });
+
+  journalCmd
+    .command('stats')
+    .description('Aggregate analytics: latency percentiles, retry rates, provider errors, creation funnel')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--json', 'Machine-readable output')
+    .action((opts: { dir?: string; json?: boolean }) => {
+      const c = currentPalette();
+      const report = computeJournalStats({ journalDir: opts.dir });
+
+      if (opts.json) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+      console.log(
+        `  ${c.bold('Exchanges:')} ${report.exchanges.total} total, ${(report.exchanges.retryRate * 100).toFixed(1)}% retried, ` +
+          `${(report.exchanges.failureRate * 100).toFixed(1)}% of attempts failed`,
+      );
+      console.log(`  ${c.bold('Window:')} ${report.window.from ?? '—'} → ${report.window.to ?? '—'} (${report.window.events} events)`);
+      if (report.latency.length > 0) {
+        console.log(`\n  ${c.bold('Latency (successful responses):')}`);
+        for (const row of report.latency.slice(0, 8)) {
+          console.log(`  ${c.dim(row.endpoint)}  n=${row.count}  p50=${row.p50}ms  p90=${row.p90}ms  p99=${row.p99}ms  max=${row.max}ms`);
+        }
+      }
+      if (report.topErrors.length > 0) {
+        console.log(`\n  ${c.bold('Top errors:')}`);
+        for (const row of report.topErrors.slice(0, 8)) {
+          console.log(`  ${c.red(row.code)}  ${row.kind}  x${row.count}  last ${row.lastSeen}`);
+        }
+      }
+      const funnel = report.funnel;
+      console.log(
+        `\n  ${c.bold('Funnel:')} ${funnel.transactionsTracked} tracked · ${funnel.creationsObserved} creations · ` +
+          `${funnel.withObservedStatus} with status · ${c.green(String(funnel.approved))} approved · ` +
+          `${c.red(String(funnel.declined))} declined · ${funnel.stillPending} pending · ${funnel.withCallback} with callback`,
+      );
+      console.log(`  ${c.dim('Funnel reports the local record only — see docs/18 for the gateway blind spots.')}`);
+    });
+
+  journalCmd
+    .command('explain')
+    .description('Root-cause narrative for one transaction from its journal timeline')
+    .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--json', 'Machine-readable output')
+    .action((opts: { transactionId: string; dir?: string; json?: boolean }) => {
+      const c = currentPalette();
+      const report = explainTransaction(opts.transactionId, { journalDir: opts.dir });
+
+      if (opts.json) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+      if (!report.found) {
+        console.log(`  ${c.yellow(report.verdict)}`);
+        for (const hint of report.hints) console.log(`  ${c.dim(`• ${hint}`)}`);
+        return;
+      }
+      console.log(`  ${c.bold('Investigation:')} ${opts.transactionId}`);
+      console.log(`  ${c.bold('Verdict:')} ${report.verdict}`);
+      console.log();
+      for (const step of report.steps) {
+        console.log(`  ${c.dim(step.at)}  ${step.title}${step.detail ? ` — ${c.dim(step.detail)}` : ''}`);
+      }
+      if (report.hints.length > 0) {
+        console.log();
+        for (const hint of report.hints) console.log(`  ${c.yellow(`• ${hint}`)}`);
+      }
+    });
+
+  journalCmd
+    .command('anomalies')
+    .description('Detect error spikes, retry bursts and latency outliers (documented heuristics)')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--json', 'Machine-readable output')
+    .action((opts: { dir?: string; json?: boolean }) => {
+      const c = currentPalette();
+      const report = detectJournalAnomalies({ journalDir: opts.dir });
+
+      if (opts.json) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+      if (report.anomalies.length === 0) {
+        console.log(`  ${c.green('✓')} No anomalies detected.`);
+        return;
+      }
+      for (const anomaly of report.anomalies) {
+        console.log(`  ${c.yellow('▲')} [${anomaly.kind}] ${c.bold(anomaly.subject)} — ${anomaly.metric} (${anomaly.baseline})`);
+        console.log(`     ${c.dim(anomaly.detail)}`);
+      }
+      console.log(`\n  ${c.dim('Heuristics:')}`);
+      for (const heuristic of report.heuristics) console.log(`  ${c.dim(`• ${heuristic}`)}`);
     });
 }

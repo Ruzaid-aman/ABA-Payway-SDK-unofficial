@@ -22,6 +22,7 @@ export type AgentToolName =
   | 'create_checkout_purchase'
   | 'create_payment_link'
   | 'get_payment_link_details'
+  | 'query_journal'
   | 'check_transaction'
   | 'check_transaction_by_merchant_ref'
   | 'poll_transaction'
@@ -99,6 +100,22 @@ export interface CreatePaymentLinkParams {
    * domain validator + advisory equality rule apply).
    */
   payout?: Array<{ acc: string; amt: number }>;
+  rationale?: string;
+}
+
+/**
+ * Phase 5: read-only queries over the local Transaction Journal. Never hits
+ * the network — the journal only knows what was recorded while it was on.
+ */
+export interface QueryJournalParams {
+  tool: 'query_journal';
+  query: 'timeline' | 'stats' | 'reconcile' | 'anomalies';
+  /** Required for `timeline`. */
+  transactionId?: string;
+  /** `timeline`/`stats`: filter events by kind. */
+  kind?: string;
+  /** `timeline`: cap the returned events (default 100). */
+  last?: number;
   rationale?: string;
 }
 

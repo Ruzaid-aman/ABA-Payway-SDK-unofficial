@@ -74,6 +74,43 @@ arrived while journaling was off), plus duplicate-delivery flags. A missing call
 is **not** proof of non-payment — PayWay never retries missed deliveries; re-check
 with `check-transaction` before acting.
 
+## Analytics (Phase 4)
+
+`payway-sdk journal stats [--dir] [--json]` aggregates the journal:
+
+- **Latency** per endpoint over successful responses: count, p50/p90/p99, max.
+- **Retry rate**: exchanges (grouped by correlation id) that needed more than one
+  attempt, per endpoint and overall; failure rate per attempt.
+- **Top errors**: grouped by provider code / HTTP status / transport type, with the
+  last-seen timestamp; per-day error counts.
+- **Funnel** (local record only): transactions tracked → creations observed → with
+  observed status → approved / declined / still-pending → with callback. Read-only
+  endpoints (check/detail/list/by-ref/exchange-rate) never count as creations.
+
+## Intelligence (Phase 6)
+
+- **`journal explain -t <id> [--json]`** — the root-cause narrative: one line verdict
+  plus a chronological step reconstruction (creation, retries, gateway answers,
+  status changes, callback, artifacts) and hints pulled from the repo's
+  sandbox-verified gotchas (gateway code hints, never-retried callbacks, the
+  PENDING-forever blind spot, unpaid-QR list invisibility).
+- **`journal anomalies [--json]`** — documented heuristics: error spikes and retry
+  bursts (a day at ≥ 3× the mean of the *other* active days), and latency outliers
+  (endpoint p99 ≥ 3× p50 over ≥ 5 samples). Heuristics are printed with the output.
+
+## AI layer (Phase 5)
+
+The agent CLI ships a read-only **`query_journal`** tool (13-tool catalog) with
+queries `timeline` (reconstructed steps + verdict + hints for one transaction),
+`stats`, `reconcile`, and `anomalies`. It is in the planner's READONLY set — no
+approval gate — and hits no network. Ask the agent "what happened to transaction X"
+or "why did this checkout fail" and it answers from the journal when recording was
+on. Packaged skill: `aba-payway-journal` (install with the rest:
+`npx payway-sdk skills add opencode`).
+
+The environment knob `PAYWAY_WEBHOOK_DIR` (registered) relocates the webhook capture
+store for `journal reconcile`.
+
 Join keys on every event: `correlationId` (the SDK per-exchange cid), `attempt`,
 `endpoint`, `transactionId`/`merchantRef` when the request or response carries them,
 `traceId` (the gateway's `status.trace`), `httpStatus`, `paywayCode`, `durationMs`,

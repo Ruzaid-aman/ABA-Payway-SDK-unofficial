@@ -11,6 +11,26 @@
 
 ### Added
 
+- **Transaction Journal — Phase 4 Analytics** (roadmap §17): `computeJournalStats`
+  (exported) + **`journal stats`** CLI — latency percentiles (p50/p90/p99/max) per
+  endpoint over successful responses, retry rates per correlation-id-grouped
+  exchange, top provider/HTTP/transport errors with per-day counts, and the
+  creation → status → callback funnel (read-endpoint heuristic documented;
+  reports the local record only, never gateway truth).
+- **Transaction Journal — Phase 5 AI Layer**: new read-only **`query_journal`**
+  agent tool (13-tool catalog; planner/risk READONLY sets, provider listing, plan
+  + ledger schemas updated) with `timeline` (RCA steps + verdict), `stats`,
+  `reconcile`, and `anomalies` queries — no network, no approval gate. Packaged
+  skill **`aba-payway-journal`** v1.0.0 (skills README + discovery pin 30→31).
+  `PAYWAY_WEBHOOK_DIR` env var (registered) relocates the webhook capture store
+  for reconciliation.
+- **Transaction Journal — Phase 6 Intelligence**: `explainTransaction` +
+  **`journal explain -t <id>`** root-cause narrative (verdict, chronological step
+  reconstruction, sandbox-verified hints incl. gateway code hints and the
+  PENDING-forever/no-retry caveats) and `detectJournalAnomalies` +
+  **`journal anomalies`** — error spikes, retry bursts (leave-one-out baseline:
+  a day at ≥ 3× the mean of the OTHER active days), and latency outliers (p99 ≥ 3×
+  p50 over ≥ 5 samples). This completes the 6-phase transaction-data roadmap.
 - **Transaction Journal — Phase 3 Callback/Event Capture** (roadmap §17; closes gaps
   G7/G8, mitigates G9): the webhook sink now **persists the signature verdict** it
   previously computed-then-dropped — `signatureVerdict` (`verified`/`invalid`/

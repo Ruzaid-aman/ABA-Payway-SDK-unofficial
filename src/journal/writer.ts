@@ -128,12 +128,18 @@ export interface JournalFileRead {
   malformed: number;
 }
 
+/** Resolve the effective journal directory: explicit arg > env > <cwd>/payway-data. */
+export function resolveJournalDir(explicit?: string): string {
+  return explicit ?? resolveJournalConfig(undefined, process.env)?.dir ?? path.join(process.cwd(), DEFAULT_JOURNAL_DIR_NAME);
+}
+
 /**
  * Read and parse a journal file tolerantly: malformed lines are counted and
  * skipped, never fatal — a partially-written or evolving journal stays
  * queryable. Shared by the journal CLI and the reconcile engine.
  */
-export function readJournalEvents(dir: string): JournalFileRead {
+export function readJournalEvents(explicitDir?: string): JournalFileRead {
+  const dir = resolveJournalDir(explicitDir);
   const file = path.join(dir, DEFAULT_JOURNAL_FILE_NAME);
   const events: JournalEventV1[] = [];
   let malformed = 0;

@@ -253,9 +253,9 @@ describe('provider adapter - propose (native-tools)', () => {
     const capturedBody = JSON.parse((fetchImpl.mock.calls[0][1] as RequestInit).body as string);
     expect(capturedBody.tools).toBeDefined();
     expect(Array.isArray(capturedBody.tools)).toBe(true);
-    // 12 since the get_payment_link_details read tool joined the catalog
-    // (2026-09-06; it was 11 before — flip consciously if the catalog changes).
-    expect(capturedBody.tools).toHaveLength(12);
+    // 13 since query_journal (transaction journal, roadmap Phase 5) joined
+    // the catalog (2026-09-06; it was 12 before — flip consciously).
+    expect(capturedBody.tools).toHaveLength(13);
   });
 
   it('rejects invalid tool-call arguments (fails validation)', async () => {

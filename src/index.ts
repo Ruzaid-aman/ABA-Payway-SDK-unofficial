@@ -78,8 +78,27 @@ export type {
   JournalSink,
 } from './journal/types.js';
 export { DEFAULT_JOURNAL_DIR_NAME, DEFAULT_JOURNAL_FILE_NAME, JOURNAL_VERSION } from './journal/types.js';
-export { createJournalEmitter, JsonlJournalSink, pruneJournal, resolveJournalConfig } from './journal/writer.js';
-export type { JournalPruneResult } from './journal/writer.js';
+export { createJournalEmitter, JsonlJournalSink, pruneJournal, readJournalEvents, resolveJournalConfig } from './journal/writer.js';
+export type { JournalFileRead, JournalPruneResult } from './journal/writer.js';
+export { reconcileTransactions } from './journal/reconcile.js';
+export type { ReconcileEntry, ReconcileOptions, ReconcileReport } from './journal/reconcile.js';
+export { computeJournalStats } from './journal/stats.js';
+export type {
+  JournalErrorRow,
+  JournalFunnel,
+  JournalLatencyRow,
+  JournalRetryRow,
+  JournalStatsOptions,
+  JournalStatsReport,
+} from './journal/stats.js';
+export { detectJournalAnomalies, explainTransaction } from './journal/intelligence.js';
+export type {
+  AnomaliesReport,
+  JournalAnomaly,
+  RcaOptions,
+  RcaReport,
+  RcaStep,
+} from './journal/intelligence.js';
 export { computeTokenExpiry, daysUntilTokenExpiry } from './utils.js';
 export {
   PURCHASE_LIFETIME_MIN_MINUTES,
