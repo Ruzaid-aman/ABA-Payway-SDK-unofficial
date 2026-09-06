@@ -27,6 +27,24 @@
   `PAYMENT_LINK_EXPIRY_MIN_SECONDS = 300`; advisory by default,
   `strictValidation` escalates. Barrel +2 runtime exports (57 → 59; +2 type-only;
   release-checklist smoke updated). Remaining backlog: `.scratch/payment-link-docs-review/CODIFY-BACKLOG.md`.
+- **Payment-link codification C4–C9 (2026-09-06, third session)** —
+  **(C4)** the mock harness (`startMockPaywayServer`, `payway-sdk demo`)
+  now serves the payment-link create/detail endpoints with the live-learned
+  shapes (numeric `tran_id`, `expired_date: "0"` string echo, `status: OPEN`,
+  empty-image shape; detail echoes a created link per server lifetime and
+  answers the sandbox-observed code 96 for a bogus id). **(C5)**
+  `payment-link detail` human output prints a "PAST expiry" warning when
+  `expired_date` is past — the gateway keeps reporting OPEN (no EXPIRED
+  status exists), so the CLI surfaces the computed state; `--json` stays
+  raw. **(C6)** new `payway-sdk explain` family for the payment-link PTL
+  codes not claimed by other families (PTL05/PTL99/PTL132, with the
+  sandbox-vs-official caveats in the hints) + `apiErrorHint` rows for
+  PTL132/PTL05/PTL99. **(C7)** copy-runnable pushback receivers
+  (`docs/examples/backend/payment-link-pushback-receiver.{js,php}`) on the
+  live no-hash contract, wired into the docs-examples suite. **(C8)** agent
+  `create_payment_link` result now surfaces `shareUrl` directly. **(C9)**
+  reusable callback-capture recipe (`docs/agents/callback-capture-recipe.md`)
+  extracted from the V-1 rig.
 - **Payment-link follow-up batch (2026-09-06, second session)** — Batch-A
   probes executed (SANDBOX-FINDINGS §22): `tran_id` observed as a NUMBER on
   both endpoints; **no EXPIRED status** (expired links read OPEN + hosted

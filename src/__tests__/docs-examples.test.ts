@@ -167,6 +167,20 @@ describe('Documentation examples', () => {
     expect(chapter).toContain('pushback');
   });
 
+  it('keeps the payment-link pushback receivers on the live no-hash contract (C7)', () => {
+    for (const file of ['payment-link-pushback-receiver.js', 'payment-link-pushback-receiver.php']) {
+      const example = readFileSync(join(currentDir, '../../docs/examples/backend', file), 'utf-8');
+      // The contract: no hash, notification-only, verify via check-transaction.
+      expect(example).toContain('NO `hash` field');
+      expect(example).toContain('check-transaction');
+      expect(example).toContain('verifyCallback');
+      // The learned status values: numeric 0 live, "00" official — both accepted.
+      expect(example).toContain("'00'");
+      // Never verify via HMAC: the receivers must not import verifyCallback logic.
+      expect(example).not.toContain('createHmac');
+    }
+  });
+
   it('keeps the payment-link example file on the public param contract', () => {
     const example = readFileSync(
       join(currentDir, '../../docs/examples/backend/payment-link-create.ts'),

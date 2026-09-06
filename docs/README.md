@@ -72,6 +72,7 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 |---|---|
 | Agentic PayWay CLI — User Guide | [AGENTIC-PAYWAY-CLI-USER-GUIDE.md](./AGENTIC-PAYWAY-CLI-USER-GUIDE.md) |
 | Agent Setup Playbook (manual path + maintainer gotchas) | [AGENT-SETUP-PLAYBOOK.md](./AGENT-SETUP-PLAYBOOK.md) |
+| Recipe: capturing a PayWay callback contract (probe rig) | [agents/callback-capture-recipe.md](./agents/callback-capture-recipe.md) |
 | Agentic CLI 1-Pager | [QUICK-START-1-PAGER.md](./QUICK-START-1-PAGER.md) |
 | Project Status (session log + quick reference) | [PROJECT_STATUS.md](./PROJECT_STATUS.md) |
 | Release Checklist (+ first npm publish) | [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) |

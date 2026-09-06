@@ -221,6 +221,9 @@ async function runCreatePaymentLink(action: MaterializedAgentAction, client: Pay
       tool: 'create_payment_link',
       data: {
         paymentLinkId: (asRecord.data as Record<string, unknown> | undefined)?.id,
+        // Codification C8: the share URL is the field providers consume most —
+        // surface it so plans don't have to dig through `raw`.
+        shareUrl: (asRecord.data as Record<string, unknown> | undefined)?.payment_link,
         transactionId: asRecord.tran_id,
         status,
         raw: response,

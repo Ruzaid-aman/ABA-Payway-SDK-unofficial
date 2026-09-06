@@ -1,5 +1,12 @@
 # Payment-Link Codification Backlog — SDK/CLI improvements (2026-09-06)
 
+> **Status (2026-09-06, later same session): C1–C3 SHIPPED** (`parsePaymentLinkPushback`,
+> webhook `/aba-payway-pushback` route + storage metadata, `expired_date` advisory +
+> `PAYMENT_LINK_EXPIRY_MIN_SECONDS`) **and C4–C9 SHIPPED** (mock-harness routes, detail
+> expiry display, explain PTL family + PTL132 hint, pushback receiver examples, agent
+> `shareUrl`, this-recipe doc → `docs/agents/callback-capture-recipe.md`). Nothing
+> remains open here except the explicitly-NOT-proposed items.
+
 Source: the payment-link docs-review campaign (PLAN.md in this folder, Batch-A
 probes + V-1 live capture; SANDBOX-FINDINGS §22). Each item names the learning
 it codifies, so the SDK/CLI *encodes* gateway reality instead of leaving it in

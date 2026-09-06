@@ -148,6 +148,12 @@ function apiErrorHint(e: PayWayAPIError): string | undefined {
   if (e.paywayCode === '96') {
     return 'check the link id — use the data.id value returned by create.';
   }
+  if (e.paywayCode === 'PTL132') {
+    return 'invalid payment link — pass the opaque data.id returned by create, NOT merchant_ref_no or the URL slug (sandbox note: a bogus id may answer 96 instead).';
+  }
+  if (e.paywayCode === 'PTL05' || e.paywayCode === 'PTL99') {
+    return 'sandbox probes (2026-09-06) answered PTL04 for these shapes — check datatypes and merchant currency enablement (docs/12 payment-link table).';
+  }
   if (e.paywayCode === '49') {
     return 'transaction-list dates must be "YYYY-MM-DD HH:mm:ss" (sandbox-verified format).';
   }
@@ -2591,6 +2597,21 @@ paymentLinkCmd
       console.log(`  ${c.bold('Payments:')}    ${data?.total_trxn ?? 0} (total ${data?.total_amount ?? 0})`);
       console.log(`  ${c.bold('Created:')}     ${data?.created_at ?? '-'}`);
       console.log(`  ${c.bold('Expires:')}     ${data?.expired_date || '-'}`);
+      // Codification C5 (2026-09-06): the gateway has NO EXPIRED status — an
+      // expired link still reads OPEN (SANDBOX-FINDINGS §22 #2), so surface
+      // the computed expiry state instead of trusting the status field.
+      const expiredRaw: unknown = data?.expired_date;
+      const expiredEpoch =
+        typeof expiredRaw === 'number'
+          ? expiredRaw
+          : typeof expiredRaw === 'string' && expiredRaw !== '0' && /^\d+$/.test(expiredRaw)
+            ? Number(expiredRaw)
+            : undefined;
+      if (expiredEpoch !== undefined && expiredEpoch * 1000 < Date.now()) {
+        console.log(
+          `  ${c.yellow('⚠')} PAST expiry — the gateway still reports "${String(data?.status ?? 'OPEN')}"; enforce expiry merchant-side.`,
+        );
+      }
       console.log(`  ${c.bold('Link:')}        ${c.cyan(data?.payment_link ?? '-')}`);
       console.log();
     } catch (e) {
