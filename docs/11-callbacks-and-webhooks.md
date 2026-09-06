@@ -429,3 +429,29 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 - **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](./03-web-implementation.md)
 
 > ← [Previous: UI Customization](./10-ui-customization.md) | [Next: Error Handling →](./12-error-handling-and-debugging.md)
+
+---
+
+## Payment Link pushbacks (`return_url`) — no HMAC
+
+Payment links do **not** use the checkout webhook contract. On payment, PayWay
+POSTs directly to the link's decoded `return_url` (live-captured 2026-09-06):
+
+```json
+POST <return_url>
+Content-Type: application/json; charset=utf-8
+User-Agent: PayWayApp/3.0
+
+{ "tran_id": "178865526240157", "status": 0, "merchant_ref_no": "plvr-v1-mtp34wx4" }
+```
+
+- **No `hash` field — live-verified.** Treat the pushback as a notification and
+  verify the payment via `check-transaction(tran_id)`; `verifyCallback()` does
+  not apply.
+- `status` is the numeric `0` (APPROVED), not the `"00"` string the official
+  sample shows — accept both. One pushback per completed payment.
+- Receiver requirements: accept `POST` + `application/json`, answer 200 fast.
+
+Receiver setup (tunnel, storage, routes) is covered in
+[16. Webhook Setup](./16-webhook-setup-guide.md); the full payment-link
+lifecycle in [17. Payment Link API](./17-payment-link.md) §17.6.

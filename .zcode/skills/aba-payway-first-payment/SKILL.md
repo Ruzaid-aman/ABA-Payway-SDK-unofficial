@@ -66,7 +66,7 @@ requirements and a different result-handling contract.
 | **Subscription** (`checkout.purchase` + `ctid`/`tokenFlag`/`frequency`) | Recurring billing on a card/ABA account | Checkout requirements + `ctid` (customer token id) + `tokenFlag: 'CITR_FIX'` + `frequency` (1W\|1M\|2M) | First charge + registered subscription token | Webhook callback |
 | **Online QR** (`generate_online_qr`) | In-person / app scan | `callbackUrl` (webhook) + network connectivity to PayWay | `qrString` / `qrImage` | Webhook callback **or** poll (sandbox verification only) |
 | **Offline KHQR** (`generate_offline_khqr`) | Static/dynamic local QR, no API call | Merchant data configured (`khqr` config) | Local QR string only | **Never** confirms payment — you must reconcile via the offline KHQR notification route |
-| **Payment Link** (`create_payment_link`) | Shareable link via WhatsApp/email | `publicKeyPem` (RSA), `title`, `amount`, `merchantRefNo`, `returnUrl` | Shareable URL | Webhook callback |
+| **Payment Link** (`create_payment_link`) | Shareable link via WhatsApp/email | `publicKeyPem` (RSA), `title`, `amount`, `merchantRefNo`, `returnUrl` | Shareable URL | Pushback POST to `return_url` — **no hash** (live-verified): verify via check-transaction(tran_id); `status` is numeric `0` |
 
 > **Subscription route (v1.3.6+):** `payway.checkout.purchase({ ..., ctid: 'customer123', tokenFlag: 'CITR_FIX', frequency: '1M' })` — CLI: `payway-sdk generate-checkout -a 9.99 --ctid customer123 --token-flag CITR_FIX --frequency 1M --return-url <url>`. Only `CITR_FIX` is supported on the purchase path; other linking flags go through the CoF link endpoints. See [Subscription](../aba-payway-subscription/SKILL.md).
 
@@ -82,6 +82,14 @@ requirements and a different result-handling contract.
   payment status.
 - **Payment Link** requires the RSA public key (`publicKeyPem`) because PayWay
   encrypts the merchant payload.
+
+> **Payment Link pushback (live-captured 2026-09-06):** PayWay POSTs
+> `{ "tran_id": "…", "status": 0, "merchant_ref_no": "…" }` as JSON to the
+> decoded `return_url` — **no `hash` field**, `status` numeric `0` (APPROVED),
+> one pushback per payment. Treat it as a notification and verify the payment
+> via `check-transaction(tran_id)` before fulfilling; `verifyCallback()` does
+> not apply. No EXPIRED status exists — after `expired_date` passes the link
+> still reads OPEN; enforce expiry merchant-side.
 
 ### Required inputs per route
 

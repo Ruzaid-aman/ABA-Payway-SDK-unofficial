@@ -28,3 +28,10 @@ All scripts are dependency-free, read `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY` from
 
 ## Related Skills
 - [Check Transaction](../aba-payway-check-transaction/SKILL.md)
+
+> **Scope (2026-09-06):** `verifyCallback` applies to the HMAC-signed checkout/webhook
+> callbacks. It does **NOT** apply to payment-link pushbacks — those POST to the link's
+> `return_url` with **no hash field** (live-verified: body is
+> `{tran_id, status: 0, merchant_ref_no}` only). Verify payment-link payments via
+> `check-transaction(tran_id)` instead. See
+> [payment-link](../aba-payway-payment-link/SKILL.md) and `docs/17-payment-link.md` §17.6.

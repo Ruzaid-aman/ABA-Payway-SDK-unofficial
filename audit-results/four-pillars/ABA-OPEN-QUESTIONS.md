@@ -318,3 +318,50 @@ can remove a token themselves, and the merchant then receives a CoF callback wit
 | Q6.3 | 2026-08-27 | ABA clarification (relay) | See "Partial answers" above. |
 | Q3–Q5, Q6.1–6.2, Q7–Q10 | — | awaiting | See the status table above for current evidence levels. |
 | Q11–Q18 | — | awaiting | New 2026-09-02; never sent yet. |
+
+---
+
+## Re-audit 2026-09-06 — payment-link campaign (Q19–Q21)
+
+Discovered by the payment-link docs-review campaign (`docs/17-payment-link.md`,
+SANDBOX-FINDINGS §22, evidence `test-output/payment-link-docs-review/`).
+Merchant `ec476910` (sandbox).
+
+## Q19 — Sandbox payout-whitelist service disabled (payment-link payout blocker) 🔴
+
+**Observed:** `beneficiary add 500000001` (a seeded sandbox beneficiary) answers
+HTTP 403 body code **32 "Service is not enable"**; a payment-link create with
+`payout [{acc, amt}]` answers 403 "Payout accounts are not in whitelist". The
+profile cannot whitelist beneficiaries OR exercise split-payout on payment
+links, so the documented response `payout` shape (apidog: top-level
+`[{acc, amt, acc_name}]` vs the overview sample: inside `data`) is unverifiable.
+
+**Blocks:** split-payout documentation accuracy (V-2), any merchant testing
+payment-link split payout in sandbox.
+
+**Answer must contain:** how to enable the payout-whitelist service for a
+sandbox merchant (or a pre-enabled test MID), and the canonical placement +
+shape of `payout` in the create/detail responses.
+
+## Q20 — Payment-link pushback: no hash in production? `status` value set? 🟡
+
+**Observed (sandbox, live capture through a real payment):** the pushback to
+`return_url` is `POST application/json` with body exactly
+`{"tran_id":"…","status":0,"merchant_ref_no":"…"}` — **no `hash` field**, and
+`status` is the **numeric `0`**, while the official overview sample shows
+`"status": "00"`. We treat the pushback as a notification and verify via
+check-transaction.
+
+**Answer must contain:** confirmation that production pushbacks likewise carry
+no hash (i.e. no HMAC verification is possible/intended), whether `status` can
+take other values (and their meanings — e.g. failed/cancelled), and whether
+more than one pushback per payment can occur (retries on non-200).
+
+## Q21 — Invalid payment-link id: `PTL132` (docs) vs `96` (sandbox)? 🟢
+
+**Observed:** the official detail page documents `PTL132 "Invalid payment
+link"`; the sandbox answers **HTTP 403 code `96` "Invalid merchant data"** for
+a bogus link id. `PTL132` was not reproducible on this profile.
+
+**Answer must contain:** which code production returns for an invalid/unknown
+link id (or both, and when), so the SDK hint table can map it deterministically.
