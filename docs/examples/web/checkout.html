@@ -190,7 +190,7 @@
 
         // Step 2: Populate and auto-submit hidden form to PayWay
         var form = document.getElementById('paywayForm');
-        form.action = data.checkoutUrl + '/api/payment-gateway/v1/payments/checkout';
+        form.action = data.checkoutUrl + '/api/payment-gateway/v1/payments/purchase';
         form.innerHTML = '';
 
         Object.keys(data.payload).forEach(function(key) {

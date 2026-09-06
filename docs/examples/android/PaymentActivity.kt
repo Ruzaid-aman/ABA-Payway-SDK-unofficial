@@ -178,7 +178,7 @@ class PaymentActivity : AppCompatActivity() {
                 <div class="spinner"></div>
                 <p>Redirecting to payment...</p>
                 <form id="f" method="POST"
-                      action="$checkoutURL/api/payment-gateway/v1/payments/checkout">
+                      action="$checkoutURL/api/payment-gateway/v1/payments/purchase">
                     $hiddenInputs
                 </form>
                 <script>

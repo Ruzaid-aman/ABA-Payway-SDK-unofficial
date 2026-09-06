@@ -45,6 +45,22 @@ For the documented **online checkout callback**, PayWay signs the delivery with 
 
 > ⚠️ **Verified for online checkout in sandbox:** PayWay uses **HMAC-SHA512** (not SHA-256). Some older documentation may incorrectly reference SHA-256. Our sandbox probes confirm SHA-512 with Base64 encoding and sorted-key verification.
 
+### SDK helpers for verification (beyond the boolean)
+
+- **`verifyCallback(body, sig)`** — boolean, what the snippets below use.
+- **`verifyCallbackDetailed(body, sig, options?)`** (v1.3.0+) — returns
+  `{ valid, reason }` so you can log WHY a delivery failed:
+  `malformed_signature` | `empty_body` | `signature_mismatch`. Same options
+  object (`stripHash: true` strips the `hash` field before verifying).
+- **Wrong-hash diagnostics on API calls:** a gateway hash rejection throws
+  **`PayWaySignatureError`** — a `PayWayAPIError` subclass whose message
+  includes the endpoint's documented hash-field order (the hint that prevents
+  the classic "which fields went into the HMAC" debugging session). COF/QR
+  families: codes `1`/`01`/`PTL02` map here.
+- **Binding failures:** COF `04`-family rejections carry per-field messages —
+  catch `PayWayBusinessError` and read **`error.fieldErrors`**
+  (`Record<string, string>`).
+
 ---
 
 ## Implementation: Express.js Webhook Handler

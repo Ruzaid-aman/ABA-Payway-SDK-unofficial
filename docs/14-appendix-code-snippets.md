@@ -431,7 +431,7 @@ echo json_encode(['received' => true]);
 
         // Populate and submit hidden form to PayWay
         const form = document.getElementById('paywayForm');
-        form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/checkout`;
+        form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/purchase`;
         form.innerHTML = '';
         Object.entries(data.payload).forEach(([key, value]) => {
           form.innerHTML += `<input type="hidden" name="${key}" value="${value}">`;

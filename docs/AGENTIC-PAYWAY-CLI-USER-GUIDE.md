@@ -6,7 +6,7 @@ audited PayWay operations. It covers what is implemented, every command, the saf
 and how to configure both the agent's LLM provider and your PayWay credentials.
 
 > The agentic layer is **additive** — it never changes the behavior of the existing manual
-> commands (`generate-qr`, `create-checkout`, `check-transaction`, …). Those commands remain
+> commands (`generate-qr`, `generate-checkout`, `check-transaction`, …). Those commands remain
 > the single source of truth and are re-dispatched by the interactive REPL.
 
 ---
@@ -56,7 +56,7 @@ Two optional agent-guidance skills are also shipped under `skills/`:
 npm install
 npm run build      # tsup → dist/
 npm run typecheck  # tsc --noEmit
-npm test           # vitest (988 tests)
+npm test           # vitest (1350+ tests as of 2026-09-06)
 ```
 
 After building, the CLI binary is the SDK entry point (referenced here as `payway-sdk`).

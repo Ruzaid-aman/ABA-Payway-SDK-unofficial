@@ -188,7 +188,7 @@ Go through **every** item before switching from sandbox to production. A missed 
 
 ```bash
 # 1. Verify production credentials work
-npx tsx verify-credentials.ts  # (with production env vars)
+npx payway-sdk doctor --live  # (with production env vars)
 
 # 2. Check webhook endpoint is accessible
 curl -I https://your-production-domain.com/api/payway-webhook
@@ -240,7 +240,7 @@ Print this and keep it handy during launch:
 │  ABA Support: [email / phone]                               │
 ├─────────────────────────────────────────────────────────────┤
 │  Quick Commands                                              │
-│  Test auth:   npx tsx verify-credentials.ts                 │
+│  Test auth:   npx payway-sdk doctor --live                    │
 │  Check webhook: curl -I https://your-domain.com/api/webhook │
 │  View errors:  tail -f error.log | grep PayWay              │
 │  Rollback:     git revert <last-deploy-commit>              │

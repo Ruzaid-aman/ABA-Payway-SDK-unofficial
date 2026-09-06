@@ -125,12 +125,12 @@ This documentation is written for **junior to mid-level developers** who need to
 
 - [ABA PayWay Developer Portal](https://developer.payway.com.kh)
 - [SDK npm Package](https://www.npmjs.com/package/aba-payway-ts)
-- [SDK Source Code](https://github.com/your-org/aba-payway-ts)
+- [SDK Source Code](../src/) — repo-local; the package is not yet published to the npm registry (see RELEASE_CHECKLIST)
 - [Sandbox Dashboard](https://checkout-sandbox.payway.com.kh)
 - [Production Dashboard](https://checkout.payway.com.kh)
 - [Agentic PayWay CLI (1-pager)](./QUICK-START-1-PAGER.md#agentic-payway-cli) — risk-gated, provider-driven payments
 - [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md)
-- [All 29 AI skills](../skills/README.md) — task-focused agent guides; five bundle dependency-free `.cjs` tools (request signing, callback verification, KHQR decode/CRC validation, status decoding, reconciliation) under their `scripts/` folders
+- [All 30 AI skills](../skills/README.md) — task-focused agent guides; five bundle dependency-free `.cjs` tools (request signing, callback verification, KHQR decode/CRC validation, status decoding, reconciliation) under their `scripts/` folders
 
 ---
 

@@ -80,6 +80,23 @@ router.post('/generate', async (req, res) => {
       // QR image visual template (optional)
       // 'template1', 'template2', etc. — affects the visual style
       qrImageTemplate: 'template2',
+
+      // ── Live-documented optional params (v1.3.6+, all also CLI flags) ──
+      // Payer identity improves the scan-to-pay UX in the ABA app:
+      firstName: req.body.firstName,   // --first-name
+      lastName: req.body.lastName,     // --last-name
+      email: req.body.email,           // --email
+      phone: req.body.phone,           // --phone
+      // Line items shown on the ABA app payment sheet:
+      items: req.body.items,           // --items  [{name, price, quantity}]
+      // Open the ABA app directly after a scan instead of a hosted page:
+      returnDeeplink: req.body.returnDeeplink, // --return-deeplink
+      // Echoed back verbatim in the callback (order metadata):
+      customFields: req.body.customFields,    // --custom-fields
+      returnParams: req.body.returnParams,    // --return-params
+      // Split the collected amount at payment time ({account, amount} keys
+      // here — the QR domain's shape, NOT the purchase path's {acc, amt}):
+      payout: req.body.payout,               // --payout
     });
 
     // The response contains:
@@ -382,6 +399,9 @@ payway-sdk generate-qr -a 3.31 -c USD --no-open-image
 
 # List today's transactions (strict date format)
 payway-sdk transaction-list --from "2026-08-25 00:00:00" --to "2026-08-25 23:59:59" --status APPROVED
+# Pre-validated LOCALLY before any network call (exit 1): date window > 3 days
+# (gateway 403s wider), --pagination > 1000, non-"YYYY-MM-DD HH:mm:ss" dates.
+# Omit --from/--to entirely for the full gateway day (UTC+7 clock).
 
 # Void/close before payment (prompts; -y/--force for agents)
 payway-sdk close-transaction -t qrabc123 -y

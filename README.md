@@ -223,7 +223,7 @@ Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or
 | `npx tsx scripts/online-qr-poll.ts` | One online KHQR (default $31.11 USD, 600s lifetime) → save/open PNG → poll every 5s for 10 min |
 | `npx tsx scripts/checkout-link-poll.ts` | Create Transaction API (default $12.12 USD, 600s lifetime) → open hosted `checkout_qr_url` → poll every 5s for 10 min |
 | `npx tsx scripts/check-qr-transactions.ts` | Fetch transactions via `getTransactionList`, query detail for each |
-| `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 10 PayWay templates, save PNGs + QR strings to `test-logs/qr-images/` |
+| `npx tsx scripts/test-all-qr-templates.ts` | Generate QR codes for all 7 validator-supported PayWay templates (`QR_TEMPLATES`), save PNGs + QR strings to `test-logs/qr-images/` |
 | `npx tsx scripts/zero-logic-purchase-flow.ts` | End-to-end purchase flow with no business logic (demo) |
 
 Results from integration scripts are written to `test-logs/` with timestamps.
