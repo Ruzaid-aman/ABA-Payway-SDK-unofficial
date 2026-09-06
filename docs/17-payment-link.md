@@ -145,6 +145,7 @@ User-Agent: PayWayApp/3.0
 - `tran_id` is a string here (though numeric-typed in the create/detail responses) — coerce.
 - One pushback per payment: a multi-payment link (payment_limit > 1) fires one per completion.
 - The receiver must answer 200 quickly; ACK first, process after (the sample receiver below does exactly that).
+- **SDK helper:** `parsePaymentLinkPushback(rawBody)` (exported) parses/coerces the body — `status` numeric `0`/`"0"`/`"00"` → `'APPROVED'`, anything else `'UNKNOWN'` (raw preserved), `tran_id` coerced to string. The built-in webhook server's `/aba-payway-pushback` route uses it, so `payway-sdk setup-webhook` can host your pushback receiver too.
 
 ```ts
 // Express-style receiver

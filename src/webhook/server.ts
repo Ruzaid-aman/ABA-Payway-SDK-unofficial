@@ -8,6 +8,7 @@
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { verifyCallbackSignature } from '../auth.js';
+import { parsePaymentLinkPushback } from '../domains/payment-link.js';
 import { extractJsonPayload, parseKhqrPaymentNotification } from './khqr-notification.js';
 import type { WebhookStorage } from './storage.js';
 
@@ -31,6 +32,16 @@ export interface WebhookServerOptions {
     /** Dedicated path to prevent conflating KHQR notifications with checkout callbacks. */
     path?: string;
   };
+  /**
+   * Payment-link pushback listener settings. PayWay POSTs the payment
+   * notification for a payment link directly to the link's `return_url`
+   * (no hash — see `parsePaymentLinkPushback`); this route gives that
+   * contract a home on the webhook server.
+   */
+  pushback?: {
+    /** Dedicated path (default `/aba-payway-pushback`). */
+    path?: string;
+  };
 }
 
 export interface WebhookServerResult {
@@ -46,14 +57,19 @@ export interface WebhookServerResult {
 
 const WEBHOOK_PATH = '/aba-payway-webhook';
 const KHQR_WEBHOOK_PATH = '/aba-payway-khqr-webhook';
+const PUSHBACK_PATH = '/aba-payway-pushback';
 
 export function createWebhookServer(storage: WebhookStorage, options: WebhookServerOptions = {}): WebhookServerResult {
   const port = options.port ?? 8443;
   const apiKey = options.apiKey;
   const quiet = options.quiet ?? false;
   const khqrPath = options.khqr?.path ?? KHQR_WEBHOOK_PATH;
+  const pushbackPath = options.pushback?.path ?? PUSHBACK_PATH;
   if (khqrPath === WEBHOOK_PATH) {
     throw new Error(`KHQR webhook path must differ from the legacy ${WEBHOOK_PATH} route`);
+  }
+  if (pushbackPath === WEBHOOK_PATH || pushbackPath === khqrPath) {
+    throw new Error(`Payment-link pushback path must differ from the ${WEBHOOK_PATH} and ${khqrPath} routes`);
   }
 
   let server: Server | null = null;
@@ -75,9 +91,11 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
   function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     const isOnlineWebhook = req.url === WEBHOOK_PATH;
     const isKhqrWebhook = req.url === khqrPath;
-    if (req.method !== 'POST' || (!isOnlineWebhook && !isKhqrWebhook)) {
-      res.writeHead(isOnlineWebhook || isKhqrWebhook ? 405 : 404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: isOnlineWebhook || isKhqrWebhook ? 'Method not allowed' : 'Not found' }));
+    const isPushback = req.url === pushbackPath;
+    if (req.method !== 'POST' || (!isOnlineWebhook && !isKhqrWebhook && !isPushback)) {
+      const knownPath = isOnlineWebhook || isKhqrWebhook || isPushback;
+      res.writeHead(knownPath ? 405 : 404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: knownPath ? 'Method not allowed' : 'Not found' }));
       return;
     }
 
@@ -92,6 +110,37 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         }
 
         const sourceIp = req.socket?.remoteAddress;
+
+        if (isPushback) {
+          // Payment-link pushback (live contract, SANDBOX-FINDINGS §22): raw
+          // store first — the same never-discard rule as the KHQR route.
+          // There is NO hash on this delivery (notification only), so no
+          // HMAC verification is attempted; the payment itself is verified
+          // via check-transaction using the parsed tran_id.
+          const record = storage.save({ headers, body, sourceIp });
+          let pushback: import('./storage.js').PaymentLinkPushbackMetadata;
+          try {
+            const parsed = parsePaymentLinkPushback(body);
+            pushback = { parsed };
+            log(
+              `  Payment-link pushback [${record.id}]: tran_id=${parsed.tranId} status=${parsed.status}${parsed.merchantRefNo ? ` merchant_ref_no=${parsed.merchantRefNo}` : ''}`,
+            );
+          } catch (error) {
+            pushback = { parseError: error instanceof Error ? error.message : String(error) };
+            log(`  Payment-link pushback [${record.id}] failed to parse: ${pushback.parseError}`);
+          }
+
+          if (storage.updatePaymentLinkPushbackMetadata) {
+            try {
+              storage.updatePaymentLinkPushbackMetadata(record.id, pushback);
+            } catch (error) {
+              log(`  Unable to store pushback parse metadata: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ acknowledged: true, id: record.id }));
+          return;
+        }
 
         if (isKhqrWebhook) {
           // Persist the delivery before parsing it: malformed JSON and future ABA

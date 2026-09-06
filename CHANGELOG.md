@@ -11,6 +11,22 @@
 
 ### Added
 
+- **Payment-link codification C1–C3 (2026-09-06, third session)** — the
+  live-learned gateway contracts are now encoded in the SDK:
+  **(C1)** exported `parsePaymentLinkPushback()` + `PaymentLinkPushback` /
+  `PaymentLinkPushbackStatus` types — coerces the captured pushback body
+  (`status` numeric `0`/`"0"`/`"00"` → `'APPROVED'`, unknown → `'UNKNOWN'`
+  with the raw value preserved; `tran_id` → string; throws on structurally
+  invalid bodies). **(C2)** webhook server route **`/aba-payway-pushback`**
+  (configurable via `pushback.path`): stores the raw delivery first, attaches
+  `parsePaymentLinkPushback` metadata (JSON + SQLite backends), ACKs 200 —
+  no HMAC is attempted because pushbacks carry no hash; `setup-webhook`
+  prints the route. **(C3)** `paymentLink.create` warns locally when
+  `expiredDate` is past or under ~5 minutes out (gateway PTL04,
+  sandbox-verified; boundary bracketed (150s, 300s]) — new exported constant
+  `PAYMENT_LINK_EXPIRY_MIN_SECONDS = 300`; advisory by default,
+  `strictValidation` escalates. Barrel +2 runtime exports (57 → 59; +2 type-only;
+  release-checklist smoke updated). Remaining backlog: `.scratch/payment-link-docs-review/CODIFY-BACKLOG.md`.
 - **Payment-link follow-up batch (2026-09-06, second session)** — Batch-A
   probes executed (SANDBOX-FINDINGS §22): `tran_id` observed as a NUMBER on
   both endpoints; **no EXPIRED status** (expired links read OPEN + hosted

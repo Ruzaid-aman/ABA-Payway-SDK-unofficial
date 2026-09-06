@@ -175,9 +175,12 @@ Content-Type: application/json
 
 ### Payment Link pushbacks (`return_url`)
 
-Payment links do NOT use the webhook server's routes: PayWay POSTs the payment
-notification directly to the link's decoded `return_url` as
-`Content-Type: application/json`:
+Payment links do NOT use the checkout webhook contract: PayWay POSTs the
+payment notification directly to the link's decoded `return_url` as
+`Content-Type: application/json`. The webhook server now exposes a matching
+**`/aba-payway-pushback`** route — set your link's `return_url` to
+`<your-public-url>/aba-payway-pushback` and the delivery lands in the same
+storage as every other callback (`parsePaymentLinkPushback()` metadata included):
 
 ```json
 { "tran_id": "123456789", "status": "00", "merchant_ref_no": "ref0001" }

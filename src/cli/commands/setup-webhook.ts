@@ -200,6 +200,9 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   log('');
   log(`  ${c.bold('Webhook endpoint:')}`);
   log(`    ${c.cyan(webhookUrl)}`);
+  log(`  ${c.dim('The same listener also serves:')}`);
+  log(`    ${c.dim(`${webhookUrl.replace(/\/$/, '')}/aba-payway-khqr-webhook — offline KHQR notifications`)}`);
+  log(`    ${c.dim(`${webhookUrl.replace(/\/$/, '')}/aba-payway-pushback — payment-link pushbacks (use as the link's return_url; no hash — verify via check-transaction)`)}`);
   log('');
 
   if (publicUrl) {
