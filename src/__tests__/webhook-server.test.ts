@@ -6,10 +6,12 @@
  */
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import crypto from 'node:crypto';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createJournalEmitter } from '../journal/writer.js';
 import { createWebhookServer, type WebhookServerResult } from '../webhook/server.js';
 import type { WebhookRecord, WebhookStorage } from '../webhook/storage.js';
 import { JsonWebhookStorage } from '../webhook/storage-json.js';
@@ -318,5 +320,141 @@ describe('WebhookServer rejectInvalidSignature (TD-09)', () => {
   it('still responds 200 for deliveries without any signature header', async () => {
     const res = await httpRequest(port, 'POST', '/aba-payway-webhook', JSON.stringify({ tran_id: 'TX-NOSIG' }));
     expect(res.statusCode).toBe(200);
+  });
+});
+
+// ─── Phase 3: callback correlation, verdict persistence, replay marker ─────
+describe('WebhookServer callback correlation (Phase 3)', () => {
+  let tempDir: string;
+  let journalDir: string;
+  let storage: JsonWebhookStorage;
+  let server: WebhookServerResult;
+  let port: number;
+
+  function getFreePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const srv = http.createServer();
+      srv.listen(0, () => {
+        const addr = srv.address();
+        if (addr && typeof addr === 'object') srv.close(() => resolve(addr.port));
+        else srv.close(() => reject(new Error('no port')));
+      });
+    });
+  }
+
+  // Replicates the gateway's sorted-key callback signature algorithm.
+  function signCallbackBody(body: Record<string, unknown>, apiKey: string): string {
+    const concatenated = Object.keys(body)
+      .sort()
+      .map((key) => {
+        const value = body[key];
+        if (value === undefined || value === null) return '';
+        return typeof value === 'object' ? JSON.stringify(value) : String(value);
+      })
+      .join('');
+    return crypto.createHmac('sha512', apiKey).update(concatenated).digest('base64');
+  }
+
+  beforeEach(async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'webhook-correlate-test-'));
+    journalDir = mkdtempSync(join(tmpdir(), 'webhook-correlate-journal-'));
+    storage = new JsonWebhookStorage(join(tempDir, 'callbacks.jsonl'));
+    port = await getFreePort();
+    const journal = createJournalEmitter({ dir: journalDir });
+    server = createWebhookServer(storage, { port, quiet: true, apiKey: 'verify-key', journal });
+    await server.start();
+  });
+
+  afterEach(async () => {
+    await server.stop();
+    storage.close();
+    rmSync(tempDir, { recursive: true, force: true });
+    rmSync(journalDir, { recursive: true, force: true });
+  });
+
+  it('stores a VERIFIED verdict when the signature validates', async () => {
+    const body = { tran_id: 'TX-OK', status: 'APPROVED', apv: 'apv-1' };
+    const signature = signCallbackBody(body, 'verify-key');
+    const res = await httpRequest(port, 'POST', '/aba-payway-webhook', JSON.stringify(body), {
+      'x-payway-hmac-sha512': signature,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const [record] = storage.getAll();
+    expect(record.signatureVerdict).toBe('verified');
+    expect(record.verificationReason).toBeUndefined();
+    expect(record.matchedTransactionId).toBe('TX-OK');
+    expect(record.matchedStatus).toBe('APPROVED');
+  });
+
+  it('stores an INVALID verdict with the failure reason and still responds 200', async () => {
+    const payload = JSON.stringify({ tran_id: 'TX-BAD', status: 'APPROVED' });
+    const res = await httpRequest(port, 'POST', '/aba-payway-webhook', payload, {
+      'x-payway-hmac-sha512': 'not-the-right-signature',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const [record] = storage.getAll();
+    expect(record.signatureVerdict).toBe('invalid');
+    expect(record.verificationReason).toBe('signature_mismatch');
+    expect(record.matchedTransactionId).toBe('TX-BAD');
+  });
+
+  it('stores UNSIGNED for deliveries without a signature header and flags replays', async () => {
+    const payload = JSON.stringify({ tran_id: 'TX-REPLAY', status: 'APPROVED' });
+    await httpRequest(port, 'POST', '/aba-payway-webhook', payload);
+    await httpRequest(port, 'POST', '/aba-payway-webhook', payload);
+
+    const records = storage.getAll();
+    expect(records).toHaveLength(2);
+    expect(records[0].signatureVerdict).toBe('unsigned');
+    expect(records[0].replay).toBe(false);
+    expect(records[1].replay).toBe(true);
+    expect(records[1].matchedTransactionId).toBe('TX-REPLAY');
+  });
+
+  it('emits callback.received journal events joined to the webhook record id', async () => {
+    const payload = JSON.stringify({ tran_id: 'TX-J', status: 'APPROVED' });
+    await httpRequest(port, 'POST', '/aba-payway-webhook', payload);
+
+    const events = readFileSync(join(journalDir, 'journal.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { kind: string; correlationId: string; transactionId?: string; status?: string });
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('callback.received');
+    expect(events[0].transactionId).toBe('TX-J');
+    expect(events[0].status).toBe('APPROVED');
+    expect(events[0].correlationId).toBe(storage.getAll()[0].id);
+  });
+
+  it('emits callback.received for the KHQR route with the parsed notification id', async () => {
+    const payload = JSON.stringify({
+      transaction_id: 'KHQR-J-1',
+      transaction_date: '2026-09-06 10:00:00',
+      original_currency: 'USD',
+      original_amount: 2,
+      bank_ref: 'BR-1',
+      apv: 'apv-x',
+      payment_status_code: 0,
+      payment_status: 'SUCCESS',
+      payment_currency: 'USD',
+      payment_amount: 2,
+      payment_type: 'KHQR',
+      payer_account: 'payer',
+      bank_name: 'ABA',
+      merchant_ref: 'mref-1',
+    });
+    const res = await httpRequest(port, 'POST', '/aba-payway-khqr-webhook', payload);
+    expect(res.statusCode).toBe(200);
+
+    const events = readFileSync(join(journalDir, 'journal.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { kind: string; transactionId?: string; status?: string });
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('callback.received');
+    expect(events[0].transactionId).toBe('KHQR-J-1');
+    expect(events[0].status).toBe('SUCCESS');
   });
 });

@@ -52,6 +52,30 @@ export function ensureKhqrMetadataColumn(db: Pick<BetterSqlite3Database, 'exec'>
   }
 }
 
+/**
+ * Phase 3: callback-correlation columns (signature verdict, extracted
+ * transaction id/status, replay marker). Additive and duplicate-tolerant so
+ * databases created before Phase 3 migrate in place.
+ */
+export function ensureCallbackMetadataColumns(db: Pick<BetterSqlite3Database, 'exec'>): void {
+  const columns: Array<[string, string]> = [
+    ['signature_verdict', 'TEXT'],
+    ['verification_reason', 'TEXT'],
+    ['matched_transaction_id', 'TEXT'],
+    ['matched_status', 'TEXT'],
+    ['replay', 'INTEGER'],
+  ];
+  for (const [name, type] of columns) {
+    try {
+      db.exec(`ALTER TABLE callbacks ADD COLUMN ${name} ${type}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (message.includes('duplicate column name') && message.includes(name)) continue;
+      throw error;
+    }
+  }
+}
+
 export class SqliteWebhookStorage implements WebhookStorage {
   private db: BetterSqlite3Database;
 
@@ -92,6 +116,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       )
     `);
     ensureKhqrMetadataColumn(db);
+    ensureCallbackMetadataColumns(db);
 
     return new SqliteWebhookStorage(db);
   }
@@ -105,7 +130,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
 
     this.db
       .prepare(
-        'INSERT INTO callbacks (record_id, received_at, headers_json, body, source_ip, khqr_json) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO callbacks (record_id, received_at, headers_json, body, source_ip, khqr_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .run(
         entry.id,
@@ -114,6 +139,11 @@ export class SqliteWebhookStorage implements WebhookStorage {
         entry.body,
         entry.sourceIp ?? null,
         entry.khqr ? JSON.stringify(entry.khqr) : null,
+        entry.signatureVerdict ?? null,
+        entry.verificationReason ?? null,
+        entry.matchedTransactionId ?? null,
+        entry.matchedStatus ?? null,
+        entry.replay === undefined ? null : entry.replay ? 1 : 0,
       );
 
     return entry;
@@ -129,7 +159,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
   getAll(): WebhookRecord[] {
     const rows = this.db
       .prepare(
-        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json FROM callbacks ORDER BY rowid ASC',
+        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay FROM callbacks ORDER BY rowid ASC',
       )
       .all() as Array<{
       record_id: string;
@@ -138,6 +168,11 @@ export class SqliteWebhookStorage implements WebhookStorage {
       body: string;
       source_ip: string | null;
       khqr_json: string | null;
+      signature_verdict: string | null;
+      verification_reason: string | null;
+      matched_transaction_id: string | null;
+      matched_status: string | null;
+      replay: number | null;
     }>;
 
     return rows.map((row) => ({
@@ -147,6 +182,11 @@ export class SqliteWebhookStorage implements WebhookStorage {
       body: row.body,
       sourceIp: row.source_ip ?? undefined,
       khqr: row.khqr_json ? JSON.parse(row.khqr_json) : undefined,
+      signatureVerdict: (row.signature_verdict ?? undefined) as WebhookRecord['signatureVerdict'],
+      verificationReason: (row.verification_reason ?? undefined) as WebhookRecord['verificationReason'],
+      matchedTransactionId: row.matched_transaction_id ?? undefined,
+      matchedStatus: row.matched_status ?? undefined,
+      replay: row.replay === null || row.replay === undefined ? undefined : row.replay === 1,
     }));
   }
 

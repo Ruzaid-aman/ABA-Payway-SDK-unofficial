@@ -7,15 +7,24 @@
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { verifyCallbackSignature } from '../auth.js';
+import { verifyCallbackDetailed } from '../auth.js';
+import { extractTransactionIdFrom } from '../journal/digest.js';
+import { createJournalEmitter } from '../journal/writer.js';
+import type { JournalContext } from '../journal/types.js';
 import { extractJsonPayload, parseKhqrPaymentNotification } from './khqr-notification.js';
-import type { WebhookStorage } from './storage.js';
+import type { WebhookRecord, WebhookSignatureVerdict, WebhookStorage } from './storage.js';
 
 export interface WebhookServerOptions {
   /** Port to listen on (default: 8443). */
   port?: number;
   /** Callback signature verification key. If provided, signatures are logged. */
   apiKey?: string;
+  /**
+   * Phase 3: journal emitter for `callback.received` events. Defaults to an
+   * env-resolved emitter (PAYWAY_JOURNAL / PAYWAY_JOURNAL_DIR) — undefined
+   * (no emission) when journaling is disabled.
+   */
+  journal?: JournalContext;
   /**
    * TD-09 hardening mode: when `apiKey` is configured and a callback carries a
    * signature that FAILS verification, respond 401 instead of the capture
@@ -47,6 +56,26 @@ export interface WebhookServerResult {
 const WEBHOOK_PATH = '/aba-payway-webhook';
 const KHQR_WEBHOOK_PATH = '/aba-payway-khqr-webhook';
 
+function tryParseJsonObject(body: string): Record<string, unknown> | undefined {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function firstStringOf(source: Record<string, unknown> | undefined, ...keys: string[]): string | undefined {
+  if (!source) return undefined;
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+  return undefined;
+}
+
 export function createWebhookServer(storage: WebhookStorage, options: WebhookServerOptions = {}): WebhookServerResult {
   const port = options.port ?? 8443;
   const apiKey = options.apiKey;
@@ -55,12 +84,35 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
   if (khqrPath === WEBHOOK_PATH) {
     throw new Error(`KHQR webhook path must differ from the legacy ${WEBHOOK_PATH} route`);
   }
+  // Phase 3: callback.received journal events (env-gated when not injected).
+  const journal: JournalContext | undefined = options.journal ?? createJournalEmitter(undefined, process.env);
 
   let server: Server | null = null;
   let running = false;
 
   function log(msg: string): void {
     if (!quiet) console.log(msg);
+  }
+
+  function emitCallbackJournal(
+    record: WebhookRecord,
+    transactionId: string | undefined,
+    status: string | undefined,
+    route: string,
+  ): void {
+    if (!journal) return;
+    try {
+      journal.emit({
+        kind: 'callback.received',
+        // The webhook record id joins the journal event with the raw capture.
+        correlationId: record.id,
+        transactionId,
+        status,
+        endpoint: route,
+      });
+    } catch {
+      // Journaling must never break callback capture.
+    }
   }
 
   function collectBody(req: IncomingMessage): Promise<string> {
@@ -119,28 +171,66 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
               log(`  Unable to store KHQR parse metadata: ${error instanceof Error ? error.message : String(error)}`);
             }
           }
+          emitCallbackJournal(
+            record,
+            khqr.parsed?.notification.transactionId,
+            khqr.parsed?.notification.paymentStatus,
+            khqrPath,
+          );
           log(`  Received offline KHQR notification [${record.id}] at ${record.receivedAt}`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ acknowledged: true, id: record.id }));
           return;
         }
 
-        // Online checkout callback behavior remains unchanged.
-        let signatureValid: boolean | null = null;
+        // Online checkout callback: verify BEFORE saving so the verdict is
+        // part of the durable record (Phase 3 — previously computed, logged,
+        // then dropped: audit gap G7).
+        let signatureVerdict: WebhookSignatureVerdict = 'unsigned';
+        let verificationReason: WebhookRecord['verificationReason'];
         const receivedSignature = req.headers['x-payway-hmac-sha512'];
         if (apiKey && typeof receivedSignature === 'string') {
           try {
-            const bodyObj = JSON.parse(body) as Record<string, unknown>;
-            const signedBody = { ...bodyObj };
-            delete signedBody.hash;
-            signatureValid = verifyCallbackSignature(signedBody, receivedSignature, apiKey);
+            const detailed = verifyCallbackDetailed(
+              JSON.parse(body) as Record<string, unknown>,
+              receivedSignature,
+              apiKey,
+              { stripHash: true },
+            );
+            signatureVerdict = detailed.valid ? 'verified' : 'invalid';
+            verificationReason = detailed.valid ? undefined : detailed.reason;
           } catch {
-            signatureValid = false;
+            // Unparseable body carrying a signature header can never verify.
+            signatureVerdict = 'invalid';
+            verificationReason = 'signature_mismatch';
           }
-          log(`  Signature: ${signatureValid ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}`);
+          log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}`);
         }
 
-        const record = storage.save({ headers, body, sourceIp });
+        // Correlate the delivery with its transaction (gap G8) and flag
+        // replays of an already-captured (tran_id, status) pair for
+        // idempotent processing.
+        const parsedBody = tryParseJsonObject(body);
+        const matchedTransactionId = extractTransactionIdFrom(parsedBody);
+        const matchedStatus = firstStringOf(parsedBody, 'status', 'payment_status');
+        let replay = false;
+        if (matchedTransactionId && matchedStatus !== undefined) {
+          replay = storage
+            .getAll()
+            .some((prior) => prior.matchedTransactionId === matchedTransactionId && prior.matchedStatus === matchedStatus);
+        }
+
+        const record = storage.save({
+          headers,
+          body,
+          sourceIp,
+          signatureVerdict,
+          verificationReason,
+          matchedTransactionId,
+          matchedStatus,
+          replay,
+        });
+        emitCallbackJournal(record, matchedTransactionId, matchedStatus, WEBHOOK_PATH);
 
         log(`  Received callback [${record.id}] at ${record.receivedAt}`);
         if (sourceIp) {
@@ -149,7 +239,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
 
         // TD-09: optional verdict mode. The capture sink still stores every
         // delivery, but an explicitly-invalid signed callback is refused.
-        if (options.rejectInvalidSignature && apiKey && signatureValid === false) {
+        if (options.rejectInvalidSignature && apiKey && signatureVerdict === 'invalid') {
           log(`  \x1b[31m✗ Rejecting [${record.id}]: invalid signature (rejectInvalidSignature enabled)\x1b[0m`);
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'invalid signature', id: record.id }));

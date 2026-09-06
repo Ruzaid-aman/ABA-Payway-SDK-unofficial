@@ -2,12 +2,12 @@
  * Tests for webhook storage adapters (JSON and SQLite).
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JsonWebhookStorage } from '../webhook/storage-json.js';
-import { ensureKhqrMetadataColumn } from '../webhook/storage-sqlite.js';
+import { ensureCallbackMetadataColumns, ensureKhqrMetadataColumn } from '../webhook/storage-sqlite.js';
 
 // ─── JSON Storage Tests ──────────────────────────────────────────────────
 
@@ -156,5 +156,90 @@ describe('ensureKhqrMetadataColumn', () => {
     };
 
     expect(() => ensureKhqrMetadataColumn(db)).toThrow('database is locked');
+  });
+});
+
+// ─── Phase 3: callback-correlation metadata ───────────────────────────────
+
+describe('JsonWebhookStorage Phase 3 fields', () => {
+  let tempDir: string;
+  let storage: JsonWebhookStorage;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'webhook-json-p3-'));
+    storage = new JsonWebhookStorage(join(tempDir, 'callbacks.jsonl'));
+  });
+
+  afterEach(() => {
+    storage.close();
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('round-trips the signature verdict, matched transaction and replay marker', () => {
+    storage.save({
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ tran_id: 'TX-P3', status: 'APPROVED' }),
+      signatureVerdict: 'verified',
+      matchedTransactionId: 'TX-P3',
+      matchedStatus: 'APPROVED',
+      replay: false,
+    });
+    storage.save({
+      headers: {},
+      body: JSON.stringify({ tran_id: 'TX-P3', status: 'APPROVED' }),
+      signatureVerdict: 'invalid',
+      verificationReason: 'signature_mismatch',
+      matchedTransactionId: 'TX-P3',
+      matchedStatus: 'APPROVED',
+      replay: true,
+    });
+
+    const records = storage.getAll();
+    expect(records).toHaveLength(2);
+    expect(records[0].signatureVerdict).toBe('verified');
+    expect(records[0].matchedTransactionId).toBe('TX-P3');
+    expect(records[0].replay).toBe(false);
+    expect(records[1].signatureVerdict).toBe('invalid');
+    expect(records[1].verificationReason).toBe('signature_mismatch');
+    expect(records[1].replay).toBe(true);
+  });
+
+  it('reads legacy records without the new fields (undefined, not throw)', () => {
+    writeFileSync(join(tempDir, 'callbacks.jsonl'), `${JSON.stringify({ id: 'wh_old', receivedAt: new Date().toISOString(), headers: {}, body: 'x' })}\n`, 'utf-8');
+    const [legacy] = storage.getAll();
+    expect(legacy.id).toBe('wh_old');
+    expect(legacy.signatureVerdict).toBeUndefined();
+    expect(legacy.matchedTransactionId).toBeUndefined();
+    expect(legacy.replay).toBeUndefined();
+  });
+});
+
+describe('ensureCallbackMetadataColumns', () => {
+  it('attempts all five Phase 3 columns and tolerates duplicates', () => {
+    const executed: string[] = [];
+    const db = {
+      exec: (sql: string) => {
+        executed.push(sql);
+        if (executed.length > 2) {
+          const column = sql.replace('ALTER TABLE callbacks ADD COLUMN ', '').split(' ')[0];
+          throw new Error(`duplicate column name: ${column}`);
+        }
+      },
+    };
+
+    expect(() => ensureCallbackMetadataColumns(db)).not.toThrow();
+    expect(executed).toHaveLength(5);
+    expect(executed[0]).toContain('signature_verdict');
+    expect(executed[4]).toContain('replay');
+  });
+
+  it('propagates a SQLite error unrelated to an existing column', () => {
+    const db = {
+      exec: () => {
+        throw new Error('database is locked');
+      },
+    };
+
+    expect(() => ensureCallbackMetadataColumns(db)).toThrow('database is locked');
   });
 });

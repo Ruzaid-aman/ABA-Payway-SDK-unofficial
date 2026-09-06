@@ -25,6 +25,7 @@ const journalEventSchema: Record<string, unknown> = {
         'poll.attempt',
         'status.observed',
         'artifact.written',
+        'callback.received',
       ],
     },
     correlationId: { type: 'string', minLength: 1 },

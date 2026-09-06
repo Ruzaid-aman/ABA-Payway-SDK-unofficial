@@ -11,6 +11,20 @@
 
 ### Added
 
+- **Transaction Journal — Phase 3 Callback/Event Capture** (roadmap §17; closes gaps
+  G7/G8, mitigates G9): the webhook sink now **persists the signature verdict** it
+  previously computed-then-dropped — `signatureVerdict` (`verified`/`invalid`/
+  `unsigned`) + `verificationReason` on every online-route record, extracted
+  **`matchedTransactionId`/`matchedStatus`** (online body or KHQR parsed
+  notification) as the correlation join key, and a **`replay`** marker when a prior
+  record carries the same (transactionId, status) pair for idempotent processing.
+  Every delivery emits a `callback.received` journal event (correlationId = webhook
+  record id). SQLite stores migrate in place via `ensureCallbackMetadataColumns`
+  (5 additive columns, duplicate-tolerant); JSONL needs no migration. New
+  **`journal reconcile`** command joins the journal with the webhook store per
+  transaction: with-callback / **without-callback** / webhook-only buckets plus
+  duplicate-delivery flags — with the standing caveat that a missing callback is
+  not proof of non-payment (PayWay never retries missed deliveries).
 - **Transaction Journal — Phase 2 Transaction History** (roadmap §17; closes gaps
   G5/G6/G10/G12/G16/G17): new **`journal show|timeline|prune`** CLI query surface
   over the JSONL file (show filters by kind/transaction with `--last`, timeline

@@ -35,8 +35,7 @@ single `console.warn` and the SDK call proceeds exactly as before.
 ## Events
 
 One JSON object per line, envelope `{version, ts, eventId, kind, correlationId, …}`
-(schema-validated before write; readers must tolerate unknown `kind` values — Phase 3
-adds `callback.received`).
+(schema-validated before write; readers must tolerate unknown `kind` values).
 
 | kind | Fires when | Source |
 | --- | --- | --- |
@@ -47,6 +46,33 @@ adds `callback.received`).
 | `poll.attempt` | Every poll of a transaction (previously stdout-only — gap G16), grouped under one poll correlation id | CLI polling |
 | `status.observed` | Normalized payment-status reading: check-transaction, transaction-detail, terminal poll event | CLI |
 | `artifact.written` | Agent artifact saved (links sidecar ↔ journal via executionId/correlationId) | agent |
+| `callback.received` | Webhook delivery captured by the dev listener — both routes; joins the journal to the raw webhook record via `correlationId` (the record id) | webhook sink |
+
+## Callback capture (Phase 3)
+
+The webhook sink (`setup-webhook`) now persists what it used to compute-and-drop
+(audit gap G7) and extracts the correlation join key (G8):
+
+- **`signatureVerdict`** on every online-route record: `verified` / `invalid` /
+  `unsigned`, with `verificationReason` (`signature_mismatch` / `malformed_signature`
+  / `empty_body`) on failures. The KHQR route never sets it — ABA publishes no auth
+  contract for those notifications.
+- **`matchedTransactionId` / `matchedStatus`** extracted best-effort from the raw
+  body (online route) or the parsed notification (KHQR route).
+- **`replay: true`** when a prior stored record already carries the same
+  `(matchedTransactionId, matchedStatus)` — the marker for idempotent processing.
+  PayWay does not retry missed deliveries, but integrators DO receive duplicate
+  notifications in some flows; treat replays as already-processed, not as new events.
+- Every delivery emits a `callback.received` journal event when journaling is on.
+- SQLite databases migrate in place (`ensureCallbackMetadataColumns` — five additive
+  columns, duplicate-tolerant); JSONL needs no migration.
+
+**Reconciliation** — `payway-sdk journal reconcile [--dir] [--webhook-dir] [--json]`
+joins the two stores per transaction id and reports: with callback, **without
+callback** (the "created but never called back" query), and webhook-only (callback
+arrived while journaling was off), plus duplicate-delivery flags. A missing callback
+is **not** proof of non-payment — PayWay never retries missed deliveries; re-check
+with `check-transaction` before acting.
 
 Join keys on every event: `correlationId` (the SDK per-exchange cid), `attempt`,
 `endpoint`, `transactionId`/`merchantRef` when the request or response carries them,

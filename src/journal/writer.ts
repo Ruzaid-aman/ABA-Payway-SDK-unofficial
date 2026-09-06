@@ -122,6 +122,39 @@ export interface JournalPruneResult {
   kept: number;
 }
 
+export interface JournalFileRead {
+  file: string;
+  events: JournalEventV1[];
+  malformed: number;
+}
+
+/**
+ * Read and parse a journal file tolerantly: malformed lines are counted and
+ * skipped, never fatal — a partially-written or evolving journal stays
+ * queryable. Shared by the journal CLI and the reconcile engine.
+ */
+export function readJournalEvents(dir: string): JournalFileRead {
+  const file = path.join(dir, DEFAULT_JOURNAL_FILE_NAME);
+  const events: JournalEventV1[] = [];
+  let malformed = 0;
+  if (existsSync(file)) {
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      if (line.trim().length === 0) continue;
+      try {
+        const parsed = JSON.parse(line) as JournalEventV1;
+        if (parsed && typeof parsed === 'object' && typeof parsed.kind === 'string') {
+          events.push(parsed);
+        } else {
+          malformed += 1;
+        }
+      } catch {
+        malformed += 1;
+      }
+    }
+  }
+  return { file, events, malformed };
+}
+
 /**
  * Drop events older than `before` by rewriting the JSONL file atomically
  * (temp file + rename, mirroring the agent store's durability pattern).

@@ -7,6 +7,13 @@ import type { ParsedKhqrPaymentNotification } from './khqr-notification.js';
  * Two implementations: JSON file (zero deps, default) and SQLite (optional peer dep).
  */
 
+/**
+ * Signature verification outcome for the online checkout callback route
+ * (Phase 3 — the verdict is now part of the durable record; previously it
+ * was computed, logged, then dropped: audit gap G7).
+ */
+export type WebhookSignatureVerdict = 'verified' | 'invalid' | 'unsigned';
+
 export interface WebhookRecord {
   /** Auto-generated unique identifier. */
   readonly id: string;
@@ -20,6 +27,19 @@ export interface WebhookRecord {
   readonly sourceIp?: string;
   /** Offline KHQR parsing metadata. The raw body remains the audit source. */
   readonly khqr?: KhqrWebhookMetadata;
+  /**
+   * Online-route signature verification outcome. Unset on records stored by
+   * older versions; the KHQR route never sets it (no published auth contract).
+   */
+  readonly signatureVerdict?: WebhookSignatureVerdict;
+  /** Why verification failed — only present when `signatureVerdict === 'invalid'`. */
+  readonly verificationReason?: 'signature_mismatch' | 'malformed_signature' | 'empty_body';
+  /** `tran_id`/`transaction_id` extracted best-effort from the raw body — the correlation join key (gap G8). */
+  readonly matchedTransactionId?: string;
+  /** Status field extracted alongside the transaction id (drives replay detection). */
+  readonly matchedStatus?: string;
+  /** True when a prior stored record already carries the same (matchedTransactionId, matchedStatus) — a replay marker for idempotent processing. */
+  readonly replay?: boolean;
 }
 
 export interface KhqrWebhookMetadata {

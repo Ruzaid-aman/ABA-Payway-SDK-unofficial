@@ -23,7 +23,8 @@ export type JournalMode = 'digest' | 'full';
  * layer: `execution.started` (CLI command / agent turn begins),
  * `poll.attempt` (each poll of a transaction), `status.observed` (normalized
  * payment status reading), and `artifact.written` (agent artifact saved).
- * Readers MUST tolerate unknown kinds — Phase 3 adds `callback.received`.
+ * Phase 3 adds `callback.received` (webhook capture, correlated via the
+ * webhook record id). Readers MUST tolerate unknown kinds.
  */
 export type JournalEventKind =
   | 'execution.started'
@@ -32,7 +33,8 @@ export type JournalEventKind =
   | 'execution.error'
   | 'poll.attempt'
   | 'status.observed'
-  | 'artifact.written';
+  | 'artifact.written'
+  | 'callback.received';
 
 export interface JournalErrorInfo {
   code?: string;

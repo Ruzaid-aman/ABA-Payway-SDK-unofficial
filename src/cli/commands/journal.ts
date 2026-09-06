@@ -6,7 +6,6 @@
  * (never fatal) so a partially-written or evolving journal stays queryable.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Command } from 'commander';
 import {
@@ -14,7 +13,8 @@ import {
   DEFAULT_JOURNAL_FILE_NAME,
   type JournalEventV1,
 } from '../../journal/types.js';
-import { pruneJournal, resolveJournalConfig } from '../../journal/writer.js';
+import { reconcileTransactions } from '../../journal/reconcile.js';
+import { pruneJournal, readJournalEvents, resolveJournalConfig } from '../../journal/writer.js';
 import { currentPalette } from '../ui/theme.js';
 
 function resolveJournalDir(explicit: string | undefined): string {
@@ -25,32 +25,8 @@ function resolveJournalDir(explicit: string | undefined): string {
   );
 }
 
-interface JournalFileRead {
-  file: string;
-  events: JournalEventV1[];
-  malformed: number;
-}
-
-function readJournalFile(dir: string): JournalFileRead {
-  const file = path.join(dir, DEFAULT_JOURNAL_FILE_NAME);
-  const events: JournalEventV1[] = [];
-  let malformed = 0;
-  if (existsSync(file)) {
-    for (const line of readFileSync(file, 'utf8').split('\n')) {
-      if (line.trim().length === 0) continue;
-      try {
-        const parsed = JSON.parse(line) as JournalEventV1;
-        if (parsed && typeof parsed === 'object' && typeof parsed.kind === 'string') {
-          events.push(parsed);
-        } else {
-          malformed += 1;
-        }
-      } catch {
-        malformed += 1;
-      }
-    }
-  }
-  return { file, events, malformed };
+function readJournalFile(dir: string) {
+  return readJournalEvents(dir);
 }
 
 function eventLine(event: JournalEventV1): string {
@@ -148,5 +124,46 @@ export function registerJournalCommands(program: Command): void {
         return;
       }
       console.log(`  Pruned ${result.removed} event(s) before ${before.toISOString()}; ${result.kept} kept.`);
+    });
+
+  journalCmd
+    .command('reconcile')
+    .description(
+      'Join journal creations with webhook captures: which transactions never received a callback, which callbacks have no tracked creation.',
+    )
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--webhook-dir <path>', 'Webhook capture directory (default: <cwd>/webhook_data)')
+    .option('--json', 'Machine-readable output')
+    .action((opts: { dir?: string; webhookDir?: string; json?: boolean }) => {
+      const c = currentPalette();
+      const report = reconcileTransactions({ journalDir: opts.dir, webhookDir: opts.webhookDir });
+
+      if (opts.json) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+      const { summary } = report;
+      console.log(
+        `  ${c.bold('Reconcile:')} ${summary.total} transaction(s) — ${summary.withCallback} with callback, ` +
+          `${c.red(String(summary.withoutCallback))} without, ${summary.webhookOnly} webhook-only`,
+      );
+      console.log(`  ${c.dim(`journal: ${report.journalFile ?? '(not found)'} · webhook store: ${report.webhookFile ?? '(not found)'}`)}`);
+      if (summary.total === 0) {
+        console.log(`  ${c.dim('Nothing to reconcile — enable recording with --journal or PAYWAY_JOURNAL=1.')}`);
+        return;
+      }
+      console.log();
+      for (const entry of report.transactions) {
+        const flag = entry.callbackReceived
+          ? entry.callbackReplaySeen
+            ? c.yellow('↺')
+            : c.green('✓')
+          : c.red('✗ no callback');
+        const status = entry.lastStatus ?? '?';
+        console.log(`  ${flag} ${c.cyan(entry.transactionId)}  status=${status}  sources=${entry.sources.join('+')}`);
+      }
+      console.log(
+        `\n  ${c.dim('A missing callback is NOT proof of non-payment — PayWay never retries missed deliveries. Re-check with check-transaction.')}`,
+      );
     });
 }
