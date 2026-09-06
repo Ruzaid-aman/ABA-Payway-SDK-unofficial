@@ -253,6 +253,8 @@ describe('PayWay journal integration', () => {
     expect(request.transactionId).toBe('T1');
     expect(request.requestDigest).toMatchObject({ tran_id: 'T1' });
     expect(request.requestDigest).not.toHaveProperty('hash');
+    // The caller-facing correlation getter exposes the same cid the journal records.
+    expect(payway.lastCorrelationId).toBe(request.correlationId);
 
     expect(response.correlationId).toBe(request.correlationId);
     expect(response.httpStatus).toBe(200);

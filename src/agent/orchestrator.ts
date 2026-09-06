@@ -508,6 +508,7 @@ export class AgentOrchestrator {
               currency: (action as { currency?: 'USD' | 'KHR' }).currency,
               transactionId: record.transactionId ?? undefined,
               executionId: record.executionId,
+              correlationId: execCtx.correlationId,
             });
             this.appendEvent(sessionId, 'artifact', { artifactId: bundle.metadata.artifactId, path: bundle.metadata.path });
             entry.artifact = this.scrub(bundle.metadata);

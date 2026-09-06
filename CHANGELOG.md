@@ -26,8 +26,12 @@
   runs bodies through `sanitizeForLog` with a 16 KB cap. Writes are
   fail-open, schema-validated (strict Ajv, `additionalProperties: false`),
   and the barrel exports `pruneJournal` (atomic, parse-safe rewrite).
-  Default OFF — a library must never write files silently. Docs:
-  `docs/18-transaction-journal.md`.
+  Default OFF — a library must never write files silently. Correlation is
+  propagated end-to-end: new `PayWay.lastCorrelationId` getter, the agent
+  executor attaches the cid to the ledger record (`attachCorrelation`,
+  first-write-wins — the unused `correlation` field is now populated), and
+  artifact sidecars carry `correlationId` (contracts + strict Ajv schema
+  updated). Docs: `docs/18-transaction-journal.md`.
 - **Payment-link documentation & consistency batch (2026-09-06)** — new full
   lifecycle chapter `docs/17-payment-link.md` (parameter tables with datatype
   reality notes — the official docs declare several numeric fields as strings

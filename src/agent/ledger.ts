@@ -197,6 +197,21 @@ export function markOutcomeUnknown(
 }
 
 /**
+ * Attaches the SDK correlation id (cid) of the exchange that executed this
+ * record — the join key into the transaction journal. Idempotent and
+ * first-write-wins: an existing correlation is never overwritten, and the
+ * record's lifecycle status is untouched. Works from any status because the
+ * cid only becomes known after the SDK call has run.
+ */
+export function attachCorrelation(id: string, correlation: string): ExecutionRecordV1 {
+  const record = loadRecord(id);
+  if (correlation.length === 0 || record.correlation !== undefined) return record;
+  record.correlation = correlation;
+  record.updatedAt = nowIso();
+  return persist(record);
+}
+
+/**
  * Returns executions for a session that have not reached a terminal state
  * (succeeded/failed). Exposes transactionId/merchantRef for idempotent lookup
  * without replaying. Never auto-replays.

@@ -131,6 +131,22 @@ describe('saveQrArtifact', () => {
     expect(JSON.stringify(metadata)).not.toMatch(/apiKey|secret|authorization|password/i);
   });
 
+  it('carries the correlation id into the metadata sidecar when provided', async () => {
+    const bundle = await saveQrArtifact({
+      qrString: '00020101021226aba01kh',
+      root,
+      overrideApproval: true,
+      name: 'cid-art',
+      sessionId: 'sess_test_008',
+      transactionId: 'tx_cid',
+      correlationId: 'cid-abc123',
+    });
+
+    expect(bundle.metadata.correlationId).toBe('cid-abc123');
+    const metadata = JSON.parse(readFileSync(path.join(root, 'cid-art.json'), 'utf8'));
+    expect(metadata.correlationId).toBe('cid-abc123');
+  });
+
   it('renders a local PNG when the QR image is missing from an API response', async () => {
     const bundle = await saveQrArtifact({
       qrString: 'khqr-content',

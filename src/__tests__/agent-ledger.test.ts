@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AgentToolName, ExecutionRecordV1 } from '../agent/contracts.js';
 import {
+  attachCorrelation,
   confirmExecution,
   createExecutionRecord,
   findUnfinishedExecutions,
@@ -160,6 +161,34 @@ describe('correlation survival', () => {
     const submitted = markSubmitted(confirmed.executionId);
     const succeeded = markSucceeded(submitted.executionId);
     expect(succeeded.correlation).toBe('corr-xyz');
+  });
+});
+
+describe('attachCorrelation', () => {
+  it('attaches a cid to a terminal record and persists it', () => {
+    const record = markSucceeded(markSubmitted(confirmExecution(planned().executionId).executionId).executionId);
+    expect(record.correlation).toBeUndefined();
+
+    const attached = attachCorrelation(record.executionId, 'cid-abc123');
+    expect(attached.correlation).toBe('cid-abc123');
+    expect(attached.status).toBe('succeeded');
+
+    const onDisk = JSON.parse(
+      readFileSync(path.join(getAgentDataPaths().ledgerDir, `${record.executionId}.json`), 'utf8'),
+    ) as ExecutionRecordV1;
+    expect(onDisk.correlation).toBe('cid-abc123');
+  });
+
+  it('never overwrites an existing correlation (first-write-wins)', () => {
+    const record = confirmExecution(planned().executionId, 'confirm-time-corr');
+    const attached = attachCorrelation(record.executionId, 'post-call-cid');
+    expect(attached.correlation).toBe('confirm-time-corr');
+  });
+
+  it('ignores an empty cid and rejects an unknown execution id', () => {
+    const record = planned();
+    expect(attachCorrelation(record.executionId, '').correlation).toBeUndefined();
+    expect(() => attachCorrelation('no-such-execution', 'cid-1')).toThrow(LedgerNotFoundError);
   });
 });
 

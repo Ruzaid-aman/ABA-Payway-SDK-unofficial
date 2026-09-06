@@ -18,7 +18,7 @@ import type { PayWay } from '../client.js';
 import type { ResolvedPayWayContext } from './context.js';
 import { createAgentPayWay, resolvedSensitiveValues } from './context.js';
 import type { AgentSessionV1, AgentToolName, ExecutionRecordV1, MaterializedAgentAction } from './contracts.js';
-import { markFailed, markOutcomeUnknown, markSubmitted, markSucceeded } from './ledger.js';
+import { attachCorrelation, markFailed, markOutcomeUnknown, markSubmitted, markSucceeded } from './ledger.js';
 import { toolRegistry } from './tools.js';
 import { scrubSensitive } from './privacy.js';
 
@@ -28,6 +28,8 @@ export interface ExecutionContext {
   session?: AgentSessionV1;
   execution: ExecutionRecordV1;
   payway?: PayWay;
+  /** Populated by the executor after a create action's SDK call — joins the artifact sidecar with the transaction journal. */
+  correlationId?: string;
 }
 
 export interface ToolExecutionResult {
@@ -121,6 +123,7 @@ export async function executeAction(
       code: safeError.code,
       message: safeError.message,
     }, sensitiveValues);
+    recordCorrelation(executionContext, executionId, client);
     return {
       ok: false,
       tool,
@@ -149,5 +152,23 @@ export async function executeAction(
     }, sensitiveValues);
   }
 
+  recordCorrelation(executionContext, executionId, client);
+
   return result;
+}
+
+/**
+ * Joins the ledger record (and, via the execution context, the artifact
+ * sidecar) with the SDK correlation id of the exchange that just ran —
+ * the same cid every transaction-journal event carries. First-write-wins.
+ */
+function recordCorrelation(
+  executionContext: ExecutionContext,
+  executionId: string,
+  client: PayWay,
+): void {
+  const cid = client.lastCorrelationId;
+  if (!cid) return;
+  executionContext.correlationId = cid;
+  attachCorrelation(executionId, cid);
 }

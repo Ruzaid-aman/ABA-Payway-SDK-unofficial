@@ -313,4 +313,6 @@ export interface ArtifactMetadataV1 {
   currency?: Currency;
   transactionId?: string;
   executionId?: string;
+  /** SDK correlation id (cid) of the exchange that produced this artifact — joins the sidecar with the transaction journal. */
+  correlationId?: string;
 }

@@ -1001,6 +1001,7 @@ export class PayWay {
   private recentCallsByEndpoint = new Map<string, number[]>();
   private readonly breaker: CircuitBreaker | undefined;
   private readonly journal: JournalContext | undefined;
+  private lastCid: string | undefined;
 
   // --- Sub-Clients ---
   public readonly checkout: CheckoutDomain;
@@ -1069,6 +1070,15 @@ export class PayWay {
     this.preAuth = createPreAuthDomain(this.config, this.requestWithMerchantAuth.bind(this));
     this.payout = createPayoutDomain(this.config, this.request.bind(this), this.requestWithMerchantAuth.bind(this));
     this.khqr = createKhqrDomain(this.config, this.request.bind(this));
+  }
+
+  /**
+   * Correlation id (cid) of the most recent API exchange. Callers and the
+   * agent layer use it to join their own records with the transaction
+   * journal (every journal event carries the same cid).
+   */
+  get lastCorrelationId(): string | undefined {
+    return this.lastCid;
   }
 
   private static resolveConfig(config: Partial<PayWayConfig> | null): ResolvedPayWayConfig {
@@ -1255,6 +1265,7 @@ export class PayWay {
     const retriesDisabled = options?.retry === 'none';
     const url = `${this.baseUrl}${endpoint}`;
     const correlationId = randomBytes(8).toString('hex');
+    this.lastCid = correlationId;
     const requestStartedAt = Date.now();
 
     // TD-07: fail fast while the endpoint's circuit is open (half-open probes

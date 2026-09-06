@@ -43,6 +43,7 @@
 | Implementation roadmap (6 phases) | §17 |
 | Open questions register | §18 |
 | Verification appendix (reproducible greps) | §19 |
+| Investigation rules (7 roles, tagging discipline, evidence blocks) | §1 |
 
 ---
 
@@ -159,6 +160,19 @@ onThrottle?: (info: { endpoint: string; waitMs: number }) => void;
 - Hook payloads are **unsanitized**: the request body string includes the HMAC `hash` field; responses pass through raw. `sanitizeForLog` is applied only to debug console output (1256-1257, 1344), never to hooks and never to CLI `--json`.
 - The debug-mode wrapper (1090-1119) computes `trace_id` inside `onResponse` and logs it — but does not forward it to the user hook either.
 
+```
+File:           src/client.ts
+Class/Module:   PayWay._executeFetch (the single HTTP choke point)
+Function/Region: 1208-1420 — correlationId at 1224, durationMs at 1339,
+                attempt loop at 1235, error classification at 1363-1380
+Current behavior: computes per-exchange metadata, surfaces it only in
+                debug console lines and lossy hooks, then discards it
+Data produced:  cid, durationMs, attempt no., RateLimitInfo, trace_id,
+                classified PayWayAPIError fields
+Data persisted: nothing (debug console only)
+Data discarded: all of it, on every call, success and failure alike
+```
+
 **Hidden data-transforming behaviors** (things that mutate or constrain the data before it is even returned): `encodeBase64IfNeeded` on callback_url/items/deeplink/custom_fields/payout (utils.ts:452); payout domain hashes in **hex** not base64; QR lifetime seconds → floored whole minutes; purchase dual-hash (both hashes identical, checkout.ts:401/424); empty 2xx body → thrown `PayWayAPIError` (1288-1298); sandbox 403-wrapped-429 detection; `HASH_ORDER_HINTS` (client.ts:471) mapping signature failures to per-endpoint field-order hints.
 
 **Retry/idempotency (CONFIRMED):** retries = 3 × exponential backoff (base 3000 ms) on 429/5xx/`retryable`, `Retry-After`-aware; purchase supports `retryPolicy: 'none'` for once-only submission; pre-auth carries an optional `idempotency_key` body field; the agent ledger enforces once-only creates. **No automatic idempotency-key generation; no dedup store.**
@@ -185,18 +199,20 @@ onThrottle?: (info: { endpoint: string; waitMs: number }) => void;
 
 Complete enumeration method: grep every `writeFileSync|appendFileSync|createWriteStream` in shipped `src/` (§19 reproduces the command). The table uses the audit brief's columns.
 
-| Data object | Location | Purpose | Fields (shape) | Created when | Retention | Correlation ID | AI-ready? |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| QR PNG | `payway-output/<tranId>.png` | scannable QR | image bytes; tranId only in filename | generate-qr (cli.ts:2101-2107) | forever (manual) | filename=tran_id | No (binary, no metadata) |
-| link-card hosted page | `payway-output/link-card-<requestId>.html` | hosted card-entry form (success signal) | gateway HTML | cof link-card (cli.ts:2830-2833) | forever | filename=request_id | No |
-| Agent artifact PNG + sidecar | `payway-output/<name>.png` + `.json` | agent-saved QRs | `ArtifactMetadataV1` (contracts.ts:303+): artifactId, sessionId, kind, path, url?, generatedAt, route?, amount?, currency?, transactionId?, executionId? | agent saves (artifacts.ts:103+) | forever | artifactId + executionId + transactionId + sessionId | Partial (JSON but no query layer) |
-| Execution ledger record | `%APPDATA%/aba-payway-sdk/agent/ledger/<executionId>.json` | never-replay create lifecycle | `ExecutionRecordV1` (contracts.ts:283-295): version, executionId, sessionId, tool, transactionId, merchantRef?, status, correlation?, createdAt, updatedAt, error? | every agent create (orchestrator.ts:425/431) | forever (unbounded) | executionId, sessionId, transactionId | Partial (no payload, no query) |
-| Agent session log | `%APPDATA%/aba-payway-sdk/agent/sessions/<sessionId>.json` | append-only event log | `AgentSessionV1` (contracts.ts:268-275): events of type prompt/summary/plan/confirmation/tool_call/tool_result/error/artifact/ledger/cancellation; `tool_result` data = `{tool, ok, error}` only (orchestrator.ts:473) | every ask/REPL turn | forever (unbounded, `clear` is manual) | sessionId | Partial (results stripped) |
-| Webhook callback record | `./webhook_data/callbacks.jsonl` (or SQLite via optional peer dep) | raw capture sink | `WebhookRecord` (webhook/storage.ts:10-23): id, receivedAt, headers, raw body string, sourceIp, khqr?{parsed, parseError, duplicateTransactionId} | dev webhook listener (server.ts:99/143) | forever (append-only) | body contains tran_id (unparsed join) | Partial (raw JSONL, no query) |
-| Credential profiles | `%APPDATA%/aba-payway-sdk/profiles.json` | CLI credential store | ≤8 profiles incl. **plaintext apiKey** (profiles.ts:63, mode 0600) | profiles commands | forever | name | n/a (secret) |
-| tx-batch report | caller path via `--report` | batch evidence | markdown table (id/ok/code/status/error) | tx-batch (cli.ts:1314) | caller-managed | tran_id | Partial |
-| Campaign/test artifacts | `test-output/**` (`purchase-test-campaign/` etc.), `test-logs/*.jsonl` | ad-hoc evidence | raw JSON responses, HTML, PNG, LogEntry JSONL (scripts/sandbox-integration-test.ts:92-105) | probe scripts | forever | tran_id in filenames/bodies | No (heterogeneous) |
-| In-memory state | `rateLimitState`, `recentCallsByEndpoint` (client.ts:973-974), circuit-breaker map | transport accounting | tokens/timestamps | per-process | process lifetime | endpoint | No (lost on exit) |
+| Data object | Location | Purpose | Fields (shape) | Created when | Updated when | Retention | Correlation ID | AI-ready? |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| QR PNG | `payway-output/<tranId>.png` | scannable QR | image bytes; tranId only in filename | generate-qr (cli.ts:2101-2107) | never (write-once) | forever (manual) | filename=tran_id | No (binary, no metadata) |
+| link-card hosted page | `payway-output/link-card-<requestId>.html` | hosted card-entry form (success signal) | gateway HTML | cof link-card (cli.ts:2830-2833) | never (write-once) | forever | filename=request_id | No |
+| Agent artifact PNG + sidecar | `payway-output/<name>.png` + `.json` | agent-saved QRs | `ArtifactMetadataV1` (contracts.ts:303+): artifactId, sessionId, kind, path, url?, generatedAt, route?, amount?, currency?, transactionId?, executionId?, correlationId? | agent saves (artifacts.ts:103+) | never (write-once) | forever | artifactId + executionId + transactionId + sessionId | Partial (JSON but no query layer) |
+| Execution ledger record | `%APPDATA%/aba-payway-sdk/agent/ledger/<executionId>.json` | never-replay create lifecycle | `ExecutionRecordV1` (contracts.ts:283-295): version, executionId, sessionId, tool, transactionId, merchantRef?, status, correlation?, createdAt, updatedAt, error? | every agent create (orchestrator.ts:425/431) | every state transition + attachCorrelation | forever (unbounded) | executionId, sessionId, transactionId | Partial (no payload, no query) |
+| Agent session log | `%APPDATA%/aba-payway-sdk/agent/sessions/<sessionId>.json` | append-only event log | `AgentSessionV1` (contracts.ts:268-275): events of type prompt/summary/plan/confirmation/tool_call/tool_result/error/artifact/ledger/cancellation; `tool_result` data = `{tool, ok, error}` only (orchestrator.ts:473) | every ask/REPL turn | every event (full-file atomic rewrite) | forever (unbounded, `clear` is manual) | sessionId | Partial (results stripped) |
+| Webhook callback record | `./webhook_data/callbacks.jsonl` (or SQLite via optional peer dep) | raw capture sink | `WebhookRecord` (webhook/storage.ts:10-23): id, receivedAt, headers, raw body string, sourceIp, khqr?{parsed, parseError, duplicateTransactionId} | dev webhook listener (server.ts:99/143) | KHQR route only: `updateKhqrMetadata` attaches parse metadata | forever (append-only) | body contains tran_id (unparsed join) | Partial (raw JSONL, no query) |
+| Credential profiles | `%APPDATA%/aba-payway-sdk/profiles.json` | CLI credential store | ≤8 profiles incl. **plaintext apiKey** (profiles.ts:63, mode 0600) | profiles commands | profile add/use/remove | forever | name | n/a (secret) |
+| tx-batch report | caller path via `--report` | batch evidence | markdown table (id/ok/code/status/error) | tx-batch (cli.ts:1314) | never (one-shot) | caller-managed | tran_id | Partial |
+| Campaign/test artifacts | `test-output/**` (`purchase-test-campaign/` etc.), `test-logs/*.jsonl` | ad-hoc evidence | raw JSON responses, HTML, PNG, LogEntry JSONL (scripts/sandbox-integration-test.ts:92-105) | probe scripts | per run | forever | tran_id in filenames/bodies | No (heterogeneous) |
+| In-memory state | `rateLimitState`, `recentCallsByEndpoint` (client.ts:973-974), circuit-breaker map | transport accounting | tokens/timestamps | per-process | continuously | process lifetime | endpoint | No (lost on exit) |
+
+**Entities the brief asks about that are NOT durable objects** (they exist only in transit or on stdout — retained nowhere): payment links and checkout requests (share URL/deeplink printed, §2), API requests/responses (except the two artifact rows above; §9), logs (stdout only, §4), audit records (only the agent ledger/sessions, §6), provider references (`trace_id`, `bank_ref` — inside discarded responses; §3), status history (only `transaction_operations` on detail responses, §8), retry attempts (never surfaced, §3). See §9 for the per-stage retention matrix and §11 for the gap register.
 
 **NOT FOUND (searched, absent):** any transaction database (SQLite used only by the optional webhook store; no lowdb/level/redis/prisma/typeorm); any append-only execution log for plain CLI/SDK paths; any persistence of poll results; any persistence of checkout URLs/deeplinks; any status-history store.
 
@@ -211,6 +227,16 @@ Complete enumeration method: grep every `writeFileSync|appendFileSync|createWrit
 - One JSON file per execution under `%APPDATA%/aba-payway-sdk/agent/ledger/`, atomic 0600 writes (`atomicWriteJson`, storage.ts:48), Ajv-validated loads.
 - State machine `planned → confirmed → submitted → succeeded | failed | outcome_unknown`, recorded **before** the SDK call runs; `submitted` fires exactly once (executor.ts:106); replay of an unconfirmed/finished create is refused with `RECOVERY_REQUIRED` (executor.ts:88-99). **Never auto-replays.**
 - **The double result-discard:** executor calls `markSucceeded(executionId)` with no result (executor.ts:139); even if it did, `markSucceeded` ignores it (`void result;` ledger.ts:165-168). The ledger knows *that* a purchase succeeded, never *what* it returned.
+
+```
+File:            src/agent/ledger.ts (and src/agent/executor.ts)
+Class/Module:    agent execution ledger
+Function:        markSucceeded (ledger.ts:165-168); call site executor.ts:139
+Current behavior: advances submitted -> succeeded ignoring the result
+Data produced:   lifecycle status + updatedAt
+Data persisted:  status, timestamps, scrubbed error (fail paths only)
+Data discarded:  the entire API response payload ("void result;")
+```
 - `correlation` field exists (contracts.ts:291) but **no caller supplies a value** — `confirmExecution(id)` is called bare (orchestrator.ts:431) — and the gateway `trace_id` is never carried into it.
 - `findUnfinishedExecutions(sessionId)` (ledger.ts:204-222) lists recoverable records — **zero production callers** (grep §19; tests only). Recovery is exported, tested, and unreachable from any CLI surface.
 - The `'ledger'` session event type (contracts.ts:259, schemas.ts:297) is **never emitted** by any code.
@@ -244,6 +270,19 @@ PNG + `ArtifactMetadataV1` JSON sidecar (103+), traversal-safe names, carrying s
 ### Verification primitives (CONFIRMED — auth.ts)
 
 `verifyCallbackDetailed` (72-118): optional `stripHash`, sorted-key ascending concatenation (objects JSON-encoded), HMAC-SHA512 base64, length check + `timingSafeEqual` (111-117), reasons `signature_mismatch|malformed_signature|empty_body`. Distinct from outbound `generateHmac` (8-25) which uses per-endpoint fixed field lists. Callback body contract: `PaymentCallbackBody {tran_id, apv, status, return_params?}` (types.ts:1317) with an explicit "body shape is NOT fixed" note.
+
+```
+File:            src/webhook/server.ts
+Class/Module:    createWebhookServer (dev/test capture sink)
+Function/Region: 129-143 — verdict computed at 136, logged at 140,
+                 record saved at 143 without it
+Current behavior: verifies the X-PAYWAY-HMAC-SHA512 signature, prints the
+                 verdict to console, then stores {headers, body, sourceIp}
+Data produced:   signatureValid (boolean|null) + full raw delivery
+Data persisted:  raw body, headers, sourceIp, receivedAt (WebhookRecord)
+Data discarded:  the signature verdict itself — a stored record cannot say
+                 whether it verified
+```
 
 ### Gap summary
 
@@ -538,6 +577,7 @@ Unchanged: the SDK stays a client library; no server components are added; defau
 - **Migration/back-compat:** pure addition, default OFF; no public signature changes; hooks untouched.
 - **Benefits:** G1/G3/G4/G11 closed for opted-in users; every debugging session becomes reconstructable.
 - **Tests:** vitest unit (writer, schema, sanitize) + mock-gateway e2e (event sequence incl. error + retry paths); docs/CHANGELOG row.
+- **Status (2026-09-06): SHIPPED** on branch `audit/transaction-data-ai-readiness` — `src/journal/` (types, strict Ajv schema, digest builders, JSONL sink, `pruneJournal`), emitter at the request/response/catch points, config + env registered, digest|full redaction, `PayWay.lastCorrelationId` getter, cid propagated into ledger `correlation` (`attachCorrelation`, first-write-wins) and artifact metadata sidecars; default OFF; 23+ journal tests + ledger/artifact cid tests. Deliberate refinement: no separate `execution.started` transport event (request#0 carries the same data; command-level `started` arrives with Phase 2's CLI emission).
 
 ### Phase 2 — Transaction history
 - CLI/agent event emission (`execution.started`, `poll.attempt`, `artifact.written`, `status.observed` on check/detail/list); `payway-sdk journal show|timeline|prune`; wire `findUnfinishedExecutions` → `agent ledger recover`; emit `'ledger'` session events; result digests into `markSucceeded` + session `tool_result`; additive hook enrichment (`meta` arg + `onError`).
@@ -548,13 +588,13 @@ Unchanged: the SDK stays a client library; no server components are added; defau
 - Closes G7, G8, G9(mitigated). Risks: schema migration on existing JSONL/SQLite stores (additive optional fields only).
 
 ### Phase 4 — Analytics
-- `journal stats` (latency percentiles per endpoint, retry rates, provider error-code time series, QR→paid / link→paid funnels, callback delivery rate). Closes G17. Risks: none structural (read-only aggregations).
+- `journal stats` (latency percentiles per endpoint, retry rates, provider error-code time series, QR→paid / link→paid funnels, callback delivery rate). Closes G17. Risks: none structural (read-only aggregations). Migration: none — pure consumption of the existing event file. Back-compat: additive command only.
 
 ### Phase 5 — AI readiness
-- `query_journal` agent tool following the existing registry pattern (`ToolExecutionResult {ok, tool, data}`, agent/tools.ts); packaged skill `aba-payway-journal`; JSON query output for programmatic use.
+- `query_journal` agent tool following the existing registry pattern (`ToolExecutionResult {ok, tool, data}`, agent/tools.ts); packaged skill `aba-payway-journal`; JSON query output. Migration: registry + skill addition only. Back-compat: read-only tool; no changes to existing tools or schemas beyond the tool list.
 
 ### Phase 6 — Transaction intelligence
-- RCA templates ("trace a failed checkout end-to-end"), anomaly detection (error-rate/latency spikes), NL queries through the existing `ask` orchestrator backed by the query tool. Mostly composition over P1-P5.
+- RCA templates ("trace a failed checkout end-to-end"), anomaly detection (error-rate/latency spikes), NL queries through the existing `ask` orchestrator backed by the query tool. Mostly composition over P1-P5. Migration: prompt/provider-context changes only. Back-compat: journal schema untouched; new analysis surfaces degrade gracefully when the journal is empty.
 
 **Recommended sequencing:** P1 → P2 → P3 are the substance; P4-P6 are additive and can follow opportunistically.
 

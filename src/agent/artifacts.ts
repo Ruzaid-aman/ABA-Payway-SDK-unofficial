@@ -41,6 +41,7 @@ export interface SaveQrArtifactInput {
   currency?: Currency;
   transactionId?: string;
   executionId?: string;
+  correlationId?: string;
 }
 
 /**
@@ -113,6 +114,7 @@ export async function saveQrArtifact(input: SaveQrArtifactInput): Promise<Artifa
     currency,
     transactionId,
     executionId,
+    correlationId,
   } = input;
 
   if (!sessionId) {
@@ -156,6 +158,7 @@ export async function saveQrArtifact(input: SaveQrArtifactInput): Promise<Artifa
     currency,
     transactionId,
     executionId,
+    correlationId,
   };
 
   // Atomic writes: a failure leaves the previous file (if any) untouched and

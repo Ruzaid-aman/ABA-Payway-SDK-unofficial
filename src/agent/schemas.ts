@@ -364,6 +364,7 @@ const artifactSchema = {
     currency: CURRENCY,
     transactionId: { type: 'string' },
     executionId: { type: 'string' },
+    correlationId: { type: 'string' },
   },
 };
 
