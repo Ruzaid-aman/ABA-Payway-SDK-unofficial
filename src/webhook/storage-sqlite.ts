@@ -30,7 +30,6 @@ interface BetterSqlite3Database {
  */
 async function loadBetterSqlite3(): Promise<new (path: string) => BetterSqlite3Database> {
   try {
-    // @ts-expect-error — better-sqlite3 is an optional peer dependency
     const mod = await import('better-sqlite3');
     // biome-ignore lint/suspicious/noExplicitAny: dynamic import of optional peer dependency
     return (mod.default ?? mod) as any;
@@ -90,21 +89,28 @@ export class SqliteWebhookStorage implements WebhookStorage {
     }
 
     const db = new Sqlite3(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS callbacks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        record_id TEXT NOT NULL,
-        received_at TEXT NOT NULL,
-        headers_json TEXT NOT NULL,
-        body TEXT NOT NULL,
-        source_ip TEXT,
-        khqr_json TEXT,
-        pushback_json TEXT
-      )
-    `);
-    ensureKhqrMetadataColumn(db);
-    ensurePushbackMetadataColumn(db);
+    try {
+      db.pragma('journal_mode = WAL');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS callbacks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          record_id TEXT NOT NULL,
+          received_at TEXT NOT NULL,
+          headers_json TEXT NOT NULL,
+          body TEXT NOT NULL,
+          source_ip TEXT,
+          khqr_json TEXT,
+          pushback_json TEXT
+        )
+      `);
+      ensureKhqrMetadataColumn(db);
+      ensurePushbackMetadataColumn(db);
+    } catch (error) {
+      // A failed open (corrupt file, bad pragma) must not leak the handle —
+      // on Windows the open file blocks even the temp-dir cleanup.
+      db.close();
+      throw error;
+    }
 
     return new SqliteWebhookStorage(db);
   }

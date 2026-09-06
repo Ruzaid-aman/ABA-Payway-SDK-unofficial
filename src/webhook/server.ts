@@ -1,9 +1,13 @@
 /**
  * Webhook HTTP server for receiving PayWay callback payloads.
  *
- * Exposes a single POST endpoint at `/aba-payway-webhook` that accepts
- * raw payloads, stores them unvalidated, and returns 200 OK.
- * Signature verification is logged but never causes rejection (WH-TC-05).
+ * Exposes three POST routes, each with a dedicated contract:
+ *  - `/aba-payway-webhook` — online checkout callback. Raw-stored; optional
+ *    HMAC verification is logged and never causes rejection (WH-TC-05).
+ *  - `/aba-payway-khqr-webhook` — offline KHQR notification. No HMAC
+ *    (no published contract); raw-stored first, parsed as metadata only.
+ *  - `/aba-payway-pushback` — payment-link pushback. No hash on the wire
+ *    (live-verified); raw-stored first, parsed via `parsePaymentLinkPushback`.
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
