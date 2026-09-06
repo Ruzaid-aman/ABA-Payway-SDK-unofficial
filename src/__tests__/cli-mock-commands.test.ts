@@ -5,7 +5,7 @@
  * via process.env; only non-interactive flag combinations are used
  * (-y/--json/--no-polling), so nothing reads stdin and nothing leaves localhost.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -394,6 +394,66 @@ describe('CLI API commands against the local mock gateway', () => {
       result: { payment: { status: 'APPROVED', terminal: true }, poll: { outcome: 'terminal' } },
     });
     expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('keeps duplicate journal warnings off structured stdout and records streamed polls', async () => {
+    const previous = process.env.PAYWAY_JOURNAL_DIR;
+    const journalDir = path.join(tempDir, 'structured-journal');
+    process.env.PAYWAY_JOURNAL_DIR = journalDir;
+    try {
+      const args = ['--journal', 'generate-checkout', '-a', '5.00', '-t', 'CO-JOURNAL',
+        '--output', 'ndjson', '--poll-interval', '0.001', '--poll-timeout', '1', '--no-save-image'];
+      await run(args);
+      const result = await run(args);
+      const records = result.stdout.trim().split('\n').map((line) => JSON.parse(line));
+      expect(records.map((record) => record.event)).toEqual(['creation', 'poll', 'final']);
+      expect(result.stderr).toContain('already appears in the local journal');
+      const journal = readFileSync(path.join(journalDir, 'journal.jsonl'), 'utf8')
+        .trim().split('\n').map((line) => JSON.parse(line));
+      expect(journal.some((event) => event.kind === 'poll.attempt' && event.transactionId === 'CO-JOURNAL')).toBe(true);
+      const suppressed = await run([...args, '--allow-duplicate-id']);
+      expect(suppressed.stderr).not.toContain('already appears in the local journal');
+    } finally {
+      if (previous === undefined) delete process.env.PAYWAY_JOURNAL_DIR;
+      else process.env.PAYWAY_JOURNAL_DIR = previous;
+    }
+  });
+
+  it('doctor keeps journal retention warnings advisory for a healthy hosted route', async () => {
+    const previous = process.env.PAYWAY_JOURNAL_DIR;
+    const previousEnabled = process.env.PAYWAY_JOURNAL;
+    const journalDir = mkdtempSync(path.join(tempDir, 'doctor-journal-'));
+    const journalPath = path.join(journalDir, 'journal.jsonl');
+    writeFileSync(journalPath, '');
+    truncateSync(journalPath, 51 * 1024 * 1024);
+    process.env.PAYWAY_JOURNAL_DIR = journalDir;
+    process.env.PAYWAY_JOURNAL = '1';
+    try {
+      const { text, exitCode } = await run(['doctor', '--route', 'hosted-checkout']);
+      expect(text).toContain('Journal exceeds 50 MB');
+      expect(exitCode ?? 0).toBe(0);
+    } finally {
+      if (previous === undefined) delete process.env.PAYWAY_JOURNAL_DIR;
+      else process.env.PAYWAY_JOURNAL_DIR = previous;
+      if (previousEnabled === undefined) delete process.env.PAYWAY_JOURNAL;
+      else process.env.PAYWAY_JOURNAL = previousEnabled;
+    }
+  });
+
+  it.each(['generate-checkout', 'generate-qr'])('%s preserves accepted creation when writing the PNG fails', async (command) => {
+    const blockedParent = path.join(tempDir, `${command}-not-a-directory`);
+    writeFileSync(blockedParent, 'ordinary file');
+    const { stdout, exitCode } = await run([
+      command, '-a', '5.00', '-t', 'ARTIFACT-FAIL', '--output', 'json',
+      '--callback-url', 'https://example.com/cb', '--no-polling',
+      '--save-image', path.join(blockedParent, 'qr.png'),
+    ]);
+    const result = JSON.parse(stdout);
+    expect(result.creation.outcome).toBe('accepted');
+    expect(result.creation.gatewayResponse).toBeDefined();
+    expect(result.payment.status).not.toBe('NOT_CREATED');
+    expect(result.nextAction.kind).toBe('check_existing_transaction');
+    expect(exitCode).not.toBe(0);
   });
 
   it('generate-checkout --output json reports an ambiguous create without replaying it', async () => {

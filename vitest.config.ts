@@ -1,6 +1,12 @@
 import { defineConfig } from 'vitest/config';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
+  resolve: {
+    // Exercise checkout source in example lifecycle tests, even before the
+    // example installs its packed dependency. Package smoke tests run separately.
+    alias: { 'aba-payway-ts': fileURLToPath(new URL('./src/index.ts', import.meta.url)) },
+  },
   test: {
     globals: true,
     include: ['src/**/*.test.ts'],

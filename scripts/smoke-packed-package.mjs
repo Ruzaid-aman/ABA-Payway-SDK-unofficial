@@ -85,7 +85,7 @@ try {
   const skillCount = readdirSync(skillsRoot, { withFileTypes: true }).filter(
     (entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'),
   ).length;
-  if (skillCount !== 30) throw new Error(`expected 30 installed skills, found ${skillCount}`);
+  if (skillCount !== 31) throw new Error(`expected 31 installed skills, found ${skillCount}`);
 
   const installedPackage = JSON.parse(
     readFileSync(path.join(temporaryRoot, 'node_modules', 'aba-payway-ts', 'package.json'), 'utf8'),

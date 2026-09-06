@@ -17,6 +17,6 @@ Base: P0 commit `6331e48`
 
 ## Remaining P1
 
-- [ ] Task 7: portable first-payment reference app.
+- [x] Task 7: portable first-payment reference app (integrated from codex/dx-p2 on codex/dx-overhaul).
 - [ ] Task 8: refresh public skills around the canonical flow.
 - [ ] Task 9: durable documentation and drift checks.

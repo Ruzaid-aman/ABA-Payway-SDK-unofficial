@@ -75,6 +75,19 @@ import { openImageInDefaultViewer } from './open-image.js';
 import { sdk } from './sdk.js';
 import { formatTestReport } from './test/index.js';
 import { gatewayDayWindow, payoutEntriesTotal, validatePayoutEntryShape, validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
+import {
+  CLI_OUTPUT_SCHEMA_VERSION,
+  type PaymentCommandName,
+  type PaymentCommandResult,
+  type PollProgressRecord,
+  parseStructuredOutputMode,
+  resolveOutputContext,
+  type StructuredError,
+  type StructuredOutputMode,
+  writeStructuredEvent,
+  writeStructuredFinal,
+} from './cli/output.js';
+import { saveQrPng } from './cli/qr-artifact.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (shared parser; supports multi-line quoted PEMs)
@@ -158,14 +171,15 @@ function printApiResultJson(result: unknown, payway?: PayWay): void {
  * tran_ids silently but the resulting QR can be unpayable. Advisory only
  * (never blocks); `--allow-duplicate-id` suppresses it.
  */
-function warnDuplicateTransactionId(transactionId: string, opts: { allowDuplicateId?: boolean }): void {
+function warnDuplicateTransactionId(transactionId: string, opts: { allowDuplicateId?: boolean; output?: string }): void {
   if (opts.allowDuplicateId) return;
   if (!journalSawCreateFor(transactionId)) return;
-  console.log(
+  const warn = opts.output ? console.error : console.log;
+  warn(
     `  ${c.yellow('⚠')} Transaction ID ${c.bold(transactionId)} already appears in the local journal` +
       ` (W5-7: the gateway accepts duplicate tran_ids but the duplicate QR can be unpayable).`,
   );
-  console.log(`  ${c.dim('Use a fresh id, or pass --allow-duplicate-id to silence this warning.')}`);
+  warn(`  ${c.dim('Use a fresh id, or pass --allow-duplicate-id to silence this warning.')}`);
 }
 
 function classifyError(e: unknown): number {
@@ -282,6 +296,95 @@ function printValidationErrorJson(message: string): number {
   return EXIT_VALIDATION;
 }
 
+function selectedProfileName(): string | undefined {
+  const store = loadProfileStore();
+  return program.opts<{ profile?: string }>().profile ?? process.env.PAYWAY_PROFILE ?? store.defaultProfile ?? store.activeProfile;
+}
+
+function structuredError(e: unknown): StructuredError {
+  const exitCode = classifyError(e);
+  const payload: StructuredError = {
+    kind: exitCode === EXIT_NETWORK ? 'network' : exitCode === EXIT_API_FAILURE ? 'api' : 'validation',
+    exitCode,
+    type: e instanceof Error ? e.constructor.name : typeof e,
+    message: e instanceof Error ? e.message : String(e),
+  };
+  if (e instanceof PayWayAPIError) {
+    if (e.paywayCode !== undefined) payload.paywayCode = e.paywayCode;
+    if (e.statusCode !== undefined) payload.httpStatus = e.statusCode;
+    if (e.retryable !== undefined) payload.retryable = e.retryable;
+    const hint = apiErrorHint(e);
+    if (hint) payload.hint = hint;
+  }
+  return payload;
+}
+
+function basePaymentResult(input: {
+  command: PaymentCommandName;
+  transactionId: string;
+  amount?: number;
+  currency: 'USD' | 'KHR';
+  mode?: 'online' | 'offline';
+}): PaymentCommandResult {
+  return {
+    schemaVersion: CLI_OUTPUT_SCHEMA_VERSION,
+    command: input.command,
+    transactionId: input.transactionId,
+    context: resolveOutputContext({ environment: process.env.PAYWAY_ENV, profile: selectedProfileName() }),
+    request: {
+      ...(input.amount === undefined ? {} : { amount: input.amount }),
+      currency: input.currency,
+      mode: input.mode ?? 'online',
+    },
+    creation: { outcome: 'accepted' },
+    payment: { status: 'PENDING', terminal: false },
+    poll: { outcome: 'not_requested', attempts: 0, elapsedMs: 0 },
+    artifacts: {},
+    nextAction: {
+      kind: 'check_existing_transaction',
+      command: `payway-sdk check-transaction -t ${input.transactionId}`,
+      reason: 'Confirm the gateway status using the existing transaction id.',
+    },
+  };
+}
+
+function applyPollResult(
+  result: PaymentCommandResult,
+  poll: Awaited<ReturnType<typeof runPolling>>,
+): void {
+  result.payment = {
+    status: poll.status ?? poll.lastStatus ?? 'UNKNOWN',
+    terminal: poll.terminalReached,
+  };
+  result.poll = {
+    outcome: poll.terminalReached
+      ? 'terminal'
+      : poll.abortedReason === 'max_duration_exceeded'
+        ? 'timed_out'
+        : poll.abortedReason === 'caller_aborted'
+          ? 'cancelled'
+          : poll.abortedReason === 'max_consecutive_errors'
+            ? 'failed'
+            : 'ended',
+    attempts: poll.attempts,
+    elapsedMs: poll.elapsedMs,
+    ...(poll.lastStatus ? { lastStatus: poll.lastStatus } : {}),
+    ...(poll.abortedReason ? { reason: poll.abortedReason } : {}),
+  };
+  if (poll.terminalReached) {
+    result.nextAction = {
+      kind: 'none',
+      reason: `Polling reached terminal payment status ${result.payment.status}.`,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ANSI helpers (no external deps) — palette from the TUI theme layer, which
+// resolves the --no-color override, NO_COLOR/FORCE_COLOR env, and TTY state.
+// Re-resolved in the program's preAction hook once options are parsed.
+// ---------------------------------------------------------------------------
+
 // ---------------------------------------------------------------------------
 // ANSI helpers (no external deps) — palette from the TUI theme layer, which
 // resolves the --no-color override, NO_COLOR/FORCE_COLOR env, and TTY state.
@@ -308,6 +411,7 @@ interface GenerateQrCommandOptions {
   polling?: boolean;
   pollInterval?: string;
   pollTimeout?: string;
+  output?: string;
   // B6 parity: the 9 live-documented optional generate-qr params.
   firstName?: string;
   lastName?: string;
@@ -321,13 +425,61 @@ interface GenerateQrCommandOptions {
   allowDuplicateId?: boolean;
 }
 
+interface GenerateCheckoutCommandOptions {
+  allowDuplicateId?: boolean;
+  amount: string;
+  currency?: string;
+  transactionId?: string;
+  paymentOption?: string;
+  paymentGate?: string;
+  callbackUrl?: string;
+  returnUrl?: string;
+  cancelUrl?: string;
+  ctid?: string;
+  tokenFlag?: string;
+  frequency?: string;
+  type?: string;
+  firstname?: string;
+  lastname?: string;
+  email?: string;
+  phone?: string;
+  items?: string;
+  shipping?: string;
+  lifetime?: string;
+  customFields?: string;
+  returnParams?: string;
+  skipSuccessPage?: string;
+  viewType?: string;
+  continueSuccessUrl?: string;
+  payout?: string;
+  additionalParams?: string;
+  googlePayToken?: string;
+  returnDeeplink?: string;
+  json?: boolean;
+  output?: string;
+  polling?: boolean;
+  pollInterval?: string;
+  pollTimeout?: string;
+  showQr?: boolean;
+  saveImage?: string | boolean;
+  openImage?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Shared polling runner for generate-qr and generate-checkout.
 // With a clack PaymentIO the loop renders through an in-place spinner
 // (createPollDisplay) and offers a next-step picker on APPROVED; with a null
 // IO the historical plain-line output is produced byte-for-byte.
 // ---------------------------------------------------------------------------
-type PollingOptions = { pollInterval?: string; pollTimeout?: string; json?: boolean };
+type PollingOptions = {
+  pollInterval?: string;
+  pollTimeout?: string;
+  json?: boolean;
+  /** Task 2 structured output: suppress human poll lines (stderr stays). */
+  silent?: boolean;
+  /** Task 2 structured output: ndjson poll events streamed to stdout. */
+  onStructuredEvent?: (event: PollProgressRecord) => void;
+};
 
 async function runNextStepPicker(
   payway: InstanceType<typeof PayWay>,
@@ -371,13 +523,21 @@ async function runPolling(
   transactionId: string,
   opts: PollingOptions,
   io: PaymentIO | null = null,
-): Promise<{ terminalReached: boolean; status?: string; abortedReason?: 'max_duration_exceeded' | 'max_consecutive_errors' | 'caller_aborted' }> {
+): Promise<{
+  terminalReached: boolean;
+  status?: string;
+  abortedReason?: 'max_duration_exceeded' | 'max_consecutive_errors' | 'caller_aborted';
+  attempts: number;
+  elapsedMs: number;
+  lastStatus?: string;
+}> {
   const intervalMs = opts.pollInterval ? Number(opts.pollInterval) * 1000 : 5_000;
   const maxDurationMs = opts.pollTimeout ? Number(opts.pollTimeout) * 1000 : 600_000;
   const asJson = opts.json === true;
-  const display = io === null ? null : createPollDisplay(io, { transactionId, intervalMs, maxDurationMs });
+  const silent = opts.silent === true;
+  const display = silent || io === null ? null : createPollDisplay(io, { transactionId, intervalMs, maxDurationMs });
 
-  if (!asJson && display === null) {
+  if (!asJson && !silent && display === null) {
     console.log(`  ${c.bold('Polling:')} ${c.cyan(transactionId)}`);
     console.log(`    Interval:     ${c.cyan(`${intervalMs / 1000}s`)}`);
     console.log(`    Max duration: ${c.cyan(`${maxDurationMs / 1000}s`)}`);
@@ -385,7 +545,13 @@ async function runPolling(
   }
 
   const startTime = Date.now();
-  const emit = (line: string): void => console.log(asJson ? line : `  ${line}`);
+  let attempts = 0;
+  let lastStatus: string | undefined;
+  const emit = (line: string): void => {
+    if (!silent) console.log(asJson ? line : `  ${line}`);
+  };
+  // Phase 2: every poll attempt reaches the journal (previously
+  // stdout-only — gap G16), grouped under one poll correlation id.
   const pollCorrelationId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 
   try {
@@ -393,7 +559,20 @@ async function runPolling(
       intervalMs,
       maxDurationMs,
     })) {
+      attempts = result.attempt;
+      lastStatus = result.paymentStatus;
       const elapsed = formatClock(Date.now() - startTime);
+
+      opts.onStructuredEvent?.({
+        schemaVersion: CLI_OUTPUT_SCHEMA_VERSION,
+        event: 'poll',
+        transactionId,
+        attempt: result.attempt,
+        paymentStatus: result.paymentStatus,
+        terminal: result.isTerminal,
+        elapsedMs: Date.now() - startTime,
+        ...(result.paymentStatus.startsWith('ERROR:') ? { error: result.paymentStatus } : {}),
+      });
 
       // Phase 2: every poll attempt reaches the journal (previously
       // stdout-only — gap G16), grouped under one poll correlation id.
@@ -484,7 +663,7 @@ async function runPolling(
         if (display && result.paymentStatus === 'APPROVED' && io !== null) {
           await runNextStepPicker(payway, transactionId, opts, io);
         }
-        return { terminalReached: true, status: result.paymentStatus };
+        return { terminalReached: true, status: result.paymentStatus, attempts, elapsedMs: Date.now() - startTime, lastStatus };
       }
 
       if (asJson) {
@@ -508,7 +687,7 @@ async function runPolling(
         emit(`${c.dim('○')} [${elapsed} elapsed / ${remaining} left] Poll #${result.attempt}: ${result.paymentStatus}`);
       }
     }
-    return { terminalReached: false };
+    return { terminalReached: false, attempts, elapsedMs: Date.now() - startTime, lastStatus };
   } catch (error) {
     if (error instanceof PollingAbortedError) {
       if (asJson) {
@@ -524,7 +703,7 @@ async function runPolling(
         if (error.lastStatus) emit(c.dim(`Last status: ${error.lastStatus}`));
         emit('');
       }
-      return { terminalReached: false, abortedReason: error.reason };
+      return { terminalReached: false, abortedReason: error.reason, attempts, elapsedMs: Date.now() - startTime, lastStatus: error.lastStatus };
     }
     throw error;
   } finally {
@@ -749,7 +928,10 @@ function activateSelectedProfile(command: Command): void {
   const profile = getProfileByName(loadProfileStore(), selectedName);
   if (!profile) throw new Error(`Credential profile "${selectedName}" does not exist`);
   activateProfile(profile);
-  console.log(`  ${c.dim(`Using profile: ${profile.name} (${profile.environment})`)}`);
+  const output = command.opts<{ output?: string }>().output;
+  const notice = `  ${c.dim(`Using profile: ${profile.name} (${profile.environment})`)}`;
+  if (output === 'json' || output === 'ndjson') console.error(notice);
+  else console.log(notice);
 }
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
@@ -908,7 +1090,9 @@ program
     const liveGateIds = new Set(['env-PAYWAY_ENV', 'env-PAYWAY_MERCHANT_ID', 'env-PAYWAY_API_KEY']);
     const credChecks = result.checks.filter((c) => liveGateIds.has(c.id));
     const credFailures = credChecks.filter((c) => !c.ok);
-    const blockingFailures = result.checks.filter((check) => !check.ok && check.id !== 'framework');
+    const blockingFailures = result.checks.filter(
+      (check) => !check.ok && check.id !== 'framework' && check.id !== 'journal',
+    );
     let liveStatus: 'ok' | 'fail' | undefined;
 
     if (opts.live && process.env.PAYWAY_MERCHANT_ID && process.env.PAYWAY_API_KEY) {
@@ -1859,10 +2043,13 @@ program
   .requiredOption('-a, --amount <number>', 'Payment amount')
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
   .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
-  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--payment-option <option>', 'Payment option (omit to let PayWay show all options)')
+  .option('--allow-duplicate-id', 'Accepted for compatibility; local form signing does not submit a transaction')
+  .option('--payment-gate <0|1>', 'Hosted checkout gate; use 0 for the browser-hosted payment page')
   .option('--return-url <url>', 'Return URL after payment')
   .option('--cancel-url <url>', 'Cancel URL')
+  .option('--skip-success-page <0|1>', 'Skip the PayWay success page (0 or 1)')
+  .option('--continue-success-url <url>', 'Destination used by the hosted page Continue action')
   .option('--firstname <name>', 'Customer first name')
   .option('--lastname <name>', 'Customer last name')
   .option('--email <email>', 'Customer email')
@@ -1888,6 +2075,19 @@ program
       process.exitCode = EXIT_VALIDATION;
       return;
     }
+
+    const paymentGate = opts.paymentGate === undefined ? undefined : Number(opts.paymentGate);
+    if (paymentGate !== undefined && paymentGate !== 0 && paymentGate !== 1) {
+      say(`  ${c.red('✗')} --payment-gate must be 0 or 1, received: ${c.red(String(opts.paymentGate))}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    const skipSuccessPage = opts.skipSuccessPage === undefined ? undefined : Number(opts.skipSuccessPage);
+    if (skipSuccessPage !== undefined && skipSuccessPage !== 0 && skipSuccessPage !== 1) {
+      say(`  ${c.red('✗')} --skip-success-page must be 0 or 1, received: ${c.red(String(opts.skipSuccessPage))}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -1901,8 +2101,11 @@ program
           amount,
           currency,
           ...(opts.paymentOption ? { paymentOption: opts.paymentOption } : {}),
+          ...(paymentGate === undefined ? {} : { paymentGate }),
           ...(opts.returnUrl ? { returnUrl: opts.returnUrl } : {}),
           ...(opts.cancelUrl ? { cancelUrl: opts.cancelUrl } : {}),
+          ...(skipSuccessPage === undefined ? {} : { skipSuccessPage: skipSuccessPage as 0 | 1 }),
+          ...(opts.continueSuccessUrl ? { continueSuccessUrl: opts.continueSuccessUrl } : {}),
           ...(opts.firstname ? { firstname: opts.firstname } : {}),
           ...(opts.lastname ? { lastname: opts.lastname } : {}),
           ...(opts.email ? { email: opts.email } : {}),
@@ -1942,6 +2145,7 @@ program
   .option('-a, --amount <number>', 'Payment amount (optional for static offline QR)')
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR')
   .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted; online mode only)')
+  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--offline', 'Generate official ABA KHQR offline (no API call)')
   .option('--callback-url <url>', 'Webhook callback URL (required for online mode)')
   .option('--payment-option <option>', 'Payment option for online mode')
@@ -1955,7 +2159,6 @@ program
   .option('--no-save-image', 'Do not save the QR image PNG to payway-output/<transaction-id>.png by default')
   .option('--open-image', 'Open the saved QR image with the OS default viewer (default: auto when interactive)')
   .option('--no-open-image', 'Never open the QR image, even in interactive terminals')
-  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
   .option('--first-name <name>', 'Payer first name (gateway caps at 20 chars, err 16/17)')
   .option('--last-name <name>', 'Payer last name (gateway caps at 20 chars, err 16/17)')
@@ -1971,10 +2174,19 @@ program
   .option('--no-polling', 'Disable automatic polling after QR generation')
   .option('--poll-interval <seconds>', 'Polling interval in seconds (default: 5)', '5')
   .option('--poll-timeout <seconds>', 'Max polling duration in seconds (default: 600)', '600')
+  .option('--output <format>', 'Stable command result: json or ndjson')
   .action(async (opts: GenerateQrCommandOptions) => {
-    console.log(`\n${c.bold('ABA PayWay SDK')} — generate QR code\n`);
+    let outputMode: StructuredOutputMode | undefined;
+    try {
+      outputMode = parseStructuredOutputMode(opts.output);
+    } catch (error) {
+      console.log(JSON.stringify({ error: structuredError(error) }, null, 2));
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    if (!outputMode) console.log(`\n${c.bold('ABA PayWay SDK')} — generate QR code\n`);
 
-    const mode = resolvePromptMode({ nonInteractive: opts.nonInteractive });
+    const mode = outputMode ? 'none' : resolvePromptMode({ nonInteractive: opts.nonInteractive });
     const io = mode === 'clack' ? createClackIO() : null;
 
     // Wizard-resolved values. In readline/none modes these are exactly the
@@ -1989,6 +2201,35 @@ program
     let paymentOption = opts.paymentOption ?? 'abapay_khqr';
     let template = opts.template ?? 'template2';
     let lifetimeSeconds = opts.lifetime ? Number(opts.lifetime) : 180;
+    let acceptedQr: { response: unknown } | undefined;
+    const failStructuredQr = (error: unknown): boolean => {
+      if (!outputMode) return false;
+      const detail = structuredError(error);
+      const result = basePaymentResult({
+        command: 'generate-qr',
+        transactionId,
+        ...(amount !== undefined && Number.isFinite(amount) ? { amount } : {}),
+        currency: currency === 'KHR' ? 'KHR' : 'USD',
+        mode: offline ? 'offline' : 'online',
+      });
+      result.creation = acceptedQr
+        ? { outcome: 'accepted', gatewayResponse: acceptedQr.response, error: detail }
+        : { outcome: detail.kind === 'network' ? 'unknown' : 'rejected', error: detail };
+      result.payment = { status: acceptedQr ? 'PENDING' : detail.kind === 'network' ? 'UNKNOWN' : 'NOT_CREATED', terminal: false };
+      result.nextAction =
+        acceptedQr || detail.kind === 'network'
+          ? {
+              kind: 'check_existing_transaction',
+              command: `payway-sdk check-transaction -t ${transactionId}`,
+              reason: acceptedQr
+                ? 'Creation succeeded but local processing failed; check this transaction id before another create attempt.'
+                : 'The create outcome is ambiguous; reconcile this transaction id before another create attempt.',
+            }
+          : { kind: 'fix_input', reason: detail.message };
+      writeStructuredFinal(outputMode, result);
+      process.exitCode = detail.exitCode;
+      return true;
+    };
 
     if (io !== null) {
       // ── Guided wizard (real interactive TTY only) ────────────────────────
@@ -2031,18 +2272,21 @@ program
     }
 
     if (!io && !offline && amount === undefined) {
+      if (failStructuredQr(new PayWayConfigError('--amount is required for online mode'))) return;
       console.log(`  ${c.red('✗')} --amount is required for online mode`);
       process.exitCode = 1;
       return;
     }
 
     if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
+      if (failStructuredQr(new PayWayConfigError(`Amount must be a positive number, received: ${String(opts.amount)}`))) return;
       console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
       process.exitCode = 1;
       return;
     }
 
     if (!['USD', 'KHR'].includes(currency)) {
+      if (failStructuredQr(new PayWayConfigError(`Currency must be USD or KHR, received: ${currency}`))) return;
       console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${c.red(currency)}`);
       process.exitCode = 1;
       return;
@@ -2052,18 +2296,21 @@ program
     // already guarantees a valid value.
     if (!io && opts.template !== undefined && !QR_TEMPLATE_NAMES.includes(opts.template)) {
       const hint = suggestMessage(opts.template, QR_TEMPLATE_NAMES, 'QR template');
-      console.log(`  ${c.yellow('⚠')} ${hint ?? `Unknown QR template '${opts.template}'.`}`);
+      const warn = outputMode ? console.error : console.log;
+      warn(`  ${c.yellow('⚠')} ${hint ?? `Unknown QR template '${opts.template}'.`}`);
     }
 
     // Unknown payment option → hard validation error (mirrors the currency check).
     if (!io && opts.paymentOption !== undefined && !(PAYMENT_OPTIONS as readonly string[]).includes(opts.paymentOption)) {
       const hint = suggestMessage(opts.paymentOption, [...PAYMENT_OPTIONS], 'payment option');
-      console.log(`  ${c.red('✗')} ${hint ?? `Payment option must be one of: ${PAYMENT_OPTIONS.join(', ')}, received: ${opts.paymentOption}`}`);
+      const message = hint ?? `Payment option must be one of: ${PAYMENT_OPTIONS.join(', ')}, received: ${opts.paymentOption}`;
+      if (failStructuredQr(new PayWayConfigError(message))) return;
+      console.log(`  ${c.red('✗')} ${message}`);
       process.exitCode = 1;
       return;
     }
 
-    if (opts.nonInteractive) {
+    if (opts.nonInteractive && !outputMode) {
       console.log(`  ${c.dim('(non-interactive mode — skipping prompts)')}`);
       console.log();
     }
@@ -2071,6 +2318,7 @@ program
     if (offline) {
       // ── Offline mode ──────────────────────────────────────────────────
       if (!ref) {
+        if (failStructuredQr(new PayWayConfigError('--ref is required for offline mode'))) return;
         console.log(`  ${c.red('✗')} --ref is required for offline mode`);
         process.exitCode = 1;
         return;
@@ -2085,6 +2333,14 @@ program
         });
         const readiness = payway.khqr.validateConfiguration();
         if (!readiness.ready) {
+          if (
+            failStructuredQr(
+              new PayWayConfigError(
+                `ABA KHQR configuration is not ready: ${readiness.issues.map((issue) => `${issue.code}: ${issue.message}`).join('; ')}`,
+              ),
+            )
+          )
+            return;
           console.log(`  ${c.red('✗')} ABA KHQR configuration is not ready`);
           for (const issue of readiness.issues) console.log(`    ${c.red('•')} ${issue.code}: ${issue.message}`);
           process.exitCode = 1;
@@ -2096,6 +2352,22 @@ program
           merchantRef: ref,
         });
 
+        if (outputMode) {
+          const structured = basePaymentResult({
+            command: 'generate-qr',
+            transactionId,
+            ...(amount === undefined ? {} : { amount }),
+            currency,
+            mode: 'offline',
+          });
+          structured.creation = { outcome: 'accepted', gatewayResponse: { qrString } };
+          structured.payment = { status: 'NOT_APPLICABLE', terminal: false };
+          structured.nextAction = { kind: 'none', reason: 'Offline KHQR was generated locally.' };
+          if (outputMode === 'ndjson') writeStructuredEvent({ event: 'creation', transactionId, outcome: 'accepted' });
+          writeStructuredFinal(outputMode, structured);
+          return;
+        }
+
         console.log(`  ${c.green('✓')} Offline ABA KHQR generated\n`);
         console.log(
           `  ${c.bold('Amount:')}           ${c.cyan(amount === undefined ? `Static ${currency}` : `${amount} ${currency}`)}`,
@@ -2106,6 +2378,7 @@ program
         console.log(`  ${c.dim(qrString)}`);
         console.log();
       } catch (e) {
+        if (failStructuredQr(e)) return;
         console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
         process.exitCode = 1;
       }
@@ -2121,6 +2394,7 @@ program
         callbackUrl = opts.callbackUrl || process.env.PAYWAY_CALLBACK_URL?.trim();
 
         if (!callbackUrl) {
+          if (failStructuredQr(new PayWayConfigError('--callback-url is required for online mode'))) return;
           console.log(`  ${c.red('✗')} --callback-url is required for online mode`);
           console.log(`  ${c.dim('Tip: use --offline for offline QR generation without credentials')}`);
           console.log(`  ${c.dim('Or run: payway-sdk setup-webhook --tunnel to set PAYWAY_CALLBACK_URL in .env')}`);
@@ -2129,6 +2403,14 @@ program
         }
 
         if (!Number.isFinite(lifetimeSeconds) || lifetimeSeconds <= 0 || !Number.isInteger(lifetimeSeconds)) {
+          if (
+            failStructuredQr(
+              new PayWayConfigError(
+                `--lifetime must be a positive whole number of seconds, received: ${opts.lifetime}`,
+              ),
+            )
+          )
+            return;
           console.log(
             `  ${c.red('✗')} --lifetime must be a positive whole number of seconds, received: ${opts.lifetime}`,
           );
@@ -2136,6 +2418,14 @@ program
           return;
         }
         if (lifetimeSeconds < QR_LIFETIME_MIN_SECONDS) {
+          if (
+            failStructuredQr(
+              new PayWayConfigError(
+                `--lifetime must be at least ${QR_LIFETIME_MIN_SECONDS} seconds, received: ${opts.lifetime}`,
+              ),
+            )
+          )
+            return;
           console.log(
             `  ${c.red('✗')} --lifetime must be at least ${QR_LIFETIME_MIN_SECONDS} seconds (3 minutes — PayWay gateway minimum; below that the API rejects with code "04"), received: ${opts.lifetime}`,
           );
@@ -2147,18 +2437,28 @@ program
       if (callbackUrl === undefined) {
         // Unreachable: the legacy path guards above; the clack wizard always
         // resolves a callback URL for online payments. Kept for narrowing.
+        if (failStructuredQr(new PayWayConfigError('--callback-url is required for online mode'))) return;
         process.exitCode = 1;
         return;
       }
 
-      if (!assertCredentialsPresent()) {
+      const credentialIssues = validateRequiredCredentials(process.env);
+      if (hasBlockingIssues(credentialIssues) && outputMode) {
+        failStructuredQr(
+          new PayWayConfigError(
+            `Missing merchant credentials: ${credentialIssues.map((issue) => issue.message).join('; ')}`,
+          ),
+        );
+        return;
+      }
+      if (!outputMode && !assertCredentialsPresent()) {
         process.exitCode = 1;
         return;
       }
 
       let finalLifetime = lifetimeSeconds;
 
-      if (!io && !opts.nonInteractive) {
+      if (!io && !opts.nonInteractive && !outputMode) {
         console.log();
         console.log(`  ${c.bold('Parameters:')}`);
         console.log(`    Amount:           ${c.cyan(`${amount} ${currency}`)}`);
@@ -2208,6 +2508,47 @@ program
           returnParams: opts.returnParams,
           payout: parseJsonOrString(opts.payout) as Array<{ account: string; amount: number }> | string | undefined,
         });
+        acceptedQr = { response: qr };
+
+        if (outputMode) {
+          const resolvedSaveImage =
+            opts.saveImage === false
+              ? undefined
+              : typeof opts.saveImage === 'string'
+                ? opts.saveImage
+                : path.join(process.cwd(), 'payway-output', `${transactionId}.png`);
+          const qrPngPath = resolvedSaveImage
+            ? await saveQrPng({ outputPath: resolvedSaveImage, qrImage: qr.qrImage, qrString: qr.qrString })
+            : undefined;
+          const structured = basePaymentResult({
+            command: 'generate-qr',
+            transactionId,
+            amount,
+            currency,
+          });
+          structured.creation = { outcome: 'accepted', gatewayResponse: qr };
+          if (qrPngPath) structured.artifacts.qrPngPath = qrPngPath;
+          if (outputMode === 'ndjson') writeStructuredEvent({ event: 'creation', transactionId, outcome: 'accepted' });
+          if (opts.polling !== false) {
+            const poll = await runPolling(
+              payway,
+              transactionId,
+              {
+                pollInterval: opts.pollInterval,
+                pollTimeout: opts.pollTimeout,
+                silent: true,
+                ...(outputMode === 'ndjson'
+                  ? { onStructuredEvent: (event: PollProgressRecord) => writeStructuredEvent({ ...event }) }
+                  : {}),
+              },
+              null,
+            );
+            applyPollResult(structured, poll);
+            process.exitCode = mapPollOutcomeToExitCode(poll);
+          }
+          writeStructuredFinal(outputMode, structured);
+          return;
+        }
 
         console.log(`  ${c.green('✓')} Online QR generated via PayWay API\n`);
         console.log(`  ${c.bold('Transaction ID:')}  ${c.cyan(transactionId)}`);
@@ -2276,16 +2617,14 @@ program
 
         // ── Polling ─────────────────────────────────────────────────────
         if ((opts as Record<string, unknown>).polling !== false) {
-          // W5-11 (improvement I-1): a poll timeout/consecutive-error abort
-          // must be machine-visible — map the outcome to the exit code
-          // (terminal 0, consecutive errors 2, timeout 3). runPolling already
-          // emits the `aborted` NDJSON event under --json.
-          process.exitCode = mapPollOutcomeToExitCode(await runPolling(payway, transactionId, opts, io));
+          const poll = await runPolling(payway, transactionId, opts, io);
+          process.exitCode = mapPollOutcomeToExitCode(poll);
         } else {
           console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
           console.log();
         }
       } catch (e) {
+        if (failStructuredQr(e)) return;
         process.exitCode = printApiError(e);
       }
     }
@@ -2294,14 +2633,13 @@ program
 // --- generate-checkout ---
 program
   .command('generate-checkout')
-  .description(
-    'Generate a checkout QR URL (requires sandbox/production credentials). ' +
-      'Note: the SDK-only purchase param paymentGate (send 0 for a checkout_qr_url) is deliberately not a flag — use checkout.purchase() with a JSON request for that path.',
-  )
+  .description('Create a PayWay checkout and optionally save its QR as a PNG')
   .requiredOption('-a, --amount <number>', 'Payment amount')
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
   .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
+  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--payment-option <option>', 'Payment option', 'abapay_khqr_deeplink')
+  .option('--payment-gate <0|1>', 'Gate 0 returns hosted HTML; use checkout-form for browser navigation')
   .option('--callback-url <url>', 'Callback endpoint configured in PayWay merchant settings')
   .option('--return-url <url>', 'Return URL after payment')
   .option('--cancel-url <url>', 'Cancel URL')
@@ -2326,23 +2664,69 @@ program
   .option('--google-pay-token <token>', 'Google Pay token (required by the gateway when --payment-option google_pay)')
   .option('--return-deeplink <json>', 'App deeplink — JSON {ios_scheme, android_scheme} or string')
   .option('--json', 'Print the raw JSON response')
+  .option('--output <format>', 'Stable command result: json or ndjson')
   .option('--polling', 'Poll transaction status after checkout (enabled by default)', true)
   .option('--no-polling', 'Disable automatic polling after checkout')
   .option('--poll-interval <seconds>', 'Polling interval in seconds (default: 5)', '5')
   .option('--poll-timeout <seconds>', 'Max polling duration in seconds (default: 600)', '600')
+  .option('--save-image <path>', 'Save the checkout QR as a PNG (renders qrString when needed)')
+  .option('--no-save-image', 'Do not save a checkout QR PNG')
+  .option('--open-image', 'Open the saved checkout QR with the OS default viewer')
+  .option('--no-open-image', 'Never open the saved checkout QR')
   .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
-  .action(async (opts: Record<string, string | undefined>) => {
-    console.log(`\n${c.bold('ABA PayWay SDK')} — generate checkout QR URL\n`);
+  .action(async (opts: GenerateCheckoutCommandOptions) => {
+    let outputMode: StructuredOutputMode | undefined;
+    try {
+      outputMode = parseStructuredOutputMode(opts.output);
+      if (outputMode && opts.json) throw new PayWayConfigError('Use either --json or --output, not both');
+    } catch (error) {
+      console.log(JSON.stringify({ error: structuredError(error) }, null, 2));
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
 
-    const io = resolvePromptMode() === 'clack' ? createClackIO() : null;
+    if (!outputMode) console.log(`\n${c.bold('ABA PayWay SDK')} — generate checkout QR URL\n`);
+
+    const io = !outputMode && resolvePromptMode() === 'clack' ? createClackIO() : null;
     const amount = Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
     const transactionId = opts.transactionId ?? `ck${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
     warnDuplicateTransactionId(transactionId, opts);
+    const safeCurrency: 'USD' | 'KHR' = currency === 'KHR' ? 'KHR' : 'USD';
+    let acceptedCheckout: { response: unknown } | undefined;
+    const failStructured = (error: unknown): boolean => {
+      if (!outputMode) return false;
+      const detail = structuredError(error);
+      const result = basePaymentResult({
+        command: 'generate-checkout',
+        transactionId,
+        ...(Number.isFinite(amount) ? { amount } : {}),
+        currency: safeCurrency,
+      });
+      result.creation = acceptedCheckout
+        ? { outcome: 'accepted', gatewayResponse: acceptedCheckout.response, error: detail }
+        : { outcome: detail.kind === 'network' ? 'unknown' : 'rejected', error: detail };
+      result.payment = { status: acceptedCheckout ? 'PENDING' : detail.kind === 'network' ? 'UNKNOWN' : 'NOT_CREATED', terminal: false };
+      result.nextAction =
+        acceptedCheckout || detail.kind === 'network'
+          ? {
+              kind: 'check_existing_transaction',
+              command: `payway-sdk check-transaction -t ${transactionId}`,
+              reason: acceptedCheckout
+                ? 'Creation succeeded but local processing failed; check this transaction id before another create attempt.'
+                : 'The create outcome is ambiguous; reconcile this transaction id before another create attempt.',
+            }
+          : { kind: 'fix_input', reason: detail.message };
+      writeStructuredFinal(outputMode, result);
+      process.exitCode = detail.exitCode;
+      return true;
+    };
 
     if (!Number.isFinite(amount) || amount <= 0) {
+      const error = new PayWayConfigError(`Amount must be a positive number, received: ${String(opts.amount)}`);
+      if (failStructured(error)) return;
       if (opts.json) {
-        process.exitCode = printValidationErrorJson(`Amount must be a positive number, received: ${String(opts.amount)}`);
+        process.exitCode = printValidationErrorJson(error.message);
         return;
       }
       console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
@@ -2351,8 +2735,10 @@ program
     }
 
     if (!['USD', 'KHR'].includes(currency)) {
+      const error = new PayWayConfigError(`Currency must be USD or KHR, received: ${String(currency)}`);
+      if (failStructured(error)) return;
       if (opts.json) {
-        process.exitCode = printValidationErrorJson(`Currency must be USD or KHR, received: ${String(currency)}`);
+        process.exitCode = printValidationErrorJson(error.message);
         return;
       }
       console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${c.red(currency)}`);
@@ -2360,13 +2746,47 @@ program
       return;
     }
 
+    const paymentGate = opts.paymentGate === undefined ? undefined : Number(opts.paymentGate);
+    if (paymentGate !== undefined && paymentGate !== 0 && paymentGate !== 1) {
+      const error = new PayWayConfigError(`--payment-gate must be 0 or 1, received: ${String(opts.paymentGate)}`);
+      if (failStructured(error)) return;
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(error.message);
+        return;
+      }
+      console.log(`  ${c.red('✗')} ${error.message}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    const skipSuccessPage = opts.skipSuccessPage === undefined ? undefined : Number(opts.skipSuccessPage);
+    if (skipSuccessPage !== undefined && skipSuccessPage !== 0 && skipSuccessPage !== 1) {
+      const error = new PayWayConfigError(
+        `--skip-success-page must be 0 or 1, received: ${String(opts.skipSuccessPage)}`,
+      );
+      if (failStructured(error)) return;
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(error.message);
+        return;
+      }
+      console.log(`  ${c.red('✗')} ${error.message}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
     if (opts.callbackUrl) {
-      console.log(
+      const warn = outputMode ? console.error : console.log;
+      warn(
         `  ${c.yellow('⚠')} --callback-url is not sent by checkout purchase; use --return-url for the customer redirect.`,
       );
     }
 
-    if (!assertCredentialsPresent()) {
+    const credentialIssues = validateRequiredCredentials(process.env);
+    if (hasBlockingIssues(credentialIssues) && outputMode) {
+      const message = `Missing merchant credentials: ${credentialIssues.map((issue) => issue.message).join('; ')}`;
+      failStructured(new PayWayConfigError(message));
+      return;
+    }
+    if (!outputMode && !assertCredentialsPresent()) {
       process.exitCode = 1;
       return;
     }
@@ -2402,13 +2822,14 @@ program
     try {
       const payway = new PayWay();
 
-      console.log(`  ${c.dim('Calling PayWay API...')}`);
+      if (!outputMode) console.log(`  ${c.dim('Calling PayWay API...')}`);
 
       const result = await payway.checkout.purchase({
         transactionId,
         amount,
         currency,
         paymentOption: (opts.paymentOption as 'abapay_khqr_deeplink') ?? 'abapay_khqr_deeplink',
+        paymentGate,
         returnUrl: opts.returnUrl,
         cancelUrl: opts.cancelUrl,
         type: opts.type === undefined ? undefined : (opts.type as 'purchase' | 'pre-auth'),
@@ -2418,7 +2839,7 @@ program
         phone: opts.phone,
         shipping: opts.shipping !== undefined ? Number(opts.shipping) : undefined,
         lifetime: opts.lifetime !== undefined ? Number(opts.lifetime) : undefined,
-        skipSuccessPage: opts.skipSuccessPage !== undefined ? (Number(opts.skipSuccessPage) as 0 | 1) : undefined,
+        skipSuccessPage: skipSuccessPage as 0 | 1 | undefined,
         viewType: opts.viewType === undefined ? undefined : (opts.viewType as 'hosted_view' | 'popup'),
         continueSuccessUrl: opts.continueSuccessUrl,
         items: parseJsonOrString(opts.items) as ItemEntry[] | string | undefined,
@@ -2434,10 +2855,60 @@ program
         ctid: opts.ctid,
         tokenFlag: opts.tokenFlag === undefined ? undefined : (opts.tokenFlag as 'CITR_FIX'),
         frequency: opts.frequency === undefined ? undefined : (opts.frequency as '1W' | '1M' | '2M'),
+        retryPolicy: 'none',
       });
+      acceptedCheckout = { response: result };
 
       if (opts.json) {
         printApiResultJson(result, payway);
+        return;
+      }
+
+      const response = result && typeof result === 'object' ? (result as Record<string, unknown>) : {};
+      const qrStringValue = response.qrString ?? response.qr_string;
+      const qrImageValue = response.qrImage ?? response.qr_image;
+      const qrString = typeof qrStringValue === 'string' ? qrStringValue : undefined;
+      const qrImage = typeof qrImageValue === 'string' ? qrImageValue : undefined;
+      const resolvedSaveImage =
+        opts.saveImage === false
+          ? undefined
+          : typeof opts.saveImage === 'string'
+            ? opts.saveImage
+            : path.join(process.cwd(), 'payway-output', `${transactionId}.png`);
+      const qrPngPath = resolvedSaveImage ? await saveQrPng({ outputPath: resolvedSaveImage, qrImage, qrString }) : undefined;
+
+      if (outputMode) {
+        const structured = basePaymentResult({
+          command: 'generate-checkout',
+          transactionId,
+          amount,
+          currency,
+        });
+        structured.creation = { outcome: 'accepted', gatewayResponse: result };
+        if (qrPngPath) structured.artifacts.qrPngPath = qrPngPath;
+        if (outputMode === 'ndjson') {
+          writeStructuredEvent({ event: 'creation', transactionId, outcome: 'accepted' });
+        }
+
+        if (opts.polling !== false) {
+          const poll = await runPolling(
+            payway,
+            transactionId,
+            {
+              pollInterval: opts.pollInterval,
+              pollTimeout: opts.pollTimeout,
+              silent: true,
+              ...(outputMode === 'ndjson'
+                ? { onStructuredEvent: (event: PollProgressRecord) => writeStructuredEvent({ ...event }) }
+                : {}),
+            },
+            null,
+          );
+          applyPollResult(structured, poll);
+          process.exitCode = mapPollOutcomeToExitCode(poll);
+        }
+
+        writeStructuredFinal(outputMode, structured);
         return;
       }
 
@@ -2449,14 +2920,14 @@ program
 
       if (result && typeof result === 'object') {
         const r = result as Record<string, unknown>;
-        if (r.qr_string) {
+        if (qrString) {
           console.log(`  ${c.bold('QR String:')}`);
-          console.log(`  ${c.dim(String(r.qr_string))}`);
+          console.log(`  ${c.dim(qrString)}`);
           console.log();
 
           if (shouldAutoRenderQr(process.stdout, asBoolFlag(opts.showQr))) {
             try {
-              const terminalQr = await renderQrToTerminal(String(r.qr_string));
+              const terminalQr = await renderQrToTerminal(qrString);
               console.log(terminalQr);
               console.log(`  ${c.dim('Scan the QR above with the ABA app to pay.')}\n`);
             } catch {
@@ -2476,15 +2947,27 @@ program
         }
       }
 
+      if (qrPngPath) {
+        console.log(`  ${c.green('✓')} Image saved to ${c.cyan(qrPngPath)}`);
+        const shouldOpenImage = opts.openImage === true || (opts.openImage === undefined && Boolean(process.stdout.isTTY));
+        if (shouldOpenImage) {
+          const opened = await openImageInDefaultViewer(qrPngPath);
+          if (opened.opened) console.log(`  ${c.green('✓')} QR image opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
+          else console.log(`  ${c.yellow('⚠')} Could not open QR image automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`);
+        }
+        console.log();
+      }
+
       // ── Polling ─────────────────────────────────────────────────────
-      if ((opts as Record<string, unknown>).polling !== false) {
-        // W5-11 (improvement I-1): poll outcome -> exit code (see generate-qr).
-        process.exitCode = mapPollOutcomeToExitCode(await runPolling(payway, transactionId, opts, io));
+      if (opts.polling !== false) {
+        const poll = await runPolling(payway, transactionId, opts, io);
+        process.exitCode = mapPollOutcomeToExitCode(poll);
       } else {
         console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
         console.log();
       }
     } catch (e) {
+      if (failStructured(e)) return;
       // T5.4 (H6-confirmed): the envelope contract from check-transaction /
       // transaction-detail now covers generate-checkout — gateway
       // rejections (04/35/104) and SDK-local validation both emit
@@ -2496,6 +2979,7 @@ program
       process.exitCode = printApiError(e);
     }
   });
+
 
 // --- payment-link ---
 const paymentLinkCmd = program

@@ -55,6 +55,16 @@ jobs:
       # (cli.test.ts, agent-cli.test.ts, webhook-cli.test.ts) spawn dist/cli.js.
       - name: Build
         run: npm run build
+      - name: Public package and documentation boundaries
+        run: |
+          npm run check:package
+          npm run check:public-docs
+      - name: Packed SDK and reference app
+        if: matrix.node-version == '22.x'
+        run: |
+          npm run smoke:package
+          npm --prefix examples/first-payment run setup
+          npm --prefix examples/first-payment run typecheck
       - name: Unit & integration tests
         run: npm test
       - name: Coverage (enforces floor thresholds from vitest.config.ts)
