@@ -25,7 +25,7 @@ const fs = require('node:fs');
 
 // Live 27-field purchase order (src/domains/checkout.ts PURCHASE_HASH_FIELDS):
 // ctid sits between items and shipping (the gateway signs it on the
-// subscription path — SANDBOX-FINDINGS §17, 2026-09-05; the live docs' list
+// subscription path — sandbox-verified 2026-09-05; the live docs' list
 // omits it), token_flag + frequency are appended after skip_success_page;
 // omitted fields hash as '' so plain purchases are byte-identical to the
 // legacy 24-field HMAC.

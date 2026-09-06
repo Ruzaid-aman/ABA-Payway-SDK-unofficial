@@ -223,6 +223,53 @@ describe('checkout-form (in-process runCli)', () => {
     }
   });
 
+  it('forwards hosted-page and continuation fields into the signed form', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');
+    vi.stubEnv('PAYWAY_API_KEY', 'inprocess-key');
+    const outDir = mkdtempSync(path.join(tmpdir(), 'payway-checkout-hosted-form-'));
+    const outPath = path.join(outDir, 'hosted.html');
+    try {
+      const { exitCode } = await run([
+        'checkout-form',
+        '-a',
+        '15.00',
+        '--payment-gate',
+        '0',
+        '--skip-success-page',
+        '0',
+        '--continue-success-url',
+        'https://merchant.example/continue',
+        '--out',
+        outPath,
+      ]);
+      expect(exitCode).toBe(0);
+
+      const html = readFileSync(outPath, 'utf8');
+      expect(html).toContain('name="payment_gate" value="0"');
+      expect(html).toContain('name="skip_success_page" value="0"');
+      expect(html).toContain('name="continue_success_url"');
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('rejects checkout-form hosted-page flags outside 0 or 1', async () => {
+    vi.stubEnv('APPDATA', emptyAppData);
+    try {
+      const gate = await run(['checkout-form', '-a', '15.00', '--payment-gate', '2']);
+      expect(gate.exitCode).toBe(1);
+      expect(gate.text).toContain('--payment-gate must be 0 or 1');
+
+      const successPage = await run(['checkout-form', '-a', '15.00', '--skip-success-page', 'yes']);
+      expect(successPage.exitCode).toBe(1);
+      expect(successPage.text).toContain('--skip-success-page must be 0 or 1');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('emits clean HTML on stdout and diagnostics on stderr (redirect-safe)', async () => {
     vi.stubEnv('APPDATA', emptyAppData);
     vi.stubEnv('PAYWAY_MERCHANT_ID', 'inprocess-mid');

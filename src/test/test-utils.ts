@@ -56,17 +56,35 @@ export function mockJsonResponse(body: unknown, status = 200, statusText = 'OK')
  * string (ANSI left intact — combine with {@link stripAnsi} in assertions).
  * Callers must invoke `restore()` (typically in `afterEach`).
  */
-export function captureConsole(): { text: () => string; restore: () => void } {
+export function captureConsole(): {
+  text: () => string;
+  stdout: () => string;
+  stderr: () => string;
+  restore: () => void;
+} {
   const lines: string[] = [];
+  const stdoutLines: string[] = [];
+  const stderrLines: string[] = [];
   const push =
     (target: string[]) =>
     (...args: unknown[]) =>
       target.push(args.map((a) => String(a)).join(' '));
-  const log = vi.spyOn(console, 'log').mockImplementation(push(lines));
-  const warn = vi.spyOn(console, 'warn').mockImplementation(push(lines));
-  const error = vi.spyOn(console, 'error').mockImplementation(push(lines));
+  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+    push(lines)(...args);
+    push(stdoutLines)(...args);
+  });
+  const warn = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+    push(lines)(...args);
+    push(stderrLines)(...args);
+  });
+  const error = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    push(lines)(...args);
+    push(stderrLines)(...args);
+  });
   return {
     text: () => lines.join('\n'),
+    stdout: () => stdoutLines.join('\n'),
+    stderr: () => stderrLines.join('\n'),
     restore: () => {
       log.mockRestore();
       warn.mockRestore();

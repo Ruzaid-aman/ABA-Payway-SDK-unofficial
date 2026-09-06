@@ -27,7 +27,7 @@ This endpoint is capped at 50 requests per minute; cache dashboard results inste
 - **Gateway `transaction_date` is UTC+7 (Asia/Phnom_Cambodia), NOT UTC/local** —
   deriving `--from/--to` from the agent machine's clock silently returns **0 rows
   with no error** (a UTC window 7 hours behind misses everything; live-missed a
-  paid txn exactly this way 2026-09-05, SANDBOX-FINDINGS §18). Compute the
+  paid transaction exactly this way in sandbox on 2026-09-05). Compute the
   window in UTC+7, or omit `--from/--to` (defaults to the full gateway day).
 - The array is the top-level `data` value; entries use `transaction_id`,
   `payment_status`, `original_amount`, `original_currency`.

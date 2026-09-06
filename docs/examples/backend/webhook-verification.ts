@@ -1,4 +1,4 @@
-import { verifyCallbackSignature } from '../../../src/auth.js';
+import { verifyCallbackSignature } from 'aba-payway-ts';
 
 export interface WebhookHeaders {
   'x-payway-hmac-sha512'?: string | string[];

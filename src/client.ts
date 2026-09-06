@@ -137,7 +137,7 @@ export interface PayWayConfig {
   /**
    * Escape hatch for the v3 token-management trio (renewToken/getTokenDetails/
    * removeToken). The live-documented HMAC compositions were sandbox-verified
-   * 2026-08-31 (SANDBOX-FINDINGS §16), so the operations are allowed by
+   * 2026-08-31, so the operations are allowed by
    * DEFAULT now; set `false` to re-block them (legacy TD-03 posture).
    * @deprecated No longer required — kept as an opt-out only.
    */
@@ -346,7 +346,7 @@ export interface CofPaymentParams {
 /**
  * Renew an expired (or expiring) ACCOUNT token. Live-documented hash:
  * `ctid.request_time.pwt.merchant_id.request_id` (sandbox-verified 2026-08-31,
- * SANDBOX-FINDINGS §16).
+   * sandbox verification dated 2026-08-31).
  */
 export interface RenewTokenParams {
   requestId: string;
@@ -358,7 +358,7 @@ export interface RenewTokenParams {
 /**
  * Retrieve stored-token details. Live-documented request carries ONLY
  * request_time/merchant_id/request_id — no ctid, no pwt (sandbox-verified
- * 2026-08-31, SANDBOX-FINDINGS §16).
+   * 2026-08-31).
  */
 export interface GetTokenDetailsParams {
   requestId: string;
@@ -368,7 +368,7 @@ export interface GetTokenDetailsParams {
 /**
  * Remove a linked account or card token (irreversible). Live-documented
  * request: request_time/merchant_id/ctid/pwt — no request_id
- * (sandbox-verified 2026-08-31, SANDBOX-FINDINGS §16).
+   * (sandbox-verified 2026-08-31).
  */
 export interface RemoveTokenParams {
   ctid: string;
@@ -380,7 +380,7 @@ export interface RemoveTokenParams {
  * @deprecated Legacy shared shape for the v3 token trio. The endpoints now
  * take per-endpoint params ({@link RenewTokenParams},
  * {@link GetTokenDetailsParams}, {@link RemoveTokenParams}) — the old shared
- * composition was wrong (SANDBOX-FINDINGS §16).
+   * composition was wrong in the 2026-08-31 sandbox verification.
  */
 export type TokenParams = RenewTokenParams;
 
@@ -492,8 +492,8 @@ export interface GetTransactionListParams {
 export const MERCHANT_AUTH_DEFAULT_HASH_FIELDS: readonly string[] = ['request_time', 'merchant_id', 'merchant_auth'];
 
 /**
- * Live-documented HMAC field orders per endpoint (SANDBOX-FINDINGS §16 and
- * the 2026-08-31 audit matrix §3). Surfaced inside PayWaySignatureError hints
+ * Live-documented HMAC field orders per endpoint, sandbox-verified 2026-08-31.
+ * Surfaced inside PayWaySignatureError hints
  * so a wrong-hash rejection (`1`/`01`/`PTL02`) points directly at the
  * composition to fix instead of a bare "Wrong Hash".
  *
@@ -502,7 +502,7 @@ export const MERCHANT_AUTH_DEFAULT_HASH_FIELDS: readonly string[] = ['request_ti
  * drift-guard test rejects it). Endpoint-specific quirks live here in the
  * comments instead:
  * - purchase: the live 27-field order (`ctid` signed after `items` per
- *   SANDBOX-FINDINGS §17 — the live docs' subscription page omits it; plus the
+ *   the 2026-09-05 sandbox verification — the live docs' subscription page omits it; plus the
  *   subscription `token_flag` + `frequency` positions after
  *   `skip_success_page`). Pinned to the exported
  *   `PURCHASE_HASH_FIELDS` constant by the drift-guard test.
@@ -561,7 +561,7 @@ export const HASH_ORDER_HINTS: Record<string, string> = {
 
 /**
  * Codes the gateway uses for hash/signature rejections (sandbox-verified,
- * SANDBOX-FINDINGS §16: `01` on wrong CoF compositions, `PTL02` on refunds,
+ * sandbox verification dated 2026-08-31: `01` on wrong CoF compositions, `PTL02` on refunds,
  * flat `1`/`01` on legacy paths).
  */
 const SIGNATURE_ERROR_CODES = new Set(['1', '01']);
@@ -569,7 +569,7 @@ const SIGNATURE_ERROR_CODES = new Set(['1', '01']);
 /** Advisory hints appended to business errors for codes observed live (§16). */
 const CODE_HINTS: Record<string, string> = {
   '98': 'Merchant ID not found — verify the merchant credential (env/profile) for the target environment.',
-  '104': 'Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX; charging: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX). For purchase-path subscriptions (CITR_FIX) it means the merchant profile is NOT enabled for subscription/token registration — the sandbox profile is not (SANDBOX-FINDINGS §17); ask ABA to enable it.',
+  '104': 'Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX; charging: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX). For purchase-path subscriptions (CITR_FIX) it means the merchant profile is NOT enabled for subscription/token registration; ask ABA to enable it.',
   '105': 'Account token invalid or expired — re-link via linkAccount/linkCard, or renew via renewToken.',
   '09': 'Token not found — the ctid/request_id does not reference a known account token.',
 };

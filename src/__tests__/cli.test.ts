@@ -554,6 +554,67 @@ describe('built CLI', () => {
     }
   });
 
+  it('keeps structured JSON on stdout when run through the built CLI', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+    const mockServer = createServer((request, response) => {
+      request.on('data', () => {});
+      request.on('end', () => {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            status: { code: 0, message: 'OK' },
+            qrString: 'ONLINE-STRUCTURED-KHQR',
+          }),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
+    const address = mockServer.address();
+    if (!address || typeof address === 'string') throw new Error('mock server did not bind to a TCP port');
+
+    try {
+      const result = await runBuiltCli(
+        [
+          'generate-qr',
+          '--amount',
+          '1.00',
+          '--transaction-id',
+          'ONLINE-STRUCTURED',
+          '--callback-url',
+          'https://example.com/cb',
+          '--non-interactive',
+          '--output',
+          'json',
+          '--no-polling',
+          '--no-save-image',
+        ],
+        {
+          cwd,
+          env: {
+            PATH: process.env.PATH ?? '',
+            SystemRoot: process.env.SystemRoot ?? '',
+            PAYWAY_ENV: 'sandbox',
+            PAYWAY_MERCHANT_ID: 'test-merchant-001',
+            PAYWAY_API_KEY: 'test-api-key-123456789012',
+            PAYWAY_BASE_URL: `http://127.0.0.1:${address.port}`,
+          },
+        },
+      );
+      const parsed = JSON.parse(result.stdout) as Record<string, any>;
+      expect(result.status).toBe(0);
+      expect(parsed).toMatchObject({
+        schemaVersion: '1.0',
+        command: 'generate-qr',
+        transactionId: 'ONLINE-STRUCTURED',
+        creation: { outcome: 'accepted' },
+      });
+      expect(result.stdout).not.toContain('API_KEY');
+    } finally {
+      await new Promise<void>((resolve, reject) => mockServer.close((error) => (error ? reject(error) : resolve())));
+    }
+  });
+
   it('allows opting out of the default QR image save', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);

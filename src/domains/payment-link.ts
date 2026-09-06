@@ -127,7 +127,7 @@ export function createPaymentLinkDomain(
 
       // Optional image travels as a top-level multipart part (never inside
       // merchant_auth, never hashed) — sandbox probe evidence in
-      // docs/SANDBOX-FINDINGS.md §14.
+      // Sandbox-verified 2026-08-31.
       let multipartFile: { name: string; filename: string; contentType: string; data: Uint8Array } | undefined;
       if (params.image !== undefined) {
         const { image } = params;

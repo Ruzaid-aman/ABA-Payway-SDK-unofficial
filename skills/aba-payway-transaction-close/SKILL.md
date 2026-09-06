@@ -27,7 +27,7 @@ Official contract (developer.payway.com.kh/close-transaction): *"Once a transact
 
 **Customer-side enforcement is channel-dependent** (dossier §2a/§2b/§9):
 - **QR/KHQR channel — ENFORCED (3 live observations: 2026-08-25, 2026-09-05 ×2):** QRs closed while PENDING were then scanned in the ABA app — refused with **"transaction expired"**, even minutes before natural lifetime expiry, while the API kept saying PENDING.
-- **Hosted card/checkout channel — NOT enforced (2026-08-25):** two closed-unpaid transactions were paid on the still-open hosted page → APPROVED (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206). Hypothesis: the page carries a checkout session issued before the close that the gateway accepts without re-validation.
+- **Hosted card/checkout channel — not enforced in the 2026-08-25 sandbox observation:** two closed-unpaid transactions were paid on an already-open hosted page and became APPROVED. Treat this as an observed limitation; the provider has not confirmed the cause.
 
 **Always follow a successful close with `checkTransaction`** and interpret via:
 

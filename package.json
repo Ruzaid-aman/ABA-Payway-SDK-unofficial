@@ -43,7 +43,10 @@
   },
   "files": [
     "dist",
-    "skills"
+    "skills",
+    "QUICKSTART.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
@@ -55,8 +58,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:sandbox": "node scripts/run-sandbox-contract.mjs",
-    "docs:api": "npx typedoc --out docs/api src/index.ts",
-    "clean": "rm -rf dist",
+    "docs:api": "npx typedoc --options typedoc.json",
+    "clean": "node scripts/clean.mjs",
+    "check:package": "node scripts/check-package-contents.mjs",
+    "check:public-docs": "node scripts/check-public-docs.mjs",
+    "smoke:package": "node scripts/smoke-packed-package.mjs",
     "prepublishOnly": "npm run clean && npm run build",
     "bundle": "npx @redocly/cli bundle payway-openapi/openapi.yaml -o dist/openapi.bundled.yaml",
     "generate-types": "npx openapi-typescript dist/openapi.bundled.yaml -o src/types.ts",

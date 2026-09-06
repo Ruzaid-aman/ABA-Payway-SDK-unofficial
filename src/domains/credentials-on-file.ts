@@ -85,7 +85,7 @@ export interface CredentialsOnFileDomain {
   /**
    * Build a complete link-card HTML document (local-only, no network call).
    *
-   * `link-card` rejects JSON bodies outright (SANDBOX-FINDINGS §9a) and always
+   * `link-card` rejected JSON bodies in sandbox verification and always
    * answers with the gateway's hosted card-entry page — a plain browser form
    * POST is exactly the `application/x-www-form-urlencoded` wire format this
    * endpoint requires. The hidden fields and HMAC hash are byte-identical to
@@ -133,7 +133,7 @@ export interface CredentialsOnFileDomain {
 
 /**
  * Live-documented hash orders, sandbox-verified 2026-08-31 via
- * scripts/sandbox-probe-token-trio.ts (SANDBOX-FINDINGS §16). The gateway
+ * controlled token-lifecycle probes on 2026-08-31. The gateway
  * tightened CoF hash validation: the §9a-era SDK orders now return
  * "01 Wrong Hash" while these orders pass the hash layer.
  */
@@ -161,7 +161,7 @@ export function createCredentialsOnFileDomain(
     if (config.allowUnverifiedTokenOperations === false) {
       throw new PayWayConfigError(
         'renewToken/getTokenDetails/removeToken are blocked because allowUnverifiedTokenOperations is explicitly false. ' +
-          'The live-documented HMAC compositions were sandbox-verified 2026-08-31 (SANDBOX-FINDINGS §16) — remove the flag to allow them.',
+          'The live-documented HMAC compositions were sandbox-verified 2026-08-31 — remove the flag to allow them.',
       );
     }
   };

@@ -29,7 +29,8 @@ node_modules/
 .gitignore
 .git/
 
-# Documentation (keep README.md and CHANGELOG.md)
+# Documentation is excluded except for README/QUICKSTART/CHANGELOG/LICENSE,
+# which are explicitly allowlisted in package.json.
 PROJECT_STATUS.md
 SANDBOX-FINDINGS.md
 building-a-payway-sdk-cto-workflow-and-strategy.md

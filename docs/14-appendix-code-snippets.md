@@ -534,7 +534,7 @@ payway-sdk payment-link detail -i "<data.id from create>"
 
 ```bash
 # Clone the project
-git clone https://github.com/your-org/aba-payway-ts
+git clone https://github.com/antigravity-google/aba-payway-ts.git
 cd aba-payway-ts
 
 # Install dependencies

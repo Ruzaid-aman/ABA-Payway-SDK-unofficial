@@ -21,17 +21,16 @@ import type { InitiateTransactionPayload, ResponseType, TransactionSession } fro
 /**
  * Normalizes a raw PayWay purchase response into a `TransactionSession`.
  *
- * PayWay returns one of:
- *  - An HTML string (hosted checkout page) when payment_option is omitted or
- *    is `cards`/`abapay_khqr`/`alipay`/`wechat`/`google_pay`.
- *  - A JSON object (`PurchaseQrResponse`) when payment_option is
- *    `abapay_khqr_deeplink`, containing `qr_string`, `abapay_deeplink`, and
- *    `checkout_qr_url`.
+ * PayWay responses vary by the merchant configuration, payment option, and
+ * request flags. This function uses fields present in the response instead of
+ * assuming a specific response shape for an option.
  *
  * This function inspects the raw response and assigns the correct
  * `responseType` discriminator so the client module knows how to render it.
  */
 export function normalizePaywayResponse(raw: unknown, sessionId: string, lifetimeMinutes?: number): TransactionSession {
+  // A local deadline derived from the requested lifetime. It is not proof of
+  // PayWay acceptance, QR scan validity, or terminal payment status.
   const expiresAt = new Date(Date.now() + (lifetimeMinutes ?? 60) * 60 * 1000).toISOString();
 
   // HTML hosted checkout page.
@@ -174,6 +173,7 @@ export const server = {
       cancelUrl: payload.cancelUrl,
       viewType: payload.viewType,
       lifetime: payload.lifetime,
+      retryPolicy: payload.retryPolicy ?? 'none',
     });
 
     return normalizePaywayResponse(raw, sessionId, payload.lifetime);

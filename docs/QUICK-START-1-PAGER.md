@@ -217,7 +217,7 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 | `payway-sdk get-transactions-by-ref --merchant-ref <reference>` | Retrieve up to 50 transactions for a merchant reference |
 | `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
 | `payway-sdk generate-qr` | Generate a QR code (online or offline). Saves the PNG and opens it in the OS default viewer on interactive terminals. Use `--non-interactive` (`-y`) to skip prompts for scripts/CI. |
-| `payway-sdk generate-checkout` | Generate a checkout QR URL (full purchase flag set incl. `--payout`, `--additional-params`, `--google-pay-token`, `--return-deeplink`) |
+| `payway-sdk generate-checkout` | Create a checkout, save its QR PNG, and optionally poll (`--payment-gate 0` requests the hosted QR URL) |
 | `payway-sdk check-transaction -t <id>` | One-shot payment status check |
 | `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min) |
 | `payway-sdk transaction-list --from "YYYY-MM-DD HH:mm:ss" --to ...` | List transactions in a window (strict date format) |
@@ -226,7 +226,12 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 | `payway-sdk exchange-rate` | Live USD/KHR exchange rate |
 | `payway-sdk setup-webhook` | Start a local webhook server for callback testing |
 
-**Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit. Scripts and agents can branch on `$?` without parsing output. Every command also accepts `--json` where structured output helps automation.
+**Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit. Scripts and agents can branch on `$?` without parsing output. For creation flows, use `--output json` for one versioned final result or `--output ndjson` for creation, polling, and final records. The existing `--json` flags keep their raw-response behavior.
+
+```bash
+payway-sdk generate-qr -a 3.31 -t order-123 --callback-url https://example.com/payway --output json --no-polling
+payway-sdk generate-checkout -a 3.31 -t order-124 --output ndjson --save-image ./checkout.png
+```
 
 ### Transaction lifecycle from the terminal
 

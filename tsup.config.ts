@@ -5,6 +5,8 @@ export default defineConfig({
   format: ['esm', 'cjs'],
   dts: true,
   clean: true,
-  sourcemap: true,
+  // Source maps embed the complete source tree and internal evidence comments.
+  // Keep the public tarball limited to runtime code and declarations.
+  sourcemap: false,
   minify: false,
 });

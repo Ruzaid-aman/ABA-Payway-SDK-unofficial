@@ -151,7 +151,7 @@ executes zero PayWay creates.
 
 ## Setup playbook & pitfalls (field-tested)
 
-Full notes: [docs/AGENT-SETUP-PLAYBOOK.md](../../docs/AGENT-SETUP-PLAYBOOK.md).
+Full notes: [versioned Agent Setup Playbook](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/AGENT-SETUP-PLAYBOOK.md).
 Architecture/maintenance notes (module map, stage order, gotchas): same doc,
 section "Implementation & architecture".
 

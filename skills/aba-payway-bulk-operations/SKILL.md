@@ -87,7 +87,7 @@ payway-sdk tx-batch close --ids-file ids.txt --dry-run
 # 2. Sweep statuses before cleanup
 payway-sdk tx-batch check --ids-file ids.txt --json
 # 3. Close with evidence
-payway-sdk tx-batch close --ids-file ids.txt -y --report test-output/<campaign>/close-report.md
+payway-sdk tx-batch close --ids-file ids.txt -y --report payway-reports/close-report.md
 # 4. Confirm the post-close state (expect PENDING everywhere unpaid)
 payway-sdk tx-batch check --ids-file ids.txt --json
 ```

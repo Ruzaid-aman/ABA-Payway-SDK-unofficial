@@ -10,9 +10,7 @@
 <ul class="tsd-breadcrumb" aria-label="Breadcrumb">
 <li><a href="" aria-current="page">WebhookStorage</a></li></ul>
 <h1>Interface WebhookStorage</h1></div>
-<div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">WebhookStorage</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-call-signature" href="#close-1">close</a><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#count-1">count</a><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#getall-1">getAll</a><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#save-1">save</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">record</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Omit</span><span class="tsd-signature-symbol">&lt;</span><a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">&quot;id&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;receivedAt&quot;</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#updatekhqrmetadata-1">updateKhqrMetadata</a><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">id</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">khqr</span><span class="tsd-signature-symbol">:</span> <a href="KhqrWebhookMetadata.html" class="tsd-signature-type tsd-kind-interface">KhqrWebhookMetadata</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
-<ul>
-<li>Defined in src/webhook/storage.ts:32</li></ul></aside>
+<div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">WebhookStorage</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-call-signature" href="#close-1">close</a><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#count-1">count</a><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#getall-1">getAll</a><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#save-1">save</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">record</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Omit</span><span class="tsd-signature-symbol">&lt;</span><a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">&quot;id&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;receivedAt&quot;</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#updatekhqrmetadata-1">updateKhqrMetadata</a><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">id</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">khqr</span><span class="tsd-signature-symbol">:</span> <a href="KhqrWebhookMetadata.html" class="tsd-signature-type tsd-kind-interface">KhqrWebhookMetadata</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -37,9 +35,7 @@
 <div class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Release any resources (file handles, database connections).</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
-<ul>
-<li>Defined in src/webhook/storage.ts:49</li></ul></aside></div></li></ul></section>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="count"><span>count</span><a href="#count" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -48,9 +44,7 @@
 <div class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Return the total number of stored records.</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
-<ul>
-<li>Defined in src/webhook/storage.ts:46</li></ul></aside></div></li></ul></section>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="getall"><span>get<wbr/>All</span><a href="#getall" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -59,9 +53,7 @@
 <div class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Retrieve all stored records, ordered by insertion time.</p>
 </div>
-<h4 class="tsd-returns-title">Returns <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
-<ul>
-<li>Defined in src/webhook/storage.ts:43</li></ul></aside></div></li></ul></section>
+<h4 class="tsd-returns-title">Returns <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">[]</span></h4></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="save"><span>save</span><a href="#save" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -75,9 +67,7 @@ The <code>receivedAt</code> and <code>id</code> fields are populated by the impl
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li><span><span class="tsd-kind-parameter">record</span>: <span class="tsd-signature-type">Omit</span><span class="tsd-signature-symbol">&lt;</span><a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">&quot;id&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;receivedAt&quot;</span><span class="tsd-signature-symbol">&gt;</span></span></li></ul></div>
-<h4 class="tsd-returns-title">Returns <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a></h4><aside class="tsd-sources">
-<ul>
-<li>Defined in src/webhook/storage.ts:37</li></ul></aside></div></li></ul></section>
+<h4 class="tsd-returns-title">Returns <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a></h4></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="updatekhqrmetadata"><code class="tsd-tag">Optional</code><span>update<wbr/>Khqr<wbr/>Metadata</span><a href="#updatekhqrmetadata" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -91,9 +81,7 @@ The <code>receivedAt</code> and <code>id</code> fields are populated by the impl
 <ul class="tsd-parameter-list">
 <li><span><span class="tsd-kind-parameter">id</span>: <span class="tsd-signature-type">string</span></span></li>
 <li><span><span class="tsd-kind-parameter">khqr</span>: <a href="KhqrWebhookMetadata.html" class="tsd-signature-type tsd-kind-interface">KhqrWebhookMetadata</a></span></li></ul></div>
-<h4 class="tsd-returns-title">Returns <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a></h4><aside class="tsd-sources">
-<ul>
-<li>Defined in src/webhook/storage.ts:40</li></ul></aside></div></li></ul></section></section></details></div>
+<h4 class="tsd-returns-title">Returns <a href="WebhookRecord.html" class="tsd-signature-type tsd-kind-interface">WebhookRecord</a></h4></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -111,7 +99,7 @@ The <code>receivedAt</code> and <code>id</code> fields are populated by the impl
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Methods</summary>
 <div><a href="#close"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>close</span></a><a href="#count"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>count</span></a><a href="#getall"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All</span></a><a href="#save"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>save</span></a><a href="#updatekhqrmetadata"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>update<wbr/>Khqr<wbr/>Metadata</span></a></div></details></div></details></div>
 <div class="site-menu">
-<nav class="tsd-navigation"><a href="../modules.html">aba-payway-ts</a>
+<nav class="tsd-navigation"><a href="../index.html">aba-payway-ts</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
 <li>Loading...</li></ul></nav></div></div></div><footer>
 <p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
