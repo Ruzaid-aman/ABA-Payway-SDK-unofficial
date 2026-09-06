@@ -30,8 +30,8 @@ interface BetterSqlite3Database {
  */
 async function loadBetterSqlite3(): Promise<new (path: string) => BetterSqlite3Database> {
   try {
-    // @ts-expect-error — better-sqlite3 is an optional peer dependency
-    const mod = await import('better-sqlite3');
+    const optionalPeer = 'better-sqlite3';
+    const mod = await import(optionalPeer);
     // biome-ignore lint/suspicious/noExplicitAny: dynamic import of optional peer dependency
     return (mod.default ?? mod) as any;
   } catch {
