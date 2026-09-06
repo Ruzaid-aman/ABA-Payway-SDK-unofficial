@@ -833,3 +833,25 @@ Full evidence: `test-output/purchase-test-campaign/` (WAVE5-captures.md, REPORT.
 14. **(W5-13) `transaction-detail.transaction_date` and the `transaction-list` date column are DIFFERENT events** (both UTC+7): detail carries the **creation** timestamp — it stays fixed even when approval lands much later (w2u12001: transaction_date 22:17:24, approval ~22:40 via the dupprobe form) — while the list column carries the **payment completion** time (matches the `Completed` op timestamp on 4/4 paid samples). Reconciliation windows keyed on the list date window the payment time, not creation. Gateway clock can also precede the client wall clock by 2–28 s.
 15. **Scan→approve latency varies** (22 s this pass vs §18's 60–90 s) — poll for ≥2 min, never hard-code.
 16. **`generate-checkout` saves NO QR PNG in non-TTY mode**; the human-mode `abapay_deeplink` embeds the URL-encoded qrString (`&qrcode=<payload>`) — extractable and renderable with the `qrcode` package when a scannable PNG is needed. JSON mode carries `qrString` directly.
+
+## 22. Payment-link gateway facts — docs-review probes (2026-09-06, agent session; scripts `scripts/sandbox-probe-payment-link-verify.ts` + `-expired-sweep.ts` + `-after-expiry.ts`)
+
+Evidence: `test-output/payment-link-docs-review/` (verify-probes + expired-sweep + after-expiry JSON, gitignored — lives on disk).
+
+1. **(V-3) `tran_id` is a NUMBER on both payment-link endpoints** (create + detail), contradicting the official docs' `string` declaration — e.g. `178865342966685`. The SDK's `number | string` typing stands; do not rely on the type.
+2. **(V-4) No EXPIRED status exists — expiry is advisory**: a link created with `expired_date = now+300s` reads `status: "OPEN"` in detail AFTER expiry, and the hosted `payment_link` page still answers **HTTP 200** (payment acceptance untested — needs an interactive payer; assume refusal and enforce expiry merchant-side, mirroring W4-1 purchase lifetimes).
+3. **(V-4) `expired_date` acceptance window**: past values (−3600s) and short-future offsets (+150s) are **rejected at create with PTL04**; **+300s and beyond accepted** (number or string both fine; echo is number at create, **string** in detail). Boundary is somewhere in (150s, 300s].
+4. **(V-4) Unset expiry echoes `"0"` (string)** in the detail response — same shape the OpenAPI spec models; `pushback_url` was **absent** from sandbox detail responses despite the official detail schema.
+5. **(V-5a) A bogus link id on detail answers HTTP 403 + code `96` "Invalid merchant data"** — the officially documented `PTL132` was NOT reproduced on this profile. Both stay in the docs/12 table with their status noted.
+6. **(V-5b/c/d) PTL04 is the catch-all create rejection**: unsupported currency (EUR), omitted currency, and a non-numeric amount ALL answered HTTP 400 `PTL04`. Neither PTL99 (merchant invalid currency) nor PTL05 (parameter invalid format) was reproducible — they may be production-only or superseded shapes.
+7. **(V-2, externally blocked) Payout placement remains unverified**: the payout-bearing create is rejected 403 "Payout accounts are not in whitelist", and `beneficiary add 500000001` fails 403 code **32 "Service is not enable"** — this sandbox merchant profile has no payout-whitelist service at all (mirrors the subscription `104` blocker, §17). Response `payout` placement (apidog top-level vs ABA sample inside `data`) needs a payout-enabled profile; the OpenAPI keeps the UNVERIFIED note + oneOf until then.
+8. **(V-1, still open) Pushback body**: the documented sample carries no `hash`; verifying a real pushback's field set needs an interactive payment session on a live `return_url` receiver.
+
+**§22 addendum (2026-09-06, later same session — V-1 closed with a real payment):**
+
+9. **(V-1) The payment-link pushback contract is LIVE-CAPTURED** — user paid a $1.50 link through the ABA Mobile Simulator against a trycloudflare receiver (`scripts/sandbox-probe-payment-link-pushback.ts`, evidence `test-output/payment-link-docs-review/pushback-captures.jsonl` + `v1-rig-console.txt`):
+   - **NO `hash` field — confirmed live.** Body is exactly `{"tran_id":"178865526240157","status":0,"merchant_ref_no":"plvr-v1-mtp34wx4"}` — `verifyCallback()` does NOT apply; the pushback is a notification, verification is `check-transaction(tran_id)` (which returned APPROVED / amount 1.5 within ~1s of the pushback).
+   - `status` is the **numeric `0`** (APPROVED), NOT the `"00"` string the official overview sample shows — receivers must accept both.
+   - `tran_id` arrives as a **string** here while create/detail responses carry it numeric-typed — coerce everywhere.
+   - Headers: `User-Agent: PayWayApp/3.0`, `Content-Type: application/json; charset=utf-8`, W3C `traceparent`/`elastic-apm-traceparent` tracing headers, source IP `103.108.218.2` (KH).
+   - Pushback latency: approval → pushback ≈ instant (captured seconds after the simulator approval); the pushback fired once, no retries observed on a 200 ACK.

@@ -41,10 +41,10 @@ const link = await payway.paymentLink.create({ ..., image: { data: readFileSync(
 ```
 
 ## Pushback (payment notification)
-On payment, the gateway POSTs JSON to the decoded `return_url`: `{ tran_id, status, merchant_ref_no }` (documented sample carries NO hash — verify via `check-transaction` on the pushed `tran_id` before fulfilling). One pushback per payment; multi-payment links fire repeatedly.
+On payment, the gateway POSTs to the decoded `return_url` (live-captured 2026-09-06: `User-Agent: PayWayApp/3.0`, `Content-Type: application/json`): body `{ "tran_id": "…", "status": 0, "merchant_ref_no": "…" }` — **NO hash field (live-confirmed)**, `status` numeric 0 (not "00"). Treat as notification; verify via `check-transaction` on the pushed `tran_id` before fulfilling — `verifyCallback()` does not apply. One pushback per payment; multi-payment links fire repeatedly. SDK: `parsePaymentLinkPushback(body)` coerces the body (`status` → `'APPROVED'`/`'UNKNOWN'`); the webhook server's `/aba-payway-pushback` route can host the receiver (`setup-webhook` prints it). `create` also warns locally when `expiredDate` is past or under ~5 minutes out (gateway PTL04 — sandbox-verified).
 
 ## Status lifecycle
-`OPEN` while `payment_limit > total_trxn`; `PAID` once equal (hosted page stops accepting). No EXPIRED status exists — treat `expired_date` expiry as a merchant-side rule. Totals: `total_amount_org` (gross), `total_refund`, `total_amount` (net), `total_trxn` (count).
+`OPEN` while `payment_limit > total_trxn`; `PAID` once equal (hosted page stops accepting). **No EXPIRED status exists** (sandbox-verified 2026-09-06): after `expired_date` passes, detail still reads OPEN and the hosted page still answers 200 — enforce expiry merchant-side. Create rejects past/under-5-min `expired_date` with PTL04. Totals: `total_amount_org` (gross), `total_refund`, `total_amount` (net), `total_trxn` (count).
 
 ## Error Handling
 ```ts
@@ -53,7 +53,7 @@ try { await payway.paymentLink.getDetails('link-id'); }
 catch (error) { if (error instanceof PayWayConfigError) console.error(error.message); }
 ```
 
-Codes: `PTL02` wrong hash, `PTL04` param validation (currency/return_url missing, description >250 — sandbox-discovered), `PTL05` bad format, `PTL99` merchant invalid currency, `PTL132`/`96` invalid link id on detail. Payout whitelist failures use 37/PTL146/PTL46.
+Codes: `PTL02` wrong hash, `PTL04` param validation (currency/return_url missing, description >250, non-numeric amount, OR expired_date in the past/under ~5 min out — sandbox-discovered catch-all), `96` invalid link id on detail (PTL132 documented but not reproduced on sandbox), 37/PTL146/PTL46 payout whitelist. Sandbox detail: `expired_date` unset echoes "0"; NO EXPIRED status — expired links still read OPEN and the hosted page still answers 200, enforce expiry yourself.
 
 ## Inspecting a link (CLI)
 

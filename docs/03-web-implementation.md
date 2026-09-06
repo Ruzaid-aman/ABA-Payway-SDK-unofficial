@@ -123,8 +123,10 @@ router.post('/create', (req, res) => {
       // Pass the signed payload back to the frontend
       payload: signedPayload,
       // The PayWay base URL for the current environment
-      // The frontend will POST the form to this URL
-      checkoutUrl: payway.getBaseUrl(),
+      // The frontend will POST the form to this URL.
+      // NOTE: the SDK has no public base-URL getter — resolve it the same way
+      // the SDK does (config baseUrl > PAYWAY_BASE_URL > PAYWAY_ENV > default).
+      checkoutUrl: process.env.PAYWAY_BASE_URL ?? 'https://checkout-sandbox.payway.com.kh',
     });
   } catch (error) {
     console.error('Checkout creation failed:', error);
@@ -286,7 +288,7 @@ The form auto-submits to PayWay, redirecting the user's browser to the hosted ch
         const form = document.getElementById('payway-form');
 
         // Set the form's action URL to PayWay's checkout endpoint
-        form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/checkout`;
+        form.action = `${data.checkoutUrl}/api/payment-gateway/v1/payments/purchase`;
 
         // Create a hidden input for each field in the signed payload
         Object.entries(data.payload).forEach(([key, value]) => {
@@ -482,7 +484,7 @@ For a more "in-app" feel on desktop, use PayWay's `checkout2-0.js` library to op
           var form = document.getElementById('aba_merchant_request');
           form.innerHTML = '';
           form.action = data.checkoutUrl +
-            '/api/payment-gateway/v1/payments/checkout';
+            '/api/payment-gateway/v1/payments/purchase';
 
           Object.keys(data.payload).forEach(function(key) {
             var input = document.createElement('input');

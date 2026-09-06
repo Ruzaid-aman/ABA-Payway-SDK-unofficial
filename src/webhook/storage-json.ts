@@ -9,7 +9,7 @@
 import { randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './storage.js';
+import type { KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
 
 const DEFAULT_PATH = './webhook_data/callbacks.jsonl';
 
@@ -44,11 +44,23 @@ export class JsonWebhookStorage implements WebhookStorage {
   }
 
   updateKhqrMetadata(id: string, khqr: KhqrWebhookMetadata): WebhookRecord {
+    return this.updateMetadata(id, 'khqr', khqr);
+  }
+
+  updatePaymentLinkPushbackMetadata(id: string, pushback: PaymentLinkPushbackMetadata): WebhookRecord {
+    return this.updateMetadata(id, 'paymentLinkPushback', pushback);
+  }
+
+  private updateMetadata<K extends 'khqr' | 'paymentLinkPushback'>(
+    id: string,
+    slot: K,
+    metadata: WebhookRecord[K],
+  ): WebhookRecord {
     const records = this.getAll();
     const index = records.findIndex((record) => record.id === id);
     if (index === -1) throw new Error(`Webhook record ${id} was not found`);
 
-    const updated: WebhookRecord = { ...records[index], khqr };
+    const updated: WebhookRecord = { ...records[index], [slot]: metadata };
     records[index] = updated;
     const temporaryPath = `${this.filePath}.${randomBytes(8).toString('hex')}.tmp`;
     try {

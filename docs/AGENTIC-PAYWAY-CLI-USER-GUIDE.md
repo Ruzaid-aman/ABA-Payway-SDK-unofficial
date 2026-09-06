@@ -6,7 +6,7 @@ audited PayWay operations. It covers what is implemented, every command, the saf
 and how to configure both the agent's LLM provider and your PayWay credentials.
 
 > The agentic layer is **additive** — it never changes the behavior of the existing manual
-> commands (`generate-qr`, `create-checkout`, `check-transaction`, …). Those commands remain
+> commands (`generate-qr`, `generate-checkout`, `check-transaction`, …). Those commands remain
 > the single source of truth and are re-dispatched by the interactive REPL.
 
 ---
@@ -56,7 +56,7 @@ Two optional agent-guidance skills are also shipped under `skills/`:
 npm install
 npm run build      # tsup → dist/
 npm run typecheck  # tsc --noEmit
-npm test           # vitest (988 tests)
+npm test           # vitest (1350+ tests as of 2026-09-06)
 ```
 
 After building, the CLI binary is the SDK entry point (referenced here as `payway-sdk`).
@@ -358,7 +358,7 @@ All writes are atomic (`<file>.tmp` → `rename`), so a crash never corrupts an 
 
 ---
 
-## 7. The 11 agent tools (actions)
+## 7. The 12 agent tools (actions)
 
 A provider-proposed plan is a list of these actions. Each is validated against a strict
 schema before execution; each maps to exactly one SDK call.
@@ -369,7 +369,8 @@ schema before execution; each maps to exactly one SDK call.
 | `generate_offline_khqr` | create | `amount?`, `currency`, `merchantRef` |
 | `create_checkout_payload` | create | `amount`, `currency`, `returnUrl?`, `cancelUrl?`, `paymentOption?` |
 | `create_checkout_purchase` | create | `amount`, `currency`, `returnUrl?`, `cancelUrl?`, `paymentOption?` |
-| `create_payment_link` | create | `title`, `amount`, `currency`, `merchantRefNo`, `returnUrl`, `description?`, `paymentLimit?`, `expiredDate?` |
+| `create_payment_link` | create | `title`, `amount`, `currency`, `merchantRefNo`, `returnUrl`, `description?`, `paymentLimit?`, `expiredDate?`, `payout?` (`[{acc, amt}]`, total must equal the amount) |
+| `get_payment_link_details` | read | `paymentLinkId` (the opaque Link ID from create — not the merchant ref, not the URL slug) |
 | `check_transaction` | read | `transactionId` |
 | `check_transaction_by_merchant_ref` | read | `merchantRef`, `requestTime?` |
 | `poll_transaction` | read | `transactionId`, `interval?`, `timeout?` |

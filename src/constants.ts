@@ -157,6 +157,32 @@ export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }>
 };
 
 /**
+ * Payment-link PTL error codes not claimed by other families (PTL02/PTL04
+ * resolve via the refund family; `96` via the QR family). Sources: official
+ * create/detail pages + sandbox probes (SANDBOX-FINDINGS §22, 2026-09-06).
+ */
+export const PAYMENT_LINK_ERROR_CODES = {
+  /** Parameter invalid format */
+  PARAMETER_INVALID_FORMAT: 'PTL05',
+  /** Merchant invalid currency */
+  MERCHANT_INVALID_CURRENCY: 'PTL99',
+  /** Invalid payment link (detail) */
+  INVALID_PAYMENT_LINK: 'PTL132',
+} as const;
+
+export const PAYMENT_LINK_TITLES: Record<string, string> = {
+  PTL05: 'Parameter Invalid Format',
+  PTL99: 'Merchant Invalid Currency',
+  PTL132: 'Invalid Payment Link',
+};
+
+export const PAYMENT_LINK_HINTS: Record<string, string> = {
+  PTL05: 'Check datatypes — amounts are numbers in the SDK (the official docs declare strings; the gateway accepts numbers). Sandbox probes: malformed values answered PTL04 instead.',
+  PTL99: 'Currency not enabled for the merchant profile. Sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile.',
+  PTL132: 'Invalid payment link — pass the opaque data.id returned by create, NOT merchant_ref_no, NOT the URL slug. Sandbox note (2026-09-06): a bogus id answered 96 instead.',
+};
+
+/**
  * Sandbox-verified `token_flag` enums for credentials-on-file endpoints.
  *
  * Sources (RTM R-08/R-09, `docs/09:185-188`, sandbox campaign section 9):

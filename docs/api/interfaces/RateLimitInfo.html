@@ -12,7 +12,7 @@
 <h1>Interface RateLimitInfo</h1></div>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">RateLimitInfo</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#limit">limit</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#rawheaders">rawHeaders</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#remaining">remaining</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#reset">reset</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#retryafterms">retryAfterMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:46</li></ul></aside>
+<li>Defined in src/client.ts:54</li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -35,19 +35,19 @@
 <div class="tsd-comment tsd-typography"><p>Raw <code>x-rate-limit-limit</code> header value (requests per window).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:48</li></ul></aside></section>
+<li>Defined in src/client.ts:56</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="rawheaders"><code class="tsd-tag">Optional</code><span>raw<wbr/>Headers</span><a href="#rawheaders" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">rawHeaders</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:60</li></ul></aside></section>
+<li>Defined in src/client.ts:68</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="remaining"><code class="tsd-tag">Optional</code><span>remaining</span><a href="#remaining" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">remaining</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Raw <code>x-rate-limit-remaining</code> header value.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:50</li></ul></aside></section>
+<li>Defined in src/client.ts:58</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="reset"><code class="tsd-tag">Optional</code><span>reset</span><a href="#reset" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">reset</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
@@ -57,14 +57,14 @@ response has carried this header — so treat it as opaque and prefer
 <code>retryAfterMs</code> for retry decisions.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:57</li></ul></aside></section>
+<li>Defined in src/client.ts:65</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="retryafterms"><code class="tsd-tag">Optional</code><span>retry<wbr/>After<wbr/>Ms</span><a href="#retryafterms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">retryAfterMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Milliseconds to wait: <code>Retry-After</code> delta-seconds × 1000, or an HTTP-date converted to a delay.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/client.ts:59</li></ul></aside></section></section></details></div>
+<li>Defined in src/client.ts:67</li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

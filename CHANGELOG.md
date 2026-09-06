@@ -23,7 +23,8 @@
   captures); `setup-webhook --journal` (.env upsert, never clobbers); REPL
   unfinished-creates banner (`PAYWAY_AGENT_NO_RECOVER_HINT` opt-out);
   `agent ledger prune --before` (finished-only, unfinished never removed);
-  docs/12 Pattern 3b (hook meta + onError + journal join).- **Transaction Journal — Phase 4 Analytics** (roadmap §17): `computeJournalStats`
+  docs/12 Pattern 3b (hook meta + onError + journal join).
+- **Transaction Journal — Phase 4 Analytics** (roadmap §17): `computeJournalStats`
   (exported) + **`journal stats`** CLI — latency percentiles (p50/p90/p99/max) per
   endpoint over successful responses, retry rates per correlation-id-grouped
   exchange, top provider/HTTP/transport errors with per-day counts, and the
@@ -97,6 +98,59 @@
   first-write-wins — the unused `correlation` field is now populated), and
   artifact sidecars carry `correlationId` (contracts + strict Ajv schema
   updated). Docs: `docs/18-transaction-journal.md`.
+- **Payment-link codification C1–C3 (2026-09-06, third session)** — the
+  live-learned gateway contracts are now encoded in the SDK:
+  **(C1)** exported `parsePaymentLinkPushback()` + `PaymentLinkPushback` /
+  `PaymentLinkPushbackStatus` types — coerces the captured pushback body
+  (`status` numeric `0`/`"0"`/`"00"` → `'APPROVED'`, unknown → `'UNKNOWN'`
+  with the raw value preserved; `tran_id` → string; throws on structurally
+  invalid bodies). **(C2)** webhook server route **`/aba-payway-pushback`**
+  (configurable via `pushback.path`): stores the raw delivery first, attaches
+  `parsePaymentLinkPushback` metadata (JSON + SQLite backends), ACKs 200 —
+  no HMAC is attempted because pushbacks carry no hash; `setup-webhook`
+  prints the route. **(C3)** `paymentLink.create` warns locally when
+  `expiredDate` is past or under ~5 minutes out (gateway PTL04,
+  sandbox-verified; boundary bracketed (150s, 300s]) — new exported constant
+  `PAYMENT_LINK_EXPIRY_MIN_SECONDS = 300`; advisory by default,
+  `strictValidation` escalates. Barrel +2 runtime exports (57 → 59; +2 type-only;
+  release-checklist smoke updated). Remaining backlog: `.scratch/payment-link-docs-review/CODIFY-BACKLOG.md`.
+- **Payment-link codification C4–C9 (2026-09-06, third session)** —
+  **(C4)** the mock harness (`startMockPaywayServer`, `payway-sdk demo`)
+  now serves the payment-link create/detail endpoints with the live-learned
+  shapes (numeric `tran_id`, `expired_date: "0"` string echo, `status: OPEN`,
+  empty-image shape; detail echoes a created link per server lifetime and
+  answers the sandbox-observed code 96 for a bogus id). **(C5)**
+  `payment-link detail` human output prints a "PAST expiry" warning when
+  `expired_date` is past — the gateway keeps reporting OPEN (no EXPIRED
+  status exists), so the CLI surfaces the computed state; `--json` stays
+  raw. **(C6)** new `payway-sdk explain` family for the payment-link PTL
+  codes not claimed by other families (PTL05/PTL99/PTL132, with the
+  sandbox-vs-official caveats in the hints) + `apiErrorHint` rows for
+  PTL132/PTL05/PTL99. **(C7)** copy-runnable pushback receivers
+  (`docs/examples/backend/payment-link-pushback-receiver.{js,php}`) on the
+  live no-hash contract, wired into the docs-examples suite. **(C8)** agent
+  `create_payment_link` result now surfaces `shareUrl` directly. **(C9)**
+  reusable callback-capture recipe (`docs/agents/callback-capture-recipe.md`)
+  extracted from the V-1 rig.
+- **Payment-link follow-up batch (2026-09-06, second session)** — Batch-A
+  probes executed (SANDBOX-FINDINGS §22): `tran_id` observed as a NUMBER on
+  both endpoints; **no EXPIRED status** (expired links read OPEN + hosted
+  page 200 — enforce expiry merchant-side); create rejects past/under-5-min
+  `expired_date` with PTL04; bogus detail id answers **96** (PTL132 not
+  reproduced); PTL04 is the catch-all create rejection (EUR/omitted
+  currency/non-numeric amount). V-1 (real pushback body) and V-2 (payout
+  placement) — **V-1 CLOSED live**: the pushback carries NO hash field
+  (live-captured through a real simulator payment; body
+  `{"tran_id":"…","status":0,"merchant_ref_no":"…"}`, `User-Agent:
+  PayWayApp/3.0`, `status` numeric 0, `tran_id` string — verification is
+  check-transaction, not verifyCallback; docs/17 §17.6 + docs/16 + skill
+  updated). V-2 remains externally blocked: the sandbox profile has no
+  payout-whitelist service (code 32). Doc deliverables completed:
+  docs/14 snippets, docs/16 pushback section, docs/13 checklist row,
+  README CLI detail example, agent user-guide 12-tool table,
+  `docs/examples/backend/payment-link-create.ts` (+ docs-examples wiring),
+  TypeDoc regen; probe findings folded into docs/17, docs/12, the OpenAPI
+  spec (`src/types.ts` regenerated), and the packaged skill.
 - **Payment-link documentation & consistency batch (2026-09-06)** — new full
   lifecycle chapter `docs/17-payment-link.md` (parameter tables with datatype
   reality notes — the official docs declare several numeric fields as strings
@@ -120,7 +174,11 @@
   (12-tool catalog) resolves a Link ID to normalized
   `{paymentLinkId, status, totalTrxn, totalAmount, paymentLink, raw}` —
   wired through contracts, plan/ledger schemas, planning/risk READONLY sets
-  (no approval gate), and the provider tool listing.
+  (no approval gate), and the provider tool listing. NOTE: the plan's P2 also
+  listed `image` forwarding — deliberately NOT wired into the agent tool
+  (the provider plan schema is JSON; shipping raw image bytes through an
+  LLM plan adds noise and secret-scrubbing risk for little utility). Create
+  image-bearing links via the SDK/CLI; revisit only if a real workflow asks.
 - **`payment-link create --no-show-qr`** — suppresses the TTY auto-QR of the
   share URL (parity with generate-qr / generate-checkout).
 - **`paymentLink.create` merchantRefNo cap advisory** — >50 chars warns

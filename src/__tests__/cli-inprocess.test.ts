@@ -75,6 +75,22 @@ describe('CLI in-process (runCli)', () => {
     expect(unknownText).toContain('Unknown or undocumented code');
   });
 
+  // Codification C6 (2026-09-06): the payment-link PTL family has its own
+  // explain entries, with the sandbox-vs-official caveats baked into the hint.
+  it('explain decodes the payment-link PTL132/PTL05/PTL99 family', async () => {
+    const ptl132 = await run(['explain', 'PTL132']);
+    expect(ptl132.text).toContain('Invalid Payment Link');
+    expect(ptl132.text).toContain('data.id');
+    expect(ptl132.text).toContain('96');
+
+    const ptl05 = await run(['explain', 'PTL05']);
+    expect(ptl05.text).toContain('Parameter Invalid Format');
+    expect(ptl05.text).toContain('PTL04');
+
+    const ptl99 = await run(['explain', 'PTL99']);
+    expect(ptl99.text).toContain('Merchant Invalid Currency');
+  });
+
   it('validate accepts a valid amount and transaction id', async () => {
     const { text, exitCode } = await run(['validate', '-a', '5', '-c', 'USD', '-t', 'probe-ok-1']);
     expect(text).toContain('valid');

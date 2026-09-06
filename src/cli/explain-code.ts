@@ -3,11 +3,18 @@
  * Backs the `payway-sdk explain <code>` command; pure data + lookup so it is
  * trivially testable and usable by agents without spawning the CLI.
  */
-import { GATEWAY_CODE_HINTS, PAYOUT_ERROR_CODES, PRE_AUTH_ERROR_CODES, REFUND_ERROR_CODES } from '../constants.js';
+import {
+  GATEWAY_CODE_HINTS,
+  PAYMENT_LINK_HINTS,
+  PAYMENT_LINK_TITLES,
+  PAYOUT_ERROR_CODES,
+  PRE_AUTH_ERROR_CODES,
+  REFUND_ERROR_CODES,
+} from '../constants.js';
 
 export interface CodeExplanation {
   readonly code: string;
-  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr';
+  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr' | 'payment-link';
   readonly title: string;
   readonly hint: string;
 }
@@ -129,6 +136,13 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
     return { code, family: 'payout', title: PAYOUT_TITLES[code], hint: PAYOUT_HINTS[code] ?? '' };
   }
 
+  // Payment-link family (2026-09-06): PTL05/PTL99/PTL132 — PTL02/PTL04 are
+  // claimed by the refund family and 96 by the QR family, so this branch only
+  // claims the unclaimed payment-link codes.
+  if (code in PAYMENT_LINK_TITLES) {
+    return { code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code], hint: PAYMENT_LINK_HINTS[code] ?? '' };
+  }
+
   // COF / QR families (B5, live parity) — checked before the generic numeric
   // gateway table so codes like 04/98/104/105/PTL02 resolve to their family.
   const numeric = code.replace(/^0+(?=\d)/, '');
@@ -171,6 +185,9 @@ export function explainAll(): CodeExplanation[] {
   }
   for (const code of Object.keys(PAYOUT_TITLES)) {
     all.push({ code, family: 'payout', title: PAYOUT_TITLES[code] ?? code, hint: PAYOUT_HINTS[code] ?? '' });
+  }
+  for (const code of Object.keys(PAYMENT_LINK_TITLES)) {
+    all.push({ code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code] ?? code, hint: PAYMENT_LINK_HINTS[code] ?? '' });
   }
   for (const [code, title] of Object.entries(COF_TITLES)) {
     all.push({ code, family: 'cof', title, hint: COF_HINTS[code] ?? '' });

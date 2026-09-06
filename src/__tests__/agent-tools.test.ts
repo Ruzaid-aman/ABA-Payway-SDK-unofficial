@@ -73,7 +73,7 @@ function makePayWay(): PayWay {
       }),
     },
     paymentLink: {
-      create: fn(async () => ({ status: { code: '0' }, data: { id: 'pl1' }, tran_id: 123 })),
+      create: fn(async () => ({ status: { code: '0' }, data: { id: 'pl1', payment_link: 'https://link-sandbox/ABAPAY1' }, tran_id: 123 })),
       getDetails: fn(async () => ({
         status: { code: '00', message: 'Success' },
         data: { id: 'pl1', status: 'OPEN', total_trxn: 0, total_amount: 0, payment_link: 'https://link/pl1' },
@@ -317,6 +317,12 @@ describe('TASK-009 tool registry + executor', () => {
       returnUrl: 'https://ret',
       payout: [{ acc: '000111222', amt: 20 }],
     });
+  });
+
+  it('create_payment_link surfaces the shareUrl (C8)', async () => {
+    const ctx = makeExecContext(payway, makeRecord('confirmed', { tool: 'create_payment_link' }));
+    const result = await executeAction(createAction('create_payment_link'), ctx);
+    expect(result.data?.shareUrl).toBe('https://link-sandbox/ABAPAY1');
   });
 
   it('get_payment_link_details resolves the read tool with normalized fields', async () => {

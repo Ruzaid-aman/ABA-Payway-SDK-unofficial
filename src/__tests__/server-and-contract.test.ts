@@ -17,6 +17,7 @@ import { PayWay } from '../client.js';
 import type { PayWayConfig } from '../client.js';
 import { PayWayBusinessError } from '../errors.js';
 import { normalizePaywayResponse, server } from '../server/index.js';
+import { generateTestRsaKeyPair } from '../test/test-utils.js';
 import {
   generateMockSession,
   getMockPaywayUrl,
@@ -119,6 +120,76 @@ describe('server.test (contract compliance)', () => {
       expect(s.responseType).toBe(type);
     });
   }
+});
+
+// Codification C4 (2026-09-06): the mock harness now serves the payment-link
+// endpoints with the LIVE shapes learned in the docs-review campaign
+// (SANDBOX-FINDINGS §22): numeric tran_id, `expired_date: "0"` string echo,
+// status OPEN, empty-image shape; detail echoes a created link, answers 96
+// for a bogus id when none exists.
+describe('mock harness payment-link endpoints (C4)', () => {
+  let mockServer: HttpServer;
+  let client: PayWay;
+  // The harness never inspects merchant_auth, but the client still RSA-encrypts
+  // it locally — so the config needs a structurally real key, not a fake PEM.
+  const TEST_RSA = generateTestRsaKeyPair();
+
+  beforeAll(async () => {
+    mockServer = await startMockPaywayServer(0);
+    client = new PayWay({
+      merchantId: 'mock',
+      apiKey: 'mock-key',
+      environment: 'sandbox',
+      baseUrl: getMockPaywayUrl(mockServer),
+      publicKeyPem: TEST_RSA.publicKey,
+    });
+  });
+
+  afterAll(async () => {
+    await stopMockPaywayServer(mockServer);
+  });
+
+  it('create returns the live-learned response shape', async () => {
+    const link = await client.paymentLink.create({
+      title: 'Harness link',
+      amount: 1.5,
+      merchantRefNo: 'plmock-1',
+      returnUrl: 'https://merchant.example/return',
+    });
+
+    expect(link.status?.code).toBe('00');
+    expect(typeof link.tran_id).toBe('number');
+    const data = link.data as Record<string, unknown> | undefined;
+    expect(data?.status).toBe('OPEN');
+    expect(data?.expired_date).toBe('0');
+    expect(data?.image).toEqual({ image: '', filename: '', size: 0 });
+    expect(typeof data?.payment_link).toBe('string');
+  });
+
+  it('detail echoes a created link and answers 96 for a bogus id', async () => {
+    await client.paymentLink.create({
+      title: 'Harness link 2',
+      amount: 2,
+      merchantRefNo: 'plmock-2',
+      returnUrl: 'https://merchant.example/return',
+    });
+    const details = await client.paymentLink.getDetails('whatever-the-harness-holds');
+    expect(details.status?.code).toBe('00');
+    expect((details.data as Record<string, unknown>)?.status).toBe('OPEN');
+  });
+
+  it('answers 96 for detail before any link was created (fresh server)', async () => {
+    const fresh = await startMockPaywayServer(0);
+    const freshClient = new PayWay({
+      merchantId: 'mock',
+      apiKey: 'mock-key',
+      environment: 'sandbox',
+      baseUrl: getMockPaywayUrl(fresh),
+      publicKeyPem: TEST_RSA.publicKey,
+    });
+    await expect(freshClient.paymentLink.getDetails('bogus')).rejects.toThrow(/Invalid merchant data|96/);
+    await stopMockPaywayServer(fresh);
+  });
 });
 
 describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {

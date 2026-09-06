@@ -289,10 +289,17 @@ The payment-link endpoints (`create`, `detail`) use the `PTL*` family in `status
 |---|---|---|
 | `PTL02` | Wrong hash | Hash covers `request_time + merchant_id + merchant_auth` ONLY — the optional image is never hashed (use `paymentLink.create()`; hand-rolled multipart is the usual cause) |
 | `PTL04` | Parameter validation required | `currency` / `return_url` missing, or `description` >250 chars (sandbox-verified; NOT in the official docs' code list) |
-| `PTL05` | Parameter invalid format | Check datatypes (amounts are numbers in the SDK; the official docs' `string` declarations are wrong) |
-| `PTL99` | Merchant invalid currency | Currency not enabled for the merchant profile |
-| `PTL132` | Invalid payment link | `detail` got the wrong `id` — pass the opaque `data.id` from create, NOT `merchant_ref_no`, NOT the URL slug |
-| `96` | Link not found (detail) | Verify the Link ID |
+| `PTL05` | Parameter invalid format | Check datatypes (amounts are numbers in the SDK; the official docs' `string` declarations are wrong). Sandbox probes (2026-09-06): malformed values answered PTL04 — PTL05 not yet reproduced |
+| `PTL99` | Merchant invalid currency | Currency not enabled for the merchant profile. Sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile |
+| `PTL132` | Invalid payment link (officially documented) | `detail` got the wrong `id` — pass the opaque `data.id` from create, NOT `merchant_ref_no`, NOT the URL slug. NOT reproduced on the sandbox profile (2026-09-06): a bogus id answers **96** |
+| `96` | Invalid link id (detail) — sandbox-observed | Verify the Link ID (HTTP 403 "Invalid merchant data") |
+
+> 🧪 **Sandbox-verified (2026-09-06, payment-link probes):** `expired_date`
+> in the past or under ~5 minutes out → PTL04 at create; **no EXPIRED status
+> exists** — after expiry, detail keeps reporting OPEN and the hosted page
+> still answers 200. Evidence:
+> `test-output/payment-link-docs-review/` (gitignored, on disk) +
+> SANDBOX-FINDINGS §22.
 
 Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](./17-payment-link.md)**.
 
@@ -659,7 +666,7 @@ echo $PAYWAY_API_KEY
 ### 2. Run the Verification Script
 
 ```bash
-npx tsx verify-credentials.ts
+npx payway-sdk doctor --live
 ```
 
 If this fails, your credentials or network are the issue. (See Chapter 2 for the script.)

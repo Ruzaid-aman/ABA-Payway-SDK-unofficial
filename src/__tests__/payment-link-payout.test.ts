@@ -152,3 +152,53 @@ describe('payment-link merchantRefNo 50-char cap (advisory, strict escalates)', 
     expect(() => domain.create({ ...VALID_PARAMS, merchantRefNo: 'r'.repeat(51) })).toThrow(PayWayConfigError);
   });
 });
+
+describe('payment-link expired_date advisory (codification C3, SANDBOX-FINDINGS §22 #3)', () => {
+  // Sandbox-verified (2026-09-06): past values and offsets under ~5 minutes
+  // are rejected with PTL04; +300s is accepted. The boundary is only
+  // bracketed — (150s, 300s] — so the check is advisory (strict escalates)
+  // with PAYMENT_LINK_EXPIRY_MIN_SECONDS = 300 as the conservative threshold.
+  it('warns when expired_date is in the past', async () => {
+    const { domain } = makeDomain();
+    await domain.create({ ...VALID_PARAMS, expiredDate: Math.floor(Date.now() / 1000) - 3600 });
+
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('expired_date is in the past'));
+  });
+
+  it('warns when expired_date is under ~5 minutes out (+150s was rejected live)', async () => {
+    const { domain } = makeDomain();
+    await domain.create({ ...VALID_PARAMS, expiredDate: Math.floor(Date.now() / 1000) + 150 });
+
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('under ~5 minutes out'));
+  });
+
+  it('does not warn at exactly 300s ahead (accepted live)', async () => {
+    // Fake timers pin `now` so the exactly-at-boundary case cannot flake on
+    // second-granularity drift between the test's clock and the domain's.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-06T00:00:00Z'));
+    try {
+      const { domain } = makeDomain();
+      await domain.create({ ...VALID_PARAMS, expiredDate: Math.floor(Date.now() / 1000) + 300 });
+
+      expect(console.warn).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not warn when expired_date is omitted or far out', async () => {
+    const { domain } = makeDomain();
+    await domain.create({ ...VALID_PARAMS });
+    await domain.create({ ...VALID_PARAMS, expiredDate: Math.floor(Date.now() / 1000) + 86400 });
+
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('throws under strictValidation for a past expired_date', () => {
+    const { domain } = makeDomain({ strictValidation: true } as unknown as PayWayConfig);
+    expect(() => domain.create({ ...VALID_PARAMS, expiredDate: Math.floor(Date.now() / 1000) - 60 })).toThrow(
+      PayWayConfigError,
+    );
+  });
+});

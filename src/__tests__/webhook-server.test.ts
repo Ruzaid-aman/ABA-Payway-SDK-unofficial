@@ -137,6 +137,44 @@ describe('WebhookServer', () => {
     expect(record.khqr?.parsed?.unknownFields).toEqual({ future_field: 'retained' });
   });
 
+  // Codification C2 (2026-09-06): payment-link pushbacks get a first-class
+  // route. Live-captured contract (SANDBOX-FINDINGS §22): NO hash, numeric
+  // status 0 — raw is stored, parse metadata is attached, always 200.
+  it('receives a payment-link pushback, stores raw + parsed metadata, ACKs 200', async () => {
+    const payload = JSON.stringify({
+      tran_id: '178865526240157',
+      status: 0,
+      merchant_ref_no: 'plvr-v1-mtp34wx4',
+    });
+
+    const res = await httpRequest(port, 'POST', '/aba-payway-pushback', payload);
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toMatchObject({ acknowledged: true });
+    const [record] = storage.getAll();
+    expect(record.body).toBe(payload);
+    expect(record.paymentLinkPushback?.parsed?.tranId).toBe('178865526240157');
+    expect(record.paymentLinkPushback?.parsed?.status).toBe('APPROVED');
+    expect(record.paymentLinkPushback?.parsed?.merchantRefNo).toBe('plvr-v1-mtp34wx4');
+    expect(record.paymentLinkPushback?.parsed?.raw).toEqual({ tran_id: '178865526240157', status: 0, merchant_ref_no: 'plvr-v1-mtp34wx4' });
+  });
+
+  it('stores a pushback parse error without discarding the raw body', async () => {
+    const res = await httpRequest(port, 'POST', '/aba-payway-pushback', 'not-json');
+
+    expect(res.statusCode).toBe(200);
+    const [record] = storage.getAll();
+    expect(record.body).toBe('not-json');
+    expect(record.paymentLinkPushback?.parseError).toContain('not valid JSON');
+  });
+
+  it('404s unknown routes and 405s non-POST pushbacks', async () => {
+    const missing = await httpRequest(port, 'POST', '/nowhere', '{}');
+    expect(missing.statusCode).toBe(404);
+    const wrongMethod = await httpRequest(port, 'GET', '/aba-payway-pushback');
+    expect(wrongMethod.statusCode).toBe(405);
+  });
+
   it('stores an offline KHQR parse error and marks duplicate transaction metadata', async () => {
     const validPayload = JSON.stringify({
       transaction_id: 'KHQR-duplicate',

@@ -524,3 +524,312 @@ cleared) still reached the sandbox: the persisted global profile store
 opt-in. Precedence (profile store > `.env` > ambient env) is undocumented —
 see finding EC-14 and the improvement plan.
 
+
+## 14. Sandbox contract suite — transaction-list visibility gap + shape (2026-08-31)
+
+New opt-in suite: `src/__tests__/sandbox-contract.test.ts` (`npm run test:sandbox`,
+gate `SANDBOX_CONTRACT_TESTS=1`). First run evidence in the suite file and
+`test-output/` shell history. Facts pinned live:
+
+### 14a. transaction-list response shape + date-range cap
+
+`getTransactionList` success body is a JSON object `{ data: [...], page,
+pagination, status: { code: "00", message: "Success!", tran_id } }` — rows carry
+`transaction_id`, `payment_status`, `payment_status_code`, `original_amount`,
+`original_currency`, `transaction_date`. (The local mock in
+`cli-mock-commands.test.ts` sends a bare array — that mock shape deviates from
+the live sandbox and is kept for CLI-renderer coverage only.)
+
+A date range wider than **3 days** is rejected with **HTTP 403** and the message
+"Maximum date rang is allowed only 3 days" (sic — gateway typo) — sandbox-verified
+2026-08-31 with a 4-year window. The SDK surfaces it as `PayWayAPIError`
+(statusCode 403, message preserved).
+
+### 14b. Unpaid QR-only transactions are invisible to transaction-list (NEW)
+
+Across a wide window (`2026-01-01` → `2030-01-01`), transaction-list was rejected
+out of hand (see 14a); within a valid ≤3-day window spanning both days,
+transaction-list returned only the two checkout-created (`purchase`) transactions
+— **none** of the 16+ unpaid `generate-qr` transactions created 2026-08-30/31 by
+the suite appeared, although `check-transaction` sees them in <1 s and
+`getTransactionDetail` in ~5 s (both returned PENDING / original_amount as expected).
+
+Implication for merchants: reconciliation built on transaction-list alone will
+miss unpaid-but-open QR transactions; poll with check-transaction (per-tran)
+instead, and expect list visibility only for checkout-created or paid items.
+The contract suite pins this asymmetry as a regression test; revisit if ABA
+confirms different production semantics (ABA-OPEN-QUESTIONS Q9/Q10 territory).
+
+### 14c. Suite infrastructure notes
+
+- Gate `SANDBOX_CONTRACT_TESTS=1` (deliberately not `PAYWAY_*`-prefixed — the
+  hermetic-env setup file scrubs `PAYWAY_*` before test-file modules evaluate).
+- `.env` is parsed directly by the suite (credentials never depend on
+  `process.env`, which is scrubbed).
+- `NODE_TLS_REJECT_UNAUTHORIZED='0'` is set/restored inside the suite's
+  `beforeAll`/`afterAll` (undici reads it lazily at connect time — verified);
+  no shell prefix needed for `npm run test:sandbox`.
+- Rate budget per run: ~6 generate-qr, ~5 check-transaction, 1 detail, 1 list
+  call — inside the §4 caps (detail 10/min, list 50/min).
+
+---
+
+## 15. Payment-link multipart image upload — accepted, renamed, hosted (2026-08-31)
+
+Evidence: `test-output/payment-link-image-probe/probe-*.json` (full probe matrix per run;
+`scripts/sandbox-probe-payment-link.ts` case 3c), plus a chained `payment-link/detail`
+call on the image link (`HTTP 200 code=00`).
+
+### 15a. Multipart contract
+
+- `payment-link/create` accepts **`multipart/form-data`** with exactly the four string
+  fields (`request_time`, `merchant_id`, `merchant_auth`, `hash`) plus an optional
+  top-level **`image`** binary part. HTTP 200 `code=00` "Success." on the first attempt.
+- The HMAC composition is **unchanged** when an image is attached:
+  `hash = base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key))` —
+  image bytes are never hashed. Sending the same hash as the urlencoded requests is
+  accepted verbatim.
+- No `Content-Type` header must be set by the caller (the runtime generates the
+  boundary); sending urlencoded `Content-Type` with a multipart body would fail, but
+  the SDK's multipart path omits the header entirely.
+
+### 15b. What the gateway does with the image
+
+`payment-link/detail` on the image link returned:
+
+```json
+"image": {
+  "image": "https://pw-admin-sandbox.ababank.com/merchants/transaction-photo/payment_link_image_178811415013201.png",
+  "filename": "payment_link_image_178811415013201.png",
+  "size": 0
+}
+```
+
+- The upload is **stored and hosted** — `image.image` becomes an ABA CDN URL.
+- The original filename is **not preserved**: the gateway renames to
+  `payment_link_image_<epoch-ms>.<ext>`. Do not rely on `filename` for anything
+  merchant-facing.
+- `size` is reported as `0` even after a successful upload (sandbox quirk; treat as
+  unreliable).
+- A link created **without** an image returns the empty shape
+  `{"image":"","filename":"","size":0}` — check `image.image` truthiness, not presence.
+
+### 15c. Tooling notes from this campaign
+
+- `scripts/sandbox-probe-payment-link.ts` previously parsed `.env` with a line-by-line
+  minimal parser; the repo `.env` now stores `PAYWAY_RSA_PUBLIC_KEY` as a multi-line
+  quoted PEM, which that parser truncates to the header line (`local RSA error:
+  DECODER routines::unsupported` on every case). The probe now uses the CLI's shared
+  `loadDotEnvIntoProcess` (`src/cli/dotenv.ts`) — the same fix belongs in any other
+  script that still hand-rolls dotenv parsing.
+- `npm run bundle` (Redocly) has been broken since the spec split in `017cc4d`
+  (duplicate `$ref` keys under `components.schemas`, plus duplicated schema names
+  across the split files). `payway-openapi/bundled.yaml` is maintained by hand in the
+  meantime; the `image` part is documented in both `components/schemas/payment-link.yaml`
+  and `bundled.yaml`.
+
+---
+
+## 16. Token-trio HMAC compositions VERIFIED from live docs; CoF family realigned (2026-08-31)
+
+**Context.** TD-03 / RTM R-04/05/06 / ABA-OPEN-QUESTIONS Q6 blocked the v3 token-management trio because
+~60 derivable HMAC compositions were rejected during the §9a campaign (2026-08-2x). The live docs at
+developer.payway.com.kh now publish **explicit per-endpoint hash orders** (each spec page embeds the Apidog
+OpenAPI definition). `scripts/sandbox-probe-token-trio.ts` (new, re-runnable) probed the documented orders plus
+the SDK baselines; evidence: `test-output/token-trio/probe-2026-08-31T00-28-10-661Z.log`.
+
+**Classification rule.** The gateway checks the HMAC before the business layer: a wrong-hash code
+(`1`/`01`/PTL02) proves rejection; ANY other business code (105 invalid token, 09 data not found, 04 invalid
+data, 104 flag not enabled, 00 success) proves the hash layer ACCEPTED the composition — synthetic
+request_id/ctid/pwt values are sufficient.
+
+### 16a. Verdicts (merchant `ec476910`, sandbox)
+
+| Endpoint | Live-documented composition | Verdict | Business code observed |
+|---|---|---|---|
+| renew-expired-account-token | `ctid.request_time.pwt.merchant_id.request_id` | **ACCEPTED** | `105` Invalid payment credential token (403) |
+| get-token-details | `merchant_id.request_time.request_id` — **no ctid/pwt anywhere** | **ACCEPTED** | `09` Data not found (403) |
+| remove-token | `merchant_id.ctid.request_time.pwt` — **no request_id** | **ACCEPTED** | `200` code `00` Success (idempotent removal of unknown token) |
+| link-account | `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency` | **ACCEPTED** | `104` Merchant not enabled token flag (403) |
+| purchase/payment-credential | `request_time.merchant_id.tran_id.amount.currency.items.ctid.pwt.first_name.last_name.email.phone.purchase_type.callback_url.custom_fields.return_params.payout.token_flag.shipping_fee` — **no request_id** | **ACCEPTED** | `105` Invalid payment credential token (403) |
+| every corresponding SDK legacy order (5 baselines) | `request_time.merchant_id.request_id.…` | **REJECTED** | `01` Wrong Hash on all five |
+
+### 16b. Consequences (behavior contract change — flip the pins consciously)
+
+1. **The gateway tightened CoF hash validation since §9a.** The §9a-era "sandbox-verified" SDK orders now
+   return `01 Wrong Hash` on the same sandbox. The live-documented compositions are the current contract;
+   the SDK is realigned to them (link-account, link-card, CoF payment, renew, details, remove).
+2. **The token trio is UN-GATED**: `allowUnverifiedTokenOperations` now defaults to allowed; setting it
+   explicitly to `false` re-blocks (escape hatch). TD-03/Q6 are resolved-by-evidence, not by ABA prose.
+3. **Per-endpoint token params replace the shared `TokenParams`**: renew needs `requestId+ctid+pwt`,
+   get-token-details needs ONLY `requestId`, remove-token needs `ctid+pwt` (no `request_id`).
+4. **`request`/`request_id` binding quirks from §9a are gone**: the binding layer accepted bodies without
+   `request` and without `request_id` (token-details, remove-token, CoF payment live-doc probes passed
+   binding and reached the business layer). The SDK no longer sends `request`; CoF payment no longer sends
+   `request_id` (param kept, deprecated, not sent).
+5. **link-card** is realigned to its live-documented composition
+   (`merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency.continue_success_url`,
+   with `amount`/`frequency` as empty hash positions) — `return_url`/`return_deeplink` are NOT part of the
+   live-documented link-card request and are no longer sent (params deprecated). Not directly probed (the
+   endpoint answers in HTML); aligned on family consistency + documented order.
+6. `npm run bundle` is FIXED as of 13f817e (duplicate `$ref` under `components.schemas` removed); §15c's
+   hand-maintained `payway-openapi/bundled.yaml` can now be regenerated (`dist/openapi.bundled.yaml`).
+
+## 17. Subscription trio "Wrong Hash" root-caused: gateway signs `ctid`; docs omit it; profile not subscription-enabled (2026-09-05)
+
+**Context.** The 2026-09-03 skills audit (T1 blocker) live-reproduced `Wrong Hash`
+(code 1, HTTP 403) for `purchase` with the subscription trio
+(`ctid` + `token_flag=CITR_FIX` + `frequency`) on every documented
+`payment_option`, while the SAME body without the trio succeeds. The gateway's
+wrong-hash hint prints the documented 26-field order — which matches
+`PURCHASE_HASH_FIELDS` byte-for-byte — yet the hash is rejected. Re-probed and
+confirmed live 2026-09-05.
+
+**Method.** `scripts/sandbox-probe-subscription.ts` (new, re-runnable, per-case
+filter args) builds the exact SDK body via `checkout.createTransaction()`, then
+re-signs it with candidate hash orders and POSTs to `/payments/purchase`.
+Classification per §16: wrong-hash codes prove rejection; ANY other business
+code proves the hash layer ACCEPTED. Evidence:
+`test-output/subscription-hash/probe-2026-09-05T10-35-35-445Z.log` (A–B6) and
+`probe-2026-09-05T10-37-53-177Z.log` (C1/C2 disambiguation).
+
+**Findings.**
+
+1. **The live docs' subscription hash order is WRONG: it omits `ctid`.** With
+   `ctid` inserted after `items`, the hash layer ACCEPTS (business code
+   observed); the documented 26-field order (and 4 other ctid placements:
+   before token_flag, after frequency, after merchant_id, body-only) are all
+   rejected with code 1. Probe C1/C2 (items present, non-empty) disambiguated
+   the position: ctid AFTER items accepted (104), ctid BEFORE items (right
+   after amount) rejected. The live composition is the **27-field order**
+   `req_time.merchant_id.tran_id.amount.items.ctid.shipping.…
+   .skip_success_page.token_flag.frequency` — the same `ctid`-after-`items`
+   motif as the §16 payment-credential composition.
+2. **The gateway's wrong-hash hint prints the DOC list, not the enforcement
+   list** — it shows 26 fields (no ctid) while enforcement includes ctid. Do
+   not treat the hint as authoritative; it is a static template.
+3. **Merchant profile `ec476910` is NOT subscription-enabled.** With the
+   correct (ctid-signed) composition the gateway answers **`104` "Merchant not
+   enabled token flag"** (HTTP 403) — the §16 rule in action: past the hash
+   layer, business layer refuses. A green end-to-end subscription checkout is
+   impossible on this profile until ABA enables subscription/token
+   registration. The CODE_HINTS entry for `104` now says so.
+4. **Fix shipped:** `ctid` added to `PURCHASE_HASH_FIELDS` after `items` (one
+   shared order — for plain purchases `ctid` is absent from the body, hashes as
+   `''`, and the HMAC is byte-identical to the 26-field order, so plain
+   purchases are unaffected; pinned by tests). The OpenAPI subscription
+   operation documents the gateway divergence. Bundled skill scripts
+   (`sign-request.cjs`, `checkout-payload.cjs`) realigned to the 27-field
+   order in the same change.
+5. Probe note: the probe script initially classified numeric codes against a
+   string set (`WRONG_HASH_CODES.has(1)` vs `'1'`) and mislabeled verdicts in
+   the first run's SUMMARY — the raw codes in the log are authoritative; the
+   script now String()s the code before classification.
+
+## 18. First full paid lifecycle end-to-end: QR → ABA simulator → APPROVED → list-visible → partial refund → REFUNDED (2026-09-05)
+
+**Context.** The 2026-09-03 skills audit executed zero money movement; every
+prior transaction stayed PENDING. With the user running the ABA Simulator app,
+a complete paid lifecycle was executed on merchant `ec476910`.
+
+**Flow.** `generate-qr -a 0.50 -c USD --lifetime 900 -y` → tran
+`qrmtoab02ufd0f32` → user scanned + approved in the simulator (~18:13:54
+gateway time) → `check-transaction` APPROVED (code 0) within seconds →
+partial refund `-a 0.10 -y` accepted (`code 00`) → detail shows
+`refund_amount 0.1`, `payment_status REFUNDED` (code 4).
+
+**Confirmations (nothing contradicts existing pins).**
+
+1. **Paid transactions ARE visible in transaction-list** (§14's invisibility
+   gap applies to UNPAID QR-only transactions only) — the paid txn appears
+   with its APPROVED status. Watch the timezone: gateway `transaction_date`
+   is UTC+7; a UTC-derived window misses it.
+2. **Partial refund flips the WHOLE payment_status to REFUNDED** in sandbox
+   while `refund_amount` (0.10) stays the source of truth for how much was
+   returned — confirms the refund skill's "payment_status is a coarse flag"
+   guidance.
+3. Simulator scan→approve latency ≈ 60–90 s from QR creation; check-transaction
+   saw the APPROVED status immediately after approval (<1 s, §7 holds).
+
+## 19. Close-transaction IS enforced customer-side on the QR path — nuancing §7/§12 (2026-09-05)
+
+**Context.** §7/§12 (2026-08-25) pinned: "Close-transaction is advisory in
+sandbox — closed-unpaid transactions still pay and stay PENDING; no CLOSED
+status exists anywhere." That evidence came from the checkout/card path
+(hosted page payments). Today's user-driven simulator test adds the QR path.
+
+**Test.** `generate-qr -a 33.12 USD --lifetime 900` → tran `qrmtoaywyqb13a72`
+(created 18:31:49 gateway, expires 18:46:49). `check-transaction` PENDING,
+detail PENDING/unpaid. One minute later: `close-transaction -y` → code 00
+Success. Detail after close: still PENDING, no CLOSED status,
+`transaction_operations` empty — API-side unchanged from §7.
+
+**New fact.** The user then scanned the closed QR in the ABA Simulator
+(~18:38, ~8 minutes BEFORE natural lifetime expiry) — the app refused with
+**"transaction expired"** and payment could not be completed. Customer-side,
+the close IS effective on the QR/KHQR path.
+
+**Consequences.**
+
+1. §7's "closed-unpaid txns still pay" must be scoped to the checkout/card
+   path (2026-08-25 evidence). Whether the gateway changed since August or the
+   behavior is path-specific is OPEN — re-verify with a checkout-path
+   close→pay before relying on either direction.
+2. The customer-facing close signal on the QR path is the generic
+   "transaction expired" message — indistinguishable from natural lifetime
+   expiry at scan time.
+3. API-side guidance is unchanged: no CLOSED status exists remotely, so keep
+   a local `closed` flag; a PENDING status after close cannot distinguish
+   closed-unpaid from still-open.
+
+**Also noted.** `transaction-detail --json` on this unpaid txn shows
+`original_currency: "KHR"` (the merchant credential currency) while
+`payment_currency: ""` and `payment_amount: 0` — for USD-created QRs the
+unpaid detail carries the credential currency in `original_currency`, not the
+transaction currency. Cosmetic, but agents parsing `original_currency` on
+unpaid transactions should not treat it as the payment currency.
+
+## 20. QR lifecycle retest — §18/§19 confirmed with a second controlled pass (2026-09-05, user-driven)
+
+Two back-to-back QRs (QR-1 `qrmretest01usd` $2.50, QR-2 `qrmretest02usd`
+$0.75; both 900 s, created 18:42 gateway): full matrix of 10 expectations met
+— evidence: `test-output/qr-lifecycle-retest-2026-09-05.md`. Highlights:
+
+1. **§14 demonstrated within ONE list response:** after payment, QR-1 appears
+   (APPROVED) while the closed-unpaid QR-2 — same day, same merchant — stays
+   absent. The visibility gap is unpaid-only, not merchant/day-related.
+2. **§19 repeatable:** the closed-unpaid QR was scan-refused by the simulator
+   with "transaction expired" for the SECOND time (~1 min after close, ~13
+   min before natural expiry). QR-path close enforcement is a stable
+   behavior, not a one-off.
+3. **§18 repeatable:** partial refund ($1.00 of $2.50) → whole status flips
+   REFUNDED, `refund_amount 1` authoritative.
+4. **Currency quirk resolved (§19 addendum):** unpaid detail's
+   `original_currency` carries the merchant CREDENTIAL currency (KHR);
+   after payment it reflects the REAL transaction currency (USD). Parse
+   `original_currency` only on paid transactions.
+5. Simulator scan→approve latency this pass: ~60 s from creation.
+
+## 21. Purchase API campaign — routes × methods × gate negotiation (2026-09-05, evening; agent + user simulator/card session)
+
+Full evidence: `test-output/purchase-test-campaign/` (WAVE5-captures.md, REPORT.md, raw JSON/HTML/PNG). Plan: `.scratch/purchase-api-test-plan/TEST-PLAN.md`. Facts W5-1…W5-12 (report §5). Highlights for the knowledge base:
+
+1. **(W5-1) Purchase KHQRs have a scan-time validity window INDEPENDENT of the record lifetime.** A QR with 1440-min record lifetime was scan-refused "Transaction expired" at age 2h15m while check-transaction read PENDING seconds before; a seconds-old lifetime-10 QR pays. The KHQR payload embeds NO expiry (TLV decode: tags 00/01/30/52/53/54/58/59/60/62/99/63 only) — validity is a server-side lookup. Bounds: pays <2 min, refused at 2h15m; root cause (fixed window vs lifetime-unit mismatch) unresolved — Q-E. A refused scan does NOT mutate gateway state.
+2. **(W5-2) Close-endpoint validation is three-way on the purchase channel:** never-created tran_id → code 00 (§W2-3); PENDING unpaid → code 00, no state change; PAID (APPROVED/REFUNDED) → HTTP 403 code 2 "This transaction has already been approved and cannot be cancelled."
+3. **(W5-3) The gate-0 response HTML is a Nuxt SSR app** with relative `/_nuxt/*` assets (SRI-hashed) and client-side QR hydration — the QR is NOT in the HTML. Saved standalone (file:// or foreign origin) it renders BLANK; it renders only as the browser's form-POST response. Matches the official docs ("responds with a HTML response that contains the checkout interface, which you must render").
+4. **(W5-4) Success payloads differ by media/gate negotiation (H4, stronger than expected):** JSON POST without gate → JSON; browser form POST without gate (KHQR **or cards**) → the same JSON rendered raw in the browser; form POST with `payment_gate: 0` → the hosted interface. The hosted card page is therefore reachable ONLY via gate 0 (H2) — CLI/plain-form "cards" flows are mislabeled bank QRs (H3).
+5. **(W5-5) `payment_type` is method-dependent:** KHQR → `"ABA Pay"`; card → scheme name (`"MC"`, `"VISA"`) with `card_source: "ONUS"`. Paid ops differ too: card = [Create Order, Completed]; KHQR = [Completed] only.
+6. **(W5-6) `payment_amount`/`payment_currency` report the PAYER's actual debit**, which can differ in currency from the request: 4000 KHR request paid as 1 USD; 1.20 USD request paid as 4800 KHR (`payer_account "*001"`). `original_amount`/`original_currency`/`total_amount` and transaction-list keep the merchant's request. Reconcile on `original_*`, never `payment_amount` alone.
+7. **(W5-7) Duplicate `tran_id` on purchase:** JSON path silently accepts N creations (code 00 each) but the resulting KHQRs are UNPAYABLE — scan refuses "Transaction not found" (fresh or expired). A gate-0 form re-POST of a PENDING duplicate renders the hosted page and the payment LANDS with the form's amount ($1.71). Re-POST of a CLOSED id answered code 4 "Duplicated Transaction ID." once, then rendered the page on retry. Never reuse tran_ids.
+8. **(W5-8/H7) A CLOSED gate-0 card session still pays:** created → close code 00 at 22:17:26 → paid $1.50 VISA ONUS at 22:22:42. Third lifetime observation (2026-08-25 ×2, purchase channel ×1); close stays scan-enforced ONLY on the KHQR channel (§19/§20).
+9. **(W5-9) Simulator scan-refusal messages are generic:** "Transaction expired" covers record-expired, scan-window-exceeded, AND already-paid re-scans; "Transaction not found" is duplicate-ID-only. Apps cannot branch on the message.
+10. **(W5-10) Hosted-page post-payment continuation requires `skip_success_page: 0 + continue_success_url`** (redirect observed); a plain `return_url` does NOT move the browser. `return_params` echo: unresolved (no listener).
+11. **(W5-11) `generate-checkout` poll timeout exits 0** (human warning only; `--json` prints just the create response) — machine-invisible, contrast generate-qr's exit-3 `{event: aborted}` envelope. DX follow-up.
+12. **(W5-12) The AbaPayway popup plugin (`checkout2-0.js`) modal renders blank** from a locally-opened (file://) form page — popup flows need an http(s) origin; mechanism live-verified 2026-08-25.
+13. CLI poll semantics (H1): `generate-checkout` blocks + polls by default (5 s), exits 0 on APPROVED with a final block; first poll often NOT_FOUND (indexing lag); check latency ~282 ms.
+
+**§21 addenda (same session, post-report sweep):**
+
+14. **(W5-13) `transaction-detail.transaction_date` and the `transaction-list` date column are DIFFERENT events** (both UTC+7): detail carries the **creation** timestamp — it stays fixed even when approval lands much later (w2u12001: transaction_date 22:17:24, approval ~22:40 via the dupprobe form) — while the list column carries the **payment completion** time (matches the `Completed` op timestamp on 4/4 paid samples). Reconciliation windows keyed on the list date window the payment time, not creation. Gateway clock can also precede the client wall clock by 2–28 s.
+15. **Scan→approve latency varies** (22 s this pass vs §18's 60–90 s) — poll for ≥2 min, never hard-code.
+16. **`generate-checkout` saves NO QR PNG in non-TTY mode**; the human-mode `abapay_deeplink` embeds the URL-encoded qrString (`&qrcode=<payload>`) — extractable and renderable with the `qrcode` package when a scannable PNG is needed. JSON mode carries `qrString` directly.

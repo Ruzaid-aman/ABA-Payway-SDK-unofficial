@@ -9,7 +9,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './storage.js';
+import type { KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
 
 const DEFAULT_PATH = './webhook_data/callbacks.db';
 
@@ -30,7 +30,6 @@ interface BetterSqlite3Database {
  */
 async function loadBetterSqlite3(): Promise<new (path: string) => BetterSqlite3Database> {
   try {
-    // @ts-expect-error — better-sqlite3 is an optional peer dependency
     const mod = await import('better-sqlite3');
     // biome-ignore lint/suspicious/noExplicitAny: dynamic import of optional peer dependency
     return (mod.default ?? mod) as any;
@@ -76,6 +75,17 @@ export function ensureCallbackMetadataColumns(db: Pick<BetterSqlite3Database, 'e
   }
 }
 
+/** Add the payment-link pushback metadata column to pre-existing databases. */
+export function ensurePushbackMetadataColumn(db: Pick<BetterSqlite3Database, 'exec'>): void {
+  try {
+    db.exec('ALTER TABLE callbacks ADD COLUMN pushback_json TEXT');
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    if (message.includes('duplicate column name') && message.includes('pushback_json')) return;
+    throw error;
+  }
+}
+
 export class SqliteWebhookStorage implements WebhookStorage {
   private db: BetterSqlite3Database;
 
@@ -103,20 +113,34 @@ export class SqliteWebhookStorage implements WebhookStorage {
     }
 
     const db = new Sqlite3(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS callbacks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        record_id TEXT NOT NULL,
-        received_at TEXT NOT NULL,
-        headers_json TEXT NOT NULL,
-        body TEXT NOT NULL,
-        source_ip TEXT,
-        khqr_json TEXT
-      )
-    `);
-    ensureKhqrMetadataColumn(db);
-    ensureCallbackMetadataColumns(db);
+    try {
+      db.pragma('journal_mode = WAL');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS callbacks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          record_id TEXT NOT NULL,
+          received_at TEXT NOT NULL,
+          headers_json TEXT NOT NULL,
+          body TEXT NOT NULL,
+          source_ip TEXT,
+          khqr_json TEXT,
+          pushback_json TEXT,
+          signature_verdict TEXT,
+          verification_reason TEXT,
+          matched_transaction_id TEXT,
+          matched_status TEXT,
+          replay INTEGER
+        )
+      `);
+      ensureKhqrMetadataColumn(db);
+      ensureCallbackMetadataColumns(db);
+      ensurePushbackMetadataColumn(db);
+    } catch (error) {
+      // A failed open (corrupt file, bad pragma) must not leak the handle —
+      // on Windows the open file blocks even the temp-dir cleanup.
+      db.close();
+      throw error;
+    }
 
     return new SqliteWebhookStorage(db);
   }
@@ -130,7 +154,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
 
     this.db
       .prepare(
-        'INSERT INTO callbacks (record_id, received_at, headers_json, body, source_ip, khqr_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO callbacks (record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .run(
         entry.id,
@@ -139,6 +163,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
         entry.body,
         entry.sourceIp ?? null,
         entry.khqr ? JSON.stringify(entry.khqr) : null,
+        entry.paymentLinkPushback ? JSON.stringify(entry.paymentLinkPushback) : null,
         entry.signatureVerdict ?? null,
         entry.verificationReason ?? null,
         entry.matchedTransactionId ?? null,
@@ -156,10 +181,17 @@ export class SqliteWebhookStorage implements WebhookStorage {
     return updated;
   }
 
+  updatePaymentLinkPushbackMetadata(id: string, pushback: PaymentLinkPushbackMetadata): WebhookRecord {
+    this.db.prepare('UPDATE callbacks SET pushback_json = ? WHERE record_id = ?').run(JSON.stringify(pushback), id);
+    const updated = this.getAll().find((record) => record.id === id);
+    if (!updated) throw new Error(`Webhook record ${id} was not found`);
+    return updated;
+  }
+
   getAll(): WebhookRecord[] {
     const rows = this.db
       .prepare(
-        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay FROM callbacks ORDER BY rowid ASC',
+        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay FROM callbacks ORDER BY rowid ASC',
       )
       .all() as Array<{
       record_id: string;
@@ -168,6 +200,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       body: string;
       source_ip: string | null;
       khqr_json: string | null;
+      pushback_json: string | null;
       signature_verdict: string | null;
       verification_reason: string | null;
       matched_transaction_id: string | null;
@@ -182,6 +215,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       body: row.body,
       sourceIp: row.source_ip ?? undefined,
       khqr: row.khqr_json ? JSON.parse(row.khqr_json) : undefined,
+      paymentLinkPushback: row.pushback_json ? JSON.parse(row.pushback_json) : undefined,
       signatureVerdict: (row.signature_verdict ?? undefined) as WebhookRecord['signatureVerdict'],
       verificationReason: (row.verification_reason ?? undefined) as WebhookRecord['verificationReason'],
       matchedTransactionId: row.matched_transaction_id ?? undefined,

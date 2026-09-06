@@ -90,7 +90,13 @@ PaymentLink:
       description: "YYYY-MM-DD HH:mm:ss"
     expired_date:
       oneOf: [{ type: integer }, { type: string }]
-      description: Epoch seconds when set; empty string or "0" when unset.
+      description: >
+        Epoch seconds when set; echoes "0" (string) when unset. Number or
+        string both accepted at create. Sandbox-verified (2026-09-06): a past
+        value or one under ~5 minutes in the future is rejected PTL04;
+        offsets from +300s upward are accepted. No EXPIRED status exists —
+        detail keeps reporting OPEN after expiry and the hosted page still
+        answers 200.
     return_url:
       type: string
       description: Decoded callback URL.
@@ -98,7 +104,11 @@ PaymentLink:
       type: string
       description: >
         The URL the gateway calls to send payment status updates (detail
-        endpoint; official detail schema — may mirror return_url).
+        endpoint; official detail schema — absent from sandbox detail
+        responses). The pushback body is live-captured (2026-09-06):
+        POST application/json, User-Agent PayWayApp/3.0, body
+        {tran_id (string), status (numeric 0 = approved), merchant_ref_no}
+        — NO hash field; verify via check-transaction, not verifyCallback.
     merchant_ref_no: { type: string }
     outlet_id: { type: string }
     outlet_name: { type: string }
@@ -108,10 +118,11 @@ PaymentLink:
         - type: array
         - type: 'null'
       description: >
-        Payout details (null when none). The official apidog create schema
-        places a top-level payout array of {acc, amt, acc_name}; the
-        official overview sample response shows it inside data as an
-        array. Placement/shape verified per sandbox evidence.
+        Payout details (null when none). PLACEMENT IS UNVERIFIED: the
+        official apidog create schema places a top-level payout array of
+        {acc, amt, acc_name}; the official overview sample response shows
+        it inside data as an array. oneOf both shapes until probe V-2
+        settles it (see HANDOFF §9 open items) — do not rely on either.
     payment_link:
       type: string
       description: Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N).
@@ -132,8 +143,9 @@ CreatePaymentLinkResponse:
       $ref: '#/PaymentLinkStatus'
     tran_id:
       description: >
-        Gateway log id. Official schemas say string; the official overview
-        sample shows an integer — coerce, do not rely on the type.
+        Gateway log id. Official schemas say string; sandbox-observed as a
+        NUMBER on both create and detail (2026-09-06) — coerce, do not rely
+        on the type.
       oneOf: [{ type: integer }, { type: string }]
     data:
       $ref: '#/PaymentLink'
@@ -153,13 +165,18 @@ GetPaymentLinkDetailsRequest:
 
 GetPaymentLinkDetailsResponse:
   type: object
+  description: >
+    Sandbox-observed (2026-09-06): a bogus link id answers HTTP 403 code 96
+    "Invalid merchant data" — the officially documented PTL132 was NOT
+    reproduced on this sandbox profile. Sandbox detail responses carry no
+    pushback_url.
   properties:
     status:
       $ref: '#/PaymentLinkStatus'
     tran_id:
       description: >
-        Gateway log id. Official schemas say string; observed integer —
-        coerce, do not rely on the type.
+        Gateway log id. Official schemas say string; sandbox-observed as a
+        NUMBER (2026-09-06) — coerce, do not rely on the type.
       oneOf: [{ type: integer }, { type: string }]
     data:
       $ref: '#/PaymentLink'

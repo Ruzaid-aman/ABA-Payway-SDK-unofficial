@@ -1,3 +1,4 @@
+import type { PaymentLinkPushback } from '../domains/payment-link.js';
 import type { ParsedKhqrPaymentNotification } from './khqr-notification.js';
 
 /**
@@ -40,6 +41,8 @@ export interface WebhookRecord {
   readonly matchedStatus?: string;
   /** True when a prior stored record already carries the same (matchedTransactionId, matchedStatus) — a replay marker for idempotent processing. */
   readonly replay?: boolean;
+  /** Payment-link pushback parsing metadata. The raw body remains the audit source. */
+  readonly paymentLinkPushback?: PaymentLinkPushbackMetadata;
 }
 
 export interface KhqrWebhookMetadata {
@@ -47,6 +50,13 @@ export interface KhqrWebhookMetadata {
   readonly parseError?: string;
   /** A prior captured notification had the same ABA transaction ID. */
   readonly duplicateTransactionId?: boolean;
+}
+
+export interface PaymentLinkPushbackMetadata {
+  /** Parsed pushback (see `parsePaymentLinkPushback`). The raw body is the audit source. */
+  readonly parsed?: PaymentLinkPushback;
+  /** Why the body could not be parsed, when parsing failed. */
+  readonly parseError?: string;
 }
 
 export interface WebhookStorage {
@@ -58,6 +68,9 @@ export interface WebhookStorage {
 
   /** Attach offline-KHQR parse metadata after the raw delivery is durable. */
   updateKhqrMetadata?(id: string, khqr: KhqrWebhookMetadata): WebhookRecord;
+
+  /** Attach payment-link pushback parse metadata after the raw delivery is durable. */
+  updatePaymentLinkPushbackMetadata?(id: string, pushback: PaymentLinkPushbackMetadata): WebhookRecord;
 
   /** Retrieve all stored records, ordered by insertion time. */
   getAll(): WebhookRecord[];

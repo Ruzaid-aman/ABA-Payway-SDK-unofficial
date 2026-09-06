@@ -45,7 +45,7 @@ const linkId = link.data?.id;             // ← save for getDetails (NOT the UR
 | `returnUrl` | `return_url` | string | yes | public HTTPS (throws otherwise); base64-encoded automatically by the SDK |
 | `description` | `description` | string | no | >250 chars **throws** (sandbox-verified PTL04) |
 | `paymentLimit` | `payment_limit` | number | no | max number of payments; unset = unlimited; link flips to `PAID` when `total_trxn == payment_limit` |
-| `expiredDate` | `expired_date` | number | no | epoch seconds; unset = no expiry |
+| `expiredDate` | `expired_date` | number | no | epoch seconds; unset = no expiry. Gateway rejects past values and offsets < ~5 min (PTL04, sandbox-verified); after expiry the link still reads OPEN — enforce expiry yourself |
 | `payout` | `payout` | `{acc, amt}[]` \| pre-encoded string | no | see §17.4 |
 | `image` | `image` (multipart) | `PaymentLinkImage` | no | see §17.5 |
 
@@ -85,7 +85,8 @@ Status lifecycle:
 
 - **`OPEN`** — `payment_limit > total_trxn` (or no limit); payments still accepted.
 - **`PAID`** — `payment_limit == total_trxn`; the hosted page stops accepting payments. A link **without** `payment_limit` never reaches PAID.
-- No EXPIRED status exists: an `expired_date`-expired link's status behavior is not documented by ABA — treat expiry as a merchant-side rule and verify before shipping anything valuable against it (open verification item, sandbox probe pending).
+- **No EXPIRED status exists — expiry is advisory** (sandbox-verified 2026-09-06): after `expired_date` passes, `detail` still reports `status: "OPEN"` and the hosted page still answers HTTP 200. Enforce expiry on your side (check `expired_date` against the clock before fulfilling), exactly like purchase lifetimes (W4-1).
+- `expired_date` constraints (sandbox-verified): **past values and offsets under ~5 minutes are rejected at create with PTL04**; ≥ +300s accepted (number or string). Unset links echo `"0"` (string) in detail.
 
 Totals semantics: `total_amount_org` = gross collected; `total_refund` = refunded; `total_amount` = after refunds; `total_trxn` = completed payment count. Per-transaction reconciliation: take `tran_id` from each pushback → `check-transaction` / `transaction-detail` (see docs/12).
 
@@ -129,14 +130,22 @@ await payway.paymentLink.create({
 
 ## 17.6 Handling the payment pushback
 
-When a payment completes on the link, PayWay POSTs JSON to your decoded `return_url`:
+When a payment completes on the link, PayWay POSTs to your decoded `return_url`. **Live-captured contract (2026-09-06, real sandbox payment through a trycloudflare receiver):**
 
 ```json
-{ "tran_id": "123456789", "status": "00", "merchant_ref_no": "ref0001" }
+POST /pushback
+Content-Type: application/json; charset=utf-8
+User-Agent: PayWayApp/3.0
+
+{ "tran_id": "178865526240157", "status": 0, "merchant_ref_no": "plvr-v1-mtp34wx4" }
 ```
 
-- The documented sample carries **no `hash` field** (unlike purchase webhooks). Treat the pushback as a *notification*: verify the payment with `check-transaction` using the pushed `tran_id` before fulfilling. (Whether real pushbacks include a hash is an open verification item — probe V-1; if one arrives, `verifyCallback()` applies.)
+- **There is NO `hash` field — confirmed live.** The pushback is a *notification only*: verify the payment with `check-transaction` using the pushed `tran_id` before fulfilling (that call is what carries the gateway's signed status). `verifyCallback()` does not apply here.
+- `status` arrives as the **numeric `0`** (APPROVED), not the `"00"` string the official overview sample shows — accept both.
+- `tran_id` is a string here (though numeric-typed in the create/detail responses) — coerce.
 - One pushback per payment: a multi-payment link (payment_limit > 1) fires one per completion.
+- The receiver must answer 200 quickly; ACK first, process after (the sample receiver below does exactly that).
+- **SDK helper:** `parsePaymentLinkPushback(rawBody)` (exported) parses/coerces the body — `status` numeric `0`/`"0"`/`"00"` → `'APPROVED'`, anything else `'UNKNOWN'` (raw preserved), `tran_id` coerced to string. The built-in webhook server's `/aba-payway-pushback` route uses it, so `payway-sdk setup-webhook` can host your pushback receiver too.
 
 ```ts
 // Express-style receiver
@@ -171,11 +180,11 @@ npx tsx src/cli.ts payment-link detail -i "UD/8Hl…==" [--json]
 | Code | Meaning | SDK hint |
 |---|---|---|
 | `PTL02` | Wrong hash | hash order `request_time.merchant_id.merchant_auth` (the image is never hashed) |
-| `PTL04` | Parameter validation required | currency/return_url missing, description >250 — *sandbox-discovered, not in official docs* |
-| `PTL05` | Parameter invalid format | check datatypes |
-| `PTL99` | Merchant invalid currency | currency not enabled for the merchant profile |
-| `PTL132` | Invalid payment link (detail) | wrong `id` — you passed the merchant ref or URL slug, not `data.id` |
-| `96` | (detail) link not found | check the Link ID |
+| `PTL04` | Parameter validation required | currency/return_url missing, description >250, non-numeric amount, **or an expired_date in the past / under ~5 min out** — *sandbox-discovered, not in official docs* |
+| `PTL05` | Parameter invalid format | check datatypes (sandbox probes: malformed values answered PTL04 instead — PTL05 not yet reproduced) |
+| `PTL99` | Merchant invalid currency | currency not enabled for the merchant profile (sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile) |
+| `PTL132` | Invalid payment link (detail, officially documented) | wrong `id` — you passed the merchant ref or URL slug, not `data.id`. NOT reproduced on this sandbox profile (2026-09-06): a bogus id answers **96** instead |
+| `96` | (detail) invalid link id — **sandbox-observed** | check the Link ID (HTTP 403 "Invalid merchant data") |
 | 37 / `PTL146` / `PTL46` | Payout account not whitelisted | `beneficiary add <acc>` first |
 | `PTL147` / 12 | Payout currency mismatch | payout follows the link currency |
 
@@ -201,6 +210,6 @@ All surface as `PayWayAPIError`/`PayWayBusinessError` with `paywayCode` set; `pa
 - **"Wrong hash" (PTL02)** on a request with an image → the image must never enter the hash; the SDK handles this — you're likely hand-rolling the request. Use `paymentLink.create()`.
 - **Private-host returnUrl rejected** → intentional guard; `allowPrivateCallbackHosts: true` (or `PAYWAY_ALLOW_PRIVATE_CALLBACK_HOSTS=1`) to un-gate for local tests.
 - **PEM with literal `\n`** → normalized automatically (pinned test); keep real newlines where possible.
-- **Detail says PTL132 but the link works in the browser** → you're passing the URL slug or merchant_ref_no; use the opaque `data.id` from create.
+- **Detail fails with 96 / PTL132 but the link works in the browser** → you're passing the URL slug or merchant_ref_no; use the opaque `data.id` from create (sandbox answers 96 for a bogus id).
 - **Payout total warning at create** → Σamt ≠ amount; the CLI hard-rejects, the SDK warns (strict throws).
 - **Pushback never arrives** → receiver must accept POST + `application/json` and answer 200; check it's publicly reachable.

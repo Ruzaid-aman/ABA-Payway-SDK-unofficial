@@ -32,6 +32,13 @@
   - The resulting `pwt` token NEVER appears in the response — it arrives only via the `callback_url` sent with the request.
   - HTML-attribute escaping for all form builders goes through the shared `escapeHtmlAttribute()` in `src/utils.ts` — never re-implement it locally.
 
+## Payment Link pushback & lifecycle (sandbox-verified 2026-09-06, live payment)
+- **The pushback to `return_url` carries NO `hash` field** (live-captured through a real simulator payment): body is exactly `{tran_id (string), status (numeric 0 = APPROVED), merchant_ref_no}`; `User-Agent: PayWayApp/3.0`, `Content-Type: application/json; charset=utf-8`. `verifyCallback()` does NOT apply — verification is `check-transaction(tran_id)`. `status` is numeric `0`, NOT the `"00"` string the official overview sample shows — accept both. `tran_id` is a string in the pushback but numeric-typed in create/detail responses — coerce everywhere.
+- **No EXPIRED status exists for payment links**: after `expired_date` passes, detail still reports `OPEN` and the hosted page still answers 200 (mirrors W4-1 purchase lifetimes) — enforce expiry merchant-side. Create rejects past/under-~5-min `expired_date` with PTL04 (boundary in (150s, 300s]); unset expiry echoes `"0"` (string) in detail.
+- **PTL04 is the catch-all payment-link create rejection**: unsupported currency (EUR), omitted currency, non-numeric amount ALL answer PTL04 (HTTP 400). PTL99/PTL05 are documented but NOT reproducible on this sandbox profile. A bogus detail id answers **HTTP 403 code 96** "Invalid merchant data" — the officially documented PTL132 was NOT reproduced.
+- **Response datatype reality**: `tran_id` is a NUMBER on create/detail (official docs say string); response `amount` arrives as a string ("0.03"); official schemas are internally inconsistent (amount string-vs-number, payout top-level-vs-in-data) — the repo OpenAPI pins the observed reality with do-not-rely notes.
+- **Payout on payment links is blocked on this sandbox profile**: `beneficiary add` → 403 code 32 "Service is not enable"; payout-bearing create → 403 "Payout accounts are not in whitelist". Same blocker class as the subscription `104` (§17). Filed as ABA question Q19.
+
 ## Workflow & State Tracking
 - **Always check status first**: Before beginning new work or deciding what to do next, ALWAYS read `PROJECT_STATUS.md` in the root of the workspace. This is the source of truth for what has been done and what the current priorities are.
 - **Understand the API quirks**: Read `SANDBOX-FINDINGS.md` to understand API behaviors we have verified during our sandbox probes.

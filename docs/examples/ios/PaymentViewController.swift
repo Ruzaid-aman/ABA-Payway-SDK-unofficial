@@ -123,7 +123,7 @@ class PaymentViewController: UIViewController, WKNavigationDelegate {
         <style>body{font-family:-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f7f7f8}.loader{text-align:center}.spinner{border:3px solid #e5e7eb;border-top-color:#111;border-radius:50%;width:40px;height:40px;animation:spin .8s linear infinite;margin:0 auto 16px}@keyframes spin{to{transform:rotate(360deg)}}p{font-size:.9rem;color:#5a5a5f}</style>
         </head><body>
         <div class="loader"><div class="spinner"></div><p>Redirecting to payment...</p></div>
-        <form id="f" method="POST" action="\(checkoutURL)/api/payment-gateway/v1/payments/checkout">\(hiddenInputs)</form>
+        <form id="f" method="POST" action="\(checkoutURL)/api/payment-gateway/v1/payments/purchase">\(hiddenInputs)</form>
         <script>setTimeout(function(){document.getElementById('f').submit()},500)</script>
         </body></html>
         """
