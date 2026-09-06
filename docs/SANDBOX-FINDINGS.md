@@ -846,3 +846,12 @@ Evidence: `test-output/payment-link-docs-review/` (verify-probes + expired-sweep
 6. **(V-5b/c/d) PTL04 is the catch-all create rejection**: unsupported currency (EUR), omitted currency, and a non-numeric amount ALL answered HTTP 400 `PTL04`. Neither PTL99 (merchant invalid currency) nor PTL05 (parameter invalid format) was reproducible — they may be production-only or superseded shapes.
 7. **(V-2, externally blocked) Payout placement remains unverified**: the payout-bearing create is rejected 403 "Payout accounts are not in whitelist", and `beneficiary add 500000001` fails 403 code **32 "Service is not enable"** — this sandbox merchant profile has no payout-whitelist service at all (mirrors the subscription `104` blocker, §17). Response `payout` placement (apidog top-level vs ABA sample inside `data`) needs a payout-enabled profile; the OpenAPI keeps the UNVERIFIED note + oneOf until then.
 8. **(V-1, still open) Pushback body**: the documented sample carries no `hash`; verifying a real pushback's field set needs an interactive payment session on a live `return_url` receiver.
+
+**§22 addendum (2026-09-06, later same session — V-1 closed with a real payment):**
+
+9. **(V-1) The payment-link pushback contract is LIVE-CAPTURED** — user paid a $1.50 link through the ABA Mobile Simulator against a trycloudflare receiver (`scripts/sandbox-probe-payment-link-pushback.ts`, evidence `test-output/payment-link-docs-review/pushback-captures.jsonl` + `v1-rig-console.txt`):
+   - **NO `hash` field — confirmed live.** Body is exactly `{"tran_id":"178865526240157","status":0,"merchant_ref_no":"plvr-v1-mtp34wx4"}` — `verifyCallback()` does NOT apply; the pushback is a notification, verification is `check-transaction(tran_id)` (which returned APPROVED / amount 1.5 within ~1s of the pushback).
+   - `status` is the **numeric `0`** (APPROVED), NOT the `"00"` string the official overview sample shows — receivers must accept both.
+   - `tran_id` arrives as a **string** here while create/detail responses carry it numeric-typed — coerce everywhere.
+   - Headers: `User-Agent: PayWayApp/3.0`, `Content-Type: application/json; charset=utf-8`, W3C `traceparent`/`elastic-apm-traceparent` tracing headers, source IP `103.108.218.2` (KH).
+   - Pushback latency: approval → pushback ≈ instant (captured seconds after the simulator approval); the pushback fired once, no retries observed on a 200 ACK.

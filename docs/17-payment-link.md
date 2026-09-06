@@ -130,14 +130,21 @@ await payway.paymentLink.create({
 
 ## 17.6 Handling the payment pushback
 
-When a payment completes on the link, PayWay POSTs JSON to your decoded `return_url`:
+When a payment completes on the link, PayWay POSTs to your decoded `return_url`. **Live-captured contract (2026-09-06, real sandbox payment through a trycloudflare receiver):**
 
 ```json
-{ "tran_id": "123456789", "status": "00", "merchant_ref_no": "ref0001" }
+POST /pushback
+Content-Type: application/json; charset=utf-8
+User-Agent: PayWayApp/3.0
+
+{ "tran_id": "178865526240157", "status": 0, "merchant_ref_no": "plvr-v1-mtp34wx4" }
 ```
 
-- The documented sample carries **no `hash` field** (unlike purchase webhooks). Treat the pushback as a *notification*: verify the payment with `check-transaction` using the pushed `tran_id` before fulfilling. (Whether real pushbacks include a hash is an open verification item — probe V-1; if one arrives, `verifyCallback()` applies.)
+- **There is NO `hash` field — confirmed live.** The pushback is a *notification only*: verify the payment with `check-transaction` using the pushed `tran_id` before fulfilling (that call is what carries the gateway's signed status). `verifyCallback()` does not apply here.
+- `status` arrives as the **numeric `0`** (APPROVED), not the `"00"` string the official overview sample shows — accept both.
+- `tran_id` is a string here (though numeric-typed in the create/detail responses) — coerce.
 - One pushback per payment: a multi-payment link (payment_limit > 1) fires one per completion.
+- The receiver must answer 200 quickly; ACK first, process after (the sample receiver below does exactly that).
 
 ```ts
 // Express-style receiver

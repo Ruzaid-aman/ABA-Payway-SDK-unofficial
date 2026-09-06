@@ -41,7 +41,7 @@ const link = await payway.paymentLink.create({ ..., image: { data: readFileSync(
 ```
 
 ## Pushback (payment notification)
-On payment, the gateway POSTs JSON to the decoded `return_url`: `{ tran_id, status, merchant_ref_no }` (documented sample carries NO hash — verify via `check-transaction` on the pushed `tran_id` before fulfilling). One pushback per payment; multi-payment links fire repeatedly.
+On payment, the gateway POSTs to the decoded `return_url` (live-captured 2026-09-06: `User-Agent: PayWayApp/3.0`, `Content-Type: application/json`): body `{ "tran_id": "…", "status": 0, "merchant_ref_no": "…" }` — **NO hash field (live-confirmed)**, `status` numeric 0 (not "00"). Treat as notification; verify via `check-transaction` on the pushed `tran_id` before fulfilling — `verifyCallback()` does not apply. One pushback per payment; multi-payment links fire repeatedly.
 
 ## Status lifecycle
 `OPEN` while `payment_limit > total_trxn`; `PAID` once equal (hosted page stops accepting). **No EXPIRED status exists** (sandbox-verified 2026-09-06): after `expired_date` passes, detail still reads OPEN and the hosted page still answers 200 — enforce expiry merchant-side. Create rejects past/under-5-min `expired_date` with PTL04. Totals: `total_amount_org` (gross), `total_refund`, `total_amount` (net), `total_trxn` (count).

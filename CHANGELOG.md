@@ -18,8 +18,13 @@
   `expired_date` with PTL04; bogus detail id answers **96** (PTL132 not
   reproduced); PTL04 is the catch-all create rejection (EUR/omitted
   currency/non-numeric amount). V-1 (real pushback body) and V-2 (payout
-  placement) remain open — V-2 externally blocked: the sandbox profile has
-  no payout-whitelist service (code 32). Doc deliverables completed:
+  placement) — **V-1 CLOSED live**: the pushback carries NO hash field
+  (live-captured through a real simulator payment; body
+  `{"tran_id":"…","status":0,"merchant_ref_no":"…"}`, `User-Agent:
+  PayWayApp/3.0`, `status` numeric 0, `tran_id` string — verification is
+  check-transaction, not verifyCallback; docs/17 §17.6 + docs/16 + skill
+  updated). V-2 remains externally blocked: the sandbox profile has no
+  payout-whitelist service (code 32). Doc deliverables completed:
   docs/14 snippets, docs/16 pushback section, docs/13 checklist row,
   README CLI detail example, agent user-guide 12-tool table,
   `docs/examples/backend/payment-link-create.ts` (+ docs-examples wiring),

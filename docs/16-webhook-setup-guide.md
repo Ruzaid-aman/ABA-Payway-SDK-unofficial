@@ -183,12 +183,15 @@ notification directly to the link's decoded `return_url` as
 { "tran_id": "123456789", "status": "00", "merchant_ref_no": "ref0001" }
 ```
 
-Differences from checkout webhooks:
+Differences from checkout webhooks (live-captured 2026-09-06, real payment):
 
-- The **documented pushback carries no `hash` field** — treat it as a
+- **The pushback carries NO `hash` field — live-confirmed** (`User-Agent: PayWayApp/3.0`,
+  `Content-Type: application/json; charset=utf-8`, body
+  `{"tran_id":"…","status":0,"merchant_ref_no":"…"}`). Treat it as a
   notification and verify the payment itself via `checkTransaction(tran_id)`
-  before fulfilling (an ABA-side answer on hash presence is still pending —
-  see HANDOFF open item V-1).
+  before fulfilling — `verifyCallback()` does not apply.
+- `status` arrives as the **numeric `0`** (APPROVED), not the `"00"` string
+  the official sample shows — accept both.
 - The receiver must accept **POST + `application/json`** and answer 200.
 - A multi-payment link (`payment_limit > 1`) fires one pushback **per
   completed payment**.

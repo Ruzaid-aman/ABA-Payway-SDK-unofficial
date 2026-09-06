@@ -1154,7 +1154,7 @@ export interface components {
             expired_date?: number | string;
             /** @description Decoded callback URL. */
             return_url?: string;
-            /** @description The URL the gateway calls to send payment status updates (detail endpoint; official detail schema — may mirror return_url). */
+            /** @description The URL the gateway calls to send payment status updates (detail endpoint; official detail schema — absent from sandbox detail responses). The pushback body is live-captured (2026-09-06): POST application/json, User-Agent PayWayApp/3.0, body {tran_id (string), status (numeric 0 = approved), merchant_ref_no} — NO hash field; verify via check-transaction, not verifyCallback. */
             pushback_url?: string;
             merchant_ref_no?: string;
             outlet_id?: string;
