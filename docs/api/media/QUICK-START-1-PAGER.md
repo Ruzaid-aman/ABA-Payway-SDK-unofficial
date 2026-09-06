@@ -217,7 +217,7 @@ Types: `TransactionSession`, `InitiateTransactionPayload`, `HandleResponseOption
 | `payway-sdk get-transactions-by-ref --merchant-ref <reference>` | Retrieve up to 50 transactions for a merchant reference |
 | `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
 | `payway-sdk generate-qr` | Generate a QR code (online or offline). Saves the PNG and opens it in the OS default viewer on interactive terminals. Use `--non-interactive` (`-y`) to skip prompts for scripts/CI. |
-| `payway-sdk generate-checkout` | Generate a checkout QR URL |
+| `payway-sdk generate-checkout` | Generate a checkout QR URL (full purchase flag set incl. `--payout`, `--additional-params`, `--google-pay-token`, `--return-deeplink`) |
 | `payway-sdk check-transaction -t <id>` | One-shot payment status check |
 | `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min) |
 | `payway-sdk transaction-list --from "YYYY-MM-DD HH:mm:ss" --to ...` | List transactions in a window (strict date format) |

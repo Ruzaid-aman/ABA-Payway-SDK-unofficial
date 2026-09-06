@@ -643,6 +643,14 @@ const linkWithPayout = await payway.paymentLink.create({
 
 Full lifecycle guide — parameter tables, datatype reality notes, pushback receiver, permutations & recipes, troubleshooting: **[docs/17-payment-link.md](./docs/17-payment-link.md)**.
 
+```sh
+# Inspecting a link from the CLI — the opaque Link ID from create's data.id:
+payway-sdk payment-link detail -i "UD/8Hl…Ht1xQdhlw=="
+# Human output: Link ID / title / amount / status / payments / created / expires / share URL.
+# --json prints the raw response; on ANY failure both commands print the
+# machine-parseable { "error": { kind, exitCode, type, message, paywayCode, … } } envelope.
+```
+
 ### 5. Pre-Authorization (`payway.preAuth`)
 
 Hold funds on a card and capture/cancel them later.

@@ -173,6 +173,33 @@ Content-Type: application/json
 { "acknowledged": true }
 ```
 
+### Payment Link pushbacks (`return_url`)
+
+Payment links do NOT use the webhook server's routes: PayWay POSTs the payment
+notification directly to the link's decoded `return_url` as
+`Content-Type: application/json`:
+
+```json
+{ "tran_id": "123456789", "status": "00", "merchant_ref_no": "ref0001" }
+```
+
+Differences from checkout webhooks:
+
+- The **documented pushback carries no `hash` field** — treat it as a
+  notification and verify the payment itself via `checkTransaction(tran_id)`
+  before fulfilling (an ABA-side answer on hash presence is still pending —
+  see HANDOFF open item V-1).
+- The receiver must accept **POST + `application/json`** and answer 200.
+- A multi-payment link (`payment_limit > 1`) fires one pushback **per
+  completed payment**.
+
+```sh
+# Receiver smoke test once your URL is live:
+curl -X POST https://your-host/payway/pushback   -H 'Content-Type: application/json'   -d '{"tran_id":"123456789","status":"00","merchant_ref_no":"ref0001"}'
+```
+
+Full lifecycle: [17. Payment Link API](./17-payment-link.md) §17.6.
+
 ### Online Checkout Signature Logging and Offline KHQR Notifications
 
 For the **online checkout route**, the server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then logs HMAC-SHA512 verification using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../src/auth.ts)).

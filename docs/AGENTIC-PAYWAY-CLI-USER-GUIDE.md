@@ -347,7 +347,7 @@ All writes are atomic (`<file>.tmp` → `rename`), so a crash never corrupts an 
 
 ---
 
-## 7. The 11 agent tools (actions)
+## 7. The 12 agent tools (actions)
 
 A provider-proposed plan is a list of these actions. Each is validated against a strict
 schema before execution; each maps to exactly one SDK call.
@@ -358,7 +358,8 @@ schema before execution; each maps to exactly one SDK call.
 | `generate_offline_khqr` | create | `amount?`, `currency`, `merchantRef` |
 | `create_checkout_payload` | create | `amount`, `currency`, `returnUrl?`, `cancelUrl?`, `paymentOption?` |
 | `create_checkout_purchase` | create | `amount`, `currency`, `returnUrl?`, `cancelUrl?`, `paymentOption?` |
-| `create_payment_link` | create | `title`, `amount`, `currency`, `merchantRefNo`, `returnUrl`, `description?`, `paymentLimit?`, `expiredDate?` |
+| `create_payment_link` | create | `title`, `amount`, `currency`, `merchantRefNo`, `returnUrl`, `description?`, `paymentLimit?`, `expiredDate?`, `payout?` (`[{acc, amt}]`, total must equal the amount) |
+| `get_payment_link_details` | read | `paymentLinkId` (the opaque Link ID from create — not the merchant ref, not the URL slug) |
 | `check_transaction` | read | `transactionId` |
 | `check_transaction_by_merchant_ref` | read | `merchantRef`, `requestTime?` |
 | `poll_transaction` | read | `transactionId`, `interval?`, `timeout?` |

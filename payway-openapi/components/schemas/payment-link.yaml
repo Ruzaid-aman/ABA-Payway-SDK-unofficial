@@ -90,7 +90,13 @@ PaymentLink:
       description: "YYYY-MM-DD HH:mm:ss"
     expired_date:
       oneOf: [{ type: integer }, { type: string }]
-      description: Epoch seconds when set; empty string or "0" when unset.
+      description: >
+        Epoch seconds when set; echoes "0" (string) when unset. Number or
+        string both accepted at create. Sandbox-verified (2026-09-06): a past
+        value or one under ~5 minutes in the future is rejected PTL04;
+        offsets from +300s upward are accepted. No EXPIRED status exists —
+        detail keeps reporting OPEN after expiry and the hosted page still
+        answers 200.
     return_url:
       type: string
       description: Decoded callback URL.
@@ -133,8 +139,9 @@ CreatePaymentLinkResponse:
       $ref: '#/PaymentLinkStatus'
     tran_id:
       description: >
-        Gateway log id. Official schemas say string; the official overview
-        sample shows an integer — coerce, do not rely on the type.
+        Gateway log id. Official schemas say string; sandbox-observed as a
+        NUMBER on both create and detail (2026-09-06) — coerce, do not rely
+        on the type.
       oneOf: [{ type: integer }, { type: string }]
     data:
       $ref: '#/PaymentLink'
@@ -154,13 +161,18 @@ GetPaymentLinkDetailsRequest:
 
 GetPaymentLinkDetailsResponse:
   type: object
+  description: >
+    Sandbox-observed (2026-09-06): a bogus link id answers HTTP 403 code 96
+    "Invalid merchant data" — the officially documented PTL132 was NOT
+    reproduced on this sandbox profile. Sandbox detail responses carry no
+    pushback_url.
   properties:
     status:
       $ref: '#/PaymentLinkStatus'
     tran_id:
       description: >
-        Gateway log id. Official schemas say string; observed integer —
-        coerce, do not rely on the type.
+        Gateway log id. Official schemas say string; sandbox-observed as a
+        NUMBER (2026-09-06) — coerce, do not rely on the type.
       oneOf: [{ type: integer }, { type: string }]
     data:
       $ref: '#/PaymentLink'

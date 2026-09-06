@@ -3,6 +3,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCheckoutPayload } from '../../docs/examples/backend/checkout-signing.ts';
+import {
+  createPaymentLink,
+  getPaymentLinkDetails,
+} from '../../docs/examples/backend/payment-link-create.ts';
 import { extractWebhookSignature, removeHashField } from '../../docs/examples/backend/webhook-verification.ts';
 
 describe('Documentation examples', () => {
@@ -152,5 +156,35 @@ describe('Documentation examples', () => {
     expect(setupGuide).toContain('does not mean a payment is verified or an order is paid');
     expect(setupGuide).toContain('online checkout callback');
     expect(setupGuide).not.toContain('The server extracts the `X-PAYWAY-HMAC-SHA512` header');
+  });
+
+  it('documents the payment-link lifecycle in the dedicated chapter (docs/17)', () => {
+    const chapter = readDoc('docs/17-payment-link.md');
+    expect(chapter).toContain('paymentLink.create');
+    expect(chapter).toContain('getDetails');
+    expect(chapter).toContain('{acc, amt}');
+    expect(chapter).toContain('PTL04');
+    expect(chapter).toContain('pushback');
+  });
+
+  it('keeps the payment-link example file on the public param contract', () => {
+    const example = readFileSync(
+      join(currentDir, '../../docs/examples/backend/payment-link-create.ts'),
+      'utf-8',
+    );
+    // Purchase-path payout keys — NOT the payout domain's {account, amount}.
+    expect(example).toContain("payout?: { acc: string; amt: number }[]");
+    expect(example).not.toContain('account:');
+    // The detail helper must document the opaque-Link-ID rule.
+    expect(example).toContain('data.id');
+  });
+
+  it('exposes payment-link example helpers that build SDK params (no network at import)', () => {
+    // Module-level import already succeeded above (constructing PayWay with
+    // placeholder credentials throws only on blank/whitespace values, which
+    // the example does not use); calling create would hit the network, so the
+    // wiring test asserts the exported shapes instead.
+    expect(typeof createPaymentLink).toBe('function');
+    expect(typeof getPaymentLinkDetails).toBe('function');
   });
 });

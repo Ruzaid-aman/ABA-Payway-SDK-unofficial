@@ -1150,7 +1150,7 @@ export interface components {
             created_at?: string;
             /** @description YYYY-MM-DD HH:mm:ss */
             updated_at?: string;
-            /** @description Epoch seconds when set; empty string or "0" when unset. */
+            /** @description Epoch seconds when set; echoes "0" (string) when unset. Number or string both accepted at create. Sandbox-verified (2026-09-06): a past value or one under ~5 minutes in the future is rejected PTL04; offsets from +300s upward are accepted. No EXPIRED status exists — detail keeps reporting OPEN after expiry and the hosted page still answers 200. */
             expired_date?: number | string;
             /** @description Decoded callback URL. */
             return_url?: string;
@@ -1166,7 +1166,7 @@ export interface components {
         };
         CreatePaymentLinkResponse: {
             status?: components["schemas"]["PaymentLinkStatus"];
-            /** @description Gateway log id. Official schemas say string; the official overview sample shows an integer — coerce, do not rely on the type. */
+            /** @description Gateway log id. Official schemas say string; sandbox-observed as a NUMBER on both create and detail (2026-09-06) — coerce, do not rely on the type. */
             tran_id?: number | string;
             data?: components["schemas"]["PaymentLink"];
         };
@@ -1179,9 +1179,10 @@ export interface components {
             /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
             hash: string;
         };
+        /** @description Sandbox-observed (2026-09-06): a bogus link id answers HTTP 403 code 96 "Invalid merchant data" — the officially documented PTL132 was NOT reproduced on this sandbox profile. Sandbox detail responses carry no pushback_url. */
         GetPaymentLinkDetailsResponse: {
             status?: components["schemas"]["PaymentLinkStatus"];
-            /** @description Gateway log id. Official schemas say string; observed integer — coerce, do not rely on the type. */
+            /** @description Gateway log id. Official schemas say string; sandbox-observed as a NUMBER (2026-09-06) — coerce, do not rely on the type. */
             tran_id?: number | string;
             data?: components["schemas"]["PaymentLink"];
         };

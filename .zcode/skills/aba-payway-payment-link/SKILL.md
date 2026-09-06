@@ -44,7 +44,7 @@ const link = await payway.paymentLink.create({ ..., image: { data: readFileSync(
 On payment, the gateway POSTs JSON to the decoded `return_url`: `{ tran_id, status, merchant_ref_no }` (documented sample carries NO hash — verify via `check-transaction` on the pushed `tran_id` before fulfilling). One pushback per payment; multi-payment links fire repeatedly.
 
 ## Status lifecycle
-`OPEN` while `payment_limit > total_trxn`; `PAID` once equal (hosted page stops accepting). No EXPIRED status exists — treat `expired_date` expiry as a merchant-side rule. Totals: `total_amount_org` (gross), `total_refund`, `total_amount` (net), `total_trxn` (count).
+`OPEN` while `payment_limit > total_trxn`; `PAID` once equal (hosted page stops accepting). **No EXPIRED status exists** (sandbox-verified 2026-09-06): after `expired_date` passes, detail still reads OPEN and the hosted page still answers 200 — enforce expiry merchant-side. Create rejects past/under-5-min `expired_date` with PTL04. Totals: `total_amount_org` (gross), `total_refund`, `total_amount` (net), `total_trxn` (count).
 
 ## Error Handling
 ```ts
@@ -53,7 +53,7 @@ try { await payway.paymentLink.getDetails('link-id'); }
 catch (error) { if (error instanceof PayWayConfigError) console.error(error.message); }
 ```
 
-Codes: `PTL02` wrong hash, `PTL04` param validation (currency/return_url missing, description >250 — sandbox-discovered), `PTL05` bad format, `PTL99` merchant invalid currency, `PTL132`/`96` invalid link id on detail. Payout whitelist failures use 37/PTL146/PTL46.
+Codes: `PTL02` wrong hash, `PTL04` param validation (currency/return_url missing, description >250, non-numeric amount, OR expired_date in the past/under ~5 min out — sandbox-discovered catch-all), `96` invalid link id on detail (PTL132 documented but not reproduced on sandbox), 37/PTL146/PTL46 payout whitelist. Sandbox detail: `expired_date` unset echoes "0"; NO EXPIRED status — expired links still read OPEN and the hosted page still answers 200, enforce expiry yourself.
 
 ## Inspecting a link (CLI)
 

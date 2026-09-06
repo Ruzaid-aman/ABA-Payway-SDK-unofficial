@@ -11,6 +11,20 @@
 
 ### Added
 
+- **Payment-link follow-up batch (2026-09-06, second session)** — Batch-A
+  probes executed (SANDBOX-FINDINGS §22): `tran_id` observed as a NUMBER on
+  both endpoints; **no EXPIRED status** (expired links read OPEN + hosted
+  page 200 — enforce expiry merchant-side); create rejects past/under-5-min
+  `expired_date` with PTL04; bogus detail id answers **96** (PTL132 not
+  reproduced); PTL04 is the catch-all create rejection (EUR/omitted
+  currency/non-numeric amount). V-1 (real pushback body) and V-2 (payout
+  placement) remain open — V-2 externally blocked: the sandbox profile has
+  no payout-whitelist service (code 32). Doc deliverables completed:
+  docs/14 snippets, docs/16 pushback section, docs/13 checklist row,
+  README CLI detail example, agent user-guide 12-tool table,
+  `docs/examples/backend/payment-link-create.ts` (+ docs-examples wiring),
+  TypeDoc regen; probe findings folded into docs/17, docs/12, the OpenAPI
+  spec (`src/types.ts` regenerated), and the packaged skill.
 - **Payment-link documentation & consistency batch (2026-09-06)** — new full
   lifecycle chapter `docs/17-payment-link.md` (parameter tables with datatype
   reality notes — the official docs declare several numeric fields as strings
