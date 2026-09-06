@@ -5,8 +5,13 @@ export interface FirstPaymentCommandExample {
 
 export const FIRST_PAYMENT_COMMANDS: readonly FirstPaymentCommandExample[] = [
   {
+    label: 'Run the credential-free demo',
+    command: 'payway-sdk demo',
+  },
+  {
     label: 'Create an online QR',
-    command: 'payway-sdk generate-qr -a 3.00 -c USD',
+    command:
+      'payway-sdk generate-qr -a 3.00 -c USD --callback-url <https-url> -y --no-polling --output json',
   },
   {
     label: 'Check current status',

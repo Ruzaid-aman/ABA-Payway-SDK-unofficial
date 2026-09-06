@@ -62,6 +62,48 @@ describe('Documentation examples', () => {
     expect(payload).toHaveProperty('merchant_id', 'SANDBOX_MERCHANT');
   });
 
+  it('builds the documented hosted checkout with the public package API and purchase form route', () => {
+    const html = createHostedCheckoutForm({
+      transactionId: 'order-123',
+      amount: 15,
+      currency: 'USD',
+      returnUrl: 'https://example.com/success',
+      cancelUrl: 'https://example.com/cancel',
+    });
+
+    expect(html).toContain('action="https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase"');
+    expect(html).toContain('name="payment_gate" value="0"');
+    expect(html).toContain("document.getElementById('aba_merchant_request').submit()");
+    expect(createWebhookServer).toBeTypeOf('function');
+  });
+
+  it.each(['README.md', 'docs/README.md', 'docs/QUICK-START-1-PAGER.md'])('resolves repository-relative links from %s', (docPath) => {
+    const markdown = readDoc(docPath);
+    const docDir = dirname(join(repoRoot, docPath));
+    const missing = [...markdown.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g)]
+      .map((match) => match[1].trim().replace(/^<|>$/g, ''))
+      .filter((target) => !/^(?:[a-z][a-z\d+.-]*:|#)/i.test(target))
+      .map((target) => decodeURIComponent(target.split('#', 1)[0].split('?', 1)[0]))
+      .filter((target) => target.length > 0)
+      .filter((target) => !existsSync(resolve(docDir, target)));
+
+    expect(missing).toEqual([]);
+  });
+
+  it('keeps the public onboarding path executable and credential safe', () => {
+    const onboarding = ['README.md', 'QUICKSTART.md', 'docs/QUICK-START-1-PAGER.md']
+      .map(readDoc)
+      .join('\n');
+
+    expect(onboarding).toContain('payway-sdk demo --check');
+    expect(onboarding).toContain('payway-sdk init --mode sandbox --template first-payment');
+    expect(onboarding).toContain('payway-sdk doctor --route online-qr');
+    expect(onboarding).toContain('-y --no-polling --output json');
+    expect(onboarding).toContain('PowerShell');
+    expect(onboarding).toContain('fulfill');
+    expect(onboarding).not.toMatch(/^\s*npx payway-sdk\b/gm);
+  });
+
   it('documents official offline ABA KHQR configuration and its dedicated callback route', () => {
     const documentation = khqrDocs.join('\n');
 

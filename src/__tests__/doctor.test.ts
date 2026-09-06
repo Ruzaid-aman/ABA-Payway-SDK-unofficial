@@ -131,4 +131,53 @@ describe('runDoctor', () => {
     expect(callbackCheck?.ok).toBe(true);
     expect(callbackCheck?.detail).toContain('https://example.com/payway/callback');
   });
+
+  it('treats the credential-free demo route as ready in an empty directory', () => {
+    const result = runDoctor({ cwd: TEST_DIR, env: {}, route: 'demo' });
+    expect(result.allHealthy).toBe(true);
+    expect(result.context).toMatchObject({ credentialSource: 'missing', environment: 'sandbox' });
+    expect(result.checks.some((check) => check.id === 'env-PAYWAY_API_KEY')).toBe(false);
+  });
+
+  it('reports resolved profile context without exposing credential contents', () => {
+    const secret = 'secret-api-key-that-must-not-render';
+    const result = runDoctor({
+      cwd: TEST_DIR,
+      profileName: 'merchant-prod',
+      route: 'hosted-checkout',
+      env: {
+        PAYWAY_ENV: 'production',
+        PAYWAY_MERCHANT_ID: 'merchant-1',
+        PAYWAY_API_KEY: secret,
+      },
+    });
+
+    expect(result.allHealthy).toBe(true);
+    expect(result.context).toEqual({
+      credentialSource: 'profile',
+      profile: 'merchant-prod',
+      environment: 'production',
+      endpoint: 'https://checkout.payway.com.kh',
+    });
+    expect(JSON.stringify(result)).not.toContain(secret);
+    expect(JSON.stringify(result)).not.toContain(secret.slice(0, 8));
+    expect(result.checks.some((check) => check.id === 'env-PAYWAY_CALLBACK_URL')).toBe(false);
+  });
+
+  it('does not require a .env file when ambient credentials are complete', () => {
+    const result = runDoctor({
+      cwd: TEST_DIR,
+      route: 'hosted-checkout',
+      env: {
+        PAYWAY_ENV: 'sandbox',
+        PAYWAY_MERCHANT_ID: 'merchant-1',
+        PAYWAY_API_KEY: 'a'.repeat(32),
+      },
+    });
+    expect(result.allHealthy).toBe(true);
+    expect(result.context.credentialSource).toBe('environment');
+    expect(result.checks.find((check) => check.id === 'env-file')).toMatchObject({ ok: true });
+    expect(result.envIssues.some((issue) => issue.varName === 'PAYWAY_RETURN_URL')).toBe(false);
+    expect(result.envIssues.some((issue) => issue.varName === 'PAYWAY_CALLBACK_URL')).toBe(false);
+  });
 });

@@ -4,52 +4,71 @@
 
 Production-ready, fully-typed TypeScript SDK for the ABA PayWay payment gateway.
 
-> [!IMPORTANT]
-> **Security Warning**: This SDK is designed for **Server-Side (Node.js) execution only**. It relies on `node:crypto` for cryptographic signing (HMAC-SHA512) and RSA encryption. **Never** import or use this SDK in frontend/client-side applications (React, Angular, Vue, iOS, Android), as doing so will expose your high-privilege PayWay API Key and RSA credentials to the public.
->
-> Requires Node.js 20 or later.
+Requires Node.js 20 or later. The SDK runs on your server, where PayWay credentials remain private.
 
----
+## Start in two minutes
 
-## Secure Architecture Guide
-
-For a secure integration, separate your payment flow into distinct Backend and Frontend duties:
-
-```
-┌─────────────────────────────────┐           ┌─────────────────────────────────┐
-│     Client (Browser / App)      │           │     Secure Backend (Node.js)    │
-│  (No API keys or certs stored)  │           │   (Stores API keys & calls SDK) │
-└────────────────┬────────────────┘           └────────────────┬────────────────┘
-                 │                                             │
-                 │  1. Request checkout initiation             │
-                 ├────────────────────────────────────────────>│
-                 │                                             │  2. Create signed request
-                 │                                             │     using PayWay SDK
-                 │                                             │
-                 │  3. Return signed payment form/link         │
-                 │<────────────────────────────────────────────┤
-                 │                                             │
-                 │  4. Redirect or embed PayWay Checkout       │
-                 ├─────────────────────────────────────────────┼──────────────┐
-                 │                                             │              │
-                 │  5. Perform payment & redirect to returnUrl │              ▼
-                 │<────────────────────────────────────────────┼─────── [ PayWay API ]
-                 │                                             │              ▲
-                 │                                             │  6. Webhook  │
-                 │                                             │     Callback │
-                 │                                             │<─────────────┘
-                 │                                             │
-                 │                                             │  7. Verify webhook signature
-                 │                                             │     using SDK & fulfill order
-```
-
----
-
-## Installation
+The package is not yet published to the public npm registry. Build a tarball from this checkout and install it in your application:
 
 ```bash
-npm install aba-payway-ts
+npm ci
+npm run build
+npm pack
+npm install ../aba-payway-ts/aba-payway-ts-1.5.0.tgz
 ```
+
+After publication, install with `npm install aba-payway-ts`. Run the local CLI with `npm exec -- payway-sdk`. Do not run bare `npx payway-sdk`; that name currently resolves to an unrelated public package.
+
+### 1. Explore without credentials
+
+```bash
+npm exec -- payway-sdk demo
+```
+
+The command serves a local simulated checkout at `127.0.0.1` and prints its URL. Create a payment, scan its generated QR, and simulate approval without contacting ABA or loading merchant credentials. For CI or package verification, run `npm exec -- payway-sdk demo --check`.
+
+### 2. Create a sandbox QR
+
+Set server-side sandbox credentials, then run the route-aware diagnostic and one complete non-interactive payment command:
+
+```bash
+npm exec -- payway-sdk doctor --route online-qr
+npm exec -- payway-sdk generate-qr -a 3.00 -c USD -t order-001 \
+  --callback-url https://your-public-host.example/payway/callback \
+  -y --no-polling --output json
+```
+
+PowerShell uses the same commands; use a backtick instead of `\` for line continuation. A create timeout has an unknown outcome, so reconcile `order-001` before creating a replacement payment.
+
+### 3. Add the first server-side payment
+
+```bash
+npm exec -- payway-sdk init --mode sandbox --template first-payment
+node payway-first-payment.mjs
+```
+
+`init` writes `.env.example`, creates `.env` only when it is missing, and never overwrites the generated starter. The starter uses a unique transaction ID, prints the accepted response, and explains how to verify the final payment state.
+
+See [QUICKSTART.md](./QUICKSTART.md) for POSIX and PowerShell setup, or the [one-page guide](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/QUICK-START-1-PAGER.md) for the full payment lifecycle.
+
+> [!IMPORTANT]
+> Never import this package into browser or mobile code. It uses server-side cryptographic credentials. Return only a signed checkout artifact or safe payment response to the client, and fulfill an order only after a verified callback or status lookup confirms the transaction, amount, and currency.
+
+## Secure architecture
+
+```text
+Browser or app          Your Node.js server               ABA PayWay
+     |  create request          |                              |
+     |------------------------->|  signed SDK request          |
+     |                          |----------------------------->|
+     |  checkout artifact       |                              |
+     |<-------------------------|                              |
+     |------------------------- customer pays ---------------->|
+     |                          |<------ callback / lookup -----|
+     |                          |  verify, then fulfill once    |
+```
+
+Keep API keys and RSA material on the server. Treat payment creation as acceptance, not proof of payment. Make fulfillment idempotent because callbacks and status checks can be repeated.
 
 ### Install AI skills
 
@@ -87,10 +106,10 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 
 | Command | Description |
 |---|---|
-| `payway-sdk init` | Initialize PayWay integration in the current project |
-| `payway-sdk doctor` | Validate environment configuration and connectivity (`--live` adds a real sandbox round-trip) |
+| `payway-sdk init` | Initialize a demo, framework scaffold, or first-payment starter without overwriting existing files |
+| `payway-sdk doctor` | Validate a selected route (`demo`, `online-qr`, or `hosted-checkout`); `--live` adds a real sandbox round-trip |
 | `payway-sdk test` | Run the sandbox test suite (default) |
-| `payway-sdk demo` | Run the test suite with pass/fail output |
+| `payway-sdk demo` | Open a credential-free simulated payment UI on localhost (`--check` for CI/package smoke) |
 | `payway-sdk poll-transaction -t <id>` | Watch a transaction until terminal status (`--json` events for agents) |
 | `payway-sdk status` | Display payment status codes and refund error codes reference |
 | `payway-sdk explain [code]` | Decode a PayWay error code (e.g. `explain PTL36`, `explain 49`) with a fix hint — no credentials needed |

@@ -72,6 +72,15 @@ try {
   );
   if (!cliOutput.includes('payway-sdk')) throw new Error('installed CLI help did not render');
 
+  const demoOutput = execFileSync(
+    process.execPath,
+    [path.join(temporaryRoot, 'node_modules', 'aba-payway-ts', 'dist', 'cli.js'), 'demo', '--check'],
+    { cwd: temporaryRoot, encoding: 'utf8' },
+  );
+  if (!demoOutput.includes('Credential-free demo check passed')) {
+    throw new Error('installed CLI demo self-check failed');
+  }
+
   const skillsRoot = path.join(temporaryRoot, 'node_modules', 'aba-payway-ts', 'skills');
   const skillCount = readdirSync(skillsRoot, { withFileTypes: true }).filter(
     (entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'),
@@ -83,7 +92,7 @@ try {
   );
   if (installedPackage.name !== 'aba-payway-ts') throw new Error('installed package identity mismatch');
 
-  console.log(`Packed-package smoke passed: ESM, CJS, declarations, CLI, and ${skillCount} skills.`);
+  console.log(`Packed-package smoke passed: ESM, CJS, declarations, CLI demo, and ${skillCount} skills.`);
 } finally {
   const resolvedTemporaryRoot = path.resolve(temporaryRoot);
   const resolvedSystemTemp = path.resolve(tmpdir());

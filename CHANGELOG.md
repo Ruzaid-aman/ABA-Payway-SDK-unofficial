@@ -187,6 +187,26 @@
   locally (parity with the `--payout` total-equals-amount rule; the SDK domain
   stays advisory — the gateway is the final arbiter).
 
+- **First-payment onboarding path** — `payway-sdk demo` now serves a clearly
+  labelled, credential-free payment UI backed by the local mock gateway;
+  `demo --check` verifies the installed flow for CI. `init` adds explicit
+  demo/sandbox modes and a non-destructive first-payment starter, while
+  route-aware `doctor` reports credential source, profile, environment, and
+  endpoint without exposing secret fragments. The packaged quickstart now
+  leads from install to demo, sandbox QR, and server-side integration with
+  POSIX and PowerShell examples.
+- **Versioned payment-command output** — `generate-qr` and `generate-checkout`
+  accept `--output json` for one final result or `--output ndjson` for creation,
+  polling, and final records. Results include non-secret context, explicit
+  creation/payment/wait states, artifact paths, and a safe reconciliation step.
+- **Checkout QR artifact parity** — `generate-checkout` normalizes camelCase and
+  snake_case QR fields and can render the payload to a PNG with the same
+  non-interactive image controls as `generate-qr`.
+- **Hosted form controls** — `checkout-form` now forwards `--payment-gate`,
+  `--skip-success-page`, and `--continue-success-url` into the signed form.
+- **Curated distribution boundary** — the package now includes `LICENSE`,
+  `QUICKSTART.md`, and this changelog; automated checks validate packaged files,
+  embedded text, Markdown links, generated docs, and a clean tarball install.
 - **`checkout.purchaseHosted()` — typed hosted-checkout purchase** — sets
   `paymentGate: 0` for you and returns a structured `PurchaseHostedHtmlResult`
   (`{ hosted_checkout: true, content_type, html }`): the gateway answers a
