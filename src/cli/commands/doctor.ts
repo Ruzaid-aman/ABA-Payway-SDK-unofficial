@@ -2,12 +2,24 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
 import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
+import { BASE_URLS } from '../../constants.js';
 import { isValidPublicKeyPem, validatePublicHttpsUrl } from '../../utils.js';
 import { parseDotEnvFile } from '../dotenv.js';
 
 export interface DoctorOptions {
   readonly cwd?: string;
   readonly env?: NodeJS.ProcessEnv;
+  readonly profileName?: string;
+  readonly route?: DoctorRoute;
+}
+
+export type DoctorRoute = 'demo' | 'online-qr' | 'hosted-checkout';
+
+export interface DoctorContext {
+  readonly credentialSource: 'profile' | 'environment' | '.env' | 'missing';
+  readonly profile?: string;
+  readonly environment: string;
+  readonly endpoint: string;
 }
 
 export interface DoctorCheck {
@@ -24,6 +36,8 @@ export interface DoctorResult {
   readonly framework: DetectedFramework;
   readonly frameworkEvidence: readonly string[];
   readonly allHealthy: boolean;
+  readonly route: DoctorRoute;
+  readonly context: DoctorContext;
 }
 
 function checkRsaPem(env: NodeJS.ProcessEnv): DoctorCheck | undefined {
@@ -49,15 +63,15 @@ function checkRsaPem(env: NodeJS.ProcessEnv): DoctorCheck | undefined {
   };
 }
 
-function checkEnvFile(cwd: string): DoctorCheck {
+function checkEnvFile(cwd: string, configurationAvailable: boolean): DoctorCheck {
   const envPath = path.join(cwd, '.env');
   const exists = existsSync(envPath);
   return {
     id: 'env-file',
     label: '.env file exists',
-    ok: exists,
-    detail: exists ? envPath : `.env not found in ${cwd}`,
-    fix: exists ? undefined : 'Run `payway-sdk init` to create a .env template',
+    ok: exists || configurationAvailable,
+    detail: exists ? envPath : configurationAvailable ? 'not present; using profile or environment variables' : `.env not found in ${cwd}`,
+    fix: exists || configurationAvailable ? undefined : 'Run `payway-sdk init --mode sandbox` to create a .env template',
   };
 }
 
@@ -89,7 +103,13 @@ function checkEnvVars(env: NodeJS.ProcessEnv): DoctorCheck[] {
       id: `env-${name}`,
       label: `${name} is set`,
       ok: !issue,
-      detail: issue ? issue.message : `set to ${(env[name] ?? '').slice(0, 8)}...`,
+      detail: issue
+        ? issue.message
+        : name === 'PAYWAY_API_KEY'
+          ? `configured (${env[name]?.length ?? 0} characters)`
+          : name === 'PAYWAY_MERCHANT_ID'
+            ? 'configured'
+            : `set to ${env[name]}`,
       fix: issue ? `Add ${name}=<value> to your .env file` : undefined,
     });
   }
@@ -125,6 +145,38 @@ function checkEnvVars(env: NodeJS.ProcessEnv): DoctorCheck[] {
   }
 
   return checks;
+}
+
+function resolveDoctorContext(input: {
+  env: NodeJS.ProcessEnv;
+  fileVars: NodeJS.ProcessEnv;
+  profileName?: string;
+}): DoctorContext {
+  const environmentValue = input.env.PAYWAY_ENV?.trim() || input.fileVars.PAYWAY_ENV?.trim() || 'sandbox';
+  const environment = environmentValue === 'production' ? 'production' : environmentValue === 'sandbox' ? 'sandbox' : 'custom';
+  const endpoint =
+    input.env.PAYWAY_BASE_URL?.trim() ||
+    input.fileVars.PAYWAY_BASE_URL?.trim() ||
+    (/^https?:\/\//i.test(environmentValue)
+      ? environmentValue
+      : environment === 'production'
+        ? BASE_URLS.production
+        : BASE_URLS.sandbox);
+  const environmentHasCredentials = Boolean(input.env.PAYWAY_MERCHANT_ID?.trim() && input.env.PAYWAY_API_KEY?.trim());
+  const fileHasCredentials = Boolean(input.fileVars.PAYWAY_MERCHANT_ID?.trim() && input.fileVars.PAYWAY_API_KEY?.trim());
+  const credentialSource = input.profileName
+    ? 'profile'
+    : environmentHasCredentials
+      ? 'environment'
+      : fileHasCredentials
+        ? '.env'
+        : 'missing';
+  return {
+    credentialSource,
+    ...(input.profileName ? { profile: input.profileName } : {}),
+    environment,
+    endpoint,
+  };
 }
 
 function checkCallbackUrl(env: NodeJS.ProcessEnv): DoctorCheck {
@@ -164,19 +216,36 @@ function checkCallbackUrl(env: NodeJS.ProcessEnv): DoctorCheck {
 export function runDoctor(options: DoctorOptions = {}): DoctorResult {
   const cwd = options.cwd ?? process.cwd();
   const env = options.env ?? process.env;
+  const route = options.route ?? 'online-qr';
 
   const envPath = path.join(cwd, '.env');
   const fileVars = parseDotEnvFile(envPath);
   const mergedEnv = { ...fileVars, ...env } as NodeJS.ProcessEnv;
+  const context = resolveDoctorContext({ env, fileVars, profileName: options.profileName });
+  const configurationAvailable = Boolean(mergedEnv.PAYWAY_MERCHANT_ID?.trim() && mergedEnv.PAYWAY_API_KEY?.trim());
 
-  const envFileCheck = checkEnvFile(cwd);
+  const envFileCheck = checkEnvFile(cwd, configurationAvailable);
   const frameworkCheck = checkFramework(cwd);
   const envVarChecks = checkEnvVars(mergedEnv);
   const callbackCheck = checkCallbackUrl(mergedEnv);
   const rsaCheck = checkRsaPem(mergedEnv);
 
-  const checks = [envFileCheck, frameworkCheck, ...envVarChecks, callbackCheck, ...(rsaCheck ? [rsaCheck] : [])];
-  const envIssues = validatePayWayEnv(mergedEnv);
+  const checks =
+    route === 'demo'
+      ? [frameworkCheck]
+      : [
+          envFileCheck,
+          frameworkCheck,
+          ...envVarChecks,
+          ...(route === 'online-qr' ? [callbackCheck] : []),
+          ...(rsaCheck ? [rsaCheck] : []),
+        ];
+  const envIssues =
+    route === 'demo'
+      ? []
+      : validatePayWayEnv(mergedEnv).filter(
+          (issue) => !['PAYWAY_RETURN_URL', 'PAYWAY_CANCEL_URL', 'PAYWAY_CALLBACK_URL'].includes(issue.varName),
+        );
   const detection = detectFramework(cwd);
 
   return {
@@ -185,5 +254,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
     framework: detection.framework,
     frameworkEvidence: detection.evidence,
     allHealthy: checks.every((c) => c.ok),
+    route,
+    context,
   };
 }

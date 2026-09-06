@@ -107,6 +107,20 @@ describe('CLI in-process (runCli)', () => {
     expect([0, 1]).toContain(exitCode as number);
   });
 
+  it('doctor reports the credential-free demo route as ready', async () => {
+    const { text, exitCode } = await run(['doctor', '--route', 'demo']);
+    expect(text).toContain('Route: demo');
+    expect(text).toContain('Credential source:');
+    expect(text).not.toContain('API Key is set');
+    expect(exitCode).toBe(0);
+  });
+
+  it('rejects unsupported init modes before writing files', async () => {
+    const { text, exitCode } = await run(['init', '--mode', 'production']);
+    expect(text).toContain('--mode must be demo or sandbox');
+    expect(exitCode).toBe(1);
+  });
+
   it('profiles list runs read-only against the local profile store', async () => {
     const { text, exitCode } = await run(['profiles', 'list']);
     expect(text.length).toBeGreaterThan(0);
@@ -119,13 +133,18 @@ describe('CLI in-process (runCli)', () => {
     expect(exitCode).not.toBe(1);
   });
 
-  it('demo runs the built-in mock-server test suite to completion', async () => {
-    const { text, exitCode } = await run(['demo']);
-    expect(text).toContain('demo run');
-    expect(text).toMatch(/Total:/);
-    expect(text).toMatch(/Passed:/);
+  it('demo checks the local simulated payment app to completion', async () => {
+    const { text, exitCode } = await run(['demo', '--check']);
+    expect(text).toContain('Credential-free demo check passed');
+    expect(text).toContain('http://127.0.0.1:');
     expect(exitCode).toBe(0);
-  }, 60_000);
+  });
+
+  it('rejects invalid demo ports before starting a server', async () => {
+    const { text, exitCode } = await run(['demo', '--port', '70000']);
+    expect(text).toContain('--port must be an integer from 0 to 65535');
+    expect(exitCode).toBe(1);
+  });
 
   it('setup-webhook rejects an invalid port before starting anything', async () => {
     const { text, exitCode } = await run(['setup-webhook', '--port', '99999']);

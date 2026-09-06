@@ -11,6 +11,14 @@
 
 ### Added
 
+- **First-payment onboarding path** — `payway-sdk demo` now serves a clearly
+  labelled, credential-free payment UI backed by the local mock gateway;
+  `demo --check` verifies the installed flow for CI. `init` adds explicit
+  demo/sandbox modes and a non-destructive first-payment starter, while
+  route-aware `doctor` reports credential source, profile, environment, and
+  endpoint without exposing secret fragments. The packaged quickstart now
+  leads from install to demo, sandbox QR, and server-side integration with
+  POSIX and PowerShell examples.
 - **Versioned payment-command output** — `generate-qr` and `generate-checkout`
   accept `--output json` for one final result or `--output ndjson` for creation,
   polling, and final records. Results include non-secret context, explicit

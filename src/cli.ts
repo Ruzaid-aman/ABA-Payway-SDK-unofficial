@@ -24,6 +24,7 @@ import type { AnsiPalette } from './cli/ui/theme.js';
 import { suggestMessage } from './cli/ui/suggest.js';
 import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
 import { registerAgentCommands } from './cli/commands/agent.js';
+import { checkDemoApp, startDemoApp } from './cli/commands/demo.js';
 import { registerOnboardCommand } from './cli/commands/onboard.js';
 import { runDoctor } from './cli/commands/doctor.js';
 import { runInit } from './cli/commands/init.js';
@@ -848,7 +849,7 @@ function isProfilesCommand(command: Command): boolean {
 }
 
 function activateSelectedProfile(command: Command): void {
-  if (isProfilesCommand(command)) return;
+  if (isProfilesCommand(command) || command.name() === 'demo' || command.name() === 'init') return;
   const selectedName =
     program.opts<{ profile?: string }>().profile ??
     process.env.PAYWAY_PROFILE ??
@@ -879,9 +880,21 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
 program
   .command('init')
   .description('Initialize PayWay integration in the current project')
-  .action(() => {
+  .option('--mode <mode>', 'Setup path: demo or sandbox', 'sandbox')
+  .option('--template <template>', 'Starter: framework or first-payment', 'framework')
+  .action((opts: { mode: string; template: string }) => {
+    if (!['demo', 'sandbox'].includes(opts.mode)) {
+      console.error(`--mode must be demo or sandbox, received: ${opts.mode}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    if (!['framework', 'first-payment'].includes(opts.template)) {
+      console.error(`--template must be framework or first-payment, received: ${opts.template}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
     console.log(`\n${c.bold('ABA PayWay SDK')} — initializing project\n`);
-    const result = runInit();
+    const result = runInit({ mode: opts.mode as 'demo' | 'sandbox', template: opts.template as 'framework' | 'first-payment' });
 
     console.log(`  Framework: ${c.cyan(result.framework)}`);
     for (const e of result.frameworkEvidence) {
@@ -912,7 +925,49 @@ program
     }
 
     console.log(`  Report: ${c.cyan(result.reportPath)}`);
-    console.log(`  ${c.dim('Next: fill PAYWAY_MERCHANT_ID and PAYWAY_API_KEY in .env')}\n`);
+    console.log(`  ${c.dim(`Next: ${result.nextCommand}`)}\n`);
+  });
+
+// --- demo ---
+program
+  .command('demo')
+  .description('Run a credential-free simulated payment journey on localhost')
+  .option('-p, --port <number>', 'Local UI port (default: an available port)')
+  .option('--check', 'Start the demo, verify its local endpoints, and exit')
+  .action(async (opts: { port?: string; check?: boolean }) => {
+    if (opts.check) {
+      const result = await checkDemoApp();
+      console.log(`Credential-free demo check passed (${result.url}).`);
+      process.exitCode = EXIT_OK;
+      return;
+    }
+
+    const port = opts.port === undefined ? 0 : Number(opts.port);
+    if (!Number.isInteger(port) || port < 0 || port > 65_535) {
+      console.error(`--port must be an integer from 0 to 65535, received: ${String(opts.port)}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
+    const app = await startDemoApp({ port });
+    console.log(`\n${c.bold('ABA PayWay SDK')} — simulated local demo\n`);
+    console.log(`  Open: ${c.cyan(app.url)}`);
+    console.log(`  ${c.dim('No ABA credentials or external network are used.')}`);
+    console.log(`  ${c.dim('Press Ctrl-C to stop.')}\n`);
+
+    await new Promise<void>((resolve) => {
+      let stopping = false;
+      const stop = async () => {
+        if (stopping) return;
+        stopping = true;
+        process.off('SIGINT', stop);
+        process.off('SIGTERM', stop);
+        await app.close();
+        resolve();
+      };
+      process.on('SIGINT', stop);
+      process.on('SIGTERM', stop);
+    });
   });
 
 // --- doctor ---
@@ -920,9 +975,25 @@ program
   .command('doctor')
   .description('Validate environment configuration and connectivity')
   .option('--live', 'Also perform a real sandbox round-trip (exchange-rate) when credentials are present')
-  .action(async (opts: { live?: boolean }) => {
+  .option('--route <route>', 'Readiness target: demo, online-qr, or hosted-checkout', 'online-qr')
+  .action(async (opts: { live?: boolean; route: string }) => {
+    if (!['demo', 'online-qr', 'hosted-checkout'].includes(opts.route)) {
+      console.error(`--route must be demo, online-qr, or hosted-checkout, received: ${opts.route}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
     console.log(`\n${c.bold('ABA PayWay SDK Doctor')}\n`);
-    const result = runDoctor();
+    const result = runDoctor({
+      route: opts.route as 'demo' | 'online-qr' | 'hosted-checkout',
+      profileName: selectedProfileName(),
+    });
+
+    console.log(`  Route: ${c.cyan(result.route)}`);
+    console.log(`  Credential source: ${c.cyan(result.context.credentialSource)}`);
+    if (result.context.profile) console.log(`  Profile: ${c.cyan(result.context.profile)}`);
+    console.log(`  Environment: ${c.cyan(result.context.environment)}`);
+    console.log(`  Endpoint: ${c.cyan(result.context.endpoint)}`);
+    console.log();
 
     console.log(`  Framework: ${c.cyan(result.framework)}`);
     for (const e of result.frameworkEvidence) {
@@ -942,10 +1013,9 @@ program
     // Live probe depends on credentials, NOT cosmetic rows like framework detection
     // (the SDK's own repo fails that check and previously could never go live).
     const liveGateIds = new Set(['env-PAYWAY_ENV', 'env-PAYWAY_MERCHANT_ID', 'env-PAYWAY_API_KEY']);
-    const blockingCheckIds = new Set([...liveGateIds, 'env-PAYWAY_CALLBACK_URL']);
     const credChecks = result.checks.filter((c) => liveGateIds.has(c.id));
     const credFailures = credChecks.filter((c) => !c.ok);
-    const blockingFailures = result.checks.filter((c) => blockingCheckIds.has(c.id) && !c.ok);
+    const blockingFailures = result.checks.filter((check) => !check.ok && check.id !== 'framework');
     let liveStatus: 'ok' | 'fail' | undefined;
 
     if (opts.live && process.env.PAYWAY_MERCHANT_ID && process.env.PAYWAY_API_KEY) {
@@ -1096,23 +1166,6 @@ program
     console.log(`\n${c.bold('ABA PayWay SDK')} — running sandbox test suite\n`);
     const report = await sdk.runTestSuite();
     console.log(formatTestReport(report));
-    process.exitCode = report.success ? 0 : 1;
-  });
-
-// --- demo ---
-program
-  .command('demo')
-  .description('Run the test suite with pass/fail output')
-  .action(async () => {
-    console.log(`\n${c.bold('ABA PayWay SDK')} — demo run\n`);
-    const report = await sdk.runTestSuite();
-    for (const result of report.results) {
-      const icon = result.passed ? c.green('PASS') : c.red('FAIL');
-      console.log(`  [${icon}] ${result.name} → ${result.message}`);
-    }
-    console.log(
-      `\n  Total: ${c.bold(String(report.total))}  Passed: ${c.green(String(report.passed))}  Failed: ${c.red(String(report.failed))}`,
-    );
     process.exitCode = report.success ? 0 : 1;
   });
 

@@ -3,6 +3,10 @@ import path from 'node:path';
 import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
 import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
 import { selectTemplateFiles, type TemplateModule } from '../../config/templates/index.js';
+import { FIRST_PAYMENT_TEMPLATE } from '../templates/first-payment/index.js';
+
+export type InitMode = 'demo' | 'sandbox';
+export type InitTemplate = 'framework' | 'first-payment';
 
 const ENV_TEMPLATE =
   '# ABA PayWay credentials\n' +
@@ -17,9 +21,13 @@ const ENV_TEMPLATE =
 export interface InitOptions {
   readonly cwd?: string;
   readonly env?: NodeJS.ProcessEnv;
+  readonly mode?: InitMode;
+  readonly template?: InitTemplate;
 }
 
 export interface InitResult {
+  readonly mode: InitMode;
+  readonly template: InitTemplate;
   readonly framework: DetectedFramework;
   readonly frameworkEvidence: readonly string[];
   readonly writtenFiles: readonly string[];
@@ -27,6 +35,7 @@ export interface InitResult {
   readonly envIssues: readonly EnvIssue[];
   readonly envWritten: boolean;
   readonly reportPath: string;
+  readonly nextCommand: string;
 }
 
 function writeFileIfMissing(filePath: string, content: string): boolean {
@@ -42,6 +51,8 @@ function renderReport(result: InitResult): string {
   lines.push('# ABA PayWay Integration Report');
   lines.push('');
   lines.push(`- Framework: \`${result.framework}\``);
+  lines.push(`- Mode: \`${result.mode}\``);
+  lines.push(`- Template: \`${result.template}\``);
   lines.push('- Evidence:');
   for (const e of result.frameworkEvidence) lines.push(`  - ${e}`);
   lines.push('');
@@ -66,6 +77,10 @@ function renderReport(result: InitResult): string {
     }
   }
   lines.push('');
+  lines.push('## Next command');
+  lines.push('');
+  lines.push(`\`${result.nextCommand}\``);
+  lines.push('');
   return lines.join('\n');
 }
 
@@ -75,10 +90,17 @@ function renderReport(result: InitResult): string {
 export function runInit(options: InitOptions = {}): InitResult {
   const cwd = options.cwd ?? process.cwd();
   const env = options.env ?? process.env;
+  const mode = options.mode ?? 'sandbox';
+  const template = options.template ?? 'framework';
 
   const detection = detectFramework(cwd);
   const modules: TemplateModule[] = ['checkout', 'callback'];
-  const templateFiles = selectTemplateFiles(detection.framework, modules);
+  const templateFiles =
+    mode === 'demo'
+      ? []
+      : template === 'first-payment'
+        ? FIRST_PAYMENT_TEMPLATE
+        : selectTemplateFiles(detection.framework, modules);
 
   const written: string[] = [];
   const skipped: string[] = [];
@@ -92,12 +114,22 @@ export function runInit(options: InitOptions = {}): InitResult {
   }
 
   const envPath = path.join(cwd, '.env');
-  const envWritten = writeFileIfMissing(envPath, ENV_TEMPLATE);
+  if (mode === 'sandbox') {
+    const examplePath = path.join(cwd, '.env.example');
+    if (writeFileIfMissing(examplePath, ENV_TEMPLATE)) {
+      written.push('.env.example');
+    } else {
+      skipped.push('.env.example');
+    }
+  }
+  const envWritten = mode === 'sandbox' ? writeFileIfMissing(envPath, ENV_TEMPLATE) : false;
 
-  const envIssues = validatePayWayEnv(env);
+  const envIssues = mode === 'sandbox' ? validatePayWayEnv(env) : [];
 
   const reportPath = path.join(cwd, 'INTEGRATION_REPORT.md');
   const report: InitResult = {
+    mode,
+    template,
     framework: detection.framework,
     frameworkEvidence: detection.evidence,
     writtenFiles: written,
@@ -105,6 +137,7 @@ export function runInit(options: InitOptions = {}): InitResult {
     envIssues,
     envWritten,
     reportPath,
+    nextCommand: mode === 'demo' ? 'payway-sdk demo' : template === 'first-payment' ? 'node payway-first-payment.mjs' : 'payway-sdk doctor',
   };
   writeFileSync(reportPath, renderReport(report), { encoding: 'utf8' });
 

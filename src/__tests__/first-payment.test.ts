@@ -4,7 +4,10 @@ import { FIRST_PAYMENT_COMMANDS, renderFirstPaymentQuickstart } from '../cli/fir
 describe('first-payment quickstart', () => {
   it('lists the canonical first-payment commands', () => {
     expect(FIRST_PAYMENT_COMMANDS.length).toBeGreaterThanOrEqual(4);
-    expect(FIRST_PAYMENT_COMMANDS.map((c) => c.command)).toContain('payway-sdk generate-qr -a 3.00 -c USD');
+    expect(FIRST_PAYMENT_COMMANDS[0]?.command).toBe('payway-sdk demo');
+    expect(FIRST_PAYMENT_COMMANDS.map((c) => c.command)).toContain(
+      'payway-sdk generate-qr -a 3.00 -c USD --callback-url <https-url> -y --no-polling --output json',
+    );
   });
 
   it('renders a labelled quickstart block', () => {

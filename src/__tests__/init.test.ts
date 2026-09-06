@@ -69,4 +69,28 @@ describe('runInit', () => {
     expect(result.envIssues.length).toBeGreaterThan(0);
     expect(result.envIssues.some((i) => i.severity === 'error')).toBe(true);
   });
+
+  it('supports an explicit credential-free demo mode', () => {
+    const result = runInit({ cwd: TEST_DIR, env: {}, mode: 'demo' });
+
+    expect(result.mode).toBe('demo');
+    expect(result.envWritten).toBe(false);
+    expect(result.envIssues).toEqual([]);
+    expect(result.nextCommand).toBe('payway-sdk demo');
+    expect(existsSync(path.join(TEST_DIR, '.env'))).toBe(false);
+  });
+
+  it('writes the first-payment sandbox starter without overwriting it', () => {
+    const first = runInit({ cwd: TEST_DIR, env: {}, mode: 'sandbox', template: 'first-payment' });
+    const starterPath = path.join(TEST_DIR, 'payway-first-payment.mjs');
+    expect(first.writtenFiles).toContain('payway-first-payment.mjs');
+    expect(readFileSync(path.join(TEST_DIR, '.env.example'), 'utf8')).toContain('PAYWAY_MERCHANT_ID=');
+    expect(readFileSync(starterPath, 'utf8')).toContain("from 'aba-payway-ts'");
+
+    writeFileSync(starterPath, '// merchant edit\n');
+    const second = runInit({ cwd: TEST_DIR, env: {}, mode: 'sandbox', template: 'first-payment' });
+    expect(second.skippedFiles).toContain('payway-first-payment.mjs');
+    expect(readFileSync(starterPath, 'utf8')).toBe('// merchant edit\n');
+    expect(second.nextCommand).toBe('node payway-first-payment.mjs');
+  });
 });
