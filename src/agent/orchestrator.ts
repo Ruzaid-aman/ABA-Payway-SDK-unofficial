@@ -29,8 +29,10 @@ import type {
   MaterializedAgentPlanV1,
   ProviderConfigV1,
 } from './contracts.js';
-import { type ExecutionContext, executeAction, type ToolExecutionResult } from './executor.js';
-import { confirmExecution, createExecutionRecord, generateTransactionId } from './ledger.js';
+import { type ExecutionContext, executeAction, summarizeToolData, type ToolExecutionResult } from './executor.js';
+import { confirmExecution, createExecutionRecord, generateTransactionId, loadExecutionRecord } from './ledger.js';
+import { createJournalEmitter } from '../journal/writer.js';
+import type { JournalContext } from '../journal/types.js';
 import { prevalidateLocalAction } from './local-tools.js';
 import { renderCreatePlanConfirmation, renderHumanResult, serializeCommandResult } from './output.js';
 import { normalizePlan } from './planning.js';
@@ -38,6 +40,14 @@ import { scrubSensitive } from './privacy.js';
 import type { ProviderAdapter } from './provider.js';
 import { ProviderProposalError } from './provider.js';
 import { authorizePlan, classifyRisk } from './risk.js';
+
+let artifactJournal: JournalContext | undefined;
+
+/** Env-gated journal emitter for agent-origin events (artifact.written). */
+function artifactJournalEmitter(): JournalContext | undefined {
+  artifactJournal ??= createJournalEmitter(undefined, process.env);
+  return artifactJournal;
+}
 import { validateAgentPlan, validateCommandResult, validateMaterializedPlan } from './schemas.js';
 import { appendSessionEvent, buildDeterministicSummary, createSession, loadSession } from './sessions.js';
 
@@ -470,7 +480,31 @@ export class AgentOrchestrator {
       // Session write failures must warn (handled inside appendSessionEvent)
       // and must NOT crash the pipeline — the action still happened.
       this.appendEvent(sessionId, 'tool_call', { tool, index: i });
-      this.appendEvent(sessionId, 'tool_result', { tool, ok: result.ok, error: result.error ?? null });
+      // Phase 2: the durable tool_result now carries a digest of the result
+      // data (previously stdout-only — gap G6).
+      this.appendEvent(sessionId, 'tool_result', {
+        tool,
+        ok: result.ok,
+        error: result.error ?? null,
+        data: summarizeToolData(result.data) ?? null,
+      });
+      // Phase 2: the 'ledger' session event (type existed since v1 but was
+      // never emitted — gap G12) links the session to the ledger record's
+      // final lifecycle state and correlation id.
+      if (record) {
+        try {
+          const updated = loadExecutionRecord(record.executionId);
+          this.appendEvent(sessionId, 'ledger', {
+            executionId: updated.executionId,
+            tool: updated.tool,
+            transactionId: updated.transactionId,
+            status: updated.status,
+            correlation: updated.correlation ?? null,
+          });
+        } catch {
+          // Ledger read failures must not break the pipeline either.
+        }
+      }
 
       if (!result.ok) {
         anyFailure = true;
@@ -512,6 +546,16 @@ export class AgentOrchestrator {
             });
             this.appendEvent(sessionId, 'artifact', { artifactId: bundle.metadata.artifactId, path: bundle.metadata.path });
             entry.artifact = this.scrub(bundle.metadata);
+            // Phase 2: artifact.written lands in the transaction journal too
+            // (env-gated — the agent journal follows PAYWAY_JOURNAL).
+            artifactJournalEmitter()?.emit({
+              kind: 'artifact.written',
+              correlationId: execCtx.correlationId ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`,
+              executionId: record.executionId,
+              transactionId: record.transactionId ?? undefined,
+              command: 'save_artifact',
+              artifact: { artifactId: bundle.metadata.artifactId, path: bundle.metadata.path },
+            });
             pollOffered = true;
           } catch (error) {
             console.warn(

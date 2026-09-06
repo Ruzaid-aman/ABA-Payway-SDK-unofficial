@@ -139,6 +139,34 @@ describe('journal writer', () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
     warnSpy.mockRestore();
   });
+
+  it('accepts the Phase 2 event kinds (started/poll/status/artifact)', () => {
+    const emitter = createJournalEmitter({ dir });
+    emitter?.emit({ kind: 'execution.started', correlationId: 'c1', command: 'payway-sdk journal show' });
+    emitter?.emit({
+      kind: 'poll.attempt',
+      correlationId: 'c2',
+      transactionId: 'T1',
+      attempt: 3,
+      status: 'PENDING',
+      durationMs: 42,
+    });
+    emitter?.emit({ kind: 'status.observed', correlationId: 'c2', transactionId: 'T1', status: 'APPROVED' });
+    emitter?.emit({
+      kind: 'artifact.written',
+      correlationId: 'c2',
+      executionId: 'e1',
+      transactionId: 'T1',
+      artifact: { artifactId: 'a1', path: '/tmp/a.png' },
+    });
+    const events = readEvents(dir);
+    expect(events.map((e) => e.kind)).toEqual([
+      'execution.started',
+      'poll.attempt',
+      'status.observed',
+      'artifact.written',
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -324,6 +352,42 @@ describe('PayWay journal integration', () => {
     ]);
     expect(events[1].httpStatus).toBe(502);
     expect(events[3].httpStatus).toBe(502);
+  });
+
+  it('passes correlation meta to the observability hooks and fires onError per failed attempt', async () => {
+    const onRequest = vi.fn();
+    const onResponse = vi.fn();
+    const onError = vi.fn();
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(mockJsonResponse({ status: { code: 1, message: 'boom' } }, 500))
+      .mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, tran_id: 'T1' } }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const payway = new PayWay({ ...TEST_CONFIG, journal: { dir }, onRequest, onResponse, onError });
+    await payway.checkout.checkTransaction('T1');
+
+    expect(onRequest).toHaveBeenCalledTimes(2);
+    expect(onRequest.mock.calls[0][2]).toMatchObject({ attempt: 0, correlationId: payway.lastCorrelationId });
+    expect(onRequest.mock.calls[1][2]).toMatchObject({ attempt: 1 });
+    expect(onResponse).toHaveBeenCalledTimes(1);
+    expect(onResponse.mock.calls[0][4]).toMatchObject({ attempt: 1, correlationId: payway.lastCorrelationId });
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0][0]).toMatchObject({
+      attempt: 0,
+      statusCode: 500,
+      endpoint: expect.stringContaining('check-transaction'),
+    });
+  });
+
+  it('forwards hook meta through the debug-mode wrapper too', async () => {
+    const onRequest = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0, tran_id: 'T1' } })));
+    const payway = new PayWay({ ...TEST_CONFIG, debug: true, onRequest });
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    await payway.checkout.checkTransaction('T1');
+    debugSpy.mockRestore();
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    expect(onRequest.mock.calls[0][2]).toMatchObject({ attempt: 0, correlationId: payway.lastCorrelationId });
   });
 });
 

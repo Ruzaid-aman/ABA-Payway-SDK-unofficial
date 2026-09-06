@@ -35,22 +35,69 @@ single `console.warn` and the SDK call proceeds exactly as before.
 ## Events
 
 One JSON object per line, envelope `{version, ts, eventId, kind, correlationId, …}`
-(schema-validated before write; readers must tolerate unknown `kind` values — Phase 2
-adds `execution.started`, `poll.attempt`, `callback.received`, `status.observed`,
-`artifact.written`).
+(schema-validated before write; readers must tolerate unknown `kind` values — Phase 3
+adds `callback.received`).
 
-| kind | Fires when |
-| --- | --- |
-| `execution.request` | Each attempt of each API call (retries included — the attempt number distinguishes send #1 from send #N) |
-| `execution.response` | Every parsed 2xx body, **including 200-wrapped business failures** (same EC-06 semantics as the `onResponse` hook) |
-| `execution.error` | Every thrown path: HTTP errors, empty-body guard, link-card HTML, JSON-parse failures, network/timeout/abort — the paths where no hook fires |
+| kind | Fires when | Source |
+| --- | --- | --- |
+| `execution.started` | Every executed CLI command (preAction) | CLI |
+| `execution.request` | Each attempt of each API call (retries included — the attempt number distinguishes send #1 from send #N) | SDK transport |
+| `execution.response` | Every parsed 2xx body, **including 200-wrapped business failures** (same EC-06 semantics as the `onResponse` hook) | SDK transport |
+| `execution.error` | Every thrown path: HTTP errors, empty-body guard, link-card HTML, JSON-parse failures, network/timeout/abort — the paths where no hook fires | SDK transport |
+| `poll.attempt` | Every poll of a transaction (previously stdout-only — gap G16), grouped under one poll correlation id | CLI polling |
+| `status.observed` | Normalized payment-status reading: check-transaction, transaction-detail, terminal poll event | CLI |
+| `artifact.written` | Agent artifact saved (links sidecar ↔ journal via executionId/correlationId) | agent |
 
 Join keys on every event: `correlationId` (the SDK per-exchange cid), `attempt`,
 `endpoint`, `transactionId`/`merchantRef` when the request or response carries them,
-`traceId` (the gateway's `status.trace`), `httpStatus`, `paywayCode`, `durationMs`.
+`traceId` (the gateway's `status.trace`), `httpStatus`, `paywayCode`, `durationMs`,
+`status` (normalized payment status on poll/observed events), `artifact` on
+artifact events.
 
-Reconstruct a transaction timeline: filter the file on `transactionId` (or
-`correlationId` for a single exchange) and sort by `ts`.
+Reconstruct a transaction timeline: `payway-sdk journal timeline -t <transactionId>`
+(or filter the file on `transactionId` and sort by `ts`).
+
+## Querying (CLI)
+
+```
+payway-sdk journal show [--kind <kind>] [--tran <id>] [--last <n>] [--dir <path>] [--json]
+payway-sdk journal timeline -t <transactionId> [--dir <path>] [--json]
+payway-sdk journal prune [--before <days|ISO>] [--dir <path>] [--json]
+```
+
+`--journal` (or `PAYWAY_JOURNAL=1`) turns on recording for a single invocation —
+command lifecycle *and* every API exchange. Malformed lines are skipped by the
+readers, never fatal.
+
+## Agent-mode records (Phase 2 additions)
+
+- **`agent ledger recover [--session-id <id>] [--json]`** lists unfinished executions
+  (planned/confirmed/submitted/outcome_unknown) and prints the `check-transaction`
+  recovery hint for each. **Lookup only — creates are never replayed.** With no
+  `--session-id`, the most recent session is inspected. (Closes gap G10.)
+- Ledger records now carry a **`resultSummary`** — a scrubbed, allow-listed digest of
+  what a successful create returned (transaction ids, checkout URLs; never payloads or
+  secrets). (Closes gap G5.)
+- Session `tool_result` events carry the same digest in `data` (previously
+  `{tool, ok, error}` only — gap G6), and each executed create emits the previously
+  dormant `'ledger'` session event with the record's final status + correlation id
+  (gap G12).
+- Agent artifacts saved during a session emit `artifact.written` journal events when
+  `PAYWAY_JOURNAL` is set.
+
+## Hook enrichment (Phase 2, backward compatible)
+
+`onRequest`/`onResponse` receive a trailing `meta` argument
+(`{correlationId, attempt, durationMs?, traceId?}`) — existing two-argument handlers
+keep working. New `onError` hook fires on every failed attempt (HTTP errors, network,
+timeout, business failures) — the paths `onResponse` never sees:
+
+```ts
+new PayWay({
+  // …
+  onError: (info) => console.error(`${info.endpoint} failed: ${info.message} (cid=${info.correlationId})`),
+});
+```
 
 ## Digest vs full mode
 

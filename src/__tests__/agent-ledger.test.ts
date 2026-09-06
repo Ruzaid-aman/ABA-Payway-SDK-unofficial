@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AgentToolName, ExecutionRecordV1 } from '../agent/contracts.js';
+import { summarizeToolData } from '../agent/executor.js';
 import {
   attachCorrelation,
   confirmExecution,
@@ -15,6 +16,8 @@ import {
   markSubmitted,
   markSucceeded,
 } from '../agent/ledger.js';
+import { runCli } from '../cli.js';
+import { captureConsole } from '../test/test-utils.js';
 import { getAgentDataPaths } from '../agent/storage.js';
 
 const temporaryDirectories: string[] = [];
@@ -189,6 +192,84 @@ describe('attachCorrelation', () => {
     const record = planned();
     expect(attachCorrelation(record.executionId, '').correlation).toBeUndefined();
     expect(() => attachCorrelation('no-such-execution', 'cid-1')).toThrow(LedgerNotFoundError);
+  });
+});
+
+describe('markSucceeded resultSummary (Phase 2)', () => {
+  it('stores the summary on the record and on disk', () => {
+    const record = planned();
+    const succeeded = markSucceeded(markSubmitted(confirmExecution(record.executionId).executionId).executionId, {
+      checkout_qr_url: 'https://payway.example/checkout/x',
+    });
+    expect(succeeded.resultSummary).toEqual({ checkout_qr_url: 'https://payway.example/checkout/x' });
+
+    const onDisk = JSON.parse(
+      readFileSync(path.join(getAgentDataPaths().ledgerDir, `${record.executionId}.json`), 'utf8'),
+    ) as ExecutionRecordV1;
+    expect(onDisk.resultSummary).toEqual({ checkout_qr_url: 'https://payway.example/checkout/x' });
+  });
+
+  it('omits the field entirely when no summary is passed', () => {
+    const succeeded = markSucceeded(markSubmitted(confirmExecution(planned().executionId).executionId).executionId);
+    expect(succeeded.resultSummary).toBeUndefined();
+  });
+});
+
+describe('summarizeToolData (Phase 2)', () => {
+  it('keeps allow-listed ids/URLs, caps long strings, drops everything else', () => {
+    const summary = summarizeToolData({
+      checkout_qr_url: 'https://payway.example/checkout/x',
+      transactionId: 'tx-1',
+      qrString: 'HUGE-BASE64-BLOB',
+      qrImage: 'data:image/png;base64,...',
+      apiKey: 'SECRET',
+      items: [{ name: 'x' }],
+    });
+    expect(summary).toEqual({ checkout_qr_url: 'https://payway.example/checkout/x', transactionId: 'tx-1' });
+  });
+
+  it('caps long allow-listed strings', () => {
+    const summary = summarizeToolData({ checkout_qr_url: `https://x/${'a'.repeat(500)}` });
+    const url = summary?.checkout_qr_url as string;
+    expect(url.length).toBeLessThan(260);
+    expect(url.endsWith('…[capped]')).toBe(true);
+  });
+
+  it('returns undefined for missing or empty digests', () => {
+    expect(summarizeToolData(undefined)).toBeUndefined();
+    expect(summarizeToolData({ qrString: 'only-unknown-fields' })).toBeUndefined();
+  });
+});
+
+describe('agent ledger recover command (Phase 2)', () => {
+  it('lists unfinished executions for a session as JSON', async () => {
+    const record = planned({ sessionId: 's-recover', transactionId: 'tx-recover-1' });
+    const captured = captureConsole();
+    try {
+      await runCli(['agent', 'ledger', 'recover', '--session-id', 's-recover', '--json']);
+    } finally {
+      captured.restore();
+    }
+    const parsed = JSON.parse(captured.text()) as {
+      sessionId: string;
+      unfinished: Array<{ executionId: string; status: string; transactionId: string | null }>;
+    };
+    expect(parsed.sessionId).toBe('s-recover');
+    expect(parsed.unfinished.map((u) => u.executionId)).toContain(record.executionId);
+    expect(parsed.unfinished[0].transactionId).toBe('tx-recover-1');
+  });
+
+  it('reports an empty list for a session with only terminal records', async () => {
+    const record = planned({ sessionId: 's-done' });
+    markSucceeded(markSubmitted(confirmExecution(record.executionId).executionId).executionId);
+    const captured = captureConsole();
+    try {
+      await runCli(['agent', 'ledger', 'recover', '--session', 's-done', '--json']);
+    } finally {
+      captured.restore();
+    }
+    const parsed = JSON.parse(captured.text()) as { unfinished: unknown[] };
+    expect(parsed.unfinished).toEqual([]);
   });
 });
 

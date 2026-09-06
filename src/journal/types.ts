@@ -18,14 +18,21 @@ export const JOURNAL_VERSION = 'payway-journal/v1' as const;
 export type JournalMode = 'digest' | 'full';
 
 /**
- * Phase-1 event kinds emitted by the shared HTTP executor. `execution.response`
- * fires for every parsed 2xx body — including 200-wrapped business failures
- * (EC-06 semantics) — and is followed by `execution.error` when
- * `checkResponseError` then rejects the envelope. Error-path throws (HTTP
- * errors, empty-body guard, link-card HTML, JSON-parse failures, network)
- * produce `execution.error` alone, because no integrator hook fires there.
+ * Event kinds. Phase 1 shipped the transport kinds (request/response/error,
+ * emitted by the shared HTTP executor). Phase 2 adds the command/semantic
+ * layer: `execution.started` (CLI command / agent turn begins),
+ * `poll.attempt` (each poll of a transaction), `status.observed` (normalized
+ * payment status reading), and `artifact.written` (agent artifact saved).
+ * Readers MUST tolerate unknown kinds — Phase 3 adds `callback.received`.
  */
-export type JournalEventKind = 'execution.request' | 'execution.response' | 'execution.error';
+export type JournalEventKind =
+  | 'execution.started'
+  | 'execution.request'
+  | 'execution.response'
+  | 'execution.error'
+  | 'poll.attempt'
+  | 'status.observed'
+  | 'artifact.written';
 
 export interface JournalErrorInfo {
   code?: string;
@@ -55,6 +62,10 @@ export interface JournalEventV1 {
   durationMs?: number;
   /** Gateway `status.trace` correlation id. */
   traceId?: string;
+  /** Normalized payment status (`poll.attempt` / `status.observed`). */
+  status?: string;
+  /** Agent artifact linkage (`artifact.written`). */
+  artifact?: { artifactId?: string; path?: string };
   /**
    * `'digest'` mode: allow-listed non-secret fields only. `'full'` mode:
    * `sanitizeForLog`-redacted body (hash/pwt/keys masked), size-capped.

@@ -24,6 +24,9 @@ import type { AnsiPalette } from './cli/ui/theme.js';
 import { suggestMessage } from './cli/ui/suggest.js';
 import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
 import { registerAgentCommands } from './cli/commands/agent.js';
+import { registerJournalCommands } from './cli/commands/journal.js';
+import { emitCliCommandStarted, emitCliJournal, emitStatusObserved } from './cli/journal-cli.js';
+import { buildResponseDigest } from './journal/digest.js';
 import { registerOnboardCommand } from './cli/commands/onboard.js';
 import { runDoctor } from './cli/commands/doctor.js';
 import { runInit } from './cli/commands/init.js';
@@ -338,6 +341,7 @@ async function runPolling(
 
   const startTime = Date.now();
   const emit = (line: string): void => console.log(asJson ? line : `  ${line}`);
+  const pollCorrelationId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 
   try {
     for await (const result of payway.checkout.pollTransactionStatus(transactionId, {
@@ -345,6 +349,17 @@ async function runPolling(
       maxDurationMs,
     })) {
       const elapsed = formatClock(Date.now() - startTime);
+
+      // Phase 2: every poll attempt reaches the journal (previously
+      // stdout-only — gap G16), grouped under one poll correlation id.
+      emitCliJournal({
+        kind: 'poll.attempt',
+        correlationId: pollCorrelationId,
+        transactionId,
+        attempt: result.attempt,
+        status: result.paymentStatus,
+        durationMs: result.durationMs,
+      });
 
       if (result.paymentStatus.startsWith('ERROR:')) {
         if (asJson) {
@@ -373,6 +388,11 @@ async function runPolling(
       }
 
       if (result.isTerminal) {
+        emitStatusObserved(payway, {
+          transactionId,
+          status: result.paymentStatus,
+          responseDigest: buildResponseDigest(result.response, 'digest'),
+        });
         if (asJson) {
           emit(
             JSON.stringify({
@@ -642,6 +662,10 @@ program
   .version(readPackageVersion())
   .option('--profile <name>', 'Use a saved credential profile for this command')
   .option('--no-color', 'Disable ANSI colors in output')
+  .option(
+    '--journal',
+    'Record command lifecycle + every API exchange to the transaction journal (<cwd>/payway-data/journal.jsonl; same as PAYWAY_JOURNAL=1)',
+  )
   .showSuggestionAfterError()
   .addHelpText(
     'after',
@@ -691,6 +715,13 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
   setColorOverride(optsColor);
   c = currentPalette();
   activateSelectedProfile(actionCommand);
+  // Phase 2: --journal (or PAYWAY_JOURNAL=1) turns on the transaction
+  // journal for the whole invocation. Setting the env var here also arms
+  // every `new PayWay()` constructed by command handlers downstream.
+  if (program.opts<{ journal?: boolean }>().journal) {
+    process.env.PAYWAY_JOURNAL = '1';
+  }
+  emitCliCommandStarted(actionCommand);
 });
 
 // --- init ---
@@ -1027,6 +1058,12 @@ program
       validateTransactionId(opts.transactionId);
       const payway = new PayWay();
       const result = await payway.checkout.checkTransaction(opts.transactionId);
+      const checkData = (result as Record<string, unknown>).data as Record<string, unknown> | undefined;
+      emitStatusObserved(payway, {
+        transactionId: opts.transactionId,
+        status: checkData?.payment_status as string | undefined,
+        responseDigest: buildResponseDigest(result, 'digest'),
+      });
       if (opts.json) {
         console.log(JSON.stringify(result, null, 2));
         return;
@@ -1376,6 +1413,13 @@ program
           await new Promise((resolve) => setTimeout(resolve, 2_000));
         }
       }
+
+      const detailData = (result as Record<string, unknown>).data as Record<string, unknown> | undefined;
+      emitStatusObserved(payway, {
+        transactionId: opts.transactionId,
+        status: detailData?.payment_status as string | undefined,
+        responseDigest: buildResponseDigest(result, 'digest'),
+      });
 
       if (opts.json) {
         console.log(JSON.stringify(result, null, 2));
@@ -3339,6 +3383,7 @@ program
 
 // --- agentic command tree ---
 registerAgentCommands(program);
+registerJournalCommands(program);
 registerOnboardCommand(program);
 
 // --- pre-auth (complete / complete-with-payout / cancel) ---

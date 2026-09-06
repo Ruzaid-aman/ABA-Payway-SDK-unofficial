@@ -16,7 +16,17 @@ const journalEventSchema: Record<string, unknown> = {
     version: { const: JOURNAL_VERSION },
     ts: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}' },
     eventId: { type: 'string', minLength: 1 },
-    kind: { enum: ['execution.request', 'execution.response', 'execution.error'] },
+    kind: {
+      enum: [
+        'execution.started',
+        'execution.request',
+        'execution.response',
+        'execution.error',
+        'poll.attempt',
+        'status.observed',
+        'artifact.written',
+      ],
+    },
     correlationId: { type: 'string', minLength: 1 },
     attempt: { type: 'integer', minimum: 0 },
     executionId: { type: 'string', minLength: 1 },
@@ -29,6 +39,15 @@ const journalEventSchema: Record<string, unknown> = {
     paywayCode: { type: 'string', minLength: 1 },
     durationMs: { type: 'integer', minimum: 0 },
     traceId: { type: 'string', minLength: 1 },
+    status: { type: 'string', minLength: 1 },
+    artifact: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        artifactId: { type: 'string', minLength: 1 },
+        path: { type: 'string', minLength: 1 },
+      },
+    },
     requestDigest: {},
     responseDigest: {},
     error: {

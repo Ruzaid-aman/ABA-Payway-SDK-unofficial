@@ -11,6 +11,25 @@
 
 ### Added
 
+- **Transaction Journal — Phase 2 Transaction History** (roadmap §17; closes gaps
+  G5/G6/G10/G12/G16/G17): new **`journal show|timeline|prune`** CLI query surface
+  over the JSONL file (show filters by kind/transaction with `--last`, timeline
+  reconstructs one transaction's chronological history, prune deletes by cutoff —
+  parse-safe, atomic). **`agent ledger recover --session-id <id>`** finally exposes
+  the orphaned `findUnfinishedExecutions` (lookup only, never auto-replays) with a
+  per-record `check-transaction` recovery hint. New event kinds:
+  `execution.started` (every CLI command via a new global `--journal` flag that arms
+  the whole invocation), `poll.attempt` (every poll — previously stdout-only),
+  `status.observed` (check-transaction/transaction-detail/terminal poll),
+  `artifact.written` (agent artifacts). Ledger records gain **`resultSummary`** — a
+  scrubbed allow-listed digest of what successful creates returned (checkout URLs,
+  ids); session `tool_result` events carry the same digest in `data`; the dormant
+  `'ledger'` session event is now emitted with final status + correlation. Hooks are
+  additively enriched: `onRequest`/`onResponse` receive trailing
+  `meta {correlationId, attempt, durationMs?, traceId?}` (old handlers unaffected)
+  and a new **`onError`** hook fires on every failed attempt. Option-name note: the
+  recover flag is `--session-id` because the `agent` group's own `--session` (REPL
+  resume) swallows the value on subcommands.
 - **Transaction Journal — Phase 1 Observability** (roadmap in
   `audit-results/transaction-data-audit/REPORT.md` §17; closes audit gaps
   G1/G3/G4/G11): opt-in append-only JSONL record of every API exchange under

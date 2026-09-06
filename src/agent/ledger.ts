@@ -160,11 +160,17 @@ export function markSubmitted(id: string): ExecutionRecordV1 {
 }
 
 /**
- * submitted -> succeeded. Rejects if the record is not 'submitted'.
+ * submitted -> succeeded. Stores a scrubbed, allow-listed digest of the tool
+ * result (Phase 2 resultSummary) so the ledger answers "what came back",
+ * not just "it worked". Rejects if the record is not 'submitted'.
  */
-export function markSucceeded(id: string, result?: Record<string, unknown>): ExecutionRecordV1 {
-  void result;
-  return advance(id, 'submitted', 'succeeded');
+export function markSucceeded(
+  id: string,
+  resultSummary?: Record<string, unknown>,
+): ExecutionRecordV1 {
+  return advance(id, 'submitted', 'succeeded', (record) => {
+    if (resultSummary) record.resultSummary = resultSummary;
+  });
 }
 
 /**
@@ -209,6 +215,11 @@ export function attachCorrelation(id: string, correlation: string): ExecutionRec
   record.correlation = correlation;
   record.updatedAt = nowIso();
   return persist(record);
+}
+
+/** Loads one record by id (throws LedgerNotFoundError when missing/invalid). */
+export function loadExecutionRecord(executionId: string): ExecutionRecordV1 {
+  return loadRecord(executionId);
 }
 
 /**

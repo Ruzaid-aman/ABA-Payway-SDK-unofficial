@@ -292,6 +292,8 @@ export interface ExecutionRecordV1 {
   createdAt: string;
   updatedAt: string;
   error?: { code?: string; message: string };
+  /** Phase 2: scrubbed, allow-listed digest of a successful tool result (ids, URLs — never payloads/secrets). */
+  resultSummary?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------

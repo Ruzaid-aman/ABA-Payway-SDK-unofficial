@@ -344,6 +344,7 @@ const ledgerSchema = {
       properties: { code: { type: 'string' }, message: { type: 'string' } },
       required: ['message'],
     },
+    resultSummary: { type: 'object' },
   },
 };
 
