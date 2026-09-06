@@ -1,6 +1,6 @@
 ---
 name: aba-payway-agent
-description: Operate the agentic PayWay CLI safely — provider modes, the 12 tools, risk gates, the execution ledger, sessions, and secret redaction.
+description: Use when operating the agentic PayWay CLI with provider modes, the 13 tools, risk gates, the execution ledger, sessions, local journal queries, and secret redaction.
 version: 1.3.0
 ---
 
@@ -53,7 +53,7 @@ const config = {
 
 Both modes funnel through the same safety pipeline; only the plan source differs.
 
-## The 12 tools
+## The 13 tools
 
 | # | Tool | Create? | Purpose / key inputs |
 |---|---|---|---|
@@ -66,9 +66,10 @@ Both modes funnel through the same safety pipeline; only the plan source differs
 | 7 | `check_transaction` | no | Read-only status lookup by `transactionId` |
 | 8 | `check_transaction_by_merchant_ref` | no | Read-only lookup by `merchantRef` |
 | 9 | `poll_transaction` | no | Read-only repeated lookup (sandbox verification) by `transactionId` |
-| 10 | `save_artifact` | no | Persist a produced artifact to `./payway-output` |
-| 11 | `open_artifact` | no | Open a saved artifact |
-| 12 | `copy_to_clipboard` | no | Copy an artifact value to the clipboard |
+| 10 | `query_journal` | no | Read-only local journal query: `timeline`, `stats`, `reconcile`, or `anomalies` |
+| 11 | `save_artifact` | no | Persist a produced artifact to `./payway-output` |
+| 12 | `open_artifact` | no | Open a saved artifact |
+| 13 | `copy_to_clipboard` | no | Copy an artifact value to the clipboard |
 
 > `create_checkout_payload` builds a **local** signed payload; `create_checkout_purchase`
 > performs the actual **network** request. Treat them as distinct tools.
@@ -91,7 +92,9 @@ uses — the provider only receives a scrubbed, secret-free summary.
 | `ask ...` in a TTY | interactive confirmation | interactive confirmation |
 | `ask ...` in non-TTY, no flag | `needs_confirmation` — **no create** | `needs_confirmation` — **no create** |
 
-Read-only tools (6–11) never require approval. Plans containing only read-only
+Read-only tools (`get_payment_link_details`, `check_transaction`,
+`check_transaction_by_merchant_ref`, `poll_transaction`, and `query_journal`)
+never require approval. Plans containing only read-only
 actions run without a flag. A resumed session restores **no** stored approval —
 it returns `needs_confirmation` and must be re-confirmed.
 
@@ -126,6 +129,9 @@ executes zero PayWay creates.
   Set `PAYWAY_ONBOARD_AUTO=1` to auto-launch the wizard on first unconfigured `ask`/`agent`.
 - `payway-sdk agent sessions list|export|clear` — manage sessions. `export`
   scrubs secrets; `clear all` requires `--approve` in non-TTY.
+- `payway-sdk journal timeline|stats|reconcile|explain|anomalies` — inspect
+  opt-in transaction journal records. The agent can call the same read-only data
+  through `query_journal`.
 - `payway-sdk agent` (no subcommand) — interactive REPL.
 
 ## Artifacts & sessions (plaintext, local)
@@ -151,7 +157,7 @@ executes zero PayWay creates.
 
 ## Setup playbook & pitfalls (field-tested)
 
-Full notes: [docs/AGENT-SETUP-PLAYBOOK.md](../../docs/AGENT-SETUP-PLAYBOOK.md).
+Full notes: [versioned Agent Setup Playbook](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/AGENT-SETUP-PLAYBOOK.md).
 Architecture/maintenance notes (module map, stage order, gotchas): same doc,
 section "Implementation & architecture".
 

@@ -69,10 +69,10 @@ Under `--json`, both commands print the machine-parseable error envelope `{ "err
 `payway-sdk ask "create a $49.50 payment link for invoice INV-041 …"` uses the `create_payment_link` tool (title/amount/currency/merchantRefNo/returnUrl/description/paymentLimit/expiredDate/payout — requires RSA readiness); `get_payment_link_details` (read-only) inspects a link by Link ID.
 
 ## Full guide
-[docs/17-payment-link.md](../../docs/17-payment-link.md) — parameter tables, datatype reality notes, permutations/recipes, pushback receiver, troubleshooting.
+[docs/17-payment-link.md](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/17-payment-link.md) — parameter tables, datatype reality notes, permutations/recipes, pushback receiver, troubleshooting.
 
 ## Related Skills
 - [Configuration](../aba-payway-sdk-configuration/SKILL.md)
 - [Payout](../aba-payway-payout/SKILL.md) (standalone payout domain — note its `{account, amount}` keys)
 - [First Payment](../aba-payway-first-payment/SKILL.md) (route selection)
-- [Agent CLI](../aba-payway-agent/SKILL.md) (the 12-tool catalog)
+- [Agent CLI](../aba-payway-agent/SKILL.md) (the 13-tool catalog)

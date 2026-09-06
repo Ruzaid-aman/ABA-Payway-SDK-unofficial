@@ -75,4 +75,4 @@ Under `--json`, both commands print the machine-parseable error envelope `{ "err
 - [Configuration](../aba-payway-sdk-configuration/SKILL.md)
 - [Payout](../aba-payway-payout/SKILL.md) (standalone payout domain — note its `{account, amount}` keys)
 - [First Payment](../aba-payway-first-payment/SKILL.md) (route selection)
-- [Agent CLI](../aba-payway-agent/SKILL.md) (the 12-tool catalog)
+- [Agent CLI](../aba-payway-agent/SKILL.md) (the 13-tool catalog)

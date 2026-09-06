@@ -74,6 +74,7 @@ This documentation is designed to be read **in order** if you're new to PayWay, 
 | Agent Setup Playbook (manual path + maintainer gotchas) | [AGENT-SETUP-PLAYBOOK.md](./AGENT-SETUP-PLAYBOOK.md) |
 | Recipe: capturing a PayWay callback contract (probe rig) | [agents/callback-capture-recipe.md](./agents/callback-capture-recipe.md) |
 | Agentic CLI 1-Pager | [QUICK-START-1-PAGER.md](./QUICK-START-1-PAGER.md) |
+| Transaction Journal | [18-transaction-journal.md](./18-transaction-journal.md) |
 | Project Status (session log + quick reference) | [PROJECT_STATUS.md](./PROJECT_STATUS.md) |
 | Release Checklist (+ first npm publish) | [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) |
 | Agent Handoff (for coding agents resuming work) | [../HANDOFF.md](../HANDOFF.md) |
@@ -130,7 +131,7 @@ This documentation is written for **junior to mid-level developers** who need to
 - [Production Dashboard](https://checkout.payway.com.kh)
 - [Agentic PayWay CLI (1-pager)](./QUICK-START-1-PAGER.md#agentic-payway-cli) — risk-gated, provider-driven payments
 - [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) and [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md)
-- [All 30 AI skills](../skills/README.md) — task-focused agent guides; five bundle dependency-free `.cjs` tools (request signing, callback verification, KHQR decode/CRC validation, status decoding, reconciliation) under their `scripts/` folders
+- [All 31 AI skills](../skills/README.md) — task-focused agent guides; five bundle dependency-free `.cjs` tools (request signing, callback verification, KHQR decode/CRC validation, status decoding, reconciliation) under their `scripts/` folders
 
 ---
 
@@ -151,5 +152,17 @@ The SDK performs input validation in each domain to fail fast and give clear dev
 - **`qr` / `khqr`**: validates `transactionId` (max 20 chars, `[a-zA-Z0-9\-]` charset), `amount`, `currency`, and `callbackUrl` as a public HTTPS URL; offline QR helper validates merchantId and amount.
 - **`credentials-on-file`**: requires `requestId`/`ctid` where applicable, validates `paymentToken` presence for Cof payments, and validates any `returnUrl`/`callbackUrl` as public HTTPS URLs.
 
-If validation fails, the SDK throws `PayWayConfigError` with a descriptive message. For integrators, validate inputs client-side before calling SDK methods or catch `PayWayConfigError` to present a clear error to users.
+## Current Operational Learnings
 
+- Use `--output json` for one stable result or `--output ndjson` for create +
+  poll streams; both keep stdout machine-readable.
+- `correlationId` and `traceId` join CLI output to the opt-in transaction
+  journal. Enable `--journal` or `PAYWAY_JOURNAL=1` before flows you may need to
+  explain later.
+- Payment-link pushbacks are unsigned JSON notifications. Verify fulfillment
+  with `check-transaction(tran_id)`, not `verifyCallback()`.
+- Gateway read APIs do not expose `EXPIRED` or `CLOSED` as durable statuses.
+  Keep merchant-side state for expiry/closure decisions and reconcile PENDING
+  records before retrying creates.
+
+If validation fails, the SDK throws `PayWayConfigError` with a descriptive message. For integrators, validate inputs client-side before calling SDK methods or catch `PayWayConfigError` to present a clear error to users.

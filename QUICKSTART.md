@@ -80,7 +80,11 @@ npm exec -- payway-sdk generate-qr -a 3.00 -c USD -t order-001 `
   -y --no-polling --output json
 ```
 
-The JSON envelope includes the transaction ID, creation outcome, saved QR path, and safe next action. If the request times out, the outcome is unknown: query `order-001` before creating another payment.
+The JSON envelope includes the transaction ID, creation outcome, saved QR path,
+safe next action, `correlationId`, and any gateway `traceId`. If the request
+times out, the outcome is unknown: query `order-001` before creating another
+payment. Add `--journal` when you want a local audit trail for later
+`journal timeline`, `journal reconcile`, or `journal explain` queries.
 
 ```bash
 npm exec -- payway-sdk check-transaction -t order-001
@@ -103,4 +107,4 @@ For hosted checkout, generate a signed form locally and let the browser submit d
 npm exec -- payway-sdk checkout-form -a 5.00 -t order-002 --payment-gate 0 --auto-submit --out checkout.html
 ```
 
-Exit codes are `0` for completed command work, `1` for input/configuration, `2` for a PayWay API rejection, and `3` for network, rate-limit, or timeout failures. See the [one-page guide](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/QUICK-START-1-PAGER.md) for lifecycle rules and the [documentation index](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/README.md) for deeper guides.
+Exit codes are `0` for completed command work, `1` for input/configuration, `2` for a PayWay API rejection, and `3` for network, rate-limit, or timeout failures. See the [one-page guide](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/QUICK-START-1-PAGER.md) for lifecycle rules, [Transaction Journal](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/18-transaction-journal.md) for audit/reconciliation commands, and the [documentation index](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/README.md) for deeper guides.

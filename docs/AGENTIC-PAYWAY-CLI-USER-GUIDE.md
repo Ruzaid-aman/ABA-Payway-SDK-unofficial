@@ -45,8 +45,10 @@ The command-tree glue lives in `src/cli/commands/agent.ts` (registers `ask`,
 into `src/cli/commands/agent-helpers.ts` (setup-option validation, doctor/ack/
 session output builders, interactive confirmation helpers).
 
-Two optional agent-guidance skills are also shipped under `skills/`:
-`skills/aba-payway-first-payment/SKILL.md` and `skills/aba-payway-agent/SKILL.md`.
+Three high-value agent-guidance skills are shipped under `skills/`:
+`skills/aba-payway-first-payment/SKILL.md`,
+`skills/aba-payway-agent/SKILL.md`, and
+`skills/aba-payway-journal/SKILL.md`.
 
 ---
 
@@ -358,7 +360,7 @@ All writes are atomic (`<file>.tmp` → `rename`), so a crash never corrupts an 
 
 ---
 
-## 7. The 12 agent tools (actions)
+## 7. The 13 agent tools (actions)
 
 A provider-proposed plan is a list of these actions. Each is validated against a strict
 schema before execution; each maps to exactly one SDK call.
@@ -374,6 +376,7 @@ schema before execution; each maps to exactly one SDK call.
 | `check_transaction` | read | `transactionId` |
 | `check_transaction_by_merchant_ref` | read | `merchantRef`, `requestTime?` |
 | `poll_transaction` | read | `transactionId`, `interval?`, `timeout?` |
+| `query_journal` | read | `query: timeline|stats|reconcile|anomalies`, optional `transactionId`, `dir`, `webhookDir` |
 | `save_artifact` | local | `qrString?`, `content?`, `root?`, `name?`, `kind?` |
 | `open_artifact` | local | `reference` (session artifact path or HTTPS URL) |
 | `copy_to_clipboard` | local | `text` |

@@ -103,8 +103,10 @@ requirements and a different result-handling contract.
 
 - Render or deliver the produced artifact (form, QR string, or link) to the
   customer. Do **not** treat the redirect or QR display as proof of payment.
-- Always wait for the **webhook callback** and verify its HMAC signature
-  (`payway.verifyCallback`) before marking an order paid.
+- For normal PayWay callbacks, verify the HMAC signature (`payway.verifyCallback`)
+  before marking an order paid. Payment-link pushbacks are the exception: they
+  carry no hash, so verify them with `check-transaction(tran_id)` before
+  fulfillment.
 - For sandbox smoke-testing you may `poll`/`check_transaction` by `transactionId`,
   but polling is a convenience only — the webhook remains authoritative.
 

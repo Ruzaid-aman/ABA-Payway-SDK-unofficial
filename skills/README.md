@@ -66,11 +66,11 @@ referenced in some guides are development-only and ship nowhere.
 - [aba-payway-hash](./aba-payway-hash/SKILL.md) — webhook signature verification + the request-signing/verify/mock-callback tools.
 - [aba-payway-journal](./aba-payway-journal/SKILL.md) — query the local transaction journal: timelines, stats, reconcile, anomalies, RCA (`journal` CLI + agent `query_journal` tool).
 - [aba-payway-test-harness](./aba-payway-test-harness/SKILL.md) — the built-in mock PayWay server.
-- [aba-payway-agent](./aba-payway-agent/SKILL.md) — the agentic, risk-gated CLI (provider modes, 12 tools, execution ledger).
+- [aba-payway-agent](./aba-payway-agent/SKILL.md) — the agentic, risk-gated CLI (provider modes, 13 tools, execution ledger).
 
 ## Agentic CLI skills
 
-- [aba-payway-agent](./aba-payway-agent/SKILL.md) — provider modes, the 12 tools, risk gates, execution ledger, sessions, and redaction.
+- [aba-payway-agent](./aba-payway-agent/SKILL.md) — provider modes, the 13 tools, risk gates, execution ledger, sessions, redaction, and read-only journal queries.
 - [aba-payway-first-payment](./aba-payway-first-payment/SKILL.md) — QR / checkout / subscription / payment-link route decision matrix and result handling (the agentic entrypoint).
 
 ## Bundled script exit-code contract

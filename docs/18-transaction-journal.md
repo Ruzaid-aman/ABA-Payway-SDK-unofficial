@@ -155,7 +155,11 @@ Reconstruct a transaction timeline: `payway-sdk journal timeline -t <transaction
 
 ```
 payway-sdk journal show [--kind <kind>] [--tran <id>] [--last <n>] [--dir <path>] [--json]
-payway-sdk journal timeline -t <transactionId> [--dir <path>] [--json]
+payway-sdk journal timeline -t <transactionId> [--with-webhooks] [--dir <path>] [--webhook-dir <path>] [--json]
+payway-sdk journal stats [--dir <path>] [--json]
+payway-sdk journal reconcile [--dir <path>] [--webhook-dir <path>] [--json]
+payway-sdk journal explain -t <transactionId> [--dir <path>] [--json]
+payway-sdk journal anomalies [--dir <path>] [--json]
 payway-sdk journal prune [--before <days|ISO>] [--dir <path>] [--json]
 ```
 
@@ -213,8 +217,12 @@ and the journal is the only place bodies are persisted at all.
 
 ## Pruning
 
-The journal grows unbounded by design (like the webhook capture store). Trim it with
-the exported helper (CLI command planned for Phase 2):
+The journal grows until you prune it or configure retention. Trim it with the CLI
+or the exported helper:
+
+```sh
+payway-sdk journal prune --before 30
+```
 
 ```ts
 import { pruneJournal } from 'aba-payway-ts';

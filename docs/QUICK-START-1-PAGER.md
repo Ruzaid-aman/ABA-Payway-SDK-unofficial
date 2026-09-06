@@ -77,7 +77,11 @@ The browser submits that form directly to PayWay. Never bundle `aba-payway-ts`, 
 
 ## Automation contract
 
-Use `--output json` for one versioned result or `--output ndjson` for creation and polling events. Exit codes are stable:
+Use `--output json` for one versioned result or `--output ndjson` for creation
+and polling events. Success envelopes include `correlationId` and, when present,
+PayWay's `traceId`. Add `--journal` to the same create/check command when you
+want a local JSONL trail for `journal timeline`, `journal reconcile`, and
+`journal explain`. Exit codes are stable:
 
 | Code | Meaning |
 |---:|---|

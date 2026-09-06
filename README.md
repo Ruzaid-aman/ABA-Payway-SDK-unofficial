@@ -84,7 +84,7 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 
 The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk onboard`, `payway-sdk agent setup|doctor|sessions`). See the [1-pager agentic guide](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/QUICK-START-1-PAGER.md#agentic-payway-cli) and the skill guides:
 
-- [aba-payway-agent skill](./skills/aba-payway-agent/SKILL.md) — provider modes, the 11 tools, risk gates, execution ledger, sessions, redaction.
+- [aba-payway-agent skill](./skills/aba-payway-agent/SKILL.md) — provider modes, the 13 tools, risk gates, execution ledger, sessions, redaction, and read-only journal queries.
 - [aba-payway-first-payment skill](./skills/aba-payway-first-payment/SKILL.md) — choosing QR / checkout / payment-link for a first payment.
 
 ```bash
@@ -141,6 +141,12 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk --version` | Print SDK version |
 
 > **Exit codes (all commands):** `0` success · `1` validation/input error · `2` PayWay API failure · `3` network/timeout/rate-limit — so scripts and agent frameworks can branch on `$?`. Lifecycle commands also accept `--json` for structured output.
+
+For automated payment creation, prefer `--output json` for a single stable result
+or `--output ndjson` when polling is enabled. Success envelopes include
+`correlationId` and, when PayWay returns one, `traceId`; enable `--journal` or
+`PAYWAY_JOURNAL=1` to join those IDs to the local transaction journal for
+timeline, reconciliation, stats, anomaly, and root-cause queries.
 
 ### Interactive experience
 
@@ -234,7 +240,7 @@ For a complete 16-chapter integration guide, diagrams, and runnable examples, se
 > Note: The SDK also performs fast client-side validation per domain. See the validation behavior section in [docs/README.md](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/README.md) for details.
 
 > [!CAUTION]
-> **Observed PayWay limitations (sandbox, 2026-09-05):** create a fresh transaction ID for every attempt and reconcile an ambiguous create response before starting another payment. A PENDING record does not prove that an older QR still scans. Closing a transaction is not exposed by read APIs and did not stop already-rendered hosted card sessions, so keep a local closed flag and still accept late verified payment. The hosted page must be reached as the response to its signed browser form POST; saving or embedding the returned HTML can leave relative assets and QR hydration blank. Reconcile the requested amount/currency separately from the payer debit, use `refund_amount` for partial refunds, and interpret gateway timestamps in UTC+7. These are dated sandbox observations, not guaranteed production behavior.
+> **Observed PayWay limitations (sandbox, 2026-09-05/06):** create a fresh transaction ID for every attempt and reconcile an ambiguous create response before starting another payment. A PENDING record does not prove that an older QR still scans. Closing a transaction is not exposed by read APIs and did not stop already-rendered hosted card sessions, so keep a local closed flag and still accept late verified payment. The hosted page must be reached as the response to its signed browser form POST; saving or embedding the returned HTML can leave relative assets and QR hydration blank. Payment-link pushbacks carry no HMAC hash; treat them as notifications and verify with `check-transaction`. Reconcile the requested amount/currency separately from the payer debit, use `refund_amount` for partial refunds, and interpret gateway timestamps in UTC+7. These are dated sandbox observations, not guaranteed production behavior.
 
 ### Documentation & examples
 
