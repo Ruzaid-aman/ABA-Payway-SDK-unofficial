@@ -87,6 +87,11 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   if (url.includes('check-transaction')) {
     if (tranId === 'MISSING') {
       send(200, { status: { code: 6, message: 'tran_id not found', tran_id: tranId } });
+    } else if (tranId === 'CO-PENDING-1') {
+      send(200, {
+        status: { code: '00', message: 'Success', tran_id: tranId },
+        data: { payment_status: 'PENDING', payment_status_code: 2, payment_amount: '5.00' },
+      });
     } else {
       send(200, {
         status: { code: '00', message: 'Success', tran_id: tranId },
@@ -123,6 +128,10 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
     // (audit D1). Only THIS branch: the CoF payment-credential endpoint above
     // also matches 'purchase' and must not pollute the capture.
     capturedPurchaseBodies.push(parsed);
+    if (tranId === 'CO-UNKNOWN-1') {
+      res.socket?.destroy();
+      return;
+    }
     send(200, {
       status: { code: '00', message: 'Success' },
       qrString: '000201010212',
@@ -367,6 +376,58 @@ describe('CLI API commands against the local mock gateway', () => {
       result: { payment: { status: 'APPROVED', terminal: true }, poll: { outcome: 'terminal' } },
     });
     expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('generate-checkout --output json reports an ambiguous create without replaying it', async () => {
+    const before = capturedPurchaseBodies.length;
+    const { stdout, exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-UNKNOWN-1',
+      '--output',
+      'json',
+      '--no-polling',
+      '--no-save-image',
+    ]);
+
+    expect(JSON.parse(stdout)).toMatchObject({
+      schemaVersion: '1.0',
+      transactionId: 'CO-UNKNOWN-1',
+      creation: { outcome: 'unknown', error: { kind: 'network', exitCode: 3 } },
+      payment: { status: 'UNKNOWN', terminal: false },
+      nextAction: { kind: 'check_existing_transaction' },
+    });
+    expect(capturedPurchaseBodies.slice(before).filter((body) => body.tran_id === 'CO-UNKNOWN-1')).toHaveLength(1);
+    expect(exitCode).toBe(3);
+  });
+
+  it('generate-checkout --output json distinguishes a stopped wait from payment failure', async () => {
+    const { stdout, exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-PENDING-1',
+      '--output',
+      'json',
+      '--poll-interval',
+      '0.001',
+      '--poll-timeout',
+      '0.01',
+      '--no-save-image',
+    ]);
+
+    expect(JSON.parse(stdout)).toMatchObject({
+      schemaVersion: '1.0',
+      transactionId: 'CO-PENDING-1',
+      creation: { outcome: 'accepted' },
+      payment: { status: 'PENDING', terminal: false },
+      poll: { outcome: 'timed_out', reason: 'max_duration_exceeded' },
+      nextAction: { kind: 'check_existing_transaction' },
+    });
+    expect(exitCode).toBe(3);
   });
 
   it('generate-qr --output json uses the same stable envelope', async () => {
