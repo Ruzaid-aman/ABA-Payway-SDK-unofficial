@@ -38,6 +38,10 @@
 - **Close Transaction channel dependence (open escalation)**: `docs/CLOSE-TRANSACTION-FINDINGS.md` documents that closure enforcement is CHANNEL-dependent in sandbox — the KHQR/QR channel refuses closed transactions at scan time (3 observations: 2026-08-25 + 2026-09-05 ×2, "transaction expired"), while two hosted-card sessions accepted payment AFTER a code-00 close (APPROVED). Closure is unqueryable: no CLOSED status in check/detail ever — keep a local `closed` flag. Read the dossier before ANY work involving `closeTransaction`, and re-run its §7 validation checklist when ABA ships a fix.
 - **When probing endpoints**: When tasked to probe a sandbox endpoint, write a script in the `scripts/` folder to execute and verify the endpoint exists and validates formatting correctly, similar to prior probes.
 - **Update status continuously**: Keep `PROJECT_STATUS.md` updated as tasks are completed.
+- **Never embed backticks in `git commit -m` under Git Bash**: command substitution eats the enclosed text (a 2026-09-06 commit lost a word). Use `git commit -F <file>` or backtick-free messages.
+- **Sub-agent line numbers drift (~40-60 lines observed in cli.ts)**: explorer reports are orientation only — re-derive every file:line from the working tree (grep the symbol) before it lands in a durable doc. Policy: audit-results/transaction-data-audit/REPORT.md §19.
+- **commander option collision**: an option defined on ANY ancestor command (e.g. `agent --session`) silently swallows the same flag on descendants — never reuse an ancestor's option name (why `agent ledger recover` uses `--session-id`).
+- **Design against instrumentation only after reading its contract**: the journal originally targeted the SDK hooks; code validation showed hooks carry no cid/duration/attempt and onResponse never fires on error paths — hence the first-party emitter inside `_executeFetch` (docs/18).
 
 ## Sandbox Channel & Status Facts (2026-09-05, user-driven simulator campaigns — SANDBOX-FINDINGS §17–§20)
 - **Purchase hash signs `ctid` after `items` (live 27-field order, §17)**: the live docs' subscription operation omits ctid and is gateway-rejected with Wrong Hash; `PURCHASE_HASH_FIELDS` carries the verified order. The gateway's wrong-hash hint prints the DOC list, not the enforced one — never treat the hint as authoritative.
@@ -57,6 +61,15 @@
 - **Scan-refusal messages are generic (W5-9)**: "Transaction expired" covers expired, window-exceeded, and already-paid; "Transaction not found" = duplicate IDs only.
 - **Dates are different events (W5-13)**: detail `transaction_date` = creation (fixed); list date = payment completion. Both UTC+7; gateway clock can trail the client wall clock by seconds.
 - **Hosted-page continuation needs `continue_success_url` (W5-10)**: plain `return_url` does not move the browser. `generate-checkout` poll timeout exits 0 and is machine-invisible in `--json` (W5-11 — follow-up).
+
+## Transaction Journal Facts (2026-09-06 — deep audit + 6-phase implementation, branch audit/transaction-data-ai-readiness)
+- **The local journal is the only complete transaction record** (audit verdict: gateway history is incomplete BY DESIGN — no CLOSED/EXPIRED status, unpaid QR-only invisible to lists, callbacks never retried). Recording is OPT-IN: `--journal` (single invocation) or `PAYWAY_JOURNAL=1` + `PAYWAY_JOURNAL_DIR` + `PAYWAY_JOURNAL_MODE=digest|full`, or SDK config `journal: true | {dir, mode}`. Default OFF — the library never writes files silently. File: `<cwd>/payway-data/journal.jsonl`.
+- **One join key everywhere**: SDK cid (`payway.lastCorrelationId`) = journal `correlationId` = ledger `correlation` (attachCorrelation, first-write-wins) = artifact sidecar `correlationId`. Webhook records join via record id (callback.received correlationId) + matchedTransactionId. Reuse these keys; never invent new ones.
+- **Redaction at write is mandatory**: digest mode allow-lists non-secret transactional fields (no hash/merchant_auth/pwt/QR base64/PII); full mode runs sanitizeForLog with caps. Hook payloads and `--json` output are NOT sanitized — the journal must not repeat that.
+- **Query surface**: `journal show|timeline|stats|reconcile|explain|anomalies|prune`; agent tool `query_journal` (read-only, no approval gate, 13-tool catalog); skill `aba-payway-journal`. `agent ledger recover --session-id` lists unfinished creates (lookup only, NEVER replays). Webhook sink persists signatureVerdict/verificationReason/matchedTransactionId/matchedStatus/replay.
+- **Honesty rules baked into outputs**: a missing callback is NOT proof of non-payment (PayWay never retries deliveries); PENDING does not mean alive (expired/closed read PENDING forever); the funnel reports the local record only. Keep those caveats in any new journal-derived output.
+- **Anomaly heuristics use leave-one-out baselines** (a day vs the mean of the OTHER active days) — never include the spike in its own baseline.
+- Follow-up backlog: `.scratch/transaction-data-journal/IMPROVEMENTS.md` (W5-11 exit-code fix, correlationId in --json envelopes, duplicate-tran_id advisory via journal, doctor journal row, retention, hooks docs). Learnings: `audit-results/transaction-data-audit/LEARNINGS.md`.
 
 ## SDK Usage Examples
 - Prefer the facade for a complete merchant flow: `const session = await sdk.initiate(payload, config);` followed by `await sdk.handle(session, { target: '#payway-container' });`.
@@ -84,9 +97,13 @@
 | `PAYWAY_SANDBOX` | `true` selects sandbox; `false` selects production. |
 | `PAYWAY_TIMEOUT` | Optional request timeout in milliseconds. |
 | `DEBUG_PAYWAY` | `true` or `1` enables sanitized diagnostic logging. |
+| `PAYWAY_JOURNAL` | `1` enables the transaction journal (`<cwd>/payway-data/journal.jsonl`). |
+| `PAYWAY_JOURNAL_DIR` | Journal directory override. |
+| `PAYWAY_JOURNAL_MODE` | `digest` (default, allow-listed fields) or `full` (sanitizeForLog bodies, capped). |
+| `PAYWAY_WEBHOOK_DIR` | Webhook capture store directory for `journal reconcile` (default `<cwd>/webhook_data`). |
 
 ## Skills Directory
-- The packaged `skills/` directory contains 29 focused `aba-payway-*` guides.
+- The packaged `skills/` directory contains 31 focused `aba-payway-*` guides (incl. `aba-payway-journal` — the journal query layer).
 - Several guides bundle dependency-free `.cjs` tools under their `scripts/` folder (KHQR decode/CRC validation, request signing, callback verification, mock callbacks, reconciliation cron, checkout payload builder, status decoder) — each SKILL.md documents its own tools.
 - Install all of them (including bundled scripts) with `npx payway-sdk skills add <agent>`, where agent is `claude`, `codex`, `opencode`, `cursor`, or `copilot`.
 

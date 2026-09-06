@@ -42,8 +42,20 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary update-sta
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link create -t "Invoice 1" -a 5.00 -r inv-001 --return-url <url> --payout '[{"acc":"500000001","amt":5.00}]'
 # Payment-link detail by Link ID (-i ONLY — data.id from create, NOT merchant ref/slug; --json error envelope on failure)
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link detail -i <link-id> --json
+
+# Transaction journal (local reads — no API call; recording is opt-in via --journal or PAYWAY_JOURNAL=1)
+npx tsx src/cli.ts --journal generate-qr -a 5.00 -c USD --no-polling -y   # record one invocation
+npx tsx src/cli.ts journal timeline -t <tran-id> --json                   # reconstruct one transaction
+npx tsx src/cli.ts journal stats                                          # latency/retries/errors/funnel
+npx tsx src/cli.ts journal reconcile --json                               # creations vs callbacks
 ```
 
+- Transaction journal (audit-results/transaction-data-audit/, docs/18): opt-in JSONL record of every
+  exchange/command/poll/status/artifact/callback at `<cwd>/payway-data/journal.jsonl`. `--journal` arms one
+  invocation; `PAYWAY_JOURNAL=1` (+`_DIR`, `_MODE=digest|full`) persists; SDK config `journal: true|{dir,mode}`.
+  Digest mode allow-lists non-secret fields (no hash/pwt/PII). Query: `journal show|timeline|stats|reconcile|explain|anomalies|prune`.
+  Missing callback ≠ non-payment (PayWay never retries); PENDING ≠ alive (no EXPIRED/CLOSED status remotely).
+  Backlog: `.scratch/transaction-data-journal/IMPROVEMENTS.md`.
 - `payment-link create`: `--image <path>` (JPG/JPEG/PNG ≤3MB, enforced locally),
   `--no-show-qr` suppresses the TTY QR; under `--json` BOTH payment-link
   commands emit the `{ error: { kind, exitCode, … } }` envelope on any failure
