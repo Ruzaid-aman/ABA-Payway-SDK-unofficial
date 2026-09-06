@@ -211,6 +211,17 @@ and ends with the suggested first command.
 - Set `PAYWAY_ONBOARD_AUTO=1` to auto-launch the wizard the first time `ask`/`agent` run
   unconfigured in a TTY (opt-in; non-TTY is unaffected).
 
+### `payway-sdk agent ledger` (recovery & retention)
+
+- `recover [--session-id <id>]` — list unfinished creates
+  (planned/confirmed/submitted/outcome_unknown) with a per-record
+  `check-transaction` hint. **Lookup only — creates are never replayed.**
+- `prune --before <days|ISO>` — remove FINISHED (succeeded/failed) execution
+  records older than the cutoff; unfinished records are never removed and
+  unparseable files are left untouched.
+- The REPL prints a banner when the most recent prior session has unfinished
+  creates (suppress with `PAYWAY_AGENT_NO_RECOVER_HINT=1`).
+
 ### `payway-sdk agent sessions`
 
 | Subcommand | Purpose |

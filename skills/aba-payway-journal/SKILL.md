@@ -46,7 +46,11 @@ pruneJournal(new Date(Date.now() - 30 * 86_400_000)); // retention
 
 - Single invocation: global `--journal` flag (arms the whole command).
 - Persistent: `PAYWAY_JOURNAL=1` (+ optional `PAYWAY_JOURNAL_DIR`,
-  `PAYWAY_JOURNAL_MODE=digest|full`), or SDK config `journal: true | {dir, mode}`.
+  `PAYWAY_JOURNAL_MODE=digest|full`, `PAYWAY_JOURNAL_MAX_AGE_DAYS` retention), or SDK
+  config `journal: true | {dir, mode, maxAgeDays}`.
+- `--json` success envelopes carry `correlationId`/`traceId` — grep them in the
+  journal to reconstruct the exact exchange. Create commands warn when the
+  journal already holds the same tran_id (`--allow-duplicate-id` to suppress).
 - Default OFF — the library never writes files silently. File:
   `<cwd>/payway-data/journal.jsonl`, one JSON event per line.
 - `digest` mode (default) stores allow-listed non-secret fields only — no
@@ -72,6 +76,8 @@ journal when recording was on.
 | `journal explain -t <id>` | Root-cause narrative + hints |
 | `journal anomalies` | Error spikes, retry bursts, latency outliers (heuristics listed in output) |
 | `journal prune --before 30` | Retention (days or ISO timestamp) |
+| `journal timeline --with-webhooks` | Callback steps enriched with the persisted signature verdict / matched status / replay marker |
+| `agent ledger prune --before 30` | Ledger retention — FINISHED records only; unfinished are never removed |
 
 ## Error Handling
 

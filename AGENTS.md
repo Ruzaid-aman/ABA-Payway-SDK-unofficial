@@ -50,6 +50,9 @@ npx tsx src/cli.ts journal stats                                          # late
 npx tsx src/cli.ts journal reconcile --json                               # creations vs callbacks
 ```
 
+- `--json` success envelopes carry `correlationId`/`traceId` (join keys into the journal); poll timeouts on
+  generate-qr/generate-checkout exit 3 (machine-visible, W5-11 fixed); create commands warn on duplicate
+  tran_ids seen in the journal (`--allow-duplicate-id` to suppress).
 - Transaction journal (audit-results/transaction-data-audit/, docs/18): opt-in JSONL record of every
   exchange/command/poll/status/artifact/callback at `<cwd>/payway-data/journal.jsonl`. `--journal` arms one
   invocation; `PAYWAY_JOURNAL=1` (+`_DIR`, `_MODE=digest|full`) persists; SDK config `journal: true|{dir,mode}`.

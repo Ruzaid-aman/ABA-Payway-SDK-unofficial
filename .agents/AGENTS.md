@@ -60,7 +60,7 @@
 - **Close validation is three-way (W5-2/W5-8)**: never-created → code 00; PENDING → code 00 no-op; paid → 403 code 2. Closed gate-0 CARD sessions still pay (H7 ×3); close is scan-enforced only on the KHQR channel.
 - **Scan-refusal messages are generic (W5-9)**: "Transaction expired" covers expired, window-exceeded, and already-paid; "Transaction not found" = duplicate IDs only.
 - **Dates are different events (W5-13)**: detail `transaction_date` = creation (fixed); list date = payment completion. Both UTC+7; gateway clock can trail the client wall clock by seconds.
-- **Hosted-page continuation needs `continue_success_url` (W5-10)**: plain `return_url` does not move the browser. `generate-checkout` poll timeout exits 0 and is machine-invisible in `--json` (W5-11 — follow-up).
+- **Hosted-page continuation needs `continue_success_url` (W5-10)**: plain `return_url` does not move the browser. `generate-checkout` poll timeout was machine-invisible in `--json` (W5-11) — **FIXED 2026-09-06 (improvement I-1)**: generate-qr/generate-checkout now map poll outcomes to exit codes (timeout 3, consecutive errors 2).
 
 ## Transaction Journal Facts (2026-09-06 — deep audit + 6-phase implementation, branch audit/transaction-data-ai-readiness)
 - **The local journal is the only complete transaction record** (audit verdict: gateway history is incomplete BY DESIGN — no CLOSED/EXPIRED status, unpaid QR-only invisible to lists, callbacks never retried). Recording is OPT-IN: `--journal` (single invocation) or `PAYWAY_JOURNAL=1` + `PAYWAY_JOURNAL_DIR` + `PAYWAY_JOURNAL_MODE=digest|full`, or SDK config `journal: true | {dir, mode}`. Default OFF — the library never writes files silently. File: `<cwd>/payway-data/journal.jsonl`.
@@ -69,7 +69,7 @@
 - **Query surface**: `journal show|timeline|stats|reconcile|explain|anomalies|prune`; agent tool `query_journal` (read-only, no approval gate, 13-tool catalog); skill `aba-payway-journal`. `agent ledger recover --session-id` lists unfinished creates (lookup only, NEVER replays). Webhook sink persists signatureVerdict/verificationReason/matchedTransactionId/matchedStatus/replay.
 - **Honesty rules baked into outputs**: a missing callback is NOT proof of non-payment (PayWay never retries deliveries); PENDING does not mean alive (expired/closed read PENDING forever); the funnel reports the local record only. Keep those caveats in any new journal-derived output.
 - **Anomaly heuristics use leave-one-out baselines** (a day vs the mean of the OTHER active days) — never include the spike in its own baseline.
-- Follow-up backlog: `.scratch/transaction-data-journal/IMPROVEMENTS.md` (W5-11 exit-code fix, correlationId in --json envelopes, duplicate-tran_id advisory via journal, doctor journal row, retention, hooks docs). Learnings: `audit-results/transaction-data-audit/LEARNINGS.md`.
+- **Improvement batch shipped 2026-09-06 (I-1..I-8/I-12/I-13)**: poll outcomes to exit codes (I-1); `--json` envelopes carry `correlationId`/`traceId` + `PayWay.lastTraceId` (I-2); duplicate-tran_id advisory, `--allow-duplicate-id` (I-3); `doctor` journal row + 50 MB warning (I-4); `maxAgeDays`/`PAYWAY_JOURNAL_MAX_AGE_DAYS` prune-on-write (I-5); `journal timeline --with-webhooks` (I-6); `setup-webhook --journal` .env upsert (I-7); docs/12 Pattern 3b (I-8); REPL unfinished-creates banner, `PAYWAY_AGENT_NO_RECOVER_HINT` (I-12); `agent ledger prune --before` (I-13). Deferred: profiles encryption, `--json-safe`, SQLite backend (I-9/I-10/I-11). Backlog: `.scratch/transaction-data-journal/IMPROVEMENTS.md`. Learnings: `audit-results/transaction-data-audit/LEARNINGS.md`.
 
 ## SDK Usage Examples
 - Prefer the facade for a complete merchant flow: `const session = await sdk.initiate(payload, config);` followed by `await sdk.handle(session, { target: '#payway-container' });`.
@@ -101,6 +101,8 @@
 | `PAYWAY_JOURNAL_DIR` | Journal directory override. |
 | `PAYWAY_JOURNAL_MODE` | `digest` (default, allow-listed fields) or `full` (sanitizeForLog bodies, capped). |
 | `PAYWAY_WEBHOOK_DIR` | Webhook capture store directory for `journal reconcile` (default `<cwd>/webhook_data`). |
+| `PAYWAY_JOURNAL_MAX_AGE_DAYS` | Journal retention — prune events older than N days on write (best-effort, fail-open). |
+| `PAYWAY_AGENT_NO_RECOVER_HINT` | `1` suppresses the agent REPL banner about unfinished creates in the prior session. |
 
 ## Skills Directory
 - The packaged `skills/` directory contains 31 focused `aba-payway-*` guides (incl. `aba-payway-journal` — the journal query layer).

@@ -112,4 +112,4 @@ agents**, and **footguns that actually bit**. The follow-up backlog lives in
   (`resultSummary`), and the dormant `'ledger'` session event fires.
 - The 18-gap register stands at 12 closed, G9 mitigated. Remaining: G2/G13–G15
   (partial / backlog), G18 (provider-side, permanent — the journal exists
-  precisely because of it). Backlog: `../../.scratch/transaction-data-journal/IMPROVEMENTS.md`.
+  precisely because of it). Backlog: `../../.scratch/transaction-data-journal/IMPROVEMENTS.md` — **I-1..I-8, I-12, I-13 shipped 2026-09-06 (same branch, commit f362971); I-9/I-10/I-11 deferred**.
