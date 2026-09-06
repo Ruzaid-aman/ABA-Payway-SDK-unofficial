@@ -39,6 +39,8 @@ const forbiddenPathPatterns = [
   /(?:^|\/)src\//,
   /^scripts\//,
   /(?:^|\/)docs\//,
+  /(?:^|\/)examples\//,
+  /(?:^|\/)payway-boilerplate\//,
   /(?:^|\/)(?:test-output|test-logs|audit-results|\.scratch|\.agents)\//,
   /(?:^|\/)HANDOFF\.md$/,
   /\.map$/,

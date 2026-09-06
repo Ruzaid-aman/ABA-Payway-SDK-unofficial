@@ -1,0 +1,23 @@
+{
+  "name": "payway-first-payment-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Portable first-payment reference app for aba-payway-ts: QR + hosted-card tabs, verified callbacks, idempotent fulfillment, refunds, and reconciliation.",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "start": "node --experimental-strip-types --no-warnings src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'Lifecycle tests live in the SDK repository: npm --workspace-root run test:examples (or vitest run src/__tests__/first-payment-examples.test.ts)' && exit 0"
+  },
+  "dependencies": {
+    "aba-payway-ts": "file:vendor/aba-payway-ts.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.3.3"
+  }
+}

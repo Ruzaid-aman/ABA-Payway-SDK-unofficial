@@ -195,6 +195,27 @@
   endpoint without exposing secret fragments. The packaged quickstart now
   leads from install to demo, sandbox QR, and server-side integration with
   POSIX and PowerShell examples.
+- **Portable first-payment reference app** (`examples/first-payment/`, DX
+  overhaul Task 7) — a dependency-light teaching app that runs the FULL
+  payment lifecycle in two modes with identical verification/reconciliation
+  code: `demo` (default, zero credentials — a local simulator speaks the
+  sandbox wire shapes and delivers real HMAC-signed pushbacks to the app's
+  own callback endpoint) and `sandbox` (the real `PayWay` client; loopback
+  callbacks require the explicit `ALLOW_PRIVATE_CALLBACK_HOSTS=1` opt-in).
+  Teaches and tests: server-side pricing (no client-supplied amounts),
+  per-attempt unique transaction IDs, verified-callback + poll
+  reconciliation, fulfill-once idempotency across callback replay,
+  amount/currency-mismatch refusal, unverified-notification rejection,
+  paid-order 409 on new attempts, late-payment-after-close routed to an
+  explicit merchant `needs_resolution` decision (never auto-refunded),
+  missed-callback discovery via status reads, and quantitative partial
+  refunds. Consumes the SDK as a packed tarball (`npm run setup` — no
+  junctions, no repo-relative imports); lifecycle acceptance tests live in
+  the repository suite (`src/__tests__/first-payment-examples.test.ts`,
+  10/10 green through the real HTTP surface). `check-package-contents.mjs`
+  now also forbids `examples/` and `payway-boilerplate/` paths in the npm
+  tarball as defense in depth.
+
 - **Versioned payment-command output** — `generate-qr` and `generate-checkout`
   accept `--output json` for one final result or `--output ndjson` for creation,
   polling, and final records. Results include non-secret context, explicit

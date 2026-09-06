@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ABA PayWay — first payment reference app</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 46rem; margin: 0 auto; padding: 1.25rem; color: #1a1a2e; }
+    h1 { font-size: 1.35rem; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; margin: 1.25rem 0 .5rem; }
+    .subtitle { color: #555; margin: 0 0 1rem; font-size: .9rem; }
+    .banner { background: #fff3cd; border: 1px solid #ffe08a; padding: .6rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: .85rem; }
+    .banner.live { background: #d1e7dd; border-color: #a3cfbb; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: .5rem; }
+    button { font: inherit; padding: .45rem .8rem; border-radius: 8px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+    button.primary { background: #17325c; border-color: #17325c; color: #fff; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    button.product { text-align: left; }
+    button.product small { display: block; color: #666; font-size: .75rem; }
+    .tabs { display: flex; gap: .5rem; margin-bottom: .75rem; }
+    .tabs button[aria-selected="true"] { background: #17325c; color: #fff; border-color: #17325c; }
+    .qr-wrap { text-align: center; margin: .75rem 0; }
+    .qr-wrap img { width: 220px; height: 220px; image-rendering: pixelated; border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: #fff; }
+    .muted { color: #666; font-size: .82rem; }
+    .countdown { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .status { font-weight: 600; }
+    .status.paid { color: #0f7b3d; }
+    .status.bad { color: #a10000; }
+    .status.warn { color: #9a6300; }
+    iframe.hosted { width: 100%; height: 22rem; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+    .events { list-style: none; padding: 0; margin: .5rem 0 0; font-size: .78rem; max-height: 14rem; overflow-y: auto; }
+    .events li { padding: .25rem .5rem; border-bottom: 1px solid #eee; }
+    .events li time { color: #888; margin-right: .5rem; }
+    .ops { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; }
+    code { background: #f2f2f8; padding: .1rem .3rem; border-radius: 4px; font-size: .8rem; }
+    .error { color: #a10000; font-size: .85rem; margin-top: .5rem; min-height: 1em; }
+  </style>
+</head>
+<body>
+  <h1>First-payment reference app</h1>
+  <p class="subtitle">aba-payway-ts · server-signed payments, verified callbacks, idempotent fulfillment</p>
+  <div id="mode-banner" class="banner" hidden></div>
+
+  <h2>1 · Create an order</h2>
+  <div id="catalog" class="grid"></div>
+
+  <div id="order-card" class="card" hidden>
+    <div>
+      <strong id="order-product"></strong>
+      — <span id="order-amount"></span>
+      <span class="status" id="order-status"></span>
+    </div>
+    <div class="muted" id="order-id"></div>
+
+    <h2 style="margin-top:.75rem">2 · Pay</h2>
+    <div class="tabs" role="tablist">
+      <button id="tab-qr" role="tab" aria-selected="true">Scan QR (KHQR)</button>
+      <button id="tab-hosted" role="tab" aria-selected="false">Hosted card page</button>
+    </div>
+
+    <div id="pane-qr">
+      <div class="qr-wrap"><img id="qr-image" alt="Payment QR code" hidden/></div>
+      <div class="muted" id="qr-hint">Create a QR, then scan it with any KHQR-member banking app.</div>
+      <div class="muted">Expires in <span class="countdown" id="qr-countdown">–</span></div>
+      <div class="ops">
+        <button class="primary" id="btn-create-qr">Create QR</button>
+        <button id="btn-close" hidden>Close payment</button>
+      </div>
+    </div>
+
+    <div id="pane-hosted" hidden>
+      <div class="muted">A signed form opens the gateway's hosted card page inside a sandboxed iframe. In demo mode the iframe shows a clearly-labelled simulated page.</div>
+      <iframe class="hosted" id="hosted-frame" title="Hosted checkout" sandbox="allow-scripts allow-forms" hidden></iframe>
+      <div class="ops">
+        <button class="primary" id="btn-create-hosted">Open hosted card page</button>
+        <button id="btn-close-h" hidden>Close payment</button>
+      </div>
+    </div>
+    <div class="error" id="pay-error"></div>
+  </div>
+
+  <div id="lifecycle-card" class="card" hidden>
+    <h2 style="margin:0 0 .25rem">3 · Order lifecycle</h2>
+    <div class="muted" id="lifecycle-note"></div>
+    <div id="refund-row" class="ops" hidden>
+      <input id="refund-amount" type="number" step="0.01" min="0.01" style="width:7rem" placeholder="Amount"/>
+      <button id="btn-refund">Refund (partial ok)</button>
+    </div>
+    <div id="resolve-row" class="ops" hidden>
+      <span class="muted">A late payment arrived after local closure. Merchant decision required:</span>
+      <button id="btn-resolve-fulfill">Fulfill order</button>
+      <button id="btn-resolve-refund">Refund payment</button>
+    </div>
+    <ul class="events" id="events"></ul>
+  </div>
+
+  <p class="muted">This page receives only sanitized order data and payment artifacts — credentials and raw gateway responses stay on the server. Payment confirmation comes from the verified callback and server-side status reads shown in the event log, never from this page's timers or redirects.</p>
+
+  <script>
+    let mode = 'demo';
+    let orderId = null;
+    let pollTimer = null;
+    let countdownTimer = null;
+    let currentTransactionId = null;
+    let countdownEndsAt = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    async function api(path, options) {
+      const response = await fetch(path, options);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      return body;
+    }
+
+    function setModeBanner(catalog) {
+      mode = catalog.mode;
+      const banner = $('mode-banner');
+      banner.hidden = false;
+      if (mode === 'demo') {
+        banner.textContent = 'DEMO MODE — all payments are simulated locally. No PayWay credentials are configured and no real money moves.';
+      } else {
+        banner.textContent = 'SANDBOX MODE — real PayWay sandbox calls. Only use sandbox credentials.';
+        banner.classList.add('live');
+      }
+    }
+
+    async function loadCatalog() {
+      const catalog = await api('/api/catalog');
+      setModeBanner(catalog);
+      const grid = $('catalog');
+      grid.innerHTML = '';
+      for (const p of catalog.products) {
+        const btn = document.createElement('button');
+        btn.className = 'product';
+        btn.innerHTML = `${p.name}<small>${p.price.toFixed(2)} ${p.currency}</small>`;
+        btn.onclick = () => createOrder(p.id);
+        grid.appendChild(btn);
+      }
+    }
+
+    async function createOrder(productId) {
+      stopPolling();
+      const { order } = await api('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productId }) });
+      orderId = order.orderId;
+      $('order-card').hidden = false;
+      $('order-product').textContent = order.product;
+      $('order-amount').textContent = `${order.amount.toFixed(2)} ${order.currency}`;
+      $('order-id').textContent = `order ${order.orderId}`;
+      setStatus(order.status);
+      $('qr-image').hidden = true;
+      $('hosted-frame').hidden = true;
+      $('hosted-frame').srcdoc = '';
+      $('btn-close').hidden = true;
+      $('btn-close-h').hidden = true;
+      $('pay-error').textContent = '';
+      refreshLifecycle();
+    }
+
+    function setStatus(status) {
+      const el = $('order-status');
+      el.textContent = status;
+      el.className = 'status ' + (status === 'paid' || status === 'refunded' ? 'paid' : status === 'needs_resolution' ? 'warn' : status === 'declined' || status === 'cancelled' ? 'bad' : '');
+    }
+
+    function selectTab(which) {
+      const qr = which === 'qr';
+      $('tab-qr').setAttribute('aria-selected', String(qr));
+      $('tab-hosted').setAttribute('aria-selected', String(!qr));
+      $('pane-qr').hidden = !qr;
+      $('pane-hosted').hidden = qr;
+    }
+
+    async function createQr() {
+      try {
+        $('pay-error').textContent = '';
+        const result = await api('/api/orders/create-qr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId }) });
+        currentTransactionId = result.transactionId;
+        countdownEndsAt = result.expiresAtMs;
+        if (result.qrImage) {
+          $('qr-image').src = result.qrImage;
+          $('qr-image').hidden = false;
+        }
+        $('btn-close').hidden = false;
+        $('qr-hint').textContent = mode === 'demo'
+          ? 'SIMULATED QR — scanning it with a real banking app does nothing. Watch the event log instead.'
+          : 'Scan with any KHQR-member banking app.';
+        startCountdown();
+        startPolling();
+        refreshLifecycle();
+      } catch (error) {
+        $('pay-error').textContent = error.message;
+      }
+    }
+
+    async function createHosted() {
+      try {
+        $('pay-error').textContent = '';
+        const result = await api('/api/orders/create-hosted', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId }) });
+        currentTransactionId = result.transactionId;
+        countdownEndsAt = result.expiresAtMs;
+        $('hosted-frame').srcdoc = result.html;
+        $('hosted-frame').hidden = false;
+        $('btn-close-h').hidden = false;
+        startCountdown();
+        startPolling();
+        refreshLifecycle();
+      } catch (error) {
+        $('pay-error').textContent = error.message;
+      }
+    }
+
+    function startCountdown() {
+      if (countdownTimer) clearInterval(countdownTimer);
+      const update = () => {
+        const remaining = Math.max(0, Math.round((countdownEndsAt - Date.now()) / 1000));
+        const el = $('qr-countdown');
+        el.textContent = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+        if (remaining === 0 && countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      };
+      update();
+      countdownTimer = setInterval(update, 1000);
+    }
+
+    function startPolling() {
+      stopPolling();
+      pollTimer = setInterval(async () => {
+        try {
+          const result = await api(`/api/orders/status/${currentTransactionId}`, { method: 'POST' });
+          setStatus(result.order.status);
+          refreshOps(result.order.status, result.order);
+          if (result.terminal || ['paid', 'refunded', 'needs_resolution'].includes(result.order.status)) stopPolling();
+        } catch { /* transient poll failures surface on the next tick */ }
+      }, 1500);
+    }
+
+    function stopPolling() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+
+    async function closePayment() {
+      try {
+        await api(`/api/orders/close/${currentTransactionId}`, { method: 'POST' });
+        stopPolling();
+        await refreshLifecycle();
+        const detail = await api(`/api/orders/${orderId}`);
+        setStatus(detail.order.status);
+      } catch (error) {
+        $('pay-error').textContent = error.message;
+      }
+    }
+
+    async function refund() {
+      const amount = Number($('refund-amount').value);
+      try {
+        const result = await api(`/api/orders/refund/${currentTransactionId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) });
+        setStatus(result.order.status);
+        refreshLifecycle();
+      } catch (error) {
+        $('pay-error').textContent = error.message;
+      }
+    }
+
+    async function resolve(decision) {
+      try {
+        const result = await api(`/api/orders/resolve/${orderId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision }) });
+        setStatus(result.order.status);
+        refreshLifecycle();
+      } catch (error) {
+        $('pay-error').textContent = error.message;
+      }
+    }
+
+    function refreshOps(status, order) {
+      const refundable = status === 'paid' && order.paidTotal > order.refundedTotal;
+      $('refund-row').hidden = !refundable;
+      $('resolve-row').hidden = status !== 'needs_resolution';
+    }
+
+    async function refreshLifecycle() {
+      if (!orderId) return;
+      const detail = await api(`/api/orders/${orderId}`);
+      setStatus(detail.order.status);
+      refreshOps(detail.order.status, detail.order);
+      $('lifecycle-card').hidden = false;
+      $('lifecycle-note').textContent = `${detail.order.paidTotal > 0 ? `Paid ${detail.order.paidTotal.toFixed(2)} ${detail.order.currency}` : 'Awaiting verified payment'}${detail.order.refundedTotal > 0 ? ` · refunded ${detail.order.refundedTotal.toFixed(2)}` : ''}`;
+      const list = $('events');
+      list.innerHTML = '';
+      for (const e of detail.events) {
+        const li = document.createElement('li');
+        const time = document.createElement('time');
+        time.textContent = e.createdAt.slice(11, 19);
+        li.appendChild(time);
+        li.appendChild(document.createTextNode(`${e.type}${e.detail ? ` — ${e.detail}` : ''}`));
+        list.appendChild(li);
+      }
+    }
+
+    $('tab-qr').onclick = () => selectTab('qr');
+    $('tab-hosted').onclick = () => selectTab('hosted');
+    $('btn-create-qr').onclick = createQr;
+    $('btn-create-hosted').onclick = createHosted;
+    $('btn-close').onclick = closePayment;
+    $('btn-close-h').onclick = closePayment;
+    $('btn-refund').onclick = refund;
+    $('btn-resolve-fulfill').onclick = () => resolve('fulfill');
+    $('btn-resolve-refund').onclick = () => resolve('refund');
+
+    loadCatalog();
+  </script>
+</body>
+</html>
