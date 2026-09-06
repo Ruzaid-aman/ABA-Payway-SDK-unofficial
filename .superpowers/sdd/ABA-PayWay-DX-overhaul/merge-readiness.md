@@ -1,6 +1,6 @@
 # DX overhaul integration — 2026-09-06
 
-The user requested one combined branch, ready for a later merge to main. Do not merge or push main as part of this task. The requested dx-po was resolved to the existing dx-p0 (zero).
+The user requested one combined branch and later authorized its local merge to main. The combined branch was fast-forwarded into local main after verification; nothing was pushed. The requested dx-po was resolved to the existing dx-p0 (zero).
 
 ## Inputs and preserved work
 
@@ -37,10 +37,10 @@ All local merge gates passed on the combined working tree:
 - Ten example lifecycle tests also passed with its local node_modules temporarily absent, proving clean-checkout test resolution.
 - Git diff whitespace check, no unmerged index entries, and all input refs plus the unchanged local main baseline are ancestors of the combined branch.
 
-Detailed local coverage output remains in the gitignored .merge-verification-final.log. The branch is ready for the requested later merge to the current local main; remote CI remains a separate gate.
+Detailed local coverage output remains in the gitignored .merge-verification-final.log. The combined branch was fast-forwarded into local main at `46c895b`; remote CI remains a separate gate.
 
 ## Remaining scope and limits
 
-This integrates the supplied branch contents; it does not mark the whole DX roadmap complete. Tasks 8 (broader skill refresh) and 9 (remaining documentation/drift work) are still listed in the P1/P2 trackers. Added CI checks will run on the next pull request; GitHub CI, its secret scan and Node 20/Linux matrix have not been executed locally. Local checks use Node 22.14.0 on Windows. No live gateway transactions, publication, pushes or main merge were performed. TypeDoc succeeds with existing warning categories (unknown OpenAPI tags and unexported referenced types).
+This integrates the supplied branch contents; it does not mark the whole DX roadmap complete. Tasks 8 (broader skill refresh) and 9 (remaining documentation/drift work) are still listed in the P1/P2 trackers. Added CI checks will run on the next pull request; GitHub CI, its secret scan and Node 20/Linux matrix have not been executed locally. Local checks use Node 22.14.0 on Windows. No live gateway transactions, publication, or pushes were performed. TypeDoc succeeds with existing warning categories (unknown OpenAPI tags and unexported referenced types).
 
 An independent review identified the doctor advisory regression, now covered and fixed; that review ended early due to workspace credit exhaustion. Integration verification and follow-up source review were completed in the primary task.

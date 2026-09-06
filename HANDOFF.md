@@ -1,6 +1,6 @@
 # Agent Handoff — aba-payway-ts
 
-**DX integration update — 2026-09-06:** `codex/dx-overhaul` combines `codex/dx-p0` (`6331e48`), `codex/dx-p1` (`601dcb6`), and `codex/dx-p2` (`c20c616`) on local `main` (`67d9301`). Merge repairs preserve structured payment output, hosted-form controls, P1 onboarding, the P2 reference app, and main's journal/payment-link additions. The combined branch has NOT been merged back to `main`; `main` has not advanced. Source branches/worktrees and two named integration-backup stashes are retained. See [merge readiness](.superpowers/sdd/ABA-PayWay-DX-overhaul/merge-readiness.md) for verification and remaining roadmap scope.
+**DX integration update — 2026-09-06:** `codex/dx-p0` (`6331e48`), `codex/dx-p1` (`601dcb6`), and `codex/dx-p2` (`c20c616`) were combined as `codex/dx-overhaul` and fast-forwarded into local `main` at `46c895b`. Merge repairs preserve structured payment output, hosted-form controls, P1 onboarding, the P2 reference app, and the journal/payment-link additions. Nothing was pushed. Source P0/P1/P2 branches/worktrees and two named integration-backup stashes are retained. See [merge readiness](.superpowers/sdd/ABA-PayWay-DX-overhaul/merge-readiness.md) for verification and remaining roadmap scope.
 
 
 **Audience:** an agent resuming work in a fresh session. Read this plus `AGENTS.md` before acting.
