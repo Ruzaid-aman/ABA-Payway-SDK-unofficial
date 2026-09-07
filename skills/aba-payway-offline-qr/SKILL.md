@@ -2,7 +2,7 @@
 name: aba-payway-offline-qr
 description: Generate an offline EMVCo KHQR payload without calling ABA PayWay APIs.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
 ---
 
 # Offline KHQR
@@ -13,6 +13,21 @@ const payload = payway.khqr.generateOfflineQR({ amount: 10, currency: 'USD', mer
 ```
 
 Offline QR uses EMVCo TLV plus CRC-16 CCITT. It does not use online HMAC signing, and generating it never calls PayWay. **Generation itself does not enroll any callback** — downstream payment notifications depend on ABA's routing/enrollment for your Bakong account, which local QR creation neither configures nor proves.
+
+## Payload self-check (offline decode + CRC verification)
+
+Before printing or distributing a QR, decode and verify it locally — exported from the package barrel:
+
+```ts
+import { inspectKhqrPayload, validateKhqrCrc } from 'aba-payway-ts';
+
+if (!validateKhqrCrc(payload)) throw new Error('CRC mismatch — never distribute');
+const inspection = inspectKhqrPayload(payload);
+// { valid, crcValid, isStatic, currency, amount?, merchantName?, merchantCity?, merchantRef?, bakongId? }
+// undefined ⇒ structurally malformed; valid:false ⇒ checksum mismatch (structure still decoded).
+```
+
+`generate-qr --offline` runs this self-check automatically and prints the decoded summary (static/dynamic, amount, currency, merchant identity, Bakong ID, reference) plus a locally rendered PNG — the same `--save-image/--no-save-image/--open-image` contract as online mode, saved as `payway-output/<ref>.png`.
 
 ## Notifications and reconciliation (separate from generation)
 

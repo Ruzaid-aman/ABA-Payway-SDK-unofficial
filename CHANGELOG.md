@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Salvaged from preserved stashes (2026-09-07 "merge all to main" sweep)
+
+- **KHQR payload self-check (from the 2026-08-26 stash):** new exported
+  `inspectKhqrPayload()` / `validateKhqrCrc()` / `khqrCrc16()` — offline TLV
+  decode + CRC-16 verification returning a typed
+  `KhqrPayloadInspection` (static/dynamic, currency, amount, merchant
+  identity, Bakong ID, reference; `undefined` for malformed payloads).
+  `generate-qr --offline` now runs the self-check automatically, prints the
+  decoded summary, renders the QR in the terminal (interactive TTYs), and
+  saves a locally rendered PNG (`payway-output/<ref>.png`) under the same
+  `--save-image/--no-save-image/--open-image` contract as online mode —
+  offline QRs previously shipped the raw string only.
+- `examples/first-payment/package-lock.json` restored (vendored-tarball
+  install reproducibility; from the DX-overhaul stash).
+- `.gitleaks.toml` committed — the CI secret-scan workflow
+  (gitleaks/gitleaks-action) reads its reviewed allowlist from the repo root.
+- Superseded-stash remainder dropped deliberately: the old CLI merge-repair
+  stash was fully integrated earlier via the DX campaign; the old
+  payment-link/pre-auth payout-entry validation and skill-text hunks
+  conflicted with the F02–F13 audit fixes now on main (see
+  `validatePayoutEntryShape` / the audit remediation commit 9d36e26).
+
 ### Correctness (skills/SDK/CLI audit 2026-09-07, F01/F02)
 
 - **F01 — mutation single-submit policy**: side-effecting endpoints (QR/purchase

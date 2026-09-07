@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { KhqrMerchantConfiguration } from '../khqr-config.js';
-import { generateOfflineQR } from '../khqr-offline.js';
+import { generateOfflineQR, inspectKhqrPayload, khqrCrc16, validateKhqrCrc } from '../khqr-offline.js';
 
 const configuration: KhqrMerchantConfiguration = {
   bakongId: 'merchant@bakong',
@@ -212,5 +212,66 @@ describe('generateOfflineQR', () => {
       configuration,
     );
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Salvaged from the 2026-08-26 stash (merged 2026-09-07): payload self-check ──
+describe('inspectKhqrPayload / validateKhqrCrc / khqrCrc16 (offline self-check)', () => {
+  // Real Merchant-Portal customer QR (skills fixture): static, USD, no amount tag.
+  const SAMPLE_CUSTOMER_QR =
+    '00020101021130510016abaakhppxxx@abaa01153250602141550800208ABA Bank5204787653038405802KH5915Donation outlet6010BATTAMBANG624268380010PAYWAY@ABA0104693002071620916050119924001317871247638256803mmp63049955';
+
+  it('validates the CRC of a real portal QR', () => {
+    expect(validateKhqrCrc(SAMPLE_CUSTOMER_QR)).toBe(true);
+    expect(khqrCrc16(SAMPLE_CUSTOMER_QR.slice(0, -4))).toBe(SAMPLE_CUSTOMER_QR.slice(-4));
+  });
+
+  it('rejects a tampered checksum and malformed tails', () => {
+    expect(validateKhqrCrc(`${SAMPLE_CUSTOMER_QR.slice(0, -1)}0`)).toBe(false);
+    expect(validateKhqrCrc('6304')).toBe(false); // too short
+    expect(validateKhqrCrc('6304ZZZZ')).toBe(false); // non-hex
+  });
+
+  it('inspects a real static portal QR: static, USD, merchant identity, no amount', () => {
+    const inspection = inspectKhqrPayload(SAMPLE_CUSTOMER_QR);
+    expect(inspection).toBeDefined();
+    expect(inspection?.valid).toBe(true);
+    expect(inspection?.crcValid).toBe(true);
+    expect(inspection?.isStatic).toBe(true);
+    expect(inspection?.currency).toBe('USD');
+    expect(inspection?.amount).toBeUndefined(); // static QR — payer enters amount
+    expect(inspection?.merchantName).toBe('Donation outlet');
+    expect(inspection?.merchantCity).toBe('BATTAMBANG');
+    expect(inspection?.bakongId).toBe('abaakhppxxx@abaa');
+  });
+
+  it('inspects a locally generated dynamic QR and round-trips the amount', () => {
+    const payload = generateOfflineQR(
+      { amount: 12.5, currency: 'USD', merchantRef: 'ORDER', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 },
+      configuration,
+    );
+    const inspection = inspectKhqrPayload(payload);
+    expect(inspection).toBeDefined();
+    expect(inspection?.crcValid).toBe(true);
+    expect(inspection?.isStatic).toBe(false); // dynamic: carries tag 54 amount
+    expect(inspection?.amount).toBe('12.50');
+    expect(inspection?.currency).toBe('USD');
+    expect(inspection?.merchantRef).toBe('ORDER');
+    expect(inspection?.merchantName).toBe('Example Merchant');
+  });
+
+  it('reports a bad checksum as valid:false (structure still decodable)', () => {
+    const tampered = `${SAMPLE_CUSTOMER_QR.slice(0, -1)}0`;
+    const inspection = inspectKhqrPayload(tampered);
+    expect(inspection).toBeDefined();
+    expect(inspection?.valid).toBe(false);
+    expect(inspection?.crcValid).toBe(false);
+  });
+
+  it('returns undefined for structurally malformed payloads', () => {
+    expect(inspectKhqrPayload('junk')).toBeUndefined();
+    expect(inspectKhqrPayload('')).toBeUndefined();
+    // Point-of-initiation must be 11/12.
+    expect(inspectKhqrPayload(`${'00'}02` + '0112' + '6304ABCD')).toBeUndefined();
   });
 });

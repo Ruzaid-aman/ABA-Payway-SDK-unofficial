@@ -1,0 +1,46 @@
+title = "ABA PayWay SDK secret scanning"
+
+[extend]
+useDefault = true
+
+# Reviewed fixtures only: BOTH the exact path and exact extracted value must
+# match. Any other credential in these files remains detectable.
+[[allowlists]]
+description = "CLI mock gateway fixture"
+targetRules = ['generic-api-key']
+condition = "AND"
+paths = ['''(?:^|/)src/__tests__/cli\.test\.ts$''']
+regexTarget = "secret"
+regexes = ['''^test-api-key-123456789012$''']
+
+[[allowlists]]
+description = "Loopback timeout test fixture"
+targetRules = ['generic-api-key']
+condition = "AND"
+paths = ['''(?:^|/)src/__tests__/per-call-options\.test\.ts$''']
+regexTarget = "secret"
+regexes = ['''^e2e-api-key-0123456789abcdef0123$''']
+
+[[allowlists]]
+description = "Privacy redaction assertion canary"
+targetRules = ['generic-api-key']
+condition = "AND"
+paths = ['''(?:^|/)src/__tests__/agent-privacy-session\.test\.ts$''']
+regexTarget = "secret"
+regexes = ['''^AKIA-1234567890-canary$''']
+
+[[allowlists]]
+description = "Android local HMAC test fixture"
+targetRules = ['generic-api-key']
+condition = "AND"
+paths = ['''(?:^|/)sdk/android/sdk/src/test/java/com/ababank/payway/SignatureVerifierTest\.kt$''']
+regexTarget = "secret"
+regexes = ['''^test_api_key_12345$''']
+
+[[allowlists]]
+description = "Literal documentation substitution placeholder"
+targetRules = ['curl-auth-header']
+condition = "AND"
+paths = ['''(?:^|/)docs/cloudflare-free-webhook\.md$''']
+regexTarget = "secret"
+regexes = ['''^YOUR_ADMIN_TOKEN$''']

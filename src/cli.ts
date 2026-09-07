@@ -24,6 +24,7 @@ import { currentPalette, setColorOverride } from './cli/ui/theme.js';
 import type { AnsiPalette } from './cli/ui/theme.js';
 import { suggestMessage } from './cli/ui/suggest.js';
 import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
+import { inspectKhqrPayload } from './khqr-offline.js';
 import { registerAgentCommands } from './cli/commands/agent.js';
 import { registerJournalCommands } from './cli/commands/journal.js';
 import {
@@ -2392,10 +2393,78 @@ program
           `  ${c.bold('Amount:')}           ${c.cyan(amount === undefined ? `Static ${currency}` : `${amount} ${currency}`)}`,
         );
         console.log(`  ${c.bold('Reference:')}        ${ref}`);
+
+        // Self-check: decode the TLV and re-verify the CRC-16 checksum
+        // locally so configuration mistakes surface before the QR is used.
+        const inspection = inspectKhqrPayload(qrString);
+        if (!inspection) {
+          console.log(`  ${c.yellow('⚠')} Self-check: payload could not be decoded (unexpected)`);
+        } else if (!inspection.crcValid) {
+          console.log(`  ${c.red('✗')} Self-check failed: CRC-16 checksum mismatch`);
+        } else {
+          console.log(`  ${c.green('✓')} Self-check passed ${c.dim('(TLV decoded · CRC-16 CCITT valid)')}`);
+          console.log(`    ${c.bold('Type:')}             ${inspection.isStatic ? 'Static' : 'Dynamic'}`);
+          if (!inspection.isStatic && inspection.amount !== undefined) {
+            console.log(
+              `    ${c.bold('Amount:')}           ${c.cyan(`${inspection.amount} ${inspection.currency ?? ''}`.trimEnd())}`,
+            );
+          }
+          if (inspection.merchantName !== undefined || inspection.merchantCity !== undefined) {
+            console.log(
+              `    ${c.bold('Merchant:')}         ${[inspection.merchantName, inspection.merchantCity].filter(Boolean).join(' — ')}`,
+            );
+          }
+          if (inspection.bakongId !== undefined) {
+            console.log(`    ${c.bold('Bakong ID:')}        ${inspection.bakongId}`);
+          }
+          console.log(`    ${c.bold('Reference:')}        ${inspection.merchantRef ?? ref}`);
+        }
+
         console.log();
         console.log(`  ${c.bold('QR String:')}`);
         console.log(`  ${c.dim(qrString)}`);
         console.log();
+
+        // Render a scannable QR right in the terminal when interactive.
+        if (shouldAutoRenderQr(process.stdout, asBoolFlag(opts.showQr))) {
+          try {
+            const terminalQr = await renderQrToTerminal(qrString);
+            console.log(terminalQr);
+            console.log(`  ${c.dim('Scan the QR above with any KHQR-compatible banking app.')}\n`);
+          } catch {
+            // Terminal rendering is best-effort; the raw string is already printed.
+          }
+        }
+
+        // Offline QRs carry no API image — render the PNG locally so the
+        // same --save-image/--no-save-image contract works as online mode.
+        if (opts.saveImage !== false) {
+          try {
+            const resolvedOfflineSaveImage =
+              typeof opts.saveImage === 'string'
+                ? opts.saveImage
+                : path.join(process.cwd(), 'payway-output', `${ref.replace(/[^a-zA-Z0-9._-]+/g, '-')}.png`);
+            const offlinePngPath = await saveQrPng({ outputPath: resolvedOfflineSaveImage, qrString });
+            if (offlinePngPath) {
+              console.log(`  ${c.green('✓')} Image saved to ${c.cyan(offlinePngPath)}`);
+              const shouldOpenImage = opts.openImage === true || (opts.openImage === undefined && Boolean(process.stdout.isTTY));
+              if (shouldOpenImage) {
+                const opened = await openImageInDefaultViewer(offlinePngPath);
+                if (opened.opened) console.log(`  ${c.green('✓')} QR image opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
+                else console.log(`  ${c.yellow('⚠')} Could not open QR image automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`);
+              }
+              console.log();
+            }
+          } catch (renderError) {
+            console.log(
+              `  ${c.yellow('⚠')} Could not render/save the QR PNG ${c.dim(`(${renderError instanceof Error ? renderError.message : String(renderError)})`)}`,
+            );
+            console.log();
+          }
+        } else {
+          console.log(`  ${c.dim('Image auto-save disabled for this run.')}`);
+          console.log();
+        }
       } catch (e) {
         if (failStructuredQr(e)) return;
         console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);

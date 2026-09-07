@@ -134,7 +134,8 @@ export {
   validateKhqrCallbackSetup,
   validateKhqrConfiguration,
 } from './khqr-config.js';
-export type { GenerateOfflineQrParams } from './khqr-offline.js';
+export type { GenerateOfflineQrParams, KhqrPayloadInspection } from './khqr-offline.js';
+export { inspectKhqrPayload, khqrCrc16, validateKhqrCrc } from './khqr-offline.js';
 export type {
   HandleResponseOptions,
   HandleResponseResult,
