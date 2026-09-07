@@ -161,12 +161,16 @@ export class OrderStore {
 
   /**
    * Record a new payment attempt for an order. Each attempt gets a fresh,
-   * unique transaction ID (duplicate IDs across attempts are refused — the
-   * gateway treats tran_id as the idempotency surface, and sandbox evidence
-   * shows duplicates get overwritten, not rejected).
+   * unique transaction ID. Refuse duplicate IDs locally: the gateway does
+   * not provide an idempotency guarantee for repeated creation requests.
    */
   recordAttempt(orderId: string, transactionId: string, lifetimeSeconds: number): PaymentAttempt {
     const order = this.requireOrder(orderId);
+    if (order.status === 'awaiting_payment') {
+      const error = new Error('Check the existing transaction before creating another payment attempt') as Error & { statusCode: number };
+      error.statusCode = 409;
+      throw error;
+    }
     if (order.status === 'paid' || order.status === 'refunded') {
       throw new Error(`order ${orderId} is already ${order.status} — no new payment attempts`);
     }

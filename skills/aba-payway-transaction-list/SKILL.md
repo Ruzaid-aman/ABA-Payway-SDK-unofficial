@@ -1,7 +1,8 @@
 ---
 name: aba-payway-transaction-list
 description: List ABA PayWay transactions with date, amount, and status filters.
-version: 1.3.0
+metadata:
+  version: 1.3.0
 ---
 
 # Transaction List
@@ -24,7 +25,7 @@ This endpoint is capped at 50 requests per minute; cache dashboard results inste
   ("Maximum date rang is allowed only 3 days", sandbox-verified 2026-08-31). The
   CLI **pre-validates locally** and exits 1 with a hint before any network call.
 - **`pagination` above 1000 is rejected locally too** (CLI exit 1, no network).
-- **Gateway `transaction_date` is UTC+7 (Asia/Phnom_Cambodia), NOT UTC/local** —
+- **Gateway `transaction_date` is UTC+7 (Asia/Phnom_Penh), NOT UTC/local** —
   deriving `--from/--to` from the agent machine's clock silently returns **0 rows
   with no error** (a UTC window 7 hours behind misses everything; live-missed a
   paid transaction exactly this way in sandbox on 2026-09-05). Compute the

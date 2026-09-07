@@ -1,7 +1,8 @@
 ---
 name: aba-payway-transaction-close
-description: Close an ABA PayWay transaction after processing it.
-version: 1.4.0
+description: Close an unpaid ABA PayWay transaction so it stops accepting payment.
+metadata:
+  version: 1.5.0
 ---
 
 # Close Transaction
@@ -13,10 +14,10 @@ const result = await payway.checkout.closeTransaction('order-123');
 
 Only close a transaction after your order system has reconciled its PayWay status.
 
-## Sandbox Facts (verified 2026-08-25)
+## Sandbox Facts (dated observations — they conflict across campaigns)
 - Success returns `{"status":{"code":"00","message":"Success!"}}`.
 - **Closing is idempotent in sandbox** — re-closing an already-closed transaction returns code 00 again.
-- Nonexistent `tran_id` → HTTP 403, numeric code `5` "Transaction not found".
+- Nonexistent `tran_id`: **conflicting dated evidence** — 2026-08-25 (close-transaction § sandbox) recorded HTTP 403 / numeric code `5` "Transaction not found"; 2026-09-05 purchase-channel probes (W5-2) recorded **code 00** for never-created IDs, with HTTP 403 code `2` reserved for already-APPROVED transactions. Treat code 5/403 as one observed behavior, NOT a universal unknown-ID detector; do not branch on it.
 - The CLI prompts before voiding; pass `-y/--force` for scripts/agents:
   `payway-sdk close-transaction -t <id> -y`.
 
@@ -27,7 +28,7 @@ Official contract (developer.payway.com.kh/close-transaction): *"Once a transact
 
 **Customer-side enforcement is channel-dependent** (dossier §2a/§2b/§9):
 - **QR/KHQR channel — ENFORCED (3 live observations: 2026-08-25, 2026-09-05 ×2):** QRs closed while PENDING were then scanned in the ABA app — refused with **"transaction expired"**, even minutes before natural lifetime expiry, while the API kept saying PENDING.
-- **Hosted card/checkout channel — NOT enforced (2026-08-25):** two closed-unpaid transactions were paid on the still-open hosted page → APPROVED (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206). Hypothesis: the page carries a checkout session issued before the close that the gateway accepts without re-validation.
+- **Hosted card/checkout channel — not enforced in the 2026-08-25 sandbox observation:** two closed-unpaid transactions were paid on an already-open hosted page and became APPROVED. Treat this as an observed limitation; the provider has not confirmed the cause.
 
 **Always follow a successful close with `checkTransaction`** and interpret via:
 
@@ -35,7 +36,8 @@ Official contract (developer.payway.com.kh/close-transaction): *"Once a transact
 |---|---|---|
 | code 00 | `PENDING` | closed-unpaid OR still open — indistinguishable remotely; keep a local `closed` flag. QR channel: customers can no longer pay it; checkout channel: payment could still land (Aug evidence) |
 | code 00 | `APPROVED` | payment landed AFTER close (checkout path, 2026-08-25 evidence) — go to refund path |
-| code `5` / 403 | — | unknown tran_id |
+| code `2` / 403 | `APPROVED`/`REFUNDED` | transaction already paid — close cannot cancel it (W5-2, 2026-09-05) |
+| code `5` / 403 | — | unknown tran_id (2026-08-25 observation only — see dated conflict above) |
 
 Production enforcement of rejection/reversing remains an open question for ABA (#13) — never assume close prevents payment on the checkout path.
 

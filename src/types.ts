@@ -1551,7 +1551,7 @@ export interface operations {
                  * @example {
                  *       "request_time": "20200728093403",
                  *       "merchant_id": "ec000002",
-                 *       "merchant_auth": "[REMOVED-HISTORICAL-c2a924c7bffe]",
+                 *       "merchant_auth": "REPLACE_ME",
                  *       "hash": "3nd/2Z4g45...wnA2WA/M/Qg=="
                  *     }
                  */

@@ -1,7 +1,8 @@
 ---
 name: aba-payway-pre-auth
 description: Complete, complete with payout, or cancel an ABA PayWay pre-authorization.
-version: 1.2.0
+metadata:
+  version: 1.2.0
 ---
 
 # ABA PayWay Pre-Authorization
@@ -28,8 +29,10 @@ payout:
 - **Sandbox only:** `acc` must be one of the seeded sandbox beneficiaries and the payout is always **USD** — a non-whitelisted or currency-mismatched account throws `PayWayConfigError` before the request (see `aba-payway-sandbox-beneficiaries`).
 
 ```ts
-// ✗ sandbox throws: 500000001 is a USD account, but this entry is treated as USD payout —
-// fine here; a KHR beneficiary/MID or an unknown account is rejected.
+// Sandbox payout rules (applies to the entry { acc: '500000001', amt: 200.0 }):
+// 500000001 IS a seeded USD account, so this entry passes sandbox validation.
+// A KHR beneficiary/MID or an unknown account throws PayWayConfigError locally
+// BEFORE any request (see aba-payway-sandbox-beneficiaries).
 ```
 
 ## Error Handling

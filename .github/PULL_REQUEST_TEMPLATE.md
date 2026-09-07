@@ -1,26 +1,19 @@
-# Pull Request
+# Change
 
-## Summary
+Describe the problem, resulting behavior, and relevant issue.
 
-Describe what this PR changes and why.
+## Validation
 
-## Testing
-
+- [ ] `npm ci` and `npm run build` before CLI tests
+- [ ] `npm run typecheck` and `npm run lint`
 - [ ] `npm test`
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
+- [ ] Relevant docs and regression coverage updated
+- [ ] Distribution checks from CONTRIBUTING.md, if applicable
 
-## Sandbox Verification
+## Gateway behavior (if applicable)
 
-Describe the sandbox command used and the result:
+Describe mocked contract coverage and any maintainer sandbox verification. If no live check was needed or available, say why. Never include credentials, tokens, signed artifacts, customer data, or raw captures.
 
-```bash
-PAYWAY_MERCHANT_ID=$PAYWAY_MERCHANT_ID \
-PAYWAY_API_KEY=$PAYWAY_API_KEY \
-PAYWAY_RSA_PUBLIC_KEY="$PAYWAY_RSA_PUBLIC_KEY" \
-npm run probe
-```
+## Release impact
 
-## Notes
-
-Include any additional notes, limitations, or follow-up items.
+Note breaking changes, runtime changes, migrations, and remaining verification limits.

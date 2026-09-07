@@ -9,6 +9,14 @@ export const FIRST_PAYMENT_COMMANDS: readonly FirstPaymentCommandExample[] = [
     command: 'payway-sdk demo',
   },
   {
+    label: 'Generate the server starter',
+    command: 'payway-sdk init --mode sandbox --template first-payment',
+  },
+  {
+    label: 'Check online QR readiness (or use --route hosted-checkout)',
+    command: 'payway-sdk doctor --route online-qr',
+  },
+  {
     label: 'Create an online QR',
     command:
       'payway-sdk generate-qr -a 3.00 -c USD --callback-url <https-url> -y --no-polling --output json',

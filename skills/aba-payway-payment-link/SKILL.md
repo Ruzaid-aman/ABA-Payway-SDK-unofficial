@@ -1,12 +1,22 @@
 ---
 name: aba-payway-payment-link
 description: Create and inspect hosted ABA PayWay payment links.
-version: 1.4.0
+metadata:
+  version: 1.4.0
 ---
 
 # ABA PayWay Payment Link
 
 ## Quick Start
+
+For onboarding, start with [first payment](../aba-payway-first-payment/SKILL.md).
+Use the shared lifecycle: `created`, `pending`, `approved`, `failed`, `unknown`.
+Creation is not approval. Verify order ID, amount, and currency before fulfilling once.
+A timeout means unknown; query the existing attempt before replacing it.
+Expiry and closure remain local policy, even when the gateway reads PENDING.
+See [webhook production](../aba-payway-webhook-production/SKILL.md) for callback trust and recovery.
+Run the installed CLI as `npm exec -- payway-sdk`.
+
 ```ts
 const link = await payway.paymentLink.create({ title: 'Invoice 123', amount: 10, merchantRefNo: 'invoice-123', returnUrl: 'https://merchant.example/paid', currency: 'USD' });
 ```
@@ -22,15 +32,15 @@ Payment Link APIs require `publicKeyPem` for RSA-encrypted merchant authorizatio
 const link = await payway.paymentLink.create({
   title: 'Invoice 123', amount: 150, merchantRefNo: 'invoice-123',
   returnUrl: 'https://merchant.example/paid', currency: 'USD',
-  payout: [{ acc: '000111222', amt: 100 }, { acc: '000999888', amt: 50 }],
+  payout: [{ acc: '500000001', amt: 100 }, { acc: '500000002', amt: 50 }], // seeded sandbox accounts
 });
 ```
 
 ```sh
 # CLI (JSON-or-string flag):
-npx tsx src/cli.ts payment-link create -t "Invoice 123" -a 150 -r invoice-123 \
+payway-sdk payment-link create -t "Invoice 123" -a 150 -r invoice-123 \
   --return-url https://merchant.example/paid \
-  --payout '[{"acc":"000111222","amt":100},{"acc":"000999888","amt":50}]'
+  --payout '[{"acc":"500000001","amt":100},{"acc":"500000002","amt":50}]'
 ```
 
 ## Image (optional)
@@ -60,7 +70,7 @@ Codes: `PTL02` wrong hash, `PTL04` param validation (currency/return_url missing
 `payment-link detail` takes the link id via **`-i` only** (a positional id is rejected):
 
 ```sh
-npx tsx src/cli.ts payment-link detail -i <link-id>   # the opaque base64 Link ID from create — NOT the merchant ref
+payway-sdk payment-link detail -i <link-id>   # the opaque base64 Link ID from create — NOT the merchant ref
 ```
 
 Under `--json`, both commands print the machine-parseable error envelope `{ "error": { kind, exitCode, type, message, paywayCode, … } }` on ANY failure (local validation included) — branch on the envelope, not on stdout text. On a TTY, `create` renders a terminal QR of the share URL; `--no-show-qr` suppresses.
@@ -69,7 +79,12 @@ Under `--json`, both commands print the machine-parseable error envelope `{ "err
 `payway-sdk ask "create a $49.50 payment link for invoice INV-041 …"` uses the `create_payment_link` tool (title/amount/currency/merchantRefNo/returnUrl/description/paymentLimit/expiredDate/payout — requires RSA readiness); `get_payment_link_details` (read-only) inspects a link by Link ID.
 
 ## Full guide
-[docs/17-payment-link.md](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/17-payment-link.md) — parameter tables, datatype reality notes, permutations/recipes, pushback receiver, troubleshooting.
+
+The complete parameter tables, datatype reality notes, permutations/recipes,
+pushback receiver, and troubleshooting live in the SDK repository's
+`docs/17-payment-link.md` (development checkout). The URL form is only valid
+after that document is published with a real release tag — until then rely on
+this skill plus `payway-sdk payment-link create --help`.
 
 ## Related Skills
 - [Configuration](../aba-payway-sdk-configuration/SKILL.md)

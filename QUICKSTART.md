@@ -1,6 +1,12 @@
 # ABA PayWay SDK quickstart
 
-Use Node.js 20 or later. Complete these steps on a server or development machine; never place PayWay credentials in browser or mobile code.
+Use Node.js 22.12 or later. Complete these steps on a server or development machine; never place PayWay credentials in browser or mobile code.
+
+## Payment lifecycle
+
+**Create -> show the artifact -> verify -> fulfill once.**
+
+`created` means an artifact is ready; `pending` means payment is unconfirmed; `approved` means verified approval; `failed` means a confirmed rejection or cancellation; `unknown` means look up the existing transaction before retrying creation. Expiry and closure are local policy: gateway reads may remain PENDING. PRE-AUTH and REFUNDED need their advanced domain flows.
 
 ## 1. Install
 
@@ -54,7 +60,11 @@ $env:PAYWAY_CALLBACK_URL = 'https://your-public-host.example/payway/callback'
 
 Profiles are also supported. The CLI resolves `--profile`, then `PAYWAY_PROFILE`, then the saved default, then project and ambient environment values. It reports the selected source and endpoint without printing secrets.
 
-## 4. Check the intended route
+## 4. Choose one route
+
+Online QR is the default below. For a hosted payment page, use `doctor --route hosted-checkout` and the signed form command in step 6. For a shareable link, follow the [payment-link guide](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/17-payment-link.md); it additionally needs an RSA key.
+
+Check the intended route:
 
 ```bash
 npm exec -- payway-sdk doctor --route online-qr
@@ -83,8 +93,7 @@ npm exec -- payway-sdk generate-qr -a 3.00 -c USD -t order-001 `
 The JSON envelope includes the transaction ID, creation outcome, saved QR path,
 safe next action, `correlationId`, and any gateway `traceId`. If the request
 times out, the outcome is unknown: query `order-001` before creating another
-payment. Add `--journal` when you want a local audit trail for later
-`journal timeline`, `journal reconcile`, or `journal explain` queries.
+payment.
 
 ```bash
 npm exec -- payway-sdk check-transaction -t order-001
@@ -93,7 +102,44 @@ npm exec -- payway-sdk transaction-detail -t order-001 --wait 10
 
 ## 6. Integrate the server
 
-Run the generated starter:
+Follow the [runnable first-payment walkthrough](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/FIRST-PAYMENT-WALKTHROUGH.md) to see an artifact, verification, duplicate delivery, and recovery in the reference app.
+
+Use the existing `sdk.initiate` facade for a purchase QR or deeplink. All of this code runs on your server:
+
+```ts
+import { sdk, PayWay, paymentArtifact, paymentLifecycle } from 'aba-payway-ts';
+
+const config = {
+  merchantId: process.env.PAYWAY_MERCHANT_ID!,
+  apiKey: process.env.PAYWAY_API_KEY!,
+  environment: 'sandbox' as const,
+};
+const order = { transactionId: 'order-003', amount: 3, currency: 'USD' as const };
+// Persist this order and reserve its payment attempt before initiating.
+const session = await sdk.initiate({
+  ...order,
+  paymentOption: 'abapay_khqr',
+  returnUrl: process.env.PAYWAY_CALLBACK_URL!,
+}, config);
+const artifact = paymentArtifact(session); // Return only this to the authorized customer.
+
+// Later, in a server-side status or callback handler:
+const payway = new PayWay(config);
+const result = await payway.checkout.checkTransaction(order.transactionId);
+const state = paymentLifecycle(result.data?.payment_status);
+if (state === 'approved') {
+  // Match verified transaction detail to the stored ID, amount, and currency.
+  // Atomically mark paid and enqueue fulfillment once in your database.
+}
+```
+
+This is the SDK call sequence, not a database implementation. The [reference app](https://github.com/antigravity-google/aba-payway-ts/tree/main/examples/first-payment) supplies a complete verification and fulfillment example. Keep the full session and raw gateway response server-side. `paymentArtifact` selects render fields; it does not verify payment or sanitize arbitrary HTML.
+
+The facade defaults to no automatic create retry. Reserve each attempt in durable storage; PayWay transaction IDs alone do not provide idempotency. After an ambiguous response, query the saved ID before creating a replacement. Signed online callbacks use `payway.verifyCallback` with the route's signing contract; payment-link pushbacks are unsigned and require lookup. Never fulfill from a browser redirect.
+
+
+
+Alternatively, run the generated starter:
 
 ```bash
 node payway-first-payment.mjs
@@ -107,4 +153,4 @@ For hosted checkout, generate a signed form locally and let the browser submit d
 npm exec -- payway-sdk checkout-form -a 5.00 -t order-002 --payment-gate 0 --auto-submit --out checkout.html
 ```
 
-Exit codes are `0` for completed command work, `1` for input/configuration, `2` for a PayWay API rejection, and `3` for network, rate-limit, or timeout failures. See the [one-page guide](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/QUICK-START-1-PAGER.md) for lifecycle rules, [Transaction Journal](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/18-transaction-journal.md) for audit/reconciliation commands, and the [documentation index](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/README.md) for deeper guides.
+Exit codes are `0` for completed command work, `1` for input/configuration, `2` for a PayWay API rejection, and `3` for network, rate-limit, or timeout failures. Saved CLI profiles contain plaintext credentials; use a server secret manager and explicit SDK configuration for deployment. See the [one-page guide](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/QUICK-START-1-PAGER.md) for lifecycle rules, [Transaction Journal](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/18-transaction-journal.md) for audit/reconciliation commands, and the [documentation index](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/README.md) for deeper guides.

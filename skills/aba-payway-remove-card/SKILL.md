@@ -1,7 +1,8 @@
 ---
 name: aba-payway-remove-card
 description: Remove a stored ABA PayWay card token.
-version: 1.2.0
+metadata:
+  version: 1.2.0
 ---
 
 # Remove Card
@@ -23,7 +24,7 @@ await payway.credentialsOnFile.removeToken({
 ```
 
 PayWay uses the same `removeToken` API for linked account and card credentials.
-CLI: `npx tsx src/cli.ts cof token remove --ctid credential01 --token <pwt>`
+CLI: `payway-sdk cof token remove --ctid credential01 --token <pwt>`
 
 ## Error Handling
 ```ts

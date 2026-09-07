@@ -11,6 +11,7 @@ import { collectQrParams } from './cli/flows/qr-flow.js';
 import { loadDotEnvIntoProcess } from './cli/dotenv.js';
 import { explainAll, explainPayWayCode } from './cli/explain-code.js';
 import { renderFirstPaymentQuickstart } from './cli/first-payment.js';
+import { paymentLifecycle, paymentNextStep } from './payment-lifecycle.js';
 import { renderBanner } from './cli/ui/banner.js';
 import { renderGroupedHelp, unknownCommandSuggestion, unknownOptionSuggestion } from './cli/ui/help.js';
 import { formatClock, mapPollOutcomeToExitCode } from './cli/journey.js';
@@ -74,7 +75,7 @@ import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConf
 import { openImageInDefaultViewer } from './open-image.js';
 import { sdk } from './sdk.js';
 import { formatTestReport } from './test/index.js';
-import { gatewayDayWindow, payoutEntriesTotal, validatePayoutEntryShape, validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
+import { computeRefundableBalance, gatewayDayWindow, payoutEntriesTotal, validatePayoutEntryShape, validatePositiveAmount, validateRefundAmount, validateTransactionId } from './utils.js';
 import {
   CLI_OUTPUT_SCHEMA_VERSION,
   type PaymentCommandName,
@@ -237,14 +238,17 @@ function apiErrorHint(e: PayWayAPIError): string | undefined {
 }
 
 function printApiError(e: unknown): number {
+  const next = classifyError(e) === EXIT_NETWORK ? paymentNextStep('unknown') : 'Correct the reported input or gateway rejection; run payway-sdk doctor for configuration help.';
   if (e instanceof PayWayAPIError) {
     console.log(`  ${c.red('✗')} ${e.message}`);
     if (e.paywayCode) console.log(`  ${c.dim(`PayWay code: ${e.paywayCode}`)}`);
     const hint = apiErrorHint(e);
     if (hint) console.log(`  ${c.dim(`Hint: ${hint}`)}`);
+    console.log(`  Next: ${next}`);
     return classifyError(e);
   }
   console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
+  console.log(`  Next: ${next}`);
   return classifyError(e);
 }
 
@@ -641,9 +645,9 @@ async function runPolling(
           emit('');
           if (result.paymentStatus === 'APPROVED') {
             emit(c.dim(`Next: payway-sdk transaction-detail -t ${transactionId}`));
-            emit(c.dim(`      or refund it:     payway-sdk refund -t ${transactionId} -a <amount>`));
+            emit(c.dim(paymentNextStep('approved')));
           } else {
-            emit(c.dim(`Next: create a new transaction with generate-qr or generate-checkout.`));
+            emit(c.dim(`Next: ${paymentNextStep(paymentLifecycle(result.paymentStatus))}`));
           }
           emit('');
         } else {
@@ -654,9 +658,9 @@ async function runPolling(
           emit('');
           if (result.paymentStatus === 'APPROVED') {
             emit(c.dim(`Next: payway-sdk transaction-detail -t ${transactionId}`));
-            emit(c.dim(`      or refund it:     payway-sdk refund -t ${transactionId} -a <amount>`));
+            emit(c.dim(paymentNextStep('approved')));
           } else {
-            emit(c.dim(`Next: create a new transaction with generate-qr or generate-checkout.`));
+            emit(c.dim(`Next: ${paymentNextStep(paymentLifecycle(result.paymentStatus))}`));
           }
           emit('');
         }
@@ -703,6 +707,7 @@ async function runPolling(
         if (error.lastStatus) emit(c.dim(`Last status: ${error.lastStatus}`));
         emit('');
       }
+      if (!asJson) emit(`Next: payway-sdk check-transaction -t ${transactionId}. ${paymentNextStep('unknown')}`);
       return { terminalReached: false, abortedReason: error.reason, attempts, elapsedMs: Date.now() - startTime, lastStatus: error.lastStatus };
     }
     throw error;
@@ -928,10 +933,17 @@ function activateSelectedProfile(command: Command): void {
   const profile = getProfileByName(loadProfileStore(), selectedName);
   if (!profile) throw new Error(`Credential profile "${selectedName}" does not exist`);
   activateProfile(profile);
-  const output = command.opts<{ output?: string }>().output;
   const notice = `  ${c.dim(`Using profile: ${profile.name} (${profile.environment})`)}`;
-  if (output === 'json' || output === 'ndjson') console.error(notice);
-  else console.log(notice);
+  // F11 diagnostics rule: the profile notice is a diagnostic, never data. It
+  // goes to stderr whenever ANY machine output is active — the per-command
+  // --json flag as well as the global --output json|ndjson — so stdout stays
+  // a single clean JSON document (or one record per NDJSON line).
+  const actionOpts = command.opts<{ json?: boolean; output?: string }>();
+  if (actionOpts.json === true || actionOpts.output === 'json' || actionOpts.output === 'ndjson') {
+    console.error(notice);
+  } else {
+    console.log(notice);
+  }
 }
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
@@ -1354,6 +1366,7 @@ program
       const icon =
         status === 'APPROVED' ? c.green('✓') : status === 'PENDING' ? c.yellow('⚠') : c.red('✗');
       console.log(`  ${icon} ${c.bold(opts.transactionId)} → ${c.bold(status)}`);
+      console.log(`  Next: ${paymentNextStep(paymentLifecycle(status))}`);
       if (data?.payment_status_code !== undefined) {
         console.log(`  ${c.dim(`status code: ${String(data.payment_status_code)} (${PAYMENT_STATUS_LABELS[Number(data.payment_status_code)] ?? '?'})`)}`);
       }
@@ -1841,7 +1854,7 @@ program
   .requiredOption('-t, --transaction-id <id>', 'Original transaction ID')
   .requiredOption('-a, --amount <number>', 'Refund amount (≥ 0.01 USD / ≥ 1 KHR)')
   .option('-c, --currency <code>', 'Currency of the original transaction: USD (default) or KHR', 'USD')
-  .option('-y, --force', 'Skip pre-flight check and confirmation prompt')
+  .option('-y, --force', 'Skip the confirmation prompt (balance pre-flight still runs; use --no-preflight to skip validation)')
   .option('--no-preflight', 'Skip the balance pre-flight check (detail API is rate-limited to 10/min)')
   .option('--json', 'Print the raw JSON response')
   .action(
@@ -1874,34 +1887,40 @@ program
         return;
       }
 
-      // ── Pre-flight: verify refundable balance via transaction-detail ──
-      if (opts.preflight !== false && !opts.force) {
+      // ── Pre-flight: currency-aware refundable-balance check via transaction-detail ──
+      // -y/--force skips the CONFIRMATION PROMPT only; balance validation runs
+      // unless --no-preflight is passed explicitly (audit F02 separation).
+      if (opts.preflight !== false) {
         try {
           const payway = new PayWay();
           console.log(`  ${c.dim('Pre-flight: fetching original transaction (10/min rate limit)...')}`);
           const detail = await payway.checkout.getTransactionDetail(opts.transactionId);
           const data = ((detail as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
-          const status = String(data.payment_status ?? '').toUpperCase();
-          const paid = Number(data.payment_amount ?? Number.NaN);
-          const refunded = Number(data.refund_amount ?? 0);
-          if (Number.isFinite(paid)) {
-            const remaining = paid - refunded;
-            if (remaining <= 0) {
-              console.log(`  ${c.red('✗')} Nothing left to refund: paid=${paid}, already refunded=${refunded}`);
+          const balance = computeRefundableBalance(data as Parameters<typeof computeRefundableBalance>[0], currency);
+          if (balance.reason) console.log(`  ${c.dim(balance.reason)}`);
+          if (balance.status === 'ok' && balance.remaining !== undefined) {
+            if (balance.remaining <= 0) {
+              console.log(`  ${c.red('✗')} Nothing left to refund (already refunded ${balance.alreadyRefunded}).`);
+              console.log(`  ${c.dim('Use --no-preflight to submit anyway (PayWay will reject with PTL37/PTL58).')}`);
               process.exitCode = EXIT_VALIDATION;
               return;
             }
-            if (amount > remaining + 1e-9) {
+            if (amount > balance.remaining + 1e-9) {
               console.log(
-                `  ${c.red('✗')} Refund ${amount} exceeds remaining refundable balance ${remaining} (paid=${paid}, refunded=${refunded})`,
+                `  ${c.red('✗')} Refund ${amount} ${currency} exceeds remaining refundable balance ${balance.remaining} ${currency} ` +
+                  `(order ${balance.orderAmount} ${balance.orderCurrency ?? ''}, already refunded ${balance.alreadyRefunded ?? 0}).`,
               );
-              console.log(`  ${c.dim('Use --force to submit anyway (PayWay will reject with PTL37/PTL58).')}`);
+              console.log(`  ${c.dim('Use --no-preflight to submit anyway (PayWay will reject with PTL37/PTL58).')}`);
               process.exitCode = EXIT_VALIDATION;
               return;
             }
-            console.log(`  ${c.green('✓')} Pre-flight OK: remaining refundable = ${remaining}`);
-          } else if (status !== 'APPROVED') {
-            console.log(`  ${c.yellow('⚠')} Original transaction status is "${status || 'UNKNOWN'}" — refunds usually require APPROVED.`);
+            console.log(`  ${c.green('✓')} Pre-flight OK: remaining refundable = ${balance.remaining} ${currency}`);
+          } else if (balance.status === 'ambiguous') {
+            console.log(`  ${c.yellow('⚠')} Pre-flight could not reconcile the balance unambiguously: ${balance.reason ?? 'unknown reason'}`);
+            console.log(`  ${c.dim('Continuing without balance validation. Use --no-preflight to silence this check.')}`);
+          } else {
+            console.log(`  ${c.yellow('⚠')} Pre-flight unavailable: ${balance.reason ?? 'detail data missing'}`);
+            console.log(`  ${c.dim('Continuing without balance validation. Use --no-preflight to silence this check.')}`);
           }
         } catch (e) {
           console.log(`  ${c.yellow('⚠')} Pre-flight lookup failed: ${(e as Error).message}`);
@@ -3943,32 +3962,49 @@ const skillsCmd = program.command('skills').description('Manage AI skill guides 
 
 skillsCmd
   .command('add')
-  .description('Install skills for one or more agents')
+  .description('Install skills for one or more agents (target-aware paths; preserves user-modified files)')
   .argument('<agents...>', 'Agent names: claude, codex, opencode, cursor, copilot')
-  .action(async (agents: string[]) => {
-    await addSkills(agents, getSkillsDir());
+  .option('--only <skills>', 'Install only these packaged skills (comma-separated), not the full catalog')
+  .option('--force-skills', 'Overwrite user-modified managed files (default: keep and report)')
+  .option('--dest <path>', 'Explicit destination directory (overrides the agent default)')
+  .action(async (agents: string[], opts: { only?: string; forceSkills?: boolean; dest?: string }) => {
+    await addSkills(agents, getSkillsDir(), {
+      only: opts.only ? opts.only.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+      force: opts.forceSkills === true,
+      dest: opts.dest,
+    });
   });
 
 skillsCmd
   .command('remove')
-  .description('Remove skills from one or more agents')
+  .description('Remove manifest-owned skills from agents (unmanaged aba-payway-* dirs are preserved)')
   .argument('<agents...>', 'Agent names: claude, codex, opencode, cursor, copilot')
-  .action(async (agents: string[]) => {
-    await removeSkills(agents);
+  .option('--dest <path>', 'Explicit destination directory (e.g. a legacy ~/.opencode/skills install)')
+  .action(async (agents: string[], opts: { dest?: string }) => {
+    await removeSkills(agents, { dest: opts.dest });
   });
 
 skillsCmd
   .command('list')
   .description('Show installed skills per agent')
-  .action(async () => {
-    await listSkills();
+  .option('--dest <path>', 'Explicit directory to list (overrides the agent defaults)')
+  .action(async (opts: { dest?: string }) => {
+    await listSkills({ dest: opts.dest });
   });
 
 skillsCmd
   .command('doctor')
-  .description('Verify installation health for all agents')
-  .action(async () => {
-    await doctorSkills(getSkillsDir());
+  .description('Verify installation health (presence, scripts, stale/modified files, schema)')
+  .option('--agent <name>', 'Check only this agent instead of all five')
+  .option('--dest <path>', 'Explicit directory to check (overrides the agent defaults)')
+  .action(async (opts: { agent?: string; dest?: string }) => {
+    if (opts.agent && !(opts.agent in { claude: 1, codex: 1, opencode: 1, cursor: 1, copilot: 1 })) {
+      console.log(`  ${c.red('✗')} Unknown agent: ${opts.agent} (valid: claude, codex, opencode, cursor, copilot)`);
+      process.exitCode = 1;
+      return;
+    }
+    const healthy = await doctorSkills(getSkillsDir(), { agent: opts.agent, dest: opts.dest });
+    if (!healthy) process.exitCode = 1;
   });
 
 // --- setup-webhook ---
@@ -4195,6 +4231,21 @@ program
   .addCommand(preAuthCancel);
 
 // --- parse ---
+const firstPaymentHelp: Record<string, string> = {
+  demo: 'Next: init --mode sandbox --template first-payment. Demo approval is simulated.',
+  init: 'First payment: use --mode sandbox --template first-payment, then doctor --route online-qr.',
+  doctor: 'Choose --route online-qr or --route hosted-checkout. Once ready, create one payment and retain its ID.',
+  'generate-qr': 'First payment: use -y --no-polling for one creation; then check-transaction -t <id>. A QR is not payment confirmation.',
+  'generate-checkout': 'For a hosted browser page, use checkout-form --payment-gate 0. After payment, check-transaction -t <id>.',
+  'checkout-form': 'Submit the signed form from a browser. Verify the transaction on your server before fulfillment.',
+  'payment-link': 'Create a shareable link, then verify each payment via check-transaction. Pushbacks are unsigned.',
+  'setup-webhook': 'Use a tunnel for development. Production needs a durable verified receiver and fulfillment once.',
+};
+for (const command of program.commands) {
+  const guidance = firstPaymentHelp[command.name()];
+  if (guidance) command.addHelpText('after', `\nFirst-payment path:\n  ${guidance}\n`);
+}
+
 /**
  * Run the CLI in-process against an explicit argv (defaults to process.argv).
  * Exported so tests (and embedders) can drive commands without spawning a

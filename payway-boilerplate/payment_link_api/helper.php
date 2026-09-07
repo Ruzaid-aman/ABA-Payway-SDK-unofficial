@@ -1,7 +1,8 @@
 <?php
 
 $merchant_id = 'nearyskin';
-$api_key = '[REMOVED-HISTORICAL-7d7243aa2f22]';
+$api_key = getenv('PAYWAY_API_KEY') ?: '';
+if ($api_key === '') { throw new RuntimeException('Set PAYWAY_API_KEY before using this example'); }
 
 function abaAesEncrypt(
     $plainText,

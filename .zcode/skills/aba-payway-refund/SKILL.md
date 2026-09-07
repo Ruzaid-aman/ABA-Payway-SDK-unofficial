@@ -1,7 +1,8 @@
 ---
 name: aba-payway-refund
 description: Issue an ABA PayWay refund for a completed transaction.
-version: 1.3.0
+metadata:
+  version: 1.4.0
 ---
 
 # ABA PayWay Refund
@@ -23,7 +24,7 @@ payway-sdk transaction-detail -t <tran_id>
 After the follow-up `transaction-detail`, read:
 - `refund_amount` for the total refunded so far
 - `transaction_operations` for the refund event history
-- `payment_status` as a coarse lifecycle flag only; PayWay shows `REFUNDED` even after a partial refund (live-confirmed 2026-09-05, SANDBOX-FINDINGS §18: $0.50 paid → $0.10 refund → status REFUNDED, `refund_amount 0.1`), so do not use that field alone to infer a full refund
+- `payment_status` as a coarse lifecycle flag only; PayWay shows `REFUNDED` even after a partial refund (sandbox-verified 2026-09-05: $0.50 paid → $0.10 refund → status REFUNDED, `refund_amount 0.1`), so do not use that field alone to infer a full refund
 
 ## Error Handling
 ```ts
@@ -36,17 +37,35 @@ Known sandbox-verified codes: `PTL04` (amount < 0.01 USD / < 1 KHR), `PTL36`
 (target transaction not found or invalid), `PTL37` (refund exceeds original),
 `PTL58` (refund failed), `PTL181` (insufficient balance).
 
-## Pre-flight Balance Check
-Fetch the original transaction first (rate-limited to 10/min) and compare:
+## Pre-flight Balance Check (currency-aware)
+Refunds are requested against the ORIGINAL (merchant) money of the order.
+`payment_amount` describes the PAYER's actual debit and can be in a DIFFERENT
+currency (sandbox W5-6: 4000 KHR ordered → paid 1 USD; 1.20 USD ordered → paid
+4800 KHR) — never mix the two. Use the exported helper:
+
 ```ts
+import { computeRefundableBalance } from 'aba-payway-ts';
+
 const detail = await payway.checkout.getTransactionDetail('order-123');
 const d = (detail as any).data;
-const remaining = Number(d.payment_amount) - Number(d.refund_amount ?? 0);
-if (remaining <= 0) throw new Error('Nothing left to refund');
+const balance = computeRefundableBalance(d, 'USD');   // the refund request currency
+if (balance.status !== 'ok' || balance.remaining === undefined) {
+  // status 'unavailable'/'ambiguous' + reason → stop and decide, don't guess
+  throw new Error(balance.reason ?? 'refund balance unavailable');
+}
+if (refundAmount > balance.remaining) throw new Error('Refund exceeds remaining balance');
 ```
-The CLI equivalent is `payway-sdk refund -t <id> -a <amount>` (runs this
-check automatically; `--no-preflight` skips only the detail lookup, while
-`-y/--force` skips both the pre-flight lookup and the confirmation prompt).
+
+The helper reconciles `original_amount − refund_amount` in ONE currency,
+returns `ambiguous` when the payer's debit currency differs from the order's
+(no authoritative conversion contract exists — converting would be a guess),
+and `unavailable` with a reason when fields are missing or the status is not
+refundable (APPROVED/REFUNDED/PRE-AUTH).
+
+The CLI equivalent is `payway-sdk refund -t <id> -a <amount>` — it runs this
+check automatically. `-y/--force` skips ONLY the confirmation prompt (balance
+validation still runs); `--no-preflight` skips the balance validation
+explicitly (the detail lookup is rate-limited to 10/min).
 
 ## Related Skills
 - [Transaction Detail](../aba-payway-transaction-detail/SKILL.md)

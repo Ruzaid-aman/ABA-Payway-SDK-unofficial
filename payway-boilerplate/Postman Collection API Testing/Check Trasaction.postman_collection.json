@@ -29,7 +29,7 @@
 							"\r",
 							"console.log( \"This is hash message\", pm.collectionVariables.get(\"hashMsg\" ) );\r",
 							"\r",
-							"let secret = '[REMOVED-HISTORICAL-cb78f440b7d0]'\r",
+							"let secret = pm.environment.get('PAYWAY_API_KEY')\r",
 							"\r",
 							"let crypto = require('crypto-js');\r",
 							"\r",

@@ -1,7 +1,8 @@
 ---
 name: aba-payway-hash
 description: Verify ABA PayWay webhook signatures with timing-safe HMAC verification.
-version: 1.3.0
+metadata:
+  version: 1.3.0
 ---
 
 # Hash and Webhooks

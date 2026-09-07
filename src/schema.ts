@@ -34,7 +34,7 @@ export type ResponseType = 'deeplink' | 'qr_string' | 'qr_image' | 'checkout_qr_
  *
  * - `pending`   : Initiated, awaiting customer action.
  * - `completed` : Customer has paid (confirmed via callback/check).
- * - `failed`    : Rejected, expired, or cancelled.
+ * - `failed`    : Session initiation failed. Local expiry/closure is not remote payment failure.
  */
 export type SessionStatus = 'pending' | 'completed' | 'failed';
 

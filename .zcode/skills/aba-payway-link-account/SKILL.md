@@ -1,7 +1,8 @@
 ---
 name: aba-payway-link-account
 description: Link an ABA PayWay account for future credential-on-file payments.
-version: 1.3.0
+metadata:
+  version: 1.3.0
 ---
 
 # Link Account
@@ -34,7 +35,7 @@ but IS a hash position — it is base64-encoded before hashing.
 
 CLI:
 ```sh
-npx tsx src/cli.ts cof link-account -r linkacct001 --ctid customerabc \
+payway-sdk cof link-account -r linkacct001 --ctid customerabc \
   --token-flag CITI_FLEX --currency USD --callback-url https://merchant.example/payway/callback \
   --return-deeplink '{"ios_scheme":"myapp://linked","android_scheme":"myapp://linked"}'
 ```

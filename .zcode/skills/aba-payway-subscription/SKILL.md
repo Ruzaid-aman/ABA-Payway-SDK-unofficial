@@ -1,7 +1,8 @@
 ---
 name: aba-payway-subscription
 description: Register and charge ABA PayWay recurring subscriptions on the purchase path (ctid + CITR_FIX + frequency).
-version: 1.1.0
+metadata:
+  version: 1.1.0
 ---
 
 # Subscription / Recurring Checkout
@@ -32,7 +33,7 @@ const res = await payway.checkout.purchase({
 - `lifetime` is **MINUTES** here (min 3, max 43200) — the purchase path's unit;
   the QR domain's `lifetime` is seconds. Don't mix them up.
 
-## Hash order (live 27-field, SANDBOX-FINDINGS §17)
+## Hash order (27 fields, sandbox-verified 2026-09-05)
 The purchase hash signs
 `req_time.merchant_id.tran_id.amount.items.ctid.shipping.firstname.lastname.email.phone.type.payment_option.return_url.cancel_url.continue_success_url.return_deeplink.currency.custom_fields.return_params.payout.lifetime.additional_params.google_pay_token.skip_success_page.token_flag.frequency`
 — **`ctid` IS signed, between `items` and `shipping`**, even though the live

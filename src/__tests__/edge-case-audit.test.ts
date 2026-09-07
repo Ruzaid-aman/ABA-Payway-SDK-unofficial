@@ -429,7 +429,7 @@ describe('edge-case: retry engine', () => {
     expect(server.requests).toHaveLength(1);
   });
 
-  it('purchase with the default retry policy re-sends after a transient failure (backward-compatible)', async () => {
+  it('purchase with an explicit retryPolicy "transient" re-sends after a transient failure (opt-in, F01)', async () => {
     server = await startServer((_req, res) => {
       if (server.requests.length === 1) {
         // First attempt: destroy the connection (network error).
@@ -439,10 +439,30 @@ describe('edge-case: retry engine', () => {
       jsonResponse(res, 200, { status: { code: '00', message: 'OK' } });
     });
     const client = makeClient(server.url, { maxRetries: 1, retryDelayMs: 1 });
-    await expect(client.checkout.purchase({ transactionId: 'probe-buy-2', amount: 5 })).resolves.toEqual({
+    await expect(
+      client.checkout.purchase({ transactionId: 'probe-buy-2', amount: 5, retryPolicy: 'transient' }),
+    ).resolves.toEqual({
       status: { code: '00', message: 'OK' },
     });
     expect(server.requests).toHaveLength(2);
+  });
+
+  it('purchase with the default (omitted) retry policy is single-submit — a dropped response is an unknown outcome (F01)', async () => {
+    server = await startServer((_req, res) => {
+      if (server.requests.length === 1) {
+        // First attempt: destroy the connection AFTER the gateway accepted it.
+        _req.socket.destroy();
+        return;
+      }
+      jsonResponse(res, 200, { status: { code: '00', message: 'OK' } });
+    });
+    const client = makeClient(server.url, { maxRetries: 2, retryDelayMs: 1 });
+    // The mutation must NOT be re-sent: the first submission's outcome is
+    // unknown, and an automatic re-send could double-charge.
+    await expect(client.checkout.purchase({ transactionId: 'probe-buy-3', amount: 5 })).rejects.toBeInstanceOf(
+      PayWayNetworkError,
+    );
+    expect(server.requests).toHaveLength(1);
   });
 
   it('connection resets consume all retries then surface PayWayNetworkError', async () => {

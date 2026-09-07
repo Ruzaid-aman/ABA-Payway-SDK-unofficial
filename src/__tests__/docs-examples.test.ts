@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -13,6 +13,8 @@ import { extractWebhookSignature, removeHashField } from '../../docs/examples/ba
 describe('Documentation examples', () => {
   const currentDir = dirname(fileURLToPath(import.meta.url));
   const repoRoot = join(currentDir, '..', '..');
+
+  const readSkill = (name: string) => readFileSync(join(repoRoot, 'skills', name, 'SKILL.md'), 'utf8');
 
   const khqrDocs = [
     'README.md',
@@ -126,19 +128,21 @@ describe('Documentation examples', () => {
     }
   });
 
-  it('documents official offline KHQR format, configuration, local-only behavior, and migration in README', () => {
+  it('keeps the README concise and retains the official offline KHQR reference', () => {
     const readme = readDoc('README.md');
-    const offlineSection = readme.slice(
-      readme.indexOf('### 3.1 Offline QR Generation'),
-      readme.indexOf('### 4. Payment Link'),
+    const reference = readDoc('docs/SDK-AND-CLI-REFERENCE.md');
+    const offlineSection = reference.slice(
+      reference.indexOf('### 3.1 Offline QR Generation'),
+      reference.indexOf('### 4. Payment Link'),
     );
 
-    expect(readme).toContain('payway.khqr.validateConfiguration()');
-    expect(readme).toContain('62.68');
-    expect(readme).toContain('dynamic (`01=12`');
-    expect(readme).toContain('static (`01=11`)');
-    expect(readme).toContain('without a PayWay API call');
-    expect(readme).toContain('Earlier SDK releases emitted a private offline TLV format');
+    expect(readme).toContain('SDK and CLI reference');
+    expect(reference).toContain('payway.khqr.validateConfiguration()');
+    expect(reference).toContain('62.68');
+    expect(reference).toContain('dynamic (`01=12`');
+    expect(reference).toContain('static (`01=11`)');
+    expect(reference).toContain('without a PayWay API call');
+    expect(reference).toContain('Earlier SDK releases emitted a private offline TLV format');
     expect(offlineSection).toContain('merchantId: process.env.PAYWAY_MERCHANT_ID!');
     expect(offlineSection).toContain('apiKey: process.env.PAYWAY_API_KEY!');
   });
@@ -243,5 +247,106 @@ describe('Documentation examples', () => {
     // wiring test asserts the exported shapes instead.
     expect(typeof createPaymentLink).toBe('function');
     expect(typeof getPaymentLinkDetails).toBe('function');
+  });
+
+  // ─── F12 per-skill drift guards (audit 2026-09-07) ─────────────────────────
+  // Each applicable skill is checked INDIVIDUALLY — one guide's correct
+  // wording can never mask another guide's contradiction.
+  it('each skill individually avoids known drift classes (F05–F07/F10/F13)', () => {
+    const skillsRoot = join(repoRoot, 'skills');
+    const skillNames = readdirSync(skillsRoot).filter((name) => name.startsWith('aba-payway-'));
+    expect(skillNames.length).toBe(32);
+
+    const readSkill = (name: string) => readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
+
+    for (const name of skillNames) {
+      const content = readSkill(name);
+
+      // F06: request IDs/ctids must match the gateway rule [a-zA-Z0-9]{5,24}
+      // — hyphenated example IDs fail local validation before fetch. The -r
+      // rule applies to the cof family only (payment-link -r is a merchant
+      // ref with different constraints).
+      for (const match of content.matchAll(/requestId: '([^']+)'/g)) {
+        expect(match[1], `${name}: requestId "${match[1]}"`).toMatch(/^[a-zA-Z0-9]{5,24}$/);
+      }
+      for (const match of content.matchAll(/cof\s+\S+\s+-r ([a-zA-Z0-9-]+)/g)) {
+        expect(match[1], `${name}: cof -r flag id "${match[1]}"`).toMatch(/^[a-zA-Z0-9]{5,24}$/);
+      }
+
+      // F13: sandbox examples must not present 000999888 as a valid
+      // beneficiary (it is not in the sandbox whitelist) — neither via the
+      // whitelist commands nor as a payout destination.
+      expect(content, `${name}: 000999888`).not.toContain("payee: '000999888'");
+      expect(content, `${name}: 000999888 cli`).not.toContain('beneficiary add 000999888');
+      expect(content, `${name}: 000999888 payout`).not.toMatch(/acc['"]?\s*:\s*'?000999888/);
+      expect(content, `${name}: 000999888 payout account`).not.toMatch(/account['"]?\s*:\s*'?000999888/);
+
+      // F13: bulk detail quick starts must not normalize --pace 0.
+      expect(content, `${name}: --pace 0`).not.toMatch(/--pace 0\s+--json/);
+
+      // F10: no dead versioned-tag documentation URLs (v1.5.0 tag unpublished).
+      expect(content, `${name}: dead tag URL`).not.toContain('blob/v1.5.0/');
+
+      // F13: the valid IANA zone for the gateway clock.
+      expect(content, `${name}: Asia/Phnom_Cambodia`).not.toContain('Asia/Phnom_Cambodia');
+    }
+  });
+
+  it('the refund guide reconciles money in one currency and separates confirmation from validation (F02)', () => {
+    const refund = readSkill('aba-payway-refund');
+    expect(refund).toContain('computeRefundableBalance');
+    expect(refund).not.toMatch(/payment_amount\)\s*-\s*Number\(d\.refund_amount/);
+    // -y skips ONLY the prompt; --no-preflight skips ONLY validation.
+    expect(refund).toContain('skips ONLY the confirmation prompt');
+  });
+
+  it('the purchase guide matches the live hosted-response contract and CLI flags (F05)', () => {
+    const purchase = readSkill('aba-payway-purchase');
+    // The as-any checkout_qr_url workaround must not come back.
+    expect(purchase).not.toContain('as any');
+    // The CLI DOES expose --payment-gate; claiming deliberate absence is drift.
+    expect(purchase).not.toMatch(/deliberately omits a --payment-gate/i);
+    expect(purchase).not.toMatch(/--payment-gate.*deliberately absent/i);
+    // Both hosted routes are documented with their request shapes.
+    expect(purchase).toMatch(/abapay_khqr_deeplink.*viewType: 'hosted_view'/s);
+    expect(purchase).toContain('purchaseHosted');
+  });
+
+  it('the offline-qr guide distinguishes local generation from downstream notifications (F07)', () => {
+    const offline = readSkill('aba-payway-offline-qr');
+    expect(offline).toContain('validateCallbackSetup');
+    expect(offline).toContain('parseKhqrPaymentNotification');
+    expect(offline).not.toMatch(/no webhook or automatic reconciliation/i);
+    expect(offline).not.toMatch(/has no webhook/i);
+  });
+
+  it('the token-lifecycle examples pass local request-id validation (F06)', () => {
+    const lifecycle = readSkill('aba-payway-token-lifecycle');
+    expect(lifecycle).not.toContain('req-renew-1');
+    expect(lifecycle).not.toContain('req-detail-1');
+    for (const match of lifecycle.matchAll(/requestId: '([^']+)'/g)) {
+      expect(match[1]).toMatch(/^[a-zA-Z0-9]{5,24}$/);
+    }
+  });
+
+  it('the transaction-close guide presents the conflicting not-found evidence as dated (F13)', () => {
+    const close = readSkill('aba-payway-transaction-close');
+    expect(close).toContain('conflicting dated evidence');
+    expect(close).not.toMatch(/Nonexistent `tran_id` → HTTP \*\*403\*\*/);
+  });
+
+  it('the customer-qr example guards state, obligation, and dedupe before fulfillment (F04)', () => {
+    const customerQr = readSkill('aba-payway-customer-qr');
+    expect(customerQr).toContain("String(status).toUpperCase() !== 'APPROVED'");
+    expect(customerQr).toContain('fulfillments.has(tran_id)');
+    expect(customerQr).toContain('expectsExactly');
+    // The unsupported pagination promise must not return.
+    expect(customerQr).not.toMatch(/latest 50 per request; paginate/);
+  });
+
+  it('the transaction-by-merchant-ref guide documents the saturation gap (F03)', () => {
+    const byRef = readSkill('aba-payway-transaction-by-merchant-ref');
+    expect(byRef).toContain('NO pagination parameter');
+    expect(byRef).toContain('GAP:');
   });
 });

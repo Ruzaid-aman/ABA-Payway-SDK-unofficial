@@ -1,4 +1,8 @@
 import { createHmac } from 'node:crypto';
+import fs from 'node:fs';
+import { mkdtemp } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
@@ -282,11 +286,63 @@ describe('checkout-payload.cjs (signed checkout payload + HTML form)', () => {
   });
 });
 
-describe('reconcile.cjs (watermark/dedupe helpers)', () => {
-  it('treats transactions newer than the watermark as fresh (lexicographic dates)', () => {
-    expect(reconcile.isNewerThan({ transaction_date: '2026-08-25 10:00:00' }, '2026-08-25 09:59:59')).toBe(true);
-    expect(reconcile.isNewerThan({ transaction_date: '2026-08-25 09:59:59' }, '2026-08-25 09:59:59')).toBe(false);
-    expect(reconcile.isNewerThan({ transaction_date: '2026-08-25 10:00:00' }, null)).toBe(true);
+describe('reconcile.cjs (F03: ID-dedupe reconciliation checkpoint)', () => {
+  it('admits equal-timestamp and delayed rows as candidates — ID dedupe is the only "seen" gate', () => {
+    // The watermark no longer filters rows (the old strict `>` comparison
+    // dropped equal-time new IDs and delayed arrivals — audit F03).
+    expect(reconcile.isCandidate({ transaction_date: '2026-08-25 10:00:00' }, '2026-08-25 09:59:59')).toBe(true);
+    expect(reconcile.isCandidate({ transaction_date: '2026-08-25 09:59:59' }, '2026-08-25 09:59:59')).toBe(true);
+    expect(reconcile.isCandidate({ transaction_date: '2026-08-25 09:00:00' }, '2026-08-25 09:59:59')).toBe(true);
+    expect(reconcile.isCandidate({ transaction_date: '2026-08-25 10:00:00' }, null)).toBe(true);
+  });
+
+  it('buildCheckpoint merges seen IDs and advances the watermark, surviving equal timestamps', () => {
+    const previous = { last_transaction_date: '2026-08-25 09:59:59', transaction_ids: ['TX1'] };
+    const next = reconcile.buildCheckpoint(previous, [
+      { transaction_id: 'TX2', transaction_date: '2026-08-25 09:59:59' }, // equal-time NEW id
+      { transaction_id: 'TX3', transaction_date: '2026-08-25 10:05:00' },
+      { transaction_id: 'TX1', transaction_date: '2026-08-25 10:06:00' }, // repeat id
+    ]);
+    expect(next.last_transaction_date).toBe('2026-08-25 10:06:00');
+    expect(next.transaction_ids.sort()).toEqual(['TX1', 'TX2', 'TX3']);
+  });
+
+  it('caps the seen set at SEEN_ID_CAP, dropping the OLDEST ids', () => {
+    const many = Array.from({ length: reconcile.SEEN_ID_CAP + 10 }, (_, i) => ({
+      transaction_id: `T${i}`,
+      transaction_date: '2026-08-25 10:00:00',
+    }));
+    const next = reconcile.buildCheckpoint({ last_transaction_date: null, transaction_ids: [] }, many);
+    expect(next.transaction_ids).toHaveLength(reconcile.SEEN_ID_CAP);
+    expect(next.transaction_ids).not.toContain('T0');
+    expect(next.transaction_ids).toContain(`T${reconcile.SEEN_ID_CAP + 9}`);
+  });
+
+  it('persist + reload round-trips the atomic checkpoint (restart semantics)', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'reconcile-'));
+    const file = path.join(dir, 'state.json');
+    reconcile.saveCheckpoint(file, { last_transaction_date: '2026-08-25 10:00:00', transaction_ids: ['A', 'B'] });
+    const loaded = reconcile.loadCheckpoint(file);
+    expect(loaded.last_transaction_date).toBe('2026-08-25 10:00:00');
+    expect(loaded.transaction_ids).toEqual(['A', 'B']);
+    // A torn/missing file degrades to a fresh start, never a crash.
+    expect(reconcile.loadCheckpoint(path.join(dir, 'missing.json'))).toEqual({
+      last_transaction_date: null,
+      transaction_ids: [],
+    });
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('loadCheckpoint tolerates a corrupt state file (restart after interruption)', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reconcile-corrupt-'));
+    const file = path.join(dir, 'state.json');
+    fs.writeFileSync(file, '{not json');
+    expect(reconcile.loadCheckpoint(file)).toEqual({ last_transaction_date: null, transaction_ids: [] });
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('exposes the endpoint saturation cap for gap reporting', () => {
+    expect(reconcile.MAX_ROWS_PER_RESPONSE).toBe(50);
   });
 
   it('serializes rows to CSV with quoting', () => {

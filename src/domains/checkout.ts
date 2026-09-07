@@ -425,7 +425,11 @@ export function createCheckoutDomain(
       'req_time',
       'application/json',
       undefined,
-      { retry: params.retryPolicy === 'none' ? 'none' : undefined },
+      // retryPolicy per-call override: 'none' forces single-attempt; an
+      // explicit 'transient' re-enables retries for this mutation (the
+      // transport default for purchase is single-submit — see
+      // MUTATION_ENDPOINTS / F01). Omitted → the transport default.
+      { retry: params.retryPolicy === 'none' ? 'none' : params.retryPolicy === 'transient' ? 'transient' : undefined },
       callOptions,
     );
   }

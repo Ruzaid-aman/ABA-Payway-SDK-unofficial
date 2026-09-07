@@ -1,7 +1,8 @@
 ---
 name: aba-payway-sandbox-beneficiaries
 description: Seeded sandbox-only beneficiary accounts and test MIDs for PayWay payout / split-payout testing.
-version: 1.2.0
+metadata:
+  version: 1.2.0
 ---
 
 # Sandbox Beneficiaries (test fixtures)
@@ -41,6 +42,12 @@ validateSandboxBeneficiary('500000001', 'KHR', { sandbox: true }); // currency m
   match (USD accounts → USD, MIDs → KHR). Otherwise throws `PayWayConfigError`
   (`not a known sandbox beneficiary` / `currency mismatch`) before the request is sent.
 - **Production:** only the structural format is checked; real whitelists are managed by PayWay per merchant.
+
+Local allowlist validation (either environment) only proves the ID is a known
+seeded fixture with a matching currency — it does **not** prove the provider
+has enabled payout service or whitelisted the account for your merchant. Live
+calls can still fail with 403 "Payout accounts are not in whitelist" if the
+account isn't enabled on the gateway side.
 
 ## The payout currency rule
 A payout's `currency` must match the beneficiary account currency **and** the

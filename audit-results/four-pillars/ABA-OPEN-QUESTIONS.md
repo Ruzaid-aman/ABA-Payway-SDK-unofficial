@@ -365,3 +365,274 @@ a bogus link id. `PTL132` was not reproducible on this profile.
 
 **Answer must contain:** which code production returns for an invalid/unknown
 link id (or both, and when), so the SDK hint table can map it deterministically.
+
+---
+
+## Consolidation pass — 2026-09-07: questions found outside this register
+
+**Method:** scanned all repository Markdown, including `docs/`, `audit-results/`,
+`skills/`, `.agents/`, `.scratch/`, `.zcode/`, `HANDOFF.md`, and root guides, for
+ABA-facing question markers (`Questions for ABA`, `Clarifying questions for ABA`,
+`Confirm with ABA`, `ask ABA`, `TBD: confirm with ABA`, `awaiting ABA`,
+`external blocker`). This section makes this file the canonical register for the
+open items that were previously only present in supporting notes.
+
+### Q22 — Subscription sandbox enablement + documentation correction 🔴
+
+**Source:** `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` Q-A,
+`docs/SANDBOX-FINDINGS.md` §17, `HANDOFF.md` purchase-campaign notes.
+
+**Observed:** subscription purchase requests carrying `ctid`,
+`token_flag=CITR_FIX`, and `frequency` now pass the hash layer when `ctid` is
+included between `items` and `shipping`, but the sandbox merchant profile
+`ec476910` answers HTTP 403 code `104` "Merchant not enabled token flag". The
+live subscription docs' hash list omits `ctid`, and the gateway's Wrong Hash
+hint also prints the omitted-`ctid` order.
+
+**Questions:**
+1. Please enable subscription / token registration for sandbox merchant
+   `ec476910`, or provide a pre-enabled sandbox MID, so recurring-payment
+   testing can be completed end to end.
+2. Confirm the authoritative subscription purchase HMAC field order, including
+   the position of `ctid`.
+3. Please update the subscription documentation and Wrong Hash hint if the
+   enforced order is the 27-field order observed in sandbox.
+
+**Why this is separate from Q2/Q15:** Q2 resolved initiation parameters by
+evidence, and Q15 asks about lifecycle management. Q22 is the remaining sandbox
+provisioning and provider-doc correctness blocker for proving the shipped path.
+
+### Q23 — Agent provider model support 🟢
+
+**Source:** `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` Q-B.
+
+**Observed:** the agentic CLI preset once referenced OpenCode Zen model
+`x-preview-f-free`, which later answered HTTP 401 "Model x-preview-f-free is not
+supported" (`PROVIDER_PROPOSAL_FAILED`). Current docs point to
+`deepseek-v4-flash-free` from the public `/models` list, but the durable
+integration-support model set is not confirmed.
+
+**Question:** Which Zen/OpenCode provider models are supported for merchant
+integration use, and which should SDK documentation recommend?
+
+**Note:** This is not a PayWay gateway protocol question, but it is an ABA
+integration-support question found in the same ABA draft.
+
+### Q24 — `get-transactions-by-mc-ref` sandbox 404/regression 🟡
+
+**Source:** `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` Q-C and
+`NEXT-SESSION.md`.
+
+**Observed:** `/api/payment-gateway/v1/payments/get-transactions-by-mc-ref`
+answered HTTP 404 with an empty body in sandbox during the 2026-09-05 skills
+audit, while sibling endpoints worked. Earlier campaigns had verified the
+merchant-reference lookup path.
+
+**Questions:**
+1. Is the sandbox 404 a regression, a profile-gating change, or an endpoint
+   retirement?
+2. If profile-gated, what provisioning is required for merchant `ec476910`?
+3. Is the endpoint still supported in production, and is the documented
+   10/minute throttle still current?
+
+### Q25 — Sandbox/production enum and status-domain divergence 🟡
+
+**Source:** `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` Q-D,
+`docs/SANDBOX-FINDINGS.md` §9a and transaction-list observations.
+
+**Observed:** sandbox token-flag validation accepted values outside the
+currently enforced client-side linking domain in some probes (`CITO_FIX`,
+`CITR_FLEX`), and transaction-list status values include `PRE-AUTH` plus the
+gateway typo `DECLINDED`.
+
+**Questions:**
+1. Please publish the production-valid enum domains for each token-flag use
+   site: linking, charging, and subscription registration.
+2. Should sandbox-only accepted values be considered unsupported and rejected
+   by clients?
+3. Please publish the canonical transaction status enum, including whether
+   `DECLINDED` is the stable spelling merchants should handle.
+
+### Q26 — Purchase-KHQR scan-time validity window 🟠
+
+**Source:** `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` Q-E,
+`docs/SANDBOX-FINDINGS.md` §21 W5-1.
+
+**Observed:** a Purchase-API KHQR with a transaction record still `PENDING` and
+with 1440-minute lifetime was scan-refused as "Transaction expired" at age
+2h15m, while a seconds-old lifetime-10 QR paid successfully. The KHQR payload
+does not embed expiry, so scan validity appears to be enforced by server-side
+lookup rather than payload data.
+
+**Questions:**
+1. What governs the scan-time validity window for Purchase-API KHQRs: a fixed
+   provider window, the submitted `lifetime`, a profile rule, or another value?
+2. Which unit applies to that scan-validity window?
+3. If merchants request long lifetimes, should they still instruct customers to
+   scan immediately?
+4. Is the same behavior guaranteed in production?
+
+### Q27 — Duplicate purchase `tran_id` acceptance creates unpayable KHQRs 🟠
+
+**Source:** `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` Q-F,
+`docs/SANDBOX-FINDINGS.md` §21 W5-7. Related to Q9/Q10, but this records the
+newer, more specific purchase-KHQR failure mode.
+
+**Observed:** the purchase endpoint silently accepted duplicate `tran_id`
+creations with code `00`, but the resulting KHQRs scanned as "Transaction not
+found" and could not be paid. A hosted-page re-POST for a duplicate closed id
+first answered code `4` "Duplicated Transaction ID", then rendered the page on
+retry.
+
+**Questions:**
+1. Is duplicate `tran_id` reuse supported at all on purchase, or should clients
+   treat it as always forbidden?
+2. Why does the JSON purchase path answer success for duplicate IDs if the
+   resulting KHQR is unpayable?
+3. What deterministic production error code should merchants expect on
+   duplicate purchase IDs?
+
+### Q28 — `close-transaction` succeeds for never-created IDs 🟡
+
+**Source:** `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` Q-G,
+`docs/SANDBOX-FINDINGS.md` §21 W5-2. Related to Q4, but this is a narrower
+gateway-validation question not listed in the original close dossier.
+
+**Observed:** `close-transaction` for a `tran_id` that never existed answered
+code `00` "Success!", while close-after-payment correctly rejected with HTTP 403
+code `2`.
+
+**Questions:**
+1. Is success for a never-created transaction intentional idempotent-delete
+   behavior?
+2. If not, what not-found or invalid-state error should the endpoint return?
+3. Does production match this sandbox behavior?
+
+### Q29 — Hosted checkout/deep-link route and browser-view rules 🟢
+
+**Source:** `docs/15-merchant-scenario-requirements.md` TC-001, TC-005,
+`docs/08-deep-linking.md`, `docs/glossary.md`, `docs/SANDBOX-FINDINGS.md` §8c.
+
+**Observed:** scenario docs still mark several route/UI behaviors as
+profile-dependent or ABA-defined: `payment_gate=0` routing, whether
+`hosted_view` is mobile-only, exact ABA Pay deep-link URI schemes, and whether
+`payment_gate` is still supported on `/v1/payments/purchase`.
+
+**Questions:**
+1. Confirm that `payment_gate=0` routes the merchant profile to Ecommerce
+   Checkout HTML rather than QR JSON, and whether this is profile-specific.
+2. Confirm whether `hosted_view` is mobile-only or also supported for desktop
+   browser checkout.
+3. Publish the exact supported ABA Pay deep-link URI scheme(s) and parameters.
+4. Confirm whether `payment_gate` remains supported on
+   `/api/payment-gateway/v1/payments/purchase`.
+
+### Q30 — QR callback requirement when Check Transaction API is used 🟢
+
+**Source:** `docs/15-merchant-scenario-requirements.md` TC-013 and TC-012,
+related to Q6.
+
+**Observed:** supplied acceptance material conflicted on whether QR callbacks
+remain mandatory when merchants also use Check Transaction API. The SDK can poll
+status and verify callbacks but cannot determine merchant-profile callback
+requirements.
+
+**Questions:**
+1. Are QR callbacks mandatory for merchant approval even when the merchant
+   reconciles via Check Transaction API?
+2. Is the requirement different for QR/KHQR, hosted checkout, payment links, and
+   CoF flows?
+3. Where should merchants configure or prove callback-route approval?
+
+### Q31 — Merchant-profile whitelisting and commercial configuration 🟢
+
+**Source:** `docs/15-merchant-scenario-requirements.md` TC-017, TC-018, TC-020,
+TC-021, TC-022, TC-023, TC-026, TC-027, TC-028;
+`docs/11-callbacks-and-webhooks.md`; `docs/16-webhook-setup-guide.md`;
+`docs/aba-payway-test-case-coverage.md`.
+
+**Observed:** root-domain whitelisting, custom-domain moves, profile method
+activation, checkout UI compliance, pre-auth review, POS sign-off,
+production/client onboarding gates, optional phone verification, sandbox-profile
+reactivation, and KHQR callback whitelisting are external ABA operations. Local
+SDK readiness checks can validate URL shape and operator declarations, but
+cannot prove ABA completed profile provisioning.
+
+**Questions:**
+1. What exact request should merchants send to add or change API-request root
+   domains and callback root domains?
+2. Do wildcard subdomains apply, and are they profile-specific?
+3. What is the procedure to extend or reactivate an expired sandbox profile?
+4. How should merchants confirm activated payment methods and approved labels /
+   logos for a specific profile?
+5. What evidence should merchants retain for pre-auth approval, POS checkout
+   sign-off, production/client onboarding, and optional phone-verification
+   enablement?
+6. For offline KHQR callbacks, what evidence confirms that ABA configured and
+   whitelisted the merchant's HTTPS route?
+
+### Q32 — Missed callback retrieval and callback history 🟡
+
+**Source:** `audit-results/transaction-data-audit/REPORT.md` §18.
+
+**Observed:** the SDK can locally journal callbacks it receives, but if a
+checkout callback is missed before it reaches merchant infrastructure, it is
+unclear whether ABA exposes a retrieval path comparable to
+`get-transactions-by-mc-ref` for KHQR/reference lookup.
+
+**Questions:**
+1. Is there an ABA-side API or portal export for missed checkout callbacks or
+   callback delivery history?
+2. Does it include delivery attempts, HTTP response codes, timestamps, and body
+   payloads?
+3. Can merchants request replay for a specific `tran_id` or time window?
+
+### Q33 — Payment-link expiry, lifecycle status, and datatype parity 🟡
+
+**Source:** `.scratch/payment-link-docs-review/PLAN.md` §§1.1-1.4,
+`docs/SANDBOX-FINDINGS.md` §22, `docs/17-payment-link.md` §17.5/§17.7,
+`docs/12-error-handling-and-debugging.md`.
+
+**Observed:** sandbox payment-link responses differ from the official docs in
+several lifecycle and datatype details: `tran_id` is numeric in create/detail
+responses but string in docs and pushbacks; create/detail schemas disagree on
+`total_refund`; `pushback_url` is present in the official detail schema but was
+absent from sandbox detail responses; `expired_date` unset echoes `"0"`; links
+past `expired_date` still read `OPEN` and the hosted page still answers HTTP
+200; create rejects past or under-roughly-five-minute expiry with `PTL04`; and
+`PTL04` appears to be the sandbox catch-all for several documented error cases.
+
+**Questions:**
+1. What is the canonical production type for `tran_id`, `amount`,
+   `total_refund`, and `expired_date` in payment-link create/detail responses
+   and pushbacks?
+2. Should `pushback_url` always appear in detail responses, and if not, when is
+   it omitted?
+3. Is there a terminal `EXPIRED` status for payment links in production, or
+   should merchants always enforce expiry locally?
+4. What is the exact minimum future `expired_date` offset and the intended error
+   code for too-soon or past expiry values?
+5. Are `PTL04`, `PTL05`, `PTL99`, and `PTL132` all still active production
+   codes, and what condition maps to each?
+
+---
+
+## Source map for ABA-facing questions
+
+Use this file as the canonical register. Supporting files below either feed this
+register directly or carry scenario-specific wording that has now been folded
+into Q1-Q32.
+
+| Source file | Section(s) | Register coverage |
+|---|---|---|
+| `audit-results/four-pillars/ABA-OPEN-QUESTIONS.md` | Q1-Q21, answer logs, re-audits | Canonical register. |
+| `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` | Q-A-Q-G | Folded into Q22-Q28. |
+| `docs/CLOSE-TRANSACTION-FINDINGS.md` | §5 Questions for ABA | Q4, plus Q28 for never-created close semantics. |
+| `docs/SANDBOX-FINDINGS.md` | §8c, §9f, §10d, §21, §22 | Q5-Q13, Q19-Q21, Q26-Q28. |
+| `docs/15-merchant-scenario-requirements.md` | TC-001, TC-005, TC-013, TC-016, TC-017-TC-023, TC-026-TC-028 | Q29-Q31, plus Q5/Q30. |
+| `docs/aba-payway-test-case-coverage.md` | TC-004-TC-006, TC-009, TC-014, TC-017-TC-023, TC-026-TC-028, remaining gaps | Q29-Q31. |
+| `docs/08-deep-linking.md` and `docs/glossary.md` | Deep link `[TBD: confirm with ABA]` notes | Q29. |
+| `docs/11-callbacks-and-webhooks.md` and `docs/16-webhook-setup-guide.md` | KHQR callback provisioning / whitelisting | Q31. |
+| `.scratch/payment-link-docs-review/PLAN.md` | §§1.1-1.4, V-2/V-3/V-4/V-5, G-3/G-10 | Q19-Q21, Q33. |
+| `audit-results/transaction-data-audit/REPORT.md` | §18 Open questions register | Q32; other journal-policy items are internal SDK decisions, not ABA questions. |
+| `docs/PRODUCTION-VERIFICATION-PLAN.md`, `docs/PROJECT_STATUS.md`, `audit-results/sync-audit-2026-09-01.md`, `audit-results/four-pillars/technical-debt-register.md`, `audit-results/four-pillars/RTM.md`, `audit-results/four-pillars/README.md`, `HANDOFF.md` | References to open ABA items | Secondary/stale pointers; consult this register first. |

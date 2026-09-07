@@ -1,7 +1,8 @@
 ---
 name: aba-payway-payout
 description: Make an ABA PayWay payout / split-payout and manage payout beneficiaries (whitelist, currency matching, error codes).
-version: 1.2.0
+metadata:
+  version: 1.2.0
 ---
 
 # ABA PayWay Payout

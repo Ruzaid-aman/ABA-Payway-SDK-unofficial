@@ -1,7 +1,8 @@
 ---
 name: aba-payway-sdk-configuration
 description: Configure aba-payway-ts with explicit options or PAYWAY environment variables.
-version: 1.3.0
+metadata:
+  version: 1.3.0
 ---
 
 # SDK Configuration

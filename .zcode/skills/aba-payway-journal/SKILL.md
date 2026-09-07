@@ -1,7 +1,8 @@
 ---
 name: aba-payway-journal
 description: Query the local ABA PayWay transaction journal — timelines, stats, reconciliation, anomalies, and RCA for AI agents.
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 # Transaction Journal
@@ -11,6 +12,15 @@ observed status, artifact, and webhook capture. This is the AI/agent query
 layer over that record — read-only, never a source of payment truth.
 
 ## Quick Start
+
+For onboarding, start with [first payment](../aba-payway-first-payment/SKILL.md).
+Use the shared lifecycle: `created`, `pending`, `approved`, `failed`, `unknown`.
+Creation is not approval. Verify order ID, amount, and currency before fulfilling once.
+A timeout means unknown; query the existing attempt before replacing it.
+Expiry and closure remain local policy, even when the gateway reads PENDING.
+See [webhook production](../aba-payway-webhook-production/SKILL.md) for callback trust and recovery.
+Run the installed CLI as `npm exec -- payway-sdk`.
+
 
 ```sh
 # Record one invocation (command lifecycle + every API exchange)
@@ -27,19 +37,30 @@ payway-sdk journal reconcile --json
 ```
 
 ```ts
-// Library access (all exported from aba-payway-ts)
+// Library access (all exported from aba-payway-ts) — read-only queries:
 import {
   computeJournalStats,
   detectJournalAnomalies,
   explainTransaction,
-  pruneJournal,
   reconcileTransactions,
 } from 'aba-payway-ts';
 
 const rca = explainTransaction('qrmt8onznj46fdc1');   // verdict + steps + hints
 const stats = computeJournalStats();                  // latency p50/p90/p99, funnel
 const report = reconcileTransactions();               // without-callback bucket
-pruneJournal(new Date(Date.now() - 30 * 86_400_000)); // retention
+```
+
+## Retention (opt-in maintenance — destructive, separate from queries)
+
+Pruning DELETES journal lines older than the given age. It is never part of an
+investigation; run it only as a deliberate retention policy:
+
+```ts
+import { pruneJournal } from 'aba-payway-ts';
+pruneJournal(new Date(Date.now() - 30 * 86_400_000)); // drop events older than 30 days
+```
+```sh
+payway-sdk journal prune --before 30    # same, via CLI
 ```
 
 ## Enabling Recording

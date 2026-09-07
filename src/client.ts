@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { generateHmac, verifyCallbackDetailed, verifyCallbackSignature } from './auth.js';
 import type { CallbackVerificationResult } from './auth.js';
-import { BASE_URLS, ENDPOINTS } from './constants.js';
+import { BASE_URLS, ENDPOINTS, MUTATION_ENDPOINTS } from './constants.js';
 import { CircuitBreaker, type CircuitBreakerOptions } from './circuit-breaker.js';
 import type { CheckoutDomain } from './domains/checkout.js';
 // Audit D3: the hash-order hints derive from the domain constants so the
@@ -110,6 +110,20 @@ export interface PayWayConfig {
   baseUrl?: string;
   maxRetries?: number; // Default: 3 (QR-REQ-11: retry up to 3 times on transient failures)
   retryDelayMs?: number; // Default: 3000 (3 seconds between retries)
+  /**
+   * Transport policy for side-effecting (mutation) endpoints — see
+   * `MUTATION_ENDPOINTS`. A lost response on a mutation is an UNKNOWN
+   * outcome (transaction IDs are not gateway idempotency — duplicate
+   * tran_ids are silently accepted, W5-7), so:
+   *   - `'single'` (default): mutations are submitted exactly once; network/
+   *     5xx/429 failures surface after the first attempt. Recover by QUERYING
+   *     the existing attempt, never by re-sending.
+   *   - `'transient'`: legacy behavior — mutations retry like reads. Use only
+   *     when you have verified the specific endpoint is idempotent on the
+   *     gateway side.
+   * Reads are unaffected and always use the bounded retry default.
+   */
+  mutationRetryPolicy?: 'single' | 'transient';
   rateLimitThrottling?: boolean; // Default: true for endpoints with documented limits
   rateLimitRules?: Record<string, RateLimitRule>;
   debug?: boolean;
@@ -235,7 +249,13 @@ export interface CreateTransactionParams {
   customFields?: string | Record<string, unknown>;
   returnParams?: string;
   viewType?: 'hosted_view' | 'popup';
-  /** Send 0 (with a JSON request via purchase()) to receive checkout_qr_url — the hosted page rendering the QR. */
+  /**
+   * 0 routes the request through the Checkout service. The response shape
+   * depends on the request: `abapay_khqr_deeplink` + `viewType: 'hosted_view'`
+   * returns JSON including `checkout_qr_url` (the hosted page URL); other
+   * options return the hosted checkout page as HTML
+   * (the typed `PurchaseHostedHtmlResult` from `checkout.purchaseHosted()`).
+   */
   paymentGate?: number;
   payout?: string | { acc: string; amt: number }[];
   additionalParams?: string | Record<string, unknown>;
@@ -248,11 +268,13 @@ export interface CreateTransactionParams {
   lifetime?: number;
   googlePayToken?: string;
   /**
-   * Retry policy for this purchase call. 'transient' (default) re-sends the
-   * request after network errors/5xx/429; 'none' surfaces those failures
-   * after the first attempt — use for strict once-only submission, since
-   * production duplicate-tran_id semantics are unconfirmed (sandbox
-   * overwrites duplicates).
+   * Retry policy for this purchase call. Default (omitted): single attempt —
+   * purchase is a mutation endpoint and mutations are single-submit by
+   * default (F01; duplicate tran_ids are silently accepted by the gateway, so
+   * a re-send after a lost response could double-charge). Pass 'transient' to
+   * re-send after network errors/5xx/429 when you have verified idempotency
+   * for your flow; 'none' is now equivalent to the default but stays
+   * accepted for explicitness.
    */
   retryPolicy?: 'transient' | 'none';
   /**
@@ -1320,7 +1342,16 @@ export class PayWay {
     // Per-call opt-out for non-idempotent endpoints (purchase): 'none'
     // surfaces network/5xx/429 failures after the first attempt instead of
     // silently re-sending.
-    const retriesDisabled = options?.retry === 'none';
+    //
+    // F01 operation policy: MUTATION endpoints additionally default to
+    // single-attempt (a lost response = unknown outcome; duplicate tran_ids
+    // are silently accepted by the gateway, so an automatic re-send could
+    // double-charge). An explicit per-call 'transient' or the config-level
+    // `mutationRetryPolicy: 'transient'` escape hatch restores retries for
+    // callers who have verified idempotency themselves. Reads are unaffected.
+    const isMutation = MUTATION_ENDPOINTS.has(endpoint);
+    const mutationSingleSubmit = isMutation && (this.config.mutationRetryPolicy ?? 'single') === 'single';
+    const retriesDisabled = options?.retry === 'none' || (mutationSingleSubmit && options?.retry !== 'transient');
     const url = `${this.baseUrl}${endpoint}`;
     const correlationId = randomBytes(8).toString('hex');
     this.lastCid = correlationId;

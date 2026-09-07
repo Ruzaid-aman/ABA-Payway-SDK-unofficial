@@ -29,6 +29,34 @@ export const ENDPOINTS = {
 } as const;
 
 /**
+ * Side-effecting (mutation) endpoints — operations that create or move money,
+ * or make irreversible state changes. These default to SINGLE-ATTEMPT transport
+ * (no automatic retry) because a lost response means an UNKNOWN outcome:
+ * transaction IDs are not a gateway idempotency key (sandbox accepts duplicate
+ * tran_ids silently, W5-7), so an automatic re-send could double-charge or
+ * double-refund. Reads keep the bounded retry default. A caller can still opt a
+ * specific call back into retries via `retry: 'transient'`, or globally via
+ * `mutationRetryPolicy: 'transient'` on the client config (audit F01).
+ */
+export const MUTATION_ENDPOINTS = new Set<string>([
+  ENDPOINTS.generateQr,
+  ENDPOINTS.purchase,
+  ENDPOINTS.refund,
+  ENDPOINTS.closeTransaction,
+  ENDPOINTS.linkAccount,
+  ENDPOINTS.linkCard,
+  ENDPOINTS.payment,
+  ENDPOINTS.renewToken,
+  ENDPOINTS.removeToken,
+  ENDPOINTS.createPaymentLink,
+  ENDPOINTS.completePreAuth,
+  ENDPOINTS.cancelPreAuth,
+  ENDPOINTS.payout,
+  ENDPOINTS.updateBeneficiaryStatus,
+  ENDPOINTS.addBeneficiary,
+]);
+
+/**
  * Payment status codes returned by checkTransaction, getTransactionDetail,
  * and getTransactionList.
  *

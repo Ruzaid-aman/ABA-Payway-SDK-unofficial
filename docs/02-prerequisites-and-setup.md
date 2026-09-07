@@ -35,13 +35,13 @@ Before you start coding, you need to obtain these from ABA PayWay. You'll get se
 
 | Requirement | Minimum Version |
 |---|---|
-| **Node.js** | ≥20.0.0 (uses `node:crypto` and Web Streams API — matches `engines`; v1.3.6 raised the floor from 18) |
-| **npm** | ≥10.0.0 (comes with Node.js 20+) |
+| **Node.js** | ≥22.12.0 (matches the SDK and Commander runtime requirements) |
+| **npm** | ≥10.0.0 (comes with Node.js 22.12+) |
 
 Verify your installation:
 
 ```bash
-node --version   # Should show v20.x.x or higher
+node --version   # Should show v22.12.0 or higher
 npm --version    # Should show 10.x.x or higher
 ```
 
@@ -59,7 +59,7 @@ npm install aba-payway-ts
 ```bash
 # .env file (add to .gitignore!)
 PAYWAY_MERCHANT_ID=ec476910
-PAYWAY_API_KEY=[REMOVED-HISTORICAL-6f49ced9c4d9]
+PAYWAY_API_KEY=REPLACE_ME
 PAYWAY_RSA_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC...
 -----END PUBLIC KEY-----"

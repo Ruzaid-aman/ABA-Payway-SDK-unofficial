@@ -4,8 +4,9 @@
  * One interface, two modes:
  *
  *  - `sandbox` — the real `PayWay` SDK client against PayWay's sandbox
- *    gateway. Payment creation uses `retryPolicy: 'none'`: a network-failed
- *    create has an UNKNOWN outcome (the transaction may exist), so the SDK
+ *    gateway. Payment creation is single-submit by default (the SDK's F01
+ *    mutation policy — mutations never auto-retry): a network-failed create
+ *    has an UNKNOWN outcome (the transaction may exist), so the SDK
  *    must not transparently re-send it; the operator reconciles the ID before
  *    trying again (plan §3.3 / Task 4 contract).
  *  - `demo` — a local, credential-free simulator that speaks the same

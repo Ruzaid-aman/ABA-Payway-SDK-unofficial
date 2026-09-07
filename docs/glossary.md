@@ -9,7 +9,7 @@
 ### API Key
 A secret string of characters provided by ABA PayWay. Used as the HMAC key to sign all API requests and verify webhook signatures. **Never commit to version control or expose in frontend code.**
 
-Example format: `[REMOVED-HISTORICAL-6f49ced9c4d9]`
+Example format: `REPLACE_ME`
 
 ---
 
@@ -148,7 +148,7 @@ A two-step payment flow:
 2. **Capture** — Actually charge the held amount (or **Cancel** the hold)
 
 ### PWT (PayWay Token)
-A token string representing a saved payment method in the Credentials-on-File system. Format example: `[REMOVED-HISTORICAL-81b242e05d38]`. The SDK field is named `pwt` (NOT `payment_token` — this was a verified sandbox finding).
+A token string representing a saved payment method in the Credentials-on-File system. Format example: `REPLACE_ME`. The SDK field is named `pwt` (NOT `payment_token` — this was a verified sandbox finding).
 
 ---
 

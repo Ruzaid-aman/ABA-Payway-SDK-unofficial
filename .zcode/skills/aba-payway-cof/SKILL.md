@@ -1,7 +1,8 @@
 ---
 name: aba-payway-cof
 description: Credentials-on-file with ABA PayWay — link an account or card, then charge the stored token (both hosted-page routes plus the cof CLI group).
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 # Credentials on File (CoF)
@@ -47,7 +48,7 @@ const charge = await payway.credentialsOnFile.payment({
   firstName: 'John', lastName: 'Doe', email: 'j@example.com', phone: '+855…', // hash positions
   items: [{ name: 'Item', price: 4.5, quantity: 1 }],
   returnParams: 'order=0001',
-  payout: [{ acc: '000999888', amt: 4.5 }], // ⚠️ {acc, amt} keys (purchase-path shape)
+  payout: [{ acc: '500000001', amt: 4.5 }],  // ⚠️ {acc, amt} keys (purchase-path shape; seeded sandbox account)
   customFields: { plan: 'pro' },
   shippingFee: 0.5,
 });
@@ -60,7 +61,9 @@ const charge = await payway.credentialsOnFile.payment({
 ## §16 hash orders (sandbox-verified 2026-08-31)
 - link-account: `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency`
 - link-card: `merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency.continue_success_url`
-  (`amount`/`frequency` hash as `''` — no body fields for `amount`)
+  (`amount` has NO body field and always hashes as `''`; `frequency` hashes its
+  supplied value — 1W|1M|2M — or `''` when omitted, but is live-documented as
+  required for Link Card)
 - charge (payment-credential): `request_time.merchant_id.tran_id.amount.currency.items.ctid.pwt.first_name.last_name.email.phone.purchase_type.callback_url.custom_fields.return_params.payout.token_flag.shipping_fee` — **no request_id** (deprecated, not sent)
 
 ## Error families

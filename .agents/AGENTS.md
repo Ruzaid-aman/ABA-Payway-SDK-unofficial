@@ -40,11 +40,11 @@
 - **Payout on payment links is blocked on this sandbox profile**: `beneficiary add` → 403 code 32 "Service is not enable"; payout-bearing create → 403 "Payout accounts are not in whitelist". Same blocker class as the subscription `104` (§17). Filed as ABA question Q19.
 
 ## Workflow & State Tracking
-- **Always check status first**: Before beginning new work or deciding what to do next, ALWAYS read `PROJECT_STATUS.md` in the root of the workspace. This is the source of truth for what has been done and what the current priorities are.
-- **Understand the API quirks**: Read `SANDBOX-FINDINGS.md` to understand API behaviors we have verified during our sandbox probes.
+- **Always check status first**: Before beginning new work or deciding what to do next, ALWAYS read `HANDOFF.md` in the root of the workspace. This is the source of truth for what has been done and what the current priorities are.
+- **Understand the API quirks**: Read `docs/SANDBOX-FINDINGS.md` to understand API behaviors we have verified during our sandbox probes.
 - **Close Transaction channel dependence (open escalation)**: `docs/CLOSE-TRANSACTION-FINDINGS.md` documents that closure enforcement is CHANNEL-dependent in sandbox — the KHQR/QR channel refuses closed transactions at scan time (3 observations: 2026-08-25 + 2026-09-05 ×2, "transaction expired"), while two hosted-card sessions accepted payment AFTER a code-00 close (APPROVED). Closure is unqueryable: no CLOSED status in check/detail ever — keep a local `closed` flag. Read the dossier before ANY work involving `closeTransaction`, and re-run its §7 validation checklist when ABA ships a fix.
 - **When probing endpoints**: When tasked to probe a sandbox endpoint, write a script in the `scripts/` folder to execute and verify the endpoint exists and validates formatting correctly, similar to prior probes.
-- **Update status continuously**: Keep `PROJECT_STATUS.md` updated as tasks are completed.
+- **Update status continuously**: Keep the current-state section of `HANDOFF.md` updated as tasks are completed.
 - **Never embed backticks in `git commit -m` under Git Bash**: command substitution eats the enclosed text (a 2026-09-06 commit lost a word). Use `git commit -F <file>` or backtick-free messages.
 - **Sub-agent line numbers drift (~40-60 lines observed in cli.ts)**: explorer reports are orientation only — re-derive every file:line from the working tree (grep the symbol) before it lands in a durable doc. Policy: audit-results/transaction-data-audit/REPORT.md §19.
 - **commander option collision**: an option defined on ANY ancestor command (e.g. `agent --session`) silently swallows the same flag on descendants — never reuse an ancestor's option name (why `agent ledger recover` uses `--session-id`).

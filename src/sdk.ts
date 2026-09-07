@@ -1,26 +1,10 @@
 /**
- * Top-level SDK facade — wires the three decoupled modules together.
+ * Server-side SDK facade over the existing purchase and test modules.
  *
- * This is the ONLY place that imports Module 1 (`src/server/`), Module 2
- * (`src/client-handler/`), and Module 3 (`src/test/`). The modules themselves
- * remain independently deployable and never import each other.
- *
- * Merchant usage (the "under 5 lines" promise):
- *
- *   import { sdk } from 'aba-payway-ts';
- *
- *   // 1. Server: initiate
- *   const session = await sdk.initiate(
- *     { transactionId: 'order-123', amount: 10, paymentOption: 'abapay_khqr_deeplink' },
- *     { merchantId, apiKey, environment: 'sandbox' },
- *   );
- *
- *   // 2. Client: render (SDK auto-detects deeplink/qr/url/html)
- *   await sdk.handle(session, { target: '#payway-container' });
- *
- *   // 3. Test: zero-code suite
- *   const report = await sdk.runTestSuite();
- *   console.log(report.success ? 'All passed' : 'Failures detected');
+ * First payment: sdk.initiate(payload, config), then select paymentArtifact(session)
+ * for the authorized customer. Keep session.raw and credentials on the server.
+ * Verify through a server-side lookup or route-correct callback before fulfilling
+ * the stored order once. Creation and browser redirects are not payment approval.
  */
 
 import type { PayWayConfig } from './client.js';
@@ -45,8 +29,9 @@ import {
 /**
  * The top-level SDK namespace. This is the primary entry point for merchants.
  *
- * It exposes `initiate`, `handle`, `test`, and `runTestSuite` — the four
- * functions required for a complete purchase flow with zero boilerplate.
+ * Use initiate for purchase creation and PayWay.checkout for status verification.
+ * The existing handle and test adapters remain available; fulfillment and durable
+ * idempotency belong to the merchant application.
  */
 export const sdk = {
   /**

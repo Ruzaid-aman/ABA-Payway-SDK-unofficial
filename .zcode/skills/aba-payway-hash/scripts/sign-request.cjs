@@ -29,7 +29,7 @@
 const crypto = require('node:crypto');
 
 const PRESETS = {
-  // Live 27-field purchase order (SANDBOX-FINDINGS §17, 2026-09-05): the
+  // Live 27-field purchase order (sandbox-verified 2026-09-05): the
   // gateway signs ctid between items and shipping on the subscription path;
   // the live docs' 26-field list omits it and is rejected with Wrong Hash.
   checkout: [

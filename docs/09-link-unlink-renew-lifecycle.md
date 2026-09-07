@@ -248,7 +248,7 @@ async function chargeSavedCard() {
       ctid: 'customerabc123',
 
       // ⚠️ The field name is 'pwt', NOT 'paymentToken' (verified in sandbox)
-      paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]', // This gets mapped to 'pwt' by the SDK
+      paymentToken: 'REPLACE_ME', // This gets mapped to 'pwt' by the SDK
 
       // Token usage flag
       tokenFlag: 'CITR_FLEX',
@@ -334,7 +334,7 @@ async function renewToken() {
       ctid: 'customerabc123',
 
       // The token to renew (required)
-      paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]',
+      paymentToken: 'REPLACE_ME',
     });
 
     console.log('Token renewed:', result);
@@ -361,7 +361,7 @@ async function unlinkToken() {
       ctid: 'customerabc123',
 
       // The token to remove (required)
-      paymentToken: '[REMOVED-HISTORICAL-81b242e05d38]',
+      paymentToken: 'REPLACE_ME',
     });
 
     console.log('Token removed:', result);
@@ -369,7 +369,7 @@ async function unlinkToken() {
     // Delete from your database
     // await db.query(
     //   'DELETE FROM saved_payments WHERE ctid = $1 AND pwt = $2',
-    //   ['customerabc123', '[REMOVED-HISTORICAL-81b242e05d38]']
+    //   ['customerabc123', 'REPLACE_ME']
     // );
 
     return result;
@@ -560,12 +560,12 @@ npx tsx src/cli.ts cof link-card -r link67890 --ctid customerabc123 --token-flag
 npx tsx src/cli.ts cof link-card-form --ctid customerabc123 --token-flag CITI_FLEX --callback-url https://example.com/api/cof-callback -o link-card.html
 
 # Charge a saved token (charging flags: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX)
-npx tsx src/cli.ts cof charge -t order12345 --amount 25.00 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38] --token-flag CITU_FLEX
+npx tsx src/cli.ts cof charge -t order12345 --amount 25.00 --ctid customerabc123 --token REPLACE_ME --token-flag CITU_FLEX
 
 # Token trio (note the param split)
-npx tsx src/cli.ts cof token renew -r renew12345 --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38]
+npx tsx src/cli.ts cof token renew -r renew12345 --ctid customerabc123 --token REPLACE_ME
 npx tsx src/cli.ts cof token details -r check12345          # requestId ONLY
-npx tsx src/cli.ts cof token remove --ctid customerabc123 --token [REMOVED-HISTORICAL-81b242e05d38]   # NO requestId
+npx tsx src/cli.ts cof token remove --ctid customerabc123 --token REPLACE_ME   # NO requestId
 ```
 
 Related: `beneficiary add <payee>` / `beneficiary update-status <payee> --status 0|1` (KHQR payout beneficiaries, RSA-encrypted). Run any command with `--help` for the full flag list.

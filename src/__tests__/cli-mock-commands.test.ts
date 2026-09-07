@@ -240,6 +240,15 @@ async function run(argv: string[]): Promise<{
 }
 
 describe('CLI API commands against the local mock gateway', () => {
+  it('guides verified human approval without adding prose to machine output', async () => {
+    const human = await run(['check-transaction', '-t', 'APPROVED-DX']);
+    expect(human.stdout).toContain('fulfill once atomically');
+    expect(human.stdout).toContain('amount, and currency');
+    const machine = await run(['check-transaction', '-t', 'APPROVED-DX', '--json']);
+    expect(machine.stdout).not.toContain('Next:');
+    expect(machine.stdout).not.toContain('fulfill once');
+  });
+
   it('check-transaction prints an APPROVED status (--json path)', async () => {
     const { text, exitCode } = await run(['check-transaction', '-t', 'APPROVED-1', '--json']);
     expect(text).toContain('"APPROVED"');

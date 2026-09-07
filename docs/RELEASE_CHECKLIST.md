@@ -1,74 +1,54 @@
-# Release Checklist
+# Release checklist
 
-Use this checklist for every user-facing release to ensure the SDK is correctly validated and documented.
+The checkout is a development baseline, not a published release. See [release readiness](RELEASE-READINESS.md) for fresh evidence and outstanding gates. Publication, tags, history rewriting, and credential rotation require explicit maintainer action.
 
-## Pre-Release Validation
+## Public repository gate
 
-- [ ] Run the full test suite:
+- [ ] Review a redacted full-history secret scan of all refs. Resolve genuine findings by provider-side rotation/revocation and an approved history disposition; deleting files in HEAD is insufficient.
+- [ ] Review tracked source, archives, boilerplate, audit notes, screenshots, and correspondence for customer data and redistribution rights. An MIT license on this project does not establish permission for third-party material.
+- [ ] Confirm the destination repository/organization, ownership metadata, issue tracker, and monitored security mailbox.
+- [ ] Configure the remote, branch protection, secret scanning, and push protection. Keep production credentials out of contributor CI.
 
-```bash
-npm test
-```
+## Reproducible validation
 
-- [ ] Run lint and typecheck:
+Use a clean checkout without `.env`, saved profiles, captured payments, or prebuilt `dist`. CI tests Linux/Windows with Node 22.12.0, Node 22, and Node 24.
 
-```bash
-npm run lint
-npm run typecheck
-```
-
-- [ ] Verify documentation links and examples.
-
-- [ ] Confirm new or changed API behavior is documented in `README.md` and relevant `docs/` chapters.
-- [ ] If CLI commands were added or changed, rebuild the CLI and verify `--help` output:
+Run build-dependent checks sequentially in one checkout, or use separate workspaces. The reference-app setup runs a clean SDK build and can remove `dist` while CLI tests are executing.
 
 ```bash
+npm ci
 npm run build
-npx payway-sdk --help
-```
-
-## Sandbox Verification
-
-Use environment variables for sandbox credentials.
-
-```bash
-PAYWAY_MERCHANT_ID="$PAYWAY_MERCHANT_ID" \
-PAYWAY_API_KEY="$PAYWAY_API_KEY" \
-PAYWAY_RSA_PUBLIC_KEY="$PAYWAY_RSA_PUBLIC_KEY" \
-npm run probe
-```
-
-Record the command and observed result in the PR description.
-
-## Release Notes
-
-- [ ] Update `CHANGELOG.md` with the release date and summary.
-- [ ] Mark bug fixes, features, and breaking changes clearly.
-- [ ] Note any sandbox verification performed.
-
-## Optional
-
-- [ ] Generate API reference:
-
-```bash
+npm run typecheck
+npm run lint
+npm test
+npm run test:coverage
 npm run docs:api
+npm run check:package
+npm run check:public-docs
+npm run check:repository
+npm run smoke:package
+npm --prefix examples/first-payment run setup
+npm --prefix examples/first-payment run typecheck
+npm run smoke:example
 ```
 
-- [ ] Confirm `docs/README.md` and `README.md` both link to the new docs or API reference.
+- [ ] All hosted CI jobs are green on the exact candidate commit. Local Windows results cannot replace the Linux matrix or hosted secret scan.
+- [ ] Record conditional sandbox verification for changed gateway contracts, or explain the limit. Never place raw captures in public release notes.
 
-## First Public npm Publish (one-time, maintainer decision)
+## Version and documentation
 
-The package is publish-ready (`files: ["dist", "skills"]`, `prepublishOnly` clean-builds) but is **not yet on the registry** (`npm view aba-payway-ts` → 404 as of 2026-08-30). Publishing is outward-facing and requires registry credentials, so it is deliberately left as a maintainer-executed step.
+- [ ] Select a new major release version: the Node 22.12 minimum breaks the old Node 20 support promise. `1.5.0` remains the unpublished baseline until this step; do not republish it with new behavior.
+- [ ] Update package.json and lockfile together, move Unreleased entries into dated release notes, rebuild, and rerun package smoke.
+- [ ] Confirm the GitHub destination matches package metadata. Pin public README/quickstart/reference links to the new release tag; verify local targets before tagging and actual HTTP links after the authorized push.
+- [ ] Create a new immutable tag only after approval. Never move existing tags.
 
-- [ ] Verify the exact tarball contents **without** publishing:
+## Publish and verify
 
-```bash
-npm publish --dry-run
-```
+- [ ] Confirm npm account/package ownership and package-name availability at release time.
+- [ ] Inspect `npm pack --dry-run --json`. The allowlist includes runtime/declaration files, 32 skills, README, QUICKSTART, CHANGELOG, LICENSE, and package metadata. Run `check:package`; do not rely on a hardcoded export count.
+- [ ] Prefer [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) with OIDC and provenance from an approved tag workflow. Configure the npm trust relationship and GitHub environment before enabling publication.
+- [ ] Publish only after the repository, history, ownership, support, and CI gates are cleared.
+- [ ] Install the published package in a fresh consumer; verify ESM/CJS/types, `npm exec -- payway-sdk --help`, and `npm exec -- payway-sdk demo --check`.
+- [ ] Verify the published version, source tag, provenance, documentation links, and issue/security channels.
 
-Confirm only `dist/` and `skills/` ship, no `.env`, profile stores, `test-output/`, or audit artifacts appear in the file list, and the tarball size is sane.
-
-- [ ] Confirm registry identity and name rights: `npm whoami`; the `aba-payway-ts` name must be free or already owned by the org.
-- [ ] Publish with 2FA: `npm publish`.
-- [ ] Post-publish smoke: `npm view aba-payway-ts version`, then in a clean temp directory `npm i aba-payway-ts` and `node -e "console.log(Object.keys(require('aba-payway-ts')).length)"` (expect 59 exports — 2026-09-06 count: +`parsePaymentLinkPushback`, `PAYMENT_LINK_EXPIRY_MIN_SECONDS` (runtime values; the two PaymentLinkPushback types are type-only); recount after any barrel change).
-- [ ] If publishing from CI later, add `--provenance` (requires an OIDC-linked workflow) and pin the release to a tag build, not `main` pushes.
+Never use bare `npx payway-sdk` to verify this package. The binary is shipped by `aba-payway-ts`.

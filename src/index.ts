@@ -1,3 +1,5 @@
+export { paymentArtifact, paymentLifecycle, paymentNextStep } from './payment-lifecycle.js';
+export type { PaymentArtifact, PaymentLifecycle } from './payment-lifecycle.js';
 export type {
   AddBeneficiaryParams,
   CofPaymentParams,
@@ -169,7 +171,8 @@ export type {
   TerminalPaymentStatus,
 } from './domain-types.js';
 export type { LinkCardResponse } from './domain-types.js';
-export { isValidPublicKeyPem, validateRefundAmount } from './utils.js';
+export { computeRefundableBalance, isValidPublicKeyPem, validateRefundAmount } from './utils.js';
+export type { RefundMoneySide, RefundableBalanceResult } from './utils.js';
 // ─── Sandbox beneficiary registry (used by pre-auth/payout validation) ─────
 // Exported because the aba-payway-sandbox-beneficiaries skill (and integrators
 // writing sandbox probes) need the seeded-account list and the structural

@@ -1,7 +1,8 @@
 <?php
 
 $merchant_id = 'bontoan';
-$api_key = '[REMOVED-HISTORICAL-6e4b8b3d6e71]';
+$api_key = getenv('PAYWAY_API_KEY') ?: '';
+if ($api_key === '') { throw new RuntimeException('Set PAYWAY_API_KEY before using this example'); }
 
 
 function abaAesEncrypt(

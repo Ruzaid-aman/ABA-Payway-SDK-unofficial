@@ -1,7 +1,8 @@
 ---
 name: aba-payway-transaction-by-merchant-ref
 description: Retrieve ABA PayWay transactions by merchant reference through the SDK or CLI.
-version: 1.2.0
+metadata:
+  version: 1.3.0
 ---
 
 # Get transactions by merchant reference
@@ -37,10 +38,12 @@ The command reads `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`, signs the request, 
 
 ## Tools (scripts/)
 
-- **`reconcile.cjs`** — cron-ready reconciliation fallback job (the missed-callback safety net for portal-generated static QRs — see [Customer Module QR](../aba-payway-customer-qr/SKILL.md)): signs and calls `get-transactions-by-mc-ref`, dedupes by `transaction_id`, tracks a watermark file so each run prints only NEW transactions, optional CSV append and watch mode.
+- **`reconcile.cjs`** — cron-ready reconciliation fallback job (the missed-callback safety net for portal-generated static QRs — see [Customer Module QR](../aba-payway-customer-qr/SKILL.md)): signs and calls `get-transactions-by-mc-ref`, dedupes durably by `transaction_id` (equal-timestamp and delayed arrivals are still emitted — the timestamp checkpoint never filters), persists ONE atomic checkpoint file (`--state`, temp+rename, crash-consistent), optional CSV append and watch mode.
   ```sh
   node scripts/reconcile.cjs --merchant-ref "dt-one-8989" --env sandbox          # one-shot
   node scripts/reconcile.cjs --merchant-ref "dt-one-8989" --watch --interval 300 --csv payments.csv
   ```
-  Rate limit (10/min) and pagination constraints are enforced. Exit codes: **0** success (even with no new rows) · **1** API/network failure (clean message, no stack trace) · **2** usage error / missing credentials. Credentials come from `--merchant-id/--api-key`, `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY`, or a `.env` in the cwd (loaded automatically; exported env wins).
+  Exit codes: **0** success (even with no new rows) · **1** API/network failure (clean message, no stack trace) · **2** usage error / missing credentials. Credentials come from `--merchant-id/--api-key`, `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY`, or a `.env` in the cwd (loaded automatically; exported env wins).
+
+  **Completeness caveat (do not over-promise):** the endpoint returns at most 50 matches and exposes NO pagination parameter. When a response is saturated (50 rows), the script prints a `GAP:` warning — history may be truncated and the run must NOT be treated as complete reconciliation. There is no way to page further with this API; cross-check against your own records. The rate limit (10/min) applies to every call; the watch interval is floored at 10s.
 

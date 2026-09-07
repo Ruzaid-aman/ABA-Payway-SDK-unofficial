@@ -4,25 +4,41 @@
  *
  * The fallback job from the Customer Module guide (§10): because PayWay does
  * NOT retry webhooks, poll this API periodically, dedupe by transaction_id,
- * and emit only NEW transactions since the last run (watermark file).
+ * and emit only NEW transactions since the last run.
+ *
+ * Correctness model (audit F03, 2026-09-07):
+ *   - DEDUP BY TRANSACTION ID is the primary "already seen" mechanism —
+ *     durable across restarts, immune to equal timestamps.
+ *   - The timestamp watermark only BOUNDS THE LOOK-BACK WINDOW (it is
+ *     inclusive, and re-checking an overlap is harmless because IDs dedupe).
+ *     A new transaction with transaction_date EQUAL to the watermark is still
+ *     emitted; delayed/out-of-order arrivals are caught on later runs.
+ *   - The checkpoint (watermark + seen IDs) is ONE file written atomically
+ *     (temp + rename) — a crash can never leave watermark and seen-set
+ *     disagreeing.
+ *   - Saturation: the endpoint returns at most 50 rows and has NO pagination
+ *     parameter. When a response holds 50 rows, history may be truncated —
+ *     the run reports `possibleGap: true` and NEVER claims complete
+ *     reconciliation.
  *
  * Usage:
  *   node reconcile.cjs --merchant-ref "dt-one-8989" --env sandbox
  *   node reconcile.cjs --merchant-ref "dt-one-8989" --watch --interval 300 --csv payments.csv
- *   node reconcile.cjs --merchant-ref "INV-123" --json out.json --watermark .reconcile-state.json
+ *   node reconcile.cjs --merchant-ref "INV-123" --json out.json --state .reconcile-state.json
  *
  * Flags:
  *   --merchant-ref <id>   Customer ID / invoice ref to query (required)
  *   --env sandbox|production   (default: sandbox)
  *   --watch               Run forever every --interval seconds (default 300 = 5 min)
  *   --interval <seconds>  Watch interval; PayWay rate limit is 10 req/min (min 10s)
- *   --watermark <file>    State file storing newest transaction_date seen (default ./.payway-reconcile-<ref>.json)
+ *   --state <file>        Checkpoint file: newest date seen + seen IDs (default ./.payway-reconcile-<ref>.json)
  *   --csv <file>          Append new transactions to CSV
  *   --json <file>         Write full latest response to JSON file
  *   --api-key / --merchant-id   Or PAYWAY_API_KEY / PAYWAY_MERCHANT_ID env
  *   --dry-run             Print request that would be sent, do not call the API
  *
- * Exit codes: 0 ok (even when no new rows), 1 API/network error, 2 usage error.
+ * Exit codes: 0 ok (even when no new rows; a possible gap exits 0 too — check
+ * the JSON `possibleGap` field / GAP stderr line), 1 API/network error, 2 usage error.
  */
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -35,6 +51,10 @@ const BASE_URLS = {
   sandbox: 'https://checkout-sandbox.payway.com.kh',
   production: 'https://checkout.payway.com.kh',
 };
+/** Documented maximum number of matches per response (OpenAPI). */
+const MAX_ROWS_PER_RESPONSE = 50;
+/** Cap on the persisted seen-ID set (bound memory/disk). */
+const SEEN_ID_CAP = 5000;
 
 function formatRequestTime(date) {
   const d = date || new Date();
@@ -85,28 +105,60 @@ function postJson(url, body) {
   });
 }
 
-/** transaction_date format: "YYYY-MM-DD HH:mm:ss" (string compare works lexicographically) */
-function isNewerThan(txn, watermark) {
+/**
+ * Whether a row is a candidate for emission. The watermark is INCLUSIVE: a
+ * transaction with transaction_date equal to the watermark is a candidate
+ * (its ID dedupes it if already seen; equal-time DIFFERENT-ID rows must NOT
+ * be dropped — audit F03's core defect). Older-than-watermark rows are also
+ * admitted when their ID is unseen: delayed/out-of-order arrivals must be
+ * caught on later runs.
+ */
+function isCandidate(txn, watermark) {
   if (!watermark) return true;
-  return String(txn.transaction_date || '') > watermark;
+  return true; // ID-based dedupe below is the sole "seen" gate; the watermark only advances the checkpoint.
 }
 
-function loadWatermark(file) {
+/**
+ * Atomic checkpoint write: temp file + rename in the same directory, so a
+ * crash can never leave a torn state (watermark and seen-set always agree).
+ */
+function saveCheckpoint(file, state) {
+  const resolved = path.resolve(file);
+  fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  const tmp = `${resolved}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
+  fs.renameSync(tmp, resolved);
+}
+
+function loadCheckpoint(file) {
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8')).last_transaction_date || null;
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return {
+      last_transaction_date: typeof parsed.last_transaction_date === 'string' ? parsed.last_transaction_date : null,
+      transaction_ids: Array.isArray(parsed.transaction_ids) ? parsed.transaction_ids.map(String) : [],
+    };
   } catch {
-    return null;
+    return { last_transaction_date: null, transaction_ids: [] };
   }
 }
 
-function saveWatermark(file, txns) {
-  const newest = txns.reduce((m, t) => (String(t.transaction_date || '') > m ? String(t.transaction_date) : m), '');
-  fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-  fs.writeFileSync(
-    file,
-    JSON.stringify({ last_transaction_date: newest, updated_at: new Date().toISOString() }, null, 2),
-  );
-  return newest;
+/**
+ * Advance the checkpoint from a batch of rows: newest date + merged seen IDs
+ * (capped). Returns the new state WITHOUT writing — the caller persists it
+ * only after the batch's side effects (CSV append) succeeded, keeping the
+ * checkpoint crash-consistent with the output.
+ */
+function buildCheckpoint(previous, txns) {
+  let newest = previous.last_transaction_date || '';
+  const seen = new Set(previous.transaction_ids);
+  for (const t of txns) {
+    const date = String(t.transaction_date || '');
+    if (date > newest) newest = date;
+    seen.add(String(t.transaction_id));
+  }
+  const all = Array.from(seen);
+  const capped = all.length > SEEN_ID_CAP ? all.slice(all.length - SEEN_ID_CAP) : all;
+  return { last_transaction_date: newest || null, transaction_ids: capped };
 }
 
 const CSV_COLUMNS = [
@@ -151,7 +203,7 @@ function parseArgs(argv) {
 }
 
 async function runOnce(opts) {
-  const { merchantRef, merchantId, apiKey, baseUrl, watermarkFile, csvFile, jsonFile, dryRun } = opts;
+  const { merchantRef, merchantId, apiKey, baseUrl, stateFile, csvFile, jsonFile, dryRun } = opts;
   const reqTime = formatRequestTime();
   const hash = signRequest(reqTime, merchantId, merchantRef, apiKey);
   const body = { req_time: reqTime, merchant_id: merchantId, merchant_ref: merchantRef, hash };
@@ -173,48 +225,39 @@ async function runOnce(opts) {
   }
 
   const all = Array.isArray(res.json.data) ? res.json.data : [];
-  const watermark = loadWatermark(watermarkFile);
-  const seen = loadSeen(watermarkFile);
-  const fresh = all.filter((t) => isNewerThan(t, watermark) && !seen.has(String(t.transaction_id)));
+  const previous = loadCheckpoint(stateFile);
+  const seen = new Set(previous.transaction_ids);
+  // Durable ID dedupe is the ONLY "already emitted" gate (F03): equal-time
+  // new IDs and delayed arrivals are emitted; repeats are suppressed.
+  const fresh = all.filter((t) => isCandidate(t, previous.last_transaction_date) && !seen.has(String(t.transaction_id)));
+  // Saturation signal: 50 rows = the endpoint cap; older history may exist
+  // beyond this response and there is NO pagination parameter to reach it.
+  const possibleGap = all.length >= MAX_ROWS_PER_RESPONSE;
 
   console.log(
-    `[${new Date().toISOString()}] merchant_ref=${merchantRef} fetched=${all.length} new=${fresh.length} watermark=${watermark || '(none)'}`,
+    `[${new Date().toISOString()}] merchant_ref=${merchantRef} fetched=${all.length} new=${fresh.length} watermark=${previous.last_transaction_date || '(none)'}`,
   );
   for (const t of fresh) {
     console.log(
       `  NEW ${t.transaction_date}  ${t.transaction_id}  ${t.payment_status}  ${t.payment_amount} ${t.payment_currency}  ref=${t.merchant_ref}`,
     );
   }
+  if (possibleGap) {
+    console.error(
+      `GAP: response returned ${all.length} rows (endpoint cap ${MAX_ROWS_PER_RESPONSE}, no pagination parameter) — history may be truncated; do NOT treat this run as complete reconciliation. Cross-check against your own records.`,
+    );
+  }
 
-  if (csvFile) {
+  if (csvFile && fresh.length > 0) {
     const writeHeader = !fs.existsSync(csvFile);
-    if (fresh.length > 0) {
-      fs.mkdirSync(path.dirname(path.resolve(csvFile)), { recursive: true });
-      if (writeHeader) fs.appendFileSync(csvFile, `${CSV_COLUMNS.join(',')}\n`);
-      fs.appendFileSync(csvFile, `${fresh.map(toCsvRow).join('\n')}\n`);
-    }
+    fs.mkdirSync(path.dirname(path.resolve(csvFile)), { recursive: true });
+    if (writeHeader) fs.appendFileSync(csvFile, `${CSV_COLUMNS.join(',')}\n`);
+    fs.appendFileSync(csvFile, `${fresh.map(toCsvRow).join('\n')}\n`);
   }
 
-  saveWatermark(watermarkFile, all);
-  saveSeen(watermarkFile, all);
+  // Single atomic checkpoint AFTER the batch's side effects.
+  saveCheckpoint(stateFile, buildCheckpoint(previous, all));
   return 0;
-}
-
-function stateFileFor(file) {
-  return `${file.replace(/\.json$/, '')}.seen.json`;
-}
-function loadSeen(file) {
-  try {
-    return new Set(JSON.parse(fs.readFileSync(stateFileFor(file), 'utf8')).transaction_ids || []);
-  } catch {
-    return new Set();
-  }
-}
-function saveSeen(file, txns) {
-  const seen = loadSeen(file);
-  for (const t of txns) seen.add(String(t.transaction_id));
-  const capped = Array.from(seen).slice(-5000); // bound memory/disk
-  fs.writeFileSync(stateFileFor(file), JSON.stringify({ transaction_ids: capped }, null, 2));
 }
 
 /** Minimal .env loader (same semantics as the CLI: cwd/.env, never overrides real env). */
@@ -251,14 +294,14 @@ async function main() {
   const env = args.env === 'production' ? 'production' : 'sandbox';
   const baseUrl = args['base-url'] || BASE_URLS[env];
   const interval = Math.max(10, Number(args.interval || 300));
-  const watermarkFile = args.watermark || `.payway-reconcile-${merchantRef}.json`;
+  const stateFile = args.state || args.watermark || `.payway-reconcile-${merchantRef}.json`;
 
   const opts = {
     merchantRef,
     merchantId,
     apiKey,
     baseUrl,
-    watermarkFile,
+    stateFile,
     csvFile: typeof args.csv === 'string' ? args.csv : undefined,
     jsonFile: typeof args.json === 'string' ? args.json : undefined,
     dryRun: Boolean(args['dry-run']),
@@ -289,11 +332,14 @@ async function main() {
 module.exports = {
   ENDPOINT,
   BASE_URLS,
+  MAX_ROWS_PER_RESPONSE,
+  SEEN_ID_CAP,
   formatRequestTime,
   signRequest,
-  isNewerThan,
-  loadWatermark,
-  saveWatermark,
+  isCandidate,
+  loadCheckpoint,
+  saveCheckpoint,
+  buildCheckpoint,
   toCsvRow,
   CSV_COLUMNS,
 };

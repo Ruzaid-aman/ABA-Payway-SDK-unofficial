@@ -23,3 +23,5 @@ A clear and concise description of what you expected to happen.
 
 **Additional context**
 Add any other context about the problem here.
+
+Prefer a credential-free demo or mocked response. Do not attach `.env`, profile files, tokens, QR payloads, signed forms, raw callbacks, journals, or customer data. Report vulnerabilities privately using SECURITY.md.

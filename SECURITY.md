@@ -1,22 +1,9 @@
-# Security Policy
+# Security policy
 
-If you discover a security issue in the `aba-payway-ts` SDK, please report it responsibly.
+Report suspected SDK vulnerabilities privately to `security@antigravity.dev`. Maintainers must confirm this mailbox is owned and monitored before public launch; that operational check is tracked in the [release checklist](docs/RELEASE_CHECKLIST.md).
 
-## Reporting a Vulnerability
+Include the SDK/Node versions, impact, and a minimal reproduction using synthetic data. Never send real merchant credentials, COF tokens, or customer data. Do not open a public issue containing exploit details or secrets.
 
-Email security reports to: `security@antigravity.dev`
+Maintainers will assess the report, coordinate remediation and disclosure, and publish an advisory when appropriate. Community response is best effort; there is no guaranteed SLA. Coordinate disclosure to give users time to apply a fix.
 
-Please include:
-
-- A description of the issue.
-- Steps to reproduce.
-- A minimal proof-of-concept if available.
-- The version of the SDK and environment details.
-
-## Response
-
-We aim to acknowledge reports within 48 hours and provide a remediation timeline.
-
-## Public Disclosure
-
-Do not publicly disclose vulnerabilities until they are resolved and an advisory is published.
+Security fixes target the latest public release. Until then, fixes target the development branch; historical tags are not maintained support lines. Report gateway account incidents and compromised merchant credentials directly to ABA PayWay for revocation or rotation.

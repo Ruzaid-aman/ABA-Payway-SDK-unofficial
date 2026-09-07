@@ -1,7 +1,8 @@
 ---
 name: aba-payway-agent
 description: Use when operating the agentic PayWay CLI with provider modes, the 13 tools, risk gates, the execution ledger, sessions, local journal queries, and secret redaction.
-version: 1.3.0
+metadata:
+  version: 1.3.0
 ---
 
 # ABA PayWay Agent (Agentic CLI)
@@ -157,7 +158,10 @@ executes zero PayWay creates.
 
 ## Setup playbook & pitfalls (field-tested)
 
-Full notes: [versioned Agent Setup Playbook](https://github.com/antigravity-google/aba-payway-ts/blob/v1.5.0/docs/AGENT-SETUP-PLAYBOOK.md).
+Full notes: the repository's `docs/AGENT-SETUP-PLAYBOOK.md` (available in the
+SDK repository checkout; the published-package URL goes live when a release
+tag carrying that document is published — until then rely on this skill and
+`payway-sdk agent setup --help`).
 Architecture/maintenance notes (module map, stage order, gotchas): same doc,
 section "Implementation & architecture".
 

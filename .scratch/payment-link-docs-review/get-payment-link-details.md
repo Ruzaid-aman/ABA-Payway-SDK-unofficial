@@ -118,7 +118,7 @@ paths:
             example:
               request_time: '20200728093403'
               merchant_id: ec000002
-              merchant_auth: [REMOVED-HISTORICAL-5bc390bebba7]
+              merchant_auth: REPLACE_ME
               hash: EVDFA2118UD0...fbMa2b5q9CCt+sWw==
       responses:
         '200':

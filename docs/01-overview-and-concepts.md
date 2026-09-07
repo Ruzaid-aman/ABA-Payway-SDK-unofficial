@@ -4,6 +4,8 @@
 
 ---
 
+This is a community-maintained server-side SDK, not an official ABA Bank SDK. It requires Node.js 22.12 or later. See [support and compatibility](../SUPPORT.md) for verification limits.
+
 ## What Is ABA PayWay?
 
 ABA PayWay is a payment gateway service provided by **ABA Bank Cambodia**. It allows merchants (businesses) to accept payments from customers via:

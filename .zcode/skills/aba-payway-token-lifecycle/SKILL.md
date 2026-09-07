@@ -1,7 +1,8 @@
 ---
 name: aba-payway-token-lifecycle
 description: Manage ABA PayWay stored tokens — renew, inspect details, remove, and track the 90-day expiry.
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 # Token Lifecycle
@@ -9,7 +10,7 @@ version: 1.0.0
 Account tokens (CITI_FLEX/CITO_FLEX) expire **90 days** after linking, renewal,
 or the last successful transaction (whichever is most recent). Card tokens
 cannot be renewed. The token-management trio is UN-GATED since 2026-08-31
-(the live-documented HMAC compositions are sandbox-verified — SANDBOX-FINDINGS §16).
+(the live-documented HMAC compositions were sandbox-verified on 2026-08-31).
 
 ## Quick Start
 ```ts
@@ -18,11 +19,13 @@ import { computeTokenExpiry, daysUntilTokenExpiry, TOKEN_VALIDITY_DAYS } from 'a
 // 1. Renew an expiring ACCOUNT token (a callback is expected within 3 minutes;
 //    if it never arrives, fall back to getTokenDetails).
 const renewed = await payway.credentialsOnFile.renewToken({
-  requestId: 'req-renew-1', ctid: 'customer123', paymentToken: pwt,
+  requestId: 'reqrenew001', ctid: 'customer123', paymentToken: pwt,
 });
 
-// 2. Inspect a token (takes ONLY requestId — no ctid/pwt).
-const details = await payway.credentialsOnFile.getTokenDetails({ requestId: 'req-detail-1' });
+// 2. Inspect a token (takes ONLY requestId — no ctid/pwt). Use a request ID
+//    from the SAME linkage you are inspecting (e.g. the original link request
+//    or the latest renew) — the gateway resolves the token by that request.
+const details = await payway.credentialsOnFile.getTokenDetails({ requestId: 'reqrenew001' });
 
 // 3. Remove a token (IRREVERSIBLE — takes ctid + pwt, NO requestId;
 //    future charges decline with purchase error 87; the ABA Mobile user is notified).
@@ -51,10 +54,13 @@ allowed by default; only an explicit `false` re-blocks.
 
 ## CLI
 ```sh
-payway-sdk cof token renew   -r req-renew-1  -c customer123 --token <pwt>
-payway-sdk cof token details -r req-detail-1                  # requestId ONLY
+payway-sdk cof token renew   -r reqrenew001  -c customer123 --token <pwt>
+payway-sdk cof token details -r reqrenew001                  # requestId ONLY — use the linkage's known request ID
 payway-sdk cof token remove  -c customer123  --token <pwt>     # NO requestId; irreversible
 ```
+
+> Request IDs must match `[a-zA-Z0-9]{5,24}` — letters/digits only, no hyphens.
+> The SDK validates locally and rejects invalid IDs before any network call.
 
 ## Error Handling
 ```ts

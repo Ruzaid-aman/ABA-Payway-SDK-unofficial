@@ -1,7 +1,8 @@
 ---
 name: aba-payway-link-card
 description: Link a payment card for ABA PayWay credential-on-file payments.
-version: 1.2.0
+metadata:
+  version: 1.2.0
 ---
 
 # Link Card
@@ -23,7 +24,7 @@ const html = payway.credentialsOnFile.getLinkCardFormHtml({
   requestId: 'link001',          // [a-zA-Z0-9]{5,24} — no hyphens/underscores
   ctid: 'customerabc',          // same rule; your customer token identifier
   tokenFlag: 'CITI_FLEX',        // CITI_FLEX | CITO_FLEX (live-documented)
-  frequency: '1M',               // 1W|1M|2M — optional (recurring billing)
+  frequency: '1M',               // 1W|1M|2M — live-documented as REQUIRED; omit at your own risk (advisory warning)
   callbackUrl: 'https://merchant.example/cof-callback', // how the pwt arrives
   continueSuccessUrl: 'https://merchant.example/cards/done', // Done-button target
 });
@@ -55,24 +56,29 @@ await payway.credentialsOnFile.linkCard({
 
 ```sh
 # Local signed form (NO API call): HTML to stdout or -o <path>; opens on TTY
-npx tsx src/cli.ts cof link-card-form --ctid customerabc --token-flag CITI_FLEX \
+payway-sdk cof link-card-form --ctid customerabc --token-flag CITI_FLEX \
   --callback-url https://merchant.example/cof-callback -o link-card.html
 
 # API call: saves the hosted page to payway-output/link-card-<request-id>.html, exits 0
-npx tsx src/cli.ts cof link-card -r link001 --ctid customerabc --token-flag CITI_FLEX
+payway-sdk cof link-card -r link001 --ctid customerabc --token-flag CITI_FLEX
 ```
+
+> In the SDK repository checkout, the same commands run as
+> `npx tsx src/cli.ts <args>` (requires `aba-payway-ts` installed or linked).
 
 ## Sandbox Facts (2026-09-01)
 
 - Form-urlencoded only (SDK handles encoding); `request_id`, `ctid`,
-  `token_flag` required, `currency` defaults USD, `frequency` optional
-  (1W|1M|2M, recurring profiles).
+  `token_flag` required, `currency` defaults USD. `frequency` (1W|1M|2M) is
+  live-documented as **required** — the SDK accepts its omission but warns
+  (advisory) because card linking may fail without it.
 - Live-verified 2026-09-01: the locally-built form's hidden fields POST
   exactly like a browser → HTTP 200 + the real 42 KB hosted "PayWay -
-  Checkout" page. Evidence: `test-output/link-card-form-live-probe-2026-09-01.json`.
+  Checkout" page (sandbox-verified 2026-09-01).
 - Hash order (§16-verified, merchant_id first):
   `merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency.continue_success_url`
-  — `amount` is a hash position with NO body field (live-doc quirk; hashes '').
+  — `amount` is a hash position with NO body field (live-doc quirk; hashes the
+  literal empty string regardless of any amount value supplied).
 - Sandbox does not verify the hash on this endpoint — do not treat that as a
   security control (open question to ABA).
 - The `pwt` token arrives ONLY via `callback_url` — verify it with

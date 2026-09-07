@@ -1,7 +1,8 @@
 ---
 name: aba-payway-exchange-rate
 description: Retrieve the current ABA PayWay exchange rate.
-version: 1.1.0
+metadata:
+  version: 1.1.0
 ---
 
 # Exchange Rate

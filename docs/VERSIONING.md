@@ -21,7 +21,7 @@ This SDK follows [Semantic Versioning](https://semver.org/).
 
 ## Supported Node.js Versions
 
-This SDK supports Node.js `>= 20.0.0` (raised from 18 in v1.3.6 — a breaking change).
+This SDK supports Node.js `>=22.12.0`. Raising the runtime floor from Node 20 is a breaking change in the next release.
 
 We recommend using the latest Active LTS release of Node.js for production deployments.
 

@@ -80,7 +80,7 @@
 							"\r",
 							"console.log( \"This is hash message\", pm.collectionVariables.get(\"hashMsg\" ) );\r",
 							"\r",
-							"let secret = '[REMOVED-HISTORICAL-7a0b4ee24441]'\r",
+							"let secret = pm.environment.get('PAYWAY_API_KEY')\r",
 							"\r",
 							"let crypto = require('crypto-js');\r",
 							"\r",

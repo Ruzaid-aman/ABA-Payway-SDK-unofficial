@@ -2,7 +2,8 @@ const crypto = require('crypto');
 const fs = require('fs');
 
 const merchant_id = 'nearyskin';
-const api_key = '[REMOVED-HISTORICAL-7d7243aa2f22]';
+const api_key = process.env.PAYWAY_API_KEY;
+if (!api_key) throw new Error('Set PAYWAY_API_KEY before using this example');
 
 function abaAesEncrypt(plainText, password = '3sc3RLrpd17', iv16char = 'av3DYGLkwBsErphc', method = 'aes-256-cbc') {
     // Must be exact 32 chars (256 bit)

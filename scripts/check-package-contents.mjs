@@ -86,7 +86,7 @@ for (const entry of files) {
 const failures = [
   ...(missing.length ? [`Missing required files: ${missing.join(', ')}`] : []),
   ...(forbiddenPaths.length ? [`Forbidden package paths: ${forbiddenPaths.join(', ')}`] : []),
-  ...(skillCount !== 31 ? [`Expected 31 skill guides, found ${skillCount}`] : []),
+  ...(skillCount !== 32 ? [`Expected 32 skill guides, found ${skillCount}`] : []),
   ...(contentViolations.length ? [`Forbidden embedded content: ${contentViolations.join(', ')}`] : []),
   ...(brokenLocalLinks.length ? [`Broken packaged Markdown links: ${brokenLocalLinks.join(', ')}`] : []),
 ];

@@ -408,6 +408,141 @@ export function validateRefundAmount(amount: number, currency: 'USD' | 'KHR' = '
   }
 }
 
+/**
+ * Money sides in a PayWay transaction. `original_*` is the merchant's order
+ * (what was charged); `payment_*` is the payer's actual debit, which CAN be in
+ * a different currency (sandbox W5-6: a 4000 KHR order paid as 1 USD, and a
+ * 1.20 USD order paid as 4800 KHR).
+ */
+export type RefundMoneySide = 'original' | 'payment';
+
+/**
+ * Currency-aware reconciliation of what remains refundable on a transaction.
+ *
+ * Refunds are requested against the ORIGINAL (merchant) money of the order —
+ * the refund request carries the order currency and the gateway applies it to
+ * the merchant ledger. Deriving the balance from `payment_amount` (payer
+ * debit) mixes currencies when the payer paid in a different one, silently
+ * approving/rejecting wrong refunds. This helper:
+ *   - reconciles `original_amount − refund_amount` when both report the same
+ *     currency (the common case),
+ *   - returns `status: 'ambiguous'` with `reason` when the money sides carry
+ *     different currencies (no authoritative conversion contract exists —
+ *     converting via the current exchange rate would be a guess),
+ *   - returns `status: 'unavailable'` when the needed fields are missing or
+ *     the transaction is not in a refundable state.
+ *
+ * It never throws for data problems; a non-'ok' status is the caller's signal
+ * to stop and decide.
+ */
+export interface RefundableBalanceResult {
+  /** 'ok' — balance computed; otherwise see `reason`. */
+  status: 'ok' | 'unavailable' | 'ambiguous';
+  /** Refund request currency this balance was computed against. */
+  requestCurrency: 'USD' | 'KHR';
+  /** Remaining refundable amount in `requestCurrency`; only meaningful when status is 'ok'. */
+  remaining?: number;
+  /** Merchant order amount in `orderCurrency` (informational, from original_*). */
+  orderAmount?: number;
+  orderCurrency?: string;
+  /** Payer debit (informational, from payment_*). */
+  payerAmount?: number;
+  payerCurrency?: string;
+  /** Total refunded to date, in `requestCurrency` per the gateway ledger. */
+  alreadyRefunded?: number;
+  /** Human-readable explanation for a non-'ok' status. */
+  reason?: string;
+}
+
+interface RefundDetailLike {
+  payment_status?: string;
+  payment_status_code?: number;
+  original_amount?: number;
+  original_currency?: string;
+  payment_amount?: number;
+  payment_currency?: string;
+  refund_amount?: number;
+}
+
+const REFUNDABLE_STATUSES = new Set(['APPROVED', 'REFUNDED', 'PRE-AUTH']);
+
+/**
+ * Compute the remaining refundable balance from a transaction-detail `data`
+ * object, reconciling money in ONE currency. `requestCurrency` is the currency
+ * the refund will be submitted in (the order's currency).
+ */
+export function computeRefundableBalance(
+  detail: RefundDetailLike | undefined | null,
+  requestCurrency: 'USD' | 'KHR',
+): RefundableBalanceResult {
+  const base: RefundableBalanceResult = { status: 'unavailable', requestCurrency };
+
+  if (!detail || typeof detail !== 'object') {
+    return { ...base, reason: 'transaction detail data is missing — cannot validate the refundable balance' };
+  }
+
+  const status = String(detail.payment_status ?? '').toUpperCase();
+  if (status && !REFUNDABLE_STATUSES.has(status)) {
+    return {
+      ...base,
+      reason: `transaction status is "${status}" — refunds usually require APPROVED (or REFUNDED/PRE-AUTH); PENDING/DECLINED/CANCELLED transactions are not refundable`,
+    };
+  }
+
+  const orderAmount = Number(detail.original_amount);
+  const refunded = Number(detail.refund_amount ?? 0);
+  const payerAmount = Number(detail.payment_amount);
+  const orderCurrency = typeof detail.original_currency === 'string' ? detail.original_currency : undefined;
+  const payerCurrency = typeof detail.payment_currency === 'string' ? detail.payment_currency : undefined;
+
+  if (!Number.isFinite(orderAmount)) {
+    return {
+      ...base,
+      payerAmount: Number.isFinite(payerAmount) ? payerAmount : undefined,
+      payerCurrency,
+      reason: 'original_amount is missing from the detail response — the refundable balance cannot be derived from the merchant order money',
+    };
+  }
+  if (!Number.isFinite(refunded)) {
+    return { ...base, orderAmount, orderCurrency, reason: 'refund_amount is not a finite number in the detail response' };
+  }
+
+  // The payer-side money is informational; when its currency differs from the
+  // order money, any balance derived from it would mix currencies — flag it.
+  const moneySidesDiffer =
+    Number.isFinite(payerAmount) &&
+    payerCurrency !== undefined &&
+    orderCurrency !== undefined &&
+    payerCurrency !== orderCurrency;
+
+  const balance = orderAmount - refunded;
+  if (balance <= 0) {
+    return {
+      status: 'ok',
+      requestCurrency,
+      remaining: 0,
+      orderAmount,
+      orderCurrency,
+      alreadyRefunded: refunded,
+      reason: `nothing left to refund (order ${orderAmount} ${orderCurrency ?? ''}, already refunded ${refunded})`,
+    };
+  }
+
+  return {
+    status: 'ok',
+    requestCurrency,
+    remaining: balance,
+    orderAmount,
+    orderCurrency,
+    payerAmount: Number.isFinite(payerAmount) ? payerAmount : undefined,
+    payerCurrency,
+    alreadyRefunded: refunded,
+    reason: moneySidesDiffer
+      ? `payer paid ${payerAmount} ${payerCurrency} but the order is ${orderAmount} ${orderCurrency} — the balance is in ORDER money (${orderCurrency}); never reconcile refunds against payment_amount here`
+      : undefined,
+  };
+}
+
 export function formatAmount(amount: number, currency: 'USD' | 'KHR'): string {
   if (currency === 'USD') {
     return amount.toFixed(2);

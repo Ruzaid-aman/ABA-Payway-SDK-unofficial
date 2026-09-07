@@ -1,7 +1,7 @@
 {
   "name": "aba-payway-ts",
   "version": "1.5.0",
-  "description": "Production-ready, fully-typed TypeScript SDK for the ABA PayWay payment gateway.",
+  "description": "Community-maintained, typed server-side SDK and CLI for the ABA PayWay payment gateway.",
   "license": "MIT",
   "author": "Antigravity <info@antigravity.dev> (https://antigravity.dev)",
   "repository": {
@@ -25,7 +25,7 @@
     "ai-skills"
   ],
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.12.0"
   },
   "type": "module",
   "main": "./dist/index.cjs",
@@ -54,14 +54,17 @@
     "lint": "biome lint src",
     "lint:fix": "biome lint src --write",
     "format": "biome format src --write",
-    "test": "vitest run",
+    "test": "vitest run --exclude src/__tests__/sandbox-contract.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:sandbox": "node scripts/run-sandbox-contract.mjs",
-    "docs:api": "npx typedoc --options typedoc.json",
+    "docs:api": "typedoc --options typedoc.json",
     "clean": "node scripts/clean.mjs",
     "check:package": "node scripts/check-package-contents.mjs",
     "check:public-docs": "node scripts/check-public-docs.mjs",
+    "check:repository": "node scripts/check-repository.mjs",
+    "check:secret-allowlists": "node scripts/check-secret-allowlists.mjs",
+    "smoke:example": "node scripts/smoke-example.mjs",
     "smoke:package": "node scripts/smoke-packed-package.mjs",
     "prepublishOnly": "npm run clean && npm run build",
     "bundle": "npx @redocly/cli bundle payway-openapi/openapi.yaml -o dist/openapi.bundled.yaml",
@@ -79,11 +82,8 @@
     "@types/node": "^26.1.1",
     "@types/qrcode": "^1.5.6",
     "@vitest/coverage-v8": "^4.1.10",
-    "better-sqlite3": "^13.0.3",
-    "canvas": "^3.2.3",
     "happy-dom": "^20.10.6",
     "openapi-typescript": "^7.13.0",
-    "qrcode-reader": "^1.0.4",
     "tsup": "^8.5.1",
     "tsx": "^4.23.1",
     "typedoc": "^0.28.20",

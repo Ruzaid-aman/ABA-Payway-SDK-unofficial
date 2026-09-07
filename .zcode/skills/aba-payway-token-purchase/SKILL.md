@@ -1,7 +1,8 @@
 ---
 name: aba-payway-token-purchase
 description: Charge a stored ABA PayWay credential token.
-version: 1.2.0
+metadata:
+  version: 1.2.0
 ---
 
 # Token Purchase
@@ -25,7 +26,7 @@ const result = await payway.credentialsOnFile.payment({
 
 Never log or expose the payment token to browsers.
 
-CLI: `npx tsx src/cli.ts cof charge -t order-123 -a 10.00 --token <pwt>`
+CLI: `payway-sdk cof charge -t order-123 -a 10.00 --token <pwt>`
 
 ## Error Handling
 ```ts

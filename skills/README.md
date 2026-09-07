@@ -1,13 +1,16 @@
 # ABA PayWay SDK Skills
 
-31 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
+32 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
 them for a supported coding agent:
 
 ```sh
-# From a clone of the SDK repository (the package is not yet on the npm registry —
-# `npx payway-sdk` would resolve to an unrelated third-party package):
+# From a clone of the SDK repository (source-checkout command; the package is
+# not yet on the npm registry — `npx payway-sdk` would resolve to an unrelated
+# third-party package). From an installed package use: npm exec -- payway-sdk skills add <agent>
 npx tsx src/cli.ts skills add claude        # or: codex | opencode  (or several at once)
 ```
+
+Start with [first payment](./aba-payway-first-payment/SKILL.md), then [webhook production](./aba-payway-webhook-production/SKILL.md). Choose only the QR, purchase, or payment-link guide you need. The shared journey is create, verify, and fulfill once.
 
 Each `aba-payway-*` directory is a self-contained AI guidance package. Five
 skills bundle dependency-free `.cjs` tools under their own `scripts/`
@@ -17,15 +20,16 @@ verifier, mock callbacks; transaction-by-merchant-ref: reconciliation cron) —
 each SKILL.md documents its own tools. Repo-root `scripts/*.ts` probes
 referenced in some guides are development-only and ship nowhere.
 
-> **OpenCode loader caveat:** this opencode build loads skills from
-> `~/.config/opencode/skills`, but the installer writes to
-> `~/.opencode/skills` — copy the installed `aba-payway-*` directories to the
-> former after `skills add opencode`.
+> **OpenCode note:** the installer writes to `~/.config/opencode/skills`
+> (the documented loader path for current OpenCode builds). If an older
+> release installed into `~/.opencode/skills`, remove it with
+> `payway-sdk skills remove opencode --dest ~/.opencode/skills` and re-run
+> `skills add opencode`.
 
 ## Payments
 
 - [aba-payway-purchase](./aba-payway-purchase/SKILL.md) — signed checkout purchases, hosted checkout links, the full `generate-checkout` flag set (incl. the S1 additions), and the minutes-vs-seconds lifetime trap.
-- [aba-payway-subscription](./aba-payway-subscription/SKILL.md) — recurring billing on the purchase path: `ctid` + `CITR_FIX` + `frequency`, the 26-field hash, and merchant-initiated follow-up charges.
+- [aba-payway-subscription](./aba-payway-subscription/SKILL.md) — recurring billing on the purchase path: `ctid` + `CITR_FIX` + `frequency`, the 27-field hash (live 2026-09-05 order; the documented 26-field order is rejected with Wrong Hash), and merchant-initiated follow-up charges.
 - [aba-payway-qr](./aba-payway-qr/SKILL.md) — online KHQR generation, the 9 optional params, PNG auto-open.
 - [aba-payway-offline-qr](./aba-payway-offline-qr/SKILL.md) — official ABA KHQR offline generation (no API call).
 - [aba-payway-customer-qr](./aba-payway-customer-qr/SKILL.md) — Merchant Portal static QRs (Printed QR channel) + KHQR decode/CRC validator.

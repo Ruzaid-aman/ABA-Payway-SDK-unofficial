@@ -1,6 +1,6 @@
 import type { TemplateFile } from '../../../config/templates/types.js';
 
-const starter = `import { PayWay, PayWayNetworkError } from 'aba-payway-ts';
+const starter = `import { PayWay, PayWayNetworkError, paymentNextStep } from 'aba-payway-ts';
 
 const callbackUrl = process.env.PAYWAY_CALLBACK_URL;
 if (!callbackUrl) {
@@ -22,6 +22,8 @@ try {
   console.log(JSON.stringify({
     transactionId,
     creation: 'accepted',
+    lifecycle: 'created',
+    guidance: paymentNextStep('created'),
     qrString: created.qrString,
     next: \`payway-sdk check-transaction -t \${transactionId}\`,
   }, null, 2));

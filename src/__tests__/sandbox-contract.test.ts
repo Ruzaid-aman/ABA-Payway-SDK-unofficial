@@ -13,7 +13,8 @@
  * reason). Without both, the suite skips — so plain `npx vitest run`
  * and CI stay fully hermetic.
  *
- * Run: `npm run test:sandbox`
+ * Run explicitly: `npm run test:sandbox`. The standard `npm test` command
+ * excludes this suite, including when credentials and the gate are present.
  *
  * Rate-limit awareness (SANDBOX-FINDINGS §4): transaction-detail 10/min,
  * transaction-list 50/min. This suite makes 1 detail call, 1 list call,

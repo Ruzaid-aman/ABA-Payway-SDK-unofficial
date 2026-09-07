@@ -310,13 +310,16 @@ describe('paymentLink.create multipart wire format (client)', () => {
     expect(form.get('hash')).toBe(expectedHash);
   });
 
-  it('re-sends the same FormData on transient network failures (retry)', async () => {
+  it('re-sends the same FormData on transient failures when the caller opts into mutation retries (F01)', async () => {
     fetchSpy
       .mockRejectedValueOnce(new TypeError('fetch failed'))
       .mockResolvedValueOnce(
         mockJsonResponse({ status: { code: '00', message: 'Created' }, data: { id: 'PL-IMG-3' } }),
       );
-    const retrying = new PayWay({ ...CONFIG_WITH_RSA, maxRetries: 1, retryDelayMs: 1 });
+    // payment-link create is a mutation: single-submit by default (a dropped
+    // response is an unknown outcome). The FormData-reuse mechanic is pinned
+    // here under the explicit 'transient' opt-in.
+    const retrying = new PayWay({ ...CONFIG_WITH_RSA, maxRetries: 1, retryDelayMs: 1, mutationRetryPolicy: 'transient' });
 
     await retrying.paymentLink.create({
       ...VALID_PARAMS,

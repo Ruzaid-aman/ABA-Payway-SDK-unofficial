@@ -22,16 +22,16 @@ When a payment is completed, PayWay can send a server-to-server HTTP POST callba
 
 ```bash
 # Basic — starts server on port 8443, saves callbacks to ./webhook_data/callbacks.jsonl
-npx payway-sdk setup-webhook
+npm exec -- payway-sdk setup-webhook
 
 # With Cloudflare Tunnel (auto-generates a public URL)
-npx payway-sdk setup-webhook --tunnel
+npm exec -- payway-sdk setup-webhook --tunnel
 
 # Custom port and storage
-npx payway-sdk setup-webhook --port 3000 --storage json
+npm exec -- payway-sdk setup-webhook --port 3000 --storage json
 
 # Use a pre-existing public URL (e.g., ngrok, localtunnel, or your own tunnel)
-npx payway-sdk setup-webhook --url https://your-tunnel-url.ngrok.io
+npm exec -- payway-sdk setup-webhook --url https://your-tunnel-url.ngrok.io
 ```
 
 ---
@@ -53,7 +53,7 @@ For the online checkout route only, the command reads your API key from the `PAY
 
 ```bash
 export PAYWAY_API_KEY="your-api-key"
-npx payway-sdk setup-webhook
+npm exec -- payway-sdk setup-webhook
 ```
 
 > **Note:** If `PAYWAY_API_KEY` is not set, the server still accepts and logs all deliveries. Online HMAC verification is logged as "skipped" rather than "verified"; this says nothing about offline KHQR notification authenticity.
@@ -93,7 +93,7 @@ Publish a stable HTTPS URL, then ask ABA to configure and whitelist that exact r
 Appends each callback as a JSONL (JSON Lines) record to `./webhook_data/callbacks.jsonl`. Zero dependencies — works everywhere.
 
 ```bash
-npx payway-sdk setup-webhook --storage json
+npm exec -- payway-sdk setup-webhook --storage json
 ```
 
 **Online checkout record format:**
@@ -114,7 +114,7 @@ If `better-sqlite3` is installed, uses a local SQLite database with WAL journal 
 
 ```bash
 npm install better-sqlite3  # Optional peer dependency
-npx payway-sdk setup-webhook --storage sqlite
+npm exec -- payway-sdk setup-webhook --storage sqlite
 ```
 
 Storage path: `./webhook_data/callbacks.db`
@@ -131,7 +131,7 @@ which cloudflared    # macOS/Linux
 where cloudflared    # Windows
 
 # Start with tunnel
-npx payway-sdk setup-webhook --tunnel
+npm exec -- payway-sdk setup-webhook --tunnel
 ```
 
 **How it works:**
@@ -262,7 +262,7 @@ The offline KHQR route has no assumed online HMAC contract. The listener retains
 ## Lifecycle
 
 ```
-$ npx payway-sdk setup-webhook --tunnel
+$ npm exec -- payway-sdk setup-webhook --tunnel
 
   Starting webhook server on port 8443…
   Storage: ./webhook_data/callbacks.jsonl
@@ -336,14 +336,14 @@ cat ./webhook_data/callbacks.jsonl | jq -s '.[] | select(.body.status == "APPROV
 ### Step 1: Start the webhook server
 
 ```bash
-npx payway-sdk setup-webhook --tunnel
+npm exec -- payway-sdk setup-webhook --tunnel
 # Note the generated URL, e.g. https://abc-123.trycloudflare.com/aba-payway-webhook
 ```
 
 ### Step 2: Generate a QR code with the webhook URL
 
 ```bash
-npx payway-sdk generate-qr \
+npm exec -- payway-sdk generate-qr \
   --amount 5.00 \
   --callback-url https://abc-123.trycloudflare.com/aba-payway-webhook
 # Merchant credentials come from the active profile / PAYWAY_* env (docs/02) —

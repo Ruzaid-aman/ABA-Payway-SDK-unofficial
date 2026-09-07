@@ -1,7 +1,8 @@
 ---
 name: aba-payway-beneficiary
 description: Manage the ABA PayWay payout beneficiary whitelist — add payees, update status, and test with seeded sandbox beneficiaries.
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 # Beneficiary Whitelist
@@ -13,11 +14,15 @@ operations are RSA-encrypted: they require `PAYWAY_RSA_PUBLIC_KEY`.
 
 ## Quick Start
 ```ts
-// Add a beneficiary to the whitelist (payee = beneficiary bank account id)
-await payway.payout.addBeneficiary({ payee: '000999888' });
+// Add a beneficiary to the whitelist (payee = beneficiary bank account id).
+// In the sandbox use a SEEDED account (500000001…, see Sandbox testing) —
+// 000999888 is NOT in the sandbox whitelist and live payout calls to it 403
+// ("Payout accounts are not in whitelist"). In production use the real
+// beneficiary account id.
+await payway.payout.addBeneficiary({ payee: '500000001' });
 
 // Deactivate (0) / reactivate (1)
-await payway.payout.updateBeneficiaryStatus({ payee: '000999888', status: 1 });
+await payway.payout.updateBeneficiaryStatus({ payee: '500000001', status: 1 });
 ```
 
 ## Payout key shapes — per endpoint (do NOT mix)
@@ -44,15 +49,15 @@ Validation always enforces: non-empty, digits only, length ∈ {9, 11, 15}; with
 
 ## CLI
 ```sh
-payway-sdk beneficiary add 000999888
-payway-sdk beneficiary update-status 000999888 -s 1    # 0 = inactive, 1 = active
+payway-sdk beneficiary add 500000001                   # seeded sandbox account
+payway-sdk beneficiary update-status 500000001 -s 1    # 0 = inactive, 1 = active
 payway-sdk sandbox-beneficiaries                        # list the seeded fixtures
 ```
 
 ## Error Handling
 ```ts
 import { PayWayConfigError, PayWayBusinessError } from 'aba-payway-ts';
-try { await payway.payout.addBeneficiary({ payee: '000999888' }); }
+try { await payway.payout.addBeneficiary({ payee: '500000001' }); }
 catch (error) {
   if (error instanceof PayWayConfigError) console.error(error.message); // e.g. missing RSA key
   else if (error instanceof PayWayBusinessError) console.error(error.paywayCode);

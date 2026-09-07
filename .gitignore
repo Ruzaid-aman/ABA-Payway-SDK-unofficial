@@ -68,3 +68,10 @@ dist/openapi.bundled.yaml
 /payway-output/
 stryker-tmp/
 reports/
+
+# Merchant data and local release/security evidence
+/payway-data/
+/webhook_data/
+/.release-audit/
+/.scratch/opensource-release-polish/
+.next/

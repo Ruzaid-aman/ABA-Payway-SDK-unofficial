@@ -1,7 +1,8 @@
 ---
 name: aba-payway-subscription
 description: Register and charge ABA PayWay recurring subscriptions on the purchase path (ctid + CITR_FIX + frequency).
-version: 1.1.0
+metadata:
+  version: 1.1.0
 ---
 
 # Subscription / Recurring Checkout

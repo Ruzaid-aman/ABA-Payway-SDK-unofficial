@@ -2,6 +2,83 @@
 
 ## Unreleased
 
+### Correctness (skills/SDK/CLI audit 2026-09-07, F01/F02)
+
+- **F01 — mutation single-submit policy**: side-effecting endpoints (QR/purchase
+  creates, refund, close, COF link/charge/renew/remove, payment-link create,
+  pre-auth complete/cancel, payout, beneficiary whitelist) now default to a
+  SINGLE transport attempt: a lost response is an UNKNOWN outcome (duplicate
+  tran_ids are silently accepted by the gateway, W5-7, so an automatic re-send
+  could double-charge). Reads keep the bounded retry default. Opt back in per
+  call (`retryPolicy: 'transient'` on purchase) or globally
+  (`mutationRetryPolicy: 'transient'` config). Facade (`retryPolicy ?? 'none'`)
+  and agent (`maxRetries: 0` for creates) already pinned the same behavior —
+  the direct SDK and CLI now match them.
+- **F02 — currency-aware refund preflight**: new exported
+  `computeRefundableBalance(detail, requestCurrency)` reconciles
+  `original_amount − refund_amount` in ONE currency and returns a typed
+  ok/unavailable/ambiguous result (never mixes payer `payment_amount` — W5-6
+  cross-currency evidence — and never throws for data problems). CLI `refund`
+  preflight uses it; `-y/--force` now skips ONLY the confirmation prompt while
+  `--no-preflight` skips ONLY balance validation (previously `-y` silently
+  bypassed validation).
+
+### Skills correctness and portability (audit 2026-09-07, F03–F13)
+
+- **F03**: `reconcile.cjs` rewritten around durable transaction-ID dedupe with
+  an atomic checkpoint and a 50-row saturation `GAP:` warning (the endpoint
+  has no pagination parameter; a saturated response is never reported as
+  complete reconciliation).
+- **F04**: the customer-QR example now guards payment state, obligation
+  matching, and atomic transaction-ID dedupe before fulfillment, and stops
+  promising unsupported pagination.
+- **F05/F06/F07/F13**: hosted-checkout skill rewritten to the live two-route
+  contract (hosted URL vs hosted HTML) with the `as any` cast removed and the
+  CLI `--payment-gate` flag documented truthfully; token-lifecycle example IDs
+  fixed; offline-qr guide now distinguishes local generation from downstream
+  ABA notifications (validateCallbackSetup/parseKhqrPaymentNotification);
+  beneficiary examples use seeded sandbox accounts; link-card frequency and
+  hash prose corrected; transaction-close presents the conflicting not-found
+  evidence as dated observations; bulk `--pace 0` removed from quick starts;
+  journal prune moved to an opt-in maintenance section; subscription hash
+  count (27) and skills count (32) corrected; `Asia/Phnom_Penh` timezone.
+- **F08**: all 32 skills migrated to `metadata.version` (no top-level `version`
+  field — the skill-creator validator rejects it); the skills test parses the
+  schema instead of pinning a fixed frontmatter layout.
+- **F09**: the skills installer is target-aware (OpenCode installs to
+  `~/.config/opencode/skills`), keeps a per-file sha256 manifest, preserves
+  user-modified files on upgrade (`--force-skills` to overwrite), removes only
+  manifest-owned directories, and adds `--only` bundle install, `--dest`
+  overrides, and `skills doctor --agent <name>` scoped health checks with
+  stale/modified/missing detection.
+- **F10**: distributed guides use the installed CLI (`payway-sdk …`) with
+  source-checkout commands labeled as such; dead `blob/v1.5.0` tag URLs
+  removed (payment-link guide, agent playbook reference).
+- **F11**: the `Using profile:` diagnostic goes to stderr under `--json` and
+  `--output json|ndjson` — machine-mode stdout is exactly one JSON document;
+  the "parse from the first `{`" workaround is retired from all guidance.
+- **F12**: per-skill drift guards in the test suite check every guide
+  individually for the known drift classes (request-ID validity, sandbox
+  fixtures, pacing, dead URLs, timezone names) plus focused contract pins for
+  the F02–F07 fixes.
+
+### Developer experience
+
+- Make QUICKSTART.md the canonical create, verify, and fulfill-once journey across SDK, CLI, and skills.
+- Promote sdk.initiate with additive paymentArtifact, paymentLifecycle, and paymentNextStep exports. Preserve gateway and legacy session status contracts.
+- Add first-payment command help and human verification/recovery guidance without changing JSON envelopes or exit codes.
+- Add the webhook-production skill (32 packaged guides) and simplify the first-payment skill and documentation navigation.
+
+### Breaking
+
+- Raise the minimum Node.js runtime to 22.12.0 to match Commander 15. Node 20 is no longer supported by this checkout. The next release requires a new major version; metadata remains at the unpublished 1.5.0 baseline until release preparation.
+
+### Release preparation
+
+- Keep default contributor tests offline; live sandbox checks require the explicit sandbox command. Add a runnable first-payment walkthrough and reject overlapping pending attempts in the reference app, including after restart.
+- Replace broad secret-scan exclusions with detector/file/value-specific fixtures and negative-control checks. Record historical findings and the pending owner/history decisions without publishing secret values.
+- Align contributor setup, support documentation, and Linux/Windows CI with the current SDK. Remove captured merchant/test data from the tracked tree while preserving local evidence. Historical data remains subject to the release audit gate.
+
 > Subscription "Wrong Hash" root cause (sandbox-verified 2026-09-05): the
 > gateway signs `ctid` on the purchase path (between `items`
 > and `shipping`) even though the live docs' subscription operation omits it —

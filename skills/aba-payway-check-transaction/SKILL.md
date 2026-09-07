@@ -1,12 +1,22 @@
 ---
 name: aba-payway-check-transaction
 description: Check the current status of an ABA PayWay transaction.
-version: 1.4.0
+metadata:
+  version: 1.4.0
 ---
 
 # Check Transaction
 
 ## Quick Start
+
+For onboarding, start with [first payment](../aba-payway-first-payment/SKILL.md).
+Use the shared lifecycle: `created`, `pending`, `approved`, `failed`, `unknown`.
+Creation is not approval. Verify order ID, amount, and currency before fulfilling once.
+A timeout means unknown; query the existing attempt before replacing it.
+Expiry and closure remain local policy, even when the gateway reads PENDING.
+See [webhook production](../aba-payway-webhook-production/SKILL.md) for callback trust and recovery.
+Run the installed CLI as `npm exec -- payway-sdk`.
+
 ```ts
 const result = await payway.checkout.checkTransaction('order-123');
 ```
@@ -39,8 +49,9 @@ envelope (not the human ✗ block) — branch on `error.exitCode` / `error.kind`
 { "error": { "kind": "api", "exitCode": 2, "type": "PayWayBusinessError",
   "message": "tran_id not found", "paywayCode": "6", "httpStatus": 200, "retryable": false } }
 ```
-The `Using profile: …` line may still precede the JSON on stdout (documented
-EC-14 behavior) — parse from the first `{`.
+The `Using profile: …` diagnostic goes to STDERR when `--json` is active
+(2026-09-07, audit F11) — stdout is exactly one clean JSON document
+(success payload or error envelope); parse it directly.
 
 ## Error Handling
 ```ts

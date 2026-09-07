@@ -1,7 +1,8 @@
 ---
 name: aba-payway-customer-qr
 description: Handle Merchant Portal Customer Module static QRs (Printed QR channel) — decoded payload anatomy, callback handling, and reconciliation via get-transactions-by-mc-ref.
-version: 1.2.0
+metadata:
+  version: 1.3.0
 ---
 
 # Customer Module QR (Merchant Portal)
@@ -15,18 +16,33 @@ import { PayWay } from 'aba-payway-ts';
 
 const payway = new PayWay({ merchantId: process.env.PAYWAY_MERCHANT_ID!, apiKey: process.env.PAYWAY_API_KEY! });
 
-// Callback handler: match the Customer ID returned as merchant_ref (never parse the QR payload).
+// Callback handler — verify, then check STATE + MONEY + DEDUPE before fulfilling.
+// A valid signature proves the callback came from PayWay; it does NOT prove the
+// payment was approved, that the amount matches, or that you haven't seen it.
 app.post('/payway/callback', (req, res) => {
   if (!payway.verifyCallback(req.body, req.headers['x-payway-hmac-sha512'] as string)) {
     return res.status(400).send('Invalid signature');
   }
-  markCustomerPaid(req.body.merchant_ref, req.body); // merchant_ref === your Customer ID (e.g. dt-one-8989)
+  const { merchant_ref, tran_id, status, amount, currency } = req.body;
+  const order = orders.findByCustomerRef(merchant_ref); // merchant_ref === Customer ID
+  if (String(status).toUpperCase() !== 'APPROVED') return res.sendStatus(200); // ignore non-approved
+  if (!order || !order.expectsExactly(amount, currency)) return res.sendStatus(200); // log + investigate
+  if (fulfillments.has(tran_id)) return res.sendStatus(200); // dedupe by transaction, not customer
+  // Atomically claim the transaction, THEN fulfill exactly once:
+  if (fulfillments.claim(tran_id, { merchant_ref, amount, currency })) {
+    queueFulfillment(tran_id, order); // idempotent — enqueue, don't fulfill inline
+  }
   res.sendStatus(200);
 });
 
 // Fallback job: catch missed callbacks (PayWay does NOT retry webhooks).
 const result = await payway.khqr.getTransactionsByMerchantRef('dt-one-8989');
 ```
+
+The example above is the minimum guard set: verified signature → approved
+state → matching obligation (customer + amount + currency) → atomic
+transaction-ID dedupe → fulfill once. For the full durability workflow
+(storage, retries, recovery) see [webhook production](../aba-payway-webhook-production/SKILL.md).
 
 ## Decoded payload anatomy (verified from a real portal QR)
 
@@ -51,8 +67,8 @@ const result = await payway.khqr.getTransactionsByMerchantRef('dt-one-8989');
 ## Critical behavior
 
 - **Customer ID is NOT in the QR payload.** PayWay attributes the payment server-side via its routing tags and returns the Customer ID as `merchant_ref` in the callback and API. Make Customer ID a mandatory unique field in the portal; match on `merchant_ref`.
-- Callback: HTTP POST with `X-PAYWAY-HMAC-SHA512` header, no retries (5s timeout). Same validation as the online QR flow.
-- Fallback: `get-transactions-by-mc-ref` using the Customer ID as `merchant_ref` (latest 50 per request; paginate).
+- Callback: HTTP POST with `X-PAYWAY-HMAC-SHA512` header, no retries (5s timeout). Same validation as the online QR flow — but the signature is only authenticity; the approved-state/money/dedup guards above are what prevent incorrect fulfillment.
+- Fallback: `get-transactions-by-mc-ref` using the Customer ID as `merchant_ref`. The endpoint returns AT MOST 50 matches and exposes NO pagination parameter — a single request is not a complete-history guarantee during a long outage or high-volume interval; treat a 50-row (saturated) result as a possible gap and reconcile against your own records before declaring completeness.
 
 ## Tools (scripts/)
 

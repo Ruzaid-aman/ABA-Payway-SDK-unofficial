@@ -197,12 +197,38 @@ describe('Task 7 acceptance: the full payment lifecycle', () => {
     // Still exactly one attempt.
     expect(store.listAttempts(orderId).length).toBe(1);
 
-    // (b) A fresh transaction ID is issued per attempt — no ID reuse.
+    // (b) Pending or ambiguous creation must reconcile the saved attempt.
     const orderId2 = await createOrder('coffee');
     const first = await post('/api/orders/create-qr', { orderId: orderId2 });
     const secondAttempt = await post('/api/orders/create-qr', { orderId: orderId2 });
-    expect(first.body.transactionId).not.toBe(secondAttempt.body.transactionId);
-    expect(store.listAttempts(orderId2).length).toBe(2);
+    expect(secondAttempt.status).toBe(409);
+    expect(store.listAttempts(orderId2).length).toBe(1);
+    expect(store.listAttempts(orderId2)[0].transactionId).toBe(first.body.transactionId);
+    const hosted = await post('/api/orders/create-hosted', { orderId: orderId2 });
+    expect(hosted.status).toBe(409);
+    const reopened = new OrderStore(path.join(dataDir, 'store.json'));
+    expect(() => reopened.recordAttempt(orderId2, 'replacement-after-restart', 300)).toThrow(/existing transaction/);
+  });
+
+  it('recovers a lost creation response from the saved attempt without creating a replacement', async () => {
+    const orderId = await createOrder('coffee');
+    const original = engine.createQrPayment;
+    engine.createQrPayment = async (input) => {
+      await original(input);
+      throw new Error('Simulated lost creation response');
+    };
+    try {
+      expect((await post('/api/orders/create-qr', { orderId })).status).toBe(500);
+    } finally {
+      engine.createQrPayment = original;
+    }
+    const reopened = new OrderStore(path.join(dataDir, 'store.json'));
+    const attempts = reopened.listAttempts(orderId);
+    expect(attempts).toHaveLength(1);
+    expect((await post('/api/orders/create-qr', { orderId })).status).toBe(409);
+    expect((await post(`/api/orders/status/${attempts[0].transactionId}`)).status).toBe(200);
+    expect(store.listAttempts(orderId)).toHaveLength(1);
+    expect(store.get(orderId)!.status).toBe('awaiting_payment');
   });
 
   it('routes a late payment after local closure to merchant resolution — never auto-fulfills or auto-refunds', async () => {

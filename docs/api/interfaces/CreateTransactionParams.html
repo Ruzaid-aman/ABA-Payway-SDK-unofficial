@@ -106,7 +106,11 @@ and max 43200 (30 days, not enforced locally).</p>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="paymentgate"><code class="tsd-tag">Optional</code><span>payment<wbr/>Gate</span><a href="#paymentgate" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">paymentGate</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
-<div class="tsd-comment tsd-typography"><p>Send 0 (with a JSON request via purchase()) to receive checkout_qr_url — the hosted page rendering the QR.</p>
+<div class="tsd-comment tsd-typography"><p>0 routes the request through the Checkout service. The response shape
+depends on the request: <code>abapay_khqr_deeplink</code> + <code>viewType: 'hosted_view'</code>
+returns JSON including <code>checkout_qr_url</code> (the hosted page URL); other
+options return the hosted checkout page as HTML
+(the typed <code>PurchaseHostedHtmlResult</code> from <code>checkout.purchaseHosted()</code>).</p>
 </div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="paymentoption"><code class="tsd-tag">Optional</code><span>payment<wbr/>Option</span><a href="#paymentoption" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
@@ -120,11 +124,13 @@ and max 43200 (30 days, not enforced locally).</p>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="retrypolicy"><code class="tsd-tag">Optional</code><span>retry<wbr/>Policy</span><a href="#retrypolicy" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">retryPolicy</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;none&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;transient&quot;</span></div>
-<div class="tsd-comment tsd-typography"><p>Retry policy for this purchase call. 'transient' (default) re-sends the
-request after network errors/5xx/429; 'none' surfaces those failures
-after the first attempt — use for strict once-only submission, since
-production duplicate-tran_id semantics are unconfirmed (sandbox
-overwrites duplicates).</p>
+<div class="tsd-comment tsd-typography"><p>Retry policy for this purchase call. Default (omitted): single attempt —
+purchase is a mutation endpoint and mutations are single-submit by
+default (F01; duplicate tran_ids are silently accepted by the gateway, so
+a re-send after a lost response could double-charge). Pass 'transient' to
+re-send after network errors/5xx/429 when you have verified idempotency
+for your flow; 'none' is now equivalent to the default but stays
+accepted for explicitness.</p>
 </div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="returndeeplink"><code class="tsd-tag">Optional</code><span>return<wbr/>Deeplink</span><a href="#returndeeplink" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>

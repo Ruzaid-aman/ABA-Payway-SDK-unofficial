@@ -73,7 +73,7 @@ npx tsx src/cli.ts journal reconcile --json                               # crea
 - `transaction-list --from/--to` are **gateway time UTC+7** — a UTC/local-derived window silently returns 0 rows; omit both for the full gateway day (the CLI default window is now computed on the gateway clock, shared `gatewayDayWindow()`). Paid transactions appear in the list; unpaid QR-only ones never do (§14/§20). Unpaid purchase-channel ones DO appear (campaign W2-5).
 - `payment-link` pushbacks (live-verified 2026-09-06): PayWay POSTs `{tran_id, status: 0, merchant_ref_no}` (application/json, **no hash** — `verifyCallback()` does NOT apply; verify via check-transaction) to the link's `return_url`; `status` is numeric `0`, not the "00" the official sample shows. **No EXPIRED status** — expired links read OPEN + hosted page 200; enforce expiry merchant-side (create rejects past/<5-min `expired_date` with PTL04). Detail-bogus-id answers **96** (PTL132 documented but not sandbox-reproduced); PTL04 is the catch-all create rejection. Full contract: `docs/17-payment-link.md` §17.6 + SANDBOX-FINDINGS §22.
 - `close-transaction`: no CLOSED status exists in any read API (keep a local `closed` flag); customer-side it kills QRs (scan refused "transaction expired") but hosted-card sessions may still pay — `docs/CLOSE-TRANSACTION-FINDINGS.md`. Lifetime expiry behaves the same remotely: expired transactions read PENDING forever, no EXPIRED status anywhere (campaign W4-1).
-- `check-transaction --json` / `transaction-detail --json` / `generate-checkout --json` print a `{ "error": { kind, exitCode, message, paywayCode, … } }` envelope on failure (branch on it, not on stdout text); the `Using profile:` line may precede JSON — parse from the first `{`.
+- `check-transaction --json` / `transaction-detail --json` / `generate-checkout --json` print a `{ "error": { kind, exitCode, message, paywayCode, … } }` envelope on failure (branch on it, not on stdout text). Since 2026-09-07 (audit F11) the `Using profile:` diagnostic goes to STDERR under `--json`/`--output json|ndjson` — stdout is exactly one JSON document; parse it directly.
 - As an agent, always pass `-y` to `generate-qr`/`generate-checkout` (an interactive-looking stdin can block at the lifetime prompt with no API call) and add `--no-polling --no-open-image` for one-shot runs.
 - COF (v1.3.6, live-docs parity): `cof link-account`/`link-card` require `--request-id`, `--ctid`, `--token-flag` (CITI_FLEX|CITO_FLEX); the token result (`pwt`) arrives via `callback_url`. `cof token details` takes `--request-id` ONLY (no ctid/pwt); `cof token remove` takes `--ctid` + `--token` (no request-id) — these per-endpoint shapes are gateway-verified (SANDBOX-FINDINGS §16). `link-card` always answers with an HTML hosted form — `cof link-card` saves it to `payway-output/link-card-<request-id>.html` and exits 0 (that IS the success signal); `cof link-card-form` (SDK: `credentialsOnFile.getLinkCardFormHtml()`) renders the same signed request as a local browser form, no API call. `beneficiary` commands need `PAYWAY_RSA_PUBLIC_KEY`. JSON-or-string flags (`--items`, `--payout`, `--custom-fields`, `--additional-params`, `--return-deeplink`) accept inline JSON or plain strings. Payout keys are per-endpoint: `generate-qr --payout` and the standalone payout domain use `{account, amount}`; `generate-checkout --payout`, `cof charge --payout`, pre-auth complete-payout, and `payment-link create --payout` use `{acc, amt}` (total must equal the link/transaction amount on payment-link; wrong keys now throw `PayWayConfigError` locally on the purchase path too — W1-5). `generate-checkout --payment-gate 0` returns hosted HTML; use `checkout-form --payment-gate 0` for browser navigation or SDK `checkout.purchaseHosted()` / `purchase({ paymentGate: 0 })` for the hosted response object.
 
@@ -93,9 +93,11 @@ scoped to the command only (same workaround as official boilerplate). Never set 
 
 ## Skills
 
-31 packaged guides install via `npx tsx src/cli.ts skills add opencode`.
-NOTE (2026-08-26): the installer writes to `~/.opencode/skills`, but this opencode build loads from
-`~/.config/opencode/skills` — copy the `aba-payway-*` dirs there after install.
+32 packaged guides install via `npx tsx src/cli.ts skills add <agent>` (claude | codex | opencode | cursor | copilot).
+The installer is target-aware (2026-09-07, audit F09): opencode installs to `~/.config/opencode/skills`
+(the documented loader path), keeps a hash manifest, preserves user-modified files on upgrade
+(`--force-skills` to overwrite), removes only manifest-owned dirs, and supports
+`--only <skills>` bundles, `--dest <path>`, and `skills doctor --agent <name>`.
 Deeper project rules live in `.agents/AGENTS.md`.
 
 ## Agent skills
