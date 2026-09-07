@@ -2405,6 +2405,25 @@ program
           merchantRef: ref,
         });
 
+        // S3 (second-pass audit): do the WORK — self-check inspection and the
+        // requested PNG artifact — BEFORE choosing a renderer. The old machine
+        // branch returned before this code, so `--save-image` silently
+        // produced no file under --output json/ndjson.
+        const inspection = inspectKhqrPayload(qrString);
+        let offlinePngPath: string | undefined;
+        let artifactWarning: string | undefined;
+        if (opts.saveImage !== false) {
+          try {
+            const resolvedOfflineSaveImage =
+              typeof opts.saveImage === 'string'
+                ? opts.saveImage
+                : path.join(process.cwd(), 'payway-output', `${ref.replace(/[^a-zA-Z0-9._-]+/g, '-')}.png`);
+            offlinePngPath = (await saveQrPng({ outputPath: resolvedOfflineSaveImage, qrString })) ?? undefined;
+          } catch (renderError) {
+            artifactWarning = renderError instanceof Error ? renderError.message : String(renderError);
+          }
+        }
+
         if (outputMode) {
           const structured = basePaymentResult({
             command: 'generate-qr',
@@ -2416,6 +2435,24 @@ program
           structured.creation = { outcome: 'accepted', gatewayResponse: { qrString } };
           structured.payment = { status: 'NOT_APPLICABLE', terminal: false };
           structured.nextAction = { kind: 'none', reason: 'Offline KHQR was generated locally.' };
+          if (offlinePngPath) structured.artifacts.qrPngPath = offlinePngPath;
+          // The QR was created locally regardless of artifact hiccups — report
+          // the outcome honestly instead of failing the whole command, but
+          // surface the failure so the caller can react.
+          if (artifactWarning) {
+            structured.nextAction = {
+              kind: 'none',
+              reason: 'Offline KHQR was generated locally, but the requested PNG artifact could not be written.',
+            };
+            structured.artifacts.qrPngError = artifactWarning;
+          }
+          if (inspection) {
+            structured.creation.selfCheck = {
+              crcValid: inspection.crcValid,
+              isStatic: inspection.isStatic,
+              ...(inspection.merchantName !== undefined ? { merchantName: inspection.merchantName } : {}),
+            };
+          }
           if (outputMode === 'ndjson') writeStructuredEvent({ event: 'creation', transactionId, outcome: 'accepted' });
           writeStructuredFinal(outputMode, structured);
           return;
@@ -2429,7 +2466,6 @@ program
 
         // Self-check: decode the TLV and re-verify the CRC-16 checksum
         // locally so configuration mistakes surface before the QR is used.
-        const inspection = inspectKhqrPayload(qrString);
         if (!inspection) {
           console.log(`  ${c.yellow('⚠')} Self-check: payload could not be decoded (unexpected)`);
         } else if (!inspection.crcValid) {
@@ -2472,26 +2508,17 @@ program
         // Offline QRs carry no API image — render the PNG locally so the
         // same --save-image/--no-save-image contract works as online mode.
         if (opts.saveImage !== false) {
-          try {
-            const resolvedOfflineSaveImage =
-              typeof opts.saveImage === 'string'
-                ? opts.saveImage
-                : path.join(process.cwd(), 'payway-output', `${ref.replace(/[^a-zA-Z0-9._-]+/g, '-')}.png`);
-            const offlinePngPath = await saveQrPng({ outputPath: resolvedOfflineSaveImage, qrString });
-            if (offlinePngPath) {
-              console.log(`  ${c.green('✓')} Image saved to ${c.cyan(offlinePngPath)}`);
-              const shouldOpenImage = opts.openImage === true || (opts.openImage === undefined && Boolean(process.stdout.isTTY));
-              if (shouldOpenImage) {
-                const opened = await openImageInDefaultViewer(offlinePngPath);
-                if (opened.opened) console.log(`  ${c.green('✓')} QR image opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
-                else console.log(`  ${c.yellow('⚠')} Could not open QR image automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`);
-              }
-              console.log();
+          if (offlinePngPath) {
+            console.log(`  ${c.green('✓')} Image saved to ${c.cyan(offlinePngPath)}`);
+            const shouldOpenImage = opts.openImage === true || (opts.openImage === undefined && Boolean(process.stdout.isTTY));
+            if (shouldOpenImage) {
+              const opened = await openImageInDefaultViewer(offlinePngPath);
+              if (opened.opened) console.log(`  ${c.green('✓')} QR image opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
+              else console.log(`  ${c.yellow('⚠')} Could not open QR image automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`);
             }
-          } catch (renderError) {
-            console.log(
-              `  ${c.yellow('⚠')} Could not render/save the QR PNG ${c.dim(`(${renderError instanceof Error ? renderError.message : String(renderError)})`)}`,
-            );
+            console.log();
+          } else if (artifactWarning) {
+            console.log(`  ${c.yellow('⚠')} Could not render/save the QR PNG ${c.dim(`(${artifactWarning})`)}`);
             console.log();
           }
         } else {

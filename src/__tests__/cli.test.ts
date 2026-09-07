@@ -483,6 +483,158 @@ describe('built CLI', () => {
     expect(stripAnsi(output)).toMatch(/000201010212/);
   });
 
+  // S3 (second-pass audit): the same explicit --save-image must have the same
+  // effect across renderers — machine mode previously returned before the
+  // artifact code, silently producing no PNG while reporting accepted.
+  it('offline QR --output json honors --save-image and reports the artifact path', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    writeFileSync(
+      path.join(cwd, '.env'),
+      [
+        'PAYWAY_KHQR_BAKONG_ID=merchant@bakong',
+        'PAYWAY_KHQR_ABA_MERCHANT_ID=123456789012345',
+        'PAYWAY_KHQR_ACQUIRER_NAME=ABA Bank',
+        'PAYWAY_KHQR_MERCHANT_CATEGORY_CODE=5999',
+        'PAYWAY_KHQR_MERCHANT_NAME=Example Merchant',
+        'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh',
+        'PAYWAY_KHQR_PAYWAY_DATA=synthetic-template',
+      ].join('\n'),
+    );
+
+    const requestedPng = path.join(cwd, 'requested.png');
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(process.cwd(), 'dist', 'cli.js'),
+        'generate-qr',
+        '--offline',
+        '--ref',
+        'S3-JSON',
+        '-a',
+        '1.00',
+        '-y',
+        '--no-polling',
+        '--no-open-image',
+        '--save-image',
+        requestedPng,
+        '--output',
+        'json',
+      ],
+      { cwd, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } },
+    );
+
+    expect(result.status).toBe(0);
+    // stdout is exactly one JSON document (the profile diagnostic is on stderr).
+    const parsed = JSON.parse(result.stdout) as {
+      creation?: { outcome: string; selfCheck?: { crcValid: boolean } };
+      artifacts?: { qrPngPath?: string; qrPngError?: string };
+    };
+    expect(parsed.creation?.outcome).toBe('accepted');
+    expect(parsed.creation?.selfCheck?.crcValid).toBe(true);
+    expect(parsed.artifacts?.qrPngPath).toBe(requestedPng);
+    expect(parsed.artifacts?.qrPngError).toBeUndefined();
+    expect(existsSync(requestedPng)).toBe(true);
+  });
+
+  it('offline QR --output json reports an artifact failure without failing the QR itself', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    writeFileSync(
+      path.join(cwd, '.env'),
+      [
+        'PAYWAY_KHQR_BAKONG_ID=merchant@bakong',
+        'PAYWAY_KHQR_ABA_MERCHANT_ID=123456789012345',
+        'PAYWAY_KHQR_ACQUIRER_NAME=ABA Bank',
+        'PAYWAY_KHQR_MERCHANT_CATEGORY_CODE=5999',
+        'PAYWAY_KHQR_MERCHANT_NAME=Example Merchant',
+        'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh',
+        'PAYWAY_KHQR_PAYWAY_DATA=synthetic-template',
+      ].join('\n'),
+    );
+
+    // Unwritable destination: a path whose parent is a FILE, not a directory.
+    const blocker = path.join(cwd, 'blocker');
+    writeFileSync(blocker, 'not a directory');
+    const badPng = path.join(blocker, 'nested', 'requested.png');
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(process.cwd(), 'dist', 'cli.js'),
+        'generate-qr',
+        '--offline',
+        '--ref',
+        'S3-BADPATH',
+        '-a',
+        '1.00',
+        '-y',
+        '--no-polling',
+        '--no-open-image',
+        '--save-image',
+        badPng,
+        '--output',
+        'json',
+      ],
+      { cwd, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } },
+    );
+
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout) as {
+      creation?: { outcome: string };
+      artifacts?: { qrPngPath?: string; qrPngError?: string };
+    };
+    // The QR was created locally; the artifact failure is surfaced, not hidden.
+    expect(parsed.creation?.outcome).toBe('accepted');
+    expect(parsed.artifacts?.qrPngError).toBeTypeOf('string');
+    expect(parsed.artifacts?.qrPngPath).toBeUndefined();
+  });
+
+  it('offline QR --output json with --no-save-image writes no PNG and no artifact path', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    writeFileSync(
+      path.join(cwd, '.env'),
+      [
+        'PAYWAY_KHQR_BAKONG_ID=merchant@bakong',
+        'PAYWAY_KHQR_ABA_MERCHANT_ID=123456789012345',
+        'PAYWAY_KHQR_ACQUIRER_NAME=ABA Bank',
+        'PAYWAY_KHQR_MERCHANT_CATEGORY_CODE=5999',
+        'PAYWAY_KHQR_MERCHANT_NAME=Example Merchant',
+        'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh',
+        'PAYWAY_KHQR_PAYWAY_DATA=synthetic-template',
+      ].join('\n'),
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(process.cwd(), 'dist', 'cli.js'),
+        'generate-qr',
+        '--offline',
+        '--ref',
+        'S3-NOSAVE',
+        '-a',
+        '1.00',
+        '-y',
+        '--no-polling',
+        '--no-open-image',
+        '--no-save-image',
+        '--output',
+        'json',
+      ],
+      { cwd, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } },
+    );
+
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout) as { artifacts?: Record<string, unknown> };
+    expect(Object.keys(parsed.artifacts ?? {})).toHaveLength(0);
+    expect(existsSync(path.join(cwd, 'payway-output'))).toBe(false);
+  });
+
   it('generates online through a local API without prompts in non-interactive mode', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);

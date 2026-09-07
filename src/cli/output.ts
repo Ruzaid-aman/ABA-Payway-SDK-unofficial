@@ -33,6 +33,12 @@ export interface PaymentCommandResult {
     outcome: 'accepted' | 'rejected' | 'unknown';
     gatewayResponse?: unknown;
     error?: StructuredError;
+    /** Offline mode: local TLV/CRC self-check over the generated payload. */
+    selfCheck?: {
+      crcValid: boolean;
+      isStatic: boolean;
+      merchantName?: string;
+    };
   };
   payment: {
     status: string;
@@ -47,6 +53,8 @@ export interface PaymentCommandResult {
   };
   artifacts: {
     qrPngPath?: string;
+    /** Set when the QR was created but the requested PNG could not be written. */
+    qrPngError?: string;
   };
   nextAction: {
     kind: 'none' | 'check_existing_transaction' | 'fix_input';
