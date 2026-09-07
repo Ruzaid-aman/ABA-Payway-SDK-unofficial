@@ -319,6 +319,11 @@ describe('Documentation examples', () => {
     expect(offline).toContain('parseKhqrPaymentNotification');
     expect(offline).not.toMatch(/no webhook or automatic reconciliation/i);
     expect(offline).not.toMatch(/has no webhook/i);
+    // Second-pass audit F07 follow-up: the blanket "unlike a locally built
+    // offline QR" routing distinction contradicts the capability guidance
+    // above it (callback reach depends on ABA routing/enrollment, not on
+    // which tool produced the QR string) — it must not come back.
+    expect(offline).not.toContain('unlike a locally built offline QR');
   });
 
   it('the token-lifecycle examples pass local request-id validation (F06)', () => {
@@ -328,6 +333,31 @@ describe('Documentation examples', () => {
     for (const match of lifecycle.matchAll(/requestId: '([^']+)'/g)) {
       expect(match[1]).toMatch(/^[a-zA-Z0-9]{5,24}$/);
     }
+  });
+
+  // S4 (second-pass audit): the guide computed `expiresAt` and then passed
+  // the LINKING date to daysUntilTokenExpiry — returning 0 days for a fresh
+  // token. The guide must pass the DERIVED expiry; this executes the guide's
+  // own snippet shape against a frozen clock for fresh/near-expiry/expired.
+  it('the token-lifecycle expiry example derives the expiry before counting days (S4)', async () => {
+    const lifecycle = readSkill('aba-payway-token-lifecycle');
+    // Phrase pin: the wrong call shape must not come back.
+    expect(lifecycle).not.toMatch(/daysUntilTokenExpiry\(\s*linkedAt\s*,?\s*\)/);
+    expect(lifecycle).toMatch(/daysUntilTokenExpiry\(\s*expiresAt\s*\)/);
+
+    const { computeTokenExpiry, daysUntilTokenExpiry } = await import('../utils.js');
+    const { TOKEN_VALIDITY_DAYS } = await import('../constants.js');
+    expect(TOKEN_VALIDITY_DAYS).toBe(90);
+    const linkedAt = new Date('2026-09-08T00:00:00Z');
+    const now = linkedAt;
+    // The guide's expression: derive expiry from the linking event, then count.
+    const expiresAt = computeTokenExpiry(linkedAt);
+    const daysLeft = daysUntilTokenExpiry(expiresAt, now);
+    expect(daysLeft).toBe(90); // fresh token — the audit's failing case returned 0
+    expect(daysUntilTokenExpiry(expiresAt, new Date(linkedAt.getTime() + 83 * 24 * 3600 * 1000))).toBe(7); // near-expiry
+    expect(daysUntilTokenExpiry(expiresAt, new Date(linkedAt.getTime() + 91 * 24 * 3600 * 1000))).toBe(-1); // expired
+    // The old wrong shape, executed, proves the difference the audit measured:
+    expect(daysUntilTokenExpiry(linkedAt, now)).toBe(0);
   });
 
   it('the transaction-close guide presents the conflicting not-found evidence as dated (F13)', () => {

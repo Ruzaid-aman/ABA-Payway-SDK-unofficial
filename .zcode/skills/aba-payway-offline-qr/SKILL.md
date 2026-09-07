@@ -24,7 +24,9 @@ import { inspectKhqrPayload, validateKhqrCrc } from 'aba-payway-ts';
 if (!validateKhqrCrc(payload)) throw new Error('CRC mismatch — never distribute');
 const inspection = inspectKhqrPayload(payload);
 // { valid, crcValid, isStatic, currency, amount?, merchantName?, merchantCity?, merchantRef?, bakongId? }
-// undefined ⇒ structurally malformed; valid:false ⇒ checksum mismatch (structure still decoded).
+// undefined ⇒ structurally malformed (broken TLV/nested template, bad length digits);
+// valid:false ⇒ checksum mismatch on an otherwise decodable structure.
+// Parsing is byte-based: multibyte merchant names (é, Khmer script) round-trip.
 ```
 
 `generate-qr --offline` runs this self-check automatically and prints the decoded summary (static/dynamic, amount, currency, merchant identity, Bakong ID, reference) plus a locally rendered PNG — the same `--save-image/--no-save-image/--open-image` contract as online mode, saved as `payway-output/<ref>.png`.
@@ -56,7 +58,7 @@ PAYWAY_KHQR_PAYWAY_DATA           # PayWay routing data (62·68/99 tags)
 
 The callback declaration lives in the SDK config object (not env vars): `new PayWay({ ..., khqr: { ...identity, callback: { url, enrollment, verification } } })`. Env vars cover the 7 identity fields only.
 
-Note: unlike a locally built offline QR, the Merchant Portal's Customer Module QR is also static but carries PayWay routing tags (62·68, 99), so its payments DO trigger callbacks and are reconcilable — see [Customer Module QR](../aba-payway-customer-qr/SKILL.md).
+Note: the Merchant Portal's Customer Module QR is also static but carries PayWay routing tags (62·68, 99) from the portal's own enrollment, so its payments are reconcilable via `get-transactions-by-mc-ref` — see [Customer Module QR](../aba-payway-customer-qr/SKILL.md). Whether ANY offline-format QR's payments reach you depends on ABA's routing/enrollment for your Bakong account, not on which tool produced the QR string (see Notifications above).
 
 ## Error Handling
 ```ts

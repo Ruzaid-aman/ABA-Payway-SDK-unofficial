@@ -32,8 +32,11 @@ const details = await payway.credentialsOnFile.getTokenDetails({ requestId: 'req
 await payway.credentialsOnFile.removeToken({ ctid: 'customer123', paymentToken: pwt });
 
 // Expiry helpers (90-day window):
-const expiresAt = computeTokenExpiry(new Date());       // Date 90 days out
-const daysLeft = daysUntilTokenExpiry(linkedAt);        // number — renew when low
+const expiresAt = computeTokenExpiry(linkedAt);        // Date 90 days after the validity base
+const daysLeft = daysUntilTokenExpiry(expiresAt);     // number — renew when low
+// The validity base is whichever event is most recent: linking, renewal, or
+// the last successful transaction — derive the expiry FROM that event and
+// pass the derived expiry (not the event date itself) to daysUntilTokenExpiry.
 ```
 
 ## Per-endpoint param shapes (gateway-verified §16 — do NOT mix them)

@@ -341,6 +341,48 @@ describe('reconcile.cjs (F03: ID-dedupe reconciliation checkpoint)', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  // R6 (second-pass audit): a legacy timestamp file + its sibling seen-ID file
+  // must migrate together BEFORE processing — loading only the timestamp file
+  // produced an EMPTY id set, and the inclusive-watermark policy (ID dedupe as
+  // the sole gate) would then re-emit every previously seen transaction.
+  it('loadCheckpoint migrates the legacy .seen.json sibling into the id set (R6)', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'reconcile-legacy-'));
+    const state = path.join(dir, 'legacy.json');
+    fs.writeFileSync(state, JSON.stringify({ last_transaction_date: '2026-09-07 12:00:00' }));
+    fs.writeFileSync(path.join(dir, 'legacy.seen.json'), JSON.stringify({ transaction_ids: ['already-emitted'] }));
+
+    const loaded = reconcile.loadCheckpoint(state);
+    expect(loaded.last_transaction_date).toBe('2026-09-07 12:00:00');
+    expect(loaded.transaction_ids).toEqual(['already-emitted']);
+
+    // End-to-end upgrade: process a batch containing the already-seen row and
+    // a new one, persist, "restart" — only the genuinely-new row would emit.
+    const batch = [
+      { transaction_id: 'already-emitted', transaction_date: '2026-09-07 12:00:00' },
+      { transaction_id: 'brand-new', transaction_date: '2026-09-07 13:00:00' },
+    ];
+    const next = reconcile.buildCheckpoint(loaded, batch);
+    reconcile.saveCheckpoint(state, next);
+    const reloaded = reconcile.loadCheckpoint(state);
+    expect(new Set(reloaded.transaction_ids)).toEqual(new Set(['already-emitted', 'brand-new']));
+    expect(reloaded.last_transaction_date).toBe('2026-09-07 13:00:00');
+    const wouldEmit = batch.filter((t) => !reloaded.transaction_ids.includes(t.transaction_id));
+    expect(wouldEmit).toEqual([]);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('loadCheckpoint migrates legacy siblings across naming variants (R6)', async () => {
+    for (const siblingName of ['state.json.seen.json', 'state.json-seen.json', 'state.seen.json']) {
+      const dir = await mkdtemp(path.join(os.tmpdir(), 'reconcile-legacy-alt-'));
+      const state = path.join(dir, 'state.json');
+      fs.writeFileSync(state, JSON.stringify({ last_transaction_date: '2026-09-07 09:00:00' }));
+      fs.writeFileSync(path.join(dir, siblingName), JSON.stringify({ transaction_ids: ['seen-1', 'seen-2'] }));
+      const loaded = reconcile.loadCheckpoint(state);
+      expect(loaded.transaction_ids, siblingName).toEqual(['seen-1', 'seen-2']);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('exposes the endpoint saturation cap for gap reporting', () => {
     expect(reconcile.MAX_ROWS_PER_RESPONSE).toBe(50);
   });

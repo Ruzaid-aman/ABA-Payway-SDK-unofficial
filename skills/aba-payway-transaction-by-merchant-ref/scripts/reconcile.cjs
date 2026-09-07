@@ -130,15 +130,56 @@ function saveCheckpoint(file, state) {
   fs.renameSync(tmp, resolved);
 }
 
+/**
+ * Load the checkpoint. Legacy layouts are MIGRATED in memory (and persisted on
+ * the next saveCheckpoint) before processing — the pre-F03 script stored the
+ * seen-ID set in a SIBLING file next to the timestamp file, and loading only
+ * the timestamp file re-emitted every previously seen transaction the moment
+ * the inclusive-watermark policy made ID dedupe the sole gate (second-pass
+ * audit R6). Sibling shapes covered: `<state>.seen.json`,
+ * `<state>-seen.json`, and `<state-without-.json>.seen.json` (e.g.
+ * `legacy.seen.json` next to `legacy.json`). A crash/restart is safe either
+ * way: both sources are read before any row is filtered.
+ */
 function loadCheckpoint(file) {
+  const readIds = (idFile) => {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(idFile, 'utf8'));
+      const ids = parsed?.transaction_ids ?? parsed?.seen ?? parsed;
+      return Array.isArray(ids) ? ids.map(String) : [];
+    } catch {
+      return [];
+    }
+  };
+  const legacyIds = () => {
+    const candidates = [`${file}.seen.json`, `${file}-seen.json`, `${file.replace(/\.json$/, '')}.seen.json`];
+    for (const candidate of candidates) {
+      const ids = readIds(candidate);
+      if (ids.length > 0) return ids;
+    }
+    return [];
+  };
   try {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const ids = Array.isArray(parsed?.transaction_ids) ? parsed.transaction_ids.map(String) : legacyIds();
     return {
       last_transaction_date: typeof parsed.last_transaction_date === 'string' ? parsed.last_transaction_date : null,
-      transaction_ids: Array.isArray(parsed.transaction_ids) ? parsed.transaction_ids.map(String) : [],
+      transaction_ids: ids,
     };
   } catch {
-    return { last_transaction_date: null, transaction_ids: [] };
+    // No modern checkpoint at all: still try the legacy timestamp file +
+    // sibling seen files — a bare legacy timestamp file must not silently
+    // produce an EMPTY id set.
+    let watermark = null;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (typeof parsed?.last_transaction_date === 'string') watermark = parsed.last_transaction_date;
+    } catch {
+      /* not even the timestamp file — fresh start */
+    }
+    const ids = legacyIds();
+    if (watermark === null && ids.length === 0) return { last_transaction_date: null, transaction_ids: [] };
+    return { last_transaction_date: watermark, transaction_ids: ids };
   }
 }
 
