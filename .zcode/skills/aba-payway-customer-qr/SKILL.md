@@ -16,16 +16,28 @@ import { PayWay } from 'aba-payway-ts';
 
 const payway = new PayWay({ merchantId: process.env.PAYWAY_MERCHANT_ID!, apiKey: process.env.PAYWAY_API_KEY! });
 
-// Callback handler — verify, then check STATE + MONEY + DEDUPE before fulfilling.
-// A valid signature proves the callback came from PayWay; it does NOT prove the
-// payment was approved, that the amount matches, or that you haven't seen it.
+// Callback handler — verify, then normalize the route's REAL fields, then
+// check STATE + MONEY + DEDUPE before fulfilling. A valid signature proves the
+// callback came from PayWay; it does NOT prove the payment was approved, that
+// the amount matches, or that you haven't seen it.
 app.post('/payway/callback', (req, res) => {
   if (!payway.verifyCallback(req.body, req.headers['x-payway-hmac-sha512'] as string)) {
     return res.status(400).send('Invalid signature');
   }
-  const { merchant_ref, tran_id, status, amount, currency } = req.body;
-  const order = orders.findByCustomerRef(merchant_ref); // merchant_ref === Customer ID
-  if (String(status).toUpperCase() !== 'APPROVED') return res.sendStatus(200); // ignore non-approved
+  // This route's callback shape (sandbox-verified; same as the offline-KHQR
+  // notification and skills/aba-payway-hash/scripts/mock-callback.cjs):
+  //   payment_status   — the approval state ('APPROVED' | 'PENDING' | …)
+  //   original_amount / original_currency — the MERCHANT-side order money
+  //     (the obligation; amounts arrive as strings — coerce with Number())
+  //   payment_amount / payment_currency — the PAYER's debit; can be in a
+  //     DIFFERENT currency (W5-6: 4000 KHR ordered → 1 USD paid) — match
+  //     against original_*, never payment_amount.
+  const { merchant_ref, tran_id } = req.body; // merchant_ref === Customer ID
+  const status = String(req.body.payment_status ?? '').toUpperCase();
+  const amount = Number(req.body.original_amount);
+  const currency = String(req.body.original_currency ?? '').toUpperCase();
+  if (status !== 'APPROVED') return res.sendStatus(200); // ignore non-approved
+  const order = orders.findByCustomerRef(merchant_ref);
   if (!order || !order.expectsExactly(amount, currency)) return res.sendStatus(200); // log + investigate
   if (fulfillments.has(tran_id)) return res.sendStatus(200); // dedupe by transaction, not customer
   // Atomically claim the transaction, THEN fulfill exactly once:
@@ -40,9 +52,14 @@ const result = await payway.khqr.getTransactionsByMerchantRef('dt-one-8989');
 ```
 
 The example above is the minimum guard set: verified signature → approved
-state → matching obligation (customer + amount + currency) → atomic
-transaction-ID dedupe → fulfill once. For the full durability workflow
-(storage, retries, recovery) see [webhook production](../aba-payway-webhook-production/SKILL.md).
+state → matching obligation (customer + order money) → atomic transaction-ID
+dedupe → fulfill once. Test it with the hash skill's signed fixture tool:
+`node skills/aba-payway-hash/scripts/mock-callback.cjs --url http://localhost:3000/payway/callback --tran-id <id> --merchant-ref <customer-id> --amount <expected> --status APPROVED`
+(then re-send the same `--tran-id` and confirm nothing fulfills twice). The
+handler's behavior — approval, money match, dedupe, wrong-money and
+unknown-customer rejections — is pinned by `src/__tests__/skill-handler-behavior.test.ts`.
+For the full durability workflow (storage, retries, recovery) see
+[webhook production](../aba-payway-webhook-production/SKILL.md).
 
 ## Decoded payload anatomy (verified from a real portal QR)
 

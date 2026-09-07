@@ -297,7 +297,8 @@ describe('Documentation examples', () => {
     expect(refund).toContain('computeRefundableBalance');
     expect(refund).not.toMatch(/payment_amount\)\s*-\s*Number\(d\.refund_amount/);
     // -y skips ONLY the prompt; --no-preflight skips ONLY validation.
-    expect(refund).toContain('skips ONLY the confirmation prompt');
+    expect(refund).toContain('skips ONLY the confirmation');
+    expect(refund).toContain('still runs');
   });
 
   it('the purchase guide matches the live hosted-response contract and CLI flags (F05)', () => {
@@ -337,7 +338,13 @@ describe('Documentation examples', () => {
 
   it('the customer-qr example guards state, obligation, and dedupe before fulfillment (F04)', () => {
     const customerQr = readSkill('aba-payway-customer-qr');
-    expect(customerQr).toContain("String(status).toUpperCase() !== 'APPROVED'");
+    // R2 (second-pass audit): the handler must read the route's REAL fields —
+    // payment_status + original_* money — not a status/amount/currency shape
+    // this route never sends (guards would silently pass at 200 with no jobs).
+    expect(customerQr).toContain("String(req.body.payment_status ?? '')");
+    expect(customerQr).toContain('Number(req.body.original_amount)');
+    expect(customerQr).toContain("req.body.original_currency ?? ''");
+    expect(customerQr).not.toMatch(/const \{[^}]*status[^}]*amount[^}]*currency[^}]*\}\s*=\s*req\.body/);
     expect(customerQr).toContain('fulfillments.has(tran_id)');
     expect(customerQr).toContain('expectsExactly');
     // The unsupported pagination promise must not return.

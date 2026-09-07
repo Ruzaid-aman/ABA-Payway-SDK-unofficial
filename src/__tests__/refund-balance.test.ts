@@ -32,6 +32,55 @@ describe('computeRefundableBalance', () => {
     expect(result.reason).toBeUndefined();
   });
 
+  // R1 (second-pass audit): the helper must never report a usable balance
+  // when the refund REQUEST currency differs from the ORDER currency — a
+  // 4000 KHR order queried as USD must not answer ok/remaining=4000.
+  it('refuses to reconcile a KHR order against a USD refund request (R1)', () => {
+    const result = computeRefundableBalance(
+      detail({
+        original_amount: 4000,
+        original_currency: 'KHR',
+        payment_amount: 1,
+        payment_currency: 'USD',
+      }),
+      'USD',
+    );
+    expect(result.status).toBe('ambiguous');
+    expect(result.remaining).toBeUndefined();
+    expect(result.currencyMismatch).toEqual({ requestCurrency: 'USD', orderCurrency: 'KHR' });
+    expect(result.reason).toContain('order is denominated in KHR');
+    expect(result.reason).toContain('requested in USD');
+  });
+
+  it('refuses the mirrored direction: USD order queried as KHR (R1)', () => {
+    const result = computeRefundableBalance(
+      detail({
+        original_amount: 10,
+        original_currency: 'USD',
+        payment_amount: 10,
+        payment_currency: 'USD',
+      }),
+      'KHR',
+    );
+    expect(result.status).toBe('ambiguous');
+    expect(result.remaining).toBeUndefined();
+    expect(result.currencyMismatch).toEqual({ requestCurrency: 'KHR', orderCurrency: 'USD' });
+  });
+
+  it('treats a missing original_currency as unconfirmed units, not a usable balance (R1)', () => {
+    const result = computeRefundableBalance(detail({ original_currency: undefined }), 'USD');
+    expect(result.status).toBe('ambiguous');
+    expect(result.remaining).toBeUndefined();
+    expect(result.currencyMismatch).toEqual({ requestCurrency: 'USD', orderCurrency: undefined });
+    expect(result.reason).toContain('original_currency is missing');
+  });
+
+  it('matches the order currency case-insensitively', () => {
+    const result = computeRefundableBalance(detail({ original_currency: 'usd' }), 'USD');
+    expect(result.status).toBe('ok');
+    expect(result.remaining).toBe(10);
+  });
+
   it('accounts for an existing partial refund', () => {
     const result = computeRefundableBalance(detail({ refund_amount: 2.5 }), 'USD');
     expect(result.status).toBe('ok');

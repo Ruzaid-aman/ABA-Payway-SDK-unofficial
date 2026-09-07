@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { generateHmac } from '../auth.js';
-import { captureConsole, generateTestRsaKeyPair } from '../test/test-utils.js';
+import { captureConsole, generateTestRsaKeyPair, stripAnsi } from '../test/test-utils.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-mock-'));
 const originalCwd = process.cwd();
@@ -103,6 +103,36 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('transaction-detail')) {
     if (tranId === 'MISSING') {
       send(200, { status: { code: 6, message: 'tran_id not found', tran_id: tranId } });
+    } else if (tranId === 'R-KHR-ORDER') {
+      // R1 fixture: a KHR-denominated order (W5-6 shape: 4000 KHR ordered, paid 1 USD).
+      send(200, {
+        status: { code: '00', message: 'Success', tran_id: tranId },
+        data: {
+          payment_status: 'APPROVED',
+          payment_status_code: 0,
+          original_amount: 4000,
+          original_currency: 'KHR',
+          payment_amount: 1,
+          payment_currency: 'USD',
+          refund_amount: 0,
+          transaction_operations: [],
+        },
+      });
+    } else if (tranId === 'R-USD-ORDER') {
+      // R1 mirrored fixture: a USD-denominated order.
+      send(200, {
+        status: { code: '00', message: 'Success', tran_id: tranId },
+        data: {
+          payment_status: 'APPROVED',
+          payment_status_code: 0,
+          original_amount: 10,
+          original_currency: 'USD',
+          payment_amount: 10,
+          payment_currency: 'USD',
+          refund_amount: 0,
+          transaction_operations: [],
+        },
+      });
     } else {
       send(200, {
         status: { code: '00', message: 'Success', tran_id: tranId },
@@ -297,6 +327,45 @@ describe('CLI API commands against the local mock gateway', () => {
     const { text, exitCode } = await run(['refund', '-t', 'R-OK', '-a', '1.00', '-y', '--json']);
     expect(text).toContain('Refund submitted');
     expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  // R1 (second-pass audit): preflight must HARD-STOP when the refund currency
+  // differs from the order currency — never compare numbers in different units.
+  // The detail response carries no money fields for R-OK, so the baseline path
+  // above exercises the unavailable→continue branch; these pin the mismatch
+  // branches in both directions, in human and machine modes.
+  it('refund --json hard-stops with a validation envelope when the order currency differs (KHR order, USD request)', async () => {
+    const { stdout, exitCode } = await run(['refund', '-t', 'R-KHR-ORDER', '-a', '10.00', '-y', '--json']);
+    const parsed = JSON.parse(stripAnsi(stdout)) as { error?: { kind?: string; message?: string } };
+    expect(parsed.error?.kind).toBe('validation');
+    expect(parsed.error?.message).toContain('denominated in KHR');
+    expect(parsed.error?.message).toContain('-c KHR');
+    expect(exitCode).toBe(1);
+    // The refund itself was never submitted.
+    expect(stdout).not.toContain('Refund submitted');
+  });
+
+  it('refund human mode hard-stops on the mirrored direction (USD order, KHR request)', async () => {
+    const { text, exitCode } = await run(['refund', '-t', 'R-USD-ORDER', '-a', '4000', '-c', 'KHR', '-y']);
+    expect(stripAnsi(text)).toContain('currency mismatch');
+    expect(stripAnsi(text)).toContain('-c USD');
+    expect(stripAnsi(text)).not.toContain('Refund submitted');
+    expect(exitCode).toBe(1);
+  });
+
+  it('refund succeeds in preflight when the request currency matches the order currency', async () => {
+    const { stdout, exitCode } = await run(['refund', '-t', 'R-USD-ORDER', '-a', '1.00', '-c', 'USD', '-y', '--json']);
+    const parsed = JSON.parse(stripAnsi(stdout));
+    expect(parsed.status?.code).toBe('00');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('refund --json keeps stdout to one JSON document with preflight diagnostics on stderr (R5)', async () => {
+    const { stdout, stderr } = await run(['refund', '-t', 'R-USD-ORDER', '-a', '1.00', '-c', 'USD', '-y', '--json']);
+    // The whole stdout must parse as one JSON document — no human preflight lines.
+    expect(() => JSON.parse(stripAnsi(stdout))).not.toThrow();
+    // Progress went to stderr (console.error under machine mode).
+    expect(stripAnsi(stderr)).toContain('Pre-flight');
   });
 
   it('get-transactions-by-ref reports the 404 profile gap with exit code 2', async () => {

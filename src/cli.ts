@@ -1892,21 +1892,41 @@ program
       // -y/--force skips the CONFIRMATION PROMPT only; balance validation runs
       // unless --no-preflight is passed explicitly (audit F02 separation).
       if (opts.preflight !== false) {
+        // Machine mode keeps stdout to exactly one JSON document (audit R5):
+        // progress/diagnostic text goes to stderr, local preflight rejections
+        // emit the shared error envelope.
+        const preflightLog = (...args: unknown[]) => {
+          (opts.json ? console.error : console.log)(...args);
+        };
         try {
           const payway = new PayWay();
-          console.log(`  ${c.dim('Pre-flight: fetching original transaction (10/min rate limit)...')}`);
+          preflightLog(`  ${c.dim('Pre-flight: fetching original transaction (10/min rate limit)...')}`);
           const detail = await payway.checkout.getTransactionDetail(opts.transactionId);
           const data = ((detail as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
           const balance = computeRefundableBalance(data as Parameters<typeof computeRefundableBalance>[0], currency);
-          if (balance.reason) console.log(`  ${c.dim(balance.reason)}`);
+          if (balance.reason) preflightLog(`  ${c.dim(balance.reason)}`);
           if (balance.status === 'ok' && balance.remaining !== undefined) {
             if (balance.remaining <= 0) {
+              if (opts.json) {
+                process.exitCode = printValidationErrorJson(
+                  `Nothing left to refund (already refunded ${balance.alreadyRefunded}). Re-run with --no-preflight to submit anyway (PayWay will reject with PTL37/PTL58).`,
+                );
+                return;
+              }
               console.log(`  ${c.red('✗')} Nothing left to refund (already refunded ${balance.alreadyRefunded}).`);
               console.log(`  ${c.dim('Use --no-preflight to submit anyway (PayWay will reject with PTL37/PTL58).')}`);
               process.exitCode = EXIT_VALIDATION;
               return;
             }
             if (amount > balance.remaining + 1e-9) {
+              if (opts.json) {
+                process.exitCode = printValidationErrorJson(
+                  `Refund ${amount} ${currency} exceeds remaining refundable balance ${balance.remaining} ${currency} ` +
+                    `(order ${balance.orderAmount} ${balance.orderCurrency ?? ''}, already refunded ${balance.alreadyRefunded ?? 0}). ` +
+                    'Use --no-preflight to submit anyway.',
+                );
+                return;
+              }
               console.log(
                 `  ${c.red('✗')} Refund ${amount} ${currency} exceeds remaining refundable balance ${balance.remaining} ${currency} ` +
                   `(order ${balance.orderAmount} ${balance.orderCurrency ?? ''}, already refunded ${balance.alreadyRefunded ?? 0}).`,
@@ -1915,17 +1935,30 @@ program
               process.exitCode = EXIT_VALIDATION;
               return;
             }
-            console.log(`  ${c.green('✓')} Pre-flight OK: remaining refundable = ${balance.remaining} ${currency}`);
-          } else if (balance.status === 'ambiguous') {
-            console.log(`  ${c.yellow('⚠')} Pre-flight could not reconcile the balance unambiguously: ${balance.reason ?? 'unknown reason'}`);
-            console.log(`  ${c.dim('Continuing without balance validation. Use --no-preflight to silence this check.')}`);
+            preflightLog(`  ${c.green('✓')} Pre-flight OK: remaining refundable = ${balance.remaining} ${currency}`);
+          } else if (balance.status === 'ambiguous' && balance.currencyMismatch) {
+            // R1: a determinable currency mismatch must fail safely — submitting
+            // would compare/request numbers in different units.
+            const { orderCurrency } = balance.currencyMismatch;
+            const message = orderCurrency
+              ? `Refund currency mismatch — the order is denominated in ${orderCurrency} but the refund was requested in ${currency}. ` +
+                `Re-run with -c ${orderCurrency} (or pass '${orderCurrency.toLowerCase()}' to checkout.refund). Do not convert manually.`
+              : balance.reason ?? 'Refund currency could not be confirmed against the order currency.';
+            if (opts.json) {
+              process.exitCode = printValidationErrorJson(message);
+              return;
+            }
+            console.log(`  ${c.red('✗')} ${message}`);
+            console.log(`  ${c.dim('Use --no-preflight to skip validation and submit anyway (units stay your responsibility).')}`);
+            process.exitCode = EXIT_VALIDATION;
+            return;
           } else {
-            console.log(`  ${c.yellow('⚠')} Pre-flight unavailable: ${balance.reason ?? 'detail data missing'}`);
-            console.log(`  ${c.dim('Continuing without balance validation. Use --no-preflight to silence this check.')}`);
+            preflightLog(`  ${c.yellow('⚠')} Pre-flight unavailable: ${balance.reason ?? 'detail data missing'}`);
+            preflightLog(`  ${c.dim('Continuing without balance validation. Use --no-preflight to silence this check.')}`);
           }
         } catch (e) {
-          console.log(`  ${c.yellow('⚠')} Pre-flight lookup failed: ${(e as Error).message}`);
-          console.log(`  ${c.dim('Continuing without balance validation. Use --no-preflight to silence this check.')}`);
+          preflightLog(`  ${c.yellow('⚠')} Pre-flight lookup failed: ${(e as Error).message}`);
+          preflightLog(`  ${c.dim('Continuing without balance validation. Use --no-preflight to silence this check.')}`);
         }
       }
 
@@ -4041,6 +4074,7 @@ skillsCmd
       only: opts.only ? opts.only.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
       force: opts.forceSkills === true,
       dest: opts.dest,
+      packageVersion: readPackageVersion(),
     });
   });
 

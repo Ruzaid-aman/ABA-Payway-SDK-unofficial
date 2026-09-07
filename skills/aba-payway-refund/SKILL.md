@@ -50,22 +50,30 @@ const detail = await payway.checkout.getTransactionDetail('order-123');
 const d = (detail as any).data;
 const balance = computeRefundableBalance(d, 'USD');   // the refund request currency
 if (balance.status !== 'ok' || balance.remaining === undefined) {
-  // status 'unavailable'/'ambiguous' + reason → stop and decide, don't guess
+  // 'ambiguous' + currencyMismatch → the order currency differs from (or is
+  // missing for) your request currency; re-issue with the order currency —
+  // never convert manually (no authoritative conversion contract exists).
+  // 'unavailable' + reason → fields missing or status not refundable.
   throw new Error(balance.reason ?? 'refund balance unavailable');
 }
 if (refundAmount > balance.remaining) throw new Error('Refund exceeds remaining balance');
 ```
 
-The helper reconciles `original_amount − refund_amount` in ONE currency,
-returns `ambiguous` when the payer's debit currency differs from the order's
-(no authoritative conversion contract exists — converting would be a guess),
-and `unavailable` with a reason when fields are missing or the status is not
-refundable (APPROVED/REFUNDED/PRE-AUTH).
+The helper reconciles `original_amount − refund_amount` in ONE currency — the
+ORDER currency. It returns `ambiguous` (with `currencyMismatch`) when the refund
+request currency differs from the order's `original_currency`, or that field is
+missing (the units of the number are then unconfirmed); `unavailable` with a
+reason when fields are missing or the status is not refundable
+(APPROVED/REFUNDED/PRE-AUTH). A payer debit in another currency stays
+informational and does not change the balance.
 
-The CLI equivalent is `payway-sdk refund -t <id> -a <amount>` — it runs this
-check automatically. `-y/--force` skips ONLY the confirmation prompt (balance
-validation still runs); `--no-preflight` skips the balance validation
-explicitly (the detail lookup is rate-limited to 10/min).
+The CLI equivalent is `payway-sdk refund -t <id> -a <amount> -c <currency>` — it
+runs this check automatically and HARD-STOPS on a currency mismatch (hint:
+re-run with `-c <order currency>`). `-y/--force` skips ONLY the confirmation
+prompt (balance validation still runs); `--no-preflight` skips the balance
+validation explicitly (the detail lookup is rate-limited to 10/min). Under
+`--json`, preflight diagnostics go to stderr and local rejections emit the
+`{ error: { kind: 'validation', … } }` envelope on stdout.
 
 ## Related Skills
 - [Transaction Detail](../aba-payway-transaction-detail/SKILL.md)

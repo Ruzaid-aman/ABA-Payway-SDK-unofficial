@@ -262,7 +262,7 @@ try {
 >
 > 🧪 **Sandbox-verified (2026-08-25):** Refunding an unknown/unpaid transaction returns **HTTP 403 + PTL36**. The CLI's `payway-sdk refund` command runs a pre-flight balance check via `getTransactionDetail` first (paid − already-refunded) and fails fast with exit code 1 before touching PayWay.
 >
-> ℹ️ **CLI operator note:** `--no-preflight` skips only the detail lookup; `-y/--force` skips both the lookup and the confirmation prompt.
+> ℹ️ **CLI operator note:** `--no-preflight` skips only the detail lookup; `-y/--force` skips only the confirmation prompt (the balance pre-flight still runs unless `--no-preflight` is passed). The pre-flight is currency-aware: it hard-stops (exit 1) when the refund currency differs from the order's `original_currency` — re-run with `-c <order currency>`. Under `--json`, pre-flight diagnostics go to stderr and local rejections emit the `{ error: … }` envelope on stdout.
 
 ### Payout-Specific Error Codes
 

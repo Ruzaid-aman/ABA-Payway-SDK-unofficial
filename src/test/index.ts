@@ -375,6 +375,9 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
               payment_status: tranId.startsWith('e2e-approved') ? 'APPROVED' : 'PENDING',
               payment_status_code: tranId.startsWith('e2e-approved') ? 0 : 2,
               original_amount: '1.00',
+              // Refund preflight (computeRefundableBalance, R1) needs the
+              // order currency to confirm the units of original_amount.
+              original_currency: 'USD',
               apv: '876776',
               transaction_operations: [],
             },

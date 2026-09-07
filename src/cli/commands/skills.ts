@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, type Dirent } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { cp, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -27,6 +27,34 @@ export type SkillAgent = keyof typeof SKILL_AGENT_DIRS;
 
 /** Manifest file recording which files this CLI owns (name → sha256). */
 const MANIFEST_NAME = '.payway-skills-manifest.json';
+
+/**
+ * Versioned ownership manifest (second-pass audit R3/R4/R7/S1).
+ *
+ * v1 (legacy): a flat `{ "skill/file": "<baseline-sha256>" }` map. The baseline
+ * recorded the hash AT INSTALL TIME, so after a user edit was skipped on
+ * upgrade one, the omitted entry vanished from the rewritten manifest and
+ * upgrade two silently overwrote the edit (R3); a partial --only install
+ * rewrote the manifest with only its own files, dropping ownership of every
+ * other installed skill (R4).
+ *
+ * v2 keeps the flat map for per-file baselines but records baselines for
+ * CONFLICTING (user-modified) files too — ownership never lapses — and merges
+ * partial-install results into the existing manifest instead of replacing it.
+ * The baselines are the PACKAGED hashes: on upgrade, a file whose disk hash
+ * differs from the manifest baseline is a user edit regardless of which
+ * package version installed it (R7 needs package-vs-installed comparison, not
+ * installed-vs-old-manifest).
+ */
+const MANIFEST_SCHEMA_VERSION = 2;
+
+export interface SkillInstallManifest {
+  schemaVersion: number;
+  /** Version of the package whose skills/ directory produced this install. */
+  packageVersion: string;
+  /** skill/relPath → sha256 of the PACKAGED file at install time. */
+  files: Record<string, string>;
+}
 
 const c = {
   bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
@@ -79,33 +107,49 @@ async function hashFile(filePath: string): Promise<string> {
   return createHash('sha256').update(content).digest('hex');
 }
 
-/** Load the ownership manifest for an agent dir (missing/corrupt = empty). */
-async function loadManifest(agentDir: string): Promise<Record<string, string>> {
+/**
+ * Load the ownership manifest for an agent dir. Understands both the legacy
+ * flat v1 map (upgrade: baselines carry over unchanged — they were install-time
+ * hashes, so they are already packaged hashes unless a user edit was skipped)
+ * and the v2 envelope. Missing/corrupt = empty manifest.
+ */
+async function loadManifest(agentDir: string): Promise<SkillInstallManifest> {
   try {
-    return JSON.parse(await readFile(path.join(agentDir, MANIFEST_NAME), 'utf8')) as Record<string, string>;
+    const raw = JSON.parse(await readFile(path.join(agentDir, MANIFEST_NAME), 'utf8')) as unknown;
+    if (raw && typeof raw === 'object' && 'schemaVersion' in raw && 'files' in raw) {
+      const parsed = raw as SkillInstallManifest;
+      if (parsed.schemaVersion === MANIFEST_SCHEMA_VERSION && parsed.files && typeof parsed.files === 'object') {
+        return { schemaVersion: MANIFEST_SCHEMA_VERSION, packageVersion: parsed.packageVersion ?? 'unknown', files: parsed.files };
+      }
+    }
+    // Legacy v1: flat map of relPath → hash.
+    if (raw && typeof raw === 'object') {
+      return { schemaVersion: MANIFEST_SCHEMA_VERSION, packageVersion: 'legacy', files: raw as Record<string, string> };
+    }
   } catch {
-    return {};
+    /* missing/corrupt → empty */
   }
+  return { schemaVersion: MANIFEST_SCHEMA_VERSION, packageVersion: 'none', files: {} };
 }
 
 /** Write the manifest atomically (temp + rename in the same directory). */
-async function saveManifest(agentDir: string, manifest: Record<string, string>): Promise<void> {
+async function saveManifest(agentDir: string, manifest: SkillInstallManifest): Promise<void> {
   const tmp = path.join(agentDir, `${MANIFEST_NAME}.tmp-${process.pid}`);
   await writeFile(tmp, JSON.stringify(manifest, null, 2));
   await rename(tmp, path.join(agentDir, MANIFEST_NAME));
 }
 
 /**
- * Copy a packaged skill into the destination and hash every file it owns.
- * Files the user modified (present in the old manifest with a different
- * hash) are reported and SKIPPED unless force=true — a user edit is never
- * silently overwritten.
+ * Copy a packaged skill into the destination. Conflicts (user-modified managed
+ * files) are reported and SKIPPED unless force=true — a user edit is never
+ * silently overwritten — and their packaged baseline hash is still recorded so
+ * ownership and edit detection survive every later upgrade (R3).
  */
 async function installSkill(
   sourceDir: string,
   destDir: string,
   skillName: string,
-  oldManifest: Record<string, string>,
+  oldManifest: SkillInstallManifest,
   force: boolean,
 ): Promise<{ files: Record<string, string>; conflicts: string[] }> {
   const skillSource = path.join(sourceDir, skillName);
@@ -116,12 +160,16 @@ async function installSkill(
   const relFiles = await listFilesRecursive(skillSource);
   for (const rel of relFiles) {
     const abs = path.join(skillDest, rel);
-    const expected = oldManifest[`${skillName}/${rel}`];
+    const expected = oldManifest.files[`${skillName}/${rel}`];
     if (expected !== undefined && existsSync(abs)) {
       const current = await hashFile(abs);
       if (current !== expected) {
         if (!force) {
           conflicts.push(`${skillName}/${rel}`);
+          // R3: record the PACKAGED baseline even though we did not copy, so
+          // the next upgrade still detects the user edit instead of treating
+          // the file as unowned and overwriting it.
+          files[`${skillName}/${rel}`] = expected;
           continue; // preserve the user's modification
         }
       }
@@ -140,6 +188,8 @@ export interface AddSkillsOptions {
   force?: boolean;
   /** Explicit destination directory (overrides the agent's default root). */
   dest?: string;
+  /** Package version stamped into the manifest (CLI passes its own; tests default). */
+  packageVersion?: string;
 }
 
 export async function addSkills(agentNames: string[], skillsDirectory: string, options: AddSkillsOptions = {}): Promise<void> {
@@ -165,12 +215,19 @@ export async function addSkills(agentNames: string[], skillsDirectory: string, o
     const destDir = options.dest ?? SKILL_AGENT_DIRS[agent];
     await mkdir(destDir, { recursive: true });
     const oldManifest = await loadManifest(destDir);
-    const manifest: Record<string, string> = {};
+    // R4: start from the existing manifest and OVERLAY this run's results —
+    // a partial (--only) install must not drop ownership of files installed
+    // by earlier runs that are still on disk.
+    const files: Record<string, string> = { ...oldManifest.files };
+    // What THIS run installed/refreshed (prune decisions compare against this,
+    // never against the merged manifest).
+    const installedThisRun = new Set<string>();
     let conflictCount = 0;
 
     for (const skillName of skillNames) {
-      const { files, conflicts } = await installSkill(skillsDirectory, destDir, skillName, oldManifest, options.force === true);
-      Object.assign(manifest, files);
+      const { files: skillFiles, conflicts } = await installSkill(skillsDirectory, destDir, skillName, oldManifest, options.force === true);
+      Object.assign(files, skillFiles);
+      for (const rel of Object.keys(skillFiles)) installedThisRun.add(rel);
       conflictCount += conflicts.length;
       if (conflicts.length > 0) {
         console.log(
@@ -183,12 +240,15 @@ export async function addSkills(agentNames: string[], skillsDirectory: string, o
 
     // Prune manifest-owned files from skills that no longer ship — but only
     // on FULL-catalog installs: a partial (--only) install must never delete
-    // other still-installed skills (F09 upgrade semantics).
+    // other still-installed skills (F09 upgrade semantics). Retired = the
+    // skill is not packaged anymore AND was not (re)installed this run.
     if (!requested) {
       const prunedSkills = new Set<string>();
-      for (const owned of Object.keys(oldManifest)) {
+      for (const owned of Object.keys(oldManifest.files)) {
         const skillDir = owned.split('/')[0];
-        if (!skillNames.includes(skillDir) && !manifest[owned]) {
+        if (skillNames.includes(skillDir)) continue;
+        delete files[owned]; // ownership does not outlive retired files
+        if (!installedThisRun.has(owned)) {
           const abs = path.join(destDir, owned);
           if (existsSync(abs)) {
             await rm(abs, { force: true });
@@ -196,7 +256,8 @@ export async function addSkills(agentNames: string[], skillsDirectory: string, o
           }
         }
       }
-      // Drop skill directories that no longer hold any managed file.
+      // Drop skill directories that no longer hold ANY file — managed or
+      // user-added (S1: a user note inside a retired skill keeps the dir).
       for (const skillDir of prunedSkills) {
         const dir = path.join(destDir, skillDir);
         try {
@@ -208,7 +269,11 @@ export async function addSkills(agentNames: string[], skillsDirectory: string, o
       }
     }
 
-    await saveManifest(destDir, manifest);
+    await saveManifest(destDir, {
+      schemaVersion: MANIFEST_SCHEMA_VERSION,
+      packageVersion: options.packageVersion ?? 'dev',
+      files,
+    });
     console.log(
       `  ${c.green(`Installed ${skillNames.length} skill(s) for ${agent}`)}${conflictCount > 0 ? c.yellow(` (${conflictCount} file conflict(s) preserved)`) : ''}\n`,
     );
@@ -222,7 +287,10 @@ export async function addSkills(agentNames: string[], skillsDirectory: string, o
 }
 
 /**
- * Remove ONLY manifest-owned skill directories. A custom `aba-payway-*`
+ * Remove ONLY manifest-owned files. Unmanaged files inside a managed skill
+ * directory (user notes, extra scripts) are preserved; managed skill
+ * directories are removed only when nothing remains inside them after the
+ * owned files are gone (second-pass audit S1). A custom `aba-payway-*`
  * directory the user created (or a skill never installed through this CLI)
  * is preserved — removal is ownership-scoped, not prefix-scoped (F09).
  */
@@ -234,40 +302,44 @@ export async function removeSkills(agentNames: string[], options: { dest?: strin
 
   for (const agent of agents) {
     const dir = options.dest ?? SKILL_AGENT_DIRS[agent];
-    let entries: Dirent[];
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
+    if (!existsSync(dir)) {
       console.log(`  ${c.dim('○')} ${c.bold(agent)}  ${c.dim('not installed')}`);
       continue;
     }
 
     const manifest = await loadManifest(dir);
-    const ownedSkills = new Set(Object.keys(manifest).map((key) => key.split('/')[0]));
+    const ownedSkills = new Set(Object.keys(manifest.files).map((key) => key.split('/')[0]));
 
     let removed = 0;
-    let preserved = 0;
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !entry.name.startsWith('aba-payway-')) {
-        continue;
-      }
-      if (ownedSkills.has(entry.name)) {
-        await rm(path.join(dir, entry.name), { recursive: true, force: true });
-        console.log(`  ${c.red('✗')} ${c.bold(agent)} ${c.dim('→')} ${entry.name}`);
+    let preservedFiles = 0;
+    // S1: delete exactly the manifest-owned FILES, never a whole directory.
+    for (const rel of Object.keys(manifest.files)) {
+      const abs = path.join(dir, rel);
+      if (existsSync(abs)) {
+        await rm(abs, { force: true });
         removed++;
-      } else {
-        preserved++;
       }
     }
+    // Drop managed skill directories that are EMPTY after removing owned files
+    // (nothing managed or user-added remains → safe to delete). A directory
+    // that still holds user files keeps them.
+    for (const skillDir of ownedSkills) {
+      const abs = path.join(dir, skillDir);
+      try {
+        const remaining = await readdir(abs);
+        if (remaining.length === 0) await rm(abs, { recursive: true, force: true });
+        else preservedFiles += remaining.length;
+      } catch {
+        // already gone
+      }
+    }
+    await saveManifest(dir, { schemaVersion: MANIFEST_SCHEMA_VERSION, packageVersion: 'removed', files: {} });
     if (removed > 0) {
-      await saveManifest(dir, {});
       console.log(
-        `  ${c.red(`Removed ${removed} skill(s) from ${agent}`)}${preserved > 0 ? c.dim(` (preserved ${preserved} unmanaged aba-payway-* dir(s))`) : ''}\n`,
+        `  ${c.red(`Removed ${removed} managed file(s) from ${agent}`)}${preservedFiles > 0 ? c.yellow(` (kept ${preservedFiles} unmanaged file(s) in managed skill dirs)`) : ''}\n`,
       );
     } else {
-      console.log(
-        `  ${c.dim('○')} ${c.bold(agent)}  ${c.dim(preserved > 0 ? `no managed skills to remove (${preserved} unmanaged aba-payway-* dir(s) preserved)` : 'no ABA PayWay skills to remove')}\n`,
-      );
+      console.log(`  ${c.dim('○')} ${c.bold(agent)}  ${c.dim('no managed skills to remove')}\n`);
     }
   }
 }
@@ -297,18 +369,47 @@ export async function listSkills(options: { dest?: string } = {}): Promise<void>
 }
 
 /**
- * Installation health check (F09): for each requested agent (or one agent via
- * --agent), verify every packaged skill is present, every SKILL.md parses, the
- * scripts the skill bundles actually exist, and managed files match their
- * recorded hashes (stale/modified detection).
+ * Installation health check (F09 + second-pass audit R7): for each requested
+ * agent (or one agent via --agent), verify every packaged skill is present,
+ * every SKILL.md parses (frontmatter checked for real, not just its opening
+ * delimiter), the scripts the skill bundles actually exist, and classify per
+ * file against THREE hashes — package (outdated install), manifest baseline
+ * (user-modified), and disk (missing/deleted). A packaged guide that changed
+ * upstream reads as outdated, not healthy: the previous doctor compared
+ * installed bytes with the OLD manifest only, so it approved stale installs.
  */
-export async function doctorSkills(skillsDirectory: string, options: { agent?: string; dest?: string } = {}): Promise<boolean> {
+export async function doctorSkills(
+  skillsDirectory: string,
+  options: { agent?: string; dest?: string } = {},
+): Promise<boolean> {
   const packagedSkills = await getPackagedSkillNames(skillsDirectory);
   const targets: Array<[string, string]> = options.agent
     ? [[options.agent, options.dest ?? SKILL_AGENT_DIRS[options.agent]]]
     : options.dest
       ? [['(custom)', options.dest]]
       : (Object.entries(SKILL_AGENT_DIRS) as Array<[string, string]>);
+
+  // R7: hash every packaged file ONCE up front — the comparison baseline is
+  // the CURRENT package, not the install-time manifest.
+  const packageHashes: Record<string, string> = {};
+  for (const skillName of packagedSkills) {
+    for (const rel of await listFilesRecursive(path.join(skillsDirectory, skillName)).catch(() => [] as string[])) {
+      packageHashes[`${skillName}/${rel}`] = await hashFile(path.join(skillsDirectory, skillName, rel));
+    }
+  }
+
+  /** Parse YAML frontmatter minimally: `name:` and `description:` keys. */
+  const parseFrontmatter = (content: string): { name?: string; description?: string } | null => {
+    const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!match) return null;
+    const out: { name?: string; description?: string } = {};
+    for (const line of match[1].split(/\r?\n/)) {
+      const kv = line.match(/^(\s*)([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$/);
+      if (kv && kv[2] === 'name') out.name = kv[3].trim();
+      if (kv && kv[2] === 'description') out.description = kv[3].trim();
+    }
+    return out;
+  };
 
   let allHealthy = true;
 
@@ -320,7 +421,7 @@ export async function doctorSkills(skillsDirectory: string, options: { agent?: s
     const issues: string[] = [];
 
     let agentSkills: string[] = [];
-    let manifest: Record<string, string> = {};
+    let manifest: SkillInstallManifest = { schemaVersion: MANIFEST_SCHEMA_VERSION, packageVersion: 'none', files: {} };
     try {
       const entries = await readdir(directory, { withFileTypes: true });
       dirExists = true;
@@ -339,8 +440,11 @@ export async function doctorSkills(skillsDirectory: string, options: { agent?: s
         const skillSourceDir = path.join(skillsDirectory, skillName);
         try {
           const content = await readFile(path.join(skillDir, 'SKILL.md'), 'utf8');
-          if (!content.startsWith('---')) {
-            issues.push(`${skillName}/SKILL.md has no frontmatter`);
+          const frontmatter = parseFrontmatter(content);
+          if (!frontmatter) {
+            issues.push(`${skillName}/SKILL.md has no frontmatter block`);
+          } else if (!frontmatter.name || !frontmatter.description) {
+            issues.push(`${skillName}/SKILL.md frontmatter is missing name/description`);
           }
         } catch {
           issues.push(`${skillName}/SKILL.md not found or unreadable`);
@@ -354,19 +458,27 @@ export async function doctorSkills(skillsDirectory: string, options: { agent?: s
             }
           }
         }
-        // Managed-file drift: hash mismatch = user-modified (info), recorded
-        // but absent = deleted (stale install → re-run skills add).
-        for (const [rel, expected] of Object.entries(manifest)) {
-          if (!rel.startsWith(`${skillName}/`)) continue;
-          const abs = path.join(directory, rel);
-          if (!existsSync(abs)) {
-            issues.push(`${rel} was deleted since install (stale — re-run skills add ${agent})`);
-          } else {
-            const current = await hashFile(abs).catch(() => null);
-            if (current !== null && current !== expected) {
-              issues.push(`${rel} modified since install (user edit — preserved on upgrade)`);
-            }
-          }
+      }
+
+      // Per-file drift classification (R7): manifest baseline = what the
+      // installer owns; package hash = what currently ships.
+      for (const [rel, baseline] of Object.entries(manifest.files)) {
+        const abs = path.join(directory, rel);
+        if (!existsSync(abs)) {
+          issues.push(`${rel} was deleted since install (stale — re-run skills add)`);
+          continue;
+        }
+        const current = await hashFile(abs).catch(() => null);
+        if (current === null) continue;
+        if (current !== baseline) {
+          // User edit against the recorded baseline (or an edit skipped by an
+          // old installer that dropped the entry) — either way: preserved.
+          issues.push(`${rel} modified since install (user edit — preserved on upgrade)`);
+        } else if (packageHashes[rel] !== undefined && packageHashes[rel] !== baseline) {
+          // Disk matches the OLD baseline while the package moved on: the
+          // install is outdated. Health-wise this is informational but must
+          // NOT report healthy as the old doctor did.
+          issues.push(`${rel} is outdated (a newer version ships in the package — re-run skills add)`);
         }
       }
     } catch {

@@ -450,6 +450,12 @@ export interface RefundableBalanceResult {
   payerCurrency?: string;
   /** Total refunded to date, in `requestCurrency` per the gateway ledger. */
   alreadyRefunded?: number;
+  /**
+   * Present when the refund request currency cannot be reconciled with the
+   * order currency (R1): mismatched known currencies, or the order currency
+   * is missing so the units of `original_amount` are unconfirmed.
+   */
+  currencyMismatch?: { requestCurrency: 'USD' | 'KHR'; orderCurrency?: string };
   /** Human-readable explanation for a non-'ok' status. */
   reason?: string;
 }
@@ -505,6 +511,38 @@ export function computeRefundableBalance(
   }
   if (!Number.isFinite(refunded)) {
     return { ...base, orderAmount, orderCurrency, reason: 'refund_amount is not a finite number in the detail response' };
+  }
+
+  // R1: the balance is ORDER money (original_amount − refund_amount). A
+  // number labeled with a different currency is not a usable balance — the
+  // request must be re-issued in the order's currency before comparing. This
+  // applies both mismatch directions, and to a missing original_currency
+  // (the units of original_amount are then unconfirmed).
+  const normalizedOrderCurrency = orderCurrency?.trim().toUpperCase();
+  if (normalizedOrderCurrency !== requestCurrency) {
+    const currencyMismatch = { requestCurrency, orderCurrency: normalizedOrderCurrency };
+    if (!normalizedOrderCurrency) {
+      return {
+        ...base,
+        status: 'ambiguous',
+        orderAmount,
+        currencyMismatch,
+        reason:
+          `original_currency is missing from the detail response — the units of original_amount ${orderAmount} are unconfirmed, ` +
+          `so a ${requestCurrency} refund request cannot be reconciled. Fetch the order currency and re-run.`,
+      };
+    }
+    return {
+      ...base,
+      status: 'ambiguous',
+      orderAmount,
+      orderCurrency: normalizedOrderCurrency,
+      currencyMismatch,
+      reason:
+        `currency mismatch — the order is denominated in ${normalizedOrderCurrency} but the refund was requested in ${requestCurrency}. ` +
+        `Refunds are requested against the ORIGINAL money of the order; re-issue with -c ${normalizedOrderCurrency} ` +
+        `(or refund via the SDK checkout.refund with '${normalizedOrderCurrency.toLowerCase()}'). Do not convert manually — no authoritative conversion contract exists.`,
+    };
   }
 
   // The payer-side money is informational; when its currency differs from the
