@@ -2,6 +2,67 @@
 
 ## Unreleased
 
+### Second-pass audit remediation (2026-09-08, R1–R7 + S1–S4)
+
+Second-pass review (`audit-results/second-pass-2026-09-08/REPORT.md`) found the
+seven first-pass defects still reproducible plus four new ones. All eleven are
+fixed and pinned by regression tests; the audit's own `probes.mts` now passes
+every check against this code.
+
+- **R1 — refund preflight currency validation**:
+  `computeRefundableBalance` validates the refund request currency against the
+  order's `original_currency` (both mismatch directions and the missing-field
+  case) and returns `ambiguous` with a `currencyMismatch` marker instead of
+  comparing numbers in different units. The CLI refund preflight hard-stops on
+  mismatch (hint: re-run with `-c <order currency>`). The refund skill and
+  docs no longer claim `ambiguous` for payer-currency differences (payer money
+  stays informational with a reason string).
+- **R2 — customer-qr callback handler**: the guide handler read
+  `status/amount/currency` — fields the route never sends — so a signed
+  APPROVED fixture acknowledged at 200 with zero fulfillment jobs. It now
+  normalizes the route's real fields (`payment_status`, `original_*` order
+  money; `payment_amount`/`payment_currency` stay informational W5-6 money)
+  and is executed for real by a behavior harness
+  (`skill-handler-behavior.test.ts`) that transpiles the guide's code block
+  and drives it with the packaged `mock-callback.cjs` fixtures.
+- **R3/R4/R7/S1 — skills installer versioned ownership**: the manifest is now
+  a `{ schemaVersion, packageVersion, files }` envelope. User-edited files
+  keep their packaged baseline recorded (edits survive two or more upgrades —
+  previously upgrade two silently overwrote them); partial `--only` installs
+  merge into the existing manifest instead of dropping other skills'
+  ownership; `skills doctor` compares installed bytes against the CURRENT
+  package (outdated detection), parses frontmatter for `name`/`description`,
+  and classifies modified/deleted/outdated separately; `skills remove` deletes
+  only manifest-owned files — user files inside managed skill directories
+  survive and empty-only directories are removed. Legacy flat v1 manifests
+  load with baselines intact.
+- **R5 — refund machine output (refund slice)**: under `--json`, preflight
+  progress goes to stderr and local rejections emit the shared
+  `{ error: { kind, exitCode, … } }` envelope — stdout parses as exactly one
+  JSON document end-to-end.
+- **R6 — reconcile.cjs legacy checkpoint migration**: `loadCheckpoint` merges
+  the legacy split state (timestamp file + sibling `.seen.json`) before
+  processing, so an upgraded install cannot re-emit every previously seen
+  transaction under the inclusive-watermark policy.
+- **S2 — KHQR byte-based inspection**: `inspectKhqrPayload` parses the same
+  UTF-8 bytes the generator encodes lengths against (multibyte merchant names
+  round-trip), treats nested-template parse failures as structural
+  malformation (`undefined`, never `valid: true`), and requires exactly two
+  decimal length digits. `valid` remains structure+CRC; CRC stays integrity,
+  not authenticity.
+- **S3 — offline QR artifacts in machine mode**: `generate-qr --offline` now
+  performs the self-check and the requested PNG artifact BEFORE choosing the
+  renderer — `--save-image` works identically under human/JSON/NDJSON, the
+  path lands in `artifacts.qrPngPath`, artifact failures surface as
+  `artifacts.qrPngError` without failing the locally-created QR, and
+  `creation.selfCheck` carries the CRC verdict into machine output.
+- **S4 — token-expiry example**: the token-lifecycle guide now derives the
+  expiry (`computeTokenExpiry(linkedAt)`) and passes THAT to
+  `daysUntilTokenExpiry` (the old shape answered 0 days for a fresh token);
+  pinned by a frozen-clock test (fresh 90 / near-expiry 7 / expired −1).
+- **F07 follow-up**: removed the offline-qr guide's contradictory "unlike a
+  locally built offline QR" routing claim.
+
 ### Salvaged from preserved stashes (2026-09-07 "merge all to main" sweep)
 
 - **KHQR payload self-check (from the 2026-08-26 stash):** new exported
