@@ -1,10 +1,12 @@
 # Agent Handoff — aba-payway-ts
 
-## Current release state — 2026-09-06
+## Current release state — 2026-09-08
 
-- The DX P0/P1/P2 integration, transaction journal, and payment-link additions are merged into local main (integration commit `46c895b`, baseline `6ecca2b`).
-- Open-source release polish is on `codex/opensource-release-polish`. Package version remains the unpublished `1.5.0` baseline. Node 22.12+ is now required; the next release needs a major version bump. Do not create or move tags without release authorization.
-- `docs/RELEASE-READINESS.md` records the current verification and publication blockers. No remote is configured; remote CI and public links are not verified.
+- Local main is the single line of truth: `9d36e26` (skills/SDK/CLI audit remediation F01–F13, audit file `audit-results/skills-sdk-cli-audit-2026-09-07.md`) + `b12e301` (KHQR payload self-check salvaged from the old Aug-26 stash: `inspectKhqrPayload`/`validateKhqrCrc`/`khqrCrc16` exports, `generate-qr --offline` self-check display + terminal QR + local PNG save) + docs regeneration. `codex/opensource-release-polish` points at `9d36e26` and is fully merged.
+- The "merge all to main" sweep (2026-09-08) is COMPLETE: every branch was already merged; the three old stashes were evaluated against main, all salvageable content was ported or backed up (`.scratch/merged-worktree-preservation-20260907/stash-backups/` — patches, untracked tar, commit SHAs; stashes dropped), `.gitleaks.toml` is now committed (CI reads it from the repo root), and the examples' package-lock intentionally stays gitignored (see `examples/first-payment/.gitignore`).
+- New invariants on main (pinned by tests, do not regress): mutations are single-submit by default (`MUTATION_ENDPOINTS`, `mutationRetryPolicy`/`retryPolicy` escape hatches); refund preflight is currency-aware (`computeRefundableBalance`); skills use `metadata.version` frontmatter; the skills installer is manifest-based with `--only/--dest/--force-skills` and `doctor --agent`; `Using profile:` goes to stderr under machine output; offline QRs self-check (TLV+CRC-16) and save PNGs. Suite baseline: **1561 tests / 101 files**.
+- Package version remains the unpublished `1.5.0` baseline. Node 22.12+ is required; the next release needs a major version bump. Do not create or move tags without release authorization.
+- `docs/RELEASE-READINESS.md` records the current verification and publication blockers (owner/provider dispositions, secret-history decision; plus the F10 consumer-tarball soak). No remote is configured; remote CI and public links are not verified.
 - Read this section as authoritative. The historical notes below preserve prior evidence and may describe branches as unmerged or fixes as pending that are now integrated.
 - Build before CLI tests. Keep gateway credentials and captured merchant data local; use the credential-free demo for contributor checks.
 
