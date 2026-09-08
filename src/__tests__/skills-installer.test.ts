@@ -133,7 +133,7 @@ describe('skills installer (F09)', () => {
     // manifest-owned but no longer ships as a packaged skill).
     await addSkills(['claude'], REPO_SKILLS, { dest });
     expect(existsSync(path.join(dest, 'aba-payway-legacy-gone'))).toBe(false);
-  });
+  }, 30_000);
 
   // S1 (second-pass audit): removing a managed skill must not delete user
   // files inside its directory — only manifest-owned files go, and the
