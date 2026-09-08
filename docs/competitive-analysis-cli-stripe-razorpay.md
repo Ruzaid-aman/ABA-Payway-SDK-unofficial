@@ -130,3 +130,74 @@ Ordered by leverage. Items W-1..W-4 form one coherent "webhook workbench" wave; 
 - [Razorpay CLI — About](https://razorpay.com/docs/cli) and [Install](https://razorpay.com/docs/cli/install-cli) — fetched via curl and read this session (resource commands, supported API families, platforms, brew/scoop/deb/rpm/curl install, `configure`, `/llms.txt`, MCP server in docs nav).
 - Current repository: `src/cli.ts` command tree, [src/cli/commands/](../src/cli/commands/), [src/webhook/](../src/webhook/), [src/agent/](../src/agent/), [src/journal/](../src/journal/), [src/test/index.ts](../src/test/index.ts), [src/config/profiles.ts](../src/config/profiles.ts), [src/cli/output.ts](../src/cli/output.ts), [docs/17-payment-link.md](17-payment-link.md) §17.6, [docs/SANDBOX-FINDINGS.md](SANDBOX-FINDINGS.md) §21/§22.
 - Prior related analysis: [competitive-analysis-cutluy.md](competitive-analysis-cutluy.md) (first-payment path, `webhooks test/replay/inspect` proposal), [STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md) (SDK-level audit, mostly shipped).
+
+---
+
+## The npm ecosystem we are entering (2026-09-08 survey)
+
+> Added after the initial audit, following the user's prompt to review `npmx.dev/package-docs/aba-payway/v/0.2.2`. The npmx page is a JS-rendered mirror of the npm registry; this section is grounded in registry metadata, download stats, and the packages' own source/readmes, fetched directly this session.
+
+### Registry landscape around our name
+
+Checked via `registry.npmjs.org` on 2026-09-08:
+
+| Package | Latest | Status | Description (verbatim) | Downloads (last month) |
+|---|---|---|---|---|
+| `aba-payway-ts` (**ours**) | 1.5.0 | **unpublished — name still free** | — | — |
+| `aba-payway` | 0.2.2 | taken (Joselay, created 2026-03-01, last publish 2026-03-03) | "Type-safe TypeScript SDK for ABA PayWay — Cambodia's #1 payment gateway" | 100 |
+| `aba-payway-sdk` | 0.2.35 | taken (navin_seab, personal Gmail maintainer, 32 versions, active Feb 2026) | **"Official PayWay Cambodia API SDK for Node.js"** (self-proclaimed) | 220 |
+| `payway-sdk` | 1.1.1 | taken (unrelated, 2024) | "Payway SDK NODEJS ===" | — |
+| `payway` | 0.1.4 | taken (unrelated, 2024) | "An unofficial client for ABA PayWay" | — |
+| `aba-payway-cli` | — | **free** | — | — |
+
+Three packages already crowd the `aba-payway*` namespace and two are direct competitors; `aba-payway-sdk` claims "Official" status from a personal account (repo `seabnavin19/payway-sdk`). Nothing has real traction (100–220 downloads/month), so the ecosystem is early and positionable.
+
+### `aba-payway` (Joselay) — the closest technical peer
+
+Published, zero-dependency, MIT, Node ≥18, ESM+CJS, claims Node/Bun/Deno/Cloudflare-Workers runtime support, sandbox integration tests (`tests/e2e.test.ts`, `describe.skipIf(no-credentials)`), CI badge, framework examples (Next.js/Express/Hono snippets). ~15 methods: `createTransaction` (synchronous local-signing — same philosophy as our `checkout-form`), `checkTransaction`, `listTransactions`, `getTransactionDetails`, `closeTransaction`, `getExchangeRate`, `generateQR`, `getTransactionsByRef`. Error classes: `PayWayError`/`ConfigError`/`APIError`/`HashError`. Docs: clean README param tables, sandbox test cards, companion `aba-payway-docs` repo.
+
+**What they do better:**
+
+- **Zero runtime dependencies** — Node built-ins only (`crypto`, native `fetch`); the HMAC helper is a 16-line `createHash`. We ship 5 runtime deps (`@clack/prompts`, `ajv`, `commander`, `qrcode`, `yaml`). For SDK-library consumers, zero-dep is a real selling point (supply-chain surface, install weight, edge-runtime compatibility).
+- **Runtime breadth claimed**: Node/Bun/Deno/Cloudflare Workers. We target and document Node ≥22.12 only.
+- **Publishing velocity**: 4 versions in 3 days (2026-03-01→03). We remain unpublished by policy; every unpublished week is namespace-and-mindshare time.
+- **Sandbox test cards in README** — a small beginner trust signal our README lacks.
+
+**Where they are weaker (checked against our sandbox-pinned contracts):**
+
+- **QR lifetime unit bug**: their `generateQR` validates `lifetime` as 3–43200 **minutes** (README: "Lifetime in minutes (3–43200)"; e2e passes `lifetime: 5`). Our gateway-verified contract pins QR lifetime in **seconds** with an exact 180-second minimum (179 → HTTP 400 code `"04"`); 3–43200 minutes is the *purchase/checkout* rule. Users following their docs get a 180-second QR or a validation error.
+- **close→CANCELLED claim**: their README says close makes "the payment status … `CANCELLED`". We verified no CLOSED/CANCELLED transition exists in any read API — closed transactions read PENDING forever (close-transaction dossier). A merchant coding to that README will conclude their close failed.
+- **No 200-wrapped error handling**: their `request<T>` throws only on non-OK HTTP. PayWay's 200-wrapped business errors (`status.code` 6 not-found, flat `code: "429"` rate limits, legacy numeric status bodies) resolve as *success* and surface later as runtime surprises. We classify these (`PayWayBusinessError`, `PayWayRateLimitError`, `fieldErrors` maps).
+- **No retry/rate-limit engine, no webhook verification**, no COF/pre-auth/payout/beneficiary/payment-link domains (≈8 API methods vs our 24-op matrix), no offline KHQR, no journal, no CLI, no agent tooling.
+- **No sandbox TLS guidance** — zero mention of the self-signed chain / `NODE_TLS_REJECT_UNAUTHORIZED=0` workaround in README, examples, or e2e. We document it prominently.
+- (They did get the checkout hash order essentially right, `view_type`/`payment_gate` correctly excluded — worth acknowledging.)
+
+### `aba-payway-sdk` (navin_seab) — the "Official"-claiming competitor
+
+32 versions since Feb 2026, still active, 220 downloads/month — currently the largest player. Ships a CLI (`bin: aba-payway-sdk`), `PayWayClient` covering QR/purchase/payment-link/detail/list/check/refund/exchange/close, and — notably — **an agent-skills installer** (`npx aba-payway-sdk skills add claude|cursor|copilot|codex|opencode`; `agent-skill`/`ai-agent` keywords). That's the same playbook as our `skills add`, same agent list. Its README claims "Official Node.js SDK for PayWay Cambodia" — false (personal Gmail maintainer, no ABA affiliation): a misrepresentation worth flagging to ABA when we coordinate positioning with the bank.
+
+**What they do better:**
+
+- **Published and discoverable** — 220 downloads/month vs our zero. Even a partially-wrong SDK owns the search results and the `aba-payway*` name association today.
+- **Agent-skills distribution via npx** — `npx aba-payway-sdk skills add claude` works for anyone today; our skills installer requires cloning the repo and `npx tsx src/cli.ts skills add` until we publish.
+- **Payment-link + refund + purchase coverage** in the core client — closer to our breadth than Joselay's.
+
+**Where they are weaker:** the false "Official" claim; `baseUrl: 'https://api.payway.com.kh'` in the quick-start (wrong host — the gateway is `checkout.payway.com.kh` / `checkout-sandbox.payway.com.kh`); response-shape examples that don't match the documented envelope (`response.status.tran_id` on QR create, `payment_link.data.payment_link`); `expired_date: Date.now() + …` (epoch millis, where PayWay expects a date string — our payment-link work pinned the `expired_date` acceptance window); none of our sandbox-verified behavior contract (lifetime units, gateway error shapes, unpaid-visibility, UTC+7 windows) appears in their docs.
+
+### What this changes in our recommendations
+
+1. **Naming decision is now urgent, and `aba-payway-ts` is viable.** The name is free, specific, and unambiguous among the three crowded neighbors. The bin name is the open question: `payway-sdk` is squatted by an unrelated 2024 package, `aba-payway-sdk` is taken by the "Official" claimant, but **`aba-payway-cli` is free** (also free: `payway-sdk-ts`). Recommend bin `aba-payway-cli` — or a scoped `@<org>/payway` — decided **before** first publish, per D-1 in the main report.
+2. **Counter-position explicitly against the "Official" claim.** Our README already states "community-maintained… no endorsement is claimed" — keep that honesty, and consider raising the `aba-payway-sdk` misrepresentation with ABA: an unofficial package claiming official status is a merchant-trust risk for the gateway itself, and ABA engagement could either legitimize our positioning or prompt a genuine official SDK.
+3. **The zero-dependency pitch is worth partially matching.** We can't drop `commander`/`@clack` from the CLI experience, but we can (a) keep the **library** entry free of CLI-only deps — move them to `optionalDependencies` or split a future `aba-payway-cli` package — and (b) document runtime support honestly (Node ≥22.12; Bun/Deno/Workers unverified). This shrinks the install for library-only consumers and answers their sharpest marketing point without sacrificing the CLI.
+4. **Their bugs are our content-marketing.** Their QR-lifetime-units and close→CANCELLED errors are exactly the gateway-contract mistakes our sandbox campaigns exist to prevent. A short "Why gateway-verified contracts matter" section in README/docs — naming the failure modes, not the competitor — turns our verification depth into a visible differentiator.
+5. **Publication cadence beats perfection once unblocked.** Both competitors shipped fast with real errors; we are far more correct but invisible. Once the release blockers in [docs/RELEASE-READINESS.md](RELEASE-READINESS.md) clear, publishing early-and-often matters more than holding for completeness — namespace and search positioning accrue to the published.
+
+### Ecosystem-section sources
+
+- [npmx.dev/package-docs/aba-payway/v/0.2.2](https://npmx.dev/package-docs/aba-payway/v/0.2.2) (SPA mirror; registry used as source of truth)
+- `registry.npmjs.org/aba-payway` (package.json, README) and `api.npmjs.org/downloads/point/last-month/aba-payway` — fetched 2026-09-08
+- `github.com/Joselay/aba-payway` source: `src/client.ts`, `src/hash.ts`, `src/constants.ts`, `tests/e2e.test.ts` — fetched 2026-09-08
+- `registry.npmjs.org/aba-payway-sdk` (package.json incl. maintainers, README) and downloads API — fetched 2026-09-08
+- `registry.npmjs.org/payway-sdk`, `payway`, `aba-payway-ts`, `aba-payway-cli` — availability checks, 2026-09-08
+- Our sandbox-verified contracts: [docs/SANDBOX-FINDINGS.md](SANDBOX-FINDINGS.md) (QR lifetime 180 s, close-transaction behavior), [docs/CLOSE-TRANSACTION-FINDINGS.md](CLOSE-TRANSACTION-FINDINGS.md), HANDOFF.md §3/§7
+- Our [package.json](../package.json) dependencies; [README.md](../README.md) positioning lines
