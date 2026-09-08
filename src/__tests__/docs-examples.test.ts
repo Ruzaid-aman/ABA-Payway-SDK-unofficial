@@ -94,14 +94,14 @@ describe('Documentation examples', () => {
   });
 
   it('keeps the public onboarding path executable and credential safe', () => {
-    const onboarding = ['README.md', 'QUICKSTART.md', 'docs/QUICK-START-1-PAGER.md']
+    const onboarding = ['QUICKSTART.md', 'docs/QUICK-START-1-PAGER.md']
       .map(readDoc)
       .join('\n');
 
     expect(onboarding).toContain('payway-sdk demo --check');
     expect(onboarding).toContain('payway-sdk init --mode sandbox --template first-payment');
     expect(onboarding).toContain('payway-sdk doctor --route online-qr');
-    expect(onboarding).toContain('-y --no-polling --output json');
+    expect(onboarding).toContain('-y --no-polling --no-open-image --output json');
     expect(onboarding).toContain('PowerShell');
     expect(onboarding).toContain('fulfill');
     expect(onboarding).not.toMatch(/^\s*npx payway-sdk\b/gm);

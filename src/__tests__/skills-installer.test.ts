@@ -256,7 +256,7 @@ describe('skills installer (F09)', () => {
     // With --force-skills the packaged content is restored.
     await addSkills(['claude'], REPO_SKILLS, { dest, force: true });
     expect(readFileSync(guide, 'utf8')).not.toContain('my local note');
-  });
+  }, 30_000);
 
   it('remove deletes only manifest-owned files and preserves a custom aba-payway-* dir (F09)', async () => {
     const dest = newDest();

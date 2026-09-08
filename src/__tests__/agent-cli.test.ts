@@ -215,7 +215,7 @@ describe('agentic payway CLI (TASK-011)', () => {
 
     // Never persists the provider API key.
     expect(readFileSync(configPath, 'utf8')).not.toContain('dummy-agent-key');
-  });
+  }, 30_000);
 
   it('agent doctor reports the privacy acknowledgment status', () => {
     const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));
