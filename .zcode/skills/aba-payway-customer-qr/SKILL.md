@@ -2,7 +2,7 @@
 name: aba-payway-customer-qr
 description: Handle Merchant Portal Customer Module static QRs (Printed QR channel) — decoded payload anatomy, callback handling, and reconciliation via get-transactions-by-mc-ref.
 metadata:
-  version: 1.3.0
+  version: 1.3.1
 ---
 
 # Customer Module QR (Merchant Portal)
@@ -20,7 +20,7 @@ const payway = new PayWay({ merchantId: process.env.PAYWAY_MERCHANT_ID!, apiKey:
 // check STATE + MONEY + DEDUPE before fulfilling. A valid signature proves the
 // callback came from PayWay; it does NOT prove the payment was approved, that
 // the amount matches, or that you haven't seen it.
-app.post('/payway/callback', (req, res) => {
+app.post('/payway/callback', async (req, res) => {
   if (!payway.verifyCallback(req.body, req.headers['x-payway-hmac-sha512'] as string)) {
     return res.status(400).send('Invalid signature');
   }
@@ -32,17 +32,26 @@ app.post('/payway/callback', (req, res) => {
   //   payment_amount / payment_currency — the PAYER's debit; can be in a
   //     DIFFERENT currency (W5-6: 4000 KHR ordered → 1 USD paid) — match
   //     against original_*, never payment_amount.
-  const { merchant_ref, tran_id } = req.body; // merchant_ref === Customer ID
+  const merchant_ref = String(req.body.merchant_ref ?? ''); // Customer ID
+  const tran_id = String(req.body.tran_id ?? '');
   const status = String(req.body.payment_status ?? '').toUpperCase();
   const amount = Number(req.body.original_amount);
   const currency = String(req.body.original_currency ?? '').toUpperCase();
   if (status !== 'APPROVED') return res.sendStatus(200); // ignore non-approved
-  const order = orders.findByCustomerRef(merchant_ref);
+  if (!tran_id || !merchant_ref || !Number.isFinite(amount)) return res.sendStatus(400);
+  const order = await orders.findByCustomerRef(merchant_ref);
   if (!order || !order.expectsExactly(amount, currency)) return res.sendStatus(200); // log + investigate
-  if (fulfillments.has(tran_id)) return res.sendStatus(200); // dedupe by transaction, not customer
-  // Atomically claim the transaction, THEN fulfill exactly once:
-  if (fulfillments.claim(tran_id, { merchant_ref, amount, currency })) {
-    queueFulfillment(tran_id, order); // idempotent — enqueue, don't fulfill inline
+  try {
+    // Application database: claim AND pending job commit in ONE transaction.
+    // claim uses a unique tran_id constraint and returns false on a duplicate.
+    await db.transaction(async (tx) => {
+      if (!await tx.fulfillments.claim(tran_id, { merchant_ref, amount, currency })) return;
+      await tx.outbox.insert({ tranId: tran_id, merchantRef: merchant_ref, amount, currency });
+    });
+  } catch {
+    // Both writes roll back. Reconciliation can safely submit this event again;
+    // PayWay does not retry the callback merely because we return 503.
+    return res.sendStatus(503);
   }
   res.sendStatus(200);
 });
@@ -51,13 +60,27 @@ app.post('/payway/callback', (req, res) => {
 const result = await payway.khqr.getTransactionsByMerchantRef('dt-one-8989');
 ```
 
-The example above is the minimum guard set: verified signature → approved
-state → matching obligation (customer + order money) → atomic transaction-ID
-dedupe → fulfill once. Test it with the hash skill's signed fixture tool:
+`db`, `orders`, and the worker below are application-owned adapters, not SDK
+exports. Implement the [outbox storage contract](references/fulfillment-outbox.md)
+before deploying this handler. The pending job survives a restart; a worker
+leases pending jobs and retries delivery. Fulfillment must honor the transaction
+ID as an idempotency key, including a retry after delivery succeeded but its
+acknowledgement failed:
+
+```ts
+async function deliverFulfillment(job) {
+  await fulfillOrder(job, { idempotencyKey: job.tranId });
+  await outbox.markDelivered(job.tranId); // only after fulfillment succeeds
+}
+```
+
+The guard set is verified signature → approved state → matching obligation →
+atomic acceptance plus durable job → idempotent delivery. Test it with the hash skill's signed fixture tool:
 `node skills/aba-payway-hash/scripts/mock-callback.cjs --url http://localhost:3000/payway/callback --tran-id <id> --merchant-ref <customer-id> --amount <expected> --status APPROVED`
 (then re-send the same `--tran-id` and confirm nothing fulfills twice). The
-handler's behavior — approval, money match, dedupe, wrong-money and
-unknown-customer rejections — is pinned by `src/__tests__/skill-handler-behavior.test.ts`.
+handler's behavior is pinned by `src/__tests__/skill-handler-behavior.test.ts`;
+SQLite-backed rollback/restart/worker recovery tests execute the guide examples
+in `src/__tests__/skill-outbox.test.ts`.
 For the full durability workflow (storage, retries, recovery) see
 [webhook production](../aba-payway-webhook-production/SKILL.md).
 

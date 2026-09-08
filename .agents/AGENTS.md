@@ -112,7 +112,6 @@
 | `PAYWAY_AGENT_NO_RECOVER_HINT` | `1` suppresses the agent REPL banner about unfinished creates in the prior session. |
 
 ## Skills Directory
-- The packaged `skills/` directory contains 31 focused `aba-payway-*` guides (incl. `aba-payway-journal` — the journal query layer).
+- The packaged `skills/` directory contains 32 focused `aba-payway-*` guides (including journal queries and production webhook fulfillment).
 - Several guides bundle dependency-free `.cjs` tools under their `scripts/` folder (KHQR decode/CRC validation, request signing, callback verification, mock callbacks, reconciliation cron, checkout payload builder, status decoder) — each SKILL.md documents its own tools.
-- Install all of them (including bundled scripts) with `npx payway-sdk skills add <agent>`, where agent is `claude`, `codex`, `opencode`, `cursor`, or `copilot`.
-
+- From the repo root, install all of them (including bundled scripts and references) with `npx tsx src/cli.ts skills add <agent>`, where agent is `claude`, `codex`, `opencode`, `cursor`, or `copilot`.

@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { parseDocument } from 'yaml';
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const skillsDirectory = path.join(testDirectory, '..', '..', 'skills');
@@ -16,27 +17,31 @@ const skillsDirectory = path.join(testDirectory, '..', '..', 'skills');
 function parseFrontmatter(content: string): { name: string; description: string; metadata: { version: string } } {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) throw new Error('missing frontmatter block');
-  const lines = match[1].split(/\r?\n/);
-  const top: Record<string, string> = {};
-  const metadata: Record<string, string> = {};
-  let inMetadata = false;
-  for (const line of lines) {
-    if (/^metadata:\s*$/.test(line)) {
-      inMetadata = true;
-      continue;
-    }
-    if (inMetadata) {
-      const m = line.match(/^  ([A-Za-z_][A-Za-z0-9_-]*): (.+)$/);
-      if (m) metadata[m[1]] = m[2];
-      continue;
-    }
-    const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*): (.+)$/);
-    if (m) top[m[1]] = m[2];
-  }
-  return { name: top.name, description: top.description, metadata } as { name: string; description: string; metadata: { version: string } };
+  const doc = parseDocument(match[1]);
+  expect(doc.errors).toEqual([]);
+  return doc.toJS({ maxAliasCount: 50 });
 }
 
 describe('packaged AI skills', () => {
+  it('keeps the tracked skill mirror identical, including scripts and references', async () => {
+    const mirror = path.resolve(skillsDirectory, '..', '.zcode', 'skills');
+    async function compare(relative: string): Promise<void> {
+      const entries = await readdir(path.join(skillsDirectory, relative), { withFileTypes: true });
+      expect((await readdir(path.join(mirror, relative))).sort(), relative).toEqual(entries.map((e) => e.name).sort());
+      for (const entry of entries) {
+        const resource = path.join(relative, entry.name);
+        if (entry.isDirectory()) await compare(resource);
+        else
+          expect(
+            (await readFile(path.join(mirror, resource))).equals(await readFile(path.join(skillsDirectory, resource))),
+            resource,
+          ).toBe(true);
+      }
+    }
+    for (const entry of await readdir(skillsDirectory, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name.startsWith('aba-payway-')) await compare(entry.name);
+    }
+  });
   it('provides 32 discoverable skill guides with quick-start content', async () => {
     const skillDirectories = (await readdir(skillsDirectory, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'))

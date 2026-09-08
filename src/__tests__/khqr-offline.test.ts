@@ -226,6 +226,13 @@ describe('inspectKhqrPayload / validateKhqrCrc / khqrCrc16 (offline self-check)'
     expect(khqrCrc16(SAMPLE_CUSTOMER_QR.slice(0, -4))).toBe(SAMPLE_CUSTOMER_QR.slice(-4));
   });
 
+  it('rejects a malformed nested timestamp template (tag 99) despite a correct CRC', () => {
+    const body = `${SAMPLE_CUSTOMER_QR.slice(0, -8).replace('9924001317871247638256803mmp', '99010')}6304`;
+    const qr = body + khqrCrc16(body);
+    expect(validateKhqrCrc(qr)).toBe(true);
+    expect(inspectKhqrPayload(qr)).toBeUndefined();
+  });
+
   it('rejects a tampered checksum and malformed tails', () => {
     expect(validateKhqrCrc(`${SAMPLE_CUSTOMER_QR.slice(0, -1)}0`)).toBe(false);
     expect(validateKhqrCrc('6304')).toBe(false); // too short
@@ -272,7 +279,7 @@ describe('inspectKhqrPayload / validateKhqrCrc / khqrCrc16 (offline self-check)'
     expect(inspectKhqrPayload('junk')).toBeUndefined();
     expect(inspectKhqrPayload('')).toBeUndefined();
     // Point-of-initiation must be 11/12.
-    expect(inspectKhqrPayload(`${'00'}02` + '0112' + '6304ABCD')).toBeUndefined();
+    expect(inspectKhqrPayload('000201126304ABCD')).toBeUndefined();
   });
 
   // S2 (second-pass audit): the generator encodes TLV lengths as UTF-8 BYTE

@@ -26,6 +26,32 @@ referenced in some guides are development-only and ship nowhere.
 > `payway-sdk skills remove opencode --dest ~/.opencode/skills` and re-run
 > `skills add opencode`.
 
+## Upgrades, removal, and health checks
+
+The installer preserves customized files, including manual installations with
+no manifest. Identical files can be adopted safely; other unowned files are
+reported as conflicts. Ordinary upgrades and removals delete only unchanged
+manifest-owned resources. Edited retired files keep their baseline and remain
+on disk; unrelated notes and scripts remain unowned.
+
+Use `skills add codex --force-skills` to replace conflicts intentionally, or
+`skills remove codex --force-skills` to delete modified **managed** files too.
+Neither removal mode deletes unowned files. Full upgrades prune removed package
+resources; `--only` upgrades prune only within the selected skills.
+
+The v2 manifest records package version, baseline hashes and selection intent.
+Legacy flat/v2 manifests without selection infer it from their owned skill names;
+a full install explicitly selects the whole catalog. Run
+`skills doctor --agent codex` after upgrading: it checks YAML, current package
+hashes, missing resources and linked dependencies. An intentional partial
+selection does not require the full catalog, but links to omitted skills are
+reported as missing dependencies. Add those skills with another `--only` run,
+or install the full catalog. `--dest <path>` applies these operations to an
+explicit installation directory.
+
+The tracked `.zcode/skills/aba-payway-*` mirror includes every guide, script and
+reference. Recursive parity is checked by the offline test suite.
+
 ## Payments
 
 - [aba-payway-purchase](./aba-payway-purchase/SKILL.md) — signed checkout purchases, hosted checkout links, the full `generate-checkout` flag set (incl. the S1 additions), and the minutes-vs-seconds lifetime trap.

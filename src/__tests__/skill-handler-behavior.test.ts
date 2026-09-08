@@ -85,73 +85,73 @@ const body = (overrides: Record<string, string | number> = {}) =>
   });
 
 describe('aba-payway-customer-qr guide handler (R2: real guide code + supported fixture)', () => {
-  it('queues exactly one job for a signed supported APPROVED fixture', () => {
+  it('queues exactly one job for a signed supported APPROVED fixture', async () => {
     const { harness, handler } = compileHandler(ordersFor(10, 'USD'));
     const res = harness.newResponse();
-    handler(fixtureRequest(body()), res);
+    await handler(fixtureRequest(body()), res);
     expect(res.sentStatus).toBe(200);
     expect(harness.jobsQueued).toBe(1);
     expect(harness.claims).toEqual([{ tranId: 'tran-approved-1', merchantRef: 'cust-001', amount: 10, currency: 'USD' }]);
   });
 
-  it('acknowledges but never queues a PENDING callback', () => {
+  it('acknowledges but never queues a PENDING callback', async () => {
     const { harness, handler } = compileHandler(ordersFor(10, 'USD'));
     const res = harness.newResponse();
-    handler(fixtureRequest(body({ 'tran-id': 'tran-pending-1', status: 'PENDING' })), res);
+    await handler(fixtureRequest(body({ 'tran-id': 'tran-pending-1', status: 'PENDING' })), res);
     expect(res.sentStatus).toBe(200);
     expect(harness.jobsQueued).toBe(0);
     expect(harness.claims).toHaveLength(0);
   });
 
-  it('ignores a duplicate APPROVED callback (dedupe by tran_id)', () => {
+  it('ignores a duplicate APPROVED callback (dedupe by tran_id)', async () => {
     const seen = new Set<string>();
     const first = compileHandler(ordersFor(10, 'USD'), seen);
     const res1 = first.harness.newResponse();
-    first.handler(fixtureRequest(body({ 'tran-id': 'tran-dup-1' })), res1);
+    await first.handler(fixtureRequest(body({ 'tran-id': 'tran-dup-1' })), res1);
     expect(first.harness.jobsQueued).toBe(1);
     // Second delivery through a fresh compile whose fulfillments set already
     // knows the tran_id — exactly what a process restart with a durable store
     // (the guide's recommendation) sees on a redelivery.
     const second = compileHandler(ordersFor(10, 'USD'), seen);
     const res2 = second.harness.newResponse();
-    second.handler(fixtureRequest(body({ 'tran-id': 'tran-dup-1' })), res2);
+    await second.handler(fixtureRequest(body({ 'tran-id': 'tran-dup-1' })), res2);
     expect(res2.sentStatus).toBe(200);
     expect(second.harness.jobsQueued).toBe(0);
   });
 
-  it('never queues for an unknown customer', () => {
+  it('never queues for an unknown customer', async () => {
     const { harness, handler } = compileHandler(ordersFor(10, 'USD'));
     const res = harness.newResponse();
-    handler(fixtureRequest(body({ 'tran-id': 'tran-ghost-1', 'merchant-ref': 'no-such-customer' })), res);
+    await handler(fixtureRequest(body({ 'tran-id': 'tran-ghost-1', 'merchant-ref': 'no-such-customer' })), res);
     expect(res.sentStatus).toBe(200);
     expect(harness.jobsQueued).toBe(0);
     expect(harness.claims).toHaveLength(0);
   });
 
-  it('never queues when the original money does not match the obligation', () => {
+  it('never queues when the original money does not match the obligation', async () => {
     const { harness, handler } = compileHandler(ordersFor(10, 'USD'));
     const res = harness.newResponse();
-    handler(fixtureRequest(body({ 'tran-id': 'tran-wrongmoney-1', amount: 99 })), res);
+    await handler(fixtureRequest(body({ 'tran-id': 'tran-wrongmoney-1', amount: 99 })), res);
     expect(res.sentStatus).toBe(200);
     expect(harness.jobsQueued).toBe(0);
     expect(harness.claims).toHaveLength(0);
   });
 
-  it('coerces string amounts from the callback (the route sends strings)', () => {
+  it('coerces string amounts from the callback (the route sends strings)', async () => {
     // buildCallbackBody formats USD amounts via toFixed(2) → string '10.00';
     // the handler must coerce before matching the numeric obligation.
     const { harness, handler } = compileHandler(ordersFor(10, 'USD'));
-    handler(fixtureRequest(body()), harness.newResponse());
+    await handler(fixtureRequest(body()), harness.newResponse());
     expect(harness.claims[0]?.amount).toBe(10);
   });
 
-  it('fulfills from ORDER money, not the payer debit, when currencies differ (W5-6)', () => {
+  it('fulfills from ORDER money, not the payer debit, when currencies differ (W5-6)', async () => {
     // 4000 KHR obligation paid as 1 USD: buildCallbackBody keys both sides to
     // one currency, so simulate the sandbox-verified cross-currency shape by
     // overriding the payer side of the supported base payload.
     const { harness, handler } = compileHandler(ordersFor(4000, 'KHR'));
     const res = harness.newResponse();
-    handler(
+    await handler(
       fixtureRequest({
         ...body({ 'tran-id': 'tran-xrate-1', amount: 4000, currency: 'KHR' }),
         payment_amount: 1,
@@ -163,7 +163,7 @@ describe('aba-payway-customer-qr guide handler (R2: real guide code + supported 
     expect(harness.claims[0]).toEqual({ tranId: 'tran-xrate-1', merchantRef: 'cust-001', amount: 4000, currency: 'KHR' });
   });
 
-  it('rejects an invalid signature with 400 before any fulfillment (authenticity first)', () => {
+  it('rejects an invalid signature with 400 before any fulfillment (authenticity first)', async () => {
     // Compile a variant with a REJECTING verifier: the harness above stubs
     // verifyCallback true to isolate post-verification behavior; this case
     // pins that nothing downstream runs when authenticity fails.
@@ -179,7 +179,7 @@ describe('aba-payway-customer-qr guide handler (R2: real guide code + supported 
     };
     vm.runInNewContext(js, context);
     const res = rejecting.newResponse();
-    (registered as HandlerFn)(fixtureRequest(body()), res);
+    await (registered as HandlerFn)(fixtureRequest(body()), res);
     expect(res.sentStatus).toBe(400);
     expect(rejecting.jobsQueued).toBe(0);
     expect(rejecting.claims).toHaveLength(0);

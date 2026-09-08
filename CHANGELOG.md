@@ -2,12 +2,31 @@
 
 ## Unreleased
 
+### Audit acceptance closure (2026-09-08)
+
+- Skill installation preserves unowned conflicts and edited managed files across
+  repeated upgrades, retirement and removal. Unchanged retired resources are
+  pruned per file; nested links and invalid manifest paths cannot authorize
+  writes outside an installation. `skills remove --force-skills` explicitly
+  removes modified managed files while preserving unowned files.
+- The v2 manifest now records full/partial selection intent. Doctor uses a YAML
+  parser, validates selected resources against the current package, and reports
+  missing linked dependencies. Legacy manifests infer selection from owned files.
+- Refund `--json` emits the shared error envelope for invalid credentials,
+  currency, amount, transaction ID and gateway rejection, with diagnostics on stderr.
+- Customer-QR acceptance commits its dedupe record and outbox job together.
+  The guide includes a storage-adapter reference and an idempotent worker;
+  SQLite-backed tests execute rollback, restart, duplicate delivery and worker recovery.
+- KHQR inspection rejects malformed nested tag 99; offline PNG support is
+  reflected in CLI help. Recursive skill-mirror checks cover scripts and references,
+  including the previously missed reconciliation migration.
+
 ### Second-pass audit remediation (2026-09-08, R1–R7 + S1–S4)
 
 Second-pass review (`audit-results/second-pass-2026-09-08/REPORT.md`) found the
-seven first-pass defects still reproducible plus four new ones. All eleven are
-fixed and pinned by regression tests; the audit's own `probes.mts` now passes
-every check against this code.
+seven first-pass defects still reproducible plus four new ones. This batch
+corrected those narrow reproductions. The later merged-work review found
+additional acceptance gaps, addressed by the audit acceptance closure above.
 
 - **R1 — refund preflight currency validation**:
   `computeRefundableBalance` validates the refund request currency against the

@@ -8,6 +8,8 @@ export default defineConfig({
     alias: { 'aba-payway-ts': fileURLToPath(new URL('./src/index.ts', import.meta.url)) },
   },
   test: {
+    // Node 22.12 needs this flag for the real SQLite outbox recovery tests.
+    execArgv: process.versions.node.startsWith('22.12.') ? ['--experimental-sqlite'] : [],
     globals: true,
     include: ['src/**/*.test.ts'],
     setupFiles: ['src/test/vitest-hermetic-env.ts'],

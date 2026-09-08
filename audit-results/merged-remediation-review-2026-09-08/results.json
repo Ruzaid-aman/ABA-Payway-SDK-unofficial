@@ -1,0 +1,176 @@
+{
+  "temporaryRoot": "C:\\Users\\SYED~1.SOH\\AppData\\Local\\Temp\\payway-second-pass-arL9MV",
+  "R3": {
+    "firstUpgradePreserved": true,
+    "secondUpgradePreserved": true
+  },
+  "R4": {
+    "retainedBOnDisk": true,
+    "manifest": {
+      "schemaVersion": 2,
+      "packageVersion": "dev",
+      "files": {
+        "aba-payway-a/SKILL.md": "a10b2795a7e027e0fa1c5df8939eca7b9acd7c926ed017ae29a6d680a2440844",
+        "aba-payway-b/SKILL.md": "88891cd1e1f6b43af964f19f2ecb41d4bd96e32466eda2ddd4de4a50fcc258c0"
+      }
+    }
+  },
+  "R7": {
+    "outdatedInstallReportedHealthy": false
+  },
+  "S1": {
+    "unmanagedFileSurvivedRemoval": true
+  },
+  "R1": {
+    "status": "ambiguous",
+    "requestCurrency": "USD",
+    "orderAmount": 4000,
+    "orderCurrency": "KHR",
+    "currencyMismatch": {
+      "requestCurrency": "USD",
+      "orderCurrency": "KHR"
+    },
+    "reason": "currency mismatch — the order is denominated in KHR but the refund was requested in USD. Refunds are requested against the ORIGINAL money of the order; re-issue with -c KHR (or refund via the SDK checkout.refund with 'khr'). Do not convert manually — no authoritative conversion contract exists."
+  },
+  "R2": {
+    "status": 200,
+    "jobsQueued": 1,
+    "signatureVerificationStubbedSuccessful": true
+  },
+  "R6": {
+    "last_transaction_date": "2026-09-07 12:00:00",
+    "transaction_ids": [
+      "already-emitted"
+    ]
+  },
+  "R6_zcodeMirror": {
+    "last_transaction_date": "2026-09-07 12:00:00",
+    "transaction_ids": []
+  },
+  "S4": {
+    "guideDaysLeft": 90,
+    "correctDaysLeft": 90
+  },
+  "S2": {
+    "generatedUtf8CrcValid": true,
+    "generatedUtf8Inspection": {
+      "valid": true,
+      "crcValid": true,
+      "isStatic": false,
+      "currency": "USD",
+      "amount": "1.00",
+      "merchantName": "Café",
+      "merchantCity": "Phnom Penh",
+      "merchantRef": "AUDIT",
+      "bakongId": "merchant@bakong"
+    },
+    "malformedNestedInspection": null
+  },
+  "S3": {
+    "savedRequestedPng": true,
+    "result": {
+      "schemaVersion": "1.0",
+      "command": "generate-qr",
+      "transactionId": "qrmtrvmusta15a0d",
+      "context": {
+        "environment": "sandbox"
+      },
+      "request": {
+        "amount": 1,
+        "currency": "USD",
+        "mode": "offline"
+      },
+      "creation": {
+        "outcome": "accepted",
+        "gatewayResponse": {
+          "qrString": "00020101021230500015merchant@bakong01151234567890123450208ABA Bank52045999530384054041.005802KH5910Audit Shop6010Phnom Penh62340105AUDIT6821aba-provided-template9934001317888240190550113178882491905563049FEB"
+        },
+        "selfCheck": {
+          "crcValid": true,
+          "isStatic": false,
+          "merchantName": "Audit Shop"
+        }
+      },
+      "payment": {
+        "status": "NOT_APPLICABLE",
+        "terminal": false
+      },
+      "poll": {
+        "outcome": "not_requested",
+        "attempts": 0,
+        "elapsedMs": 0
+      },
+      "artifacts": {
+        "qrPngPath": "C:\\Users\\SYED~1.SOH\\AppData\\Local\\Temp\\payway-second-pass-arL9MV\\requested.png"
+      },
+      "nextAction": {
+        "kind": "none",
+        "reason": "Offline KHQR was generated locally."
+      }
+    }
+  },
+  "R3_unowned": {
+    "preservedWithoutForce": false
+  },
+  "S1_modified": {
+    "modifiedGuideSurvivedRemoval": false
+  },
+  "S1_retired": {
+    "modifiedGuideSurvivedOrdinaryUpgrade": false
+  },
+  "R7_isolated": {
+    "outdatedInstallReportedHealthy": false
+  },
+  "R7_yaml": {
+    "invalidYamlReportedHealthy": true
+  },
+  "R7_partial": {
+    "intentionalPartialReportedHealthy": false
+  },
+  "retiredResource": {
+    "oldScriptStillPresent": true,
+    "newScriptPresent": true,
+    "doctorReportedHealthy": true
+  },
+  "S2_tag99": {
+    "malformedNestedInspection": {
+      "valid": true,
+      "crcValid": true,
+      "isStatic": true,
+      "currency": "USD",
+      "merchantName": "Donation outlet",
+      "merchantCity": "BATTAMBANG",
+      "bakongId": "abaakhppxxx@abaa"
+    }
+  },
+  "callbackRecovery": {
+    "queueAttempts": 1,
+    "delivered": 0,
+    "transactionPermanentlyClaimed": true
+  },
+  "R5": {
+    "stdoutParseableAsJson": true,
+    "stdout": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success\"\n  },\n  \"correlationId\": \"62466e1971cfb1b9\"\n}"
+  },
+  "R5_failures": {
+    "invalidCurrency": {
+      "json": null,
+      "stdout": "  ✗ Currency must be USD or KHR, received: EUR",
+      "stderr": "",
+      "exitCode": 1
+    },
+    "invalidAmount": {
+      "json": null,
+      "stdout": "  ✗ refund amount must be at least $0.01 USD, received: 0",
+      "stderr": "",
+      "exitCode": 1
+    },
+    "gatewayRejection": {
+      "json": null,
+      "stdout": "  ✗ Synthetic refund rejection\n  PayWay code: PTL37\n  Next: Correct the reported input or gateway rejection; run payway-sdk doctor for configuration help.",
+      "stderr": "",
+      "exitCode": 2
+    }
+  },
+  "realPayWayNetworkRequests": 0
+}

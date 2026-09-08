@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -87,12 +87,33 @@ try {
   ).length;
   if (skillCount !== 32) throw new Error(`expected 32 installed skills, found ${skillCount}`);
 
+  // Exercise the consumer's dependency graph (including the YAML parser) and
+  // installed paths, rather than only counting guides in the tarball.
+  const consumerEnv = { ...process.env, APPDATA: temporaryRoot };
+  for (const key of Object.keys(consumerEnv)) if (key.startsWith('PAYWAY_')) delete consumerEnv[key];
+  const cli = path.join(temporaryRoot, 'node_modules', 'aba-payway-ts', 'dist', 'cli.js');
+  const dest = path.join(temporaryRoot, 'installed-skills');
+  const runCli = (args) => execFileSync(process.execPath, [cli, ...args], { cwd: temporaryRoot, env: consumerEnv, encoding: 'utf8' });
+  runCli(['skills', 'add', 'codex', '--dest', dest]);
+  runCli(['skills', 'doctor', '--agent', 'codex', '--dest', dest]);
+  if (!existsSync(path.join(dest, 'aba-payway-customer-qr', 'references', 'fulfillment-outbox.md'))) {
+    throw new Error('installed outbox reference missing');
+  }
+  const customized = path.join(dest, 'aba-payway-refund', 'SKILL.md');
+  const edited = `${readFileSync(customized, 'utf8')}\n<!-- consumer customization -->\n`;
+  writeFileSync(customized, edited);
+  runCli(['skills', 'add', 'codex', '--dest', dest]);
+  runCli(['skills', 'add', 'codex', '--dest', dest, '--only', 'aba-payway-refund']);
+  if (readFileSync(customized, 'utf8') !== edited) throw new Error('consumer upgrade overwrote an edit');
+  runCli(['skills', 'remove', 'codex', '--dest', dest]);
+  if (readFileSync(customized, 'utf8') !== edited) throw new Error('consumer uninstall removed an edit');
+
   const installedPackage = JSON.parse(
     readFileSync(path.join(temporaryRoot, 'node_modules', 'aba-payway-ts', 'package.json'), 'utf8'),
   );
   if (installedPackage.name !== 'aba-payway-ts') throw new Error('installed package identity mismatch');
 
-  console.log(`Packed-package smoke passed: ESM, CJS, declarations, CLI demo, and ${skillCount} skills.`);
+  console.log(`Packed-package smoke passed: ESM, CJS, declarations, CLI demo, ${skillCount} skills, and install/doctor/upgrade/remove preservation.`);
 } finally {
   const resolvedTemporaryRoot = path.resolve(temporaryRoot);
   const resolvedSystemTemp = path.resolve(tmpdir());

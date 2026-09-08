@@ -230,6 +230,7 @@ export function inspectKhqrPayload(qrString: string): KhqrPayloadInspection | un
   const additionalData = rootTags.has('62') ? decodeTlvTemplate(Buffer.from(rootTags.get('62') as string, 'utf8')) : undefined;
   if (rootTags.has('30') && !accountTemplate) return undefined;
   if (rootTags.has('62') && !additionalData) return undefined;
+  if (rootTags.has('99') && !decodeTlvTemplate(Buffer.from(rootTags.get('99') as string, 'utf8'))) return undefined;
 
   return {
     valid: crcValid,

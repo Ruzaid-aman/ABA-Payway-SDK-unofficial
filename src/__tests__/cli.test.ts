@@ -20,6 +20,29 @@ afterEach(() => {
 });
 
 describe('built CLI', () => {
+  it.each([
+    ['refund', '-t', 'R-OK', '--json'],
+    ['refund', '-a', '1', '--json'],
+  ])('refund missing required options emits a JSON usage envelope: %j', async (...argv) => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+    const result = await runBuiltCli(argv, { cwd, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', APPDATA: cwd } });
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout).error.kind).toBe('validation');
+  });
+
+  it('refund human usage errors remain concise after enabling JSON usage errors', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+    const result = await runBuiltCli(['refund', '-t', 'R-OK'], {
+      cwd,
+      env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', APPDATA: cwd },
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('required option');
+    expect(result.stderr).not.toContain('CommanderError');
+  });
+
   it('lists the first-payment status and detail commands in built help output', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);

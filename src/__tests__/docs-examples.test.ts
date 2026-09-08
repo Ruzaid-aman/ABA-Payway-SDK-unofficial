@@ -375,7 +375,7 @@ describe('Documentation examples', () => {
     expect(customerQr).toContain('Number(req.body.original_amount)');
     expect(customerQr).toContain("req.body.original_currency ?? ''");
     expect(customerQr).not.toMatch(/const \{[^}]*status[^}]*amount[^}]*currency[^}]*\}\s*=\s*req\.body/);
-    expect(customerQr).toContain('fulfillments.has(tran_id)');
+    expect(customerQr).toContain('tx.fulfillments.claim(tran_id');
     expect(customerQr).toContain('expectsExactly');
     // The unsupported pagination promise must not return.
     expect(customerQr).not.toMatch(/latest 50 per request; paginate/);

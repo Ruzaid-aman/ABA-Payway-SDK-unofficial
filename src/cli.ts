@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
-import { Command, Help } from 'commander';
+import { Command, CommanderError, Help } from 'commander';
 import { confirmCheckoutSubmit } from './cli/flows/checkout-flow.js';
 import { chooseNextStep } from './cli/flows/next-steps.js';
 import { collectQrParams } from './cli/flows/qr-flow.js';
@@ -99,9 +99,14 @@ loadDotEnvIntoProcess(process.cwd());
 // ---------------------------------------------------------------------------
 // Pre-flight credential check for API-calling commands (QR-REQ-02)
 // ---------------------------------------------------------------------------
-function assertCredentialsPresent(): boolean {
+function assertCredentialsPresent(json = false): boolean {
   const issues = validateRequiredCredentials(process.env);
   if (!hasBlockingIssues(issues)) return true;
+
+  if (json) {
+    printValidationErrorJson(issues.map((issue) => issue.message).join('; '));
+    return false;
+  }
 
   console.log(`\n  ${c.red('✗')} ${c.bold('Missing merchant credentials')}\n`);
   for (const issue of issues) {
@@ -120,8 +125,13 @@ function assertCredentialsPresent(): boolean {
 // ---------------------------------------------------------------------------
 // Pre-flight RSA key check for merchant_auth-encrypted commands
 // ---------------------------------------------------------------------------
-function assertRsaKeyPresent(): boolean {
+function assertRsaKeyPresent(json = false): boolean {
   if (process.env.PAYWAY_RSA_PUBLIC_KEY?.trim()) return true;
+
+  if (json) {
+    printValidationErrorJson('PAYWAY_RSA_PUBLIC_KEY is missing');
+    return false;
+  }
 
   console.log(`\n  ${c.red('✗')} ${c.bold('PAYWAY_RSA_PUBLIC_KEY is missing')}\n`);
   console.log(`  ${c.dim('Payment Link APIs require the PayWay RSA public key for merchant_auth encryption.')}`);
@@ -1851,6 +1861,7 @@ program
 // --- refund ---
 program
   .command('refund')
+  .exitOverride()
   .description('Refund a captured transaction (pre-flight balance check against transaction-detail)')
   .requiredOption('-t, --transaction-id <id>', 'Original transaction ID')
   .requiredOption('-a, --amount <number>', 'Refund amount (≥ 0.01 USD / ≥ 1 KHR)')
@@ -1868,13 +1879,15 @@ program
       json?: boolean;
     }) => {
       const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
-      if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
         process.exitCode = EXIT_VALIDATION;
         return;
       }
       const currency = opts.currency.toUpperCase() as 'USD' | 'KHR';
       if (currency !== 'USD' && currency !== 'KHR') {
-        console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${opts.currency}`);
+        const message = `Currency must be USD or KHR, received: ${opts.currency}`;
+        if (opts.json) printValidationErrorJson(message);
+        else console.log(`  ${c.red('✗')} ${message}`);
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -1883,7 +1896,8 @@ program
         validateTransactionId(opts.transactionId);
         validateRefundAmount(amount, currency);
       } catch (e) {
-        console.log(`  ${c.red('✗')} ${(e as Error).message}`);
+        if (opts.json) printValidationErrorJson((e as Error).message);
+        else console.log(`  ${c.red('✗')} ${(e as Error).message}`);
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -1998,7 +2012,7 @@ program
           console.log('  Cancelled by user.');
           process.exit(130);
         }
-        process.exitCode = printApiError(error);
+        process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
       }
     },
   );
@@ -2208,7 +2222,7 @@ program
     'Transaction lifetime in seconds — minimum 180, sent to the API as whole minutes (default: 180)',
   )
   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
-  .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
+  .option('--save-image <path>', 'Save a QR PNG to file (online image or locally rendered offline QR)')
   .option('--no-save-image', 'Do not save the QR image PNG to payway-output/<transaction-id>.png by default')
   .option('--open-image', 'Open the saved QR image with the OS default viewer (default: auto when interactive)')
   .option('--no-open-image', 'Never open the QR image, even in interactive terminals')
@@ -4107,11 +4121,12 @@ skillsCmd
 
 skillsCmd
   .command('remove')
-  .description('Remove manifest-owned skills from agents (unmanaged aba-payway-* dirs are preserved)')
+  .description('Remove unchanged managed resources (modified and unmanaged files are preserved)')
   .argument('<agents...>', 'Agent names: claude, codex, opencode, cursor, copilot')
   .option('--dest <path>', 'Explicit destination directory (e.g. a legacy ~/.opencode/skills install)')
-  .action(async (agents: string[], opts: { dest?: string }) => {
-    await removeSkills(agents, { dest: opts.dest });
+  .option('--force-skills', 'Also remove modified manifest-owned resources; unmanaged files remain')
+  .action(async (agents: string[], opts: { dest?: string; forceSkills?: boolean }) => {
+    await removeSkills(agents, { dest: opts.dest, force: opts.forceSkills });
   });
 
 skillsCmd
@@ -4383,7 +4398,28 @@ for (const command of program.commands) {
  * through the direct-invocation guard below instead.
  */
 export async function runCli(argv: string[]): Promise<void> {
-  await program.parseAsync(argv, { from: 'user' });
+  try {
+    await program.parseAsync(argv, { from: 'user' });
+  } catch (error) {
+    // Refund usage errors are part of its machine-output contract too.
+    // Its command-local exitOverride lets us render them without process.exit.
+    if (error instanceof CommanderError && error.exitCode === 0) {
+      process.exitCode = 0;
+      return;
+    }
+    if (program.args[0] === 'refund' && argv.includes('--json')) {
+      process.exitCode = error instanceof CommanderError
+        ? printValidationErrorJson(error.message)
+        : printApiErrorJson(error);
+      return;
+    }
+    if (error instanceof CommanderError) {
+      // Commander has already printed the human usage diagnostic to stderr.
+      process.exitCode = error.exitCode;
+      return;
+    }
+    throw error;
+  }
 }
 
 const invokedDirectly = (() => {

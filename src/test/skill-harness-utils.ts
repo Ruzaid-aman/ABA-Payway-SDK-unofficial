@@ -3,7 +3,7 @@
  * callbacks (the R2/F12 behavior harness in skill-handler-behavior.test.ts).
  *
  * The guide code references collaborators by bare name (app, payway, orders,
- * fulfillments, queueFulfillment). A harness supplies deterministic fakes for
+ * db). A harness supplies deterministic fakes for
  * those names so the guide snippet runs verbatim, and records what the
  * handler did: claims taken, fulfillment jobs queued, HTTP status sent.
  */
@@ -41,9 +41,7 @@ export interface ClaimedJob {
 
 /** Order-lookup collaborator the guide handler calls. */
 export interface OrdersCollaborator {
-  findByCustomerRef: (
-    merchantRef: string,
-  ) => { expectsExactly: (amount: number, currency: string) => boolean } | null;
+  findByCustomerRef: (merchantRef: string) => { expectsExactly: (amount: number, currency: string) => boolean } | null;
 }
 
 /**
@@ -57,13 +55,11 @@ export function buildHandlerHarness(opts: { orders: OrdersCollaborator; seen?: S
   let queueCalls = 0;
   const seen = opts.seen ?? new Set<string>();
 
-  const fulfillments = {
-    has: (tranId: string) => seen.has(tranId),
-    claim: (tranId: string, meta: { merchant_ref: string; amount: number; currency: string }) => {
-      seen.add(tranId);
-      claims.push({ tranId, merchantRef: meta.merchant_ref, amount: meta.amount, currency: meta.currency });
-      return true;
-    },
+  type Transaction = {
+    fulfillments: {
+      claim: (tranId: string, meta: { merchant_ref: string; amount: number; currency: string }) => boolean;
+    };
+    outbox: { insert: (job: ClaimedJob) => void };
   };
 
   return {
@@ -71,18 +67,42 @@ export function buildHandlerHarness(opts: { orders: OrdersCollaborator; seen?: S
     context: {
       payway: { verifyCallback: () => true },
       orders: opts.orders,
-      fulfillments,
-      queueFulfillment: () => {
-        queueCalls++;
+      db: {
+        transaction: async (fn: (tx: Transaction) => Promise<void>) => {
+          const pendingClaims: ClaimedJob[] = [];
+          const jobs: ClaimedJob[] = [];
+          await fn({
+            fulfillments: {
+              claim: (tranId, meta) => {
+                if (seen.has(tranId) || pendingClaims.some((claim) => claim.tranId === tranId)) return false;
+                pendingClaims.push({
+                  tranId,
+                  merchantRef: meta.merchant_ref,
+                  amount: meta.amount,
+                  currency: meta.currency,
+                });
+                return true;
+              },
+            },
+            outbox: {
+              insert: (job) => {
+                jobs.push(job);
+              },
+            },
+          });
+          for (const claim of pendingClaims) seen.add(claim.tranId);
+          claims.push(...pendingClaims);
+          queueCalls += jobs.length;
+        },
       },
       process: { env: { PAYWAY_MERCHANT_ID: 'fixture', PAYWAY_API_KEY: 'fixture' } },
       console,
     },
-    /** Claims taken via fulfillments.claim (normalized money included). */
+    /** Claims committed with their outbox jobs (normalized money included). */
     get claims() {
       return claims;
     },
-    /** queueFulfillment invocations — the actual fulfillment jobs. */
+    /** Durable outbox jobs committed by the handler. */
     get jobsQueued() {
       return queueCalls;
     },

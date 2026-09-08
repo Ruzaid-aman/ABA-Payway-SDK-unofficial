@@ -67,6 +67,8 @@ const LIVE_PURCHASE_HASH_FIELDS = [
 
 let server: Server;
 let baseUrl = '';
+let refundRequests = 0;
+let rejectRefund = false;
 
 /** Route by endpoint substring; payloads mirror sandbox-verified shapes. */
 function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): void {
@@ -144,7 +146,8 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('exchange-rate')) {
     send(200, { status: { code: '00', message: 'Success' }, exchange_rates: { USD_KHR: 4100 } });
   } else if (url.includes('refund')) {
-    if (tranId === 'R-FAIL') {
+    refundRequests++;
+    if (rejectRefund || tranId === 'R-FAIL') {
       send(400, { status: { code: 'PTL04', message: 'Parameter validation required' } });
     } else {
       send(200, { status: { code: '00', message: 'Refund submitted' } });
@@ -229,6 +232,8 @@ beforeAll(async () => {
   const address = server.address();
   baseUrl = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
   for (const key of ENV_KEYS) originalEnv[key] = process.env[key];
+  originalEnv.APPDATA = process.env.APPDATA;
+  process.env.APPDATA = tempDir;
   process.env.PAYWAY_BASE_URL = baseUrl;
   process.env.PAYWAY_ENV = 'sandbox';
   process.env.PAYWAY_MERCHANT_ID = 'test-merchant-001';
@@ -243,6 +248,8 @@ afterAll(() => {
     if (originalEnv[key] === undefined) delete process.env[key];
     else process.env[key] = originalEnv[key];
   }
+  if (originalEnv.APPDATA === undefined) delete process.env.APPDATA;
+  else process.env.APPDATA = originalEnv.APPDATA;
   process.chdir(originalCwd);
   rmSync(tempDir, { recursive: true, force: true });
 });
@@ -366,6 +373,45 @@ describe('CLI API commands against the local mock gateway', () => {
     expect(() => JSON.parse(stripAnsi(stdout))).not.toThrow();
     // Progress went to stderr (console.error under machine mode).
     expect(stripAnsi(stderr)).toContain('Pre-flight');
+  });
+
+  it.each([
+    ['currency', ['-t', 'R-OK', '-a', '1', '-c', 'EUR']],
+    ['amount', ['-t', 'R-OK', '-a', '0']],
+    ['transaction ID', ['-t', 'bad/id', '-a', '1']],
+  ])('refund --json emits a validation envelope for invalid %s without submitting', async (_name, args) => {
+    const before = refundRequests;
+    const { stdout, exitCode } = await run(['refund', ...args, '-y', '--json']);
+    expect(JSON.parse(stdout).error.kind).toBe('validation');
+    expect(exitCode).toBe(1);
+    expect(refundRequests).toBe(before);
+  });
+
+  it.each(['PAYWAY_API_KEY', 'PAYWAY_RSA_PUBLIC_KEY'])('refund --json emits a validation envelope for missing %s', async (key) => {
+    const saved = process.env[key];
+    const before = refundRequests;
+    delete process.env[key];
+    try {
+      const { stdout, exitCode } = await run(['refund', '-t', 'R-OK', '-a', '1', '-y', '--json']);
+      expect(JSON.parse(stdout).error.kind).toBe('validation');
+      expect(exitCode).toBe(1);
+      expect(refundRequests).toBe(before);
+    } finally {
+      process.env[key] = saved;
+    }
+  });
+
+  it('refund --json emits an API envelope on gateway rejection without retrying the mutation', async () => {
+    const before = refundRequests;
+    rejectRefund = true;
+    try {
+      const { stdout, exitCode } = await run(['refund', '-t', 'R-FAIL', '-a', '1', '--no-preflight', '-y', '--json']);
+      expect(JSON.parse(stdout).error.paywayCode).toBe('PTL04');
+      expect(exitCode).toBe(2);
+      expect(refundRequests).toBe(before + 1);
+    } finally {
+      rejectRefund = false;
+    }
   });
 
   it('get-transactions-by-ref reports the 404 profile gap with exit code 2', async () => {
