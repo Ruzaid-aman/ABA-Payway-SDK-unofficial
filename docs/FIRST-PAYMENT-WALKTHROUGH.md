@@ -1,5 +1,7 @@
 # First payment: create, verify, recover
 
+This is the simulated application exercise after the [quickstart](../QUICKSTART.md). For ABA sandbox registration, callback setup, and completing an actual gateway test payment, follow that guide first. This exercise teaches verification and recovery without ABA test-payer access.
+
 This exercise uses the existing reference app and simulated payments. Run from
 the repository root with Node 22.12+ and dependencies installed. In a fresh shell,
 ensure `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY` are unset; the app automatically

@@ -2,7 +2,7 @@
 name: aba-payway-first-payment
 description: Start an ABA PayWay payment, choose QR or hosted checkout or payment link, verify it, and fulfill once.
 metadata:
-  version: 1.4.0
+  version: 1.4.1
 ---
 
 # ABA PayWay First Payment
@@ -17,11 +17,13 @@ Run the installed CLI with `npm exec -- payway-sdk`; bare `npx payway-sdk` resol
 npm exec -- payway-sdk demo --check
 npm exec -- payway-sdk init --mode sandbox --template first-payment
 npm exec -- payway-sdk doctor --route online-qr
-npm exec -- payway-sdk generate-qr -a 3.00 -c USD -t order-001 --callback-url https://merchant.example/payway/callback -y --no-polling --output json
-npm exec -- payway-sdk check-transaction -t order-001
 ```
 
-Set sandbox credentials before the diagnostic. Use a real public HTTPS callback. The demo is simulated and does not prove gateway readiness.
+Before the diagnostic, follow the installed QUICKSTART.md: register at [ABA sandbox signup](https://sandbox.payway.com.kh/register-sandbox/), retrieve the Merchant ID and API Key from the registration email, and set sandbox credentials. ABA's [official onboarding](https://developer.payway.com.kh/) documents email delivery. Never request that users paste secrets into chat.
+
+Use `npm exec -- payway-sdk setup-webhook --tunnel` in a separate terminal and keep it running. Configure the complete public HTTPS callback URL. Arrange ABA PAY test access with the user's ABA contact before creating a QR; hosted card checkout uses [ABA test cards](https://developer.payway.com.kh/resources-3305682f0). The demo is simulated and does not prove gateway readiness.
+
+Follow the quickstart's shell-specific creation commands, which retain a unique transaction ID before submission. Show the saved QR, complete the sandbox payment, then query that same ID with `check-transaction` and `transaction-detail`. Match ID, amount, and currency before fulfillment. After a timeout, recover the existing attempt instead of generating another ID and submitting again.
 
 ## Choose One Route
 

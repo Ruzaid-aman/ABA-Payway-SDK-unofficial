@@ -1,29 +1,39 @@
 # Chapter 2 — Prerequisites & Setup
 
 > **Estimated reading time:** 15 minutes  
-> **Goal:** Get your environment ready and verify everything works before building your integration.
+> **Goal:** Get your environment ready and verify everything works before building your integration. New here? Follow the [quickstart](../QUICKSTART.md) in order; use this chapter for credential and configuration details.
 
 ---
 
 ## Credential Checklist
 
-Before you start coding, you need to obtain these from ABA PayWay. You'll get separate credentials for sandbox (testing) and production (live).
+The simulated demo needs no credentials. For gateway calls, obtain credentials from ABA PayWay. Sandbox (testing) and production (live) use separate credentials.
 
 | Credential | Where to Get It | Sandbox | Production | Secret? |
 |---|---|---|---|---|
-| **Merchant ID** | ABA PayWay Dashboard → Merchant Settings | `ecXXXXXX` format | `ecXXXXXX` format | ❌ No (appears in API requests) |
-| **API Key** | ABA PayWay Dashboard → API Keys | Random alphanumeric string | Random alphanumeric string | ✅ Yes |
-| **RSA Public Key** | ABA PayWay Dashboard → Security | PEM format | PEM format | ❌ No (it's a public key) |
+| **Merchant ID** | Sandbox registration email; ABA onboarding for production | ABA-issued ID | ABA-issued ID | ❌ No (appears in API requests) |
+| **API Key** | Sandbox registration email; ABA onboarding for production | Sandbox signing key | Production signing key | ✅ Yes |
+| **RSA Public Key** | Request the environment-appropriate key from your ABA integration contact | PEM format | PEM format | ❌ No (it's a public key) |
 
 > 💡 **RSA Public Key is optional** — You only need it if you plan to use Pre-Auth, Payout, Payment Link, or Refund endpoints. Basic checkout and QR work without it.
 
 ### How to Get Sandbox Credentials
 
-1. Visit [ABA PayWay Sandbox Portal](https://developer.payway.com.kh)
-2. Register for a sandbox merchant account
-3. Navigate to **Merchant Settings** to find your Merchant ID
-4. Navigate to **API Keys** to generate your API Key
-5. If needed, navigate to **Security** to download your RSA Public Key
+1. Open the official [ABA PayWay sandbox registration page](https://sandbox.payway.com.kh/register-sandbox/), linked from the [Developer Suite](https://developer.payway.com.kh/).
+2. Complete registration using an email address you can access.
+3. Retrieve the sandbox Merchant ID and API Key from the email sent to that address. Keep the API Key private; the SDK cannot issue these credentials.
+4. Set `PAYWAY_ENV=sandbox`, `PAYWAY_MERCHANT_ID`, and `PAYWAY_API_KEY` as shown in the [quickstart](../QUICKSTART.md#3-get-and-configure-sandbox-credentials).
+5. If your route requires RSA encryption, ask your ABA integration contact for the sandbox RSA public key and any required feature activation.
+
+If the email does not arrive, check spam/junk and follow up through your ABA contact or the official portal. No delivery time or approval guarantee is assumed here.
+
+**Source checked 2026-09-08:** ABA's [official onboarding](https://developer.payway.com.kh/) describes email delivery; its [plugin configuration guide](https://developer.payway.com.kh/-871485m0) explicitly identifies the emailed Merchant ID and API Key. Dashboard menu locations are not assumed.
+
+### Prepare to complete a sandbox payment
+
+For hosted card checkout, use ABA's [official test cards](https://developer.payway.com.kh/resources-3305682f0), not real card details. That resource also explains test 3DS email OTP delivery. For ABA PAY / QR testing, contact your ABA integration representative for the supported test app or simulator and access instructions. Arrange this before generating a short-lived QR. The local SDK demo simulates approval and cannot pay a gateway QR.
+
+Return to [quickstart callback setup](../QUICKSTART.md#4-prepare-a-callback-and-check-your-route), then create and verify one payment.
 
 > ⚠️ **Production credentials require business verification with ABA Bank** — contact ABA PayWay support for the go-live process.
 

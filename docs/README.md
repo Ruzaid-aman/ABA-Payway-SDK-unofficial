@@ -4,6 +4,16 @@
 
 Follow the [quickstart](../QUICKSTART.md) to install, try the credential-free demo, and create your first sandbox payment. Read only the route you choose; the full reference is optional.
 
+| Your next question | Read next |
+|---|---|
+| What is this project, and should I use SDK, CLI, or skills? | [Project introduction](../README.md) |
+| How do I go from zero to a verified test payment? | [Quickstart](../QUICKSTART.md) — the canonical beginner path |
+| How do I get ABA sandbox keys or configure profiles? | [Credentials and setup](./02-prerequisites-and-setup.md#how-to-get-sandbox-credentials) |
+| How do I receive a callback on my development machine? | [Webhook setup](./16-webhook-setup-guide.md#quick-start) |
+| How do verification and recovery work in an application? | [Runnable simulated walkthrough](./FIRST-PAYMENT-WALKTHROUGH.md) |
+
+The [one-page lifecycle reference](./QUICK-START-1-PAGER.md) is a reminder after onboarding. Numbered chapters are topic references; you do not need to read them sequentially.
+
 The journey is **create -> show the artifact -> verify -> fulfill once**. Creation never proves payment.
 
 ## Choose Route

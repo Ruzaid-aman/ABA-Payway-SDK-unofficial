@@ -20,6 +20,8 @@ When a payment is completed, PayWay can send a server-to-server HTTP POST callba
 
 ## Quick Start
 
+Coming from the [first-payment quickstart](../QUICKSTART.md#4-prepare-a-callback-and-check-your-route)? Run the tunnel command below in a separate terminal and leave it running. Copy the complete printed HTTPS URL including `/aba-payway-webhook` into `PAYWAY_CALLBACK_URL` in your payment terminal, then return to the quickstart. See [Cloudflare Tunnel](#cloudflare-tunnel) for prerequisites. The receiver captures test notifications; payment verification and durable fulfillment belong in your application.
+
 ```bash
 # Basic — starts server on port 8443, saves callbacks to ./webhook_data/callbacks.jsonl
 npm exec -- payway-sdk setup-webhook

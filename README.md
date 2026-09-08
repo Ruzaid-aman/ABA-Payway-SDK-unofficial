@@ -4,6 +4,16 @@ A community-maintained, typed server-side SDK and CLI for ABA PayWay: online QR,
 
 This is not an official gateway-provider SDK. ABA and PayWay names identify the gateway being integrated; no endorsement is claimed.
 
+Use it to accept payments in your application and verify their outcome before delivering an order. ABA PayWay processes the payment; this project supplies the integration tools.
+
+| You want to… | Use |
+|---|---|
+| Add payments to your application | The TypeScript/JavaScript **SDK**, running on your server |
+| Try payments and inspect transactions from a terminal | The **CLI** included with the SDK package |
+| Guide a coding assistant through an integration | Optional **agent skills**, alongside the SDK and CLI |
+
+You can explore the simulated demo without an ABA account. Gateway testing requires sandbox credentials issued by ABA.
+
 **Runtime:** Node.js 22.12 or later. CI targets the minimum runtime and Node 22/24 on Linux and Windows. Keep merchant credentials on your server.
 
 ## Try it locally
@@ -22,7 +32,7 @@ To install this checkout in another application, run `npm pack`, then install th
 
 ## Create your first sandbox payment
 
-Follow [QUICKSTART.md](./QUICKSTART.md) to choose a route, configure sandbox credentials, create a payment, and verify it. The same create, verify, and fulfill-once journey applies to the SDK, CLI, and skills.
+Follow [QUICKSTART.md](./QUICKSTART.md): try the demo → obtain sandbox credentials → prepare a callback URL → create and pay → verify → integrate your server. It includes ABA's official registration link and test-payment guidance. The same create, verify, and fulfill-once journey applies to the SDK, CLI, and skills.
 
 The [first-payment reference app](https://github.com/antigravity-google/aba-payway-ts/tree/main/examples/first-payment) demonstrates server-side pricing, verification, idempotent fulfillment, and reconciliation. It starts in simulated mode without credentials.
 

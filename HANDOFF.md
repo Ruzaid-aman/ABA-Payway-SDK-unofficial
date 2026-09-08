@@ -2,6 +2,8 @@
 
 ## Current release state — 2026-09-08
 
+- Beginner onboarding documentation now follows README → QUICKSTART → setup/webhook references → simulated application walkthrough. Sandbox signup and emailed credentials are sourced to ABA's official guidance; quickstart includes test-payer access, callback setup, unique attempt IDs, and verification outcomes. First-payment skill follows the same path. This is documentation-only; publication remains separately gated.
+
 - Audit closure is implemented, verified and integrated into local `main` from `codex/audit-closure`, based on `main@64843d0`. R3/R5/R7/S1/S2/N1/N2 are closed for the reviewed acceptance cases. Evidence: [closure record](audit-results/merged-remediation-review-2026-09-08/CLOSURE.md). Final offline suite: **1,624 passed / 104 files**, including the optional SQLite driver. Build, typecheck, lint, package/docs checks, expanded packed-consumer smoke and all 32 skill validations pass. Repository boundary still fails on **275 pre-existing tracked artifact paths**; release blockers remain.
 
 - Local main is the single line of truth: `9d36e26` (skills/SDK/CLI audit remediation F01–F13, audit file `audit-results/skills-sdk-cli-audit-2026-09-07.md`) + `b12e301` (KHQR payload self-check salvaged from the old Aug-26 stash: `inspectKhqrPayload`/`validateKhqrCrc`/`khqrCrc16` exports, `generate-qr --offline` self-check display + terminal QR + local PNG save) + docs regeneration. `codex/opensource-release-polish` points at `9d36e26` and is fully merged.
