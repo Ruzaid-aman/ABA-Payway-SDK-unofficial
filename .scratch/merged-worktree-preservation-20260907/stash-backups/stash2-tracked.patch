@@ -1,0 +1,1733 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index f8f1cdd..fdaa75f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,9 +4,16 @@
+ 
+ ### Added
+ 
++- **Offline QR CLI parity + self-verification** — `generate-qr --offline` now renders the KHQR payload locally to `payway-output/<ref>.png` (refs sanitized), saves/opens it with the same flags as online mode (`--save-image/--no-save-image`, TTY-aware auto-open via the viewer pipeline), renders the terminal QR, and **self-verifies before printing**: TLV re-decode + CRC-16 CCITT recomputation plus a decoded summary (static/dynamic, amount, merchant name/city, Bakong ID, reference) so configuration mistakes surface before a QR is used.
++- **KHQR inspection exports** — `inspectKhqrPayload()` (decoded summary incl. `crcValid`/`valid`, static-vs-dynamic, amount, currency, merchant fields; `undefined` when malformed), `validateKhqrCrc()`, and `khqrCrc16()` from `src/khqr-offline.ts`.
++- **`doctor` ABA KHQR readiness row** — advisory check reporting how many of the 7 ABA-issued fields are configured: fully unconfigured is healthy ("optional"), a **partial** configuration fails the row with the exact missing `PAYWAY_KHQR_*` variables (every `--offline` run would fail). Mirrors the agent readiness matrix's existing `offlineKhqr` row.
+ - **QR image auto-open** — `generate-qr` now opens the saved QR PNG (`payway-output/<txId>.png`) with the OS default image viewer so it is immediately scannable. Default is TTY-aware (interactive terminals only; scripts/CI/agents unaffected); force with `--open-image`, suppress with `--no-open-image`. Backed by the new exported helper `openImageInDefaultViewer()` / `defaultViewerCommandForPlatform()` (`src/open-image.ts`): per-platform allowlisted command (Windows `rundll32 url.dll,FileProtocolHandler` / macOS `open` / Linux `xdg-open`), spawned shell-less and detached, never throws — failures degrade to an "Open it manually" hint.
+ - **Close-Transaction violation dossier** (`docs/CLOSE-TRANSACTION-FINDINGS.md`) — full evidence that sandbox close is advisory only: two live card payments completed AFTER a code-00 close (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206 → both APPROVED), closure is invisible in check/detail (no CLOSED status, no operation marker), close is idempotent (re-close returns 00), plus reproduction commands, five questions for ABA, merchant mitigations, and a post-fix validation checklist. Cross-linked from SANDBOX-FINDINGS §12 and agent rules.
+ - **Cards-checkout lifecycle tools** — `scripts/checkout-cards-close.ts` (official checkout2-0.js modal OR hosted page; `--no-close` supported) and reusable `scripts/close-transaction-verify.ts` (`closeOrReport`/`statusOf`/`closeAndVerify`, flags `--raw/--json/--status-only/--delay`) with the post-close interpretation table.
++- **Payment-link behavior controls** — `paymentLink.create` now documents and validates the behavior-driving params from the PayWay API: `paymentLimit` (omit = unlimited payments, `1` = single-use, `N` = multi-use up to N), `expiredDate` (`0`/omit = no expiry, epoch seconds = expires then), `currency` (min 0.01 USD / 100 KHR), and a new `payout` split-instruction array (each `{acc, amt}`; sum must equal amount). CLI `payment-link create` gains `--payout`, interprets `payment_limit`/`expired_date` into human-readable usage + validity lines, and `payment-link detail` now reports "X of N (remaining Y)" and "No expiry" vs absolute time. The `aba-payway-payment-link` skill documents every param, the callback `POST {tran_id,status,merchant_ref_no}` shape, and `PTL02/04/05/99/132` error codes.
++- **Payment-link payout wire-format fixes (per PayWay integration guidance)** — each beneficiary `amt` is now serialized as a **string** (`"5.00"`) inside the RSA-encrypted `merchant_auth`; `acc` is the ABA account/MID (numeric, not an API credential id); `payout` is omitted entirely when unused (never sent as `null`/empty). Added/forwarded `payout` through the agent `create_payment_link` tool and contract. Skill now lists payout gotchas and the `PTL-PAYOUT-36` (amount mismatch), `PTL146`/`PTL-PAYOUT-37`/`PTL46` (whitelist/type), `PTL-RSA-NOTFOUND`, and "Payout Info is invalid." errors.
++- **Pre-auth payout audit (per PayWay integration guidance)** — `checkout.purchase`/`createTransaction` now **rejects `payout` when `type: 'pre-auth'`** (split payout belongs only on completion). `preAuth.completeWithPayout` now serializes each beneficiary `amt` as a **string**, accepts an optional `accName` (`acc_name` on the wire), and validates that the sum of `amt` equals the captured `amount` (`PTL-PAYOUT-36`). Added a regression test for the pre-auth purchase guard. The `aba-payway-pre-auth` skill documents the two-step rule (no payout on step 1, payout only on pre-auth-completion).
++- **Sandbox beneficiary fixtures for payout testing** — new `src/sandbox-beneficiaries.ts` seeds 6 USD accounts (`500000001`, `500000002`, `002094060`, `111111111`, `002092621`, `000471132`) and 3 KHR test MIDs (`323080111554956`, `325012214045630`, `325012214063221`). `validateSandboxBeneficiary()` enforces: digits-only + length ∈ {9,11,15} in **both** environments, and (in sandbox) allowlist membership + currency match — surfacing `not a known sandbox beneficiary` / `currency mismatch` before any request. Validation is wired into `validateBeneficiaries` (payout domain), `paymentLink.create` payout, and `preAuth.completeWithPayout`, all gated on `environment === 'sandbox'` (production only checks format). New CLI `sandbox-beneficiaries` lists the fixtures; SDK re-exports the seed data. Added `src/__tests__/sandbox-beneficiaries.test.ts` and updated payout fixtures. Knowledge base `docs/SANDBOX-BENEFICIARIES.md` + skills `aba-payway-sandbox-beneficiaries` (new) and `aba-payway-payout` (updated).
+ - **End-to-end live-flow scripts** — `scripts/online-qr-poll.ts` (one online KHQR → save/open PNG → poll 10 min) and `scripts/checkout-link-poll.ts` (Create Transaction API with `paymentGate: 0` → open hosted `checkout_qr_url` → poll 10 min). Registered as tools in the QR, purchase, and check-transaction skills; sandbox-paid and verified 2026-08-25 ($31.11 APPROVED ~37s, $12.12 APPROVED ~32s).
+ - **Transaction-lifecycle CLI commands** — `check-transaction`, `poll-transaction` (NDJSON event stream; exit 0 terminal / 2 API error / 3 timeout), `transaction-detail`, `transaction-list` (defaults to today, aligned table), `close-transaction -y/--force`, `refund` with pre-flight refundable-balance check via transaction-detail, and `exchange-rate`. All accept `--json`.
+ - **Standardized CLI exit codes** — `0` success · `1` validation/input · `2` PayWay API failure · `3` network/timeout/rate-limit (`classifyError()`), applied across every command.
+diff --git a/docs/07-qr-code-handling.md b/docs/07-qr-code-handling.md
+index 72ac0d5..fcb1236 100644
+--- a/docs/07-qr-code-handling.md
++++ b/docs/07-qr-code-handling.md
+@@ -319,8 +319,44 @@ console.log(qrString);
+ 
+ The seven configuration fields can be supplied in the constructor (highest priority), environment (`PAYWAY_KHQR_BAKONG_ID`, `PAYWAY_KHQR_ABA_MERCHANT_ID`, `PAYWAY_KHQR_ACQUIRER_NAME`, `PAYWAY_KHQR_MERCHANT_CATEGORY_CODE`, `PAYWAY_KHQR_MERCHANT_NAME`, `PAYWAY_KHQR_MERCHANT_CITY`, and `PAYWAY_KHQR_PAYWAY_DATA`), or an optional local CLI profile. Keep them private and obtain them from ABA; do not infer or reuse another merchant's values.
+ 
++### Offline QR from the CLI
++
++```bash
++# Static QR for a table tent (no amount → reusable)
++payway-sdk generate-qr --offline --ref TABLE-7
++
++# Dynamic QR with amount, saved to payway-output/TABLE-7.png and self-verified
++payway-sdk generate-qr --offline --ref TABLE-8 -a 12.50 -c USD
++
++# Image flags work identically to online mode:
++#   --save-image <path> / --no-save-image / --open-image / --no-open-image
++```
++
++Offline mode renders the KHQR payload locally (no API image is available), saves it next to online QRs by default, and **self-verifies before printing**: the TLV is re-decoded, the CRC-16 checksum recomputed, and a summary (static/dynamic, amount, merchant name/city, Bakong ID, reference) shown so configuration mistakes surface immediately:
++
++```
++  ✓ Self-check passed (TLV decoded · CRC-16 CCITT valid)
++    Type:             Dynamic
++    Amount:           12.50 USD
++    Merchant:         Example Merchant — Phnom Penh
++    Bakong ID:        merchant@bakong
++    Reference:        TABLE-8
++```
++
++`payway-sdk doctor` reports the same readiness as an advisory row: fully unconfigured is fine (`optional`), but a **partial** configuration is flagged because every `--offline` run would fail until all 7 ABA fields are present.
++
+ Omit `amount` for a static QR (`01=11`); provide it for a dynamic QR (`01=12` with tag `54`). The payload uses byte-aware TLV lengths, includes merchant reference `62.01`, ABA-provided PayWay data `62.68`, and CRC tag `63`. Earlier SDK versions used a private offline format; migrate by removing legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments.
+ 
++Programmatic self-checks use the exported helpers:
++
++```typescript
++import { inspectKhqrPayload, validateKhqrCrc } from 'aba-payway-ts';
++
++const inspection = inspectKhqrPayload(qrString);
++if (!inspection?.valid) throw new Error('KHQR payload failed local verification');
++console.log(inspection.static ? 'Static QR' : `Dynamic ${inspection.amount} ${inspection.currency}`);
++```
++
+ > ⚠️ **Important:** Offline-generated QRs cannot be tracked by PayWay for status. For server-side status tracking, use the API-based `generateQr()`. A payment notification, when ABA has provisioned one, still needs separate reconciliation.
+ 
+ ---
+diff --git a/docs/12-error-handling-and-debugging.md b/docs/12-error-handling-and-debugging.md
+index e07e073..05f26ed 100644
+--- a/docs/12-error-handling-and-debugging.md
++++ b/docs/12-error-handling-and-debugging.md
+@@ -42,6 +42,9 @@ try {
+ |---|---|---|
+ | `publicKeyPem is required for RSA-encrypted endpoints` | No public key configured | Set `publicKeyPem` (or `PAYWAY_RSA_PUBLIC_KEY`) to the RSA key ABA gave you |
+ | `publicKeyPem does not look like a public key PEM (expected "-----BEGIN PUBLIC KEY-----")` | The value is present but not a PEM-formatted public key (e.g. truncated copy/paste, a certificate instead of a key, or a private key) | Paste the **complete** key including the `-----BEGIN PUBLIC KEY-----` and `-----END PUBLIC KEY-----` lines. Literal `\n` sequences from single-line `.env` values are handled automatically |
++| `beneficiary "<id>" must be 9, 11, or 15 digits` | Payout beneficiary id has the wrong length or non-digit chars | Use only digits; valid lengths are 9 / 11 / 15. In sandbox, use `payway-sdk sandbox-beneficiaries` to list the seeded test accounts/MIDs |
++| `not a known sandbox beneficiary` | A payout beneficiary in `environment: 'sandbox'` is not one of the seeded test accounts/MIDs | Switch to a seeded account/MID (see `sandbox-beneficiaries`), or run against `production` where only format is checked |
++| `currency mismatch: sandbox <kind> "<id>" supports USD, not KHR` | A sandbox beneficiary's seeded currency doesn't match the payout currency | USD accounts → USD payouts; test MIDs → KHR payouts (see `docs/SANDBOX-BENEFICIARIES.md`) |
+ 
+ You can pre-flight your key without calling the SDK's RSA endpoints:
+ 
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index f4aac18..4521422 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -2,6 +2,10 @@
+ 
+ > Last updated: 2026-08-26
+ 
++> **Sandbox beneficiary fixtures session (2026-08-26, uncommitted).** Added seeded sandbox-only test accounts and test MIDs for payout / split-payout testing. New `src/sandbox-beneficiaries.ts` holds 6 USD accounts (`500000001`, `500000002`, `002094060`, `111111111`, `002092621`, `000471132`) and 3 KHR MIDs (`323080111554956`, `325012214045630`, `325012214063221`), with `validateSandboxBeneficiary()` enforcing: digits-only + length ∈ {9,11,15} in **both** environments, and (in sandbox) allowlist membership + currency match (`currency mismatch` / `not a known sandbox beneficiary`). Wired into `validateBeneficiaries` (payout domain), `paymentLink.create` payout, and `preAuth.completeWithPayout` (gated on `environment: 'sandbox'`). New CLI `sandbox-beneficiaries` lists them; SDK exports (`listSandboxBeneficiaries`, `SANDBOX_BENEFICIARIES`, etc.) added. Docs: new `docs/SANDBOX-BENEFICIARIES.md` knowledge base, new `aba-payway-sandbox-beneficiaries` skill, updated `aba-payway-payout` skill. Updated existing payout test fixtures to the seeded accounts. Gate: **typecheck clean / biome lint clean / 118 tests pass** (new `sandbox-beneficiaries.test.ts` + payout integration).
++
++> **Offline QR parity + self-verification session (2026-08-26, uncommitted).** `generate-qr --offline` now matches the online pipeline end-to-end: renders the KHQR payload locally to `payway-output/<ref>.png` (refs sanitized), saves/opens with the same flags (`--save-image/--no-save-image/--open-image/--no-open-image`, TTY-aware auto-open), renders the terminal QR, and **self-verifies before printing** — TLV re-decode + CRC-16 recomputation plus a decoded summary (static/dynamic, amount, merchant, Bakong ID, ref). New SDK exports `inspectKhqrPayload()` / `validateKhqrCrc()` / `khqrCrc16()`. `doctor` gained an advisory ABA-KHQR readiness row (partial config = unhealthy with exact missing vars; fully unconfigured = optional) matching the agent matrix's existing `offlineKhqr` row. Live-verified on Windows: doctor row + real offline QR (`--open-image` opened the rendered PNG). Gate: **749 tests / 47 files / lint clean / typecheck clean / build clean**.
++
+ > **QR image auto-open session (2026-08-26, uncommitted).** `generate-qr` now opens the saved QR PNG with the OS default image viewer so it is immediately scannable: default behavior is TTY-aware (interactive terminals only; scripts/CI/agents unaffected), `--open-image` forces it, `--no-open-image` suppresses it. New SDK export `openImageInDefaultViewer()` + `defaultViewerCommandForPlatform()` in `src/open-image.ts` (allowlisted per-platform command — Windows `rundll32 url.dll,FileProtocolHandler` / macOS `open` / Linux `xdg-open` — spawned shell-less and detached, never throws, degrades to an "Open it manually" hint). Live-verified on Windows (rundll32 opened the PNG from transaction `qrmt9v6kaa288eb2`). Docs synced across README, CHANGELOG, Chapter 7, QUICK-START-1-PAGER, VISUAL-GUIDE, and `skills/aba-payway-qr` v1.3.0. Gate: **738 tests / 47 files / lint clean / typecheck clean / build clean**.
+ 
+ > **Close-Transaction escalation open (2026-08-25, uncommitted).** Live sandbox evidence that `closeTransaction` is advisory only: two card payments completed AFTER a code-00 close (`PAY8skk3vbbi` MC \*6777, `PAY8t4x1ozl9` VISA \*0206 → both APPROVED), closure is unqueryable (no CLOSED status in check/detail, no operation marker), and re-close returns 00 idempotently. Full dossier with reproduction + ABA questions + post-fix checklist: [CLOSE-TRANSACTION-FINDINGS.md](./CLOSE-TRANSACTION-FINDINGS.md). Same session also shipped: typed rate-limit errors for the undocumented HTTP 403 + numeric-code-429 shape with window-aware retry pacing and `onThrottle` hook; poller `NOT_FOUND` grace period; end-to-end tools (`online-qr-poll.ts`, `checkout-link-poll.ts`, `checkout-cards-close.ts`, `close-transaction-verify.ts`); skills/docs sync (qr/purchase/check-transaction/transaction-detail/transaction-close v1.2.0). Gate: **727 tests / lint clean / typecheck clean**, all flows paid & verified live.
+@@ -510,9 +514,9 @@ Tasks must be completed **in this order**:
+ ```
+ Package version (package.json):  1.1.1
+ Recent commits:                  808dc80 (journey UX pass) / 922cf67 (docs sync) / bc4efb7 (campaign fixes) / b8ff4b6 / e6c872c / 341923d (Milestone D)
+-Working tree state:              QR image auto-open session (2026-08-26) UNCOMMITTED: src/open-image.ts + export, generate-qr --open-image/--no-open-image, 11 new tests, docs/README/CHANGELOG/VISUAL-GUIDE/QUICK-START sync, aba-payway-qr skill v1.3.0
++Working tree state:              Offline QR parity + self-verification session (2026-08-26) UNCOMMITTED: khqr inspection exports, offline CLI PNG/self-check, doctor khqr row, 11 new tests, docs + offline-qr skill v1.2.0
+ Active agent provider:           opencode (https://opencode.ai/zen/v1), model x-preview-f-free, key via PAYWAY_AGENT_API_KEY in .env
+-Vitest:                          738 passing / 0 failing (47 files)
++Vitest:                          749 passing / 0 failing (47 files)
+ Typecheck:                       npx tsc --noEmit -> clean; npm run typecheck -> clean
+ Lint:                            biome -> 0 errors, 0 warnings
+ Build:                           clean (dist/ rebuilt)
+diff --git a/docs/QUICK-START-1-PAGER.md b/docs/QUICK-START-1-PAGER.md
+index 92ad9d0..9810822 100644
+--- a/docs/QUICK-START-1-PAGER.md
++++ b/docs/QUICK-START-1-PAGER.md
+@@ -246,6 +246,7 @@ For the fastest manual QR test:
+ - Use `--save-image <path>` to override the PNG path.
+ - Use `--no-save-image` to disable the default PNG write for one run.
+ - Use `--open-image` / `--no-open-image` to force or suppress the viewer.
++- Offline/static QR: `payway-sdk generate-qr --offline --ref <ref>` renders the PNG locally (`payway-output/<ref>.png`), self-verifies TLV + CRC-16 before printing, and supports the same image flags.
+ - If the callback row is missing, run `payway-sdk setup-webhook --tunnel`.
+ 
+ ### Refund follow-up
+diff --git a/skills/aba-payway-offline-qr/SKILL.md b/skills/aba-payway-offline-qr/SKILL.md
+index a5cf429..018770c 100644
+--- a/skills/aba-payway-offline-qr/SKILL.md
++++ b/skills/aba-payway-offline-qr/SKILL.md
+@@ -1,7 +1,7 @@
+ ---
+ name: aba-payway-offline-qr
+ description: Generate an offline EMVCo KHQR payload without calling ABA PayWay APIs.
+-version: 1.1.0
++version: 1.2.0
+ ---
+ 
+ # Offline KHQR
+@@ -15,6 +15,24 @@ Offline QR uses EMVCo TLV plus CRC-16 CCITT. It does not use online HMAC signing
+ 
+ Note: unlike a locally built offline QR, the Merchant Portal's Customer Module QR is also static but carries PayWay routing tags (62·68, 99), so its payments DO trigger callbacks and are reconcilable — see [Customer Module QR](../aba-payway-customer-qr/SKILL.md).
+ 
++## CLI Parity (2026-08-26)
++`payway-sdk generate-qr --offline --ref <ref>` now matches online mode end-to-end:
++
++- Renders the payload to `payway-output/<ref>.png` (refs sanitized; `--save-image <path>` overrides, `--no-save-image` disables).
++- Auto-opens the PNG in the OS default viewer on interactive TTYs (`--open-image` forces, `--no-open-image` suppresses) via `openImageInDefaultViewer`.
++- **Self-verifies before printing**: re-decodes the TLV, recomputes CRC-16 CCITT, and prints a summary (static/dynamic, amount, merchant name/city, Bakong ID, reference).
++- Requires ALL 7 ABA fields; `payway-sdk doctor` flags partial configs as unhealthy (fully unconfigured = optional).
++
++## Self-Check Helpers (SDK)
++```ts
++import { inspectKhqrPayload, validateKhqrCrc } from 'aba-payway-ts';
++
++validateKhqrCrc(payload);            // true/false — CRC-16 CCITT only
++const info = inspectKhqrPayload(payload); // undefined if malformed
++if (!info?.valid) throw new Error('KHQR failed local verification');
++info.static; info.amount; info.currency; info.merchantName; info.merchantCity; info.merchantRef; info.bakongId;
++```
++
+ ## Error Handling
+ ```ts
+ import { PayWayConfigError } from 'aba-payway-ts';
+@@ -24,3 +42,7 @@ catch (error) { if (error instanceof PayWayConfigError) console.error(error.mess
+ 
+ ## Related Skills
+ - [Online QR](../aba-payway-qr/SKILL.md)
++- [Customer Module QR](../aba-payway-customer-qr/SKILL.md) — bundled `decode-khqr.cjs` decodes/validates any KHQR payload offline
++
++## Related Docs
++- [Chapter 7 — QR Code Handling](../../docs/07-qr-code-handling.md)
+diff --git a/skills/aba-payway-payment-link/SKILL.md b/skills/aba-payway-payment-link/SKILL.md
+index ab2d3be..538e14d 100644
+--- a/skills/aba-payway-payment-link/SKILL.md
++++ b/skills/aba-payway-payment-link/SKILL.md
+@@ -1,24 +1,114 @@
+ ---
+ name: aba-payway-payment-link
+-description: Create and inspect hosted ABA PayWay payment links.
+-version: 1.1.0
++description: Create and inspect hosted ABA PayWay payment links (single-use vs multi-use, validity, callback, split payout).
++version: 1.2.0
+ ---
+ 
+ # ABA PayWay Payment Link
+ 
+-## Quick Start
++A payment link is a hosted checkout URL you generate via API and share with a
++customer (SMS / email / chat). The customer opens it, pays, and PayWay pushes a
++callback to your `return_url`. Requires `publicKeyPem` (RSA) — the SDK validates
++the PEM before any call and throws `PayWayConfigError` otherwise (use the
++exported `isValidPublicKeyPem()` to pre-flight).
++
++## Quick Start (SDK)
+ ```ts
+-const link = await payway.paymentLink.create({ title: 'Invoice 123', amount: 10, merchantRefNo: 'invoice-123', returnUrl: 'https://merchant.example/paid', currency: 'USD' });
++const link = await payway.paymentLink.create({
++  title: 'Invoice 123',
++  amount: 9.87,
++  currency: 'USD',
++  merchantRefNo: 'inv-123',
++  returnUrl: 'https://merchant.example/paid',   // POST callback target
++  // paymentLimit: 1,        // 1 = single-use · omit = unlimited · N = up to N payments
++  // expiredDate: 0,         // 0/omit = no expiry · epoch seconds = expires then
++  // payout: [{ acc: '122...', amt: 9.87 }],   // split payout (sum must equal amount)
++});
++console.log(link.data?.payment_link, link.data?.id);
+ ```
+ 
+-Payment Link APIs require `publicKeyPem` for RSA-encrypted merchant authorization. The SDK validates the PEM structure before any call — a malformed key throws a clear `PayWayConfigError` (use the exported `isValidPublicKeyPem()` to pre-flight).
++## Parameters (all live inside RSA-encrypted `merchant_auth`)
++| Param | Type | Behavior |
++|---|---|---|
++| `title` | string (≤250) | Link title. **Required.** |
++| `amount` | number | Link amount. Min **0.01 USD** or **100 KHR**. **Required.** |
++| `currency` | `USD` \| `KHR` | **Required.** `PTL99` if unsupported. |
++| `description` | string (≤250) | Optional. |
++| `merchant_ref_no` | string (≤50) | Your reference; echoed in the callback. PayWay does **NOT** reject duplicates — enforce uniqueness yourself. |
++| `return_url` | string (Base64) | **Required.** POST callback target. SDK base64-encodes automatically. `PTL04` if omitted. |
++| `payment_limit` | number | **Controls how many times the link can be paid** — see below. |
++| `expired_date` | epoch seconds | **Controls validity** — see below. `0`/null = no expiry. |
++| `payout` | `[{acc, amt}]` | Optional split payout; sum of `amt` MUST equal `amount`. |
++| `image` | file (≤3MB, JPG/PNG) | Optional display image. |
+ 
+-## Error Handling
+-```ts
+-import { PayWayConfigError } from 'aba-payway-ts';
+-try { await payway.paymentLink.getDetails('link-id'); }
+-catch (error) { if (error instanceof PayWayConfigError) console.error(error.message); }
++### Payout (split) — wire format & gotchas
++- The SDK takes `payout: [{ acc, amt, accName? }]` with **numeric** `amt` and
++  serializes each `amt` to a **string** on the wire (e.g. `"5.00"`), matching
++  PayWay's expected `merchant_auth` shape. `acc` is the **ABA account number or
++  MID** (numeric) — never an API credential id. `accName` is optional.
++- The SDK **omits** `payout` entirely when not supplied (it must never be sent as
++  `null`/empty — that triggers "Payout Info is invalid.").
++- `payout` is part of the **RSA-encrypted `merchant_auth`** and is therefore
++  automatically included when the HMAC hash is computed — do not sign the request
++  as if payout were absent.
++- List **every** beneficiary including the merchant's own share; the sum of all
++  `amt` must equal the link `amount` or you get an amount-mismatch error.
++
++## Behavior: payment_limit (how many payments)
++- **omitted / undefined** → **Unlimited**: anyone can pay repeatedly until it expires.
++- **`1`** → **Single-use**: link auto-closes after the first successful payment.
++- **`N` (>1)** → **Multi-use**: accepts up to N payments, then closes.
++- Track usage with `payment_link.total_trxn` (created = `0`). Status flips to
++  CLOSED when `total_trxn` reaches `payment_limit`.
++
++## Behavior: expired_date (validity)
++- **omitted / `0` / null** → **No expiry**: valid until manually closed or paid out.
++- **epoch seconds** (e.g. `Math.floor(Date.now()/1000) + 86400`) → stops accepting
++  payments at that time. Read it back as `data.expired_date` (0 = never).
++
++## Callback (return_url)
++After each successful payment PayWay **POSTs** `Content-Type: application/json`:
++```json
++{ "tran_id": "123456789", "status": "00", "merchant_ref_no": "inv-123" }
++```
++Use `tran_id` with `checkTransaction` / `getTransactionDetail` to fetch the full
++result. Verify authenticity with `payway.verifyCallback(body, hash)` (HMAC-SHA512,
++sorted keys). The POST body field order is arbitrary — the SDK's verifier sorts
++keys before hashing, so do the same on the server side.
++
++## Error codes (status.code)
++| Code | Meaning |
++|---|---|
++| `PTL02` | Wrong Hash (also: forgot to include payout in the signature / wrong key order) |
++| `PTL04` | Parameter invalid/missing (amount, currency, return_url…) |
++| `PTL05` | Parameter invalid format |
++| `PTL99` | Invalid currency |
++| `PTL132` | Invalid payment link (detail/get) |
++| `PTL-PAYOUT-36` | Payout amount mismatch — sum of beneficiary `amt` ≠ link amount |
++| `PTL146` / `PTL-PAYOUT-37` / `PTL46` | Beneficiary not whitelisted (or wrong type: ABA account vs MID-only profile) |
++| `PTL-RSA-NOTFOUND` | Wrong/old RSA public key used for `merchant_auth` encryption |
++| `Payout Info is invalid.` | Empty array, malformed, or incorrectly encoded payout |
++
++## CLI Equivalent
++```bash
++# Single-use, USD 9.87, no expiry, with a callback URL
++payway-sdk payment-link create \
++  --title "Order 9.87 USD" -a 9.87 -c USD \
++  -r "PL-987-$(date +%s)" --return-url "https://merchant.example/paid"
++
++# Multi-use (up to 5), expires in 1 hour, with split payout
++payway-sdk payment-link create --title "Fundraiser" -a 10 -r ref1 \
++  --return-url "https://merchant.example/paid" \
++  --payment-limit 5 --expired-date "$(($(date +%s)+3600))" \
++  --payout '[{"acc":"122092016015926","amt":6},{"acc":"122091511120425","amt":4}]'
++
++# Inspect (Link ID from create output)
++payway-sdk payment-link detail -i "<data.id>"
+ ```
++The CLI interprets `payment_limit`/`total_trxn` (e.g. "3 of 5 (2 remaining)") and
++`expired_date` ("No expiry" vs absolute time) for you.
+ 
+ ## Related Skills
+-- [Configuration](../aba-payway-sdk-configuration/SKILL.md)
++- [SDK Configuration](../aba-payway-sdk-configuration/SKILL.md)
++- [Check Transaction](../aba-payway-check-transaction/SKILL.md)
++- [Transaction Detail](../aba-payway-transaction-detail/SKILL.md)
+diff --git a/skills/aba-payway-payout/SKILL.md b/skills/aba-payway-payout/SKILL.md
+index 65d28d8..ffb1254 100644
+--- a/skills/aba-payway-payout/SKILL.md
++++ b/skills/aba-payway-payout/SKILL.md
+@@ -1,18 +1,36 @@
+ ---
+ name: aba-payway-payout
+ description: Make an ABA PayWay payout and manage payout beneficiaries.
+-version: 1.1.0
++version: 1.2.0
+ ---
+ 
+ # ABA PayWay Payout
+ 
+ ## Quick Start
+ ```ts
+-const result = await payway.payout.payout({ transactionId: 'payout-123', amount: 10, currency: 'USD', beneficiaries: [{ account: 'recipient-account', amount: 10 }] });
++const result = await payway.payout.payout({
++  transactionId: 'payout-123',
++  amount: 10,
++  currency: 'USD',
++  beneficiaries: [{ account: '500000001', amount: 10 }],
++});
+ ```
+ 
+ `beneficiaries` must be non-empty and their amounts must exactly equal the payout total. A public key is required.
+ 
++## Sandbox beneficiary allowlist (2026-08-26)
++When `environment: 'sandbox'`, the SDK restricts payout beneficiaries to the seeded
++test accounts/MIDs and rejects everything else client-side (saving a round-trip to
++the 403/`37` "not in whitelist" error). Use `payway-sdk sandbox-beneficiaries`
++to list them. They are **sandbox-only — never valid in production**.
++
++- **USD accounts (9-digit):** `500000001`, `500000002`, `002094060`, `111111111`, `002092621`, `000471132`
++- **Test MIDs (15-digit, KHR):** `323080111554956`, `325012214045630`, `325012214063221`
++
++Format rules enforced in **both** environments: digits only, length ∈ {9, 11, 15}.
++In sandbox, a beneficiary's currency must also match its seeded currency
++(USD accounts → USD, MIDs → KHR) or you get a `currency mismatch` error.
++
+ ## Sandbox Facts (2026-08-25)
+ - Payout to a non-whitelisted account → HTTP 403, numeric code **37** ("Payout accounts are not in whitelist"). Whitelist the payee first via `addBeneficiary`.
+ - Beneficiaries are RSA-encrypted and the HMAC is **hex**-encoded for this endpoint (SDK handles both).
+@@ -25,4 +43,5 @@ catch (error) { if (error instanceof PayWayConfigError) console.error(error.mess
+ ```
+ 
+ ## Related Skills
++- [Sandbox Beneficiaries](../aba-payway-sandbox-beneficiaries/SKILL.md)
+ - [Configuration](../aba-payway-sdk-configuration/SKILL.md)
+diff --git a/skills/aba-payway-pre-auth/SKILL.md b/skills/aba-payway-pre-auth/SKILL.md
+index 49e195a..b1e1424 100644
+--- a/skills/aba-payway-pre-auth/SKILL.md
++++ b/skills/aba-payway-pre-auth/SKILL.md
+@@ -1,24 +1,56 @@
+ ---
+ name: aba-payway-pre-auth
+ description: Complete, complete with payout, or cancel an ABA PayWay pre-authorization.
+-version: 1.1.0
++version: 1.2.0
+ ---
+ 
+ # ABA PayWay Pre-Authorization
+ 
+-## Quick Start
++Pre-authorization is a two-step capture: place a hold, then capture (complete) it
++later. Endpoints require `publicKeyPem` (RSA merchant authorization) — the SDK
++validates the PEM before any call and throws `PayWayConfigError` otherwise.
++
++## Quick Start (SDK)
+ ```ts
+-const result = await payway.preAuth.complete('order-123', 10);
++// Step 1 — initial pre-auth purchase (type: 'pre-auth'); NO payout here.
++const pay = await payway.checkout.purchase({ /* ... */ type: 'pre-auth' });
++
++// Step 4 — capture (complete). Payout split is configured ONLY here.
++const done = await payway.preAuth.completeWithPayout('order-123', 10, [
++  { acc: '200030000', amt: 6 },
++  { acc: '012538302', amt: 4 },   // sum must equal the complete amount (10)
++]);
+ ```
+ 
+-Pre-authorization endpoints require `publicKeyPem` because requests use RSA-encrypted merchant authorization. The SDK validates the PEM structure before any call — a malformed key throws a clear `PayWayConfigError` (use the exported `isValidPublicKeyPem()` to pre-flight).
++## Payout belongs ONLY on completion
++- **Step 1 (purchase / checkout with `type: 'pre-auth'`):** do **NOT** include
++  payout. The SDK explicitly rejects `payout` on a pre-auth purchase with a clear
++  error.
++- **Step 4 (pre-auth-completion):** pass `payout` inside the RSA-encrypted
++  `merchant_auth` via `preAuth.completeWithPayout(tran_id, amount, payout)`.
++  The encrypted payload is `{ mc_id, tran_id, complete_amount, payout }`, so payout
++  is automatically covered by the HMAC signature.
++- Wire format: each beneficiary `amt` is serialized as a **string** (`"5.00"`);
++  `acc` is the ABA account number / MID (numeric, not an API credential id).
++  The sum of all `amt` MUST equal the captured `amount`, or you get
++  `PTL-PAYOUT-36` (amount mismatch).
+ 
+-## Error Handling
+-```ts
+-import { PayWayConfigError } from 'aba-payway-ts';
+-try { await payway.preAuth.cancel('order-123'); }
+-catch (error) { if (error instanceof PayWayConfigError) console.error(error.message); }
+-```
++## Methods
++| Method | Purpose |
++|---|---|
++| `preAuth.complete(tran_id, amount)` | Capture without payout split. |
++| `preAuth.completeWithPayout(tran_id, amount, payout)` | Capture and split via payout. |
++| `preAuth.cancel(tran_id)` | Release the hold. |
++
++## Error codes (status.code)
++| Code | Meaning |
++|---|---|
++| `PTL02` | Wrong Hash (e.g. payout omitted from the signature) |
++| `PTL-PAYOUT-36` | Payout amount mismatch — sum of `amt` ≠ complete amount |
++| `PTL146` / `PTL-PAYOUT-37` / `PTL46` | Beneficiary not whitelisted / wrong type |
++| `PTL-RSA-NOTFOUND` | Wrong/old RSA public key |
++| Profile lacks payout permission | Sandbox profile must be provisioned for complete-with-payout |
+ 
+ ## Related Skills
+ - [Configuration](../aba-payway-sdk-configuration/SKILL.md)
++- [Payment Link](../aba-payway-payment-link/SKILL.md) (also supports payout)
+diff --git a/src/__tests__/cli.test.ts b/src/__tests__/cli.test.ts
+index 77fa7dd..dd21818 100644
+--- a/src/__tests__/cli.test.ts
++++ b/src/__tests__/cli.test.ts
+@@ -520,6 +520,110 @@ describe('built CLI', () => {
+     expect(stripAnsi(output)).toMatch(/000201010212/);
+   });
+ 
++  it('saves and self-verifies an offline QR PNG without opening it in non-TTY runs', () => {
++    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
++    temporaryDirectories.push(cwd);
++
++    writeFileSync(
++      path.join(cwd, '.env'),
++      [
++        'PAYWAY_KHQR_BAKONG_ID=merchant@bakong',
++        'PAYWAY_KHQR_ABA_MERCHANT_ID=123456789012345',
++        'PAYWAY_KHQR_ACQUIRER_NAME=ABA Bank',
++        'PAYWAY_KHQR_MERCHANT_CATEGORY_CODE=5999',
++        'PAYWAY_KHQR_MERCHANT_NAME=Example Merchant',
++        'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh',
++        'PAYWAY_KHQR_PAYWAY_DATA=synthetic-template',
++      ].join('\n'),
++    );
++
++    const result = spawnSync(
++      process.execPath,
++      [
++        path.join(process.cwd(), 'dist', 'cli.js'),
++        'generate-qr',
++        '--amount',
++        '2.50',
++        '--currency',
++        'USD',
++        '--offline',
++        '--ref',
++        'OFFLINE PNG 1',
++        '--non-interactive',
++      ],
++      {
++        cwd,
++        encoding: 'utf8',
++        env: {
++          PATH: process.env.PATH ?? '',
++          SystemRoot: process.env.SystemRoot ?? '',
++        },
++      },
++    );
++
++    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
++
++    expect(result.status, JSON.stringify({ output })).toBe(0);
++    expect(output).toContain('Self-check passed');
++    expect(output).toContain('CRC-16 CCITT valid');
++    expect(output).toContain('Type:');
++    expect(output).toContain('Amount:           2.50 USD');
++    expect(output).toContain('Merchant:         Example Merchant — Phnom Penh');
++    expect(output).toContain('Reference:        OFFLINE PNG 1');
++    // Refs with spaces are sanitized into the default file name.
++    const expectedPng = path.join(cwd, 'payway-output', 'OFFLINE-PNG-1.png');
++    expect(output).toContain(`Image saved to ${expectedPng}`);
++    expect(existsSync(expectedPng)).toBe(true);
++    // Non-TTY: auto-open stays off.
++    expect(output).not.toContain('default viewer');
++  });
++
++  it('honors --no-save-image for offline QR generation', () => {
++    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
++    temporaryDirectories.push(cwd);
++
++    writeFileSync(
++      path.join(cwd, '.env'),
++      [
++        'PAYWAY_KHQR_BAKONG_ID=merchant@bakong',
++        'PAYWAY_KHQR_ABA_MERCHANT_ID=123456789012345',
++        'PAYWAY_KHQR_ACQUIRER_NAME=ABA Bank',
++        'PAYWAY_KHQR_MERCHANT_CATEGORY_CODE=5999',
++        'PAYWAY_KHQR_MERCHANT_NAME=Example Merchant',
++        'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh',
++        'PAYWAY_KHQR_PAYWAY_DATA=synthetic-template',
++      ].join('\n'),
++    );
++
++    const result = spawnSync(
++      process.execPath,
++      [
++        path.join(process.cwd(), 'dist', 'cli.js'),
++        'generate-qr',
++        '--offline',
++        '--ref',
++        'OFFLINE-NOSAVE',
++        '--non-interactive',
++        '--no-save-image',
++      ],
++      {
++        cwd,
++        encoding: 'utf8',
++        env: {
++          PATH: process.env.PATH ?? '',
++          SystemRoot: process.env.SystemRoot ?? '',
++        },
++      },
++    );
++
++    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
++
++    expect(result.status, JSON.stringify({ output })).toBe(0);
++    expect(output).not.toContain('Image saved to');
++    expect(output).toContain('Image auto-save disabled');
++    expect(existsSync(path.join(cwd, 'payway-output', 'OFFLINE-NOSAVE.png'))).toBe(false);
++  });
++
+   it('generates online through a local API without prompts in non-interactive mode', async () => {
+     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+     temporaryDirectories.push(cwd);
+diff --git a/src/__tests__/client.test.ts b/src/__tests__/client.test.ts
+index d731875..500117a 100644
+--- a/src/__tests__/client.test.ts
++++ b/src/__tests__/client.test.ts
+@@ -580,6 +580,17 @@ describe('checkout domain', () => {
+         'transactionId is required',
+       );
+     });
++
++    it('rejects payout on a pre-auth purchase (split belongs on completion)', () => {
++      expect(() =>
++        payway.checkout.createTransaction({
++          transactionId: 'T',
++          amount: 10,
++          type: 'pre-auth',
++          payout: [{ acc: '500000001', amt: 10 }],
++        }),
++      ).toThrow(/payout is not allowed on the initial pre-auth purchase/);
++    });
+   });
+ 
+   describe('checkTransaction', () => {
+@@ -1258,7 +1269,7 @@ describe('preAuth domain', () => {
+   it('completeWithPayout uses the completion path with encrypted payout instructions', async () => {
+     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Completed' } }));
+ 
+-    await payway.preAuth.completeWithPayout('T-PREAUTH-002', 200.0, [{ acc: '000123456', amt: 200 }]);
++    await payway.preAuth.completeWithPayout('T-PREAUTH-002', 200.0, [{ acc: '500000001', amt: 200 }]);
+ 
+     const [url, opts] = fetchSpy.mock.calls[0];
+     expect(url).toContain(ENDPOINTS.completePreAuth);
+@@ -1291,7 +1302,7 @@ describe('payout domain', () => {
+     await payway.payout.payout({
+       transactionId: 'PO-001',
+       amount: 50.0,
+-      beneficiaries: [{ account: '000123456', amount: 50.0 }],
++      beneficiaries: [{ account: '500000001', amount: 50.0 }],
+       currency: 'USD',
+     });
+ 
+@@ -1308,7 +1319,7 @@ describe('payout domain', () => {
+     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'Updated' } }));
+ 
+     await payway.payout.updateBeneficiaryStatus({
+-      payee: '000123456',
++      payee: '500000001',
+       status: 1,
+     });
+ 
+@@ -1320,7 +1331,7 @@ describe('payout domain', () => {
+     fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 0, message: 'Added' } }));
+ 
+     await payway.payout.addBeneficiary({
+-      payee: '000123456',
++      payee: '500000001',
+     });
+ 
+     const [url, opts] = fetchSpy.mock.calls[0];
+@@ -1335,7 +1346,7 @@ describe('payout domain', () => {
+     await payway.payout.payout({
+       transactionId: 'PO-CF-001',
+       amount: 100.0,
+-      beneficiaries: [{ account: '000123456', amount: 100.0 }],
++      beneficiaries: [{ account: '500000001', amount: 100.0 }],
+       currency: 'USD',
+       customFields: { source: 'web', campaign: 'summer2026' },
+     });
+@@ -1350,7 +1361,7 @@ describe('payout domain', () => {
+       payway.payout.payout({
+         transactionId: 'PO-002',
+         amount: 100.0,
+-        beneficiaries: [{ account: '000123456', amount: 50.0 }],
++        beneficiaries: [{ account: '500000001', amount: 50.0 }],
+         currency: 'USD',
+       }),
+     ).rejects.toThrow('beneficiary amounts (50) must sum to total amount (100)');
+@@ -1366,6 +1377,17 @@ describe('payout domain', () => {
+       }),
+     ).rejects.toThrow('beneficiaries must be a non-empty array');
+   });
++
++  it('rejects a non-seeded beneficiary id in sandbox', async () => {
++    await expect(
++      payway.payout.payout({
++        transactionId: 'PO-004',
++        amount: 100.0,
++        beneficiaries: [{ account: '999999999', amount: 100.0 }],
++        currency: 'USD',
++      }),
++    ).rejects.toThrow(/not a known sandbox beneficiary/);
++  });
+ });
+ 
+ // ---------------------------------------------------------------------------
+@@ -1934,3 +1956,4 @@ describe('checkout.pollTransactionStatus', () => {
+     expect(body).toHaveProperty('req_time');
+   });
+ });
++
+diff --git a/src/__tests__/doctor.test.ts b/src/__tests__/doctor.test.ts
+index 0b5720a..c0249d5 100644
+--- a/src/__tests__/doctor.test.ts
++++ b/src/__tests__/doctor.test.ts
+@@ -123,4 +123,51 @@ describe('runDoctor', () => {
+     expect(callbackCheck?.ok).toBe(true);
+     expect(callbackCheck?.detail).toContain('https://example.com/payway/callback');
+   });
++
++  it('treats a fully unconfigured KHQR setup as healthy but optional', () => {
++    writeFileSync(path.join(TEST_DIR, '.env'), 'PAYWAY_ENV=sandbox\n');
++    const result = runDoctor({ cwd: TEST_DIR, env: {} });
++    const khqrCheck = result.checks.find((c) => c.id === 'khqr-config');
++
++    expect(khqrCheck?.ok).toBe(true);
++    expect(khqrCheck?.detail).toContain('optional');
++  });
++
++  it('flags a partially configured KHQR setup as unhealthy', () => {
++    writeFileSync(
++      path.join(TEST_DIR, '.env'),
++      ['PAYWAY_ENV=sandbox', 'PAYWAY_KHQR_BAKONG_ID=merchant@bakong', 'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh'].join(
++        '\n',
++      ),
++    );
++    const result = runDoctor({ cwd: TEST_DIR, env: {} });
++    const khqrCheck = result.checks.find((c) => c.id === 'khqr-config');
++
++    expect(khqrCheck?.ok).toBe(false);
++    expect(khqrCheck?.detail).toContain('2/7');
++    expect(khqrCheck?.detail).toContain('PAYWAY_KHQR_ABA_MERCHANT_ID');
++    expect(khqrCheck?.detail).not.toContain('PAYWAY_KHQR_BAKONG_ID');
++    expect(khqrCheck?.fix).toContain('ALL 7');
++  });
++
++  it('reports a complete KHQR configuration as ready', () => {
++    writeFileSync(
++      path.join(TEST_DIR, '.env'),
++      [
++        'PAYWAY_ENV=sandbox',
++        'PAYWAY_KHQR_BAKONG_ID=merchant@bakong',
++        'PAYWAY_KHQR_ABA_MERCHANT_ID=123456789012345',
++        'PAYWAY_KHQR_ACQUIRER_NAME=ABA Bank',
++        'PAYWAY_KHQR_MERCHANT_CATEGORY_CODE=5999',
++        'PAYWAY_KHQR_MERCHANT_NAME=Example Merchant',
++        'PAYWAY_KHQR_MERCHANT_CITY=Phnom Penh',
++        'PAYWAY_KHQR_PAYWAY_DATA=aba-provided-template',
++      ].join('\n'),
++    );
++    const result = runDoctor({ cwd: TEST_DIR, env: {} });
++    const khqrCheck = result.checks.find((c) => c.id === 'khqr-config');
++
++    expect(khqrCheck?.ok).toBe(true);
++    expect(khqrCheck?.detail).toContain('all 7 fields configured');
++  });
+ });
+diff --git a/src/__tests__/khqr-offline.test.ts b/src/__tests__/khqr-offline.test.ts
+index f917e9a..d31da8e 100644
+--- a/src/__tests__/khqr-offline.test.ts
++++ b/src/__tests__/khqr-offline.test.ts
+@@ -1,6 +1,6 @@
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ import type { KhqrMerchantConfiguration } from '../khqr-config.js';
+-import { generateOfflineQR } from '../khqr-offline.js';
++import { generateOfflineQR, inspectKhqrPayload, validateKhqrCrc } from '../khqr-offline.js';
+ 
+ const configuration: KhqrMerchantConfiguration = {
+   bakongId: 'merchant@bakong',
+@@ -214,3 +214,70 @@ describe('generateOfflineQR', () => {
+     expect(fetchSpy).not.toHaveBeenCalled();
+   });
+ });
++
++describe('validateKhqrCrc and inspectKhqrPayload', () => {
++  const dynamicQr = generateOfflineQR(
++    {
++      amount: 25.5,
++      currency: 'USD',
++      merchantRef: 'ORDER-123',
++      createdAt: 1_700_000_000_000,
++      expiresAt: 1_700_000_900_000,
++    },
++    configuration,
++  );
++  const staticQr = generateOfflineQR(
++    { currency: 'KHR', merchantRef: 'TABLE-7', createdAt: 1_700_000_000_000, expiresAt: 1_700_000_900_000 },
++    configuration,
++  );
++
++  it('validates the CRC of freshly generated payloads', () => {
++    expect(validateKhqrCrc(dynamicQr)).toBe(true);
++    expect(validateKhqrCrc(staticQr)).toBe(true);
++  });
++
++  it('accepts lowercase checksums but rejects tampered ones', () => {
++    expect(validateKhqrCrc(`${dynamicQr.slice(0, -4)}${dynamicQr.slice(-4).toLowerCase()}`)).toBe(true);
++    expect(validateKhqrCrc(`${dynamicQr.slice(0, -8)}63040000`)).toBe(false);
++  });
++
++  it('rejects structurally invalid inputs without throwing', () => {
++    expect(validateKhqrCrc('')).toBe(false);
++    expect(validateKhqrCrc('0002010102')).toBe(false);
++    expect(inspectKhqrPayload('')).toBeUndefined();
++    expect(inspectKhqrPayload('not-a-khqr-payload!!')).toBeUndefined();
++  });
++
++  it('decodes the fields a merchant eyeballs before printing', () => {
++    const inspection = inspectKhqrPayload(dynamicQr);
++
++    expect(inspection?.valid).toBe(true);
++    expect(inspection?.crcValid).toBe(true);
++    expect(inspection?.static).toBe(false);
++    expect(inspection?.amount).toBe('25.50');
++    expect(inspection?.currency).toBe('USD');
++    expect(inspection?.merchantName).toBe('Example Merchant');
++    expect(inspection?.merchantCity).toBe('Phnom Penh');
++    expect(inspection?.merchantRef).toBe('ORDER-123');
++    expect(inspection?.bakongId).toBe('merchant@bakong');
++  });
++
++  it('reports static payloads without an amount', () => {
++    const inspection = inspectKhqrPayload(staticQr);
++
++    expect(inspection?.static).toBe(true);
++    expect(inspection?.amount).toBeUndefined();
++    expect(inspection?.currency).toBe('KHR');
++    expect(inspection?.merchantRef).toBe('TABLE-7');
++    expect(inspection?.crcValid).toBe(true);
++  });
++
++  it('still decodes fields when the checksum is corrupted', () => {
++    const corrupted = `${dynamicQr.slice(0, -4)}0000`;
++    const inspection = inspectKhqrPayload(corrupted);
++
++    expect(inspection?.crcValid).toBe(false);
++    expect(inspection?.valid).toBe(false);
++    expect(inspection?.amount).toBe('25.50');
++  });
++});
+diff --git a/src/__tests__/skills.test.ts b/src/__tests__/skills.test.ts
+index aea9813..04af6c9 100644
+--- a/src/__tests__/skills.test.ts
++++ b/src/__tests__/skills.test.ts
+@@ -7,12 +7,12 @@ const testDirectory = path.dirname(fileURLToPath(import.meta.url));
+ const skillsDirectory = path.join(testDirectory, '..', '..', 'skills');
+ 
+ describe('packaged AI skills', () => {
+-  it('provides 24 discoverable skill guides with quick-start content', async () => {
++  it('provides 25 discoverable skill guides with quick-start content', async () => {
+     const skillDirectories = (await readdir(skillsDirectory, { withFileTypes: true }))
+       .filter((entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'))
+       .map((entry) => entry.name);
+ 
+-    expect(skillDirectories).toHaveLength(24);
++    expect(skillDirectories).toHaveLength(25);
+     expect(skillDirectories).toContain('aba-payway-transaction-by-merchant-ref');
+     expect(skillDirectories).toContain('aba-payway-agent');
+     expect(skillDirectories).toContain('aba-payway-first-payment');
+diff --git a/src/__tests__/utils.test.ts b/src/__tests__/utils.test.ts
+index 0b27650..d1f949a 100644
+--- a/src/__tests__/utils.test.ts
++++ b/src/__tests__/utils.test.ts
+@@ -297,8 +297,8 @@ describe('validateBeneficiaries', () => {
+     expect(() =>
+       validateBeneficiaries(
+         [
+-          { account: 'A', amount: 30 },
+-          { account: 'B', amount: 70 },
++          { account: '111111112', amount: 30 },
++          { account: '222222223', amount: 70 },
+         ],
+         100,
+         'USD',
+@@ -307,7 +307,7 @@ describe('validateBeneficiaries', () => {
+   });
+ 
+   it('throws when beneficiary amounts do not sum to total', () => {
+-    expect(() => validateBeneficiaries([{ account: 'A', amount: 50 }], 100, 'USD')).toThrow(
++    expect(() => validateBeneficiaries([{ account: '111111112', amount: 50 }], 100, 'USD')).toThrow(
+       'beneficiary amounts (50) must sum to total amount (100)',
+     );
+   });
+diff --git a/src/agent/contracts.ts b/src/agent/contracts.ts
+index a9cae79..9842b34 100644
+--- a/src/agent/contracts.ts
++++ b/src/agent/contracts.ts
+@@ -92,6 +92,8 @@ export interface CreatePaymentLinkParams {
+   description?: string;
+   paymentLimit?: number;
+   expiredDate?: number;
++  /** Split payout: each { acc, amt } where acc is an ABA account/MID and amt is a number; sum must equal amount. */
++  payout?: { acc: string; amt: number; accName?: string }[];
+   rationale?: string;
+ }
+ 
+diff --git a/src/agent/tools.ts b/src/agent/tools.ts
+index 08044fd..65581ab 100644
+--- a/src/agent/tools.ts
++++ b/src/agent/tools.ts
+@@ -202,6 +202,7 @@ async function runCreatePaymentLink(action: MaterializedAgentAction, client: Pay
+       returnUrl: params.returnUrl,
+       merchantRefNo: params.merchantRefNo,
+       expiredDate: params.expiredDate,
++      payout: params.payout,
+     });
+ 
+     const asRecord = response as Record<string, unknown>;
+diff --git a/src/cli.ts b/src/cli.ts
+index f6c4880..64f39f1 100644
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -8,7 +8,7 @@ import { loadDotEnvIntoProcess } from './cli/dotenv.js';
+ import { explainAll, explainPayWayCode } from './cli/explain-code.js';
+ import { renderFirstPaymentQuickstart } from './cli/first-payment.js';
+ import { formatClock, mapPollOutcomeToExitCode } from './cli/journey.js';
+-import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
++import { renderQrToPngBuffer, renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
+ import { registerAgentCommands } from './cli/commands/agent.js';
+ import { registerOnboardCommand } from './cli/commands/onboard.js';
+ import { runDoctor } from './cli/commands/doctor.js';
+@@ -28,6 +28,7 @@ import {
+   setDefaultProfile,
+ } from './config/profiles.js';
+ import { PAYMENT_STATUS_CODES, PAYMENT_STATUS_LABELS, REFUND_ERROR_CODES } from './constants.js';
++import { listSandboxBeneficiaries } from './sandbox-beneficiaries.js';
+ import {
+   PayWayAPIError,
+   PayWayBusinessError,
+@@ -37,6 +38,7 @@ import {
+   PollingAbortedError,
+ } from './errors.js';
+ import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConfiguration } from './khqr-config.js';
++import { inspectKhqrPayload } from './khqr-offline.js';
+ import { openImageInDefaultViewer } from './open-image.js';
+ import { sdk } from './sdk.js';
+ import { formatTestReport } from './test/index.js';
+@@ -163,6 +165,37 @@ interface GenerateQrCommandOptions {
+   pollTimeout?: string;
+ }
+ 
++// ---------------------------------------------------------------------------
++// Shared QR PNG persistence + default-viewer open (online and offline modes)
++// ---------------------------------------------------------------------------
++async function persistQrImage(
++  imageBuffer: Buffer,
++  resolvedSaveImage: string,
++  openImageFlag: boolean | undefined,
++): Promise<void> {
++  const { writeFileSync, mkdirSync } = await import('node:fs');
++  const imgDir = path.dirname(resolvedSaveImage);
++  mkdirSync(imgDir, { recursive: true });
++  writeFileSync(resolvedSaveImage, imageBuffer);
++  console.log(`  ${c.green('✓')} Image saved to ${c.cyan(resolvedSaveImage)}`);
++
++  // Open with the OS default viewer: forced via --open-image, suppressed via
++  // --no-open-image, otherwise only for humans (interactive TTYs — agents
++  // and CI keep stdout clean).
++  const shouldOpen = openImageFlag === true || (openImageFlag === undefined && Boolean(process.stdout.isTTY));
++  if (shouldOpen) {
++    const opened = await openImageInDefaultViewer(resolvedSaveImage);
++    if (opened.opened) {
++      console.log(`  ${c.green('✓')} QR image opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
++    } else {
++      console.log(
++        `  ${c.yellow('⚠')} Could not open QR image automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`,
++      );
++      console.log(`  ${c.dim(`Open it manually: ${resolvedSaveImage}`)}`);
++    }
++  }
++}
++
+ // ---------------------------------------------------------------------------
+ // Shared polling runner for generate-qr and generate-checkout
+ // ---------------------------------------------------------------------------
+@@ -1177,8 +1210,11 @@ program
+   .option('--template <name>', 'QR image template for online mode', 'template2')
+   .option('--lifetime <seconds>', 'Transaction lifetime in seconds (default: 180)', '180')
+   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
+-  .option('--save-image <path>', 'Save QR image to file (online mode only, base64 decoded)')
+-  .option('--no-save-image', 'Do not save the QR image PNG to payway-output/<transaction-id>.png by default')
++  .option('--save-image <path>', 'Save QR image PNG to file (online: API image; offline: rendered locally)')
++  .option(
++    '--no-save-image',
++    'Do not save the QR image PNG (defaults: online payway-output/<transaction-id>.png, offline payway-output/<ref>.png)',
++  )
+   .option('--open-image', 'Open the saved QR image with the OS default viewer (default: auto when interactive)')
+   .option('--no-open-image', 'Never open the QR image, even in interactive terminals')
+   .option('--no-show-qr', 'Do not render the QR code in the terminal (auto-enabled for interactive terminals)')
+@@ -1248,14 +1284,68 @@ program
+         });
+ 
+         console.log(`  ${c.green('✓')} Offline ABA KHQR generated\n`);
+-        console.log(
+-          `  ${c.bold('Amount:')}           ${c.cyan(amount === undefined ? `Static ${currency}` : `${amount} ${currency}`)}`,
+-        );
+-        console.log(`  ${c.bold('Reference:')}        ${ref}`);
++
++        // Self-check: decode the TLV and re-verify the CRC-16 checksum
++        // locally so configuration mistakes surface before the QR is used.
++        const inspection = inspectKhqrPayload(qrString);
++        if (!inspection) {
++          console.log(`  ${c.yellow('⚠')} Self-check: payload could not be decoded (unexpected)`);
++        } else if (!inspection.crcValid) {
++          console.log(`  ${c.red('✗')} Self-check failed: CRC-16 checksum mismatch`);
++        } else {
++          console.log(`  ${c.green('✓')} Self-check passed ${c.dim('(TLV decoded · CRC-16 CCITT valid)')}`);
++          console.log(`    ${c.bold('Type:')}             ${inspection.static ? 'Static' : 'Dynamic'}`);
++          if (!inspection.static && inspection.amount !== undefined) {
++            console.log(`    ${c.bold('Amount:')}           ${c.cyan(`${inspection.amount} ${inspection.currency ?? ''}`.trimEnd())}`);
++          }
++          if (inspection.merchantName !== undefined || inspection.merchantCity !== undefined) {
++            console.log(
++              `    ${c.bold('Merchant:')}         ${[inspection.merchantName, inspection.merchantCity].filter(Boolean).join(' — ')}`,
++            );
++          }
++          if (inspection.bakongId !== undefined) {
++            console.log(`    ${c.bold('Bakong ID:')}        ${inspection.bakongId}`);
++          }
++          console.log(`    ${c.bold('Reference:')}        ${inspection.merchantRef ?? ref}`);
++        }
++
+         console.log();
+         console.log(`  ${c.bold('QR String:')}`);
+         console.log(`  ${c.dim(qrString)}`);
+         console.log();
++
++        // Render a scannable QR right in the terminal when interactive.
++        if (shouldAutoRenderQr(process.stdout, asBoolFlag(opts.showQr))) {
++          try {
++            const terminalQr = await renderQrToTerminal(qrString);
++            console.log(terminalQr);
++            console.log(`  ${c.dim('Scan the QR above with any KHQR-compatible banking app.')}\n`);
++          } catch {
++            // Terminal rendering is best-effort; the raw string is already printed.
++          }
++        }
++
++        const resolvedOfflineSaveImage =
++          opts.saveImage === false
++            ? false
++            : typeof opts.saveImage === 'string'
++              ? opts.saveImage
++              : path.join(process.cwd(), 'payway-output', `${ref.replace(/[^a-zA-Z0-9._-]+/g, '-')}.png`);
++
++        if (resolvedOfflineSaveImage) {
++          try {
++            const imageBuffer = await renderQrToPngBuffer(qrString);
++            await persistQrImage(imageBuffer, resolvedOfflineSaveImage, opts.openImage);
++            console.log();
++          } catch (renderError) {
++            console.log(
++              `  ${c.yellow('⚠')} Could not render/save the QR PNG ${c.dim(`(${renderError instanceof Error ? renderError.message : String(renderError)})`)}`,
++            );
++          }
++        } else {
++          console.log(`  ${c.dim('Image auto-save disabled for this run.')}`);
++          console.log();
++        }
+       } catch (e) {
+         console.log(`  ${c.red('✗')} ${e instanceof Error ? e.message : String(e)}`);
+         process.exitCode = 1;
+@@ -1369,31 +1459,9 @@ program
+               : path.join(process.cwd(), 'payway-output', `${transactionId}.png`);
+ 
+         if (qr.qrImage && resolvedSaveImage) {
+-          const { writeFileSync, mkdirSync } = await import('node:fs');
+-          const imgDir = path.dirname(resolvedSaveImage);
+-          mkdirSync(imgDir, { recursive: true });
+           // qrImage is a data URL: "data:image/png;base64,iVBOR..."
+           const base64Data = qr.qrImage.includes('base64,') ? qr.qrImage.split('base64,')[1] : qr.qrImage;
+-          const imgBuffer = Buffer.from(base64Data, 'base64');
+-          writeFileSync(resolvedSaveImage, imgBuffer);
+-          console.log(`  ${c.green('✓')} Image saved to ${c.cyan(resolvedSaveImage)}`);
+-
+-          // Open with the OS default viewer: forced via --open-image,
+-          // suppressed via --no-open-image, otherwise only for humans
+-          // (interactive TTYs — agents and CI keep stdout clean).
+-          const shouldOpenImage =
+-            opts.openImage === true || (opts.openImage === undefined && Boolean(process.stdout.isTTY));
+-          if (shouldOpenImage) {
+-            const opened = await openImageInDefaultViewer(resolvedSaveImage);
+-            if (opened.opened) {
+-              console.log(`  ${c.green('✓')} QR image opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
+-            } else {
+-              console.log(
+-                `  ${c.yellow('⚠')} Could not open QR image automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`,
+-              );
+-              console.log(`  ${c.dim(`Open it manually: ${resolvedSaveImage}`)}`);
+-            }
+-          }
++          await persistQrImage(Buffer.from(base64Data, 'base64'), resolvedSaveImage, opts.openImage);
+           console.log();
+         } else if (qr.qrImage) {
+           console.log(`  ${c.bold('QR Image:')} base64 data available (${qr.qrImage.length} chars)`);
+@@ -1535,8 +1603,12 @@ paymentLinkCmd
+   .requiredOption('--return-url <url>', 'Public HTTPS callback URL after payment')
+   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
+   .option('-d, --description <text>', 'Link description (max 250 chars)')
+-  .option('--payment-limit <n>', 'Maximum number of payments accepted')
+-  .option('--expired-date <epochSeconds>', 'Expiration timestamp (epoch seconds)')
++  .option('--payment-limit <n>', 'Max payments: omit = unlimited, 1 = single-use, N = up to N payments')
++  .option('--expired-date <epochSeconds>', 'Expiration (epoch seconds); omit or 0 = no expiry')
++  .option(
++    '--payout <json>',
++    'Split-payout JSON array, e.g. \'[{"acc":"122092016015926","amt":5},{"acc":"122091511120425","amt":4.87}]\' (sum must equal amount)',
++  )
+   .option('--json', 'Print the raw JSON response')
+   .action(async (opts: Record<string, string | undefined>) => {
+     console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
+@@ -1562,8 +1634,21 @@ paymentLinkCmd
+     let expiredDate: number | undefined;
+     if (opts.expiredDate !== undefined) {
+       expiredDate = Number(opts.expiredDate);
+-      if (!Number.isInteger(expiredDate) || expiredDate <= 0) {
+-        console.log(`  ${c.red('✗')} --expired-date must be a positive whole number of epoch seconds`);
++      if (!Number.isInteger(expiredDate) || expiredDate < 0) {
++        console.log(`  ${c.red('✗')} --expired-date must be a non-negative whole number of epoch seconds (0 = no expiry)`);
++        process.exitCode = 1;
++        return;
++      }
++    }
++
++    let payout: { acc: string; amt: number; accName?: string }[] | undefined;
++    if (opts.payout !== undefined) {
++      try {
++        const parsed = JSON.parse(opts.payout);
++        if (!Array.isArray(parsed)) throw new Error('expected a JSON array');
++        payout = parsed.map((e: any) => ({ acc: String(e.acc), amt: Number(e.amt), ...(e.accName ? { accName: String(e.accName) } : {}) }));
++      } catch (e) {
++        console.log(`  ${c.red('✗')} --payout must be valid JSON array of { acc, amt }: ${(e as Error).message}`);
+         process.exitCode = 1;
+         return;
+       }
+@@ -1594,6 +1679,7 @@ paymentLinkCmd
+         description: opts.description,
+         paymentLimit,
+         expiredDate,
++        payout,
+       });
+ 
+       if (opts.json) {
+@@ -1622,6 +1708,30 @@ paymentLinkCmd
+       console.log(`  ${c.bold('Title:')}          ${data?.title ?? opts.title}`);
+       console.log(`  ${c.bold('Amount:')}         ${data?.amount ?? amount} ${data?.currency ?? currency}`);
+       console.log(`  ${c.bold('Status:')}         ${data?.status ?? '-'}`);
++
++      // Behavioral interpretation of payment_limit / expired_date.
++      const limit = data?.payment_limit ?? paymentLimit;
++      const usage =
++        limit === undefined || limit === null
++          ? `${c.cyan('Unlimited payments')} (anyone can pay repeatedly until it expires)`
++          : limit === 1
++            ? `${c.cyan('Single-use')} (auto-closes after the first successful payment)`
++            : `${c.cyan(`Multi-use (up to ${limit} payments)`)} (closes after ${limit} payments)`;
++      console.log(`  ${c.bold('Usage:')}          ${usage}`);
++
++      const expRaw = Number(data?.expired_date ?? expiredDate ?? 0);
++      const expiry =
++        !expRaw || expRaw === 0
++          ? `${c.cyan('No expiry')} (valid until manually closed)`
++          : `${c.cyan(new Date(expRaw * 1000).toISOString())} (epoch ${expRaw})`;
++      console.log(`  ${c.bold('Validity:')}       ${expiry}`);
++
++      if (data?.return_url) {
++        console.log(`  ${c.bold('Callback:')}       ${data.return_url} (POST {tran_id,status,merchant_ref_no})`);
++      }
++      if (payout && payout.length > 0) {
++        console.log(`  ${c.bold('Payout:')}         ${payout.length} split(s), total ${payout.reduce((s, p) => s + p.amt, 0)} ${currency}`);
++      }
+       console.log(`  ${c.bold('Merchant Ref:')}   ${data?.merchant_ref_no ?? opts.merchantRefNo}`);
+       console.log(`  ${c.bold('Transaction:')}    ${result.tran_id ?? result.status?.tran_id ?? '-'}`);
+       console.log();
+@@ -1658,9 +1768,28 @@ paymentLinkCmd
+       console.log(`  ${c.bold('Title:')}       ${data?.title ?? '-'}`);
+       console.log(`  ${c.bold('Amount:')}      ${data?.amount ?? '-'} ${data?.currency ?? ''}`);
+       console.log(`  ${c.bold('Status:')}      ${data?.status ?? '-'}`);
+-      console.log(`  ${c.bold('Payments:')}    ${data?.total_trxn ?? 0} (total ${data?.total_amount ?? 0})`);
++
++      const limit = data?.payment_limit;
++      const trxn = Number(data?.total_trxn ?? 0);
++      const paidSoFar = trxn;
++      let paymentSummary: string;
++      if (limit === undefined || limit === null) {
++        paymentSummary = `${paidSoFar} payment(s), ${c.cyan('no upper limit')}`;
++      } else {
++        const remaining = Math.max(0, limit - paidSoFar);
++        const closed = limit > 0 && paidSoFar >= limit;
++          paymentSummary = `${paidSoFar} of ${limit} (${remaining} remaining${closed ? `, ${c.yellow('limit reached')}` : ''})`;
++      }
++      console.log(`  ${c.bold('Payments:')}    ${paymentSummary} (total ${data?.total_amount ?? 0} ${data?.currency ?? ''})`);
++
+       console.log(`  ${c.bold('Created:')}     ${data?.created_at ?? '-'}`);
+-      console.log(`  ${c.bold('Expires:')}     ${data?.expired_date || '-'}`);
++
++      const expRaw = Number(data?.expired_date ?? 0);
++      const expiry =
++        !expRaw || expRaw === 0
++          ? `${c.cyan('No expiry')}`
++          : `${new Date(expRaw * 1000).toISOString()} (epoch ${expRaw})`;
++      console.log(`  ${c.bold('Expires:')}     ${expiry}`);
+       console.log(`  ${c.bold('Link:')}        ${c.cyan(data?.payment_link ?? '-')}`);
+       console.log();
+     } catch (e) {
+@@ -1668,6 +1797,45 @@ paymentLinkCmd
+     }
+   });
+ 
++// --- sandbox-beneficiaries ---
++program
++  .command('sandbox-beneficiaries')
++  .description('List seeded sandbox beneficiary accounts and test MIDs for payout testing (SANDBOX ONLY)')
++  .option('--currency <code>', 'Filter by currency: USD or KHR')
++  .option('--json', 'Print as JSON')
++  .action((opts: { currency?: string; json?: boolean }) => {
++    const currency = opts.currency?.toUpperCase();
++    if (currency && currency !== 'USD' && currency !== 'KHR') {
++      console.log(`  ${c.red('✗')} --currency must be USD or KHR, received: ${currency}`);
++      process.exitCode = 1;
++      return;
++    }
++    const all = listSandboxBeneficiaries();
++    const filtered = currency ? all.filter((b) => b.currencies.includes(currency as 'USD' | 'KHR')) : all;
++
++    if (opts.json) {
++      console.log(JSON.stringify(filtered, null, 2));
++      return;
++    }
++
++    console.log(`\n${c.bold('Sandbox beneficiaries')} ${c.dim('— sandbox-only test fixtures, NEVER use in production')}\n`);
++    const accounts = filtered.filter((b) => b.kind === 'account');
++    const mids = filtered.filter((b) => b.kind === 'mid');
++
++    if (accounts.length > 0) {
++      console.log(`  ${c.bold('USD accounts (9-digit)')}`);
++      for (const a of accounts) console.log(`    ${c.cyan(a.id)}   ${a.currencies.join('/')}`);
++      console.log();
++    }
++    if (mids.length > 0) {
++      console.log(`  ${c.bold('Test MIDs (15-digit, KHR)')}`);
++      for (const m of mids) console.log(`    ${c.cyan(m.id)}   ${m.currencies.join('/')}`);
++      console.log();
++    }
++    console.log(`  ${c.dim('Use these in payout / split-payout calls while environment=sandbox.')}`);
++    console.log(`  ${c.dim('Any other account is rejected in sandbox (format: 9/11/15 digits).')}\n`);
++  });
++
+ // --- profiles ---
+ const profilesCmd = program.command('profiles').description('Manage saved sandbox and production credential profiles');
+ 
+diff --git a/src/cli/commands/doctor.ts b/src/cli/commands/doctor.ts
+index f97f3a1..f8e5b56 100644
+--- a/src/cli/commands/doctor.ts
++++ b/src/cli/commands/doctor.ts
+@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
+ import path from 'node:path';
+ import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
+ import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
++import { KHQR_ENVIRONMENT_FIELDS } from '../../khqr-config.js';
+ import { isValidPublicKeyPem, validatePublicHttpsUrl } from '../../utils.js';
+ import { parseDotEnvFile } from '../dotenv.js';
+ 
+@@ -153,6 +154,45 @@ function checkCallbackUrl(env: NodeJS.ProcessEnv): DoctorCheck {
+   }
+ }
+ 
++/**
++ * Offline ABA KHQR readiness: reports how many of the seven ABA-issued
++ * configuration fields are present. Fully unconfigured is fine (offline QR is
++ * optional); a PARTIAL configuration is flagged because it will always fail
++ * `generate-qr --offline` at runtime.
++ */
++function checkKhqrConfig(env: NodeJS.ProcessEnv): DoctorCheck {
++  const entries = Object.entries(KHQR_ENVIRONMENT_FIELDS) as readonly [field: string, envName: string][];
++  const missing = entries.filter(([, envName]) => !(env[envName] ?? '').trim()).map(([, envName]) => envName);
++
++  if (missing.length === 0) {
++    return {
++      id: 'khqr-config',
++      label: 'ABA KHQR config (offline QR)',
++      ok: true,
++      detail: `all ${entries.length} fields configured`,
++    };
++  }
++
++  if (missing.length === entries.length) {
++    return {
++      id: 'khqr-config',
++      label: 'ABA KHQR config (offline QR)',
++      ok: true,
++      detail: 'optional — not configured (online flows unaffected)',
++      fix: 'For printed/static KHQRs obtain the 7 ABA fields and set PAYWAY_KHQR_* in .env (see docs/07-qr-code-handling.md)',
++    };
++  }
++
++  const configured = entries.length - missing.length;
++  return {
++    id: 'khqr-config',
++    label: 'ABA KHQR config (offline QR)',
++    ok: false,
++    detail: `partially configured — ${configured}/${entries.length} set; missing: ${missing.join(', ')}`,
++    fix: 'Offline generation requires ALL 7 ABA-provided fields. Add the missing PAYWAY_KHQR_* variables to .env, or remove them entirely if you do not use offline QR',
++  };
++}
++
+ /**
+  * Run the `doctor` command: validate env, detect framework, report health.
+  */
+@@ -169,8 +209,16 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
+   const envVarChecks = checkEnvVars(mergedEnv);
+   const callbackCheck = checkCallbackUrl(mergedEnv);
+   const rsaCheck = checkRsaPem(mergedEnv);
+-
+-  const checks = [envFileCheck, frameworkCheck, ...envVarChecks, callbackCheck, ...(rsaCheck ? [rsaCheck] : [])];
++  const khqrCheck = checkKhqrConfig(mergedEnv);
++
++  const checks = [
++    envFileCheck,
++    frameworkCheck,
++    ...envVarChecks,
++    callbackCheck,
++    ...(rsaCheck ? [rsaCheck] : []),
++    khqrCheck,
++  ];
+   const envIssues = validatePayWayEnv(mergedEnv);
+   const detection = detectFramework(cwd);
+ 
+diff --git a/src/cli/terminal-qr.ts b/src/cli/terminal-qr.ts
+index 95237a4..c274876 100644
+--- a/src/cli/terminal-qr.ts
++++ b/src/cli/terminal-qr.ts
+@@ -9,6 +9,11 @@ export async function renderQrToTerminal(content: string): Promise<string> {
+   return QRCode.toString(content, { type: 'terminal', small: true, margin: 1 });
+ }
+ 
++/** Render a QR payload to a PNG buffer (used to save KHQRs without an API image). */
++export async function renderQrToPngBuffer(content: string): Promise<Buffer> {
++  return QRCode.toBuffer(content, { type: 'png', errorCorrectionLevel: 'M', margin: 2, width: 512 });
++}
++
+ /** True when we should auto-render QRs (interactive terminal). */
+ export function shouldAutoRenderQr(stream: { isTTY?: boolean } | undefined, flag?: boolean): boolean {
+   if (flag === false) return false;
+diff --git a/src/client.ts b/src/client.ts
+index 0fa1dea..715a5da 100644
+--- a/src/client.ts
++++ b/src/client.ts
+@@ -172,17 +172,52 @@ export interface GenerateQrParams {
+   lifetime?: number;
+ }
+ 
++export interface PaymentLinkPayout {
++  /** ABA account number or MID of the beneficiary. */
++  acc: string;
++  /** Payout amount. Currency follows the payment link currency. */
++  amt: number;
++  /** Optional beneficiary name (account holder / outlet name). */
++  accName?: string;
++}
++
+ export interface CreatePaymentLinkParams {
+   title: string;
+   amount: number;
++  /**
++   * Payment currency. Required by PayWay; defaults to 'USD'.
++   * Minimums enforced by PayWay: 0.01 USD or 100 KHR.
++   */
++  currency?: 'USD' | 'KHR';
+   description?: string;
++  /**
++   * Maximum number of successful payments the link accepts.
++   * - `undefined` / omitted  → UNLIMITED payments (anyone can pay repeatedly until it expires)
++   * - `1`                    → SINGLE-USE (link auto-closes after the first successful payment)
++   * - `N` (>1)               → MULTI-USE (accepts up to N payments, then closes)
++   * PayWay does NOT reject duplicate `merchantRefNo`, so enforce uniqueness yourself.
++   */
+   paymentLimit?: number;
+-  /** Public HTTPS callback URL. Required by PayWay - base64-encoded automatically. */
++  /**
++   * Public callback URL. After each successful payment PayWay POSTs JSON
++   * `{ tran_id, status, merchant_ref_no }` here. Required by PayWay and
++   * base64-encoded automatically by the SDK.
++   */
+   returnUrl: string;
++  /** Your reference (max 50 chars). PayWay does not validate duplicates. */
+   merchantRefNo: string;
++  /**
++   * Expiration as epoch SECONDS.
++   * - `undefined` / `0` / omitted → NO EXPIRY (valid forever until paid out / closed)
++   * - epoch seconds              → link stops accepting payments at that time
++   */
+   expiredDate?: number;
+-  /** Payment currency. Required by PayWay; defaults to 'USD'. */
+-  currency?: 'USD' | 'KHR';
++  /**
++   * Optional split-payout instructions. The sum of all `amt` MUST equal `amount`
++   * (same currency as the link). Each entry routes part of the payment to a
++   * beneficiary ABA account/MID.
++   */
++  payout?: PaymentLinkPayout[];
+ }
+ 
+ export interface PayoutParams {
+@@ -512,7 +547,7 @@ export class PayWay {
+     this.credentialsOnFile = createCredentialsOnFileDomain(this.config, this.request.bind(this));
+     this.qr = createQrDomain(this.config, this.request.bind(this));
+     this.paymentLink = createPaymentLinkDomain(this.config, this.requestWithMerchantAuth.bind(this));
+-    this.preAuth = createPreAuthDomain(this.requestWithMerchantAuth.bind(this));
++    this.preAuth = createPreAuthDomain(this.requestWithMerchantAuth.bind(this), this.config);
+     this.payout = createPayoutDomain(this.config, this.request.bind(this), this.requestWithMerchantAuth.bind(this));
+     this.khqr = createKhqrDomain(this.config, this.request.bind(this));
+   }
+diff --git a/src/domains/checkout.ts b/src/domains/checkout.ts
+index 2b00be9..5e002e3 100644
+--- a/src/domains/checkout.ts
++++ b/src/domains/checkout.ts
+@@ -1,7 +1,7 @@
+ import { generateHmac } from '../auth.js';
+ import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig } from '../client.js';
+ import { ENDPOINTS } from '../constants.js';
+-import { PayWayAPIError, PollingAbortedError } from '../errors.js';
++import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
+ import type { components, PollTransactionOptions, PollTransactionResult } from '../types.js';
+ import {
+   encodeBase64IfNeeded,
+@@ -102,6 +102,15 @@ export function createCheckoutDomain(
+     validateCurrency(params.currency);
+     validateLifetime(params.lifetime);
+ 
++    // Pre-auth rule (PayWay integration guidance): payout split is configured
++    // ONLY at completion time (pre-auth-completion), never on the initial
++    // pre-auth purchase. Supplying it here is rejected.
++    if (params.type === 'pre-auth' && params.payout) {
++      throw new PayWayConfigError(
++        'payout is not allowed on the initial pre-auth purchase; pass it only to preAuth.completeWithPayout() (pre-auth-completion).',
++      );
++    }
++
+     const time = formatRequestTime();
+     const payload: Record<string, unknown> = filterParams({
+       tran_id: params.transactionId,
+diff --git a/src/domains/payment-link.ts b/src/domains/payment-link.ts
+index bed91c2..9dbd36b 100644
+--- a/src/domains/payment-link.ts
++++ b/src/domains/payment-link.ts
+@@ -2,6 +2,7 @@ import type { CreatePaymentLinkParams, PayWayConfig } from '../client.js';
+ import { ENDPOINTS } from '../constants.js';
+ import { PayWayConfigError } from '../errors.js';
+ import type { components } from '../types.js';
++import { validateSandboxBeneficiary } from '../sandbox-beneficiaries.js';
+ import {
+   encodeBase64IfNeeded,
+   filterParams,
+@@ -53,6 +54,43 @@ export function createPaymentLinkDomain(
+       }
+       validatePublicHttpsUrl(params.returnUrl, 'returnUrl');
+ 
++      // paymentLimit: blank → unlimited, 1 → single-use, N → multi-use.
++      if (params.paymentLimit !== undefined) {
++        if (!Number.isInteger(params.paymentLimit) || params.paymentLimit < 1) {
++          throw new PayWayConfigError('paymentLimit must be a positive whole number (1 = single-use)');
++        }
++      }
++
++      // expiredDate: 0/undefined → no expiry; otherwise epoch seconds.
++      if (params.expiredDate !== undefined && (!Number.isInteger(params.expiredDate) || params.expiredDate <= 0)) {
++        throw new PayWayConfigError('expiredDate must be a positive epoch-seconds timestamp (omit or 0 for no expiry)');
++      }
++
++      // payout: total of `amt` must equal the link `amount`.
++      if (params.payout !== undefined) {
++        if (!Array.isArray(params.payout) || params.payout.length === 0) {
++          throw new PayWayConfigError('payout must be a non-empty array of { acc, amt } entries');
++        }
++        let payoutSum = 0;
++        for (const entry of params.payout) {
++          if (typeof entry.acc !== 'string' || entry.acc.trim().length === 0) {
++            throw new PayWayConfigError('each payout entry requires a non-empty `acc`');
++          }
++          const amt = Number(entry.amt);
++          if (!Number.isFinite(amt) || amt <= 0) {
++            throw new PayWayConfigError('each payout entry requires a positive `amt`');
++          }
++          // In the sandbox, restrict payout beneficiaries to the seeded accounts/MIDs.
++          validateSandboxBeneficiary(entry.acc, currency, { sandbox: _config.environment === 'sandbox' });
++          payoutSum += amt;
++        }
++        if (Math.abs(payoutSum - params.amount) > 0.001) {
++          throw new PayWayConfigError(
++            `payout total (${payoutSum}) must equal the link amount (${params.amount})`,
++          );
++        }
++      }
++
+       return requestWithMerchantAuth<components['schemas']['CreatePaymentLinkResponse']>(
+         ENDPOINTS.createPaymentLink,
+         filterParams({
+@@ -63,7 +101,15 @@ export function createPaymentLinkDomain(
+           payment_limit: params.paymentLimit,
+           return_url: encodeBase64IfNeeded(params.returnUrl),
+           merchant_ref_no: params.merchantRefNo,
+-          expired_date: params.expiredDate,
++          expired_date: params.expiredDate && params.expiredDate > 0 ? params.expiredDate : undefined,
++          // PayWay expects each beneficiary `amt` as a STRING inside the
++          // RSA-encrypted merchant_auth (e.g. "5.00", not 5). acc is the ABA
++          // account number or MID (numeric), never an API credential id.
++          payout: params.payout?.map((p) => ({
++            acc: p.acc,
++            amt: String(p.amt),
++            ...(p.accName ? { acc_name: p.accName } : {}),
++          })),
+         }),
+       );
+     },
+diff --git a/src/domains/payout.ts b/src/domains/payout.ts
+index 8536376..527b512 100644
+--- a/src/domains/payout.ts
++++ b/src/domains/payout.ts
+@@ -50,7 +50,9 @@ export function createPayoutDomain(
+       validateTransactionId(params.transactionId);
+       validatePositiveAmount(params.amount, params.currency);
+       validateCurrency(params.currency);
+-      validateBeneficiaries(params.beneficiaries, params.amount, params.currency);
++      validateBeneficiaries(params.beneficiaries, params.amount, params.currency, {
++        sandbox: config.environment === 'sandbox',
++      });
+ 
+       return request<components['schemas']['PayoutResponse']>(
+         ENDPOINTS.payout,
+diff --git a/src/domains/pre-auth.ts b/src/domains/pre-auth.ts
+index acbd4bf..67e87c4 100644
+--- a/src/domains/pre-auth.ts
++++ b/src/domains/pre-auth.ts
+@@ -2,13 +2,15 @@ import { ENDPOINTS } from '../constants.js';
+ import { PayWayConfigError } from '../errors.js';
+ import type { components } from '../types.js';
+ import { validatePositiveAmount, validateTransactionId } from '../utils.js';
++import { validateSandboxBeneficiary } from '../sandbox-beneficiaries.js';
++import type { PayWayConfig } from '../client.js';
+ 
+ export interface PreAuthDomain {
+   complete: (transactionId: string, amount: number) => Promise<components['schemas']['CompletePreAuthResponse']>;
+   completeWithPayout: (
+     transactionId: string,
+     amount: number,
+-    payout: { acc: string; amt: number }[],
++    payout: { acc: string; amt: number; accName?: string }[],
+   ) => Promise<components['schemas']['CompletePreAuthResponse']>;
+   cancel: (transactionId: string) => Promise<components['schemas']['CancelPreAuthResponse']>;
+ }
+@@ -19,6 +21,7 @@ export function createPreAuthDomain(
+     authPayload: Record<string, unknown>,
+     options?: { hmacFields?: string[]; contentType?: 'application/json' | 'application/x-www-form-urlencoded' },
+   ) => Promise<TResponse>,
++  config?: PayWayConfig,
+ ): PreAuthDomain {
+   return {
+     complete: (transactionId: string, amount: number) => {
+@@ -39,7 +42,7 @@ export function createPreAuthDomain(
+       );
+     },
+ 
+-    completeWithPayout: (transactionId: string, amount: number, payout: { acc: string; amt: number }[]) => {
++    completeWithPayout: (transactionId: string, amount: number, payout: { acc: string; amt: number; accName?: string }[]) => {
+       // Validate inputs
+       validateTransactionId(transactionId);
+       validatePositiveAmount(amount, 'USD');
+@@ -47,12 +50,39 @@ export function createPreAuthDomain(
+         throw new PayWayConfigError('payout must be a non-empty array');
+       }
+ 
++      // Sum of beneficiary `amt` must equal the captured (complete) amount.
++      let payoutSum = 0;
++      for (const entry of payout) {
++        if (typeof entry.acc !== 'string' || entry.acc.trim().length === 0) {
++          throw new PayWayConfigError('each payout entry requires a non-empty `acc` (ABA account/MID, numeric)');
++        }
++        const amt = Number(entry.amt);
++        if (!Number.isFinite(amt) || amt <= 0) {
++          throw new PayWayConfigError('each payout entry requires a positive `amt`');
++        }
++        validateSandboxBeneficiary(entry.acc, 'USD', { sandbox: config?.environment === 'sandbox' });
++        payoutSum += amt;
++      }
++      if (Math.abs(payoutSum - amount) > 0.001) {
++        throw new PayWayConfigError(
++          `payout total (${payoutSum}) must equal the complete amount (${amount})`,
++        );
++      }
++
++      // PayWay expects each beneficiary `amt` as a STRING inside the
++      // RSA-encrypted merchant_auth (e.g. "5.00"); acc is the ABA account/MID.
++      const wirePayout = payout.map((p) => ({
++        acc: p.acc,
++        amt: String(p.amt),
++        ...(p.accName ? { acc_name: p.accName } : {}),
++      }));
++
+       return requestWithMerchantAuth<components['schemas']['CompletePreAuthResponse']>(
+         ENDPOINTS.completePreAuth,
+         {
+           tran_id: transactionId,
+           complete_amount: amount,
+-          payout,
++          payout: wirePayout,
+         },
+         {
+           hmacFields: ['merchant_auth', 'request_time', 'merchant_id'],
+diff --git a/src/index.ts b/src/index.ts
+index 30390c8..9a04d63 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -2,6 +2,7 @@ export type {
+   AddBeneficiaryParams,
+   CofPaymentParams,
+   CreatePaymentLinkParams,
++  PaymentLinkPayout,
+   CreateTransactionParams,
+   Currency,
+   Environment,
+@@ -38,6 +39,17 @@ export type { PaymentLinkDomain } from './domains/payment-link.js';
+ export type { PayoutDomain } from './domains/payout.js';
+ export type { PreAuthDomain } from './domains/pre-auth.js';
+ export type { QrDomain } from './domains/qr.js';
++export {
++  SANDBOX_BENEFICIARY_ACCOUNTS,
++  SANDBOX_TEST_MIDS,
++  SANDBOX_BENEFICIARIES,
++  VALID_BENEFICIARY_LENGTHS,
++  isKnownSandboxBeneficiary,
++  listSandboxBeneficiaries,
++  lookupSandboxBeneficiary,
++  validateSandboxBeneficiary,
++} from './sandbox-beneficiaries.js';
++export type { BeneficiaryKind, SandboxBeneficiary, SandboxCurrency } from './sandbox-beneficiaries.js';
+ export type { PollAbortReason } from './errors.js';
+ export {
+   PayWayAPIError,
+@@ -62,11 +74,13 @@ export type {
+ } from './khqr-config.js';
+ 
+ export {
++  KHQR_ENVIRONMENT_FIELDS,
+   resolveKhqrConfiguration,
+   validateKhqrCallbackSetup,
+   validateKhqrConfiguration,
+ } from './khqr-config.js';
+-export type { GenerateOfflineQrParams } from './khqr-offline.js';
++export type { GenerateOfflineQrParams, KhqrPayloadInspection } from './khqr-offline.js';
++export { inspectKhqrPayload, khqrCrc16, validateKhqrCrc } from './khqr-offline.js';
+ export type {
+   HandleResponseOptions,
+   HandleResponseResult,
+diff --git a/src/khqr-config.ts b/src/khqr-config.ts
+index 365e454..ee954c0 100644
+--- a/src/khqr-config.ts
++++ b/src/khqr-config.ts
+@@ -48,6 +48,13 @@ const environmentFields = {
+   paywayData: 'PAYWAY_KHQR_PAYWAY_DATA',
+ } as const;
+ 
++/**
++ * Environment-variable name for each ABA-issued KHQR field. Exported so
++ * tooling (doctor, onboarding) can report exactly which variables are
++ * missing without duplicating the mapping.
++ */
++export const KHQR_ENVIRONMENT_FIELDS: Readonly<Record<MerchantField, string>> = environmentFields;
++
+ type MerchantField = keyof typeof environmentFields;
+ 
+ const requiredFields: readonly MerchantField[] = [
+diff --git a/src/khqr-offline.ts b/src/khqr-offline.ts
+index de515cd..e53b323 100644
+--- a/src/khqr-offline.ts
++++ b/src/khqr-offline.ts
+@@ -36,6 +36,11 @@ function crc16Ccitt(input: string): string {
+   return crc.toString(16).toUpperCase().padStart(4, '0');
+ }
+ 
++/** CRC-16 CCITT (poly 0x1021, init 0xFFFF) checksum as 4 uppercase hex chars. */
++export function khqrCrc16(input: string): string {
++  return crc16Ccitt(input);
++}
++
+ function formatAmount(amount: number, currency: 'KHR' | 'USD'): string {
+   if (!Number.isFinite(amount) || amount <= 0)
+     throw new PayWayConfigError('amount must be a positive finite number for a dynamic ABA KHQR payload');
+@@ -124,3 +129,86 @@ export function generateOfflineQR(
+   const crcBoundary = `${payload}6304`;
+   return `${crcBoundary}${crc16Ccitt(crcBoundary)}`;
+ }
++
++/**
++ * Validate the trailing CRC-16 CCITT checksum of a KHQR payload.
++ * Expects the EMVCo form `...6304<4 hex>`; comparison is case-insensitive.
++ */
++export function validateKhqrCrc(qrString: string): boolean {
++  if (typeof qrString !== 'string' || qrString.length < 8 || !/6304[0-9A-Fa-f]{4}$/.test(qrString)) {
++    return false;
++  }
++  return crc16Ccitt(qrString.slice(0, -4)) === qrString.slice(-4).toUpperCase();
++}
++
++/** Decoded, human-oriented summary of a KHQR payload (see `inspectKhqrPayload`). */
++export interface KhqrPayloadInspection {
++  /** Structure parsed cleanly AND the CRC checksum matches. */
++  valid: boolean;
++  crcValid: boolean;
++  /** `true` for point-of-initiation `11` (static), `false` for `12` (dynamic). */
++  static: boolean;
++  currency: 'USD' | 'KHR' | undefined;
++  /** Raw tag-54 amount string — present only on dynamic payloads. */
++  amount?: string;
++  merchantName?: string;
++  merchantCity?: string;
++  merchantRef?: string;
++  bakongId?: string;
++}
++
++function decodeTlvTemplate(payload: string): Map<string, string> | undefined {
++  const tags = new Map<string, string>();
++  let index = 0;
++  while (index < payload.length) {
++    if (index + 4 > payload.length) return undefined;
++    const tag = payload.slice(index, index + 2);
++    const length = Number(payload.slice(index + 2, index + 4));
++    if (!Number.isInteger(length) || length < 0) return undefined;
++    const valueStart = index + 4;
++    const valueEnd = valueStart + length;
++    if (valueEnd > payload.length) return undefined;
++    tags.set(tag, payload.slice(valueStart, valueEnd));
++    index = valueEnd;
++  }
++  return tags;
++}
++
++const CURRENCY_CODES: Record<string, 'USD' | 'KHR'> = { '840': 'USD', '116': 'KHR' };
++
++/**
++ * Decode and self-check a KHQR payload entirely offline: TLV structure,
++ * CRC-16 checksum, and the fields merchants typically eyeball before printing
++ * (static/dynamic, amount, currency, merchant name/city, reference).
++ *
++ * Returns `undefined` when the payload is structurally malformed. A payload
++ * with a bad checksum still returns an inspection with `valid: false`.
++ */
++export function inspectKhqrPayload(qrString: string): KhqrPayloadInspection | undefined {
++  if (typeof qrString !== 'string' || qrString.length < 12) return undefined;
++
++  // The checksum travels as tag "63" (length 04); exclude it from field parsing.
++  const body = /6304[0-9A-Fa-f]{4}$/.test(qrString) ? qrString.slice(0, -8) : qrString;
++  const crcValid = validateKhqrCrc(qrString);
++
++  const rootTags = decodeTlvTemplate(body);
++  if (!rootTags) return undefined;
++
++  const poi = rootTags.get('01');
++  if (poi !== undefined && poi !== '11' && poi !== '12') return undefined;
++
++  const accountTemplate = rootTags.get('30') ? decodeTlvTemplate(rootTags.get('30') as string) : undefined;
++  const additionalData = rootTags.get('62') ? decodeTlvTemplate(rootTags.get('62') as string) : undefined;
++
++  return {
++    valid: crcValid,
++    crcValid,
++    static: poi !== '12',
++    currency: CURRENCY_CODES[rootTags.get('53') ?? ''],
++    ...(rootTags.has('54') ? { amount: rootTags.get('54') } : {}),
++    merchantName: rootTags.get('59'),
++    merchantCity: rootTags.get('60'),
++    merchantRef: additionalData?.get('01'),
++    bakongId: accountTemplate?.get('00'),
++  };
++}
+diff --git a/src/utils.ts b/src/utils.ts
+index fb37448..2b1442a 100644
+--- a/src/utils.ts
++++ b/src/utils.ts
+@@ -1,4 +1,5 @@
+ import { PayWayConfigError } from './errors.js';
++import { validateSandboxBeneficiary } from './sandbox-beneficiaries.js';
+ 
+ export function formatRequestTime(date?: Date): string {
+   const now = date || new Date();
+@@ -77,6 +78,7 @@ export function validateBeneficiaries(
+   beneficiaries: { account: string; amount: number }[],
+   totalAmount: number,
+   currency: 'USD' | 'KHR',
++  opts?: { sandbox?: boolean },
+ ): void {
+   if (!Array.isArray(beneficiaries) || beneficiaries.length === 0) {
+     throw new PayWayConfigError('beneficiaries must be a non-empty array');
+@@ -89,6 +91,8 @@ export function validateBeneficiaries(
+     }
+     validatePositiveAmount(b.amount, currency);
+     sum += b.amount;
++    // In the sandbox, restrict beneficiaries to the seeded test accounts/MIDs.
++    validateSandboxBeneficiary(b.account, currency, { sandbox: opts?.sandbox });
+   }
+ 
+   if (Math.abs(sum - totalAmount) > Number.EPSILON) {
