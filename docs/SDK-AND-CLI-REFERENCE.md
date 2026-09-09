@@ -87,7 +87,8 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk cof charge -t <id> -a <amount> --token <pwt>` | Charge a stored COF token (optional `--ctid`, `--token-flag`, payer fields, `--items`, `--payout`) |
 | `payway-sdk cof token renew / details / remove` | Token lifecycle — `details` takes `--request-id` only; `remove` takes `--ctid --token` (irreversible) |
 | `payway-sdk beneficiary add / update-status <payee>` | Manage the payout beneficiary whitelist (requires RSA key; `update-status -s 0\|1`) |
-| `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks |
+| `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks (`--forward-to <url>` also re-POSTs every capture to your app) |
+| `payway-sdk webhook trigger / verify-callback / resend / list` | Local webhook workbench — signed fixture callbacks without the ABA Simulator, one-shot signature checks, replay captured records |
 | `payway-sdk config` | Display loaded configuration and validate environment variables |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
 | `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |

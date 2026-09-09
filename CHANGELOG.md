@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### Webhook workbench — local test loop (2026-09-10, P0 Wave 1)
+
+Closes the P0 recommendations of `docs/competitive-analysis-cli-stripe-razorpay.md`
+(the Stripe `listen`/`trigger`/`events resend` analog for PayWay). All local
+tooling; no new gateway surface, no behavior change to existing capture paths.
+
+- **New `webhook` command group** (`src/cli/commands/webhook.ts`):
+  - `webhook trigger --url <url> --event <event>` — send a signed fixture
+    callback to a receiver. Seven events across the three callback contracts:
+    the five online-checkout statuses (HMAC-SHA512 signed with the merchant
+    key via the shared `signCallbackBody`, so a correct `verifyCallback`
+    accepts and a broken one rejects), `khqr.notification` (unsigned), and
+    `payment-link.pushback` (live no-hash `{tran_id, status: 0,
+    merchant_ref_no}` shape, SANDBOX-FINDINGS §22 V-1).
+  - `webhook verify-callback` — one-shot signature check over
+    body+`--sig`/`--body-file`/stdin, or `--record wh_…` to report a captured
+    delivery's persisted verdict. Exit 0 valid / 1 invalid with the failure
+    reason, `--json` envelope for agents.
+  - `webhook resend --record wh_… --to <url>` — re-POST a captured record
+    (original body + signature header) for receiver regression testing.
+  - `webhook list` — captured records with their ids (the `resend`/`--record`
+    join key).
+- **`setup-webhook --forward-to <url> [--forward-headers]`** — re-POST every
+  captured callback (all three routes) to a local app URL after capture. New
+  `src/webhook/forwarder.ts` enforces the contract: forward failures never
+  reject or lose the original callback; capture always answers 200. The
+  forwarded delivery re-attaches the original `X-PAYWAY-HMAC-SHA512` header so
+  receivers run their full verification path.
+- **SDK exports**: `signCallbackBody` (auth.ts — the canonical signing
+  inverse of `verifyCallbackDetailed`, one shared canonicalization),
+  `WebhookForwarder`/`parseForwardHeaders`, and
+  `buildWebhookFixture`/`WEBHOOK_FIXTURE_EVENTS`.
+- **Docs**: docs/16 gains the "Local Webhook Workbench" section (the loop,
+  fixture contract table, per-command guides); README integration-rules row.
+- Tests: 38 new (fixtures round-trip through the verifier, no-hash pushback
+  pin, capture-survives-forward-failure, CLI in-process coverage). Suite
+  1,662 passing.
+
 ### Audit acceptance closure (2026-09-08)
 
 - Skill installation preserves unowned conflicts and edited managed files across

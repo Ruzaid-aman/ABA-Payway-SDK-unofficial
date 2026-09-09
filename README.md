@@ -41,6 +41,7 @@ The [first-payment reference app](https://github.com/antigravity-google/aba-payw
 - Run the SDK on the server. Never expose merchant API keys or COF payment tokens to browser code or an AI provider.
 - Creation acceptance is not payment confirmation. Verify the transaction, amount, and currency before fulfilling an order, and fulfill only once.
 - Callback verification depends on the payment route. Payment-link pushbacks are unsigned and require a status lookup; online checkout verification does not apply to offline KHQR notifications.
+- Test callback handling locally without the ABA Simulator: `setup-webhook --forward-to <your-app-url>` captures and forwards deliveries, and `webhook trigger --event payment.approved` sends a correctly-signed fixture to your receiver (see [Chapter 16](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/16-webhook-setup-guide.md)).
 - Expired or closed transactions can still read `PENDING`. Hosted-card sessions may remain payable after close. Enforce local order policy and reconcile late payments.
 - Saved CLI profiles contain plaintext credentials. Use protected local storage for development and a secret manager with explicit SDK configuration in deployed services.
 

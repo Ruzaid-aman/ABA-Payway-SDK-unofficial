@@ -2,7 +2,7 @@
 name: aba-payway-hash
 description: Verify ABA PayWay webhook signatures with timing-safe HMAC verification.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
 ---
 
 # Hash and Webhooks
@@ -26,6 +26,12 @@ if (!isValid) return res.status(400).send('Invalid PayWay signature');
 - **`mock-callback.cjs`** — send a correctly-signed fake callback to your local webhook: `node scripts/mock-callback.cjs --url http://localhost:3000/payway/callback --tran-id order-1 --amount 10`. Test handlers without the ABA Simulator app.
 
 All scripts are dependency-free, read `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY` from env (or flags), and export their functions for tests.
+
+> **Prefer the first-class CLI (2026-09-10):** `payway-sdk webhook verify-callback`
+> (one-shot check, `--record` for captured verdicts), `payway-sdk webhook trigger`
+> (signed fixtures, all three callback contracts), and `payway-sdk webhook resend`
+> (replay captured records) now cover these workflows natively with `--json` output;
+> the scripts remain for checkout installs without the CLI on PATH.
 
 ## Related Skills
 - [Check Transaction](../aba-payway-check-transaction/SKILL.md)

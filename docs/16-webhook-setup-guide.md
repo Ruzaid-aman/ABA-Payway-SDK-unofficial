@@ -34,6 +34,10 @@ npm exec -- payway-sdk setup-webhook --port 3000 --storage json
 
 # Use a pre-existing public URL (e.g., ngrok, localtunnel, or your own tunnel)
 npm exec -- payway-sdk setup-webhook --url https://your-tunnel-url.ngrok.io
+
+# Forward every captured callback to your local app while capturing (test your
+# receiver's full handling path without the ABA Simulator)
+npm exec -- payway-sdk setup-webhook --tunnel --forward-to http://localhost:3000/webhooks/aba
 ```
 
 ---
@@ -46,6 +50,9 @@ npm exec -- payway-sdk setup-webhook --url https://your-tunnel-url.ngrok.io
 | `--storage <type>` | `auto` | Storage backend: `auto` (SQLite → JSON), `json`, or `sqlite` |
 | `--tunnel` | `false` | Start a Cloudflare Tunnel for a public URL |
 | `--url <string>` | — | Use an existing public URL (skips tunnel startup) |
+| `--journal` | `false` | Also set `PAYWAY_JOURNAL=1` in `.env` so `journal reconcile` works out of the box |
+| `--forward-to <url>` | — | Re-POST every captured callback (all three routes) to this local app URL after capture — the capture/store/journal contract is unchanged, and forward failures never reject or lose the original callback |
+| `--forward-headers <headers>` | — | Extra headers on forwarded deliveries: `"Key1:Value1, Key2:Value2"` |
 
 ---
 
@@ -330,6 +337,74 @@ wc -l ./webhook_data/callbacks.jsonl
 # Filter approved online checkout transactions
 cat ./webhook_data/callbacks.jsonl | jq -s '.[] | select(.body.status == "APPROVED")'
 ```
+
+---
+
+## Local Webhook Workbench
+
+The `payway-sdk webhook` command group closes the local test loop: you can exercise your receiver's entire handling path — signature verification, parsing, idempotent processing — from the terminal in seconds, without the ABA Simulator app and without real sandbox payments. The pattern mirrors the Stripe CLI's `listen` / `trigger` / `events resend` workflow, adapted to PayWay's three callback contracts.
+
+### The loop
+
+```bash
+# Terminal 1: capture + forward to your app's receiver route
+npm exec -- payway-sdk setup-webhook --forward-to http://localhost:3000/webhooks/aba
+
+# Terminal 2: fire a signed fixture at the capture server — your app receives
+# it via --forward-to with a valid X-PAYWAY-HMAC-SHA512 header
+npm exec -- payway-sdk webhook trigger --event payment.approved -t order-001
+
+# Or fire straight at your app (no capture server needed)
+npm exec -- payway-sdk webhook trigger --url http://localhost:3000/webhooks/aba --event payment.declined
+```
+
+Your receiver sees a real POST with a body shaped exactly like a gateway callback, and a signature that passes `verifyCallback` when your key configuration is correct — and fails when it is not. That is the test: a broken verifier, a wrong key, or a `hash`-field mistake surfaces immediately instead of during a live sandbox session.
+
+### `webhook trigger` — signed fixture callbacks
+
+| Fixture event | Route | Signed | Notes |
+|---|---|---|---|
+| `payment.approved` / `payment.declined` / `payment.pending` / `payment.refunded` / `payment.cancelled` | `/aba-payway-webhook` | ✅ HMAC-SHA512 | Full checkout-callback body; signature verifies with your `PAYWAY_API_KEY` |
+| `khqr.notification` | `/aba-payway-khqr-webhook` | ❌ | Offline KHQR shape (no published auth contract — capture and reconcile) |
+| `payment-link.pushback` | `/aba-payway-pushback` | ❌ no hash | Live contract `{tran_id, status: 0, merchant_ref_no}` (SANDBOX-FINDINGS §22) |
+
+Flags: `-t/--tran-id`, `--merchant-ref`, `-a/--amount`, `-c/--currency USD|KHR`, `--payer-name`, `--forward-headers`, `--json`. Two deliberate contract notes:
+
+- **Pushback and KHQR fixtures are unsigned on purpose** — their real-world deliveries carry no hash, so a receiver must never expect one for them. Verify those payments via `check-transaction -t <tran_id>`.
+- **Fixtures are synthetic** — the gateway never saw this `tran_id`. The command prints a reminder; do not treat a fixture delivery as evidence about any real transaction.
+
+### `webhook verify-callback` — one-shot signature check
+
+```bash
+# Check a body + signature pair (files, inline JSON, or piped stdin)
+npm exec -- payway-sdk webhook verify-callback --body-file callback.json --sig "abc123=="
+
+curl -s https://your.api/callback > body.json
+npm exec -- payway-sdk webhook verify-callback --body-file body.json --sig "$SIG" --json
+```
+
+Exit `0` = valid (safe to process), exit `1` = INVALID with the failure reason (`signature_mismatch` | `malformed_signature` | `empty_body`) — the same reasons `verifyCallbackDetailed` returns in code. `--record wh_…` reports the *persisted* verdict of a captured delivery instead of re-checking.
+
+### `webhook resend` — replay a captured record
+
+```bash
+# Find the record id
+npm exec -- payway-sdk webhook list
+
+# Re-POST the exact captured body + signature header to any URL
+npm exec -- payway-sdk webhook resend --record wh_xxx --to http://localhost:3000/webhooks/aba
+```
+
+Receiver regression testing against real captured payloads: a code change to your handler can be re-tested against the same deliveries that originally exercised it. Replaying does NOT create a new payment at the gateway.
+
+### What each command is for
+
+| Command | Answers |
+|---|---|
+| `webhook trigger` | "Does my receiver correctly accept signed callbacks and reject bad ones?" |
+| `webhook verify-callback` | "Why did this specific delivery fail verification?" |
+| `webhook resend` | "Does my handler still process the deliveries I captured last week?" |
+| `setup-webhook --forward-to` | "Can my real app code run end-to-end while I develop, without the ABA Simulator?" |
 
 ---
 

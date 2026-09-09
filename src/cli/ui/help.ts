@@ -114,6 +114,13 @@ export const COMMAND_EXAMPLES: Record<string, string[]> = {
   refund: ['payway-sdk refund -t <transaction-id> -a 2.00'],
   explain: ['payway-sdk explain PTL36', 'payway-sdk explain 69'],
   doctor: ['payway-sdk doctor --live'],
+  webhook: [
+    'payway-sdk webhook trigger --url http://localhost:3000/webhooks/aba --event payment.approved',
+    'payway-sdk webhook verify-callback --body-file callback.json --sig "<X-PAYWAY-HMAC-SHA512>"',
+  ],
+  'setup-webhook': [
+    'payway-sdk setup-webhook --tunnel --forward-to http://localhost:3000/webhooks/aba',
+  ],
 };
 
 /**

@@ -48,11 +48,23 @@ npx tsx src/cli.ts --journal generate-qr -a 5.00 -c USD --no-polling -y   # reco
 npx tsx src/cli.ts journal timeline -t <tran-id> --json                   # reconstruct one transaction
 npx tsx src/cli.ts journal stats                                          # latency/retries/errors/funnel
 npx tsx src/cli.ts journal reconcile --json                               # creations vs callbacks
+
+# Webhook workbench (local only — no API call, no ABA Simulator needed)
+npx tsx src/cli.ts webhook trigger --url http://localhost:3000/webhooks/aba --event payment.approved  # signed fixture
+npx tsx src/cli.ts webhook verify-callback --body-file cb.json --sig "<X-PAYWAY-HMAC-SHA512>"        # exit 0 valid / 1 invalid
+npx tsx src/cli.ts webhook resend --record wh_xxx --to http://localhost:3000/webhooks/aba            # replay a capture
+npx tsx src/cli.ts webhook list                                           # record ids = resend/--record keys
 ```
 
 - `--json` success envelopes carry `correlationId`/`traceId` (join keys into the journal); poll timeouts on
   generate-qr/generate-checkout exit 3 (machine-visible, W5-11 fixed); create commands warn on duplicate
   tran_ids seen in the journal (`--allow-duplicate-id` to suppress).
+- Webhook workbench (2026-09-10, P0 W-1..W-4): `webhook trigger` signs online fixtures with the shared
+  `signCallbackBody` (same canonicalization as `verifyCallbackDetailed` — never duplicate); pushback/KHQR
+  fixtures carry NO hash by design (their real contracts have none; verify via check-transaction).
+  `setup-webhook --forward-to <url>` re-POSTs captures after store; forward failure NEVER rejects or loses
+  the original callback. `webhook resend`/`verify-callback --record` read `webhook_data/` (JSON then SQLite).
+  Fixtures are synthetic — the gateway never saw the tran_id.
 - Transaction journal (audit-results/transaction-data-audit/, docs/18): opt-in JSONL record of every
   exchange/command/poll/status/artifact/callback at `<cwd>/payway-data/journal.jsonl`. `--journal` arms one
   invocation; `PAYWAY_JOURNAL=1` (+`_DIR`, `_MODE=digest|full`) persists; SDK config `journal: true|{dir,mode}`.

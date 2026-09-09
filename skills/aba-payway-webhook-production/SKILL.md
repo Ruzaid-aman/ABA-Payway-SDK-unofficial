@@ -2,7 +2,7 @@
 name: aba-payway-webhook-production
 description: Verify PayWay callbacks and status lookups, fulfill once, and recover missing or repeated notifications.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # PayWay Webhook Production
@@ -24,6 +24,10 @@ const payway = new PayWay(); // Server credentials from environment.
 const result = await payway.checkout.checkTransaction('order-001');
 const state = paymentLifecycle(result.data?.payment_status);
 ```
+
+## Local Testing Without the ABA Simulator
+
+Test the full receiver path in seconds, offline: `setup-webhook --forward-to <your-app-url>` captures and re-POSTs every delivery to your app, `webhook trigger --event payment.approved` sends a correctly-signed fixture (a correct `verifyCallback` accepts it; a broken key or `hash`-field mistake rejects it), `webhook resend --record wh_… --to <url>` replays a captured delivery, and `webhook verify-callback --sig …` explains why a specific delivery failed. Fixture deliveries are synthetic — the gateway never saw the `tran_id`; never fulfill on them. The pushback and KHQR fixtures deliberately carry no signature, matching their real no-hash contracts.
 
 ## Trust and Fulfillment
 
