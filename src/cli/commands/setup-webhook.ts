@@ -52,6 +52,14 @@ export interface SetupWebhookOptions {
    * works out of the box. Sets process.env too for this process.
    */
   journal?: boolean;
+  /**
+   * W-1: re-POST every captured callback to this local app URL (Stripe
+   * `listen --forward-to` analog). The receiver gets the original body and
+   * signature header; capture/storage/journal behavior is unchanged.
+   */
+  forwardTo?: string;
+  /** Extra headers attached to forwarded deliveries (`"Key:Value, K2:V2"`). */
+  forwardHeaders?: string;
 }
 
 export interface SetupWebhookDeps {
@@ -220,6 +228,16 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   log(`  ${c.dim('The same listener also serves:')}`);
   log(`    ${c.dim(`${webhookUrl.replace(/\/$/, '')}/aba-payway-khqr-webhook — offline KHQR notifications`)}`);
   log(`    ${c.dim(`${webhookUrl.replace(/\/$/, '')}/aba-payway-pushback — payment-link pushbacks (use as the link's return_url; no hash — verify via check-transaction)`)}`);
+  if (opts.forwardTo) {
+    log('');
+    log(`  ${c.bold('Forwarding captured callbacks to:')}`);
+    log(`    ${c.cyan(opts.forwardTo)}`);
+    if (opts.forwardHeaders) {
+      log(`    ${c.dim(`with headers: ${opts.forwardHeaders}`)}`);
+    }
+    log(`  ${c.dim('Every captured delivery (all three routes) is re-POSTed there after capture.')}`);
+    log(`  ${c.dim('Combine with: payway-sdk webhook trigger payment.approved')}`);
+  }
   log('');
 
   if (publicUrl) {
@@ -240,6 +258,8 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   const webhookServer: WebhookServerResult = serverFactory(storage, {
     port,
     apiKey,
+    forwardTo: opts.forwardTo,
+    forwardHeaders: opts.forwardHeaders,
   });
 
   // ── Step 8: Set up graceful shutdown (WH-REQ-08, WH-TC-06) ──────────

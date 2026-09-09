@@ -15,7 +15,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
   { title: 'Setup', commands: ['init', 'doctor', 'config', 'profiles', 'onboard'] },
   {
     title: 'Payments',
-    commands: ['generate-qr', 'generate-checkout', 'cof', 'checkout-form', 'payment-link', 'setup-webhook'],
+    commands: ['generate-qr', 'generate-checkout', 'cof', 'checkout-form', 'payment-link', 'setup-webhook', 'webhook'],
   },
   {
     title: 'Transactions',

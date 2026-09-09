@@ -142,6 +142,27 @@ describe('setup-webhook command seams', () => {
     expect(h.state.serverOptions?.apiKey).toBe('verdict-key');
   });
 
+  it('--forward-to mode: passes the forwarder URL (and headers) to the server factory', async () => {
+    const h = makeHarness(tempEnvFile(''));
+    await h.run({
+      url: 'https://example.com',
+      forwardTo: 'http://localhost:3000/webhooks/aba',
+      forwardHeaders: 'X-Custom: yes',
+    });
+
+    expect(h.state.serverOptions?.forwardTo).toBe('http://localhost:3000/webhooks/aba');
+    expect(h.state.serverOptions?.forwardHeaders).toBe('X-Custom: yes');
+    expect(h.server.start).toHaveBeenCalledTimes(1);
+    expect(h.exitSpy).not.toHaveBeenCalled();
+  });
+
+  it('without --forward-to the server options carry no forwarder keys (unchanged default contract)', async () => {
+    const h = makeHarness(tempEnvFile(''));
+    await h.run({ url: 'https://example.com' });
+    expect(h.state.serverOptions?.forwardTo).toBeUndefined();
+    expect(h.state.serverOptions?.forwardHeaders).toBeUndefined();
+  });
+
   it('interactive local-only mode: declining URL and tunnel starts a localhost server', async () => {
     const input = new PassThrough();
     input.resume();

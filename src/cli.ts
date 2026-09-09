@@ -40,6 +40,7 @@ import { runDoctor } from './cli/commands/doctor.js';
 import { runInit } from './cli/commands/init.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
 import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/commands/skills.js';
+import { registerWebhookCommands } from './cli/commands/webhook.js';
 import { readMaskedInput } from './cli/masked-input.js';
 import { loadPaymentLinkImage } from './cli/payment-link-image.js';
 import { PayWay } from './client.js';
@@ -4161,20 +4162,38 @@ program
   .option('--tunnel', 'Automatically start Cloudflare Tunnel (skip prompt)')
   .option('--url <url>', 'Public webhook URL (skip prompt, no tunnel)')
   .option('--journal', 'Also enable the transaction journal in .env (PAYWAY_JOURNAL=1) so reconcile works out of the box')
-  .action(async (opts: { port?: string; storage?: string; tunnel?: boolean; url?: string; journal?: boolean }) => {
-    await runSetupWebhook({
-      port: opts.port,
-      storage: opts.storage as 'json' | 'sqlite' | undefined,
-      tunnel: opts.tunnel,
-      url: opts.url,
-      journal: opts.journal,
-    });
-  });
+  .option(
+    '--forward-to <url>',
+    'Re-POST every captured callback to this local app URL after capture (test your receiver without the ABA Simulator)',
+  )
+  .option('--forward-headers <headers>', 'Extra headers for forwarded deliveries: "Key1:Value1, Key2:Value2"')
+  .action(
+    async (opts: {
+      port?: string;
+      storage?: string;
+      tunnel?: boolean;
+      url?: string;
+      journal?: boolean;
+      forwardTo?: string;
+      forwardHeaders?: string;
+    }) => {
+      await runSetupWebhook({
+        port: opts.port,
+        storage: opts.storage as 'json' | 'sqlite' | undefined,
+        tunnel: opts.tunnel,
+        url: opts.url,
+        journal: opts.journal,
+        forwardTo: opts.forwardTo,
+        forwardHeaders: opts.forwardHeaders,
+      });
+    },
+  );
 
 // --- agentic command tree ---
 registerAgentCommands(program);
 registerJournalCommands(program);
 registerOnboardCommand(program);
+registerWebhookCommands(program);
 
 // --- pre-auth (complete / complete-with-payout / cancel) ---
 const preAuthComplete = new Command('complete')

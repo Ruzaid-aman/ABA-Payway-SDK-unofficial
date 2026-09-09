@@ -133,3 +133,30 @@ export function verifyCallbackSignature(
 ): boolean {
   return verifyCallbackDetailed(body, receivedSignature, apiKey, options).valid;
 }
+
+/**
+ * Sign a callback body with the same canonicalization the gateway uses
+ * (sorted-key concat → HMAC-SHA512 → Base64) — the exact inverse of
+ * {@link verifyCallbackDetailed}. Used by the webhook `trigger` fixtures so
+ * a correctly-configured receiver accepts them, and by tests to build
+ * adversarial invalid signatures. Sign a callback only when you are the
+ * merchant testing your OWN receiver; the gateway is the signer in production.
+ */
+export function signCallbackBody(body: Record<string, unknown>, apiKey: string): string {
+  const sortedKeys = Object.keys(body).sort();
+
+  const concatenated = sortedKeys
+    .map((key) => {
+      const val = body[key];
+      if (val === undefined || val === null) {
+        return '';
+      }
+      if (typeof val === 'object') {
+        return JSON.stringify(val);
+      }
+      return String(val);
+    })
+    .join('');
+
+  return crypto.createHmac('sha512', apiKey).update(concatenated).digest('base64');
+}

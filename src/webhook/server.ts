@@ -16,6 +16,7 @@ import { extractTransactionIdFrom } from '../journal/digest.js';
 import { createJournalEmitter } from '../journal/writer.js';
 import type { JournalContext } from '../journal/types.js';
 import { parsePaymentLinkPushback } from '../domains/payment-link.js';
+import { WebhookForwarder, parseForwardHeaders } from './forwarder.js';
 import { extractJsonPayload, parseKhqrPaymentNotification } from './khqr-notification.js';
 import type { WebhookRecord, WebhookSignatureVerdict, WebhookStorage } from './storage.js';
 
@@ -55,6 +56,18 @@ export interface WebhookServerOptions {
     /** Dedicated path (default `/aba-payway-pushback`). */
     path?: string;
   };
+  /**
+   * W-1 (Stripe `listen --forward-to` analog): re-POST every accepted
+   * callback (all three routes) to this local app URL after capture, so the
+   * developer's receiver runs its full handling path without the ABA
+   * Simulator. Forward failures never reject the original callback — capture
+   * always wins.
+   */
+  forwardTo?: string;
+  /** Extra headers attached to every forwarded delivery (`"Key:Value, K2:V2"`). */
+  forwardHeaders?: string;
+  /** Fetch seam for the forwarder (tests). */
+  forwardFetch?: typeof fetch;
 }
 
 export interface WebhookServerResult {
@@ -110,6 +123,34 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
   let server: Server | null = null;
   let running = false;
 
+  // W-1: optional forwarder. Constructed once; invalid URL fails fast.
+  const forwarder = options.forwardTo
+    ? new WebhookForwarder({
+        url: options.forwardTo,
+        headers: parseForwardHeaders(options.forwardHeaders),
+        quiet,
+        log: (line) => log(line),
+        fetchImpl: options.forwardFetch,
+      })
+    : null;
+
+  /**
+   * Forward a captured delivery without ever breaking the response path:
+   * the outcome is logged (forwarder counts stats) but errors are swallowed
+   * by design — capture survives receiver downtime.
+   */
+  function forwardCaptured(
+    body: string,
+    headers: Record<string, string | string[] | undefined>,
+    label: string,
+  ): Promise<void> {
+    if (!forwarder) return Promise.resolve();
+    return forwarder
+      .forward(body, { headers, label })
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+
   function log(msg: string): void {
     if (!quiet) console.log(msg);
   }
@@ -156,7 +197,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
     }
 
     collectBody(req)
-      .then((body) => {
+      .then(async (body) => {
         // Parse headers
         const headers: Record<string, string | string[] | undefined> = {};
         if (req.headers) {
@@ -193,6 +234,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
               log(`  Unable to store pushback parse metadata: ${error instanceof Error ? error.message : String(error)}`);
             }
           }
+          await forwardCaptured(body, headers, `payment-link pushback [${record.id}]`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ acknowledged: true, id: record.id }));
           return;
@@ -231,6 +273,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
             khqrPath,
           );
           log(`  Received offline KHQR notification [${record.id}] at ${record.receivedAt}`);
+          await forwardCaptured(body, headers, `KHQR notification [${record.id}]`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ acknowledged: true, id: record.id }));
           return;
@@ -298,6 +341,8 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           res.end(JSON.stringify({ error: 'invalid signature', id: record.id }));
           return;
         }
+
+        await forwardCaptured(body, headers, `callback [${record.id}]`);
 
         // Always respond 200 otherwise — never reject based on content
         res.writeHead(200, { 'Content-Type': 'application/json' });

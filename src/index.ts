@@ -118,6 +118,15 @@ export {
 } from './constants.js';
 export type { WebhookServerOptions, WebhookServerResult } from './webhook/server.js';
 export { createWebhookServer } from './webhook/server.js';
+export type { ForwardOutcome, ForwardStats, WebhookForwarderOptions } from './webhook/forwarder.js';
+export { WebhookForwarder, parseForwardHeaders } from './webhook/forwarder.js';
+export type {
+  WebhookFixture,
+  WebhookFixtureEvent,
+  WebhookFixtureOverrides,
+} from './webhook/fixtures.js';
+export { buildWebhookFixture, WEBHOOK_FIXTURE_EVENTS } from './webhook/fixtures.js';
+export { signCallbackBody } from './auth.js';
 export type {
   KhqrCallbackConfiguration,
   KhqrCallbackEnrollment,

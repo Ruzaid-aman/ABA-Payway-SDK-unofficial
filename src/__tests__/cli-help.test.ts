@@ -38,6 +38,7 @@ const REGISTERED_COMMANDS = [
   'profiles',
   'skills',
   'setup-webhook',
+  'webhook',
   'pre-auth',
   'ask',
   'agent',
