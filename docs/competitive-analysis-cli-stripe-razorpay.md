@@ -201,3 +201,68 @@ Published, zero-dependency, MIT, Node ≥18, ESM+CJS, claims Node/Bun/Deno/Cloud
 - `registry.npmjs.org/payway-sdk`, `payway`, `aba-payway-ts`, `aba-payway-cli` — availability checks, 2026-09-08
 - Our sandbox-verified contracts: [docs/SANDBOX-FINDINGS.md](SANDBOX-FINDINGS.md) (QR lifetime 180 s, close-transaction behavior), [docs/CLOSE-TRANSACTION-FINDINGS.md](CLOSE-TRANSACTION-FINDINGS.md), HANDOFF.md §3/§7
 - Our [package.json](../package.json) dependencies; [README.md](../README.md) positioning lines
+
+---
+
+## Re-audit after P0 implementation (2026-09-10)
+
+> Verdict-first: **P0 (Wave 1, W-1..W-4) is CLOSED and live-verified.** The competitive headline flipped — the "local webhook test loop" gap that was our largest deficit against Stripe's CLI no longer exists. This section records the acceptance evidence, two new P3 findings from the verification run, the refreshed gap register for Waves 2–3, and current ecosystem numbers. A concurrent offline-KHQR docs batch was in the working tree during this audit (18 files, not touched here).
+
+### Acceptance evidence (live run, not test-suite claims)
+
+Full end-to-end drive of the built `dist/cli.js` against real local HTTP (receiver stub + capture server in `.scratch/audit-webhook-e2e/`, evidence files preserved there):
+
+| Leg | Command | Observed |
+|---|---|---|
+| W-2 signed fixture at app | `webhook trigger --url …/webhooks/aba --event payment.approved -t audit-e2e-1 --json` | `{"event":"payment.approved","signed":true,"httpStatus":200,"ok":true}` |
+| **Wire-byte round-trip** | receiver-captured body+sig → `webhook verify-callback --body-file --sig` | `{"valid":true,"reason":null}` exit 0 — the *received* bytes verify, not just the sent ones |
+| W-1 capture+forward | `setup-webhook --port 18443 --forward-to …` + trigger at capture route | app received forwarded copy **with signature header preserved**; capture stored (`signatureVerdict: "verified"`) |
+| Storage contract | `webhook list --json` in a SQLite-store directory (json file absent) | read `callbacks.db` correctly, returned the record |
+| W-3 replay | `webhook resend --record wh_mtvjz6w4_a90f7347 --to …` | re-delivered, app line count 3→4, `{"httpStatus":200,"ok":true}` |
+| W-4 record verdict | `webhook verify-callback --record wh_mtvjz6w4_a90f7347 --json` | `{"verdict":"verified","matchedTransactionId":"audit-e2e-fwd1"}` |
+| Negative case | `webhook verify-callback --sig "AAAAbogusAAA="` | `{"valid":false,"reason":"signature_mismatch"}` **exit 1** |
+| No-hash contract | `webhook trigger --event payment-link.pushback` through capture route | wire body exactly `{tran_id, status: 0, merchant_ref_no}`, `signed:false`, no sig header, captured `unsigned` |
+| Machine output | every `--json` invocation | single clean JSON doc on stdout; `Using profile:` on stderr only (F11 contract held) |
+
+Suite state on merged `main`: **1,662 passed / 13 skipped** (38 new tests), build, `tsc --noEmit`, biome all clean. Docs propagated: docs/16 "Local Webhook Workbench" section, README, SDK-AND-CLI-REFERENCE, AGENTS.md canonical list + behavior bullet, CHANGELOG, skills v1.4.0 (hash) / v1.1.0 (webhook-production) with `.zcode` mirrors synced.
+
+### New findings from the verification run (P3, non-blocking)
+
+- **F-A (P3): pushback captures don't populate correlation fields.** The `/aba-payway-pushback` route stores parse metadata (`paymentLinkPushback.parsed`) but leaves `matchedTransactionId`/`matchedStatus` null, so `webhook list --json` shows pushback records without their tran_id — weaker than the online route's G8 correlation. One-line fix in `server.ts` (populate the fields from the parsed pushback); would also make `journal timeline --with-webhooks` join pushbacks by tran_id.
+- **F-B (P3, docs): storage-backend asymmetry is implicit.** The capture server writes SQLite when the optional driver is present, and `webhook list/resend/verify-callback --record` read that correctly — but nothing in the CLI output tells you which backend is live. A one-line `storage: sqlite|json` field in `webhook list` output would remove the guesswork for agents.
+
+### Remaining gap register vs Stripe/Razorpay (refreshed 2026-09-10, ordered by leverage)
+
+| Ref | Gap | Status this audit |
+|---|---|---|
+| ~~W-1~~ | `listen --forward-to` analog | **CLOSED** — `setup-webhook --forward-to`, live-verified |
+| ~~W-2~~ | `trigger` analog | **CLOSED** — `webhook trigger`, 7 events, signed fixtures round-trip |
+| ~~W-3~~ | `events resend` analog | **CLOSED** — `webhook resend`, replays stored records |
+| ~~W-4~~ | standalone verify command | **CLOSED** — `webhook verify-callback` (body mode + record mode) |
+| A-1 | MCP server (`payway-sdk mcp`) | OPEN — zero MCP references in `src/`; Stripe ships one via `agent setup`, Razorpay lists one in docs nav. Largest remaining Wave-2 item |
+| A-2 | `docs/llms.txt` + `docs` command | OPEN — `docs/llms.txt` absent; Razorpay publishes one; ours is an afternoon |
+| A-3 | uniform machine-visible next-step (`nextAction` everywhere) | PARTIAL — new commands emit envelopes; older commands not audited for uniformity yet |
+| O-1 | `journal watch` (`logs tail` analog) | OPEN — no watch/follow in journal.ts |
+| O-2 | global `--log-level` | OPEN |
+| D-1 | publish + bin name decision | OPEN/EXTERNAL — bin `payway-sdk` still squatted; `aba-payway-cli` still free |
+| D-2 | update check | OPEN (post-publish) |
+| D-3 | shell completion | OPEN |
+| D-4 | `open` shortcuts | OPEN |
+| D-5 | fixtures runner (multi-step) | OPEN (P2, staged after the webhook wave as planned) |
+| D-6 | preferences config / live-mode confirm | OPEN (P2) |
+
+Competitive position after Wave 1, restated: the four capabilities that made Stripe's CLI the benchmark (forward, trigger, resend, verify) now all exist here in PayWay-native form — including the two contracts Stripe doesn't have to model (no-hash pushbacks, unsigned KHQR notifications) that we handle explicitly. Our remaining differentiator gaps are distribution-facing (MCP, llms.txt, publication), not capability-facing.
+
+### Ecosystem refresh (2026-09-10)
+
+- `aba-payway`: **88 downloads/month** (was 100 on 2026-09-08) — flat-to-declining, no new versions since 0.2.2 (2026-03-03).
+- `aba-payway-sdk`: **218 downloads/month** (was 220) — flat; "Official" claim unchanged; still the volume leader by a small margin.
+- `aba-payway-ts` (ours): name still free; still unpublished (release-gated).
+- Working-tree note: a concurrent agent's offline-KHQR billing-guidance batch (docs + skills v1.5.0/v1.4.0 + a `--lifetime` help clarification) was in flight during this audit; it does not interact with the webhook workbench surface.
+
+### Re-audit sources
+
+- Live run evidence: `.scratch/audit-webhook-e2e/evidence-{app-received,capture-log,wire-body}*` (receiver-appended JSONL of received wire bodies, capture server log, the exact verified body)
+- Suite counts: `npx vitest run` on merged `main` post-merge (1,662/13 skipped) — HANDOFF anti-checklist build-before-suite observed
+- `api.npmjs.org/downloads/point/last-month/{aba-payway,aba-payway-sdk}` — 2026-09-10
+- Gap-register greps: `webhook --help` (dist), `PAYWAY_WEBHOOK_DIR` storage resolution, MCP/llms.txt/watch/log-level/completion/update-check scans over `src/`
