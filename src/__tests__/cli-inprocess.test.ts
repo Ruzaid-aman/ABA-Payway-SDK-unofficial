@@ -91,6 +91,13 @@ describe('CLI in-process (runCli)', () => {
     expect(ptl99.text).toContain('Merchant Invalid Currency');
   });
 
+  // PTL188 (SANDBOX-FINDINGS §23, void endpoint): terminal state, not a failure.
+  it('explain decodes the payment-link PTL188 already-voided code', async () => {
+    const ptl188 = await run(['explain', 'PTL188']);
+    expect(ptl188.text).toContain('Payment Link Already Voided');
+    expect(ptl188.text).toContain('terminal state');
+  });
+
   it('validate accepts a valid amount and transaction id', async () => {
     const { text, exitCode } = await run(['validate', '-a', '5', '-c', 'USD', '-t', 'probe-ok-1']);
     expect(text).toContain('valid');

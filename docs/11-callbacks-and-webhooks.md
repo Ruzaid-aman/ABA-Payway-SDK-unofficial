@@ -470,4 +470,4 @@ User-Agent: PayWayApp/3.0
 
 Receiver setup (tunnel, storage, routes) is covered in
 [16. Webhook Setup](./16-webhook-setup-guide.md); the full payment-link
-lifecycle in [17. Payment Link API](./17-payment-link.md) §17.6.
+lifecycle in [17. Payment Link API](./17-payment-link.md) §17.7.

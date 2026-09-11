@@ -213,6 +213,9 @@ function apiErrorHint(e: PayWayAPIError): string | undefined {
   if (e.paywayCode === 'PTL04') {
     return 'currency and return_url are required; description max 250 chars.';
   }
+  if (e.paywayCode === 'PTL188') {
+    return 'the payment link is already voided — already in the desired terminal state, not a failure; detail reports status "VOIDED" (SANDBOX-FINDINGS §23).';
+  }
   if (e.paywayCode === '96') {
     return 'check the link id — use the data.id value returned by create.';
   }
@@ -3411,6 +3414,57 @@ paymentLinkCmd
       console.log(`  ${c.bold('Link:')}        ${c.cyan(data?.payment_link ?? '-')}`);
       console.log();
     } catch (e) {
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(e);
+        return;
+      }
+      process.exitCode = printApiError(e);
+    }
+  });
+
+paymentLinkCmd
+  .command('void')
+  .description('Void (permanently cancel) an unpaid payment link — irreversible; undocumented endpoint, live-verified (SANDBOX-FINDINGS §23)')
+  .requiredOption('-i, --id <id>', 'Payment link id (data.id returned by create)')
+  .option('-y, --force', 'Skip confirmation prompt (for scripts/agents)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: { id: string; force?: boolean; json?: boolean }) => {
+    const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — void payment link\n`);
+
+    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      if (!opts.force && !opts.json) {
+        const confirmed = io
+          ? await io.confirm({ message: `Void payment link ${opts.id}? This cannot be undone.`, initial: false })
+          : await promptConfirmation(`  Void payment link ${c.cyan(opts.id)}? This cannot be undone. (y/n): `);
+        if (!confirmed) {
+          console.log(`  ${c.yellow('Cancelled by user.')}`);
+          process.exitCode = EXIT_OK;
+          return;
+        }
+      }
+      const payway = new PayWay();
+      const result = await payway.paymentLink.void(opts.id);
+      if (opts.json) {
+        printApiResultJson(result, payway);
+        return;
+      }
+      console.log(`  ${c.green('✓')} Payment link voided (terminal — no longer accepts payments)`);
+      console.log(`  ${c.bold('Link ID:')}  ${opts.id}`);
+      console.log(`  ${c.bold('Gateway log:')} ${result.tran_id ?? '-'}`);
+      console.log(`  ${c.dim(`Verify with: payway-sdk payment-link detail -i ${opts.id} — detail now reports status "VOIDED".`)}`);
+      console.log();
+      process.exitCode = EXIT_OK;
+    } catch (e) {
+      if (e instanceof CliCancelled) {
+        console.log('  Cancelled by user.');
+        process.exit(130);
+      }
       if (opts.json) {
         process.exitCode = printApiErrorJson(e);
         return;

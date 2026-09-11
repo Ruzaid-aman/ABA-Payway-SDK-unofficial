@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Payment-link void (2026-09-11, undocumented endpoint — SANDBOX-FINDINGS §23)
+
+ABA's `POST /api/merchant-portal/merchant-access/payment-link/void` has no
+published docs page; the full contract was live-verified on the sandbox and
+mapped in SANDBOX-FINDINGS §23. Void permanently cancels an UNPAID link —
+irreversible; the hosted page renders an invalid-data shell (code 07) and
+detail reports the new `VOIDED` status. Not idempotent: double-void answers
+HTTP 403 `PTL188` "The payment link is already voided."; a bogus id answers
+403 `96` (same as detail). Content-Type lenient (JSON and urlencoded both
+accepted).
+
+- **SDK**: `payway.paymentLink.void(linkId)` — signs exactly like
+  `getDetails` (RSA `merchant_auth {mc_id, id}`, default-trio HMAC);
+  endpoint in `MUTATION_ENDPOINTS` (single-attempt transport);
+  `VoidPaymentLinkRequest`/`Response` schemas added to the repo OpenAPI
+  spec (`src/types.ts` regenerated).
+- **CLI**: `payment-link void -i <link-id> [-y] [--json]` — prompts on a
+  TTY (irreversible), `-y`/`--json` skip; PTL188 surfaces the standard
+  `{error:{paywayCode:'PTL188', kind:'api', exitCode:2}}` envelope with a
+  "terminal state, not a failure" hint; `payway-sdk explain PTL188` decodes
+  it (payment-link family).
+- **Docs**: docs/17 §17.4 "Voiding a link" (+VOIDED in the lifecycle,
+  PTL188 row, recipe); docs/12 payment-link table rows; skill v1.5.0
+  (+`.zcode` mirror). Mock harness serves the void route; §23 pinned in the
+  gated `sandbox-contract` suite. Open: void-on-paid links, in-flight
+  pushbacks after void (§23).
+
 ### Webhook workbench — local test loop (2026-09-10, P0 Wave 1)
 
 Closes the P0 recommendations of `docs/competitive-analysis-cli-stripe-razorpay.md`

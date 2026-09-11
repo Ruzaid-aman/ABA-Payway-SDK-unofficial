@@ -180,3 +180,38 @@ GetPaymentLinkDetailsResponse:
       oneOf: [{ type: integer }, { type: string }]
     data:
       $ref: '#/PaymentLink'
+
+VoidPaymentLinkRequest:
+  type: object
+  required: [request_time, merchant_id, merchant_auth, hash]
+  description: >
+    UNDOCUMENTED endpoint — live-verified on the sandbox (SANDBOX-FINDINGS
+    §23, 2026-09-11). Content-Type lenient: both application/json and
+    application/x-www-form-urlencoded are accepted.
+  properties:
+    request_time: { type: string, description: "UTC timestamp, YYYYMMDDHHmmss." }
+    merchant_id: { type: string }
+    merchant_auth:
+      type: string
+      description: RSA-encrypted JSON {mc_id, id} — same shape as the detail endpoint.
+    hash:
+      type: string
+      description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+
+VoidPaymentLinkResponse:
+  type: object
+  description: >
+    Live-verified (SANDBOX-FINDINGS §23, 2026-09-11): success answers
+    {status:{code:"00",message:"Success.",lang,trace_id}, tran_id}. Void is
+    NOT idempotent — a second void answers HTTP 403 code PTL188 "The
+    payment link is already voided."; a bogus link id answers HTTP 403
+    code 96 "Invalid merchant data". Post-void, detail reports the
+    previously-unobserved status "VOIDED".
+  properties:
+    status:
+      $ref: '#/PaymentLinkStatus'
+    tran_id:
+      description: >
+        Gateway log id. Sandbox-observed as a NUMBER (2026-09-11) — coerce,
+        do not rely on the type.
+      oneOf: [{ type: integer }, { type: string }]

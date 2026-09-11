@@ -1167,6 +1167,28 @@ describe('paymentLink domain', () => {
     expect(params.has('merchant_auth')).toBe(true);
     expect(params.has('hash')).toBe(true);
   });
+
+  it('void sends form-encoded request to the void path with merchant_auth and hash', async () => {
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Success.' }, tran_id: 178912355579535 }));
+
+    const result = await payway.paymentLink.void('PL-001');
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toContain(ENDPOINTS.voidPaymentLink);
+    expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+    const params = new URLSearchParams(opts.body);
+    // Same family as detail: id travels inside merchant_auth, hash over the default trio
+    expect(params.has('merchant_auth')).toBe(true);
+    expect(params.has('hash')).toBe(true);
+    expect(params.has('id')).toBe(false);
+    expect(result.status?.code).toBe('00');
+  });
+
+  it('void throws PayWayConfigError on an empty link id (no fetch)', () => {
+    // Domain validators throw synchronously (same as getDetails) — no promise to reject.
+    expect(() => payway.paymentLink.void('   ')).toThrow('paymentLinkId is required');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

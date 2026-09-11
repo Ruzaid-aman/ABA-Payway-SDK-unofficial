@@ -872,3 +872,7 @@ User surfaced an **unpublished ABA endpoint**: `POST /api/merchant-portal/mercha
 - Whether a **partially-paid** multi-payment link (`payment_limit > 1`, `total_trxn > 0`) can be voided, or PTL188-like codes guard it (the probe link was unpaid).
 - Whether voiding a **PAID** link answers PTL188/another code — likely terminal-state rejection, untested.
 - Whether a voided link still fires pushbacks for in-flight payments, and what `payment-link/create` echo of a `void` link id looks like (not applicable — void takes detail `id`, not `tran_id`).
+
+**§23 addendum (2026-09-12, branch `feat/payment-link-void` — contract IMPLEMENTED and re-verified through the shipped surfaces):**
+
+17. **(E1–E6) The implemented SDK + CLI reproduce the full §23 contract live** — `scripts/e2e-payment-link-void.ts` runs `payway.paymentLink.void()` and `payment-link void --json` against the sandbox; all six legs green (success 00 + numeric `tran_id`; detail `VOIDED` + advanced `updated_at`; double-void 403 PTL188 through `PayWayAPIError.paywayCode`; bogus 403 96; CLI `--json` one-doc success exit 0; CLI PTL188 `{error:{kind:'api',exitCode:2,hint}}` envelope exit 2). Evidence: `test-output/payment-link-void-e2e/` (gitignored). Durable facts pinned as a gated test in `src/__tests__/sandbox-contract.test.ts` (§23 describe block; needs `SANDBOX_CONTRACT_TESTS=1` + RSA key). Implementation note: the SDK ships void in `MUTATION_ENDPOINTS` (single-attempt transport) and the CLI prompt is skipped under `--json`/`-y` (agents/CI unaffected).

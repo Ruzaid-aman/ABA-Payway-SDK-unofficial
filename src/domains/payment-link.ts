@@ -45,6 +45,10 @@ export interface PaymentLinkDomain {
     paymentLinkId: string,
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['GetPaymentLinkDetailsResponse']>;
+  void: (
+    paymentLinkId: string,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['VoidPaymentLinkResponse']>;
 }
 
 export function createPaymentLinkDomain(
@@ -207,6 +211,28 @@ export function createPaymentLinkDomain(
 
       return requestWithMerchantAuth<components['schemas']['GetPaymentLinkDetailsResponse']>(
         ENDPOINTS.getPaymentLinkDetails,
+        { id: paymentLinkId },
+        { callOptions },
+      );
+    },
+
+    /**
+     * Void (permanently cancel) an unpaid payment link. UNDOCUMENTED
+     * endpoint — the contract is live-verified (SANDBOX-FINDINGS §23,
+     * 2026-09-11): same request family as getDetails (merchant_auth carries
+     * {mc_id, id}); NOT idempotent — a second void answers HTTP 403 PTL188
+     * "The payment link is already voided."; a bogus id answers 403 code 96.
+     * Post-void, getDetails reports status "VOIDED" and the hosted page
+     * renders an invalid-data shell (code 07). Irreversible — this endpoint
+     * is in MUTATION_ENDPOINTS (single-attempt transport, no auto-retry).
+     */
+    void: (paymentLinkId: string, callOptions?: RequestCallOptions) => {
+      if (typeof paymentLinkId !== 'string' || paymentLinkId.trim().length === 0) {
+        throw new PayWayConfigError('paymentLinkId is required and must be a non-empty string');
+      }
+
+      return requestWithMerchantAuth<components['schemas']['VoidPaymentLinkResponse']>(
+        ENDPOINTS.voidPaymentLink,
         { id: paymentLinkId },
         { callOptions },
       );

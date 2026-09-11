@@ -324,6 +324,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/merchant-portal/merchant-access/payment-link/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Void (cancel) a payment link
+         * @description Voids a previously created payment link before it has been paid. Once voided the link can no longer receive payments and the action CANNOT be reversed. UNDOCUMENTED by PayWay (no official docs page) — the full contract is live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11): same request family as detail (RSA-encrypted merchant_auth carrying {mc_id, id}); Content-Type lenient (both application/json and urlencoded accepted); success answers {status:{code:"00",message:"Success."}, tran_id} with a NUMERIC tran_id; double-void answers HTTP 403 code PTL188 "The payment link is already voided."; a bogus link id answers HTTP 403 code 96 "Invalid merchant data". Post-void, detail reports status "VOIDED" and the hosted page renders an invalid-data shell (page code 07).
+         */
+        post: operations["voidPaymentLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion": {
         parameters: {
             query?: never;
@@ -1186,6 +1206,22 @@ export interface components {
             tran_id?: number | string;
             data?: components["schemas"]["PaymentLink"];
         };
+        /** @description UNDOCUMENTED endpoint — live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11). Content-Type lenient: both application/json and application/x-www-form-urlencoded are accepted. */
+        VoidPaymentLinkRequest: {
+            /** @description UTC timestamp, YYYYMMDDHHmmss. */
+            request_time: string;
+            merchant_id: string;
+            /** @description RSA-encrypted JSON {mc_id, id} — same shape as the detail endpoint. */
+            merchant_auth: string;
+            /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
+            hash: string;
+        };
+        /** @description Live-verified (SANDBOX-FINDINGS §23, 2026-09-11): success answers {status:{code:"00",message:"Success.",lang,trace_id}, tran_id}. Void is NOT idempotent — a second void answers HTTP 403 code PTL188 "The payment link is already voided."; a bogus link id answers HTTP 403 code 96 "Invalid merchant data". Post-void, detail reports the previously-unobserved status "VOIDED". */
+        VoidPaymentLinkResponse: {
+            status?: components["schemas"]["PaymentLinkStatus"];
+            /** @description Gateway log id. Sandbox-observed as a NUMBER (2026-09-11) — coerce, do not rely on the type. */
+            tran_id?: number | string;
+        };
         /** @description Uses RSA-encrypted merchant_auth. NOTE: uses request_time (not req_time), same convention as the Refund endpoint. */
         CompletePreAuthRequest: {
             /** @description UTC timestamp, YYYYMMDDHHmmss. */
@@ -1912,6 +1948,40 @@ export interface operations {
                 };
             };
             /** @description Client error (invalid hash, missing parameters, validation failure) */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    voidPaymentLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["VoidPaymentLinkRequest"];
+                "application/json": components["schemas"]["VoidPaymentLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Payment link voided (terminal — a second void answers 403 PTL188) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoidPaymentLinkResponse"];
+                };
+            };
+            /** @description Client error (PTL188 already voided, 96 invalid link id, wrong hash) */
             "4XX": {
                 headers: {
                     [name: string]: unknown;

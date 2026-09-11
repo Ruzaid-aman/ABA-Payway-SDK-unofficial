@@ -213,7 +213,7 @@ Differences from checkout webhooks (live-captured 2026-09-06, real payment):
 curl -X POST https://your-host/payway/pushback   -H 'Content-Type: application/json'   -d '{"tran_id":"123456789","status":"00","merchant_ref_no":"ref0001"}'
 ```
 
-Full lifecycle: [17. Payment Link API](./17-payment-link.md) §17.6.
+Full lifecycle: [17. Payment Link API](./17-payment-link.md) §17.7.
 
 ### Online Checkout Signature Logging and Offline KHQR Notifications
 

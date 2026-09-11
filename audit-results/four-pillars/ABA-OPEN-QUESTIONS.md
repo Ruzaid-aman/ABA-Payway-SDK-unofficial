@@ -671,6 +671,37 @@ sandbox; all envelope evidence is merchant-captured production data.
 2. Can the sandbox merchant profile's callback URL be self-configured for the
    Customer Module, or does it always require an integration-team ticket as in
    production?
+### Q37 — Payment-link `void` endpoint: production availability and contract parity 🟡
+
+**Source:** user-surfaced unpublished endpoint (2026-09-11),
+`docs/SANDBOX-FINDINGS.md` §23 (+ addendum #17),
+`scripts/sandbox-probe-payment-link-void.ts` (contract mapping) and
+`scripts/e2e-payment-link-void.ts` (implementation e2e),
+`docs/17-payment-link.md` §17.4.
+
+**Observed (sandbox only — the endpoint has no published docs page):**
+`POST /api/merchant-portal/merchant-access/payment-link/void` is live and
+fully mapped on the sandbox: same request family as payment-link detail
+(RSA-encrypted `merchant_auth = {mc_id, id}`, HMAC over
+`request_time + merchant_id + merchant_auth`); success answers
+`{status:{code:"00"}, tran_id}` with a numeric `tran_id`; the link then reads
+the new `VOIDED` status in detail and the hosted page renders an
+invalid-data shell (code `07`); the endpoint is NOT idempotent — a second
+void answers HTTP 403 `PTL188` "The payment link is already voided."; a
+bogus id answers 403 `96`. Implemented in the SDK/CLI on that contract.
+
+**Questions:**
+1. Is `payment-link/void` available on production (`checkout.payway.com.kh`)
+   with the same path, signing family, and response shapes as the sandbox?
+2. Does production `detail` report the `VOIDED` status exactly, and does the
+   production hosted page render the same invalid-data state (code `07`)?
+3. Can a PAID or partially-paid multi-payment link be voided, or is it
+   rejected — and with which code? (Untested in sandbox; we advise merchants
+   to refund paid links rather than void them until answered.)
+4. Do in-flight payments on a link survive a void (pushback still fires /
+   check-transaction still approves), or are they refused client-side?
+5. Is `PTL188` the final production code for double-void, and is there an
+   official docs page forthcoming for this endpoint?
 
 ---
 
@@ -678,14 +709,14 @@ sandbox; all envelope evidence is merchant-captured production data.
 
 Use this file as the canonical register. Supporting files below either feed this
 register directly or carry scenario-specific wording that has now been folded
-into Q1-Q32.
+into Q1-Q37.
 
 | Source file | Section(s) | Register coverage |
 |---|---|---|
-| `audit-results/four-pillars/ABA-OPEN-QUESTIONS.md` | Q1-Q21, answer logs, re-audits | Canonical register. |
+| `audit-results/four-pillars/ABA-OPEN-QUESTIONS.md` | Q1-Q37, answer logs, re-audits | Canonical register. |
 | `.scratch/skills-audit/ABA-QUESTIONS-2026-09-05.md` | Q-A-Q-G | Folded into Q22-Q28. |
 | `docs/CLOSE-TRANSACTION-FINDINGS.md` | §5 Questions for ABA | Q4, plus Q28 for never-created close semantics. |
-| `docs/SANDBOX-FINDINGS.md` | §8c, §9f, §10d, §21, §22 | Q5-Q13, Q19-Q21, Q26-Q28. |
+| `docs/SANDBOX-FINDINGS.md` | §8c, §9f, §10d, §21, §22, §23 | Q5-Q13, Q19-Q21, Q26-Q28, Q34-Q37. |
 | `docs/15-merchant-scenario-requirements.md` | TC-001, TC-005, TC-013, TC-016, TC-017-TC-023, TC-026-TC-028 | Q29-Q31, plus Q5/Q30. |
 | `docs/aba-payway-test-case-coverage.md` | TC-004-TC-006, TC-009, TC-014, TC-017-TC-023, TC-026-TC-028, remaining gaps | Q29-Q31. |
 | `docs/08-deep-linking.md` and `docs/glossary.md` | Deep link `[TBD: confirm with ABA]` notes | Q29. |

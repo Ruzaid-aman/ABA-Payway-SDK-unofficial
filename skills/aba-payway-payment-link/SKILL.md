@@ -1,8 +1,8 @@
 ---
 name: aba-payway-payment-link
-description: Create and inspect hosted ABA PayWay payment links.
+description: Create, inspect, and void hosted ABA PayWay payment links.
 metadata:
-  version: 1.4.0
+  version: 1.5.0
 ---
 
 # ABA PayWay Payment Link
@@ -54,7 +54,14 @@ const link = await payway.paymentLink.create({ ..., image: { data: readFileSync(
 On payment, the gateway POSTs to the decoded `return_url` (live-captured 2026-09-06: `User-Agent: PayWayApp/3.0`, `Content-Type: application/json`): body `{ "tran_id": "…", "status": 0, "merchant_ref_no": "…" }` — **NO hash field (live-confirmed)**, `status` numeric 0 (not "00"). Treat as notification; verify via `check-transaction` on the pushed `tran_id` before fulfilling — `verifyCallback()` does not apply. One pushback per payment; multi-payment links fire repeatedly. SDK: `parsePaymentLinkPushback(body)` coerces the body (`status` → `'APPROVED'`/`'UNKNOWN'`); the webhook server's `/aba-payway-pushback` route can host the receiver (`setup-webhook` prints it). `create` also warns locally when `expiredDate` is past or under ~5 minutes out (gateway PTL04 — sandbox-verified).
 
 ## Status lifecycle
-`OPEN` while `payment_limit > total_trxn`; `PAID` once equal (hosted page stops accepting). **No EXPIRED status exists** (sandbox-verified 2026-09-06): after `expired_date` passes, detail still reads OPEN and the hosted page still answers 200 — enforce expiry merchant-side. Create rejects past/under-5-min `expired_date` with PTL04. Totals: `total_amount_org` (gross), `total_refund`, `total_amount` (net), `total_trxn` (count).
+`OPEN` while `payment_limit > total_trxn`; `PAID` once equal (hosted page stops accepting); **`VOIDED`** after a successful void (below). **No EXPIRED status exists** (sandbox-verified 2026-09-06): after `expired_date` passes, detail still reads OPEN and the hosted page still answers 200 — enforce expiry merchant-side. Create rejects past/under-5-min `expired_date` with PTL04. Totals: `total_amount_org` (gross), `total_refund`, `total_amount` (net), `total_trxn` (count).
+
+## Voiding a link (undocumented endpoint, live-verified §23)
+`payway.paymentLink.void(linkId)` permanently cancels an UNPAID link — irreversible; it can no longer receive payments and the hosted page renders an invalid-data shell (code 07), unlike expiry which leaves the form up. Signs exactly like detail (`merchant_auth = {mc_id, id}`); success answers `{status:{code:"00"}, tran_id}` (numeric). **NOT idempotent**: a second void answers HTTP 403 `PTL188` "The payment link is already voided" — treat as already-terminal, not an error. Bogus id answers 403 `96` (same as detail). Don't void paid links — refund instead; void-on-paid is untested (open in §23).
+
+```sh
+payway-sdk payment-link void -i <link-id> [-y] [--json]   # prompts on a TTY; -y/--json skip
+```
 
 ## Error Handling
 ```ts
@@ -63,7 +70,7 @@ try { await payway.paymentLink.getDetails('link-id'); }
 catch (error) { if (error instanceof PayWayConfigError) console.error(error.message); }
 ```
 
-Codes: `PTL02` wrong hash, `PTL04` param validation (currency/return_url missing, description >250, non-numeric amount, OR expired_date in the past/under ~5 min out — sandbox-discovered catch-all), `96` invalid link id on detail (PTL132 documented but not reproduced on sandbox), 37/PTL146/PTL46 payout whitelist. Sandbox detail: `expired_date` unset echoes "0"; NO EXPIRED status — expired links still read OPEN and the hosted page still answers 200, enforce expiry yourself.
+Codes: `PTL02` wrong hash, `PTL04` param validation (currency/return_url missing, description >250, non-numeric amount, OR expired_date in the past/under ~5 min out — sandbox-discovered catch-all), `PTL188` already voided (terminal state, not a failure — void is not idempotent), `96` invalid link id on detail/void (PTL132 documented but not reproduced on sandbox), 37/PTL146/PTL46 payout whitelist. Sandbox detail: `expired_date` unset echoes "0"; NO EXPIRED status — expired links still read OPEN and the hosted page still answers 200, enforce expiry yourself.
 
 ## Inspecting a link (CLI)
 

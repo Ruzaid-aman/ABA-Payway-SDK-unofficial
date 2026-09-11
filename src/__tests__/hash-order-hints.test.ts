@@ -102,11 +102,12 @@ describe('HASH_ORDER_HINTS pinned to exported hash-field constants', () => {
   });
 
   it('refund / payment-link / beneficiary hints equal MERCHANT_AUTH_DEFAULT_HASH_FIELDS', () => {
-    // refund (checkout) and create/getDetails (payment-link) pass NO
+    // refund (checkout) and create/getDetails/void (payment-link) pass NO
     // hmacFields override — the effective signed order is the default.
     expect(HASH_ORDER_HINTS[ENDPOINTS.refund]).toBe(MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'));
     expect(HASH_ORDER_HINTS[ENDPOINTS.createPaymentLink]).toBe(MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'));
     expect(HASH_ORDER_HINTS[ENDPOINTS.getPaymentLinkDetails]).toBe(MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'));
+    expect(HASH_ORDER_HINTS[ENDPOINTS.voidPaymentLink]).toBe(MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'));
     // add/updateBeneficiary DO pass an explicit two-field override.
     expect(HASH_ORDER_HINTS[ENDPOINTS.addBeneficiary]).toBe('request_time.merchant_auth');
     expect(HASH_ORDER_HINTS[ENDPOINTS.updateBeneficiaryStatus]).toBe('request_time.merchant_auth');
@@ -239,7 +240,7 @@ describe('HASH_ORDER_HINTS pinned to the captured hmacFields of each domain call
     expect(HASH_ORDER_HINTS[ENDPOINTS.updateBeneficiaryStatus]).toBe(effectiveMerchantAuthFields(updateCall!).join('.'));
   });
 
-  it('payment-link: create and getDetails pass NO hmacFields override → default applies', async () => {
+  it('payment-link: create, getDetails and void pass NO hmacFields override → default applies', async () => {
     const { spy, calls } = makeMerchantAuthSpy();
     const domain = createPaymentLinkDomain(TEST_CONFIG as PayWayConfig, spy);
 
@@ -250,11 +251,14 @@ describe('HASH_ORDER_HINTS pinned to the captured hmacFields of each domain call
       returnUrl: 'https://example.com/return',
     });
     await domain.getDetails('pl-1');
+    await domain.void('pl-1');
 
     expect(calls[0].hmacFields).toBeUndefined();
     expect(calls[1].hmacFields).toBeUndefined();
+    expect(calls[2].hmacFields).toBeUndefined();
     expect(HASH_ORDER_HINTS[ENDPOINTS.createPaymentLink]).toBe(effectiveMerchantAuthFields(calls[0]).join('.'));
     expect(HASH_ORDER_HINTS[ENDPOINTS.getPaymentLinkDetails]).toBe(effectiveMerchantAuthFields(calls[1]).join('.'));
+    expect(HASH_ORDER_HINTS[ENDPOINTS.voidPaymentLink]).toBe(effectiveMerchantAuthFields(calls[2]).join('.'));
   });
 });
 
@@ -304,6 +308,7 @@ describe('HASH_ORDER_HINTS structural guards', () => {
         ENDPOINTS.generateQr,
         ENDPOINTS.createPaymentLink,
         ENDPOINTS.getPaymentLinkDetails,
+        ENDPOINTS.voidPaymentLink,
         ENDPOINTS.completePreAuth,
         ENDPOINTS.cancelPreAuth,
         ENDPOINTS.payout,

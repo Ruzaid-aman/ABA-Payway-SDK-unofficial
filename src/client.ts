@@ -573,6 +573,7 @@ export const HASH_ORDER_HINTS: Record<string, string> = {
   // order is MERCHANT_AUTH_DEFAULT_HASH_FIELDS (request_time.merchant_id.merchant_auth).
   [ENDPOINTS.createPaymentLink]: MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'),
   [ENDPOINTS.getPaymentLinkDetails]: MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'),
+  [ENDPOINTS.voidPaymentLink]: MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'),
   [ENDPOINTS.completePreAuth]: 'merchant_auth.request_time.merchant_id',
   [ENDPOINTS.cancelPreAuth]: 'merchant_id.merchant_auth.request_time',
   // Payout: hex-encoded hash (unique among endpoints); beneficiaries are RSA-encrypted.
