@@ -3,6 +3,35 @@
 > **Estimated reading time:** 20 minutes  
 > **Goal:** Build a complete checkout flow for a web application using the PayWay SDK.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser as 🌐 Browser
+    participant Backend as ⚙️ Your Backend
+    participant PayWay as 🏦 PayWay
+
+    Browser->>Backend: POST /checkout (order details)
+    Backend->>Backend: build signed payload (hash via SDK)
+    Backend->>PayWay: purchase payload ready (server-side only)
+    Backend-->>Browser: hidden auto-submit form (merchant_id + hash)
+    Browser->>PayWay: POST purchase form (payment_gate=0 → hosted page)
+    Customer->>PayWay: completes payment on hosted page
+
+    par return-URL hop (unverified, UX only)
+        PayWay-->>Browser: redirect to return_url ✅
+        Browser->>Backend: GET return_url → show "processing"
+    and trusted server callback
+        PayWay-->>Backend: POST callback + X-PAYWAY-HMAC-SHA512
+        Backend->>Backend: verifyCallbackDetailed → dedupe → ✅ fulfill once
+    end
+
+    Note over Backend,PayWay: The callback is the only trusted source of truth — the redirect is not.
+```
+
+Full diagram: [Payment Lifecycle](./diagrams/payment-lifecycle.md) · Callback details: [Chapter 11](./11-callbacks-and-webhooks.md).
+
 ---
 
 ## Architecture Overview

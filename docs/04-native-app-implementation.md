@@ -3,6 +3,29 @@
 > **Estimated reading time:** 15 minutes  
 > **Goal:** Integrate PayWay payments into native iOS and Android apps.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as 📱 Native App
+    participant Backend as ⚙️ Your Backend (SDK)
+    participant PayWay as 🏦 PayWay
+
+    App->>Backend: create checkout (order details)
+    Backend->>Backend: build signed payload — credentials never leave the server
+    Backend-->>App: checkout URL / hosted form target
+    App->>PayWay: load payment UI in WebView
+    Customer->>PayWay: completes payment
+    PayWay-->>App: redirect to return_url (intercepted by the WebView)
+    App->>Backend: ask for verified status (do not trust the redirect)
+    Backend->>PayWay: check-transaction / callback already received
+    Backend-->>App: APPROVED ✅ → show success, fulfill server-side
+    Note over App,Backend: Intercept the return-URL prefix in the WebView delegate; the redirect itself proves nothing.
+```
+
+Runnable examples: [Android `PaymentActivity.kt`](./examples/android/PaymentActivity.kt) · [iOS `PaymentViewController.swift`](./examples/ios/PaymentViewController.swift).
+
 ---
 
 > 📘 **Important Note:** This chapter documents using the **ABA PayWay TypeScript SDK as your backend** + a WebView in your native app for the payment UI. This is the recommended approach since our SDK is server-side only. If you prefer ABA's official native iOS/Android SDK (a separate product from ABA), see the note at the bottom of this chapter.

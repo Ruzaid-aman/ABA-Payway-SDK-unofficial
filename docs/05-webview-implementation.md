@@ -3,6 +3,36 @@
 > **Estimated reading time:** 15 minutes  
 > **Goal:** Understand how to use WebViews to display PayWay's checkout page inside your app, manage cookies and sessions, and capture payment results.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Host as 📱 Host App
+    participant WebView as 🧩 WebView
+    participant Backend as ⚙️ Your Backend (SDK)
+    participant PayWay as 🏦 PayWay
+
+    Host->>Backend: create checkout
+    Backend-->>Host: payment artifact (URL / form)
+    Host->>WebView: load PayWay checkout page
+    WebView->>PayWay: render + customer pays
+
+    alt JS bridge available (preferred)
+        PayWay-->>WebView: result page calls postMessage ✅
+        WebView-->>Host: script handler receives result
+    else URL interception
+        PayWay-->>WebView: redirect to return_url prefix ✅
+        WebView-->>Host: navigation delegate intercepts
+    else deeplink return (mobile apps)
+        PayWay-->>Host: returnDeeplink opens the app ✅
+    end
+
+    Host->>Backend: verify status server-side (never trust the UI signal)
+    Backend-->>Host: APPROVED ✅ → close the WebView, show success
+    Note over Host,PayWay: Cookies: keep a shared process pool per session; clear storage between different customers.
+```
+
 ---
 
 ## What Is a WebView?
