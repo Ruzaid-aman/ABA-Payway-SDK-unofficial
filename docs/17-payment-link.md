@@ -4,6 +4,34 @@
 >
 > **Choosing a route:** see `aba-payway-first-payment` — a payment link fits when you collect a *known amount* from a customer *outside* your own checkout (invoices, live-stream sales, support-desk collections). QR / checkout fit when the customer is already in your app.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Merchant as ⚙️ Your Backend
+    participant PayWay as 🏦 PayWay
+    participant Customer as 🧑 Customer
+
+    Merchant->>PayWay: create payment link (RSA merchant_auth)
+    PayWay-->>Merchant: 201 data.id (opaque Link ID — the ONLY key for detail/void)
+    Merchant->>Customer: share hosted link (SMS / email / chat / QR)
+    Customer->>PayWay: open link + pay
+
+    par pushback to return_url (untrusted)
+        PayWay-->>Merchant: POST {tran_id, status: 0, merchant_ref_no} (NO hash)
+        Merchant->>PayWay: check-transaction (trust, don't parse the pushback)
+        PayWay-->>Merchant: APPROVED ✅ → fulfill once
+    and no pushback? (PayWay never retries)
+        Merchant->>PayWay: reconcile via get-transactions-by-mc-ref
+    end
+
+    opt cancel an UNPAID link
+        Merchant->>PayWay: void(data.id) — permanent, NOT idempotent
+        PayWay-->>Merchant: 200 VOIDED / 403 PTL188 already voided (terminal, not an error)
+    end
+```
+
 ## 17.1 Prerequisites
 
 | Requirement | Notes |

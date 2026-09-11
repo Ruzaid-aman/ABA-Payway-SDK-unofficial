@@ -3,6 +3,33 @@
 > **Estimated reading time:** 15 minutes  
 > **Goal:** Generate and display KHQR QR codes for customers to scan and pay with their banking app.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Backend as ⚙️ Your Backend (SDK)
+    participant PayWay as 🏦 PayWay
+    participant Customer as 🧑 Customer
+    participant BankApp as 📲 Any Bank App
+
+    par online QR (generate-qr API)
+        Backend->>PayWay: generateQr (amount, currency, qrImageTemplate)
+        PayWay-->>Backend: qrString + qrImage (branded PNG)
+        Backend-->>Customer: display QR
+        Customer->>BankApp: scan + pay
+        Backend->>PayWay: poll / check-transaction until terminal
+    and offline ABA KHQR (no API call to create)
+        Backend->>Backend: khqr.generateOfflineQR() — local, EMVCo TLV + CRC
+        Backend-->>Customer: display plain KHQR (no branding)
+        Customer->>BankApp: scan + pay with ANY bank app
+        PayWay-->>Backend: POST /aba-payway-khqr-webhook (NO hash — untrusted)
+        Backend->>PayWay: check-transaction before trusting ✅
+    end
+
+    Note over Backend,BankApp: Offline QRs carry no ABA branding and cannot use templates — the template gallery is online-only.
+```
+
 ---
 
 ## QR String vs. QR Image — Understanding the Difference

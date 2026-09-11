@@ -3,6 +3,32 @@
 > **Estimated reading time:** 10 minutes  
 > **Goal:** Understand how deep linking works with ABA Pay, and how to configure it for your native mobile app.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as 📱 Native App
+    participant Backend as ⚙️ Your Backend (SDK)
+    participant PayWay as 🏦 PayWay
+    participant ABAPay as 🏦 ABA Pay App
+
+    App->>Backend: purchase (paymentOption: abapay_khqr_deeplink, returnDeeplink)
+    Backend-->>App: deeplink URL for the ABA Pay app
+    App->>ABAPay: open abapay:// deeplink
+    Customer->>ABAPay: confirms payment in ABA Pay
+
+    alt ABA Pay app installed
+        ABAPay-->>App: returns via returnDeeplink (iOS universal link / Android app link) ✅
+    else app NOT installed
+        ABAPay-->>App: fallback URL opens in browser ❌ → show guidance
+    end
+
+    App->>Backend: verify payment server-side
+    Backend-->>App: APPROVED ✅ → fulfill
+    Note over App,PayWay: The deeplink return is a UX hop only — approval is real when your server verifies it.
+```
+
 ---
 
 > 📘 **Important:** Deep link URI schemes (e.g., `abapay://...`) are defined by ABA PayWay's official native SDK, not by this TypeScript SDK. This chapter documents the **patterns and concepts** surrounding deep linking. The exact URI scheme format is marked as `[TBD: confirm with ABA]` where our codebase doesn't have verified information.
