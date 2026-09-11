@@ -855,3 +855,20 @@ Evidence: `test-output/payment-link-docs-review/` (verify-probes + expired-sweep
    - `tran_id` arrives as a **string** here while create/detail responses carry it numeric-typed — coerce everywhere.
    - Headers: `User-Agent: PayWayApp/3.0`, `Content-Type: application/json; charset=utf-8`, W3C `traceparent`/`elastic-apm-traceparent` tracing headers, source IP `103.108.218.2` (KH).
    - Pushback latency: approval → pushback ≈ instant (captured seconds after the simulator approval); the pushback fired once, no retries observed on a 200 ACK.
+
+## 23. Payment-link VOID — undocumented endpoint, live-verified (2026-09-11, agent session; script `scripts/sandbox-probe-payment-link-void.ts`)
+
+User surfaced an **unpublished ABA endpoint**: `POST /api/merchant-portal/merchant-access/payment-link/void` (no official docs page). Probed live against the sandbox; the FULL contract is now mapped. Evidence: `test-output/payment-link-void-probe/` (JSON + pre/post-void hosted-page HTML, gitignored — lives on disk).
+
+1. **(W-V1/W-V2) The endpoint is LIVE and signs exactly like create/detail**: body `{request_time, merchant_id, merchant_auth, hash}`; `merchant_auth` is the RSA-encrypted `{mc_id, id}` (the **same `id` key detail uses** — the create-response `data.id`, NOT the hosted slug and NOT `tran_id`); hash is the default trio HMAC `request_time + merchant_id + merchant_auth` (base64). Success answers HTTP 200 `{status:{code:"00",message:"Success.",…}, tran_id:<log id>}` — `tran_id` arrives **numeric** (number in JSON), plus `lang`/`trace_id` inside `status`.
+2. **(W-V3) VOID IS A REAL, DISTINCT STATE — the "no status beyond OPEN/PAID" picture was incomplete**: post-void, `payment-link/detail` reports `status:"VOIDED"` (a NEW status value never before observed on this sandbox) and `updated_at` advances; `total_trxn`/`total_amount` stay 0. The hosted `payment_link` page still answers **HTTP 200** but its SSR `window.__NUXT__` state carries `checkout.page:"invalid-data"` with `status.code "07" "Invalid Data"` (`DPL-` prefixed log id) — i.e. **the customer-facing payment form is dead**; only a boilerplate error shell renders. Unlike expiry (§22 #2, page stays a live form), void **does** kill the customer side.
+3. **(W-V4) Double-void answers HTTP 403 code `PTL188` "The payment link is already voided."** — NOT idempotent; treat a PTL188 response as "already in the desired terminal state" rather than an error. New code for the docs/12 table.
+4. **(W-V5) A bogus link id answers HTTP 403 code `96` "Invalid merchant data"** — the same shape as detail's bogus id (§22 #5), keeping code 96 the "unknown link id" signal across the family.
+5. **(W-V6) Content-Type lenient — both `application/json` and `application/x-www-form-urlencoded` are accepted** (create requires form-urlencoded; void takes either — JSON verified working).
+6. **(W-V3 side observation) Pre-void hosted page title carries `"<outlet_name> | $<amount>"`** (`ehanson259 | $1.50`) — the outlet-facing brand on the link form.
+
+**Open items from this probe (deferred, need an interactive payer):**
+
+- Whether a **partially-paid** multi-payment link (`payment_limit > 1`, `total_trxn > 0`) can be voided, or PTL188-like codes guard it (the probe link was unpaid).
+- Whether voiding a **PAID** link answers PTL188/another code — likely terminal-state rejection, untested.
+- Whether a voided link still fires pushbacks for in-flight payments, and what `payment-link/create` echo of a `void` link id looks like (not applicable — void takes detail `id`, not `tran_id`).
