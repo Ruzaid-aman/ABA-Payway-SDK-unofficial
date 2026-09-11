@@ -615,6 +615,63 @@ past `expired_date` still read `OPEN` and the hosted page still answers HTTP
 5. Are `PTL04`, `PTL05`, `PTL99`, and `PTL132` all still active production
    codes, and what condition maps to each?
 
+### Q34 — get-transactions-by-mc-ref response envelope 🟡
+
+**Source:** `docs/archive/customermoudle-guide.md` §10.4 (merchant-captured),
+`.scratch/customer-module-qr/spec.md` gap G3.
+
+**Observed:** every captured production response wraps rows under `data` with a
+nested `status` OBJECT (`{"code": "00", "message": "Success!", "merchant_ref":
+…}`), while the official doc page / OpenAPI modeling describes a numeric
+`status` (0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal
+server error) and a `transactions` array. The SDK now tolerates both and
+normalizes; the sandbox cannot arbitrate (the KHQR domain 404s on our sandbox
+profile — Q24).
+
+**Questions:**
+1. Which envelope is canonical in production — `data` + status object, or
+   `transactions` + numeric status — and will it stay stable?
+2. Is the string "00" success code identical across sandbox and production?
+
+### Q35 — Customer Module callback routing and signature 🟡
+
+**Source:** `docs/archive/customer module.md` §1.4, `docs/archive/customermoudle-guide.md`
+§7.2-7.4/§11.1, `.scratch/customer-module-qr/spec.md` gaps G1/G2.
+
+**Observed:** the Customer Module ("Printed QR") callback is HMAC-signed with
+the `X-PAYWAY-HMAC-SHA512` header (captured 2026-08-18) and carries a nested
+`customer` profile object. The guide states the Customer Module has exactly ONE
+callback URL per merchant profile, configured server-side by the integration
+team. The older integration guide mentions "HMAC-SHA256" in one place — the
+knowledge base corrects this to HMAC-SHA512.
+
+**Questions:**
+1. Do Customer Module callbacks arrive at the SAME single profile callback URL
+   as online-checkout callbacks (mixed channels, discriminated only by body
+   shape), or can a distinct URL/path be provisioned per channel?
+2. Is the callback signature canonicalization identical to the online-checkout
+   contract (sorted-key concat, nested objects JSON-encoded), and does it hold
+   in production?
+3. Confirm HMAC-SHA512 (not the legacy guide's HMAC-SHA256 mention).
+
+### Q36 — Sandbox provisioning for the Customer Module / KHQR query domain 🟡
+
+**Source:** `audit-results/live-api-coverage-2026-08-31.md` row #24 (KHQR by-ref
+404), `.scratch/customer-module-qr/spec.md` user-gated live-verify plan.
+
+**Observed:** our sandbox profile answers HTTP 404 for
+`get-transactions-by-mc-ref` (the KHQR query domain is not provisioned), so the
+reconciliation leg of the Customer Module flow cannot be end-to-end tested in
+sandbox; all envelope evidence is merchant-captured production data.
+
+**Questions:**
+1. Can a sandbox profile be provisioned with the Customer Module (Invoicing
+   Tool/Payment Links enabled, Customer-ID mandatory field) AND the KHQR query
+   domain so merchants can rehearse the full flow?
+2. Can the sandbox merchant profile's callback URL be self-configured for the
+   Customer Module, or does it always require an integration-team ticket as in
+   production?
+
 ---
 
 ## Source map for ABA-facing questions
@@ -635,4 +692,5 @@ into Q1-Q32.
 | `docs/11-callbacks-and-webhooks.md` and `docs/16-webhook-setup-guide.md` | KHQR callback provisioning / whitelisting | Q31. |
 | `.scratch/payment-link-docs-review/PLAN.md` | §§1.1-1.4, V-2/V-3/V-4/V-5, G-3/G-10 | Q19-Q21, Q33. |
 | `audit-results/transaction-data-audit/REPORT.md` | §18 Open questions register | Q32; other journal-policy items are internal SDK decisions, not ABA questions. |
+| `docs/19-customer-module-qr.md`, `.scratch/customer-module-qr/spec.md` | Customer Module callback contract, mc-ref envelope, sandbox provisioning | Q34-Q36. |
 | `docs/PRODUCTION-VERIFICATION-PLAN.md`, `docs/PROJECT_STATUS.md`, `audit-results/sync-audit-2026-09-01.md`, `audit-results/four-pillars/technical-debt-register.md`, `audit-results/four-pillars/RTM.md`, `audit-results/four-pillars/README.md`, `HANDOFF.md` | References to open ABA items | Secondary/stale pointers; consult this register first. |
