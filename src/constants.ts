@@ -282,3 +282,22 @@ export const PAYMENT_OPTIONS = ['cards', 'abapay_khqr', 'abapay_khqr_deeplink', 
 
 export type PaymentOptionName = (typeof PAYMENT_OPTIONS)[number];
 
+/**
+ * payment_option values documented for the PURCHASE path (generate-checkout /
+ * hosted checkout). The archived gateway spec
+ * (docs/archive/Default module.openapi.json) documents `cards`, `abapay`,
+ * `abapay_deeplink`; `abapay_khqr_deeplink` (the checkout default) and
+ * `google_pay` (requires googlePayToken — see checkout domain validation) are
+ * live-verified additions. QR-only values (`abapay_khqr`, `wechat`, `alipay`)
+ * are intentionally absent — use PAYMENT_OPTIONS for the QR endpoints.
+ */
+export const PURCHASE_PAYMENT_OPTIONS = [
+  'cards',
+  'abapay',
+  'abapay_deeplink',
+  'abapay_khqr_deeplink',
+  'google_pay',
+] as const;
+
+export type PurchasePaymentOptionName = (typeof PURCHASE_PAYMENT_OPTIONS)[number];
+

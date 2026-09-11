@@ -1,6 +1,6 @@
 import { generateHmac } from '../auth.js';
 import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig, RequestCallOptions } from '../client.js';
-import { ENDPOINTS, PAYMENT_OPTIONS } from '../constants.js';
+import { ENDPOINTS, PURCHASE_PAYMENT_OPTIONS } from '../constants.js';
 import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
 import type { components } from '../types.js';
 import type { PollTransactionOptions, PollTransactionResult, PurchaseHostedHtmlResult } from '../domain-types.js';
@@ -316,10 +316,10 @@ export function createCheckoutDomain(
         warnAdvisory(config, `items exceeds the gateway's 500-character wire cap (encoded) — gateway may reject with error 13`);
       }
     }
-    if (params.paymentOption !== undefined && !(PAYMENT_OPTIONS as readonly string[]).includes(params.paymentOption)) {
+    if (params.paymentOption !== undefined && !(PURCHASE_PAYMENT_OPTIONS as readonly string[]).includes(params.paymentOption)) {
       warnAdvisory(
         config,
-        `payment_option "${params.paymentOption}" is outside the documented purchase enum (${PAYMENT_OPTIONS.join(', ')})`,
+        `payment_option "${params.paymentOption}" is outside the documented purchase enum (${PURCHASE_PAYMENT_OPTIONS.join(', ')})`,
       );
     }
     // Split-payout entries use the purchase-path keys {acc, amt} (NOT the
