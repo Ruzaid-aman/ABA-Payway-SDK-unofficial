@@ -20,7 +20,7 @@ import {
   createQrDomain,
   createSelfActivationDomain,
 } from './domains/index.js';
-import { GENERATE_QR_HASH_FIELDS } from './domains/qr.js';
+import { GENERATE_QR_HASH_FIELDS, REQUEST_QR_HASH_FIELDS } from './domains/qr.js';
 import type { KhqrDomain } from './domains/khqr.js';
 import type { PaymentLinkDomain } from './domains/payment-link.js';
 import type { PayoutDomain } from './domains/payout.js';
@@ -571,6 +571,13 @@ export interface GetTransactionListParams {
 export const MERCHANT_AUTH_DEFAULT_HASH_FIELDS: readonly string[] = ['request_time', 'merchant_id', 'merchant_auth'];
 
 /**
+ * Partner-auth hash order for the online-self-activation endpoints
+ * (openapi-suite-coverage W3, spec-derived). Hoisted (audit D3) so the
+ * HASH_ORDER_HINTS drift-guard pins the hint against the real order.
+ */
+export const SELF_ACTIVATION_HASH_FIELDS: readonly string[] = ['partner_id', 'request_data', 'request_time'];
+
+/**
  * Live-documented HMAC field orders per endpoint, sandbox-verified 2026-08-31.
  * Surfaced inside PayWaySignatureError hints
  * so a wrong-hash rejection (`1`/`01`/`PTL02`) points directly at the
@@ -626,6 +633,14 @@ export const HASH_ORDER_HINTS: Record<string, string> = {
   [ENDPOINTS.getTokenDetails]: 'merchant_id.request_time.request_id',
   [ENDPOINTS.removeToken]: 'merchant_id.ctid.request_time.pwt',
   [ENDPOINTS.generateQr]: GENERATE_QR_HASH_FIELDS.join('.'),
+  // Soundbox QR: spec-derived order (openapi-suite-coverage W2) — the spec's
+  // own b4hash string is corrupted, so this is the filtered real-field order.
+  [ENDPOINTS.requestQr]: REQUEST_QR_HASH_FIELDS.join('.'),
+  // Partner-auth endpoints: order is fixed; the ALGORITHM varies per endpoint
+  // (SHA256, except get-mc-credential-info's SHA512) — see the domain.
+  [ENDPOINTS.registerNewMerchant]: SELF_ACTIVATION_HASH_FIELDS.join('.'),
+  [ENDPOINTS.getMerchantCredentialInfo]: SELF_ACTIVATION_HASH_FIELDS.join('.'),
+  [ENDPOINTS.getMerchantInfo]: SELF_ACTIVATION_HASH_FIELDS.join('.'),
   // Refund/payment-link paths pass no hmacFields override → the effective
   // order is MERCHANT_AUTH_DEFAULT_HASH_FIELDS (request_time.merchant_id.merchant_auth).
   [ENDPOINTS.createPaymentLink]: MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'),
@@ -1853,7 +1868,7 @@ export class PayWay {
     };
     body.hash = generateHmac(
       body,
-      ['partner_id', 'request_data', 'request_time'],
+      [...SELF_ACTIVATION_HASH_FIELDS],
       partnerApiKey ?? this.config.apiKey,
       'base64',
       options.hashAlgorithm ?? 'sha256',

@@ -73,6 +73,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk get-transactions-by-ref --merchant-ref <reference>` | Retrieve transactions for a merchant reference |
 | `payway-sdk profiles add\|list\|use\|current\|remove` | Manage up to eight saved credential profiles |
 | `payway-sdk generate-qr` | Generate a QR code (online via PayWay API or offline) |
+| `payway-sdk request-qr -c <currency> --payment-option <option> --callback-url <url>` | Create a Soundbox QR (amount omitted = the customer keys it in on the device; `--lifetime` in minutes). Spec-derived endpoint — verify with a live Soundbox before production |
 | `payway-sdk check-transaction -t <id>` | Check payment status for one transaction |
 | `payway-sdk transaction-detail -t <id>` | Full transaction detail (PayWay limit: 10/min; `--wait <seconds>` retries the ~5s post-creation indexing lag) |
 | `payway-sdk transaction-list --from <date> --to <date>` | List transactions in a window (`"YYYY-MM-DD HH:mm:ss"` dates in **gateway time UTC+7** — a UTC-derived window silently returns 0 rows; omit both for the full gateway day) |
@@ -87,6 +88,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk cof charge -t <id> -a <amount> --token <pwt>` | Charge a stored COF token (optional `--ctid`, `--token-flag`, payer fields, `--items`, `--payout`) |
 | `payway-sdk cof token renew / details / remove` | Token lifecycle — `details` takes `--request-id` only; `remove` takes `--ctid --token` (irreversible) |
 | `payway-sdk beneficiary add / update-status <payee>` | Manage the payout beneficiary whitelist (requires RSA key; `update-status -s 0\|1`) |
+| `payway-sdk self-activation new-merchant / credential-info / mc-info` | Merchant self-activation via PARTNER credentials (`PAYWAY_PARTNER_ID` + `PAYWAY_PARTNER_API_KEY` + RSA key; spec-derived, not live-verified) — register a merchant and get the onboarding URL, then inquire credential/merchant info |
 | `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks (`--forward-to <url>` also re-POSTs every capture to your app) |
 | `payway-sdk webhook trigger / verify-callback / resend / list` | Local webhook workbench — signed fixture callbacks without the ABA Simulator, one-shot signature checks, replay captured records |
 | `payway-sdk config` | Display loaded configuration and validate environment variables |
