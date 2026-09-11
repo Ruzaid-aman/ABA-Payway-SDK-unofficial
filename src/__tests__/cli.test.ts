@@ -1249,6 +1249,25 @@ describe('built CLI', () => {
     expect(output).toContain('--id');
   });
 
+  it('payment-link void exits when --id is missing', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    const result = spawnSync(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), 'payment-link', 'void'], {
+      cwd,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
+      },
+    });
+
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+    expect(result.status).toBe(1);
+    expect(output).toContain('required option');
+    expect(output).toContain('--id');
+  });
+
   it('payment-link create exits with RSA error when PAYWAY_RSA_PUBLIC_KEY is missing', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);

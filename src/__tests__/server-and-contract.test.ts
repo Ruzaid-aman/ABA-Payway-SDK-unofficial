@@ -190,6 +190,36 @@ describe('mock harness payment-link endpoints (C4)', () => {
     await expect(freshClient.paymentLink.getDetails('bogus')).rejects.toThrow(/Invalid merchant data|96/);
     await stopMockPaywayServer(fresh);
   });
+
+  // Void — the §23 live-verified contract, served by the mock: success 00
+  // with a numeric tran_id, double-void 403 PTL188, bogus id 403 96, and
+  // detail reporting "VOIDED" after a successful void.
+  it('voids the created link, then reports VOIDED through detail', async () => {
+    const voided = await client.paymentLink.void('whatever-the-harness-holds');
+    expect(voided.status?.code).toBe('00');
+    expect(typeof voided.tran_id).toBe('number');
+
+    const details = await client.paymentLink.getDetails('whatever-the-harness-holds');
+    expect(details.status?.code).toBe('00');
+    expect((details.data as Record<string, unknown>)?.status).toBe('VOIDED');
+  });
+
+  it('a second void answers 403 PTL188 "already voided"', async () => {
+    await expect(client.paymentLink.void('whatever-the-harness-holds')).rejects.toThrow(/already voided|PTL188/);
+  });
+
+  it('answers 96 for void before any link was created (fresh server)', async () => {
+    const fresh = await startMockPaywayServer(0);
+    const freshClient = new PayWay({
+      merchantId: 'mock',
+      apiKey: 'mock-key',
+      environment: 'sandbox',
+      baseUrl: getMockPaywayUrl(fresh),
+      publicKeyPem: TEST_RSA.publicKey,
+    });
+    await expect(freshClient.paymentLink.void('bogus')).rejects.toThrow(/Invalid merchant data|96/);
+    await stopMockPaywayServer(fresh);
+  });
 });
 
 describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {

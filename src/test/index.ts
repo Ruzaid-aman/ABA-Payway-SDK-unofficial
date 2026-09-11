@@ -157,6 +157,7 @@ export function validateSessionContract(session: unknown): string | null {
 export function startMockPaywayServer(port = 0): Promise<HttpServer> {
   return new Promise((resolve, reject) => {
     const createdPaymentLinks = new Set<string>();
+    const voidedPaymentLinks = new Set<string>();
     const server = createServer((req, res) => {
       // Health check.
       if (req.url === '/health') {
@@ -302,6 +303,9 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
             return;
           }
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          // Void state is observable through detail (SANDBOX-FINDINGS §23):
+          // a voided link reads status "VOIDED" — mirrors the live gateway.
+          const isVoided = voidedPaymentLinks.has(firstId);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(
             JSON.stringify({
@@ -313,7 +317,7 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
                 image: { image: '', filename: '', size: 0 },
                 amount: '1.50',
                 currency: 'USD',
-                status: 'OPEN',
+                status: isVoided ? 'VOIDED' : 'OPEN',
                 description: 'Mock payment link from the test harness',
                 payment_limit: 0,
                 total_amount_org: 0,
@@ -332,6 +336,31 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
               },
             }),
           );
+        });
+        return;
+      }
+
+      // Void — the undocumented endpoint's live-verified behavior
+      // (SANDBOX-FINDINGS §23): void the first created link (merchant_auth
+      // is opaque to the mock); a second void answers 403 PTL188; with no
+      // created link at all, answer the observed bogus-id rejection (96).
+      if (req.url === '/api/merchant-portal/merchant-access/payment-link/void') {
+        req.on('data', () => {});
+        req.on('end', () => {
+          const firstId = createdPaymentLinks.values().next().value as string | undefined;
+          if (!firstId) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: { code: '96', message: 'Invalid merchant data' } }));
+            return;
+          }
+          if (voidedPaymentLinks.has(firstId)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: { code: 'PTL188', message: 'The payment link is already voided.' } }));
+            return;
+          }
+          voidedPaymentLinks.add(firstId);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: { code: '00', message: 'Success.', tran_id: `${Date.now()}`, lang: 'en', trace_id: 'mocktrace' }, tran_id: Date.now() }));
         });
         return;
       }

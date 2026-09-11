@@ -69,6 +69,7 @@ let server: Server;
 let baseUrl = '';
 let refundRequests = 0;
 let rejectRefund = false;
+let voidCallCount = 0;
 
 /** Route by endpoint substring; payloads mirror sandbox-verified shapes. */
 function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): void {
@@ -212,6 +213,17 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('payment-link/detail')) {
     // Sandbox parity: an unknown link id answers code PTL132 (invalid link).
     send(200, { status: { code: 'PTL132', message: 'Invalid payment link' } });
+  } else if (url.includes('payment-link/void')) {
+    // §23 live-verified: void is NOT idempotent — the first void succeeds,
+    // any subsequent one answers 403 PTL188 "already voided". The link id
+    // travels inside the RSA-encrypted merchant_auth (opaque to the mock),
+    // so route on call count instead.
+    voidCallCount += 1;
+    if (voidCallCount > 1) {
+      send(403, { status: { code: 'PTL188', message: 'The payment link is already voided.' } });
+    } else {
+      send(200, { status: { code: '00', message: 'Success.', lang: 'en', trace_id: 'mock' }, tran_id: 178912355579535 });
+    }
   } else {
     send(404, { message: `unknown endpoint ${url}` });
   }
@@ -869,6 +881,48 @@ describe('CLI API commands against the local mock gateway', () => {
     const { text, exitCode } = await run(['payment-link', 'detail', '-i', 'PLINK-UNKNOWN==']);
     expect(text).toContain('✗');
     expect(text).toContain('Invalid payment link');
+    expect(text).not.toContain('"kind"');
+    expect(exitCode).toBe(2);
+  });
+
+  // Payment-link void (SANDBOX-FINDINGS §23): confirmation is skipped under
+  // --json and -y (agents/CI); success prints the raw response under --json;
+  // a second void answers 403 PTL188 and prints the standard error envelope
+  // (exit 2, paywayCode PTL188) — the mock routes by call count because the
+  // link id travels inside the RSA-encrypted merchant_auth.
+  it('payment-link void --json skips confirmation and prints the raw response on success', async () => {
+    const { text, exitCode } = await run(['payment-link', 'void', '-i', 'PLINK-MOCK-1==', '--json']);
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
+      status: { code: string; message: string };
+      tran_id: number;
+      correlationId?: string;
+    };
+    expect(parsed.status.code).toBe('00');
+    expect(parsed.status.message).toBe('Success.');
+    expect(typeof parsed.tran_id).toBe('number');
+    expect(text).not.toContain('"error"');
+    expect(text.toLowerCase()).not.toContain('cancel');
+    // Success leaves process.exitCode unset (0-equivalent) — same as detail.
+    expect(exitCode === undefined || exitCode === 0).toBe(true);
+  });
+
+  it('payment-link void --json on an already-voided link prints the PTL188 error envelope and exits 2', async () => {
+    const { text, exitCode } = await run(['payment-link', 'void', '-i', 'PLINK-MOCK-1==', '--json']);
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { error: { message: string; paywayCode: string; kind: string; exitCode: number; hint?: string } };
+    expect(parsed.error.message).toContain('already voided');
+    expect(parsed.error.paywayCode).toBe('PTL188');
+    expect(parsed.error.kind).toBe('api');
+    expect(parsed.error.exitCode).toBe(2);
+    expect(parsed.error.hint).toContain('terminal state');
+    expect(text).not.toContain('✗');
+    expect(exitCode).toBe(2);
+  });
+
+  it('payment-link void (human mode, -y) on an already-voided link prints the ✗ block with the PTL188 hint', async () => {
+    const { text, exitCode } = await run(['payment-link', 'void', '-i', 'PLINK-MOCK-1==', '-y']);
+    expect(text).toContain('✗');
+    expect(text).toContain('already voided');
+    expect(text).toContain('PTL188');
     expect(text).not.toContain('"kind"');
     expect(exitCode).toBe(2);
   });
