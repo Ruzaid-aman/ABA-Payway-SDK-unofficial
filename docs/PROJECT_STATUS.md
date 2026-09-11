@@ -547,3 +547,12 @@ Next task:                       SQLite webhook-storage coverage (HANDOFF §5.1)
 - Skills: `aba-payway-payout` v1.2.0 (currency rule + error matrix + CLI), synced to all 3 skill paths.
 - Tests: payout/pre-auth fixtures moved to seeded `500000001`; new test asserts KHR→USD rejection.
 - Status: `npx tsc --noEmit` clean, `vitest` 754 passing / 0 failing, `biome lint` clean.
+
+## Recent Session — Payment-link void (2026-09-11/12, branch `feat/payment-link-void`, not merged)
+
+- Surfaced + live-verified ABA's **undocumented** `payment-link/void` endpoint (SANDBOX-FINDINGS §23): signs like detail, `VOIDED` is a real status, double-void → 403 PTL188, bogus id → 403 96.
+- **SDK**: `payway.paymentLink.void(id)` — merchant-auth family, `MUTATION_ENDPOINTS` single-attempt member, `VoidPaymentLink*` OpenAPI schemas + regenerated types, `HASH_ORDER_HINTS` entry.
+- **CLI**: `payment-link void -i <id> [-y] [--json]` — TTY confirmation, PTL188 exit-2 envelope with terminal-state hint, `explain PTL188`.
+- Tests: hash-order/mutation-retry/client/domain pins + mock-harness void route + gated §23 sandbox-contract pin; live e2e 6/6 legs (`scripts/e2e-payment-link-void.ts`).
+- Docs/skills: docs/17 §17.4 (+renumber, cross-refs swept), docs/12 rows, skill v1.5.0 + mirror, AGENTS/.agents/HANDOFF/CHANGELOG, typedoc regen.
+- Gates: build/tsc/lint clean; suite 1673 passed (+1 pre-existing npm-12 pack-format failure, fix in flight on main checkout); sandbox 14/14; check:repository passed.
