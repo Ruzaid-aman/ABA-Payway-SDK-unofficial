@@ -46,8 +46,8 @@ const linkId = link.data?.id;             // ← save for getDetails (NOT the UR
 | `description` | `description` | string | no | >250 chars **throws** (sandbox-verified PTL04) |
 | `paymentLimit` | `payment_limit` | number | no | max number of payments; unset = unlimited; link flips to `PAID` when `total_trxn == payment_limit` |
 | `expiredDate` | `expired_date` | number | no | epoch seconds; unset = no expiry. Gateway rejects past values and offsets < ~5 min (PTL04, sandbox-verified); after expiry the link still reads OPEN — enforce expiry yourself |
-| `payout` | `payout` | `{acc, amt}[]` \| pre-encoded string | no | see §17.4 |
-| `image` | `image` (multipart) | `PaymentLinkImage` | no | see §17.5 |
+| `payout` | `payout` | `{acc, amt}[]` \| pre-encoded string | no | see §17.5 |
+| `image` | `image` (multipart) | `PaymentLinkImage` | no | see §17.6 |
 
 **Datatype reality check** (the official docs declare several of these as `string`; the PHP samples and live gateway accept/pass numbers — the SDK uses `number` everywhere): `amount`, `payment_limit`, `expired_date`, response `tran_id` (declared string, observed integer — coerce, don't rely on the type).
 
@@ -63,7 +63,7 @@ const linkId = link.data?.id;             // ← save for getDetails (NOT the UR
     "id": "UD/8Hl…Ht1xQdhlw==",       // opaque Link ID → getDetails; NOT merchant_ref_no, NOT the URL slug
     "title": "…", "amount": "0.03",  // amount arrives as a STRING here
     "currency": "USD", "status": "OPEN",
-    "image": { "image": "", "filename": "", "size": 0 },   // empty shape when no image (size: 0 quirk — see §17.5)
+    "image": { "image": "", "filename": "", "size": 0 },   // empty shape when no image (size: 0 quirk — see §17.6)
     "payment_limit": 5, "total_amount_org": 0, "total_refund": 0,
     "total_amount": 0, "total_trxn": 0,
     "created_at": "2023-04-13 03:43:30", "updated_at": "…",

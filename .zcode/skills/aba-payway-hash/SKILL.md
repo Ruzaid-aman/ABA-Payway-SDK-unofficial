@@ -41,4 +41,4 @@ All scripts are dependency-free, read `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY` from
 > `return_url` with **no hash field** (live-verified: body is
 > `{tran_id, status: 0, merchant_ref_no}` only). Verify payment-link payments via
 > `check-transaction(tran_id)` instead. See
-> [payment-link](../aba-payway-payment-link/SKILL.md) and `docs/17-payment-link.md` §17.6.
+> [payment-link](../aba-payway-payment-link/SKILL.md) and `docs/17-payment-link.md` §17.7.
