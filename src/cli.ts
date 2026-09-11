@@ -2801,6 +2801,111 @@ program
     }
   });
 
+// --- request-qr (Soundbox) ---
+program
+  .command('request-qr')
+  .description(
+    'Create a Soundbox QR (payments/request-qr) — amount optional for on-device keypad entry; spec-derived contract, not yet live-verified',
+  )
+  .option('-a, --amount <number>', 'Payment amount (omit to let the Soundbox customer enter it on the device)')
+  .requiredOption('-c, --currency <code>', 'Currency: USD or KHR')
+  .requiredOption('--payment-option <option>', 'abapay | abapay_khqr | wechat (USD only) | alipay (USD only)')
+  .requiredOption('--callback-url <url>', 'Webhook callback URL (required by the endpoint)')
+  .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
+  .option('--lifetime <minutes>', 'QR lifetime in MINUTES — 3..43200 (gateway default: 30 days)')
+  .option('--purchase-type <type>', 'purchase (default) or pre-auth')
+  .option('--save-image <path>', 'Save the QR PNG to file (default: payway-output/<transaction-id>.png)')
+  .option('--no-save-image', 'Do not save the QR PNG')
+  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
+  .option('--json', 'Print the raw JSON response')
+  .option('-y, --non-interactive', 'Accepted for agent compatibility (this command never prompts)')
+  .action(async (opts: {
+    amount?: string;
+    currency: string;
+    paymentOption: string;
+    callbackUrl: string;
+    transactionId?: string;
+    lifetime?: string;
+    purchaseType?: string;
+    saveImage?: string | boolean;
+    allowDuplicateId?: boolean;
+    json?: boolean;
+    nonInteractive?: boolean;
+  }) => {
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — Soundbox QR (request-qr)\n`);
+    if (!assertCredentialsPresent()) {
+      process.exitCode = 1;
+      return;
+    }
+
+    const currency = opts.currency.toUpperCase() as 'USD' | 'KHR';
+    const amount = opts.amount === undefined ? undefined : Number(opts.amount);
+    const transactionId = opts.transactionId ?? `sb${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    warnDuplicateTransactionId(transactionId, opts);
+
+    try {
+      const payway = new PayWay();
+      const qr = await payway.qr.requestQr({
+        transactionId,
+        amount: amount !== undefined && Number.isFinite(amount) ? amount : null,
+        currency,
+        paymentOption: opts.paymentOption,
+        callbackUrl: opts.callbackUrl,
+        lifetime: opts.lifetime !== undefined ? Number(opts.lifetime) : undefined,
+        purchaseType: opts.purchaseType as 'purchase' | 'pre-auth' | undefined,
+      });
+
+      if (opts.json) {
+        printApiResultJson(qr, payway);
+      } else {
+        console.log(`  ${c.green('✓')} Soundbox QR created (spec-derived endpoint — verify the QR with a live device)\n`);
+        console.log(`  ${c.bold('Transaction ID:')}  ${c.cyan(transactionId)}`);
+        console.log(`  ${c.bold('Amount:')}           ${amount !== undefined && Number.isFinite(amount) ? `${amount} ${currency}` : `(keyed on device) ${currency}`}`);
+        console.log(`  ${c.bold('Payment Option:')}   ${opts.paymentOption}`);
+        console.log(`  ${c.bold('Callback URL:')}     ${opts.callbackUrl}`);
+        if (opts.lifetime !== undefined) console.log(`  ${c.bold('Lifetime:')}         ${opts.lifetime} minutes`);
+        console.log();
+
+        if (qr.qr_string) {
+          console.log(`  ${c.bold('QR String:')}`);
+          console.log(`  ${c.dim(qr.qr_string)}`);
+          console.log();
+          if (shouldAutoRenderQr(process.stdout, true)) {
+            try {
+              const terminalQr = await renderQrToTerminal(qr.qr_string);
+              console.log(terminalQr);
+            } catch {
+              // terminal render is best-effort
+            }
+          }
+        }
+
+        if (opts.saveImage !== false) {
+          const outputPath =
+            typeof opts.saveImage === 'string'
+              ? opts.saveImage
+              : path.join(process.cwd(), 'payway-output', `${transactionId}.png`);
+          try {
+            const saved = await saveQrPng({ outputPath, qrString: qr.qr_string });
+            if (saved) console.log(`  ${c.bold('QR PNG:')}          ${saved}`);
+          } catch (e) {
+            console.log(`  ${c.yellow('⚠')} Could not save QR PNG: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        console.log();
+        console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
+        console.log();
+      }
+      process.exitCode = EXIT_OK;
+    } catch (e) {
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(e);
+        return;
+      }
+      process.exitCode = printApiError(e);
+    }
+  });
+
 // --- generate-checkout ---
 program
   .command('generate-checkout')

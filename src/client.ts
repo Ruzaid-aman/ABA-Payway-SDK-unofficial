@@ -438,6 +438,45 @@ export interface GenerateQrParams {
 }
 
 /**
+ * Parameters for the Soundbox QR endpoint (`payments/request-qr` — archived
+ * gateway spec `docs/archive/Default module.openapi.json`; no live-docs page
+ * as of 2026-09-12, contract is spec-derived and NOT live-verified).
+ *
+ * Differs from {@link GenerateQrParams}: `amount` is OPTIONAL (null lets the
+ * Soundbox customer key in the amount on the device), `paymentOption` is
+ * REQUIRED and accepts `abapay` (in addition to the QR set), `callbackUrl`
+ * is REQUIRED, there is NO `qrImageTemplate`/`items`/payer-detail surface,
+ * and `lifetime` is in MINUTES on the wire (default 30 days, min 3).
+ */
+export interface RequestQrParams {
+  transactionId: string;
+  /** Omit (or null) to let the Soundbox customer enter the amount on the device. */
+  amount?: number | null;
+  currency: 'KHR' | 'USD';
+  /** REQUIRED — `abapay` | `abapay_khqr` | `wechat` (USD only) | `alipay` (USD only). */
+  paymentOption: 'abapay' | 'abapay_khqr' | 'wechat' | 'alipay' | string;
+  /** Public HTTPS pushback URL. Required by PayWay — base64-encoded automatically. */
+  callbackUrl: string;
+  purchaseType?: 'purchase' | 'pre-auth';
+  /** Lifetime in MINUTES (the wire unit). Default 30 days; minimum 3 minutes. */
+  lifetime?: number;
+  requestTime?: string;
+}
+
+/**
+ * Response of the Soundbox QR endpoint. Spec-derived (not live-verified):
+ * `status.code` uses the gateway's numeric error-code family (0 success,
+ * 1 invalid hash, 12 unsupported currency, … — see the archived spec).
+ */
+export interface RequestQrResponse {
+  tran_id: string;
+  qr_string: string;
+  amount: number | null;
+  currency: string;
+  status: { code: string | number; message: string; trace_id?: string };
+}
+
+/**
  * An optional image attached to a payment link. Sent as a top-level
  * `multipart/form-data` part named `image`; the image bytes are NOT part of
  * the HMAC hash (confirmed against ABA's official sample: the hash covers

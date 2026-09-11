@@ -28,6 +28,7 @@ const REGISTERED_COMMANDS = [
   'exchange-rate',
   'validate',
   'generate-qr',
+  'request-qr',
   'generate-checkout',
   'checkout-form',
   'payment-link',

@@ -18,6 +18,7 @@ export const ENDPOINTS = {
   getTokenDetails: '/api/payment-credential/v3/token-management/get-token-details',
   removeToken: '/api/payment-credential/v3/token-management/remove-token',
   generateQr: '/api/payment-gateway/v1/payments/generate-qr',
+  requestQr: '/api/payment-gateway/v1/payments/request-qr',
   createPaymentLink: '/api/merchant-portal/merchant-access/payment-link/create',
   getPaymentLinkDetails: '/api/merchant-portal/merchant-access/payment-link/detail',
   voidPaymentLink: '/api/merchant-portal/merchant-access/payment-link/void',
@@ -41,6 +42,7 @@ export const ENDPOINTS = {
  */
 export const MUTATION_ENDPOINTS = new Set<string>([
   ENDPOINTS.generateQr,
+  ENDPOINTS.requestQr,
   ENDPOINTS.purchase,
   ENDPOINTS.refund,
   ENDPOINTS.closeTransaction,

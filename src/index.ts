@@ -18,6 +18,8 @@ export type {
   RateLimitInfo,
   RateLimitRule,
   RequestCallOptions,
+  RequestQrParams,
+  RequestQrResponse,
   TokenParams,
   UpdateBeneficiaryStatusParams,
 } from './client.js';
