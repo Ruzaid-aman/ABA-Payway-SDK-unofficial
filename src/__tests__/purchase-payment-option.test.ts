@@ -8,21 +8,21 @@
  * checked the QR enum (PAYMENT_OPTIONS), so spec-documented `abapay` /
  * `abapay_deeplink` raised a spurious warning on every checkout.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PayWay } from '../client.js';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { type PayWayConfig, PayWay } from '../client.js';
 import { PURCHASE_PAYMENT_OPTIONS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 
-const TEST_CONFIG = {
+const TEST_CONFIG: PayWayConfig = {
   merchantId: 'test-merchant-001',
   apiKey: 'test-api-key-secret',
-  environment: 'sandbox' as const,
+  environment: 'sandbox',
 };
 
-const STRICT_CONFIG = { ...TEST_CONFIG, strictValidation: true } as unknown as Parameters<typeof PayWay>[0];
+const STRICT_CONFIG = { ...TEST_CONFIG, strictValidation: true } as PayWayConfig;
 
 function checkoutPaymentOption(paymentOption: string, extra?: { googlePayToken?: string }) {
-  const payway = new PayWay(TEST_CONFIG as Parameters<typeof PayWay>[0]);
+  const payway = new PayWay(TEST_CONFIG);
   return payway.checkout.createTransaction({
     transactionId: 'PO-TEST-001',
     amount: 5,
@@ -33,8 +33,10 @@ function checkoutPaymentOption(paymentOption: string, extra?: { googlePayToken?:
 }
 
 describe('purchase payment_option documented set', () => {
+  let warnSpy: MockInstance<typeof console.warn>;
+
   beforeEach(() => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -47,24 +49,24 @@ describe('purchase payment_option documented set', () => {
 
   it.each(['abapay', 'abapay_deeplink'])('stays silent on spec-documented value %s', (paymentOption) => {
     expect(() => checkoutPaymentOption(paymentOption)).not.toThrow();
-    expect(console.warn).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('stays silent on the live-verified checkout default and google_pay', () => {
     expect(() => checkoutPaymentOption('abapay_khqr_deeplink')).not.toThrow();
-    expect(console.warn).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
     expect(() => checkoutPaymentOption('google_pay', { googlePayToken: 'tok' })).not.toThrow();
-    expect(console.warn).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('warns on QR-only and unknown values (typo detection preserved)', () => {
     checkoutPaymentOption('abapay_khqr');
-    expect(console.warn).toHaveBeenCalledWith(
+    expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('outside the documented purchase enum'),
     );
-    console.warn.mockClear();
+    warnSpy.mockClear();
     checkoutPaymentOption('nonsense_option');
-    expect(console.warn).toHaveBeenCalledWith(
+    expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('outside the documented purchase enum'),
     );
   });
