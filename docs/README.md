@@ -66,4 +66,5 @@ These materials support maintenance and investigation; they are not onboarding p
 
 - [Contributing](../CONTRIBUTING.md), [handoff](../HANDOFF.md), [release readiness](./RELEASE-READINESS.md), [release checklist](./RELEASE_CHECKLIST.md), [versioning](./VERSIONING.md).
 - [Sandbox findings](./SANDBOX-FINDINGS.md), [close-transaction evidence](./CLOSE-TRANSACTION-FINDINGS.md), [open questions](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md).
+- [Error-code registry (generated)](./error-codes.json) — every `explain`-known code as versioned JSON; regenerate with `npm run gen:error-registry`.
 - [Historical project status](./PROJECT_STATUS.md), [agent setup playbook](./AGENT-SETUP-PLAYBOOK.md), [callback capture recipe](./agents/callback-capture-recipe.md).
