@@ -46,6 +46,12 @@ A WebView is a mini web browser embedded inside your native app. Instead of open
 | **React Native** | `react-native-webview` | `onMessage` / `postMessage` |
 | **Flutter** | `webview_flutter` | `JavaScriptChannel` |
 
+### Flutter (webview_flutter)
+
+In Flutter, `WebViewController.setNavigationDelegate` plays the role of the Android `WebViewClient` / iOS `WKNavigationDelegate`: load your backend's checkout URL, intercept any navigation to your `returnUrlPrefix`, then confirm the real status with your backend before fulfilling. Launching the ABA Pay app for `abapay_khqr_deeplink` flows uses `url_launcher` with an external-application launch and a fallback URL.
+
+> **Full runnable example:** [`examples/flutter/payment_screen.dart`](./examples/flutter/payment_screen.dart) — webview checkout + return-URL interception + ABA Pay deeplink launcher, mirroring the [Android](./examples/android/PaymentActivity.kt) and [iOS](./examples/ios/PaymentViewController.swift) examples.
+
 ---
 
 ## Why Use a WebView Instead of an External Browser?

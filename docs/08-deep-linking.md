@@ -174,6 +174,8 @@ const signedPayload = payway.checkout.createTransaction({
 
 > 💡 The `returnDeeplink` parameter is encoded as a Base64 JSON string by the SDK. The SDK automatically handles this when you pass an object.
 
+> **Flutter:** launching the ABA Pay deeplink (with the not-installed fallback above) maps to `url_launcher` — see [`launchAbapayDeeplink` in the Flutter example](./examples/flutter/payment_screen.dart).
+
 ---
 
 ## Fallback Strategy: What If the ABA App Isn't Installed?

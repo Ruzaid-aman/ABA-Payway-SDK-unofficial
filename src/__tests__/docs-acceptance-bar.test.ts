@@ -90,4 +90,18 @@ describe('docs acceptance bar', () => {
     // docs/10 routes template pickers to the gallery
     expect(read('10-ui-customization.md')).toContain('07-qr-code-handling.md#qr-image-template-gallery');
   });
+
+  it('Flutter example demonstrates webview payment + deeplink return, credential-free', () => {
+    const dart = readFileSync(join(repoRoot, 'docs', 'examples', 'flutter', 'payment_screen.dart'), 'utf8');
+    for (const marker of ['webview_flutter', 'url_launcher', 'NavigationDelegate', 'returnUrlPrefix', 'launchUrl']) {
+      expect(dart).toContain(marker);
+    }
+    // Credential-safety guard: the Flutter layer must never hold PayWay
+    // credentials — only your-backend URLs.
+    expect(dart).not.toMatch(/(?:merchant_?[iI]d|apiKey|API_KEY)\s*[:=]\s*['"][^'"]{8,}/);
+    // Cited from the WebView chapter (primary) and the native/deeplink chapters.
+    expect(read('05-webview-implementation.md')).toContain('examples/flutter/payment_screen.dart');
+    expect(read('04-native-app-implementation.md')).toContain('examples/flutter/payment_screen.dart');
+    expect(read('08-deep-linking.md')).toContain('payment_screen.dart');
+  });
 });

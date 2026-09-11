@@ -593,6 +593,8 @@ Both iOS and Android implementations follow the same pattern:
 3. The **webhook callback** (Chapter 11) is still the authoritative source for database updates
 4. The native app's status check is for UX only — to show "Payment Successful" vs "Payment Failed"
 
+> **Flutter?** The identical architecture in Dart (webview checkout + return-URL interception + ABA Pay deeplink launcher) lives in [`examples/flutter/payment_screen.dart`](./examples/flutter/payment_screen.dart), documented in [Chapter 5](./05-webview-implementation.md#flutter-webview_flutter).
+
 ---
 
 ## Important: ABA's Official Native SDK
