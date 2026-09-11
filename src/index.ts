@@ -55,6 +55,21 @@ export { PAYMENT_LINK_EXPIRY_MIN_SECONDS, parsePaymentLinkPushback } from './dom
 export type { PayoutDomain } from './domains/payout.js';
 export type { PreAuthDomain } from './domains/pre-auth.js';
 export type { QrDomain } from './domains/qr.js';
+export {
+  REQUEST_QR_HASH_FIELDS,
+  REQUEST_QR_PAYMENT_OPTIONS,
+} from './domains/qr.js';
+export type {
+  SelfActivationCredentialInfoParams,
+  SelfActivationCredentialInfoResponse,
+  SelfActivationDomain,
+  SelfActivationMerchantInfoParams,
+  SelfActivationMerchantInfoResponse,
+  SelfActivationRegisterParams,
+  SelfActivationRegisterResponse,
+  SelfActivationStatus,
+} from './domains/self-activation.js';
+export { createSelfActivationDomain } from './domains/self-activation.js';
 export type { PollAbortReason } from './errors.js';
 export {
   PayWayAPIError,

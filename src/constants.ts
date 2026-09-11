@@ -28,6 +28,9 @@ export const ENDPOINTS = {
   updateBeneficiaryStatus: '/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status',
   addBeneficiary: '/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout',
   getTransactionsByMerchantRef: '/api/payment-gateway/v1/payments/get-transactions-by-mc-ref',
+  registerNewMerchant: '/api/merchant-portal/online-self-activation/new-merchant',
+  getMerchantCredentialInfo: '/api/merchant-portal/online-self-activation/get-mc-credential-info',
+  getMerchantInfo: '/api/merchant-portal/online-self-activation/get-mc-info',
 } as const;
 
 /**
@@ -58,6 +61,9 @@ export const MUTATION_ENDPOINTS = new Set<string>([
   ENDPOINTS.payout,
   ENDPOINTS.updateBeneficiaryStatus,
   ENDPOINTS.addBeneficiary,
+  ENDPOINTS.registerNewMerchant,
+  ENDPOINTS.getMerchantCredentialInfo,
+  ENDPOINTS.getMerchantInfo,
 ]);
 
 /**

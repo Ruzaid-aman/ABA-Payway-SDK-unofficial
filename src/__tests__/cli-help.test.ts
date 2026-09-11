@@ -41,6 +41,7 @@ const REGISTERED_COMMANDS = [
   'setup-webhook',
   'webhook',
   'pre-auth',
+  'self-activation',
   'ask',
   'agent',
   'onboard',

@@ -32,6 +32,8 @@ const KNOWN_VARS: ReadonlySet<string> = new Set([
   'PAYWAY_JOURNAL_MODE',
   'PAYWAY_JOURNAL_MAX_AGE_DAYS',
   'PAYWAY_WEBHOOK_DIR',
+  'PAYWAY_PARTNER_ID',
+  'PAYWAY_PARTNER_API_KEY',
 ]);
 
 /** Validate env-only vars actually carry values that appear in the env map. */

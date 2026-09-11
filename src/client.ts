@@ -18,6 +18,7 @@ import {
   createPayoutDomain,
   createPreAuthDomain,
   createQrDomain,
+  createSelfActivationDomain,
 } from './domains/index.js';
 import { GENERATE_QR_HASH_FIELDS } from './domains/qr.js';
 import type { KhqrDomain } from './domains/khqr.js';
@@ -25,6 +26,7 @@ import type { PaymentLinkDomain } from './domains/payment-link.js';
 import type { PayoutDomain } from './domains/payout.js';
 import type { PreAuthDomain } from './domains/pre-auth.js';
 import type { QrDomain } from './domains/qr.js';
+import type { SelfActivationDomain } from './domains/self-activation.js';
 import {
   PayWayAPIError,
   PayWayBusinessError,
@@ -200,6 +202,22 @@ export interface PayWayConfig {
    * Default: disabled — a library must never write files silently.
    */
   journal?: boolean | JournalOptions;
+  /**
+   * ABA-issued PARTNER id for the online-self-activation endpoints
+   * (`/api/merchant-portal/online-self-activation/*` — archived gateway
+   * spec; NOT live-verified). Distinct from `merchantId`: these endpoints
+   * authenticate a registration PARTNER, not a merchant. Settable via
+   * `PAYWAY_PARTNER_ID`.
+   */
+  partnerId?: string;
+  /**
+   * Partner HMAC secret used to sign self-activation requests
+   * (`hash` = HMAC over `partner_id . request_data . request_time`, with a
+   * per-endpoint SHA256/SHA512 split — see the self-activation domain).
+   * Falls back to `apiKey` only when unset. Settable via
+   * `PAYWAY_PARTNER_API_KEY`.
+   */
+  partnerApiKey?: string;
 }
 
 interface ResolvedPayWayConfig extends PayWayConfig {
@@ -1114,6 +1132,7 @@ export class PayWay {
   public readonly preAuth: PreAuthDomain;
   public readonly payout: PayoutDomain;
   public readonly khqr: KhqrDomain;
+  public readonly selfActivation: SelfActivationDomain;
 
   /**
    * Create a new PayWay SDK client instance.
@@ -1173,6 +1192,7 @@ export class PayWay {
     this.preAuth = createPreAuthDomain(this.config, this.requestWithMerchantAuth.bind(this));
     this.payout = createPayoutDomain(this.config, this.request.bind(this), this.requestWithMerchantAuth.bind(this));
     this.khqr = createKhqrDomain(this.config, this.request.bind(this));
+    this.selfActivation = createSelfActivationDomain(this.config, this.requestWithPartnerAuth.bind(this));
   }
 
   /**
@@ -1228,6 +1248,8 @@ export class PayWay {
       merchantId: (config.merchantId ?? process.env.PAYWAY_MERCHANT_ID ?? '').trim(),
       apiKey: (config.apiKey ?? process.env.PAYWAY_API_KEY ?? '').trim(),
       publicKeyPem: normalizePem(config.publicKeyPem ?? process.env.PAYWAY_RSA_PUBLIC_KEY),
+      partnerId: config.partnerId ?? process.env.PAYWAY_PARTNER_ID,
+      partnerApiKey: config.partnerApiKey ?? process.env.PAYWAY_PARTNER_API_KEY,
       environment: config.environment ?? environmentFromEnv,
       baseUrl: config.baseUrl ?? process.env.PAYWAY_BASE_URL ?? baseUrlFromEnv,
       timeout: config.timeout ?? (Number.isNaN(timeoutFromEnv) ? undefined : timeoutFromEnv),
@@ -1772,6 +1794,78 @@ export class PayWay {
     }
 
     return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload, undefined, options.callOptions);
+  }
+
+  /**
+   * Partner-authenticated request for the online-self-activation endpoints
+   * (`/api/merchant-portal/online-self-activation/*`). Spec-derived
+   * (openapi-suite-coverage W3, 2026-09-12) and NOT live-verified.
+   *
+   * Wire shape per the archived gateway spec: JSON body
+   * `{ request_time, partner_id, request_data, hash }` where `request_data`
+   * is the chunked-RSA-encrypted JSON payload (same 117-byte-chunk PKCS1
+   * scheme as `merchant_auth` — {@link encryptMerchantAuth}) and `hash` is
+   * HMAC over `partner_id . request_data . request_time` with a per-endpoint
+   * algorithm (SHA256 for new-merchant/get-mc-info, SHA512 for
+   * get-mc-credential-info per that endpoint's own prose — the spec is
+   * internally inconsistent; flagged in the domain).
+   *
+   * Note: NO `merchant_id` is injected — these endpoints authenticate the
+   * registration PARTNER, not a merchant.
+   */
+  private async requestWithPartnerAuth<TResponse>(
+    path: string,
+    requestDataPayload: Record<string, unknown>,
+    options: {
+      /** 'sha256' (spec default for the trio) or 'sha512' (get-mc-credential-info). */
+      hashAlgorithm?: 'sha256' | 'sha512';
+      /** Extra top-level body fields that are NOT part of `request_data` and NOT hashed (e.g. `reference_id`). */
+      bodyExtras?: Record<string, unknown>;
+      /** Pin the request_time (get-mc-info needs it before building request_data). Defaults to now. */
+      requestTime?: string;
+      callOptions?: RequestCallOptions;
+    } = {},
+  ): Promise<TResponse> {
+    const { partnerId, partnerApiKey, publicKeyPem } = this.config;
+    if (!partnerId) {
+      throw new PayWayConfigError('partnerId is required for online-self-activation endpoints (set partnerId or PAYWAY_PARTNER_ID)');
+    }
+    if (!partnerApiKey && !this.config.apiKey) {
+      throw new PayWayConfigError(
+        'partnerApiKey (or apiKey fallback) is required to sign online-self-activation requests (set partnerApiKey or PAYWAY_PARTNER_API_KEY)',
+      );
+    }
+    if (!publicKeyPem) {
+      throw new PayWayConfigError('publicKeyPem is required to RSA-encrypt request_data for online-self-activation endpoints');
+    }
+    if (!isValidPublicKeyPem(publicKeyPem)) {
+      throw new PayWayConfigError('publicKeyPem does not look like a public key PEM (expected "-----BEGIN PUBLIC KEY-----")');
+    }
+
+    const requestTime = options.requestTime ?? formatRequestTime();
+    const requestData = (await import('./auth.js')).encryptMerchantAuth(requestDataPayload, publicKeyPem);
+
+    const body: Record<string, unknown> = {
+      request_time: requestTime,
+      partner_id: partnerId,
+      request_data: requestData,
+      ...options.bodyExtras,
+    };
+    body.hash = generateHmac(
+      body,
+      ['partner_id', 'request_data', 'request_time'],
+      partnerApiKey ?? this.config.apiKey,
+      'base64',
+      options.hashAlgorithm ?? 'sha256',
+    );
+
+    return this._executeFetch<TResponse>(
+      path,
+      { 'Content-Type': 'application/json' },
+      JSON.stringify(body),
+      undefined,
+      options.callOptions,
+    );
   }
 
   /**

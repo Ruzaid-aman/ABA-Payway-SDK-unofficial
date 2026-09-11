@@ -38,7 +38,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
       'tx-batch',
     ],
   },
-  { title: 'Money-out', commands: ['refund', 'payout', 'pre-auth', 'beneficiary'] },
+  { title: 'Money-out', commands: ['refund', 'payout', 'pre-auth', 'beneficiary', 'self-activation'] },
   {
     title: 'Reference',
     commands: ['status', 'explain', 'validate', 'exchange-rate', 'sandbox-beneficiaries'],
