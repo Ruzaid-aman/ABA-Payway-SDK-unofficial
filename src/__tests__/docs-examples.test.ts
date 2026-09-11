@@ -80,7 +80,23 @@ describe('Documentation examples', () => {
     expect(createWebhookServer).toBeTypeOf('function');
   });
 
-  it.each(['README.md', 'docs/README.md', 'docs/QUICK-START-1-PAGER.md'])('resolves repository-relative links from %s', (docPath) => {
+  // Docs acceptance bar (2026-09-12): link health is checked for EVERY numbered
+  // guide chapter plus the diagram library, not just the three entry documents.
+  const linkCheckedDocs = [
+    'README.md',
+    'docs/README.md',
+    'docs/QUICK-START-1-PAGER.md',
+    ...readdirSync(join(repoRoot, 'docs'))
+      .filter((f) => /^\d{2}-.*\.md$/.test(f))
+      .sort()
+      .map((f) => `docs/${f}`),
+    ...readdirSync(join(repoRoot, 'docs', 'diagrams'))
+      .filter((f) => f.endsWith('.md'))
+      .sort()
+      .map((f) => `docs/diagrams/${f}`),
+  ];
+
+  it.each(linkCheckedDocs)('resolves repository-relative links from %s', (docPath) => {
     const markdown = readDoc(docPath);
     const docDir = dirname(join(repoRoot, docPath));
     const missing = [...markdown.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g)]
