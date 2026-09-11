@@ -127,7 +127,7 @@ describe('F01 mutation single-submit policy (direct SDK)', () => {
     expect(result).toBeTruthy();
   });
 
-  it('covers refund, close-transaction, and COF-charge mutations', async () => {
+  it('covers refund, close-transaction, COF-charge, and payment-link void mutations', async () => {
     const cases: [string, (p: PayWay) => Promise<unknown>][] = [
       ['refund', (p) => p.checkout.refund('F01REFONE111111111', 1, 'USD')],
       ['close', (p) => p.checkout.closeTransaction('F01CLOSEONE111111')],
@@ -143,6 +143,7 @@ describe('F01 mutation single-submit policy (direct SDK)', () => {
             tokenFlag: 'MITU_FLEX',
           }),
       ],
+      ['payment-link void', (p) => p.paymentLink.void('F01VOIDONE111111111==')],
     ];
     for (const [label, run] of cases) {
       const fetchMock = droppedResponseFetch();
@@ -177,6 +178,7 @@ describe('F01 policy registry shape', () => {
       '/api/payment-credential/v3/token-management/renew-expired-account-token',
       '/api/payment-credential/v3/token-management/remove-token',
       '/api/merchant-portal/merchant-access/payment-link/create',
+      '/api/merchant-portal/merchant-access/payment-link/void',
       '/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion',
       '/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation',
       '/api/payment-gateway/v2/direct-payment/merchant/payout',

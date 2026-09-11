@@ -202,3 +202,21 @@ describe('payment-link expired_date advisory (codification C3, SANDBOX-FINDINGS 
     );
   });
 });
+
+describe('paymentLink.void (SANDBOX-FINDINGS §23, live-verified 2026-09-11)', () => {
+  it('sends {mc_id-injected, id} to the void endpoint — same family as detail', async () => {
+    const { domain, calls } = makeDomain();
+    await domain.void('H7H717wFLA10kYiwHLbTcg==');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].path).toBe('/api/merchant-portal/merchant-access/payment-link/void');
+    expect(calls[0].authPayload).toEqual({ id: 'H7H717wFLA10kYiwHLbTcg==' });
+  });
+
+  it('throws PayWayConfigError for an empty or whitespace link id', () => {
+    const { domain, calls } = makeDomain();
+    expect(() => domain.void('')).toThrow('paymentLinkId is required');
+    expect(() => domain.void('   ')).toThrow('paymentLinkId is required');
+    expect(calls).toHaveLength(0);
+  });
+});
