@@ -9,7 +9,7 @@
 import { randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
+import type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
 
 const DEFAULT_PATH = './webhook_data/callbacks.jsonl';
 
@@ -51,7 +51,11 @@ export class JsonWebhookStorage implements WebhookStorage {
     return this.updateMetadata(id, 'paymentLinkPushback', pushback);
   }
 
-  private updateMetadata<K extends 'khqr' | 'paymentLinkPushback'>(
+  updateCustomerQrMetadata(id: string, customerQr: CustomerQrWebhookMetadata): WebhookRecord {
+    return this.updateMetadata(id, 'customerQr', customerQr);
+  }
+
+  private updateMetadata<K extends 'khqr' | 'paymentLinkPushback' | 'customerQr'>(
     id: string,
     slot: K,
     metadata: WebhookRecord[K],

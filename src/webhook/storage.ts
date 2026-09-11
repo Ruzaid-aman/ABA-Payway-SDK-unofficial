@@ -1,4 +1,5 @@
 import type { PaymentLinkPushback } from '../domains/payment-link.js';
+import type { ParsedCustomerQrCallback } from './customer-callback.js';
 import type { ParsedKhqrPaymentNotification } from './khqr-notification.js';
 
 /**
@@ -43,6 +44,12 @@ export interface WebhookRecord {
   readonly replay?: boolean;
   /** Payment-link pushback parsing metadata. The raw body remains the audit source. */
   readonly paymentLinkPushback?: PaymentLinkPushbackMetadata;
+  /**
+   * Customer Module ("Printed QR") callback parsing metadata, attached when a
+   * captured delivery classifies as a customer-module callback. The raw body
+   * remains the audit source.
+   */
+  readonly customerQr?: CustomerQrWebhookMetadata;
 }
 
 export interface KhqrWebhookMetadata {
@@ -50,6 +57,11 @@ export interface KhqrWebhookMetadata {
   readonly parseError?: string;
   /** A prior captured notification had the same ABA transaction ID. */
   readonly duplicateTransactionId?: boolean;
+}
+
+export interface CustomerQrWebhookMetadata {
+  readonly parsed?: ParsedCustomerQrCallback;
+  readonly parseError?: string;
 }
 
 export interface PaymentLinkPushbackMetadata {
@@ -71,6 +83,9 @@ export interface WebhookStorage {
 
   /** Attach payment-link pushback parse metadata after the raw delivery is durable. */
   updatePaymentLinkPushbackMetadata?(id: string, pushback: PaymentLinkPushbackMetadata): WebhookRecord;
+
+  /** Attach Customer Module callback parse metadata after the raw delivery is durable. */
+  updateCustomerQrMetadata?(id: string, customerQr: CustomerQrWebhookMetadata): WebhookRecord;
 
   /** Retrieve all stored records, ordered by insertion time. */
   getAll(): WebhookRecord[];

@@ -260,7 +260,15 @@ async function runCheckTransactionByMerchantRef(
   return {
     ok: true,
     tool: 'check_transaction_by_merchant_ref',
-    data: { merchantRef: params.merchantRef, raw: response },
+    data: {
+      merchantRef: params.merchantRef,
+      success: response.success,
+      count: response.rows.length,
+      // The ≤50-row / no-pagination caveat belongs in every consumer's view.
+      possiblyTruncated: response.rows.length >= 50,
+      statuses: response.rows.map((row) => row.paymentStatus).filter(Boolean),
+      raw: response,
+    },
   };
 }
 

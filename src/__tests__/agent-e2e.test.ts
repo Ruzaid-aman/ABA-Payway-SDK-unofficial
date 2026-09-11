@@ -154,7 +154,7 @@ function makePayWay(opts: { generateQrError?: Error } = {}): FakePayWay {
       },
       getTransactionsByMerchantRef: async (..._a: unknown[]) => {
         calls.merchantRef++;
-        return { ref: 'r' };
+        return { merchantRef: 'r', success: true, statusCode: '00', rows: [] };
       },
     },
     checkout: {

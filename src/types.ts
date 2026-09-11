@@ -1309,9 +1309,15 @@ export interface components {
             refund_amount?: number;
             merchant_ref?: string;
         };
+        /** @description Response envelope as merchant-captured in production (2026-08): rows under `data`, status under a nested `status` object with STRING code ("00" = Success). The official doc page models {status: integer, transactions: []} but every captured production response uses the data/status-object shape; consumers should tolerate both (SDK normalizes). Status codes: "00"/0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error. */
         GetTransactionsByMcRefResponse: {
-            /** @description 0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error. */
-            status?: number;
+            data?: components["schemas"]["KhqrTransaction"][];
+            status?: {
+                code?: string | number;
+                message?: string;
+                merchant_ref?: string;
+            };
+            /** @description Legacy doc-page row slot — production captures use `data`. */
             transactions?: components["schemas"]["KhqrTransaction"][];
         };
         /** @description Body shape is NOT fixed — PayWay states additional fields may be present depending on payment method. Treat unknown keys as pass-through when computing the signature (item 3 in info.description sorts ALL present keys, not a fixed subset). */

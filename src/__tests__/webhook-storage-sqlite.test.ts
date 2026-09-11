@@ -157,3 +157,71 @@ maybeDescribe('SqliteWebhookStorage round-trip (driver installed)', () => {
     await expect(SqliteWebhookStorage.create(dbPath)).rejects.toThrow();
   });
 });
+
+describe('SqliteWebhookStorage customerQr metadata (Customer Module callbacks)', () => {
+  it('round-trips the parsed Customer Module callback (driver installed)', async () => {
+    const dir = makeTempDir();
+    const storage = await SqliteWebhookStorage.create(path.join(dir, 'callbacks.db'));
+    const raw = {
+      payment_status_code: 0,
+      transaction_id: '178702944869996',
+      payment_status: 'APPROVED',
+      apv: '118954',
+      original_amount: 0.38,
+      original_currency: 'USD',
+      payment_amount: 0.38,
+      payment_currency: 'USD',
+      payment_type: 'ABA Pay',
+      transaction_date: '2026-08-18 12:04:08',
+      bank_ref: '100SB1787029448',
+      payer_account: '*001',
+      payer_name: 'Payer Name',
+      bank_name: 'ABA Bank',
+      merchant_ref: 'dt-one-8989',
+      customer: { customer_id: 'dt-one-8989', customer_name: 'dhitraj' },
+    };
+    const saved = storage.save({ headers: {}, body: JSON.stringify(raw) });
+    const { parseCustomerQrCallback } = await import('../webhook/customer-callback.js');
+    const updated = storage.updateCustomerQrMetadata(saved.id, { parsed: parseCustomerQrCallback(raw) });
+    expect(updated.customerQr?.parsed?.kind).toBe('customer-module-qr');
+
+    storage.close();
+    const reopened = await SqliteWebhookStorage.create(path.join(dir, 'callbacks.db'));
+    const record = reopened.getAll()[0];
+    expect(record.customerQr?.parsed?.notification.merchantRef).toBe('dt-one-8989');
+    expect(record.customerQr?.parsed?.notification.customer?.customer_name).toBe('dhitraj');
+    reopened.close();
+  });
+
+  it('migrates a pre-customerQr database in place (customer_qr_json column added)', async () => {
+    const dir = makeTempDir();
+    const dbPath = path.join(dir, 'legacy.db');
+    const { DatabaseSync } = await import('node:sqlite') as { DatabaseSync: new (p: string) => { exec(sql: string): void; close(): void } };
+    const legacy = new DatabaseSync(dbPath);
+    legacy.exec(`CREATE TABLE callbacks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      record_id TEXT NOT NULL,
+      received_at TEXT NOT NULL,
+      headers_json TEXT NOT NULL,
+      body TEXT NOT NULL,
+      source_ip TEXT,
+      khqr_json TEXT,
+      pushback_json TEXT,
+      signature_verdict TEXT,
+      verification_reason TEXT,
+      matched_transaction_id TEXT,
+      matched_status TEXT,
+      replay INTEGER
+    )`);
+    legacy.exec("INSERT INTO callbacks (record_id, received_at, headers_json, body) VALUES ('wh_legacy1', '2026-01-01T00:00:00Z', '{}', '{}')");
+    legacy.close();
+
+    const storage = await SqliteWebhookStorage.create(dbPath);
+    const record = storage.getAll()[0];
+    expect(record.id).toBe('wh_legacy1');
+    expect(record.customerQr).toBeUndefined();
+    const updated = storage.updateCustomerQrMetadata('wh_legacy1', { parseError: 'migrated' });
+    expect(updated.customerQr?.parseError).toBe('migrated');
+    storage.close();
+  });
+});

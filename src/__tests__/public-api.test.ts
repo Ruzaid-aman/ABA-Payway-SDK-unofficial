@@ -16,6 +16,10 @@ describe('public API surface (src/index.ts barrel)', () => {
     expect(typeof PublicApi.sdk.server.initiateTransaction).toBe('function');
     expect(typeof PublicApi.verifyCallbackSignature).toBe('function');
     expect(typeof PublicApi.client).toBe('object');
+    // Customer Module surface (2026-09-11): parser, classifier, normalizer.
+    expect(typeof PublicApi.parseCustomerQrCallback).toBe('function');
+    expect(typeof PublicApi.classifyCallback).toBe('function');
+    expect(typeof PublicApi.normalizeTransactionsByMerchantRefResponse).toBe('function');
     // Compile-time pin: the option type stays part of the public surface.
     // (Type-only exports have no runtime binding to assert on.)
     const formOptions: CheckoutFormOptions = {};

@@ -51,7 +51,7 @@ function makePayWay(): PayWay {
     },
     khqr: {
       generateOfflineQR: fn(() => 'OFFLINE_QR'),
-      getTransactionsByMerchantRef: fn(async () => ({ status: 0, transactions: [] })),
+      getTransactionsByMerchantRef: fn(async () => ({ merchantRef: '', success: true, statusCode: '00', rows: [] })),
     },
     checkout: {
       createTransaction: fn(() => ({ tran_id: 'tx', hash: 'H' })),

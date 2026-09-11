@@ -22,12 +22,34 @@ GetTransactionsByMcRefRequest:
 
 GetTransactionsByMcRefResponse:
   type: object
+  description: >
+    Response envelope as merchant-captured in production (2026-08): rows under
+    `data`, status under a nested `status` object with STRING code ("00" =
+    Success). The official doc page models {status: integer, transactions: []}
+    but every captured production response uses the data/status-object shape;
+    consumers should tolerate both (SDK normalizes). Status codes: "00"/0=Success,
+    1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error.
   properties:
+    data:
+      type: array
+      items:
+        $ref: '#/KhqrTransaction'
     status:
-      type: integer
-      description: "0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error."
+      type: object
+      properties:
+        code:
+          oneOf:
+            - type: string
+              description: '"00" = Success (captured production shape)'
+            - type: integer
+              description: 0 = Success (doc-page shape)
+        message:
+          type: string
+        merchant_ref:
+          type: string
     transactions:
       type: array
+      description: Legacy doc-page row slot — production captures use `data`.
       items:
         $ref: '#/KhqrTransaction'
 

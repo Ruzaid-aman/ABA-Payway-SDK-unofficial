@@ -9,7 +9,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
+import type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
 
 const DEFAULT_PATH = './webhook_data/callbacks.db';
 
@@ -87,6 +87,17 @@ export function ensurePushbackMetadataColumn(db: Pick<BetterSqlite3Database, 'ex
   }
 }
 
+/** Add the Customer Module callback metadata column to pre-existing databases. */
+export function ensureCustomerQrMetadataColumn(db: Pick<BetterSqlite3Database, 'exec'>): void {
+  try {
+    db.exec('ALTER TABLE callbacks ADD COLUMN customer_qr_json TEXT');
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    if (message.includes('duplicate column name') && message.includes('customer_qr_json')) return;
+    throw error;
+  }
+}
+
 export class SqliteWebhookStorage implements WebhookStorage {
   private db: BetterSqlite3Database;
 
@@ -126,6 +137,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
           source_ip TEXT,
           khqr_json TEXT,
           pushback_json TEXT,
+          customer_qr_json TEXT,
           signature_verdict TEXT,
           verification_reason TEXT,
           matched_transaction_id TEXT,
@@ -136,6 +148,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       ensureKhqrMetadataColumn(db);
       ensureCallbackMetadataColumns(db);
       ensurePushbackMetadataColumn(db);
+      ensureCustomerQrMetadataColumn(db);
     } catch (error) {
       // A failed open (corrupt file, bad pragma) must not leak the handle —
       // on Windows the open file blocks even the temp-dir cleanup.
@@ -155,7 +168,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
 
     this.db
       .prepare(
-        'INSERT INTO callbacks (record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO callbacks (record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, customer_qr_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .run(
         entry.id,
@@ -165,6 +178,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
         entry.sourceIp ?? null,
         entry.khqr ? JSON.stringify(entry.khqr) : null,
         entry.paymentLinkPushback ? JSON.stringify(entry.paymentLinkPushback) : null,
+        entry.customerQr ? JSON.stringify(entry.customerQr) : null,
         entry.signatureVerdict ?? null,
         entry.verificationReason ?? null,
         entry.matchedTransactionId ?? null,
@@ -189,10 +203,17 @@ export class SqliteWebhookStorage implements WebhookStorage {
     return updated;
   }
 
+  updateCustomerQrMetadata(id: string, customerQr: CustomerQrWebhookMetadata): WebhookRecord {
+    this.db.prepare('UPDATE callbacks SET customer_qr_json = ? WHERE record_id = ?').run(JSON.stringify(customerQr), id);
+    const updated = this.getAll().find((record) => record.id === id);
+    if (!updated) throw new Error(`Webhook record ${id} was not found`);
+    return updated;
+  }
+
   getAll(): WebhookRecord[] {
     const rows = this.db
       .prepare(
-        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay FROM callbacks ORDER BY rowid ASC',
+        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, customer_qr_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay FROM callbacks ORDER BY rowid ASC',
       )
       .all() as Array<{
       record_id: string;
@@ -202,6 +223,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       source_ip: string | null;
       khqr_json: string | null;
       pushback_json: string | null;
+      customer_qr_json: string | null;
       signature_verdict: string | null;
       verification_reason: string | null;
       matched_transaction_id: string | null;
@@ -217,6 +239,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       sourceIp: row.source_ip ?? undefined,
       khqr: row.khqr_json ? JSON.parse(row.khqr_json) : undefined,
       paymentLinkPushback: row.pushback_json ? JSON.parse(row.pushback_json) : undefined,
+      customerQr: row.customer_qr_json ? JSON.parse(row.customer_qr_json) : undefined,
       signatureVerdict: (row.signature_verdict ?? undefined) as WebhookRecord['signatureVerdict'],
       verificationReason: (row.verification_reason ?? undefined) as WebhookRecord['verificationReason'],
       matchedTransactionId: row.matched_transaction_id ?? undefined,

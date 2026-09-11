@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JsonWebhookStorage } from '../webhook/storage-json.js';
 import { ensureCallbackMetadataColumns, ensureKhqrMetadataColumn } from '../webhook/storage-sqlite.js';
+import { parseCustomerQrCallback } from '../webhook/customer-callback.js';
 
 // ─── JSON Storage Tests ──────────────────────────────────────────────────
 
@@ -241,5 +242,63 @@ describe('ensureCallbackMetadataColumns', () => {
     };
 
     expect(() => ensureCallbackMetadataColumns(db)).toThrow('database is locked');
+  });
+});
+
+describe('JsonWebhookStorage customerQr metadata (Customer Module callbacks)', () => {
+  let tempDir: string;
+  let storage: JsonWebhookStorage;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'webhook-json-customer-qr-'));
+    storage = new JsonWebhookStorage(join(tempDir, 'callbacks.jsonl'));
+  });
+
+  afterEach(() => {
+    storage.close();
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const REAL_CUSTOMER_QR_BODY = {
+    payment_status_code: 0,
+    transaction_id: '178702944869996',
+    payment_status: 'APPROVED',
+    apv: '118954',
+    original_amount: 0.38,
+    original_currency: 'USD',
+    payment_amount: 0.38,
+    payment_currency: 'USD',
+    payment_type: 'ABA Pay',
+    transaction_date: '2026-08-18 12:04:08',
+    bank_ref: '100SB1787029448',
+    payer_account: '*001',
+    payer_name: 'Payer Name',
+    bank_name: 'ABA Bank',
+    merchant_ref: 'dt-one-8989',
+    customer: { customer_id: 'dt-one-8989', customer_name: 'dhitraj' },
+  };
+
+  it('round-trips the parsed Customer Module callback via updateCustomerQrMetadata', () => {
+    const saved = storage.save({ headers: {}, body: JSON.stringify(REAL_CUSTOMER_QR_BODY), sourceIp: '127.0.0.1' });
+    const updated = storage.updateCustomerQrMetadata(saved.id, { parsed: parseCustomerQrCallback(REAL_CUSTOMER_QR_BODY) });
+    expect(updated.customerQr?.parsed?.kind).toBe('customer-module-qr');
+    expect(updated.customerQr?.parsed?.notification.customer?.customer_name).toBe('dhitraj');
+
+    const [reloaded] = storage.getAll();
+    expect(reloaded.customerQr?.parsed?.notification.merchantRef).toBe('dt-one-8989');
+  });
+
+  it('round-trips a customerQr parse error and reads legacy records without the slot', () => {
+    const saved = storage.save({ headers: {}, body: 'not-json' });
+    const updated = storage.updateCustomerQrMetadata(saved.id, { parseError: 'boom' });
+    expect(updated.customerQr?.parseError).toBe('boom');
+
+    storage.save({ headers: {}, body: '{}' });
+    const all = storage.getAll();
+    expect(all[all.length - 1].customerQr).toBeUndefined();
+  });
+
+  it('updateCustomerQrMetadata throws for an unknown record id', () => {
+    expect(() => storage.updateCustomerQrMetadata('wh_missing', { parseError: 'x' })).toThrow(/not found/);
   });
 });

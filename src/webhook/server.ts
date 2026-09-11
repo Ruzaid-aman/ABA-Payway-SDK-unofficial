@@ -4,14 +4,20 @@
  * Exposes three POST routes, each with a dedicated contract:
  *  - `/aba-payway-webhook` — online checkout callback. Raw-stored; optional
  *    HMAC verification is logged and never causes rejection (WH-TC-05).
- *  - `/aba-payway-khqr-webhook` — offline KHQR notification. No HMAC
- *    (no published contract); raw-stored first, parsed as metadata only.
+ *  - `/aba-payway-khqr-webhook` — offline KHQR notification AND Customer
+ *    Module ("Printed QR") callback. The former carries no HMAC contract;
+ *    the latter IS signed with `X-PAYWAY-HMAC-SHA512` — the route verifies
+ *    whenever a signature header is present and an apiKey is configured
+ *    (verdict recorded; offline deliveries stay `'unsigned'`). Raw-stored
+ *    first; classification (`classifyCallback`) decides which parser's
+ *    metadata is attached.
  *  - `/aba-payway-pushback` — payment-link pushback. No hash on the wire
  *    (live-verified); raw-stored first, parsed via `parsePaymentLinkPushback`.
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { verifyCallbackDetailed } from '../auth.js';
+import { classifyCallback, parseCustomerQrCallback } from './customer-callback.js';
 import { extractTransactionIdFrom } from '../journal/digest.js';
 import { createJournalEmitter } from '../journal/writer.js';
 import type { JournalContext } from '../journal/types.js';
@@ -90,6 +96,21 @@ function tryParseJsonObject(body: string): Record<string, unknown> | undefined {
     const parsed: unknown = JSON.parse(body);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Non-throwing `extractJsonPayload`: raw JSON, HTML-wrapped JSON, or nothing —
+ * an unparseable delivery still gets classified and stored.
+ */
+function extractJsonPayloadSilent(body: string): Record<string, unknown> | undefined {
+  try {
+    const extracted: unknown = extractJsonPayload(body);
+    return extracted && typeof extracted === 'object' && !Array.isArray(extracted)
+      ? (extracted as Record<string, unknown>)
       : undefined;
   } catch {
     return undefined;
@@ -185,6 +206,36 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
     });
   }
 
+  /**
+   * Compute the signature verdict for a signed delivery, mirroring the online
+   * route's Phase-3 contract (verdict becomes part of the durable record).
+   * Used by BOTH the online route and the khqr route when the delivery carries
+   * `x-payway-hmac-sha512` (Customer Module callbacks are signed; offline
+   * KHQR notifications carry no header and stay `'unsigned'`).
+   */
+  function computeSignatureVerdict(
+    body: string,
+    receivedSignature: unknown,
+  ): { verdict: WebhookSignatureVerdict; reason?: WebhookRecord['verificationReason'] } {
+    if (!apiKey || typeof receivedSignature !== 'string') {
+      return { verdict: 'unsigned' };
+    }
+    try {
+      const detailed = verifyCallbackDetailed(
+        JSON.parse(body) as Record<string, unknown>,
+        receivedSignature,
+        apiKey,
+        { stripHash: true },
+      );
+      return detailed.valid
+        ? { verdict: 'verified' }
+        : { verdict: 'invalid', reason: detailed.reason };
+    } catch {
+      // Unparseable body carrying a signature header can never verify.
+      return { verdict: 'invalid', reason: 'signature_mismatch' };
+    }
+  }
+
   function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     const isOnlineWebhook = req.url === WEBHOOK_PATH;
     const isKhqrWebhook = req.url === khqrPath;
@@ -214,7 +265,19 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           // There is NO hash on this delivery (notification only), so no
           // HMAC verification is attempted; the payment itself is verified
           // via check-transaction using the parsed tran_id.
-          const record = storage.save({ headers, body, sourceIp });
+          // Correlation (P3-A): the pushback carries tran_id + numeric status.
+          const pushbackBody = tryParseJsonObject(body);
+          const matchedStatus =
+            pushbackBody?.status === undefined || pushbackBody?.status === null
+              ? undefined
+              : String(pushbackBody.status);
+          const record = storage.save({
+            headers,
+            body,
+            sourceIp,
+            matchedTransactionId: extractTransactionIdFrom(pushbackBody),
+            matchedStatus,
+          });
           let pushback: import('./storage.js').PaymentLinkPushbackMetadata;
           try {
             const parsed = parsePaymentLinkPushback(body);
@@ -243,9 +306,91 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         if (isKhqrWebhook) {
           // Persist the delivery before parsing it: malformed JSON and future ABA
           // schema changes must never discard the raw audit record.
-          const record = storage.save({ headers, body, sourceIp });
-          // This notification has no published ABA authentication contract. Parsing
-          // is capture metadata only; it must never decide that an order is paid.
+          //
+          // This route serves two contracts with the same field layout:
+          //  - offline KHQR notifications — no published auth contract
+          //  - Customer Module ("Printed QR") callbacks — HMAC-signed with
+          //    X-PAYWAY-HMAC-SHA512 (merchant-captured 2026-08-18)
+          // The signature HEADER (not the body shape) distinguishes them on
+          // the wire; classification decides which parser's metadata attaches.
+          const khqrBody = extractJsonPayloadSilent(body);
+          const classification = classifyCallback(khqrBody);
+          const isCustomerQr = classification === 'customer-module-qr';
+
+          // Signature verdict whenever the delivery is signed and an apiKey is
+          // configured; unsigned deliveries (offline KHQR) stay 'unsigned'.
+          const { verdict: signatureVerdict, reason: verificationReason } = computeSignatureVerdict(
+            body,
+            req.headers['x-payway-hmac-sha512'],
+          );
+          if (signatureVerdict !== 'unsigned') {
+            log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}`);
+          }
+
+          const matchedTransactionId = extractTransactionIdFrom(khqrBody);
+          const matchedStatus = firstStringOf(khqrBody, 'payment_status');
+          // Replay marker parity with the online route: a redelivered
+          // (transaction_id, payment_status) pair is flagged for idempotent
+          // processing — critical for Customer Module repeat payments.
+          let replay = false;
+          if (matchedTransactionId && matchedStatus !== undefined) {
+            replay = storage
+              .getAll()
+              .some((prior) => prior.matchedTransactionId === matchedTransactionId && prior.matchedStatus === matchedStatus);
+          }
+          const record = storage.save({
+            headers,
+            body,
+            sourceIp,
+            signatureVerdict,
+            verificationReason,
+            matchedTransactionId,
+            matchedStatus,
+            replay,
+          });
+
+          // TD-09 on this route too: Customer Module callbacks are signed, so
+          // verdict mode rejects an explicitly-invalid signature the same way
+          // the online route does. Unsigned offline deliveries are unaffected.
+          if (options.rejectInvalidSignature && apiKey && signatureVerdict === 'invalid') {
+            log(`  \x1b[31m✗ Rejecting [${record.id}]: invalid signature (rejectInvalidSignature enabled)\x1b[0m`);
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'invalid signature', id: record.id }));
+            return;
+          }
+
+          if (isCustomerQr) {
+            // Customer Module callback: parse into the customer-qr metadata slot.
+            // A parse failure keeps the raw record and the reason — same
+            // never-discard rule as every other route.
+            let customerQr: import('./storage.js').CustomerQrWebhookMetadata;
+            try {
+              const parsedCallback = parseCustomerQrCallback(khqrBody);
+              customerQr = { parsed: parsedCallback };
+              const parsed = parsedCallback.notification;
+              log(
+                `  Customer Module callback [${record.id}]: customer_id=${parsed.merchantRef} status=${parsed.paymentStatus} amount=${parsed.originalAmount} ${parsed.originalCurrency}`,
+              );
+            } catch (error) {
+              customerQr = { parseError: error instanceof Error ? error.message : String(error) };
+              log(`  Customer Module callback [${record.id}] failed to parse: ${customerQr.parseError}`);
+            }
+            if (storage.updateCustomerQrMetadata) {
+              try {
+                storage.updateCustomerQrMetadata(record.id, customerQr);
+              } catch (error) {
+                log(`  Unable to store customer-qr parse metadata: ${error instanceof Error ? error.message : String(error)}`);
+              }
+            }
+            emitCallbackJournal(record, matchedTransactionId, matchedStatus, khqrPath);
+            await forwardCaptured(body, headers, `customer-module callback [${record.id}]`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ acknowledged: true, id: record.id }));
+            return;
+          }
+
+          // Offline KHQR notification: capture metadata only; it must never
+          // decide that an order is paid.
           let khqr: import('./storage.js').KhqrWebhookMetadata;
           try {
             // Tolerate payload variations per ABA guidance: raw JSON or
@@ -279,9 +424,15 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           return;
         }
 
-        // Online checkout callback: verify BEFORE saving so the verdict is
-        // part of the durable record (Phase 3 — previously computed, logged,
-        // then dropped: audit gap G7).
+        // Online checkout callback — but the merchant profile's ONE configured
+        // URL receives every channel (online, customer module, offline KHQR).
+        // Classify before saving so a customer-module delivery landing here is
+        // still tagged with its contract metadata; verification stays keyed on
+        // the signature header either way.
+        const onlineClassification = classifyCallback(tryParseJsonObject(body));
+
+        // Verify BEFORE saving so the verdict is part of the durable record
+        // (Phase 3 — previously computed, logged, then dropped: audit gap G7).
         let signatureVerdict: WebhookSignatureVerdict = 'unsigned';
         let verificationReason: WebhookRecord['verificationReason'];
         const receivedSignature = req.headers['x-payway-hmac-sha512'];
@@ -326,6 +477,19 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           matchedStatus,
           replay,
         });
+
+        // A Customer Module delivery on the online route: attach the
+        // customer-qr metadata too (same parser as the khqr route).
+        if (onlineClassification === 'customer-module-qr' && storage.updateCustomerQrMetadata) {
+          try {
+            storage.updateCustomerQrMetadata(record.id, { parsed: parseCustomerQrCallback(parsedBody) });
+            log(`  Classified as Customer Module callback [${record.id}] (merchant_ref = Customer ID)`);
+          } catch (error) {
+            storage.updateCustomerQrMetadata(record.id, {
+              parseError: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
         emitCallbackJournal(record, matchedTransactionId, matchedStatus, WEBHOOK_PATH);
 
         log(`  Received callback [${record.id}] at ${record.receivedAt}`);

@@ -42,7 +42,8 @@ export {
 } from './constants.js';
 export type { CheckoutDomain, CheckoutFormOptions } from './domains/checkout.js';
 export type { CredentialsOnFileDomain, LinkCardFormOptions } from './domains/credentials-on-file.js';
-export type { KhqrDomain } from './domains/khqr.js';
+export type { KhqrDomain, MerchantRefTransaction, TransactionsByMerchantRefResult } from './domains/khqr.js';
+export { normalizeTransactionsByMerchantRefResponse } from './domains/khqr.js';
 export type {
   PaymentLinkDomain,
   PaymentLinkPushback,
@@ -196,7 +197,9 @@ export type {
 } from './sandbox-beneficiaries.js';
 export type { KhqrPaymentNotification, ParsedKhqrPaymentNotification } from './webhook/khqr-notification.js';
 export { extractJsonPayload, parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
-export type { KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './webhook/storage.js';
+export type { CallbackKind, CustomerQrCustomer, ParsedCustomerQrCallback } from './webhook/customer-callback.js';
+export { classifyCallback, parseCustomerQrCallback } from './webhook/customer-callback.js';
+export type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './webhook/storage.js';
 export type { StorageType } from './webhook/storage-factory.js';
 // ─── Webhook Storage ─────────────────────────────────────────────────────
 export { createStorage } from './webhook/storage-factory.js';
