@@ -165,6 +165,8 @@ paths:
     $ref: './paths/payment-link.yaml#/~1api~1merchant-portal~1merchant-access~1payment-link~1create'
   /api/merchant-portal/merchant-access/payment-link/detail:
     $ref: './paths/payment-link.yaml#/~1api~1merchant-portal~1merchant-access~1payment-link~1detail'
+  /api/merchant-portal/merchant-access/payment-link/void:
+    $ref: './paths/payment-link.yaml#/~1api~1merchant-portal~1merchant-access~1payment-link~1void'
 
   # --- Pre-auth paths ---
   /api/merchant-portal/merchant-access/online-transaction/pre-auth-completion:

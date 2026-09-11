@@ -96,3 +96,57 @@
           application/json:
             schema:
               $ref: '../components/schemas/shared.yaml#/ErrorResponse'
+
+/api/merchant-portal/merchant-access/payment-link/void:
+  post:
+    operationId: voidPaymentLink
+    summary: Void (cancel) a payment link
+    tags: [Payment Link]
+    description: >
+      Voids a previously created payment link before it has been paid. Once
+      voided the link can no longer receive payments and the action CANNOT
+      be reversed. UNDOCUMENTED by PayWay (no official docs page) — the full
+      contract is live-verified on the sandbox (SANDBOX-FINDINGS §23,
+      2026-09-11): same request family as detail (RSA-encrypted
+      merchant_auth carrying {mc_id, id}); Content-Type lenient (both
+      application/json and urlencoded accepted); success answers
+      {status:{code:"00",message:"Success."}, tran_id} with a NUMERIC
+      tran_id; double-void answers HTTP 403 code PTL188 "The payment link
+      is already voided."; a bogus link id answers HTTP 403 code 96
+      "Invalid merchant data". Post-void, detail reports status "VOIDED"
+      and the hosted page renders an invalid-data shell (page code 07).
+    x-hmac-fields:
+      - request_time
+      - merchant_id
+      - merchant_auth
+    x-merchant-auth-encryption:
+      algorithm: RSA public-key encryption, PKCS1 padding
+      chunk_size_bytes: 117
+      plaintext_shape:
+        mc_id: "same value as merchant_id"
+        id: "the payment link ID to void (the data.id value returned by create — NOT the URL slug)"
+      process: >
+        JSON-encode {mc_id, id} -> RSA-encrypt in 117-byte chunks ->
+        base64 encode into merchant_auth.
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/payment-link.yaml#/VoidPaymentLinkRequest'
+        application/json:
+          schema:
+            $ref: '../components/schemas/payment-link.yaml#/VoidPaymentLinkRequest'
+    responses:
+      '200':
+        description: Payment link voided (terminal — a second void answers 403 PTL188)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/payment-link.yaml#/VoidPaymentLinkResponse'
+      '4XX':
+        description: Client error (PTL188 already voided, 96 invalid link id, wrong hash)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/shared.yaml#/ErrorResponse'

@@ -20,6 +20,7 @@ export const ENDPOINTS = {
   generateQr: '/api/payment-gateway/v1/payments/generate-qr',
   createPaymentLink: '/api/merchant-portal/merchant-access/payment-link/create',
   getPaymentLinkDetails: '/api/merchant-portal/merchant-access/payment-link/detail',
+  voidPaymentLink: '/api/merchant-portal/merchant-access/payment-link/void',
   completePreAuth: '/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion',
   cancelPreAuth: '/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation',
   payout: '/api/payment-gateway/v2/direct-payment/merchant/payout',
@@ -49,6 +50,7 @@ export const MUTATION_ENDPOINTS = new Set<string>([
   ENDPOINTS.renewToken,
   ENDPOINTS.removeToken,
   ENDPOINTS.createPaymentLink,
+  ENDPOINTS.voidPaymentLink,
   ENDPOINTS.completePreAuth,
   ENDPOINTS.cancelPreAuth,
   ENDPOINTS.payout,
@@ -187,7 +189,8 @@ export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }>
 /**
  * Payment-link PTL error codes not claimed by other families (PTL02/PTL04
  * resolve via the refund family; `96` via the QR family). Sources: official
- * create/detail pages + sandbox probes (SANDBOX-FINDINGS §22, 2026-09-06).
+ * create/detail pages + sandbox probes (SANDBOX-FINDINGS §22, 2026-09-06;
+ * PTL188 from the void probe, §23, 2026-09-11).
  */
 export const PAYMENT_LINK_ERROR_CODES = {
   /** Parameter invalid format */
@@ -196,18 +199,22 @@ export const PAYMENT_LINK_ERROR_CODES = {
   MERCHANT_INVALID_CURRENCY: 'PTL99',
   /** Invalid payment link (detail) */
   INVALID_PAYMENT_LINK: 'PTL132',
+  /** Payment link already voided (void) */
+  ALREADY_VOIDED: 'PTL188',
 } as const;
 
 export const PAYMENT_LINK_TITLES: Record<string, string> = {
   PTL05: 'Parameter Invalid Format',
   PTL99: 'Merchant Invalid Currency',
   PTL132: 'Invalid Payment Link',
+  PTL188: 'Payment Link Already Voided',
 };
 
 export const PAYMENT_LINK_HINTS: Record<string, string> = {
   PTL05: 'Check datatypes — amounts are numbers in the SDK (the official docs declare strings; the gateway accepts numbers). Sandbox probes: malformed values answered PTL04 instead.',
   PTL99: 'Currency not enabled for the merchant profile. Sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile.',
   PTL132: 'Invalid payment link — pass the opaque data.id returned by create, NOT merchant_ref_no, NOT the URL slug. Sandbox note (2026-09-06): a bogus id answered 96 instead.',
+  PTL188: 'The payment link is already voided — already in the desired terminal state, not a failure. Void is not idempotent (HTTP 403, SANDBOX-FINDINGS §23); a second void on the same link id always answers PTL188.',
 };
 
 /**
