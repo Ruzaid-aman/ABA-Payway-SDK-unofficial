@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Competitive portal-parity wave (2026-09-12, from the Canadia developer-portal audit)
+
+Four adoptable patterns from `docs/competitive-analysis-canadia.md` (Canadia
+Gateway portal audit), implemented with a test-enforced docs acceptance bar:
+
+- **Error-code registry**: `explain` codes now carry `sandboxVerified` +
+  `evidence` provenance (22→28 live-verified codes, incl. new gateway code `2`
+  "Transaction Not Closable"); `payway-sdk explain [code] --json` emits one
+  JSON document (validation envelope on unknown codes); `npm run
+  gen:error-registry` generates the versioned `docs/error-codes.json` registry
+  (65 codes), pinned to the source maps by a drift test.
+- **Per-flow sequence diagrams + docs acceptance bar**: every payment-flow
+  chapter (03/04/05/06/07/08/11/17) opens with an inline Mermaid "Flow at a
+  glance" diagram; the four orphaned `docs/diagrams/` pages are now linked
+  from chapters 01/03/09/11 and indexed in a docs/README "Diagram Library";
+  `src/__tests__/docs-acceptance-bar.test.ts` enforces diagrams + example
+  blocks + diagram-library links, and link resolution now covers every
+  numbered chapter (52 docs).
+- **QR template gallery**: docs/07 gains a per-template gallery (image +
+  style + use case) rendered from 7 real sandbox `generate-qr` captures
+  (`scripts/capture-qr-template-gallery.ts`, idempotent, `--force` to
+  recapture); docs/10's template row routes to it.
+- **Flutter example**: `docs/examples/flutter/payment_screen.dart` (webview
+  checkout, return-URL interception, ABA Pay deeplink launcher with
+  not-installed fallback), cited from chapters 04/05/08; credential-free
+  guard in the acceptance bar. Suite 1721 → 1761.
+
 ### Payment-link void (2026-09-11, undocumented endpoint — SANDBOX-FINDINGS §23)
 
 ABA's `POST /api/merchant-portal/merchant-access/payment-link/void` has no
