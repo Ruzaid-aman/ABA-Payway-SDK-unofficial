@@ -166,4 +166,38 @@ describe('classifyCallback', () => {
       }),
     ).toBe('customer-module-qr');
   });
+
+  it('a pushback body with EXTRA fields (>5 keys) still classifies as pushback (merchant_ref_no is contract-unique)', () => {
+    expect(
+      classifyCallback({
+        tran_id: '178865526240157',
+        status: 0,
+        merchant_ref_no: 'plvr-v1',
+        extra_future_field: 'x',
+        another: 1,
+        and_another: true,
+      }),
+    ).toBe('payment-link-pushback');
+  });
+
+  it('an online-checkout body that also carries a customer KEY (not object shape + transaction_id) stays online', () => {
+    expect(
+      classifyCallback({ tran_id: 't1', status: 'APPROVED', customer: 'not-an-object' }),
+    ).toBe('online-checkout');
+  });
+
+  it('a body with customer object but NO transaction_id is not customer-module (falls through, conservative)', () => {
+    expect(classifyCallback({ customer: { customer_id: 'c1' }, merchant_ref: 'r1' })).toBe('unknown');
+  });
+
+  it('a body carrying BOTH tran_id and transaction_id + status + customer resolves customer-module (transaction_id + customer wins)', () => {
+    expect(
+      classifyCallback({
+        tran_id: 't1',
+        transaction_id: 'tx2',
+        status: 'APPROVED',
+        customer: { customer_id: 'c1' },
+      }),
+    ).toBe('customer-module-qr');
+  });
 });

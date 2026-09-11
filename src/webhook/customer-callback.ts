@@ -223,29 +223,30 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * Classify a parsed callback body into one of the four PayWay callback
  * contracts a merchant profile's single callback URL can receive:
  *
+ *  - `payment-link-pushback`  — `tran_id` + `merchant_ref_no` (extra fields tolerated)
+ *  - `customer-module-qr`      — `transaction_id` + nested `customer` object
  *  - `online-checkout`        — `tran_id` + `status` (+ optional `apv`, …)
- *  - `customer-module-qr`      — `transaction_id` + `merchant_ref` + nested `customer`
- *  - `khqr-offline`           — `transaction_id` + `merchant_ref` + `payer_name`, no `customer`
- *  - `payment-link-pushback`  — `{tran_id, status: 0, merchant_ref_no}`
+ *  - `khqr-offline`           — `transaction_id` + `merchant_ref`, no `customer`
  *  - `unknown`                — anything else (log + investigate, never fulfill)
  *
  * Discriminators verified against the real captured samples in
  * `docs/archive/customermoudle-guide.md` §7.4 and the sandbox-pinned shapes.
+ * Order matters: pushback's `merchant_ref_no` is unique to that contract
+ * (PayWay states body shapes are NOT fixed — extra fields must not break
+ * classification), and the Customer Module check requires `transaction_id`
+ * so a hypothetical online body carrying a `customer` key is not misrouted.
  */
 export function classifyCallback(payload: unknown): CallbackKind {
   if (!isPlainObject(payload)) return 'unknown';
 
-  // Payment-link pushback: the live-verified trio (§22 V-1).
-  if (
-    'tran_id' in payload &&
-    'merchant_ref_no' in payload &&
-    Object.keys(payload).length <= 5
-  ) {
+  // Payment-link pushback: the live-verified trio (§22 V-1). merchant_ref_no
+  // never appears on the other contracts; extras beyond the trio are tolerated.
+  if ('tran_id' in payload && 'merchant_ref_no' in payload) {
     return 'payment-link-pushback';
   }
 
   // Customer Module: KHQR fields + the nested portal customer profile.
-  if ('customer' in payload && isPlainObject(payload.customer)) {
+  if (isPlainObject(payload.customer) && typeof payload.transaction_id === 'string') {
     return 'customer-module-qr';
   }
 

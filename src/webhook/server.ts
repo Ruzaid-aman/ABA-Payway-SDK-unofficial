@@ -221,8 +221,15 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
       return { verdict: 'unsigned' };
     }
     try {
+      // HTML-tolerant extraction (same tolerance as the khqr route's parser):
+      // a valid signature wrapped in an intermediate HTML page must not read
+      // as invalid. Only a body with NO recoverable JSON can never verify.
+      const payload = extractJsonPayloadSilent(body);
+      if (!payload) {
+        return { verdict: 'invalid', reason: 'signature_mismatch' };
+      }
       const detailed = verifyCallbackDetailed(
-        JSON.parse(body) as Record<string, unknown>,
+        payload as Record<string, unknown>,
         receivedSignature,
         apiKey,
         { stripHash: true },
@@ -231,7 +238,6 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         ? { verdict: 'verified' }
         : { verdict: 'invalid', reason: detailed.reason };
     } catch {
-      // Unparseable body carrying a signature header can never verify.
       return { verdict: 'invalid', reason: 'signature_mismatch' };
     }
   }
@@ -328,6 +334,10 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           }
 
           const matchedTransactionId = extractTransactionIdFrom(khqrBody);
+          // matchedStatus spelling is per-contract (payment_status here,
+          // numeric-string status on pushback, status on online) — replay
+          // dedupe is therefore per-contract too, which is intentional: the
+          // same id arriving under two contracts is two audit records.
           const matchedStatus = firstStringOf(khqrBody, 'payment_status');
           // Replay marker parity with the online route: a redelivered
           // (transaction_id, payment_status) pair is flagged for idempotent
@@ -348,6 +358,10 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
             matchedStatus,
             replay,
           });
+
+          // Journal the capture before any rejection path: a 401-rejected
+          // delivery must still appear in journal reconcile's callback side.
+          emitCallbackJournal(record, matchedTransactionId, matchedStatus, khqrPath);
 
           // TD-09 on this route too: Customer Module callbacks are signed, so
           // verdict mode rejects an explicitly-invalid signature the same way
@@ -382,7 +396,6 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
                 log(`  Unable to store customer-qr parse metadata: ${error instanceof Error ? error.message : String(error)}`);
               }
             }
-            emitCallbackJournal(record, matchedTransactionId, matchedStatus, khqrPath);
             await forwardCaptured(body, headers, `customer-module callback [${record.id}]`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ acknowledged: true, id: record.id }));
@@ -411,12 +424,6 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
               log(`  Unable to store KHQR parse metadata: ${error instanceof Error ? error.message : String(error)}`);
             }
           }
-          emitCallbackJournal(
-            record,
-            khqr.parsed?.notification.transactionId,
-            khqr.parsed?.notification.paymentStatus,
-            khqrPath,
-          );
           log(`  Received offline KHQR notification [${record.id}] at ${record.receivedAt}`);
           await forwardCaptured(body, headers, `KHQR notification [${record.id}]`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -429,35 +436,25 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         // Classify before saving so a customer-module delivery landing here is
         // still tagged with its contract metadata; verification stays keyed on
         // the signature header either way.
-        const onlineClassification = classifyCallback(tryParseJsonObject(body));
+        // One tolerant parse for everything downstream: classification,
+        // correlation, and (when the body is a Customer Module delivery) the
+        // customer-qr metadata. HTML-wrapped payloads classify too.
+        const parsedBody = extractJsonPayloadSilent(body);
+        const onlineClassification = classifyCallback(parsedBody);
 
         // Verify BEFORE saving so the verdict is part of the durable record
         // (Phase 3 — previously computed, logged, then dropped: audit gap G7).
-        let signatureVerdict: WebhookSignatureVerdict = 'unsigned';
-        let verificationReason: WebhookRecord['verificationReason'];
-        const receivedSignature = req.headers['x-payway-hmac-sha512'];
-        if (apiKey && typeof receivedSignature === 'string') {
-          try {
-            const detailed = verifyCallbackDetailed(
-              JSON.parse(body) as Record<string, unknown>,
-              receivedSignature,
-              apiKey,
-              { stripHash: true },
-            );
-            signatureVerdict = detailed.valid ? 'verified' : 'invalid';
-            verificationReason = detailed.valid ? undefined : detailed.reason;
-          } catch {
-            // Unparseable body carrying a signature header can never verify.
-            signatureVerdict = 'invalid';
-            verificationReason = 'signature_mismatch';
-          }
+        const { verdict: signatureVerdict, reason: verificationReason } = computeSignatureVerdict(
+          body,
+          req.headers['x-payway-hmac-sha512'],
+        );
+        if (signatureVerdict !== 'unsigned') {
           log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}`);
         }
 
         // Correlate the delivery with its transaction (gap G8) and flag
         // replays of an already-captured (tran_id, status) pair for
         // idempotent processing.
-        const parsedBody = tryParseJsonObject(body);
         const matchedTransactionId = extractTransactionIdFrom(parsedBody);
         const matchedStatus = firstStringOf(parsedBody, 'status', 'payment_status');
         let replay = false;

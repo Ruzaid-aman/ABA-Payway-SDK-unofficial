@@ -143,7 +143,9 @@ export function buildWebhookFixture(
     const customerId = overrides.merchantRef ?? tranId;
     const parsed: Record<string, unknown> = {
       payment_status_code: PAYMENT_STATUS_CODES.APPROVED,
-      transaction_id: String(Math.floor(Math.random() * 1e15)),
+      // The --tran-id override IS the gateway transaction id here (like every
+      // other event) — the CLI prints it and receivers correlate on it.
+      transaction_id: tranId,
       payment_status: 'APPROVED',
       apv: String(Math.floor(100000 + Math.random() * 899999)),
       original_amount: amount,

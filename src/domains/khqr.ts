@@ -100,7 +100,12 @@ export function normalizeTransactionsByMerchantRefResponse(
         : undefined;
   const statusMessage =
     rawStatus && typeof rawStatus === 'object' ? (rawStatus as { message?: string }).message : undefined;
-  const success = statusCode === '00' || statusCode === '0';
+  // Success = explicit gateway success code, OR rows present with no error
+  // status at all (an envelope variant carrying data but no status object is
+  // a populated lookup, not a failure — discarding real rows on a branch
+  // would break reconciliation).
+  const success =
+    statusCode === '00' || statusCode === '0' || (statusCode === undefined && rawRows.length > 0);
 
   return {
     merchantRef,
