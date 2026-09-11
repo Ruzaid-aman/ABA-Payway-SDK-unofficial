@@ -85,12 +85,30 @@ Status lifecycle:
 
 - **`OPEN`** — `payment_limit > total_trxn` (or no limit); payments still accepted.
 - **`PAID`** — `payment_limit == total_trxn`; the hosted page stops accepting payments. A link **without** `payment_limit` never reaches PAID.
+- **`VOIDED`** — the link was permanently cancelled via the void endpoint (below); it can no longer receive payments. The hosted page answers HTTP 200 but renders an invalid-data shell (SSR state `page:"invalid-data"`, code `07`) — the customer-facing form is dead, unlike expiry which leaves it up (SANDBOX-FINDINGS §23).
 - **No EXPIRED status exists — expiry is advisory** (sandbox-verified 2026-09-06): after `expired_date` passes, `detail` still reports `status: "OPEN"` and the hosted page still answers HTTP 200. Enforce expiry on your side (check `expired_date` against the clock before fulfilling), exactly like purchase lifetimes (W4-1).
 - `expired_date` constraints (sandbox-verified): **past values and offsets under ~5 minutes are rejected at create with PTL04**; ≥ +300s accepted (number or string). Unset links echo `"0"` (string) in detail.
 
 Totals semantics: `total_amount_org` = gross collected; `total_refund` = refunded; `total_amount` = after refunds; `total_trxn` = completed payment count. Per-transaction reconciliation: take `tran_id` from each pushback → `check-transaction` / `transaction-detail` (see docs/12).
 
-## 17.4 Split payout
+## 17.4 Voiding a link
+
+**UNDOCUMENTED endpoint — the full contract is live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11):** `POST /api/merchant-portal/merchant-access/payment-link/void`. Permanently cancels an unpaid link; it can no longer receive payments and **the action cannot be reversed**.
+
+```ts
+await payway.paymentLink.void(linkId);   // same id as detail — create's data.id
+// → { status: { code: "00", message: "Success.", lang, trace_id }, tran_id: <number> }
+```
+
+- **Signs exactly like detail**: RSA-encrypted `merchant_auth = {mc_id, id}`, hash over `request_time + merchant_id + merchant_auth`. Content-Type is lenient (JSON and urlencoded both accepted); the SDK sends urlencoded.
+- **NOT idempotent** — a second void answers HTTP 403 `PTL188` "The payment link is already voided." Treat PTL188 as "already in the desired terminal state", not a failure.
+- **Bogus link id** → HTTP 403 code `96` "Invalid merchant data" (same unknown-id signal as detail; the documented PTL132 was not reproduced).
+- After a successful void, `detail` reports `status: "VOIDED"` with an advanced `updated_at`; `total_trxn`/`total_amount` stay 0 (an unpaid link has nothing to reverse — use refunds only for paid transactions).
+- **Irreversible, single-attempt transport**: the endpoint is in the SDK's `MUTATION_ENDPOINTS` set — a lost response is never auto-retried (the outcome would be unknown).
+- **Untested edges** (open in §23): whether a paid or partially-paid link can be voided, and whether in-flight payments still push back after a void. Don't void paid links — refund instead.
+- CLI: `npx tsx src/cli.ts payment-link void -i <link-id> [-y] [--json]` — prompts on a TTY (irreversible), `-y`/`--json` skip the prompt; PTL188 surfaces the standard `{error:{paywayCode:'PTL188',…}}` envelope with exit 2.
+
+## 17.5 Split payout
 
 `payout` splits the collected amount to whitelisted beneficiary accounts the moment the link is paid. It travels **inside** the RSA-encrypted `merchant_auth` — invisible to schema readers, which is why it's easy to miss.
 
@@ -114,7 +132,7 @@ Rules (all pinned by tests):
 - Pre-encoded payout strings pass through unvalidated (the SDK can't total them).
 - The response resolves each entry with `acc_name` (sandbox evidence pending on the exact placement of `payout` in the response — top-level per apidog schema, inside `data` per ABA's own sample; verification item V-2).
 
-## 17.5 Images
+## 17.6 Images
 
 ```ts
 import { readFileSync } from 'node:fs';
@@ -128,7 +146,7 @@ await payway.paymentLink.create({
 - The image travels as a top-level multipart part — **never inside merchant_auth, never hashed** (hash still covers only `request_time + merchant_id + merchant_auth`). The SDK switches the wire to multipart automatically when `image` is present.
 - Sandbox quirks (SANDBOX-FINDINGS §15): the gateway re-hosts uploads on its CDN and **renames** them (`payment_link_image_<epoch-ms>.<ext>`), and the echoed `image.size` reads **0** regardless of true size — don't build logic on it. Links without an image echo the empty shape `{"image":"","filename":"","size":0}`.
 
-## 17.6 Handling the payment pushback
+## 17.7 Handling the payment pushback
 
 When a payment completes on the link, PayWay POSTs to your decoded `return_url`. **Live-captured contract (2026-09-06, real sandbox payment through a trycloudflare receiver):**
 
@@ -156,7 +174,7 @@ app.post('/payway/pushback', express.json(), async (req, res) => {
 });
 ```
 
-## 17.7 CLI quick reference
+## 17.8 CLI quick reference
 
 ```sh
 # Create (all optional flags shown)
@@ -168,6 +186,9 @@ npx tsx src/cli.ts payment-link create -t "Invoice INV-041" -a 49.50 -c USD \
 
 # Inspect — -i takes the Link ID from create's data.id
 npx tsx src/cli.ts payment-link detail -i "UD/8Hl…==" [--json]
+
+# Void (permanent, irreversible) — prompts on a TTY; -y or --json skips the prompt
+npx tsx src/cli.ts payment-link void -i "UD/8Hl…==" [-y] [--json]
 ```
 
 - `--json` prints the raw response on success; on ANY failure (local validation or gateway rejection) it prints the machine-parseable envelope `{ "error": { kind, exitCode, type, message, paywayCode, … } }` — branch on the envelope, never on stdout text. Exit codes: 0 ok, 1 validation, 2 API failure, 3 network.
@@ -175,7 +196,7 @@ npx tsx src/cli.ts payment-link detail -i "UD/8Hl…==" [--json]
 - `--image` rejects non-JPG/JPEG/PNG extensions and >3MB files locally.
 - On a TTY, create renders a terminal QR of the share URL; `--no-show-qr` suppresses (same flag as generate-qr/generate-checkout).
 
-## 17.8 Error codes
+## 17.9 Error codes
 
 | Code | Meaning | SDK hint |
 |---|---|---|
@@ -184,13 +205,14 @@ npx tsx src/cli.ts payment-link detail -i "UD/8Hl…==" [--json]
 | `PTL05` | Parameter invalid format | check datatypes (sandbox probes: malformed values answered PTL04 instead — PTL05 not yet reproduced) |
 | `PTL99` | Merchant invalid currency | currency not enabled for the merchant profile (sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile) |
 | `PTL132` | Invalid payment link (detail, officially documented) | wrong `id` — you passed the merchant ref or URL slug, not `data.id`. NOT reproduced on this sandbox profile (2026-09-06): a bogus id answers **96** instead |
-| `96` | (detail) invalid link id — **sandbox-observed** | check the Link ID (HTTP 403 "Invalid merchant data") |
+| `PTL188` | The payment link is already voided (void, **sandbox-verified §23**) | not a failure — already in the desired terminal state; `detail` reads `VOIDED`. Void is not idempotent |
+| `96` | (detail/void) invalid link id — **sandbox-observed** | check the Link ID (HTTP 403 "Invalid merchant data") |
 | 37 / `PTL146` / `PTL46` | Payout account not whitelisted | `beneficiary add <acc>` first |
 | `PTL147` / 12 | Payout currency mismatch | payout follows the link currency |
 
 All surface as `PayWayAPIError`/`PayWayBusinessError` with `paywayCode` set; `payway-sdk explain <code>` decodes them.
 
-## 17.9 Permutations & recipes
+## 17.10 Permutations & recipes
 
 | Recipe | Parameters |
 |---|---|
@@ -204,8 +226,9 @@ All surface as `PayWayAPIError`/`PayWayBusinessError` with `paywayCode` set; `pa
 | **Field collection** | CLI one-liner + TTY QR → show the customer a scannable link |
 | **KHR cash collection** | `currency: 'KHR'`, integer amount ≥100; payout entries are KHR too |
 | **Refund on a paid link** | refund per `tran_id` via the refund API; the link's `total_refund`/`total_amount` adjust, `status` reflects the payment_limit rule |
+| **Cancel a mistaken link** | `void(linkId)` (unpaid links only — irreversible, PTL188 if already voided; §17.4) — don't just delete the message, the URL keeps working until voided |
 
-## 17.10 Troubleshooting
+## 17.11 Troubleshooting
 
 - **"Wrong hash" (PTL02)** on a request with an image → the image must never enter the hash; the SDK handles this — you're likely hand-rolling the request. Use `paymentLink.create()`.
 - **Private-host returnUrl rejected** → intentional guard; `allowPrivateCallbackHosts: true` (or `PAYWAY_ALLOW_PRIVATE_CALLBACK_HOSTS=1`) to un-gate for local tests.

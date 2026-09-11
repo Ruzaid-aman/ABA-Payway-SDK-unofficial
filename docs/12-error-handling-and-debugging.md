@@ -283,7 +283,7 @@ Payouts (`payway.payout.payout`) go through the direct payout API and have their
 
 ### Payment Link error codes
 
-The payment-link endpoints (`create`, `detail`) use the `PTL*` family in `status.code` — extracted into `error.paywayCode` automatically:
+The payment-link endpoints (`create`, `detail`, `void`) use the `PTL*` family in `status.code` — extracted into `error.paywayCode` automatically:
 
 | Code | Meaning | How to Fix |
 |---|---|---|
@@ -292,7 +292,8 @@ The payment-link endpoints (`create`, `detail`) use the `PTL*` family in `status
 | `PTL05` | Parameter invalid format | Check datatypes (amounts are numbers in the SDK; the official docs' `string` declarations are wrong). Sandbox probes (2026-09-06): malformed values answered PTL04 — PTL05 not yet reproduced |
 | `PTL99` | Merchant invalid currency | Currency not enabled for the merchant profile. Sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile |
 | `PTL132` | Invalid payment link (officially documented) | `detail` got the wrong `id` — pass the opaque `data.id` from create, NOT `merchant_ref_no`, NOT the URL slug. NOT reproduced on the sandbox profile (2026-09-06): a bogus id answers **96** |
-| `96` | Invalid link id (detail) — sandbox-observed | Verify the Link ID (HTTP 403 "Invalid merchant data") |
+| `PTL188` | The payment link is already voided (void — **sandbox-verified §23**, undocumented endpoint) | Not a failure — the link is already in the desired terminal state (`detail` reads `VOIDED`). Void is NOT idempotent: a second void always answers HTTP 403 PTL188 |
+| `96` | Invalid link id (detail/void) — sandbox-observed | Verify the Link ID (HTTP 403 "Invalid merchant data") |
 
 > 🧪 **Sandbox-verified (2026-09-06, payment-link probes):** `expired_date`
 > in the past or under ~5 minutes out → PTL04 at create; **no EXPIRED status
@@ -300,6 +301,13 @@ The payment-link endpoints (`create`, `detail`) use the `PTL*` family in `status
 > still answers 200. Evidence:
 > `test-output/payment-link-docs-review/` (gitignored, on disk) +
 > SANDBOX-FINDINGS §22.
+>
+> 🧪 **Void (2026-09-11, SANDBOX-FINDINGS §23):** a voided link is a REAL
+> distinct state — `detail` reports `status:"VOIDED"` and the hosted page
+> renders an invalid-data shell (SSR code `07`) — the customer form is dead,
+> unlike expiry which leaves it up. Pinned in `sandbox-contract.test.ts`
+> (gated) and `scripts/e2e-payment-link-void.ts` (evidence:
+> `test-output/payment-link-void-e2e/`, gitignored).
 
 Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](./17-payment-link.md)**.
 

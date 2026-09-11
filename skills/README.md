@@ -60,7 +60,7 @@ reference. Recursive parity is checked by the offline test suite.
 - [aba-payway-offline-qr](./aba-payway-offline-qr/SKILL.md) — official ABA KHQR offline generation (no API call).
 - [aba-payway-customer-qr](./aba-payway-customer-qr/SKILL.md) — Merchant Portal static QRs (Printed QR channel) + KHQR decode/CRC validator.
 - [aba-payway-first-payment](./aba-payway-first-payment/SKILL.md) — route decision matrix (checkout / subscription / online QR / offline KHQR / payment link) and result handling.
-- [aba-payway-payment-link](./aba-payway-payment-link/SKILL.md) — hosted payment links incl. images and split payout.
+- [aba-payway-payment-link](./aba-payway-payment-link/SKILL.md) — hosted payment links incl. images, split payout, and void.
 - [aba-payway-pre-auth](./aba-payway-pre-auth/SKILL.md) — card fund holds, capture (incl. with-payout), and cancellation.
 - [aba-payway-payout](./aba-payway-payout/SKILL.md) — direct payouts to whitelisted beneficiaries (`{account, amount}` keys).
 - [aba-payway-refund](./aba-payway-refund/SKILL.md) — refunds with pre-flight balance checks.

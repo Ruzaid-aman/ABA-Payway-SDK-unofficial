@@ -81,7 +81,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk exchange-rate` | Fetch the live USD/KHR exchange rate |
 | `payway-sdk generate-checkout -a <amount>` | Generate a checkout QR URL (full purchase flag set incl. `--payout`, `--additional-params`, `--google-pay-token`, `--return-deeplink`; requires credentials) |
 | `payway-sdk checkout-form -a <amount> -o form.html` | Write the signed hosted-checkout HTML form (local signing, no API call) |
-| `payway-sdk payment-link create / detail` | Create or inspect PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image, `create --payout <json>` adds split-payout beneficiaries `[{acc, amt}]` — total must equal the amount) |
+| `payway-sdk payment-link create / detail / void` | Create, inspect, or void PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image, `create --payout <json>` adds split-payout beneficiaries `[{acc, amt}]` — total must equal the amount; `void -i <id>` permanently cancels an unpaid link — irreversible, `-y` skips the prompt, PTL188 = already voided) |
 | `payway-sdk cof link-account / link-card` | Start a credentials-on-file link: returns the QR/deeplink (account; optional `--return-deeplink` for app deeplinks); `link-card` saves the gateway's hosted card page to `payway-output/` (that page IS the success signal); the token (`pwt`) arrives via `callback_url` |
 | `payway-sdk cof link-card-form` | Write the signed card-link HTML form locally (no API call — the browser POSTs urlencoded straight to the gateway's hosted card-entry page) |
 | `payway-sdk cof charge -t <id> -a <amount> --token <pwt>` | Charge a stored COF token (optional `--ctid`, `--token-flag`, payer fields, `--items`, `--payout`) |
@@ -592,6 +592,20 @@ payway-sdk payment-link detail -i "UD/8Hl…Ht1xQdhlw=="
 # Human output: Link ID / title / amount / status / payments / created / expires / share URL.
 # --json prints the raw response; on ANY failure both commands print the
 # machine-parseable { "error": { kind, exitCode, type, message, paywayCode, … } } envelope.
+
+# Voiding a link (unpaid links only — permanent, irreversible; §17.4/§23):
+payway-sdk payment-link void -i "UD/8Hl…Ht1xQdhlw==" -y
+# Detail then reports status "VOIDED"; a second void answers 403 PTL188
+# "The payment link is already voided." (exit 2, terminal state — not a failure).
+```
+
+Void (permanently cancel) an unpaid link through the SDK — same request family as `getDetails`, NOT idempotent (undocumented endpoint, live-verified 2026-09-11):
+
+```typescript
+const voided = await payway.paymentLink.void(link.id);
+// → { status: { code: "00", message: "Success." }, tran_id: <number> }
+// A second call on the same id rejects with PayWayAPIError paywayCode "PTL188".
+// The link is now terminal: detail reads "VOIDED", the hosted page stops accepting.
 ```
 
 ### 5. Pre-Authorization (`payway.preAuth`)

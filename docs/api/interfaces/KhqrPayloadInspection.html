@@ -44,7 +44,9 @@
 <div class="tsd-signature"><span class="tsd-kind-property">bakongId</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="crcvalid"><span>crc<wbr/>Valid</span><a href="#crcvalid" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-signature"><span class="tsd-kind-property">crcValid</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div></section>
+<div class="tsd-signature"><span class="tsd-kind-property">crcValid</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-comment tsd-typography"><p>CRC-16 checksum matches the payload bytes (integrity, not authenticity).</p>
+</div></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="currency"><span>currency</span><a href="#currency" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">currency</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;USD&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;KHR&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></div></section>
@@ -65,7 +67,11 @@
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="valid"><span>valid</span><a href="#valid" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">valid</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
-<div class="tsd-comment tsd-typography"><p>Structure parsed cleanly AND the CRC checksum matches.</p>
+<div class="tsd-comment tsd-typography"><p>Structure parsed cleanly AND the CRC checksum matches. Structural
+malformation returns <code>undefined</code> from <code>inspectKhqrPayload</code>; a decodable
+payload with a bad checksum returns an inspection with <code>valid: false</code>.
+CRC is INTEGRITY, not authenticity — it proves the bytes were not
+corrupted, never who produced them.</p>
 </div></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
