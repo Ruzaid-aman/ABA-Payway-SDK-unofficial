@@ -87,6 +87,10 @@ function describeRecord(record: WebhookRecord): string {
   if (record.replay) bits.push('replay');
   if (record.khqr?.parsed) bits.push('route=khqr');
   if (record.paymentLinkPushback?.parsed) bits.push('route=pushback');
+  if (record.customerQr?.parsed) {
+    bits.push('route=customer-qr');
+    bits.push(`customer_id=${record.customerQr.parsed.notification.merchantRef}`);
+  }
   return bits.join('  ');
 }
 
@@ -319,6 +323,7 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
     .option('-a, --amount <number>', 'Fixture amount (default 10 USD / 40000 KHR)')
     .option('-c, --currency <code>', 'Fixture currency: USD (default) or KHR', 'USD')
     .option('--payer-name <name>', 'Payer name shown in the fixture', 'Mock Payer')
+    .option('--customer-name <name>', 'Customer Module fixtures only: portal customer name in the nested customer object', 'Mock Customer')
     .option('--api-key <key>', 'Merchant API key for signing (or PAYWAY_API_KEY env)')
     .option('--forward-headers <headers>', 'Extra headers: "Key1:Value1, Key2:Value2"')
     .option('--json', 'Machine-readable output envelope')
@@ -349,6 +354,7 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
           amount,
           currency,
           payerName: opts.payerName as string | undefined,
+          customerName: opts.customerName as string | undefined,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

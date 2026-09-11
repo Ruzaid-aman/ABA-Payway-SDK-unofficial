@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { verifyCallbackDetailed } from '../auth.js';
 import { WebhookForwarder, parseForwardHeaders } from '../webhook/forwarder.js';
 import { buildWebhookFixture, WEBHOOK_FIXTURE_EVENTS } from '../webhook/fixtures.js';
+import { parseCustomerQrCallback } from '../webhook/customer-callback.js';
 
 const API_KEY = 'test-api-key-123';
 
@@ -99,16 +100,52 @@ describe('WebhookForwarder', () => {
 });
 
 describe('buildWebhookFixture', () => {
-  it('exposes exactly the seven documented fixture events', () => {
+  it('exposes exactly the eight documented fixture events', () => {
     expect(WEBHOOK_FIXTURE_EVENTS).toEqual([
       'payment.approved',
       'payment.declined',
       'payment.pending',
       'payment.refunded',
       'payment.cancelled',
+      'customer-qr.payment',
       'khqr.notification',
       'payment-link.pushback',
     ]);
+  });
+
+  it('builds the SIGNED Customer Module callback: KHQR fields + nested customer object, route /aba-payway-khqr-webhook', () => {
+    const fixture = buildWebhookFixture('customer-qr.payment', API_KEY, {
+      merchantRef: 'dt-one-8989',
+      amount: 0.38,
+      currency: 'USD',
+      customerName: 'dhitraj',
+      payerName: 'Payer Name',
+    });
+    expect(fixture.route).toBe('/aba-payway-khqr-webhook');
+    expect(fixture.verification).toBe('hmac');
+    expect(fixture.signature).toBeTruthy();
+    expect(fixture.tranId).toBe(String(fixture.parsed.transaction_id));
+    expect(fixture.parsed.merchant_ref).toBe('dt-one-8989');
+    expect((fixture.parsed.customer as Record<string, unknown>).customer_id).toBe('dt-one-8989');
+    expect((fixture.parsed.customer as Record<string, unknown>).customer_name).toBe('dhitraj');
+    expect(fixture.parsed.payer_name).toBe('Payer Name');
+
+    // The fixture must round-trip through the SDK verifier AND the parser.
+    const verdict = verifyCallbackDetailed(
+      fixture.parsed,
+      fixture.signature as string,
+      API_KEY,
+      { stripHash: true },
+    );
+    expect(verdict).toEqual({ valid: true });
+    const parsedCallback = parseCustomerQrCallback(fixture.parsed);
+    expect(parsedCallback.kind).toBe('customer-module-qr');
+    expect(parsedCallback.notification.customer?.customer_name).toBe('dhitraj');
+  });
+
+  it('refuses to build the Customer Module fixture without an API key (it is signed)', () => {
+    expect(() => buildWebhookFixture('customer-qr.payment', undefined)).toThrow(/PAYWAY_API_KEY/);
+    expect(() => buildWebhookFixture('customer-qr.payment', '')).toThrow(/PAYWAY_API_KEY/);
   });
 
   it('signs online checkout fixtures so the SDK verifier accepts them (round-trip pin)', () => {

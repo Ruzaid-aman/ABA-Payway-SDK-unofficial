@@ -28,6 +28,7 @@ export type WebhookFixtureEvent =
   | 'payment.pending'
   | 'payment.refunded'
   | 'payment.cancelled'
+  | 'customer-qr.payment'
   | 'khqr.notification'
   | 'payment-link.pushback';
 
@@ -37,6 +38,7 @@ export const WEBHOOK_FIXTURE_EVENTS: readonly WebhookFixtureEvent[] = [
   'payment.pending',
   'payment.refunded',
   'payment.cancelled',
+  'customer-qr.payment',
   'khqr.notification',
   'payment-link.pushback',
 ];
@@ -52,6 +54,8 @@ export interface WebhookFixtureOverrides {
   currency?: 'USD' | 'KHR';
   /** Customer/payer name shown in the fixture. */
   payerName?: string;
+  /** Customer Module only: portal customer name inside the nested customer object. */
+  customerName?: string;
 }
 
 export interface WebhookFixture {
@@ -92,7 +96,7 @@ function formatTransactionDate(date: Date): string {
 }
 
 const STATUS_BY_EVENT: Record<
-  Exclude<WebhookFixtureEvent, 'khqr.notification' | 'payment-link.pushback'>,
+  Exclude<WebhookFixtureEvent, 'khqr.notification' | 'payment-link.pushback' | 'customer-qr.payment'>,
   { status: keyof typeof PAYMENT_STATUS_CODES; code: number }
 > = {
   'payment.approved': { status: 'APPROVED', code: PAYMENT_STATUS_CODES.APPROVED },
@@ -126,6 +130,55 @@ export function buildWebhookFixture(
         : 10;
   const amountStr = currency === 'KHR' ? String(Math.round(amount)) : amount.toFixed(2);
   const tranId = overrides.tranId ?? autoTranId('mock-');
+
+  if (event === 'customer-qr.payment') {
+    // Customer Module ("Printed QR") callback — the merchant-captured shape
+    // (2026-08-18): KHQR fields + payer_name + nested portal customer object,
+    // SIGNED with X-PAYWAY-HMAC-SHA512 (unlike the offline notification).
+    if (apiKey === undefined || apiKey.trim() === '') {
+      throw new Error(
+        `fixture "${event}" is an HMAC-signed Customer Module callback and needs the merchant API key (PAYWAY_API_KEY) to sign with`,
+      );
+    }
+    const customerId = overrides.merchantRef ?? tranId;
+    const parsed: Record<string, unknown> = {
+      payment_status_code: PAYMENT_STATUS_CODES.APPROVED,
+      transaction_id: String(Math.floor(Math.random() * 1e15)),
+      payment_status: 'APPROVED',
+      apv: String(Math.floor(100000 + Math.random() * 899999)),
+      original_amount: amount,
+      original_currency: currency,
+      payment_amount: amount,
+      payment_currency: currency,
+      payment_type: 'ABA Pay',
+      transaction_date: formatTransactionDate(now),
+      bank_ref: `100SB${Date.now()}`,
+      payer_account: `*${String(Math.floor(100 + Math.random() * 899))}`,
+      payer_name: overrides.payerName ?? 'Mock Payer',
+      bank_name: 'ABA Bank',
+      merchant_ref: customerId,
+      customer: {
+        type: 'individual',
+        customer_id: customerId,
+        customer_name: overrides.customerName ?? 'Mock Customer',
+        vat_tin: '',
+        email: '',
+        phone: '',
+        address: '',
+        remark: '',
+      },
+    };
+    const signature = signCallbackBody(parsed, apiKey);
+    return {
+      event,
+      route: '/aba-payway-khqr-webhook',
+      body: JSON.stringify(parsed),
+      parsed,
+      signature,
+      tranId: String(parsed.transaction_id),
+      verification: 'hmac',
+    };
+  }
 
   if (event === 'khqr.notification') {
     const parsed: Record<string, unknown> = {
