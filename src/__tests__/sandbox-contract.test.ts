@@ -33,6 +33,9 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PayWay } from '../client.js';
 import { PayWayAPIError, PayWayBusinessError, PayWayConfigError } from '../errors.js';
+// Shared loader: folds the multi-line quoted RSA PEM in .env (the naive
+// line-based parse below truncated it — SANDBOX-FINDINGS §1 #1).
+import { parseDotEnvFile } from '../cli/dotenv.js';
 
 const LIVE_TIMEOUT = 30_000;
 const DETAIL_PROPAGATION_TIMEOUT = 45_000;
@@ -42,31 +45,23 @@ const gate = process.env.SANDBOX_CONTRACT_TESTS === '1' || process.env.SANDBOX_C
 function parseDotenv(): Record<string, string> {
   const envPath = path.resolve(import.meta.dirname ?? '.', '../../.env');
   if (!fs.existsSync(envPath)) return {};
-  const out: Record<string, string> = {};
-  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    out[key] = value;
-  }
-  return out;
+  return parseDotEnvFile(envPath);
 }
 
 const env = gate ? parseDotenv() : {};
 const merchantId = env.PAYWAY_MERCHANT_ID ?? '';
 const apiKey = env.PAYWAY_API_KEY ?? '';
 const callbackUrl = env.PAYWAY_CALLBACK_URL || 'https://example.com/payway-callback';
+const rsaPublicKey = (env.PAYWAY_RSA_PUBLIC_KEY ?? '').replace(/\\n/g, '\n');
 const hasCredentials = merchantId.length > 0 && apiKey.length > 0;
 
 const suite = describe.skipIf(!gate || !hasCredentials);
+/** §23 void legs need the RSA key (merchant_auth encryption) — skip when absent. */
+const voidSuite = describe.skipIf(!gate || !hasCredentials || rsaPublicKey.length === 0);
 
 let client: PayWay;
+/** Separate client wired with publicKeyPem for the payment-link void legs. */
+let rsaClient: PayWay;
 let previousTlsReject: string | undefined;
 
 beforeAll(() => {
@@ -74,6 +69,9 @@ beforeAll(() => {
   previousTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   client = new PayWay({ merchantId, apiKey, environment: 'sandbox' });
+  if (rsaPublicKey.length > 0) {
+    rsaClient = new PayWay({ merchantId, apiKey, environment: 'sandbox', publicKeyPem: rsaPublicKey });
+  }
 });
 
 afterAll(() => {
@@ -355,6 +353,52 @@ suite('sandbox contract (SANDBOX-FINDINGS §1–§13; opt-in via SANDBOX_CONTRAC
       const after = await client.checkout.checkTransaction(tranId);
       expect(after.data?.payment_status_code).toBe(2);
       expect(after.data?.payment_status).toBe('PENDING');
+    },
+    LIVE_TIMEOUT,
+  );
+});
+
+// ── §23: payment-link void — undocumented endpoint, live-verified ──────────
+// Contract mapped 2026-09-11 (scripts/sandbox-probe-payment-link-void.ts) and
+// implementation-verified end-to-end (scripts/e2e-payment-link-void.ts,
+// test-output/payment-link-void-e2e/). These legs re-pin the durable facts
+// through the shipped SDK. Skipped entirely when the RSA key is absent.
+voidSuite('payment-link void (SANDBOX-FINDINGS §23; opt-in, needs PAYWAY_RSA_PUBLIC_KEY)', () => {
+  it(
+    'void succeeds on a fresh link, detail reports VOIDED, double-void answers PTL188, bogus id answers 96 (§23)',
+    async () => {
+      const created = await rsaClient.paymentLink.create({
+        title: 'Sandbox contract void pin',
+        amount: 1.5,
+        currency: 'USD',
+        merchantRefNo: uniqueId('plvoid'),
+        returnUrl: 'https://merchant.example/payway/pushback',
+        expiredDate: Math.floor(Date.now() / 1000) + 3600,
+      });
+      const linkId = (created.data as Record<string, unknown> | undefined)?.id;
+      expect(typeof linkId).toBe('string');
+
+      // Void success: 00 + numeric gateway log id.
+      const voided = await rsaClient.paymentLink.void(linkId as string);
+      expect(voided.status?.code).toBe('00');
+      expect(typeof voided.tran_id).toBe('number');
+
+      // Post-void detail: the previously-unobserved VOIDED status, zero payments.
+      const detail = await rsaClient.paymentLink.getDetails(linkId as string);
+      expect((detail.data as Record<string, unknown>)?.status).toBe('VOIDED');
+      expect((detail.data as Record<string, unknown>)?.total_trxn).toBe(0);
+
+      // Double-void: NOT idempotent — 403 PTL188 "already voided".
+      await expect(rsaClient.paymentLink.void(linkId as string)).rejects.toMatchObject({
+        paywayCode: 'PTL188',
+        statusCode: 403,
+      });
+
+      // Bogus id: the same unknown-id signal as detail — 403 code 96.
+      await expect(rsaClient.paymentLink.void(`bogus-${Date.now().toString(36)}==`)).rejects.toMatchObject({
+        paywayCode: '96',
+        statusCode: 403,
+      });
     },
     LIVE_TIMEOUT,
   );
