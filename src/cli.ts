@@ -3452,7 +3452,7 @@ paymentLinkCmd
       console.log(`  ${c.green('✓')} Payment link voided (terminal — no longer accepts payments)`);
       console.log(`  ${c.bold('Link ID:')}  ${opts.id}`);
       console.log(`  ${c.bold('Gateway log:')} ${result.tran_id ?? '-'}`);
-      console.log(`  ${c.dim('Verify with: payway-sdk payment-link detail -i ' + opts.id + ' — detail now reports status "VOIDED".')}`);
+      console.log(`  ${c.dim(`Verify with: payway-sdk payment-link detail -i ${opts.id} — detail now reports status "VOIDED".`)}`);
       console.log();
       process.exitCode = EXIT_OK;
     } catch (e) {
