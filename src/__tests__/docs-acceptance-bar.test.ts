@@ -59,4 +59,35 @@ describe('docs acceptance bar', () => {
     }
     expect(referenced.length).toBeGreaterThanOrEqual(4);
   });
+
+  it('QR template gallery documents all sandbox-verified templates with images', () => {
+    const md = read('07-qr-code-handling.md');
+    for (const template of [
+      'template1',
+      'template1_color',
+      'template2',
+      'template2_color',
+      'template3_color',
+      'template4',
+      'template4_color',
+    ]) {
+      expect(md).toContain(template);
+    }
+    expect(md).toContain('## QR Image Template Gallery');
+    expect(md).toContain('images/qr-templates/template2.png');
+    const pngs = readdirSync(join(repoRoot, 'docs', 'images', 'qr-templates'))
+      .filter((f) => f.endsWith('.png'))
+      .sort();
+    expect(pngs).toEqual([
+      'template1.png',
+      'template1_color.png',
+      'template2.png',
+      'template2_color.png',
+      'template3_color.png',
+      'template4.png',
+      'template4_color.png',
+    ]);
+    // docs/10 routes template pickers to the gallery
+    expect(read('10-ui-customization.md')).toContain('07-qr-code-handling.md#qr-image-template-gallery');
+  });
 });

@@ -321,6 +321,28 @@ export default router;
 
 ---
 
+## QR Image Template Gallery
+
+The `qrImageTemplate` parameter (CLI `--template`) asks the **gateway** to render `qrImage` in one of seven styles. All seven are verified in sandbox (2026-08-30; per-template latency and acceptance notes in [SANDBOX-FINDINGS](./SANDBOX-FINDINGS.md)). `template2` is the API default. Templates are online-only — the [offline ABA KHQR](#official-aba-khqr-offline-generation-no-api-call-required) pipeline produces plain unbranded EMVCo payloads and cannot carry a template.
+
+Rendered samples (captured from the sandbox by `scripts/capture-qr-template-gallery.ts`):
+
+| Template | Sample | Style | Use it for |
+|---|---|---|---|
+| `template1` | ![template1](./images/qr-templates/template1.png) | Classic black & white card, no branding | Minimal digital displays, embedded devices, custom-branding hosts |
+| `template1_color` | ![template1_color](./images/qr-templates/template1_color.png) | Classic layout with ABA brand color | Same as template1 with recognizable ABA mark |
+| `template2` *(default)* | ![template2](./images/qr-templates/template2.png) | White card with ABA logo header | General checkout pages |
+| `template2_color` | ![template2_color](./images/qr-templates/template2_color.png) | Default layout with brand color | Checkout pages that match an ABA-branded theme |
+| `template3_color` | ![template3_color](./images/qr-templates/template3_color.png) | Compact color design | Customer-facing screens where vertical space is tight |
+| `template4` | ![template4](./images/qr-templates/template4.png) | Tall receipt style, black & white | Receipts and printed invoices (thermal printers) |
+| `template4_color` | ![template4_color](./images/qr-templates/template4_color.png) | Tall receipt style with brand color | Branded receipts and printed invoices |
+
+> 💡 Pick by placement, not preference: screens get `template2`/`template3_color`; print gets `template4`/`template4_color`; unbranded or self-branded hosts get `template1`. The samples above are 5.00 USD sandbox renders — amounts and merchant names render dynamically per transaction.
+
+CLI usage: `payway-sdk generate-qr -a 5.00 -c USD --template template4_color -y`. An unknown `--template` value warns (with a did-you-mean suggestion) but is still sent; the gateway answers `04` for values it does not know.
+
+---
+
 ## Official ABA KHQR Offline Generation (No API Call Required)
 
 The SDK can construct an official ABA KHQR payload entirely locally. This makes no HTTP request, so it does not submit, track, or reconcile a payment. It requires ABA-provided merchant configuration; API credentials are not a substitute for the nested merchant-account tag `30` or PayWay data tag `62.68`.
