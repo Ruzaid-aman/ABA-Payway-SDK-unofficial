@@ -167,6 +167,7 @@ export const PAYOUT_ERROR_CODES = {
  */
 export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }> = {
   '1': { title: 'Wrong Hash', hint: 'HMAC signature mismatch — check API key, field ordering, base64 vs hex encoding.' },
+  '2': { title: 'Transaction Not Closable', hint: 'Transaction status does not allow close — sandbox-verified: closing an already PAID transaction answers 403 code 2 (SANDBOX-FINDINGS §21). Only OPEN/PENDING transactions can be closed.' },
   '4': { title: 'Invalid Data', hint: 'Server-side binding/validation failed — see errors map in rawBody for per-field messages.' },
   '5': { title: 'Transaction Not Found', hint: 'Close/cancel target does not exist — verify tran_id.' },
   '6': { title: 'tran_id not found', hint: 'check-transaction found no transaction with this ID.' },

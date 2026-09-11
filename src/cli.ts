@@ -1308,11 +1308,25 @@ program
   .command('explain')
   .description('Decode a PayWay error/status code (e.g. explain PTL36, explain 49). No credentials needed.')
   .argument('[code]', 'PayWay code to explain — omit to list all known codes')
-  .action((code?: string) => {
+  .option('--json', 'Print machine-readable JSON: one document (or array for bare explain); error envelope on unknown code')
+  .action((code: string | undefined, opts: { json?: boolean }) => {
+    if (opts.json) {
+      if (!code) {
+        console.log(JSON.stringify(explainAll(), null, 2));
+        return;
+      }
+      const jsonExplanation = explainPayWayCode(code);
+      if (!jsonExplanation) {
+        process.exitCode = printValidationErrorJson(`Unknown or undocumented code: ${code}`);
+        return;
+      }
+      console.log(JSON.stringify(jsonExplanation, null, 2));
+      return;
+    }
     console.log(`\n${c.bold('ABA PayWay SDK')} — code reference\n`);
     if (!code) {
       for (const e of explainAll()) {
-        console.log(`  ${c.cyan(e.code.padEnd(7))} ${c.bold(`[${e.family}]`).padEnd(0)} ${e.title}`);
+        console.log(`  ${c.cyan(e.code.padEnd(7))} ${c.bold(`[${e.family}]`).padEnd(0)} ${e.title}${e.sandboxVerified ? c.green(' ✓') : ''}`);
         if (e.hint) console.log(`  ${''.padEnd(7)} ${c.dim(e.hint)}`);
       }
       console.log();
@@ -1327,6 +1341,7 @@ program
     }
     console.log(`  ${c.cyan(explanation.code)}  ${c.bold(explanation.title)}  ${c.dim(`(${explanation.family})`)}`);
     if (explanation.hint) console.log(`  → ${explanation.hint}`);
+    if (explanation.sandboxVerified) console.log(`  ${c.green('✓ sandbox-verified')} ${c.dim(`(${explanation.evidence})`)}`);
     console.log();
   });
 
