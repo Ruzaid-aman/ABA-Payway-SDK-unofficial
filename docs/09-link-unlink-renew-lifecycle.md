@@ -3,6 +3,8 @@
 > **Estimated reading time:** 15 minutes  
 > **Goal:** Understand how to save, manage, and charge customer payment methods using Credentials-on-File (CoF).
 
+Token state machine at a glance: [Link / Unlink State Machine](./diagrams/link-unlink-state-machine.md) — every transition keyed to the SDK method that performs it.
+
 ---
 
 ## What Is Credentials-on-File (CoF)?

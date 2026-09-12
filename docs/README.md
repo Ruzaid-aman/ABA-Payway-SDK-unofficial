@@ -53,6 +53,17 @@ Start with [error handling](./12-error-handling-and-debugging.md) or [setup and 
 
 For recorded operations, use the opt-in [transaction journal and reconciliation](./18-transaction-journal.md). For terms and background, see [concepts](./01-overview-and-concepts.md), [glossary](./glossary.md), and [code examples](./14-appendix-code-snippets.md).
 
+## Diagram Library
+
+Standalone, GitHub-rendered diagrams covering the flows every integrator needs:
+
+- [Payment lifecycle](./diagrams/payment-lifecycle.md) — initiation → payment → return-URL vs trusted webhook → fulfillment (companion to [Chapter 3](./03-web-implementation.md)).
+- [Callback flow](./diagrams/callback-flow.md) — HMAC-verified online callback vs the unverified offline KHQR route (companion to [Chapter 11](./11-callbacks-and-webhooks.md)).
+- [Link / unlink state machine](./diagrams/link-unlink-state-machine.md) — CoF token states and the SDK methods that transition them (companion to [Chapter 9](./09-link-unlink-renew-lifecycle.md)).
+- [Platform decision tree](./diagrams/platform-decision-tree.md) — which chapter for which app platform.
+
+Each flow chapter also opens with an inline "Flow at a glance" sequence diagram (enforced by the docs acceptance bar, `src/__tests__/docs-acceptance-bar.test.ts`).
+
 ## Coding Agents
 
 For a runnable local exercise covering artifacts, verification and recovery, use
@@ -66,4 +77,5 @@ These materials support maintenance and investigation; they are not onboarding p
 
 - [Contributing](../CONTRIBUTING.md), [handoff](../HANDOFF.md), [release readiness](./RELEASE-READINESS.md), [release checklist](./RELEASE_CHECKLIST.md), [versioning](./VERSIONING.md).
 - [Sandbox findings](./SANDBOX-FINDINGS.md), [close-transaction evidence](./CLOSE-TRANSACTION-FINDINGS.md), [open questions](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md).
+- [Error-code registry (generated)](./error-codes.json) — every `explain`-known code as versioned JSON; regenerate with `npm run gen:error-registry`.
 - [Historical project status](./PROJECT_STATUS.md), [agent setup playbook](./AGENT-SETUP-PLAYBOOK.md), [callback capture recipe](./agents/callback-capture-recipe.md).

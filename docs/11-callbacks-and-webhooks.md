@@ -3,6 +3,33 @@
 > **Estimated reading time:** 15 minutes  
 > **Goal:** Build a secure receiver for online checkout callbacks and a separate capture route for unverified offline ABA KHQR notifications.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PayWay as 🏦 PayWay
+    participant Endpoint as ⚙️ Your Callback Endpoint
+    participant DB as 🗄️ Your Store
+
+    PayWay->>Endpoint: POST callback + X-PAYWAY-HMAC-SHA512 (online)
+    Endpoint->>Endpoint: verifyCallbackDetailed — timing-safe compare
+    alt signature valid ✅
+        Endpoint->>DB: dedupe by tran_id (idempotent)
+        Endpoint-->>PayWay: 200 OK → PayWay will NOT retry
+        Endpoint->>Endpoint: fulfill ONCE (only after APPROVED)
+    else signature invalid ❌
+        Endpoint-->>PayWay: 403 (log + drop)
+    end
+
+    PayWay->>Endpoint: POST /aba-payway-khqr-webhook (offline KHQR pushback — NO hash)
+    Note over Endpoint: Untrusted by contract — never parse-and-trust.
+    Endpoint->>PayWay: check-transaction before acting ✅
+    Endpoint->>DB: reconcile (Missing callback ≠ non-payment; PayWay never retries)
+```
+
+Full diagram: [Callback Flow](./diagrams/callback-flow.md).
+
 ---
 
 ## Callback Types and Trust Boundaries

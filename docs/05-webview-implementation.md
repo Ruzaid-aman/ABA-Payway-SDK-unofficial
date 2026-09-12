@@ -3,6 +3,36 @@
 > **Estimated reading time:** 15 minutes  
 > **Goal:** Understand how to use WebViews to display PayWay's checkout page inside your app, manage cookies and sessions, and capture payment results.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Host as 📱 Host App
+    participant WebView as 🧩 WebView
+    participant Backend as ⚙️ Your Backend (SDK)
+    participant PayWay as 🏦 PayWay
+
+    Host->>Backend: create checkout
+    Backend-->>Host: payment artifact (URL / form)
+    Host->>WebView: load PayWay checkout page
+    WebView->>PayWay: render + customer pays
+
+    alt JS bridge available (preferred)
+        PayWay-->>WebView: result page calls postMessage ✅
+        WebView-->>Host: script handler receives result
+    else URL interception
+        PayWay-->>WebView: redirect to return_url prefix ✅
+        WebView-->>Host: navigation delegate intercepts
+    else deeplink return (mobile apps)
+        PayWay-->>Host: returnDeeplink opens the app ✅
+    end
+
+    Host->>Backend: verify status server-side (never trust the UI signal)
+    Backend-->>Host: APPROVED ✅ → close the WebView, show success
+    Note over Host,PayWay: Cookies: keep a shared process pool per session; clear storage between different customers.
+```
+
 ---
 
 ## What Is a WebView?
@@ -15,6 +45,12 @@ A WebView is a mini web browser embedded inside your native app. Instead of open
 | **Android** | `android.webkit.WebView` | `addJavascriptInterface()` |
 | **React Native** | `react-native-webview` | `onMessage` / `postMessage` |
 | **Flutter** | `webview_flutter` | `JavaScriptChannel` |
+
+### Flutter (webview_flutter)
+
+In Flutter, `WebViewController.setNavigationDelegate` plays the role of the Android `WebViewClient` / iOS `WKNavigationDelegate`: load your backend's checkout URL, intercept any navigation to your `returnUrlPrefix`, then confirm the real status with your backend before fulfilling. Launching the ABA Pay app for `abapay_khqr_deeplink` flows uses `url_launcher` with an external-application launch and a fallback URL.
+
+> **Full runnable example:** [`examples/flutter/payment_screen.dart`](./examples/flutter/payment_screen.dart) — webview checkout + return-URL interception + ABA Pay deeplink launcher, mirroring the [Android](./examples/android/PaymentActivity.kt) and [iOS](./examples/ios/PaymentViewController.swift) examples.
 
 ---
 

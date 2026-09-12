@@ -3,6 +3,26 @@
 > **Estimated reading time:** 10 minutes  
 > **Goal:** Integrate ABA PayWay payments into a Telegram Mini App.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant TG as ✈️ Telegram Mini App
+    participant Backend as ⚙️ Your Backend (SDK)
+    participant PayWay as 🏦 PayWay
+
+    TG->>Backend: order request + initData (validate via bot token)
+    Backend->>PayWay: create payment (signed server-side)
+    PayWay-->>Backend: payment artifact
+    Backend-->>TG: checkout URL → Mini App opens checkout WebView
+    Customer->>PayWay: completes payment
+    PayWay-->>Backend: callback + X-PAYWAY-HMAC-SHA512 (trusted)
+    Backend->>Backend: verifyCallbackDetailed → dedupe → ✅ fulfill once
+    Backend-->>Telegram: bot notifies the customer (sendMessage)
+    Note over TG,Backend: Telegram's WebApp.initData is auth for YOUR user identity — PayWay approval still comes only via the verified callback.
+```
+
 ---
 
 ## What Is a Telegram Mini App?
