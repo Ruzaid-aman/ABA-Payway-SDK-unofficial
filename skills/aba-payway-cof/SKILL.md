@@ -89,6 +89,7 @@ payway-sdk cof link-account -r req0001 -c customer123 -f CITI_FLEX --currency US
 payway-sdk cof link-card-form -c customer123 -f CITI_FLEX --callback-url <url> -o link-card.html   # local, no API call
 payway-sdk cof link-card -r req0002 -c customer123 -f CITI_FLEX --frequency 1M --callback-url <url>
 payway-sdk cof charge -t order-0001 -a 4.50 --token <pwt> --ctid customer123 --token-flag MITU_FLEX
+payway-sdk cof token-flag-sweep -c customer123 --json   # diagnostic: 1 POST per linking flag + card leg; uniform 104 = profile blocker (no receiver needed)
 ```
 
 ## Error Handling
