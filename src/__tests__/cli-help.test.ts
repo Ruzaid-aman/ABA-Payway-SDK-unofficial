@@ -17,6 +17,7 @@ const REGISTERED_COMMANDS = [
   'demo',
   'status',
   'explain',
+  'docs',
   'get-transactions-by-ref',
   'check-transaction',
   'poll-transaction',

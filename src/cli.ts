@@ -26,6 +26,7 @@ import { suggestMessage } from './cli/ui/suggest.js';
 import { renderQrToTerminal, shouldAutoRenderQr } from './cli/terminal-qr.js';
 import { inspectKhqrPayload } from './khqr-offline.js';
 import { registerAgentCommands } from './cli/commands/agent.js';
+import { registerDocsCommand } from './cli/commands/docs.js';
 import { registerJournalCommands } from './cli/commands/journal.js';
 import {
   emitCliCommandStarted,
@@ -971,6 +972,9 @@ function isProfilesCommand(command: Command): boolean {
 
 function activateSelectedProfile(command: Command): void {
   if (isProfilesCommand(command) || command.name() === 'demo' || command.name() === 'init') return;
+  // `docs` serves knowledge only — never credentials, so the profile notice
+  // would be pure noise on top of served content.
+  if (command.name() === 'docs') return;
   const selectedName =
     program.opts<{ profile?: string }>().profile ??
     process.env.PAYWAY_PROFILE ??
@@ -4465,6 +4469,7 @@ program
 
 // --- agentic command tree ---
 registerAgentCommands(program);
+registerDocsCommand(program);
 registerJournalCommands(program);
 registerOnboardCommand(program);
 registerWebhookCommands(program);

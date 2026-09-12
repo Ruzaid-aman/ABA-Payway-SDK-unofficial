@@ -41,7 +41,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
   { title: 'Money-out', commands: ['refund', 'payout', 'pre-auth', 'beneficiary', 'self-activation'] },
   {
     title: 'Reference',
-    commands: ['status', 'explain', 'validate', 'exchange-rate', 'sandbox-beneficiaries', 'sandbox-test-cards'],
+    commands: ['docs', 'status', 'explain', 'validate', 'exchange-rate', 'sandbox-beneficiaries', 'sandbox-test-cards'],
   },
   { title: 'Agent & skills', commands: ['ask', 'agent', 'skills', 'demo', 'test'] },
 ];

@@ -35,6 +35,8 @@ const required = [
   'dist/index.d.ts',
   'dist/cli.js',
   'skills/README.md',
+  'knowledge/MANIFEST.json',
+  'llms.txt',
 ];
 const missing = required.filter((entry) => !fileSet.has(entry));
 
@@ -79,6 +81,9 @@ for (const entry of files) {
     for (const match of content.matchAll(/\]\(([^)]+)\)/g)) {
       const destination = match[1].trim().replace(/^<|>$/g, '');
       if (!destination || destination.startsWith('#') || /^[a-z]+:/i.test(destination)) continue;
+      // CLI-served knowledge links ("payway-sdk docs <topic>") are resolved at
+      // runtime by the docs command, not by package-relative paths.
+      if (destination.startsWith('payway-sdk ')) continue;
       const localPath = destination.split('#')[0].split('?')[0];
       const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(entry), localPath.replace(/^\.\//, '')));
       if (!fileSet.has(resolved)) brokenLocalLinks.push(`${entry} -> ${destination}`);

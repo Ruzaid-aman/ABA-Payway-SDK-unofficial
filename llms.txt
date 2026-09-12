@@ -1,0 +1,67 @@
+# aba-payway-ts
+
+> ABA PayWay payment-gateway toolkit: a typed TypeScript SDK, an agent-first CLI
+> (`payway-sdk`), and 32 installable agent skills — carrying sandbox-verified
+> integration knowledge for ABA Bank PayWay (KHQR, hosted checkout, COF, payment
+> links, payouts, pre-auth, webhooks).
+
+Fast path from install to a first paid sandbox transaction:
+
+```
+npm install aba-payway-ts      # SDK + CLI + packaged agent skills
+payway-sdk init                # scaffold .env + first-payment template
+payway-sdk doctor --live       # prove a real sandbox round-trip
+payway-sdk docs quickstart     # full quickstart, served offline by the CLI
+payway-sdk onboard             # configure the LLM agent (ask / agent REPL)
+```
+
+Gateway facts most often gotten wrong (all sandbox-verified — see the errors &
+debugging guide): `--lifetime` is SECONDS on generate-qr but MINUTES on
+generate-checkout (prefer `--lifetime-minutes`); callbacks are single best-effort
+delivery with NO guaranteed retry (verify via check-transaction); there is no
+EXPIRED status remotely (expired transactions read PENDING forever); split-payout
+keys are `{account,amount}` on generate-qr/payout but `{acc,amt}` on
+generate-checkout/cof charge/payment-link.
+
+## Docs
+
+Every doc below is also served by the CLI itself, offline:
+`payway-sdk docs list` · `payway-sdk docs <topic>` · `payway-sdk docs search <query>`
+
+- [Quickstart](QUICKSTART.md): First sandbox payment end to end: credentials, .env, generate-qr, check-transaction, polling.
+- [One-page quickstart](docs/QUICK-START-1-PAGER.md): Condensed create→verify→fulfill reference for the impatient.
+- [Docs index](docs/README.md): The full documentation map: start-here routes, per-domain guides, troubleshooting.
+- [Overview & concepts](docs/01-overview-and-concepts.md): PayWay model: merchant credentials, hash signing, sandbox vs production, payment options.
+- [Prerequisites & setup](docs/02-prerequisites-and-setup.md): Merchant portal, sandbox credentials, ABA Mobile simulator, environment variables.
+- [Web implementation](docs/03-web-implementation.md): Hosted checkout + server-side purchase flow for web apps, with callback verification.
+- [Native app implementation](docs/04-native-app-implementation.md): Android/iOS integration: deeplinks, webviews, return handling.
+- [Webview implementation](docs/05-webview-implementation.md): Mobile webview checkout patterns and deeplink return legs.
+- [Telegram mini-app](docs/06-telegram-mini-app.md): PayWay checkout inside a Telegram mini-app.
+- [QR code handling](docs/07-qr-code-handling.md): Online vs offline KHQR, scan-time validity windows, rendering and expiry semantics.
+- [Deep linking](docs/08-deep-linking.md): abamobilebank:// deeplink scheme and return-leg handling.
+- [COF link/unlink/renew lifecycle](docs/09-link-unlink-renew-lifecycle.md): Credentials-on-file account/card lifecycle and token renewal.
+- [UI customization](docs/10-ui-customization.md): Hosted checkout branding and view customization options.
+- [Callbacks & webhooks](docs/11-callbacks-and-webhooks.md): Single best-effort callback delivery, HMAC verification, webhook workbench.
+- [Errors & debugging](docs/12-error-handling-and-debugging.md): Every PayWay error code with sandbox-verified hints; the debugging playbook.
+- [Deployment checklist](docs/13-deployment-checklist.md): Production go-live gates: credentials, RSA, callback URLs, base URL.
+- [Appendix: code snippets](docs/14-appendix-code-snippets.md): Copy-paste hash signing, callback verification, and polling snippets.
+- [Merchant scenario requirements](docs/15-merchant-scenario-requirements.md): POS/billing/scenario requirements observed in real integrations.
+- [Webhook setup guide](docs/16-webhook-setup-guide.md): Local listener, tunnels, forwarding, and production webhook configuration.
+- [Payment link](docs/17-payment-link.md): Payment-link create/detail/void contract incl. pushbacks and VOIDED semantics.
+- [Transaction journal](docs/18-transaction-journal.md): Opt-in JSONL journal: correlation ids, timeline/stats/reconcile/anomalies.
+- [Customer module QR](docs/19-customer-module-qr.md): Portal Customer-ID keyed QR generation and merchant-reference reconciliation.
+- [Settlement & disputes](docs/20-settlement-and-disputes.md): Settlement timing, chargebacks, and refund boundaries per payment method.
+- [Cloudflare webhook (free tier)](docs/cloudflare-free-webhook.md): Free-tier Cloudflare Worker webhook receiver setup.
+- [Agent setup playbook](docs/AGENT-SETUP-PLAYBOOK.md): Configuring the agentic CLI: providers, capability modes, privacy ack.
+- [Agentic CLI user guide](docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md): ask / agent REPL / sessions / ledger — the full agent surface.
+- [First payment walkthrough](docs/FIRST-PAYMENT-WALKTHROUGH.md): Guided first sandbox payment with verification at each step.
+- [Close-transaction findings](docs/CLOSE-TRANSACTION-FINDINGS.md): What close-transaction really does remotely (QR kill vs hosted-card sessions).
+- [SDK & CLI reference](docs/SDK-AND-CLI-REFERENCE.md): Every SDK domain method and CLI command with flags and contracts.
+- [Error codes (machine)](docs/error-codes.json): Machine-readable error-code registry (generated by scripts/generate-error-registry.ts).
+
+## Agent integration
+
+- `payway-sdk skills add <agent>` — install the 32 packaged skill guides for claude/codex/opencode/cursor/copilot.
+- `payway-sdk ask "<request>"` — single-shot LLM plan with 14 PayWay tools (incl. `query_knowledge`).
+- `payway-sdk agent` — interactive REPL; `agent doctor` shows the readiness matrix.
+
