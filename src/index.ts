@@ -222,6 +222,16 @@ export type { KhqrPaymentNotification, ParsedKhqrPaymentNotification } from './w
 export { extractJsonPayload, parseKhqrPaymentNotification } from './webhook/khqr-notification.js';
 export type { CallbackKind, CustomerQrCustomer, ParsedCustomerQrCallback } from './webhook/customer-callback.js';
 export { classifyCallback, parseCustomerQrCallback } from './webhook/customer-callback.js';
+export type { ParsedCofLinkCallback } from './webhook/cof-callback.js';
+export { isCofLinkCallback, parseCofLinkCallback } from './webhook/cof-callback.js';
+export type { LinkedTokenRecord } from './webhook/token-store.js';
+export {
+  latestTokenForCtid,
+  loadLinkedTokens,
+  maskPwt,
+  resolveTokenStoreDir,
+  saveLinkedToken,
+} from './webhook/token-store.js';
 export type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './webhook/storage.js';
 export type { StorageType } from './webhook/storage-factory.js';
 // ─── Webhook Storage ─────────────────────────────────────────────────────

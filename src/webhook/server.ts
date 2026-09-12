@@ -22,6 +22,8 @@ import { extractTransactionIdFrom } from '../journal/digest.js';
 import { createJournalEmitter } from '../journal/writer.js';
 import type { JournalContext } from '../journal/types.js';
 import { parsePaymentLinkPushback } from '../domains/payment-link.js';
+import { isCofLinkCallback, parseCofLinkCallback } from './cof-callback.js';
+import { maskPwt, resolveTokenStoreDir, saveLinkedToken } from './token-store.js';
 import { WebhookForwarder, parseForwardHeaders } from './forwarder.js';
 import { extractJsonPayload, parseKhqrPaymentNotification } from './khqr-notification.js';
 import type { WebhookRecord, WebhookSignatureVerdict, WebhookStorage } from './storage.js';
@@ -74,6 +76,15 @@ export interface WebhookServerOptions {
   forwardHeaders?: string;
   /** Fetch seam for the forwarder (tests). */
   forwardFetch?: typeof fetch;
+  /**
+   * Directory for the linked-token store (`linked-tokens.json`). When a
+   * signature-VERIFIED CoF link callback (a delivery carrying `pwt`) is
+   * captured on any route, the token is persisted here for future
+   * `cof charge` use (see `token-store.ts`). Default: `<cwd>/payway-data`
+   * (or PAYWAY_TOKEN_STORE_DIR). Unverified/invalid deliveries are captured
+   * raw but their token is NOT persisted.
+   */
+  tokenStoreDir?: string;
 }
 
 export interface WebhookServerResult {
@@ -242,6 +253,47 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
     }
   }
 
+  /**
+   * Persist a CoF link token (`pwt`) from a verified delivery into the
+   * linked-token store for future `cof charge` use. The raw record stays the
+   * audit source either way; the token is only persisted when the delivery's
+   * signature VERIFIED (a pwt is a live payment credential — never persist
+   * one that arrived unsigned or with a bad signature).
+   */
+  function captureCofToken(
+    parsedBody: Record<string, unknown> | undefined,
+    signatureVerdict: WebhookSignatureVerdict,
+    recordId: string,
+  ): void {
+    if (!parsedBody || !isCofLinkCallback(parsedBody)) return;
+    const parsed = parseCofLinkCallback(parsedBody);
+    if (signatureVerdict !== 'verified') {
+      log(
+        `  \x1b[33m⚠ CoF link callback [${recordId}] carries pwt but signature is ${signatureVerdict} — token NOT persisted\x1b[0m`,
+      );
+      return;
+    }
+    try {
+      const dir = resolveTokenStoreDir(options.tokenStoreDir);
+      const saved = saveLinkedToken(
+        {
+          ctid: parsed.ctid ?? 'unknown-ctid',
+          pwt: parsed.pwt,
+          tokenFlag: parsed.tokenFlag,
+          requestId: parsed.requestId,
+          extraFields: Object.keys(parsed.extraFields).length > 0 ? parsed.extraFields : undefined,
+          sourceRecordId: recordId,
+        },
+        dir,
+      );
+      log(
+        `  \x1b[32m✓ CoF token captured [${recordId}]: ctid=${saved.ctid} token=${maskPwt(saved.pwt)} → ${dir}\\linked-tokens.json\x1b[0m`,
+      );
+    } catch (error) {
+      log(`  Unable to persist CoF token: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     const isOnlineWebhook = req.url === WEBHOOK_PATH;
     const isKhqrWebhook = req.url === khqrPath;
@@ -359,6 +411,8 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
             replay,
           });
 
+          captureCofToken(khqrBody, signatureVerdict, record.id);
+
           // Journal the capture before any rejection path: a 401-rejected
           // delivery must still appear in journal reconcile's callback side.
           emitCallbackJournal(record, matchedTransactionId, matchedStatus, khqrPath);
@@ -474,6 +528,8 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           matchedStatus,
           replay,
         });
+
+        captureCofToken(parsedBody, signatureVerdict, record.id);
 
         // A Customer Module delivery on the online route: attach the
         // customer-qr metadata too (same parser as the khqr route).

@@ -98,12 +98,13 @@ export interface ParsedCustomerQrCallback {
   readonly unknownFields: Record<string, unknown>;
 }
 
-/** The four callback contracts a merchant-profile callback URL can receive. */
+/** The five callback contracts a merchant-profile callback URL can receive. */
 export type CallbackKind =
   | 'online-checkout'
   | 'customer-module-qr'
   | 'khqr-offline'
   | 'payment-link-pushback'
+  | 'cof-link'
   | 'unknown';
 
 const STRING_FIELDS = [
@@ -238,6 +239,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  */
 export function classifyCallback(payload: unknown): CallbackKind {
   if (!isPlainObject(payload)) return 'unknown';
+
+  // CoF link result: the pwt discriminator. No other callback contract
+  // carries a token — check BEFORE online-checkout, which also carries
+  // `status` (field set unverified live, Q18).
+  if (typeof payload.pwt === 'string' && payload.pwt.length > 0) {
+    return 'cof-link';
+  }
 
   // Payment-link pushback: the live-verified trio (§22 V-1). merchant_ref_no
   // never appears on the other contracts; extras beyond the trio are tolerated.

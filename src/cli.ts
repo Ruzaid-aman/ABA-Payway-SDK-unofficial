@@ -42,6 +42,7 @@ import { runInit } from './cli/commands/init.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
 import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/commands/skills.js';
 import { registerWebhookCommands } from './cli/commands/webhook.js';
+import { latestTokenForCtid, loadLinkedTokens, maskPwt } from './webhook/token-store.js';
 import { readMaskedInput } from './cli/masked-input.js';
 import { loadPaymentLinkImage } from './cli/payment-link-image.js';
 import { PayWay } from './client.js';
@@ -4135,9 +4136,9 @@ cofCmd
   .description('Submit a credentials-on-file (COF) payment against a linked token')
   .requiredOption('-t, --transaction-id <id>', 'Transaction ID for this payment')
   .requiredOption('-a, --amount <number>', 'Payment amount')
-  .requiredOption('--token <pwt>', 'Payment token (pwt) returned by a prior link/charge')
+  .option('--token <pwt>', 'Payment token (pwt). Omit to resolve the latest captured token for --ctid from the local token store')
   .option('-c, --currency <code>', 'Currency: USD (default) or KHR', 'USD')
-  .option('--ctid <ctid>', 'Customer token identifier (optional on repeat charges)')
+  .option('--ctid <ctid>', 'Customer token identifier (required when --token is omitted — resolves the stored pwt)')
   .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--token-flag <flag>', 'Charge flags: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX')
   .option('--callback-url <url>', 'Webhook callback URL')
@@ -4164,12 +4165,29 @@ cofCmd
       process.exitCode = EXIT_VALIDATION;
       return;
     }
+    let paymentToken = opts.token as string | undefined;
+    if (!paymentToken) {
+      if (!opts.ctid) {
+        console.log(`  ${c.red('✗')} Provide --token <pwt> or --ctid <ctid> (resolves the latest captured token from the local store).`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      const stored = latestTokenForCtid(opts.ctid as string);
+      if (!stored) {
+        console.log(`  ${c.red('✗')} No captured token for ctid ${c.cyan(String(opts.ctid))} in the local token store.`);
+        console.log(`  ${c.dim('Run the link flow with the webhook receiver running (setup-webhook), or pass --token explicitly.')}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      paymentToken = stored.pwt;
+      console.log(`  Using captured token ${c.cyan(maskPwt(stored.pwt))} ${c.dim(`(captured ${stored.capturedAt})`)}`);
+    }
     try {
       const payway = new PayWay();
       const result = await payway.credentialsOnFile.payment({
         transactionId: opts.transactionId as string,
         amount,
-        paymentToken: opts.token as string,
+        paymentToken,
         currency: (opts.currency ?? 'USD') as 'USD' | 'KHR',
         ctid: opts.ctid,
         tokenFlag: opts.tokenFlag,
@@ -4283,6 +4301,46 @@ cofTokenCmd
     } catch (e) {
       process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
+  });
+
+// Local token store (captured CoF link tokens) — offline read, no API call.
+cofTokenCmd
+  .command('list')
+  .description('List locally captured CoF link tokens (offline read of payway-data/linked-tokens.json — no API call)')
+  .option('-c, --ctid <ctid>', 'Show only tokens for this customer id')
+  .option('--show-token', 'Reveal full pwt values (default: masked)')
+  .option('--json', 'Print the store as one JSON document')
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
+    const tokens = loadLinkedTokens();
+    const filtered = opts.ctid ? tokens.filter((t) => t.ctid === opts.ctid) : tokens;
+    if (opts.json) {
+      console.log(JSON.stringify({ tokens: filtered }, null, 2));
+      process.exitCode = EXIT_OK;
+      return;
+    }
+    if (filtered.length === 0) {
+      console.log(`  ${c.yellow('⚠')} No captured tokens${opts.ctid ? ` for ctid ${c.cyan(String(opts.ctid))}` : ''}.`);
+      console.log(`  ${c.dim('Tokens arrive via the link callback — run the webhook receiver (setup-webhook) while linking.')}\n`);
+      process.exitCode = EXIT_OK;
+      return;
+    }
+    console.log(`\n${c.bold('Captured CoF tokens')} — ${filtered.length} record(s):\n`);
+    for (const t of filtered) {
+      const shown = opts.showToken ? t.pwt : maskPwt(t.pwt);
+      console.log(`  ${c.bold('CTID:')} ${c.cyan(t.ctid)}  ${c.bold('pwt:')} ${c.cyan(shown)}`);
+      const bits = [
+        t.tokenFlag ? `flag=${t.tokenFlag}` : undefined,
+        t.frequency ? `frequency=${t.frequency}` : undefined,
+        `captured=${t.capturedAt}`,
+        t.sourceRecordId ? `record=${t.sourceRecordId}` : undefined,
+      ].filter(Boolean) as string[];
+      console.log(`    ${c.dim(bits.join(' · '))}`);
+      if (t.extraFields && Object.keys(t.extraFields).length > 0) {
+        console.log(`    ${c.dim(`extra fields (Q18 capture): ${JSON.stringify(t.extraFields)}`)}`);
+      }
+    }
+    console.log(`\n  ${c.dim('Charge with: payway-sdk cof charge -t <id> -a <amount> --ctid <ctid> (token resolved from this store)')}\n`);
+    process.exitCode = EXIT_OK;
   });
 
 // --- beneficiary (whitelist management, RSA-encrypted) ---
