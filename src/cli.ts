@@ -496,6 +496,7 @@ interface GenerateCheckoutCommandOptions {
   items?: string;
   shipping?: string;
   lifetime?: string;
+  lifetimeMinutes?: string;
   customFields?: string;
   returnParams?: string;
   skipSuccessPage?: string;
@@ -505,6 +506,7 @@ interface GenerateCheckoutCommandOptions {
   additionalParams?: string;
   googlePayToken?: string;
   returnDeeplink?: string;
+  nonInteractive?: boolean;
   json?: boolean;
   output?: string;
   polling?: boolean;
@@ -1382,8 +1384,9 @@ program
   .description('Get up to 50 transactions by merchant reference (Customer Module reconciliation: use the portal Customer ID as the reference)')
   .requiredOption('-r, --merchant-ref <reference>', 'Merchant reference to look up (portal Customer ID for Customer Module QRs)')
   .option('--request-time <YYYYMMDDHHmmss>', 'Optional PayWay request timestamp')
-  .action(async (opts: { merchantRef: string; requestTime?: string }) => {
-    if (!assertCredentialsPresent()) {
+  .option('--json', 'Emit the error envelope on failure (successful reads are always JSON)')
+  .action(async (opts: { merchantRef: string; requestTime?: string; json?: boolean }) => {
+    if (!assertCredentialsPresent(opts.json)) {
       process.exitCode = 1;
       return;
     }
@@ -1398,7 +1401,7 @@ program
       }
       printApiResultJson(result, payway);
     } catch (error) {
-      process.exitCode = printApiError(error);
+      process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
     }
   });
 
@@ -2078,7 +2081,7 @@ program
   .description('Fetch the current USD/KHR exchange rate from PayWay')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: { json?: boolean }) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(opts.json)) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -2092,7 +2095,7 @@ program
       console.log(`  ${c.green('✓')} Exchange rate:`);
       console.log(`  ${JSON.stringify(result).slice(0, 300)}`);
     } catch (error) {
-      process.exitCode = printApiError(error);
+      process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
     }
   });
 
@@ -2858,7 +2861,8 @@ program
   .requiredOption('--payment-option <option>', 'abapay | abapay_khqr | wechat (USD only) | alipay (USD only)')
   .requiredOption('--callback-url <url>', 'Webhook callback URL (required by the endpoint)')
   .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
-  .option('--lifetime <minutes>', 'QR lifetime in MINUTES — 3..43200 (gateway default: 30 days)')
+  .option('--lifetime-minutes <minutes>', 'QR lifetime in minutes — 3..43200 (gateway default: 30 days) — explicit-units form')
+  .option('--lifetime <minutes>', 'QR lifetime in MINUTES — deprecated alias of --lifetime-minutes')
   .option('--purchase-type <type>', 'purchase (default) or pre-auth')
   .option('--save-image <path>', 'Save the QR PNG to file (default: payway-output/<transaction-id>.png)')
   .option('--no-save-image', 'Do not save the QR PNG')
@@ -2872,6 +2876,7 @@ program
     callbackUrl: string;
     transactionId?: string;
     lifetime?: string;
+    lifetimeMinutes?: string;
     purchaseType?: string;
     saveImage?: string | boolean;
     allowDuplicateId?: boolean;
@@ -2887,6 +2892,7 @@ program
     const currency = opts.currency.toUpperCase() as 'USD' | 'KHR';
     const amount = opts.amount === undefined ? undefined : Number(opts.amount);
     const transactionId = opts.transactionId ?? `sb${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    const lifetimeMinutesRaw = opts.lifetimeMinutes ?? opts.lifetime;
     warnDuplicateTransactionId(transactionId, opts);
 
     try {
@@ -2897,7 +2903,7 @@ program
         currency,
         paymentOption: opts.paymentOption,
         callbackUrl: opts.callbackUrl,
-        lifetime: opts.lifetime !== undefined ? Number(opts.lifetime) : undefined,
+        lifetime: lifetimeMinutesRaw !== undefined ? Number(lifetimeMinutesRaw) : undefined,
         purchaseType: opts.purchaseType as 'purchase' | 'pre-auth' | undefined,
       });
 
@@ -2909,7 +2915,7 @@ program
         console.log(`  ${c.bold('Amount:')}           ${amount !== undefined && Number.isFinite(amount) ? `${amount} ${currency}` : `(keyed on device) ${currency}`}`);
         console.log(`  ${c.bold('Payment Option:')}   ${opts.paymentOption}`);
         console.log(`  ${c.bold('Callback URL:')}     ${opts.callbackUrl}`);
-        if (opts.lifetime !== undefined) console.log(`  ${c.bold('Lifetime:')}         ${opts.lifetime} minutes`);
+        if (lifetimeMinutesRaw !== undefined) console.log(`  ${c.bold('Lifetime:')}         ${lifetimeMinutesRaw} minutes`);
         console.log();
 
         if (qr.qr_string) {
@@ -2975,7 +2981,8 @@ program
   .option('--phone <phone>', 'Customer phone')
   .option('--items <json>', 'Item list — JSON array or string (base64-encoded)')
   .option('--shipping <number>', 'Shipping fee amount')
-  .option('--lifetime <minutes>', 'Lifetime in minutes (min 3, max 43200)')
+  .option('--lifetime-minutes <minutes>', 'Lifetime in minutes (min 3, max 43200) — explicit-units form')
+  .option('--lifetime <minutes>', 'Lifetime in minutes — deprecated alias of --lifetime-minutes')
   .option('--custom-fields <json>', 'Custom fields — JSON object or string')
   .option('--return-params <value>', 'Extra params echoed in the pushback')
   .option('--skip-success-page <0|1>', 'Skip the success page (0 or 1)')
@@ -2985,6 +2992,7 @@ program
   .option('--additional-params <json>', 'Additional purchase parameters — JSON object or string')
   .option('--google-pay-token <token>', 'Google Pay token (required by the gateway when --payment-option google_pay)')
   .option('--return-deeplink <json>', 'App deeplink — JSON {ios_scheme, android_scheme} or string')
+  .option('-y, --non-interactive', 'Skip the submit confirmation prompt (for scripts/agents)')
   .option('--json', 'Print the raw JSON response')
   .option('--output <format>', 'Stable command result: json or ndjson')
   .option('--polling', 'Poll transaction status after checkout (enabled by default)', true)
@@ -3009,10 +3017,14 @@ program
 
     if (!outputMode) console.log(`\n${c.bold('ABA PayWay SDK')} — generate checkout QR URL\n`);
 
-    const io = !outputMode && resolvePromptMode() === 'clack' ? createClackIO() : null;
+    const io =
+      !outputMode && resolvePromptMode({ json: opts.json, nonInteractive: opts.nonInteractive }) === 'clack'
+        ? createClackIO()
+        : null;
     const amount = Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase() as 'USD' | 'KHR';
     const transactionId = opts.transactionId ?? `ck${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    const lifetimeMinutesRaw = opts.lifetimeMinutes ?? opts.lifetime;
     warnDuplicateTransactionId(transactionId, opts);
     const safeCurrency: 'USD' | 'KHR' = currency === 'KHR' ? 'KHR' : 'USD';
     let acceptedCheckout: { response: unknown } | undefined;
@@ -3160,7 +3172,7 @@ program
         email: opts.email,
         phone: opts.phone,
         shipping: opts.shipping !== undefined ? Number(opts.shipping) : undefined,
-        lifetime: opts.lifetime !== undefined ? Number(opts.lifetime) : undefined,
+        lifetime: lifetimeMinutesRaw !== undefined ? Number(lifetimeMinutesRaw) : undefined,
         skipSuccessPage: skipSuccessPage as 0 | 1 | undefined,
         viewType: opts.viewType === undefined ? undefined : (opts.viewType as 'hosted_view' | 'popup'),
         continueSuccessUrl: opts.continueSuccessUrl,
@@ -3729,15 +3741,19 @@ program
   .option('--custom-fields <json>', 'Optional JSON custom fields object/string')
   .option('--json', 'Print the raw response as JSON')
   .action(async (opts: { transactionId: string; amount: string; currency: string; beneficiaries: string; customFields?: string; json?: boolean }) => {
-    console.log(`\n${c.bold('ABA PayWay SDK')} — payout\n`);
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — payout\n`);
 
-    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+    if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
 
     const currency = opts.currency.toUpperCase() as 'USD' | 'KHR';
     if (currency !== 'USD' && currency !== 'KHR') {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`Currency must be USD or KHR, received: ${currency}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} Currency must be USD or KHR, received: ${c.red(currency)}`);
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -3747,6 +3763,10 @@ program
     try {
       beneficiaries = parseBeneficiariesArg(opts.beneficiaries);
     } catch (e) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson((e as Error).message);
+        return;
+      }
       console.log(`  ${c.red('✗')} ${(e as Error).message}`);
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -3754,6 +3774,10 @@ program
 
     const amount = Number(opts.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`Amount must be a positive number, received: ${String(opts.amount)}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -3764,6 +3788,10 @@ program
       try {
         customFields = JSON.parse(opts.customFields);
       } catch {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson(`--custom-fields is not valid JSON: ${opts.customFields}`);
+          return;
+        }
         console.log(`  ${c.red('✗')} --custom-fields is not valid JSON: ${opts.customFields}`);
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -3772,7 +3800,7 @@ program
 
     try {
       const payway = new PayWay();
-      console.log(`  ${c.dim('Calling PayWay payout API...')}`);
+      if (!opts.json) console.log(`  ${c.dim('Calling PayWay payout API...')}`);
       const result = await payway.payout.payout({
         transactionId: opts.transactionId,
         amount,
@@ -3791,7 +3819,7 @@ program
       }
       console.log();
     } catch (e) {
-      process.exitCode = printApiError(e);
+      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
   });
 
@@ -4462,7 +4490,7 @@ const preAuthComplete = new Command('complete')
       json?: boolean;
     }) => {
       const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
-      if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -4496,7 +4524,7 @@ const preAuthComplete = new Command('complete')
           console.log('  Cancelled by user.');
           process.exit(130);
         }
-        process.exitCode = printApiError(error);
+        process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
       }
     },
   );
@@ -4524,7 +4552,7 @@ const preAuthCompletePayout = new Command('complete-payout')
       json?: boolean;
     }) => {
       const io = resolvePromptMode({ json: opts.json }) === 'clack' ? createClackIO() : null;
-      if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -4567,7 +4595,7 @@ const preAuthCompletePayout = new Command('complete-payout')
           console.log('  Cancelled by user.');
           process.exit(130);
         }
-        process.exitCode = printApiError(error);
+        process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
       }
     },
   );
@@ -4588,7 +4616,7 @@ const preAuthCancel = new Command('cancel')
       json?: boolean;
     }) => {
       const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
-      if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+      if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -4628,7 +4656,7 @@ const preAuthCancel = new Command('cancel')
           console.log('  Cancelled by user.');
           process.exit(130);
         }
-        process.exitCode = printApiError(error);
+        process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
       }
     },
   );

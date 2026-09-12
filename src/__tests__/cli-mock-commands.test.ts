@@ -69,6 +69,8 @@ let server: Server;
 let baseUrl = '';
 let refundRequests = 0;
 let rejectRefund = false;
+let rejectExchangeRate = false;
+let rejectPreAuth = false;
 let voidCallCount = 0;
 
 /** Route by endpoint substring; payloads mirror sandbox-verified shapes. */
@@ -145,7 +147,11 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('transaction-list')) {
     send(200, [{ transaction_id: 'T1', payment_status: 'APPROVED', payment_status_code: 0, payment_amount: '5.00' }]);
   } else if (url.includes('exchange-rate')) {
-    send(200, { status: { code: '00', message: 'Success' }, exchange_rates: { USD_KHR: 4100 } });
+    if (rejectExchangeRate) {
+      send(400, { status: { code: 'PTL04', message: 'Parameter validation required' } });
+    } else {
+      send(200, { status: { code: '00', message: 'Success' }, exchange_rates: { USD_KHR: 4100 } });
+    }
   } else if (url.includes('refund')) {
     refundRequests++;
     if (rejectRefund || tranId === 'R-FAIL') {
@@ -172,7 +178,13 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
       abapay_deeplink: 'aba://mobile/pay',
     });
   } else if (url.includes('pre-auth-completion')) {
-    send(200, { status: { code: '00', message: 'Pre-auth completed' } });
+    // tran_id travels inside the RSA-encrypted merchant_auth (opaque to the
+    // mock), so failure is routed on a test flag instead of the body.
+    if (rejectPreAuth) {
+      send(400, { status: { code: 'PTL04', message: 'Parameter validation required' } });
+    } else {
+      send(200, { status: { code: '00', message: 'Pre-auth completed' } });
+    }
   } else if (url.includes('pre-auth-cancellation')) {
     send(200, { status: { code: '00', message: 'Pre-auth cancelled' } });
   } else if (url.includes('get-transactions-by-mc-ref')) {
@@ -342,6 +354,83 @@ describe('CLI API commands against the local mock gateway', () => {
     expect([undefined, 0]).toContain(exitCode as number);
   });
 
+  // T0-2 (full audit 2026-09-12): the --json error envelope is a contract, not
+  // a feature of some commands — these pin the previously-bypassing commands.
+  it('exchange-rate --json emits the error envelope on gateway failure', async () => {
+    rejectExchangeRate = true;
+    try {
+      const { stdout, exitCode } = await run(['exchange-rate', '--json']);
+      const parsed = JSON.parse(stripAnsi(stdout)) as { error?: { kind?: string; exitCode?: number; paywayCode?: string } };
+      expect(parsed.error?.kind).toBe('api');
+      expect(parsed.error?.exitCode).toBe(2);
+      expect(parsed.error?.paywayCode).toBe('PTL04');
+      expect(exitCode).toBe(2);
+    } finally {
+      rejectExchangeRate = false;
+    }
+  });
+
+  it('exchange-rate keeps the human error block without --json', async () => {
+    rejectExchangeRate = true;
+    try {
+      const { stdout } = await run(['exchange-rate']);
+      expect(stripAnsi(stdout)).toContain('✗');
+      expect(stdout).not.toContain('"error"');
+    } finally {
+      rejectExchangeRate = false;
+    }
+  });
+
+  it('get-transactions-by-ref --json emits the error envelope (mock 404)', async () => {
+    const { stdout, exitCode } = await run(['get-transactions-by-ref', '-r', 'REF-404', '--json']);
+    const parsed = JSON.parse(stripAnsi(stdout)) as { error?: { kind?: string; exitCode?: number } };
+    expect(parsed.error?.kind).toBe('api');
+    expect(parsed.error?.exitCode).toBe(2);
+    expect(exitCode).toBe(2);
+  });
+
+  it('payout --json emits validation envelopes for local rejections', async () => {
+    const { stdout, exitCode } = await run([
+      'payout',
+      '-t',
+      'PAY-1',
+      '-a',
+      '5',
+      '-c',
+      'EUR',
+      '-b',
+      '500000001:5',
+      '--json',
+    ]);
+    const parsed = JSON.parse(stripAnsi(stdout)) as { error?: { kind?: string; exitCode?: number; message?: string } };
+    expect(parsed.error?.kind).toBe('validation');
+    expect(parsed.error?.exitCode).toBe(1);
+    expect(parsed.error?.message).toContain('EUR');
+    expect(exitCode).toBe(1);
+  });
+
+  it('payout --json emits the API error envelope on gateway failure', async () => {
+    const { stdout, exitCode } = await run(['payout', '-t', 'PAY-404', '-a', '5', '-b', '500000001:5', '--json']);
+    const parsed = JSON.parse(stripAnsi(stdout)) as { error?: { kind?: string; exitCode?: number } };
+    expect(parsed.error).toBeDefined();
+    expect(parsed.error?.exitCode).toBe(2);
+    expect(exitCode).toBe(2);
+  });
+
+  it('pre-auth complete --json emits the error envelope on gateway failure', async () => {
+    rejectPreAuth = true;
+    try {
+      const { stdout, exitCode } = await run(['pre-auth', 'complete', '-t', 'PRE-FAIL', '-a', '5', '--json', '-y']);
+      const parsed = JSON.parse(stripAnsi(stdout)) as { error?: { kind?: string; paywayCode?: string; exitCode?: number } };
+      expect(parsed.error?.kind).toBe('api');
+      expect(parsed.error?.paywayCode).toBe('PTL04');
+      expect(parsed.error?.exitCode).toBe(2);
+      expect(exitCode).toBe(2);
+    } finally {
+      rejectPreAuth = false;
+    }
+  });
+
   it('refund submits through the merchant-access endpoint', async () => {
     const { text, exitCode } = await run(['refund', '-t', 'R-OK', '-a', '1.00', '-y', '--json']);
     expect(text).toContain('Refund submitted');
@@ -469,6 +558,60 @@ describe('CLI API commands against the local mock gateway', () => {
     ]);
     expect(text).toContain('aba://mobile/pay');
     expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  // T0-1 (full audit 2026-09-12): AGENTS.md instructs agents to pass -y to
+  // generate-checkout; the flag used to be an unknown-option hard error.
+  it('generate-checkout accepts -y for agent flows', async () => {
+    const { text, exitCode } = await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-Y-1',
+      '--return-url',
+      'https://example.com/r',
+      '--no-polling',
+      '--no-show-qr',
+      '-y',
+    ]);
+    expect(text).toContain('aba://mobile/pay');
+    expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  // T0-3: explicit units for the checkout lifetime — --lifetime is minutes on
+  // generate-checkout/request-qr but SECONDS on generate-qr, a silent 60x trap.
+  it('generate-checkout sends lifetime from --lifetime-minutes and keeps --lifetime as alias', async () => {
+    await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-LIFETIME-EXPLICIT',
+      '--return-url',
+      'https://example.com/r',
+      '--lifetime-minutes',
+      '30',
+      '--no-polling',
+      '--no-show-qr',
+      '-y',
+    ]);
+    expect(capturedPurchaseBodies.at(-1)?.lifetime).toBe(30);
+
+    await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-LIFETIME-ALIAS',
+      '--return-url',
+      'https://example.com/r',
+      '--lifetime',
+      '15',
+      '--no-polling',
+      '--no-show-qr',
+    ]);
+    expect(capturedPurchaseBodies.at(-1)?.lifetime).toBe(15);
   });
 
   it('generate-checkout --output json emits one stable result and saves a QR PNG', async () => {
