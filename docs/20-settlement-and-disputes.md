@@ -1,0 +1,148 @@
+# Chapter 20 — Settlement, Payouts, FX, and Disputes
+
+Money movement *after* the payment is approved: when funds settle, how to
+reconcile, when payouts land, how currency conversion works, and what happens in
+a dispute. Everything marked **confirmed** comes from the ABA integration team
+(2026-09-12); anything still unconfirmed says so.
+
+For payment-acceptance flows start at [Chapter 3](./03-web-implementation.md) or
+[Chapter 7](./07-qr-code-handling.md); for refund mechanics and error codes see
+[Chapter 12](./12-error-handling-and-debugging.md).
+
+## 20.1 Callback delivery is best-effort — reconciliation is mandatory
+
+PayWay treats callbacks as **single best-effort delivery**: one HTTP POST, expect
+your endpoint to answer HTTP 200 within ~5 s. If the endpoint is down,
+unreachable, times out, or answers non-200, the callback is considered failed and
+is **not re-sent** (confirmed 2026-09-12 — an occasional one-off retry ~10 s
+apart has been observed but must never be designed for). There is no
+merchant-facing API or portal feature for callback delivery history or replay;
+the Integration Team can inspect pushback logs on request (provide `tran_id` +
+timestamps).
+
+Required pattern:
+
+- Fast handler: immediate 200, async processing, idempotent by `tran_id`.
+- Recovery: Check Transaction / `get-transactions-by-mc-ref` polling for
+  anything that did not produce a verified callback (poll only pending
+  transactions; stop at final status or lifetime).
+- Never treat a missing callback as non-payment — see [Chapter 18](./18-transaction-journal.md) for the local journal and `journal reconcile`.
+
+## 20.2 Settlement cycle (T+N)
+
+- Settlement delay **T+N is merchant-specific** — observed values T+3, T+5, T+7,
+  up to 15 working days. The **signed merchant agreement / bank configuration is
+  the source of truth**, not a universal SLA. Confirm N and any cut-off behavior
+  for your MID with ABA. (confirmed)
+- Settlement runs observed in an afternoon window (~13:00–17:00 local) — not a
+  universal guarantee. (observed)
+- If settlement date S falls on a weekend/holiday, it shifts to the next working
+  day. (confirmed)
+- Fees appear as **separate debits** per the agreement — reconcile net vs gross
+  accordingly. (confirmed)
+
+## 20.3 Reconciliation pattern
+
+Per cycle:
+
+1. **Export from the PayWay portal** for processing date T: keep orderID
+   (`tran_id`), APV, amount, time.
+2. **Export the bank/settlement statement** for the expected settlement window.
+3. **Join on the PayWay purchase/reference** (store your order ID alongside
+   `tran_id` from creation). When the direct reference is missing (card flows),
+   match on amount + date/time + masked PAN / APV.
+4. **Mismatches** — provide `tran_id`, date/time, amount (and bank evidence) to
+   the Integration/Settlement team: they validate gateway/settlement logs and
+   confirm correct status/date; incorrect rows may be excluded from the current
+   settlement report or included in a later run. If a payment is on the bank
+   statement but absent from your system (missed callback), the team checks
+   pushback logs; you book the transaction manually and fix webhook handling.
+   (confirmed flow)
+
+Keep a consistent internal ledger: `your_order_id ↔ tran_id ↔ bank_ref`.
+
+## 20.4 Payouts and split settlement
+
+- **Split/payout is immediate at completion**: when a payment is approved (or a
+  pre-auth is completed with payout instructions), PayWay splits the collected
+  amount and settles to the beneficiary MIDs/whitelisted ABA accounts at
+  completion time — there is no T+N cycle for payouts. (confirmed)
+- **Direct Payout API** (`POST /api/payment-gateway/v2/direct-payment/merchant/payout`):
+  on success PayWay debits the source merchant account and credits all listed
+  beneficiaries in the **same operation**, subject to liquidity and daily payout
+  limits. (confirmed)
+- Production requires **beneficiary whitelisting** and the **payout service
+  enabled on the MID** (sandbox profiles answer code 32 "Service is not enable"
+  until provisioned — open item Q19).
+- ⚠️ **Once a transaction is processed via payout/split, the standard refund API
+  is not available.** Refunds are handled manually, or via pre-auth refund
+  before the split. Design split flows to make refund decisions before
+  completing the payout. (confirmed 2026-09-12)
+
+Mechanics: [Chapter 12 — Payout error codes](./12-error-handling-and-debugging.md),
+[Chapter 17 §17.5](./17-payment-link.md#175-split-payout), and the seeded
+`sandbox-beneficiaries` fixtures.
+
+## 20.5 Currency conversion (FX)
+
+- PayWay expects the amount **in the merchant settlement currency** (USD or
+  KHR). If your storefront shows another currency, convert before calling
+  PayWay — rounding, spread, and margin are **your business decisions**;
+  PayWay treats the submitted amount as final. Use `/exchange-rate` (returns
+  ABA's public board rates) if you need a reference rate. (confirmed)
+- **Single-currency merchant** (e.g. USD-only QR): the customer pays in the
+  merchant's currency and **any FX cost is borne by the customer** when their
+  funding account is in a different currency. (confirmed)
+- **Dual-currency merchant** (USD + KHR): the customer picks the currency;
+  settlement goes to the matching merchant currency account — no FX on the
+  merchant side. (confirmed)
+- Open items: partial-refund rounding scale (original-currency minor units vs
+  KHR integers) and whether the 100-KHR amount floor applies to refunds —
+  SANDBOX-FINDINGS §8c-4 / N2, still awaiting ABA.
+
+## 20.6 Chargebacks and disputes
+
+- **Scope: card payments only** (Visa, Mastercard, UnionPay, JCB). ABA PAY,
+  KHQR, and WeChat Pay are final/irrevocable once successful — no chargebacks.
+  (confirmed)
+- Flow: ABA PayWay / the acquiring bank emails a chargeback notice to the
+  merchant's **registered contact** (reason code, amount, date/time, PAN
+  partial, approval code, purchase ID, response deadline) → the merchant decides
+  to **accept (refund)** or **dispute** → for disputes, gather evidence (PayWay
+  receipt/transaction ID, order/booking details, invoices, proof of
+  delivery/service, logs/exports) and submit via the instructed channel before
+  the deadline → ABA represents the case to the card scheme → the merchant is
+  informed of the outcome (win: disputed amount may be credited back). (confirmed)
+- **Silence past the deadline is treated as acceptance.** Monitor the registered
+  email. ABA may request additional documents or hold/deduct the amount during
+  the investigation. (confirmed)
+- General questions: ABA PayWay Merchant Support / Integration Team /
+  paywaysales@ababank.com.
+
+## 20.7 Status semantics you will see during reconciliation
+
+`payment_status_code`: **0** APPROVED · **2** PENDING (may persist up to ~24 h
+before the gateway settles the final state) · **3** DECLINED · **4** REFUNDED ·
+**7** CANCELLED (pre-auth). There is **no EXPIRED or CLOSED code** — long-PENDING
+is the gateway's terminal representation of expired/closed transactions, so
+expiry is enforced merchant-side. The canonical mapping was confirmed by ABA
+(2026-09-12); the SDK exposes `PAYMENT_STATUS_CODES` / `PAYMENT_STATUS_LABELS`.
+
+A partial refund flips the whole `payment_status` to `REFUNDED` — verify actual
+refunded amounts via `refund_amount` / `transaction_operations` in
+transaction-detail, not the status string ([Chapter 12](./12-error-handling-and-debugging.md)).
+
+```ts
+import { PAYMENT_STATUS_CODES } from 'aba-payway-ts';
+
+// Reconciler decision table (canonical mapping confirmed 2026-09-12):
+switch (detail.data?.payment_status_code) {
+  case PAYMENT_STATUS_CODES.APPROVED:  // 0 — funds captured; settle/fulfill
+  case PAYMENT_STATUS_CODES.PENDING:   // 2 — keep polling; may persist up to ~24h
+  case PAYMENT_STATUS_CODES.DECLINED:  // 3 — hard fail; inspect before retry
+  case PAYMENT_STATUS_CODES.REFUNDED:  // 4 — verify refund_amount/operations in detail
+  case PAYMENT_STATUS_CODES.CANCELLED: // 7 — pre-auth cancelled
+}
+// No EXPIRED/CLOSED code exists: long-PENDING is the terminal representation;
+// enforce expiry on your side (Chapter 7 / Chapter 18 `journal reconcile`).
+```

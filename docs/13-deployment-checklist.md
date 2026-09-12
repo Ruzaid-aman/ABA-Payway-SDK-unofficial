@@ -142,6 +142,34 @@ Go through **every** item before switching from sandbox to production. A missed 
 - [ ] **QR expiry timer is displayed to the user**  
   Show a countdown or "QR expires in X minutes" message.
 
+- [ ] **Offline KHQR validity matches the distribution workflow**
+  The SDK defaults `expiresAt` to **15 minutes** after `createdAt`, including
+  static KHQR. For print or billing batches, set both explicitly and confirm
+  the permitted validity window with ABA; the CLI's `--lifetime` does not
+  configure offline expiry.
+
+- [ ] **Every offline batch has a verified manifest**
+  Reject duplicate references; record reference, amount/currency,
+  `createdAt`, `expiresAt`, output filename, generator version, and payload
+  digest; run `validateKhqrCrc()` plus `inspectKhqrPayload()` on every row.
+
+- [ ] **Invoice references remain inquiry-safe**
+  KHQR accepts 25 UTF-8 bytes, but `get-transactions-by-mc-ref` has a
+  20-character cap. Use unique references of at most 20 ASCII characters
+  when inquiry recovery is required.
+
+- [ ] **Repeat and partial payment handling is production-ready**
+  The supplied high-volume guidance says the same KHQR can be paid multiple
+  times; confirm the provider rule with ABA. Deduplicate by `transaction_id`,
+  reconcile by `merchant_ref`, and preserve separate Invoice, Payment, and
+  Payment Allocation records with defined overpayment/refund handling.
+
+- [ ] **Offline notification recovery is tested**
+  Confirm ABA routing/whitelisting and its actual verification contract, then
+  test both the notification path and `get-transactions-by-mc-ref` recovery.
+  Treat a 50-row response as potentially incomplete because the endpoint has
+  no pagination.
+
 ### Network & Infrastructure
 
 - [ ] **Firewall allows outbound HTTPS to `checkout.payway.com.kh`** (production) or `checkout-sandbox.payway.com.kh` (sandbox)**  

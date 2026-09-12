@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Offline KHQR high-volume billing guidance (2026-09-10)
+
+- Propagated the invoice/billing operating model across the Offline QR skill,
+  SDK/CLI reference, QR guide, webhook guide, deployment checklist, and
+  merchant-scenario requirements.
+- Documented the SDK's 15-minute default offline expiry, explicit
+  `createdAt`/`expiresAt` controls, and the current CLI limitation (`--lifetime`
+  does not configure offline KHQR expiry).
+- Added fixed/dynamic versus open/static invoice recipes, the 20-ASCII-character
+  recovery-safe reference policy, batch manifests and payload self-checks.
+- Added repeat/partial/overpayment accounting guidance: deduplicate by
+  `transaction_id`, reconcile by `merchant_ref`, and keep Invoice, Payment,
+  and Payment Allocation separate. Provider-specific repeat-payment and
+  validity rules remain marked for ABA confirmation.
+- Replaced the character-index KHQR parser example with the exported,
+  byte-aware `inspectKhqrPayload()` and `validateKhqrCrc()` helpers.
+- Updated `aba-payway-offline-qr` to v1.5.0 and
+  `aba-payway-transaction-by-merchant-ref` to v1.4.0.
+
 ### OpenAPI suite-coverage wave (2026-09-12, spec-derived gaps from the 33-endpoint gateway spec)
 
 Double-pass multi-agent audit of the ABA-shared archived spec

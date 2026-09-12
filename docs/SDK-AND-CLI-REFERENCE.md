@@ -514,16 +514,27 @@ const payway = new PayWay({
 const readiness = payway.khqr.validateConfiguration();
 if (!readiness.ready) throw new Error(readiness.issues.map((issue) => issue.code).join(', '));
 
+const createdAt = Date.now();
 const qrString = payway.khqr.generateOfflineQR({
   amount: 1.50,
   currency: 'USD',
   merchantRef: 'REF-123',
+  createdAt,
+  expiresAt: createdAt + 30 * 24 * 60 * 60 * 1000, // example only; confirm the permitted window with ABA
 });
 
 console.log(qrString);
 ```
 
-With `amount`, the payload is dynamic (`01=12` and tag `54`); without it, it is static (`01=11`). The payload contains ABA merchant data in nested tag `30`, your reference in `62.01`, ABA-provided PayWay data in `62.68`, timestamp data in `99`, and a CRC in `63`. Generation is local only: it neither submits the QR nor confirms payment status.
+With `amount`, the payload is dynamic (`01=12` and tag `54`) for a fixed invoice amount; without it, it is static (`01=11`) with tag `54` omitted for an amount the payer supplies. The payload contains ABA merchant data in nested tag `30`, your reference in `62.01`, ABA-provided PayWay data in `62.68`, timestamp data in `99`, and a CRC in `63`. Generation is local only: it neither submits the QR nor confirms payment status.
+
+`createdAt` and `expiresAt` accept `Date` objects or 13-digit epoch-millisecond numbers. When omitted, creation is the current time and expiry defaults to **15 minutes** later—even for static KHQR. For batches prepared before printing or delivery, set both fields explicitly and confirm the permitted validity window with ABA. `generate-qr --offline` does not currently expose these fields, and `--lifetime` does not configure offline KHQR expiry; use the typed SDK for such batches.
+
+KHQR tag `62.01` accepts a `merchantRef` of at most **25 UTF-8 bytes**. The recovery endpoint `get-transactions-by-mc-ref` has a narrower 20-character cap, so use unique references of at most **20 ASCII characters** when end-to-end inquiry is required.
+
+The supplied high-volume guidance says the same KHQR can be paid multiple times during its applicable validity; confirm that provider rule against the current merchant-issued ABA guideline. Treat `transaction_id` as the payment-level deduplication key and `merchant_ref` as the invoice/account reconciliation key. Preserve each new payment and handle partial payments, overpayments, credits, and refunds in the merchant ledger; a unique invoice QR is not a single-use payment guarantee.
+
+A local QR has no pre-created PayWay transaction to poll. After payment, an ABA-routed notification or `get-transactions-by-mc-ref` inquiry may expose the resulting transaction. Do not fulfil from the notification alone until the ABA-confirmed verification contract is implemented. Merchant-reference inquiry returns at most 50 matches, exposes no pagination parameter, and is limited to 10 requests per minute; a 50-row result may be incomplete.
 
 Earlier SDK releases emitted a private offline TLV format. This method now produces official ABA KHQR, so remove legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments. Obtain the required fields from ABA before deploying; do not copy sample values from another merchant.
 

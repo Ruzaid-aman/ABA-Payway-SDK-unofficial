@@ -14,6 +14,10 @@
 - **HMAC-SHA512**:
   - Key: API Key.
   - Format: Raw binary digest, then base64 encoded.
+- **Callback signing & verification are ONE canonicalization (2026-09-10, webhook workbench)**:
+  - `verifyCallbackDetailed` (verify) and `signCallbackBody` (sign) live together in `src/auth.ts` and share the exact sorted-key-concat → HMAC-SHA512 → Base64 canonicalization (`hash` field stripped when `stripHash: true`).
+  - Anything that must produce or check a callback signature — webhook fixtures (`buildWebhookFixture`), tests, future tooling — goes through those two functions. Never re-implement the canonicalization elsewhere (D1/D3 anti-checklist; the drift-guard suite pattern exists for a reason).
+  - Callback-signing scope: online checkout callbacks ONLY. Payment-link pushbacks (`{tran_id, status: 0, merchant_ref_no}`, no hash) and offline KHQR notifications have no signature contract — verify via check-transaction / reconciliation.
 - **RSA Public Key Encryption**:
   - Key: 1024-bit PEM public key.
   - Padding: `RSA_PKCS1_PADDING`.
@@ -116,3 +120,4 @@
 - The packaged `skills/` directory contains 32 focused `aba-payway-*` guides (including journal queries and production webhook fulfillment).
 - Several guides bundle dependency-free `.cjs` tools under their `scripts/` folder (KHQR decode/CRC validation, request signing, callback verification, mock callbacks, reconciliation cron, checkout payload builder, status decoder) — each SKILL.md documents its own tools.
 - From the repo root, install all of them (including bundled scripts and references) with `npx tsx src/cli.ts skills add <agent>`, where agent is `claude`, `codex`, `opencode`, `cursor`, or `copilot`.
+- **Webhook workbench (2026-09-10)**: the first-class `payway-sdk webhook trigger|verify-callback|resend|list` group and `setup-webhook --forward-to <url>` cover the hash skill's `.cjs` verify/mock tools natively (`--json` envelopes, record-store integration). The scripts remain only for checkout installs without the CLI; the skills point to the CLI first. Local loop: `setup-webhook --forward-to <app-url>` + `webhook trigger --event payment.approved` exercises a receiver's full verify/handle path without the ABA Simulator — fixtures are synthetic (the gateway never saw the tran_id; never fulfill on them).

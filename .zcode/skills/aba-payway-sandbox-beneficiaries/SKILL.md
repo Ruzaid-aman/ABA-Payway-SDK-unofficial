@@ -2,7 +2,7 @@
 name: aba-payway-sandbox-beneficiaries
 description: Seeded sandbox-only beneficiary accounts and test MIDs for PayWay payout / split-payout testing.
 metadata:
-  version: 1.2.0
+  version: 1.2.1
 ---
 
 # Sandbox Beneficiaries (test fixtures)
@@ -65,6 +65,8 @@ payway-sdk sandbox-beneficiaries            # list all
 payway-sdk sandbox-beneficiaries --currency USD
 payway-sdk sandbox-beneficiaries --json
 ```
+
+Sibling fixture for hosted-card testing: `payway-sdk sandbox-test-cards` (approved/declined sandbox PANs — [aba-payway-first-payment](../aba-payway-first-payment/SKILL.md)).
 
 ## Error Handling
 ```ts

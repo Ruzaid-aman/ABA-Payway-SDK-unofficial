@@ -64,6 +64,7 @@ import {
   REFUND_ERROR_CODES,
 } from './constants.js';
 import { listSandboxBeneficiaries } from './sandbox-beneficiaries.js';
+import { listSandboxTestCards, type SandboxTestCardOutcome } from './sandbox-test-cards.js';
 import {
   PayWayAPIError,
   PayWayBusinessError,
@@ -2273,7 +2274,7 @@ program
   .option('--template <name>', 'QR image template for online mode')
   .option(
     '--lifetime <seconds>',
-    'Transaction lifetime in seconds — minimum 180, sent to the API as whole minutes (default: 180)',
+    'Online QR lifetime in seconds — minimum 180, sent to the API as whole minutes; does not configure offline KHQR expiry (default: 180)',
   )
   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
   .option('--save-image <path>', 'Save a QR PNG to file (online image or locally rendered offline QR)')
@@ -3660,6 +3661,42 @@ program
     }
     console.log(`  ${c.dim('Use these in payout / split-payout calls while environment=sandbox.')}`);
     console.log(`  ${c.dim('Any other account is rejected in sandbox (format: 9/11/15 digits).')}\n`);
+  });
+
+// --- sandbox-test-cards ---
+program
+  .command('sandbox-test-cards')
+  .description('List ABA sandbox test cards for hosted card-checkout testing (SANDBOX ONLY)')
+  .option('--outcome <outcome>', 'Filter by outcome: approved or declined')
+  .option('--json', 'Print as JSON')
+  .action((opts: { outcome?: string; json?: boolean }) => {
+    const outcome = opts.outcome?.toLowerCase();
+    if (outcome && outcome !== 'approved' && outcome !== 'declined') {
+      console.log(`  ${c.red('✗')} --outcome must be "approved" or "declined", received: ${opts.outcome}`);
+      process.exitCode = 1;
+      return;
+    }
+    const filtered = listSandboxTestCards(outcome as SandboxTestCardOutcome | undefined);
+
+    if (opts.json) {
+      console.log(JSON.stringify(filtered, null, 2));
+      return;
+    }
+
+    console.log(
+      `\n${c.bold('Sandbox test cards')} ${c.dim('— sandbox-only fixtures; never use real card data; lists may rotate (request updates from ABA)')}\n`,
+    );
+    for (const card of filtered) {
+      const pan = card.number.replace(/(\d{4})(?=\d)/g, '$1 ');
+      const outcomeLabel = card.outcome === 'approved' ? c.green('✓ approved') : c.red('✗ declined');
+      console.log(
+        `    ${c.cyan(card.brand.padEnd(11))} ${pan}  exp ${card.expiry}  cvv ${card.cvv}  3DS ${card.threeDS ? 'yes' : 'no '}  ${outcomeLabel}`,
+      );
+    }
+    console.log(`\n  ${c.dim('Use with hosted card checkout while environment=sandbox; declined cards exercise error paths.')}`);
+    console.log(
+      `  ${c.dim('ABA PAY / KHQR testing needs ABA Mobile Simulator accounts from the Integration Team (docs/02).')}\n`,
+    );
   });
 
 // --- payout ---

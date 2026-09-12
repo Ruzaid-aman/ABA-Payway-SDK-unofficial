@@ -2,7 +2,7 @@
 name: aba-payway-first-payment
 description: Start an ABA PayWay payment, choose QR or hosted checkout or payment link, verify it, and fulfill once.
 metadata:
-  version: 1.4.1
+  version: 1.4.2
 ---
 
 # ABA PayWay First Payment
@@ -61,7 +61,9 @@ Return only the artifact to the authorized customer, not session.raw. Persist th
 
 Use `paymentLifecycle(result.data?.payment_status)` for a first-payment view of a server-side lookup. Do not pass API status.code or callback payloads. PRE-AUTH and REFUNDED require their domain workflows. Legacy session and CLI machine statuses stay unchanged.
 
-Signed online callbacks require route-correct HMAC verification. Payment-link pushbacks have no hash and require server-side lookup; offline KHQR uses a separate notification contract. Browser redirects and missing callbacks prove nothing. Follow [webhook production](../aba-payway-webhook-production/SKILL.md) before fulfillment.
+Signed online callbacks require route-correct HMAC verification. Payment-link pushbacks have no hash and require server-side lookup; offline KHQR uses a separate notification contract (confirmed: no signature on it — inquiry is the source of truth). Callbacks are single best-effort delivery with NO guaranteed retry (ABA-confirmed 2026-09-12). Browser redirects and missing callbacks prove nothing. Follow [webhook production](../aba-payway-webhook-production/SKILL.md) before fulfillment.
+
+For sandbox card testing use the seeded test cards: CLI `payway-sdk sandbox-test-cards` or `listSandboxTestCards()` — approved MC `5156 8399 3770 6777` and Visa `4286 0900 0000 0206` (3DS), declined cards for error paths; sandbox-only, may rotate. ABA PAY / KHQR testing needs ABA Mobile Simulator accounts from the Integration Team (PIN `1234`, secret word `TEST1`; docs/02).
 
 ## Error Handling
 

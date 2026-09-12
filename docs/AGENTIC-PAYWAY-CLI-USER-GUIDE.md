@@ -418,6 +418,27 @@ explicit approval flag.
 
 ---
 
+## 9a. Local webhook testing (agent-friendly)
+
+The `webhook` command group (2026-09-10) gives automation and agents a fully local receiver test loop — no gateway calls, no ABA Simulator, machine-readable envelopes:
+
+```bash
+# Send a correctly-signed fixture callback to any receiver
+payway-sdk webhook trigger --url http://localhost:3000/webhooks/aba --event payment.approved --json
+
+# Verify a body+signature pair (exit 0 valid / 1 invalid+reason) or a captured record
+payway-sdk webhook verify-callback --body-file cb.json --sig "<X-PAYWAY-HMAC-SHA512>" --json
+payway-sdk webhook verify-callback --record wh_xxx --json
+
+# List captures; replay one to any URL
+payway-sdk webhook list --json
+payway-sdk webhook resend --record wh_xxx --to http://localhost:3000/webhooks/aba --json
+```
+
+Combine with `setup-webhook --forward-to http://localhost:3000/webhooks/aba` to exercise the app end-to-end while capturing every delivery for the journal. Fixture events: the five online-checkout statuses (HMAC-signed), `khqr.notification` and `payment-link.pushback` (both unsigned by design — verify those via check-transaction). Fixtures are synthetic: the gateway never saw the `tran_id`; never fulfill on them. Full contract: [Local Webhook Workbench](./16-webhook-setup-guide.md#local-webhook-workbench).
+
+---
+
 ## 10. Limitations & notes
 
 - The provider adapter targets **OpenAI-compatible** `/chat/completions` endpoints

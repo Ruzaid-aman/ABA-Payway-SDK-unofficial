@@ -61,6 +61,25 @@ describe('built CLI', () => {
     expect(output).toContain('transaction-detail');
   });
 
+  it('scopes the generate-qr lifetime option to online mode in built help', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+    temporaryDirectories.push(cwd);
+
+    const result = await runBuiltCli(['generate-qr', '--help'], {
+      cwd,
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
+      },
+    });
+
+    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
+    const compactOutput = output.replace(/\s+/g, ' ');
+    expect(result.status).toBe(0);
+    expect(compactOutput).toContain('Online QR lifetime in seconds');
+    expect(compactOutput).toContain('does not configure offline KHQR expiry');
+  });
+
   it('prints a first-payment quickstart in doctor output when credentials exist but online QR is not ready', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);

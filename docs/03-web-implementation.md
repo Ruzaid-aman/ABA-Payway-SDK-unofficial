@@ -830,7 +830,7 @@ curl -X POST "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/paym
 | **Payment times out** | PayWay returns status code `22` (Expired) | Show "Payment Expired" and allow the customer to retry |
 | **User clicks "Back" and resubmits** | A new transaction ID is generated | No duplicate charge — each attempt gets a unique `tran_id` |
 | **Duplicate webhook callback** | PayWay sends the same callback twice | Use `ON CONFLICT (tran_id) DO NOTHING` in your database |
-| **Server restarts during callback** | PayWay retries the callback | Your idempotent handler handles it on the next attempt |
+| **Server restarts during callback** | **No guaranteed retry** — PayWay treats the callback as a single best-effort delivery (confirmed by ABA, 2026-09-12); an occasional one-off retry (~10 s apart) has been observed but must not be designed for | Recover via Check Transaction polling; your idempotent handler dedupes the late callback if one arrives |
 
 ---
 

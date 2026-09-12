@@ -57,7 +57,7 @@ reference. Recursive parity is checked by the offline test suite.
 - [aba-payway-purchase](./aba-payway-purchase/SKILL.md) — signed checkout purchases, hosted checkout links, the full `generate-checkout` flag set (incl. the S1 additions), and the minutes-vs-seconds lifetime trap.
 - [aba-payway-subscription](./aba-payway-subscription/SKILL.md) — recurring billing on the purchase path: `ctid` + `CITR_FIX` + `frequency`, the 27-field hash (live 2026-09-05 order; the documented 26-field order is rejected with Wrong Hash), and merchant-initiated follow-up charges.
 - [aba-payway-qr](./aba-payway-qr/SKILL.md) — online KHQR generation, the 9 optional params, PNG auto-open.
-- [aba-payway-offline-qr](./aba-payway-offline-qr/SKILL.md) — official ABA KHQR offline generation (no API call).
+- [aba-payway-offline-qr](./aba-payway-offline-qr/SKILL.md) — official ABA KHQR offline generation, invoice-batch validity, repeat-payment accounting, and recovery (no generation API call).
 - [aba-payway-customer-qr](./aba-payway-customer-qr/SKILL.md) — Merchant Portal static QRs (Printed QR channel) + KHQR decode/CRC validator.
 - [aba-payway-first-payment](./aba-payway-first-payment/SKILL.md) — route decision matrix (checkout / subscription / online QR / offline KHQR / payment link) and result handling.
 - [aba-payway-payment-link](./aba-payway-payment-link/SKILL.md) — hosted payment links incl. images, split payout, and void.
@@ -86,7 +86,7 @@ reference. Recursive parity is checked by the offline test suite.
 - [aba-payway-check-transaction](./aba-payway-check-transaction/SKILL.md) — one-shot status checks + polling (grace periods, rate limits).
 - [aba-payway-transaction-detail](./aba-payway-transaction-detail/SKILL.md) — full detail (`apv`, `bank_ref`, operations).
 - [aba-payway-transaction-list](./aba-payway-transaction-list/SKILL.md) — date/amount/status windows (3-day cap, local pre-validation).
-- [aba-payway-transaction-by-merchant-ref](./aba-payway-transaction-by-merchant-ref/SKILL.md) — lookups by merchant reference + reconciliation cron tool.
+- [aba-payway-transaction-by-merchant-ref](./aba-payway-transaction-by-merchant-ref/SKILL.md) — recovery-safe reference policy, lookups by merchant reference, and reconciliation cron tool.
 - [aba-payway-transaction-close](./aba-payway-transaction-close/SKILL.md) — close/void unpaid transactions (advisory in sandbox).
 - [aba-payway-bulk-operations](./aba-payway-bulk-operations/SKILL.md) — `tx-batch close/check/detail` over many IDs (per-item envelopes, pacing, `--report`).
 

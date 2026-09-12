@@ -80,6 +80,8 @@ npm exec -- payway-sdk setup-webhook --tunnel
 
 Keep that terminal running. Follow its tunnel setup instructions and copy the complete public HTTPS URL, including `/aba-payway-webhook`. In your payment terminal, replace `PAYWAY_CALLBACK_URL` from step 3 with that URL. A localhost URL is not reachable by ABA. See [webhook setup and tunnel prerequisites](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/16-webhook-setup-guide.md) if the tunnel cannot start. This listener captures deliveries for development; it is not an order-fulfillment service.
 
+To check a receiver before any real payment, run it against the captured deliveries: add `--forward-to http://localhost:<your-app-port>/webhooks/aba` to the command above, then in a third terminal run `npm exec -- payway-sdk webhook trigger --event payment.approved`. The receiver gets a correctly-signed fixture callback in seconds — no ABA Simulator and no sandbox payment. Fixture callbacks are synthetic; never fulfill on them. Details: [Local Webhook Workbench](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/16-webhook-setup-guide.md#local-webhook-workbench).
+
 Online QR is the default below. For a hosted payment page, use `doctor --route hosted-checkout` and the signed form command in step 6. For a shareable link, follow the [payment-link guide](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/17-payment-link.md); it additionally needs an RSA key.
 
 Check the intended route:

@@ -548,7 +548,7 @@ Next task:                       SQLite webhook-storage coverage (HANDOFF §5.1)
 - Tests: payout/pre-auth fixtures moved to seeded `500000001`; new test asserts KHR→USD rejection.
 - Status: `npx tsc --noEmit` clean, `vitest` 754 passing / 0 failing, `biome lint` clean.
 
-## Recent Session — Payment-link void (2026-09-11/12, branch `feat/payment-link-void`, not merged)
+## Recent Session — Payment-link void (2026-09-11/12, branch `feat/payment-link-void`, merged into `feat/customer-module-qr` 2026-09-12)
 
 - Surfaced + live-verified ABA's **undocumented** `payment-link/void` endpoint (SANDBOX-FINDINGS §23): signs like detail, `VOIDED` is a real status, double-void → 403 PTL188, bogus id → 403 96.
 - **SDK**: `payway.paymentLink.void(id)` — merchant-auth family, `MUTATION_ENDPOINTS` single-attempt member, `VoidPaymentLink*` OpenAPI schemas + regenerated types, `HASH_ORDER_HINTS` entry.
@@ -556,3 +556,37 @@ Next task:                       SQLite webhook-storage coverage (HANDOFF §5.1)
 - Tests: hash-order/mutation-retry/client/domain pins + mock-harness void route + gated §23 sandbox-contract pin; live e2e 6/6 legs (`scripts/e2e-payment-link-void.ts`).
 - Docs/skills: docs/17 §17.4 (+renumber, cross-refs swept), docs/12 rows, skill v1.5.0 + mirror, AGENTS/.agents/HANDOFF/CHANGELOG, typedoc regen.
 - Gates: build/tsc/lint clean; suite 1673 passed (+1 pre-existing npm-12 pack-format failure, fix in flight on main checkout); sandbox 14/14; check:repository passed.
+
+## Recent Session — CLI competitive audit + P0 webhook workbench (2026-09-10, commits `cc6c635`→`86b1604`)
+
+- Audited Stripe CLI, Razorpay CLI, and the live npm ecosystem (competitors
+  `aba-payway` v0.2.2 — verified gateway-contract bugs: QR lifetime in minutes
+  vs the seconds contract, close→CANCELLED claim, no 200-wrapped error
+  handling; `aba-payway-sdk` v0.2.35 — false "Official" claim, wrong host in
+  quick-start). Findings + roadmap + re-audit live in
+  `docs/competitive-analysis-cli-stripe-razorpay.md`.
+- **Shipped P0 Wave 1** (`9435301`+`f7b9b5d`, ff-merged to main): new
+  `payway-sdk webhook trigger|verify-callback|resend|list` command group +
+  `setup-webhook --forward-to/--forward-headers`. New library surface:
+  `src/webhook/forwarder.ts` (capture-survives-forward-failure contract),
+  `src/webhook/fixtures.ts` (7 fixture events across the three callback
+  contracts), `signCallbackBody` in `src/auth.ts` (the shared signing inverse
+  of `verifyCallbackDetailed` — one canonicalization, D1/D3).
+- Contracts: signed online fixtures round-trip through the SDK verifier;
+  pushback/KHQR fixtures carry NO hash by design (§22 V-1); exit 0 valid /
+  1 invalid+reason / 3 network; forward failures never reject the original
+  callback.
+- Live e2e verification with the built dist CLI (not just suite): trigger →
+  receiver → wire-byte verify; capture → forward with signature preserved;
+  SQLite store read by `webhook list`; resend; invalid-sig exit 1; no-hash
+  pushback leg. Evidence: `.scratch/audit-webhook-e2e/`.
+- Docs/skills propagated: docs/16 "Local Webhook Workbench" section, README,
+  SDK-AND-CLI-REFERENCE, AGENTS.md canonical list + contract bullet,
+  CHANGELOG Unreleased, `aba-payway-hash` v1.4.0 + `aba-payway-webhook-production`
+  v1.1.0 (canonical + `.zcode` mirrors), COMMAND_EXAMPLES.
+- Open follow-ups: P3-A pushback captures don't populate
+  `matchedTransactionId/matchedStatus`; P3-B `webhook list` doesn't report the
+  active storage backend; Wave 2 = `docs/llms.txt`+`docs` command, then an MCP
+  server; bin-name decision (`aba-payway-cli` free) before first publish.
+- Status on merged main: build/tsc/biome clean, **vitest 1,662 passed / 13
+  skipped** (38 new tests).

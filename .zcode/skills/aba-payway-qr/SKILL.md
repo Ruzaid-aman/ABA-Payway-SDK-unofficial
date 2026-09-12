@@ -2,7 +2,7 @@
 name: aba-payway-qr
 description: Generate an online ABA PayWay KHQR payment QR code.
 metadata:
-  version: 1.5.0
+  version: 1.5.1
 ---
 
 # ABA PayWay QR
@@ -72,6 +72,8 @@ Best-effort, never throws; safe to call right after `payway.qr.generateQr()` bef
 
 ## Lifetime
 `lifetime` is in **seconds** (SDK converts to whole minutes for the API; min 3 minutes). For a 10-minute QR pass `lifetime: 600`. Sandbox-verified end-to-end (2026-08-25): $31.11 USD QR at 600s lifetime → APPROVED on poll #8 (~37s).
+
+Two clocks (ABA-confirmed 2026-09-12): the scan/session window (hosted checkout: abapay_khqr 5 min, deeplink/cards/alipay/wechat 3 min; the QR image itself may stop scanning in ~2 min) is independent of the transaction `lifetime`. A long `lifetime` does NOT keep a QR scannable — for long-lived invoices use offline KHQR, which supports repeat payments within its validity but is never payable forever (Bakong creation/expiry timestamps).
 
 ## Error Handling
 ```ts

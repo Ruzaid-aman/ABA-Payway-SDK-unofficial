@@ -59,7 +59,7 @@ Use the merchant’s `return_url`/configured callback route. Verify the signatur
 
 ## TC-013 — Callback requirement
 
-**Confirm with ABA.** The supplied acceptance material conflicts on whether QR callbacks remain mandatory when Check Transaction API is used. The SDK can query status and verify callbacks; it cannot decide the profile rule.
+**Resolved (ABA integration team, 2026-09-12).** Check Transaction is mandatory; the callback URL is recommended but **not strictly mandatory if robust Check Transaction polling is implemented and reviewed by the Integration Team before go-live** (poll only pending transactions, ~3–5 s interval within a 5–15 min lifetime, stop at final status/lifetime, keep logs). Callback + Check Transaction remains the recommended default pattern. The SDK can query status and verify callbacks; profile-level requirements are still confirmed during review.
 
 ## TC-014 — Post-pushback recheck
 
@@ -92,6 +92,8 @@ Ask ABA technical support to extend or reactivate the merchant profile. Do not p
 ## TC-021 — Product payment methods
 
 **Merchant-profile dependent.** Koksin’s reviewed selection was KHQR only; Velon’s was KHQR plus Visa/Mastercard. Render only methods activated for the actual profile. A sandbox QR-POS run can evidence only the supplied profile’s live sandbox response.
+
+Enablement (ABA integration team, 2026-09-12): Alipay/WeChat Pay require separate approval for a fully registered business — request via **paywaysales@ababank.com**; after profile activation the merchant enables them in plugin/checkout config. Card brands cover Visa, Mastercard, UnionPay, JCB, and UPI (channel-dependent). **Google Pay online was reported "not available at the time of the guidance"** — confirm availability per profile with Sales before advertising it. Never show methods that are not enabled on the profile.
 
 ## TC-022 — Checkout UI compliance
 
@@ -135,3 +137,77 @@ caveats (2026-09-05):** the gateway signs `ctid` in the 27-field purchase hash
 §17), and the current sandbox profile answers `104` "Merchant not enabled
 token flag" — subscription enablement is an ABA-side prerequisite for this
 scenario. See the `aba-payway-subscription` skill.
+
+## TC-030 — High-volume offline KHQR validity
+
+For locally generated invoice batches, record `createdAt` and set `expiresAt`
+explicitly. The SDK default is 15 minutes, including static KHQR, which is
+usually unsuitable for QRs queued for printing or later delivery. **Confirm
+with ABA** the permitted creation/expiry policy for the merchant before
+choosing a longer window. The current CLI does not expose these fields;
+`--lifetime` does not configure offline KHQR expiry.
+
+## TC-031 — Fixed versus open invoice amount
+
+Use dynamic KHQR (`01=12`, tag `54`) when the payer must pay the exact invoice
+amount. Use static KHQR (`01=11`, tag `54` omitted) for installments or an
+open amount. Both modes need an invoice-specific `merchant_ref` and the same
+payment-ledger safeguards.
+
+## TC-032 — Recovery-safe invoice reference
+
+The offline payload accepts `merchantRef` up to 25 UTF-8 bytes, but the
+`get-transactions-by-mc-ref` recovery endpoint has a narrower 20-character
+cap. Use unique references of at most 20 ASCII characters when recovery by
+reference is part of the merchant journey.
+
+## TC-033 — Repeat, partial, and overpayment handling
+
+The supplied high-volume KHQR guidance says the same QR can be paid multiple
+times. Treat that statement as **Confirm with ABA** until it is traced to the
+current merchant-issued guideline. Regardless, the receiver must deduplicate
+only the same `transaction_id`; a new transaction with the same
+`merchant_ref` is stored as a separate Payment and allocated or routed to an
+overpayment/refund exception according to merchant policy.
+
+## TC-034 — Offline notification recovery capacity
+
+Test the ABA-provisioned notification path and the inquiry fallback. The
+merchant-reference endpoint returns at most 50 matches, exposes no pagination,
+and is limited to 10 requests per minute. A 50-row result cannot prove complete
+reconciliation during a high-volume interval or extended callback outage.
+
+## TC-035 — Settlement reconciliation
+
+**ABA-side configuration (integration team, 2026-09-12).** Settlement delay T+N is
+merchant-specific (observed T+3/5/7 up to 15 working days) — the signed merchant
+agreement / bank config is the source of truth, not a universal SLA. Reconcile by
+exporting portal transactions for processing day T (orderID, APV, amount, time) and
+joining them to the bank settlement report for the expected settlement date S
+(weekends/holidays shift S to the next working day; an afternoon processing window
+has been observed but is not universal). Fees appear as separate debits — reconcile
+net vs gross per the agreement. Mismatches: send `tran_id` + date/time + amount +
+bank evidence to the Integration/Settlement team. Full pattern:
+[Chapter 20](./20-settlement-and-disputes.md).
+
+## TC-036 — Chargebacks and disputes
+
+**Card-only (integration team, 2026-09-12).** Visa/Mastercard/UnionPay/JCB
+transactions can be charged back; ABA PAY, KHQR, and WeChat Pay are
+final/irrevocable once successful. ABA notifies the merchant's registered email
+with reason code, amount, PAN partial, approval code, purchase ID, and a response
+deadline; silence past the deadline is treated as acceptance. Merchants accept
+(refund) or dispute with evidence; ABA represents the case to the scheme. Monitor
+the registered email. Full flow: [Chapter 20](./20-settlement-and-disputes.md).
+
+## TC-037 — Payout and split timing
+
+**Immediate at completion (integration team, 2026-09-12).** Split/payout
+instructions settle to beneficiary MIDs/whitelisted accounts at the moment the
+payment is approved (or the pre-auth is completed) — not on a T+N cycle. The
+Direct Payout API debits the source account and credits all beneficiaries in the
+same operation, subject to liquidity and daily payout limits. Production requires
+beneficiary whitelisting and the payout service enabled on the MID. **Once a
+transaction is processed via payout/split, the standard refund API is not
+available** — refunds are manual, or a pre-auth refund before the split. See
+[Chapter 20](./20-settlement-and-disputes.md).

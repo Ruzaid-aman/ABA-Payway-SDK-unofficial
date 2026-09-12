@@ -2,7 +2,7 @@
 name: aba-payway-payment-link
 description: Create, inspect, and void hosted ABA PayWay payment links.
 metadata:
-  version: 1.5.0
+  version: 1.5.1
 ---
 
 # ABA PayWay Payment Link
@@ -26,7 +26,7 @@ Payment Link APIs require `publicKeyPem` for RSA-encrypted merchant authorizatio
 `currency` is gateway-REQUIRED (defaults to `'USD'` in the SDK): omitting it in a raw API call answers `PTL04` (sandbox-verified, undocumented). `merchantRefNo` is required by the SDK (stricter than the official "optional"); ≤50 chars advisory (strict throws). `description` ≤250 chars is a hard local throw.
 
 ## Split Payout (optional)
-`payout` travels INSIDE the RSA-encrypted `merchant_auth` with keys `{acc, amt}` (the purchase-path shape — NOT the standalone payout domain's `{account, amount}`). The documented rule: the payout total must equal the link amount. The SDK warns when it doesn't (throws under `strictValidation`); the CLI rejects the mismatch locally with exit 1. Beneficiaries must be whitelisted first (`beneficiary add`); payout currency follows the link currency.
+`payout` travels INSIDE the RSA-encrypted `merchant_auth` with keys `{acc, amt}` (the purchase-path shape — NOT the standalone payout domain's `{account, amount}`). The documented rule: the payout total must equal the link amount. The SDK warns when it doesn't (throws under `strictValidation`); the CLI rejects the mismatch locally with exit 1. Beneficiaries must be whitelisted first (`beneficiary add`); payout currency follows the link currency. Beneficiaries are paid **at completion, not T+N** (ABA-confirmed 2026-09-12), and after a payout/split the standard refund API is NOT available — refunds are manual or pre-auth refund before the split.
 
 ```ts
 const link = await payway.paymentLink.create({

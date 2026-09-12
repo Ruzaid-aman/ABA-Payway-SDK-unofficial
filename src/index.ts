@@ -199,8 +199,14 @@ export type {
   TerminalPaymentStatus,
 } from './domain-types.js';
 export type { LinkCardResponse } from './domain-types.js';
-export { computeRefundableBalance, isValidPublicKeyPem, validateRefundAmount } from './utils.js';
+export { buildAbaPayDeeplink, computeRefundableBalance, isValidPublicKeyPem, validateRefundAmount } from './utils.js';
 export type { RefundMoneySide, RefundableBalanceResult } from './utils.js';
+// ─── Sandbox test-card registry (ABA integration-team relay 2026-09-12) ────
+// Exported because integrators (and the aba-payway-first-payment skill) need
+// the seeded hosted-card test PANs for sandbox checkout testing without
+// reaching into package internals. Sandbox-only; the list may rotate.
+export { SANDBOX_TEST_CARDS, isKnownSandboxTestCard, listSandboxTestCards } from './sandbox-test-cards.js';
+export type { SandboxTestCard, SandboxTestCardBrand, SandboxTestCardOutcome } from './sandbox-test-cards.js';
 // ─── Sandbox beneficiary registry (used by pre-auth/payout validation) ─────
 // Exported because the aba-payway-sandbox-beneficiaries skill (and integrators
 // writing sandbox probes) need the seeded-account list and the structural

@@ -31,7 +31,7 @@ sequenceDiagram
 
 ---
 
-> 📘 **Important:** Deep link URI schemes (e.g., `abapay://...`) are defined by ABA PayWay's official native SDK, not by this TypeScript SDK. This chapter documents the **patterns and concepts** surrounding deep linking. The exact URI scheme format is marked as `[TBD: confirm with ABA]` where our codebase doesn't have verified information.
+> 📘 **Important:** Deep link URI schemes are defined by ABA PayWay, not by this TypeScript SDK. This chapter documents the **patterns and concepts** surrounding deep linking. The ABA Pay deep-link scheme was **confirmed by the ABA integration team (2026-09-12)** — see below; anything still unverified remains explicitly marked.
 
 ---
 
@@ -65,7 +65,10 @@ The simplest form of deep linking. Format: `abapay://[action]?[params]`
 abapay://pay?token=abc123&amount=15.00&currency=USD
 ```
 
-> `[TBD: Confirm the exact URI scheme format with ABA PayWay support. This format is speculative based on common payment SDK patterns.]`
+> **Confirmed (ABA integration team, 2026-09-12):** the ABA Pay deep-link scheme is
+> `abamobilebank://ababank.com?type=payway&qrcode=<QR_STRING>`
+>
+> Use the `abapay_deeplink` value returned by purchase/checkout responses **as-is** (no `intent://` wrapping) — the gateway pre-builds it. For the rare case where a raw `qrString` must be wrapped manually, the SDK ships `buildAbaPayDeeplink(qrString)` (URL-encodes the payload into the same scheme).
 
 ### Universal Links (iOS)
 

@@ -2,7 +2,7 @@
 name: aba-payway-webhook-production
 description: Verify PayWay callbacks and status lookups, fulfill once, and recover missing or repeated notifications.
 metadata:
-  version: 1.1.0
+  version: 1.1.1
 ---
 
 # PayWay Webhook Production
@@ -39,7 +39,7 @@ Persist the verified event and atomically transition the order once, using a dat
 
 ## Error Handling
 
-Do not rely on callback retries. Reconcile missing notifications through server-side status checks. A timeout means `unknown`: check the existing attempt before replacing it. Expiry and closure remain local policy; gateway PENDING can persist and late approved payments require reconciliation.
+Do not rely on callback retries — **ABA confirmed (2026-09-12) callbacks are single best-effort delivery**: one POST, answer 200 within ~5 s, no guaranteed redelivery on failure (a one-off ~10 s retry has been observed but must not be designed for). There is no merchant-facing callback delivery history or replay API; the Integration Team can inspect pushback logs on request (tran_id + timestamps). Reconcile missing notifications through server-side status checks. A timeout means `unknown`: check the existing attempt before replacing it. Expiry and closure remain local policy; gateway PENDING can persist up to ~24 h, and late approved payments require reconciliation.
 
 Do not log raw callbacks, keys, or customer data. Saved CLI profiles contain plaintext credentials; use a secret manager and explicit SDK configuration in deployed services. The development capture server is not an application fulfillment handler.
 

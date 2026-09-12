@@ -67,6 +67,22 @@ export function validatePositiveAmount(amount: number, currency: 'USD' | 'KHR'):
 }
 
 /**
+ * Build the ABA Pay deep-link URI that opens a KHQR string in the ABA Mobile
+ * app. Scheme confirmed by the ABA PayWay integration team (2026-09-12,
+ * docs/08): `abamobilebank://ababank.com?type=payway&qrcode=<QR_STRING>`.
+ *
+ * Prefer the `abapay_deeplink` field returned by purchase/checkout responses —
+ * it arrives pre-built and should be used as-is (no intent:// wrapping). This
+ * helper is for the rare case where a raw `qrString` must be wrapped manually.
+ */
+export function buildAbaPayDeeplink(qrString: string): string {
+  if (typeof qrString !== 'string' || qrString.trim().length === 0) {
+    throw new PayWayConfigError('qrString must be a non-empty string');
+  }
+  return `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(qrString.trim())}`;
+}
+
+/**
  * Gateway-documented amount floors (audit §5.9): KHR >= 100, USD >= 0.01 on
  * payout / CoF payment / QR / payment-link. Advisory — warns (escalates to
  * PayWayConfigError under strictValidation) because the exact enforcement

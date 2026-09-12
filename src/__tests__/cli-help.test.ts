@@ -35,6 +35,7 @@ const REGISTERED_COMMANDS = [
   'cof',
   'beneficiary',
   'sandbox-beneficiaries',
+  'sandbox-test-cards',
   'payout',
   'profiles',
   'skills',

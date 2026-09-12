@@ -71,10 +71,18 @@ export const MUTATION_ENDPOINTS = new Set<string>([
  * and getTransactionList.
  *
  * Discovered via sandbox testing — these numeric codes are undocumented in
- * the OpenAPI spec but confirmed against live sandbox responses:
+ * the OpenAPI spec but confirmed against live sandbox responses, and the
+ * canonical mapping was confirmed by the ABA integration team (2026-09-12):
  *   - `payment_status_code: 0` → `payment_status: "APPROVED"`
- *   - `payment_status_code: 2` → `payment_status: "PENDING"`
+ *   - `payment_status_code: 2` → `payment_status: "PENDING"` (may persist up
+ *     to ~24h before the gateway settles the final state)
+ *   - `payment_status_code: 3` → `payment_status: "DECLINED"`
  *   - `payment_status_code: 4` → `payment_status: "REFUNDED"`
+ *   - `payment_status_code: 7` → `payment_status: "CANCELLED"` (pre-auth)
+ *
+ * There is NO EXPIRED or CLOSED code — long-PENDING is the gateway's terminal
+ * representation of expired/closed transactions; merchants enforce expiry
+ * client-side (SANDBOX-FINDINGS §21, confirmed by ABA 2026-09-12).
  *
  * Use these constants instead of magic numbers:
  * @example
@@ -145,6 +153,17 @@ export const PRE_AUTH_ERROR_CODES = {
   /** Unable to cancel pre-authorization — transaction status invalid */
   UNABLE_TO_CANCEL: 'PTL170',
 } as const;
+
+/**
+ * Default pre-auth capture/hold window (ABA integration team, 2026-09-12):
+ * up to 30 days from the initial pre-authorization. Within the window the
+ * pre-auth can be completed (full or partial) or cancelled; after it, the
+ * hold auto-cancels/auto-reverses and funds are released — with NO webhook
+ * for the auto-release, so poll Check Transaction to observe the terminal
+ * state. The window is per-merchant configurable; confirm the profile value
+ * with ABA when integrating.
+ */
+export const PRE_AUTH_DEFAULT_CAPTURE_WINDOW_DAYS = 30;
 
 /**
  * Payout / split-payout error codes (direct payout API).
@@ -286,6 +305,12 @@ export const QR_TEMPLATE_NAMES: readonly string[] = QR_TEMPLATES.map((template) 
  * Payment options accepted by purchase/generate-qr endpoints (src/client.ts).
  * `abapay_khqr` is the generate-qr default; `abapay_khqr_deeplink` the
  * generate-checkout default.
+ *
+ * Note on `google_pay`: the ABA integration team reported (2026-09-12) that
+ * online Google Pay was "not available at the time of the guidance" with no
+ * activation flow documented. The value stays accepted here (the gateway may
+ * support it per profile), but merchants should verify availability for their
+ * merchant profile with ABA before advertising it on checkout.
  */
 export const PAYMENT_OPTIONS = ['cards', 'abapay_khqr', 'abapay_khqr_deeplink', 'alipay', 'wechat', 'google_pay'] as const;
 

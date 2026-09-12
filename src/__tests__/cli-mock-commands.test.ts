@@ -781,6 +781,25 @@ describe('CLI API commands against the local mock gateway', () => {
     expect([undefined, 0, 1]).toContain(exitCode as number);
   });
 
+  it('sandbox-test-cards prints the seeded test cards (--json, filter, pretty)', async () => {
+    const all = await run(['sandbox-test-cards', '--json']);
+    const cards = JSON.parse(all.text) as Array<{ number: string; outcome: string }>;
+    expect(cards).toHaveLength(4);
+
+    const declined = await run(['sandbox-test-cards', '--outcome', 'declined', '--json']);
+    const declinedCards = JSON.parse(declined.text) as Array<{ outcome: string }>;
+    expect(declinedCards).toHaveLength(2);
+    expect(declinedCards.every((card) => card.outcome === 'declined')).toBe(true);
+
+    const pretty = await run(['sandbox-test-cards']);
+    expect(pretty.text).toContain('5156 8399 3770 6777');
+    expect(pretty.text).toContain('approved');
+
+    const invalid = await run(['sandbox-test-cards', '--outcome', 'bogus']);
+    expect(invalid.text).toContain('--outcome must be');
+    expect(invalid.exitCode).toBe(1);
+  });
+
   it('pretty (non---json) output variants render human summaries', async () => {
     const close = await run(['close-transaction', '-t', 'CLOSE-PRETTY', '-y']);
     expect(close.text).toContain('Success');

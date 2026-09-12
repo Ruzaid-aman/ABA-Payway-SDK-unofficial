@@ -435,8 +435,10 @@ The callback will appear in your terminal and be saved to disk.
 
 1. Configure the ABA-issued offline KHQR merchant fields through explicit `PayWay` configuration, `PAYWAY_KHQR_*` environment variables, or a local CLI profile. `payway.khqr.validateConfiguration()` reports missing or invalid fields without exposing their values.
 2. Publish `https://your-public-host/aba-payway-khqr-webhook` and request ABA provisioning/whitelisting for that route.
-3. Keep raw notification records, deduplicate `transaction_id`, and reconcile with `merchant_ref` before any fulfilment decision.
+3. Keep raw notification records, deduplicate delivery/processing on `transaction_id`, and reconcile the invoice or account with `merchant_ref` before any fulfilment decision.
 4. Do not assume online HMAC authentication; implement only the verification strategy ABA confirms for this notification.
+5. The supplied high-volume guidance says the same KHQR can be paid multiple times; confirm the provider rule with ABA. The same `transaction_id` is a replay, but a new `transaction_id` with the same `merchant_ref` is a separate Payment that may create a partial payment or overpayment.
+6. Recover missed notifications with `get-transactions-by-mc-ref`. It returns at most 50 matches, has no pagination parameter, and is limited to 10 requests per minute; treat a saturated response as a possible reconciliation gap.
 
 ---
 

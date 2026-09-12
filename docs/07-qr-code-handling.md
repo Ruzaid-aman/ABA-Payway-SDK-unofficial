@@ -368,10 +368,13 @@ const readiness = payway.khqr.validateConfiguration();
 if (!readiness.ready) throw new Error(readiness.issues.map((issue) => issue.code).join(', '));
 
 // Generate an official ABA KHQR string locally.
+const createdAt = Date.now();
 const qrString = payway.khqr.generateOfflineQR({
   amount: 15.00,
   currency: 'USD',
   merchantRef: 'REF-123', // Your internal reference
+  createdAt,
+  expiresAt: createdAt + 30 * 24 * 60 * 60 * 1000, // validity window follows the current ABA KHQR (Bakong) spec for your merchant
 });
 
 console.log(qrString);
@@ -385,9 +388,29 @@ console.log(qrString);
 
 The seven configuration fields can be supplied in the constructor (highest priority), environment (`PAYWAY_KHQR_BAKONG_ID`, `PAYWAY_KHQR_ABA_MERCHANT_ID`, `PAYWAY_KHQR_ACQUIRER_NAME`, `PAYWAY_KHQR_MERCHANT_CATEGORY_CODE`, `PAYWAY_KHQR_MERCHANT_NAME`, `PAYWAY_KHQR_MERCHANT_CITY`, and `PAYWAY_KHQR_PAYWAY_DATA`), or an optional local CLI profile. Keep them private and obtain them from ABA; do not infer or reuse another merchant's values.
 
-Omit `amount` for a static QR (`01=11`); provide it for a dynamic QR (`01=12` with tag `54`). The payload uses byte-aware TLV lengths, includes merchant reference `62.01`, ABA-provided PayWay data `62.68`, and CRC tag `63`. Earlier SDK versions used a private offline format; migrate by removing legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments.
+Omit `amount` for a static QR (`01=11`) with an open amount and tag `54` omitted; provide it for a dynamic QR (`01=12` with a fixed amount in tag `54`). Both modes carry `createdAt` and `expiresAt` as 13-digit epoch-millisecond values in nested tag `99`. If omitted, the SDK uses the generation time and expires the payload **15 minutes** later. Static does not mean permanent.
 
-> ⚠️ **Important:** Offline-generated QRs cannot be tracked by PayWay for status. For server-side status tracking, use the API-based `generateQr()`. A payment notification, when ABA has provisioned one, still needs separate reconciliation.
+For invoice batches, set the validity explicitly and confirm the permitted window with ABA. The CLI currently does not expose offline `createdAt`/`expiresAt`; its `--lifetime` flag applies to the online QR request and does not configure offline KHQR expiry. Use the typed SDK when QRs will wait in a print or delivery queue.
+
+The payload permits `merchantRef` values up to **25 UTF-8 bytes**, but `get-transactions-by-mc-ref` has a narrower 20-character gateway cap. Use a unique reference of no more than **20 ASCII characters** when the invoice must be recoverable through that inquiry API.
+
+Earlier SDK versions used a private offline format; migrate by removing legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments.
+
+> ⚠️ **Important:** Local generation does not pre-create a PayWay transaction, so there is nothing to poll immediately after generation. When ABA has provisioned routing and the customer pays, the resulting payment transaction may arrive through the dedicated KHQR notification or be recovered by `merchant_ref`. The notification remains unverified until you implement the verification contract ABA confirms for your merchant.
+
+### High-volume invoice and billing pattern
+
+Use dynamic KHQR for an exact invoice amount and static KHQR for an open, installment, or partial amount. In both cases, make `62.01` invoice-specific. The supplied high-volume guidance says the same QR **can be paid multiple times** during its applicable validity; confirm that provider rule against the current merchant-issued ABA guideline. A unique QR must not be treated as a guaranteed single-use payment control.
+
+Persist three separate concepts:
+
+- **Invoice:** the obligation, expected currency, amount due, balance, and business status.
+- **Payment:** one actual PayWay transfer, uniquely deduplicated by `transaction_id`.
+- **Payment Allocation:** how much of a Payment settles an Invoice.
+
+Use `merchant_ref` to locate the obligation, not as the payment idempotency key. If a new `transaction_id` arrives for an already paid invoice, store it as a real additional payment and route it to the merchant's overpayment, credit, or refund workflow. Unknown references and currency mismatches belong in an exception queue, not in discarded callbacks.
+
+For each batch, reject duplicate references and retain a manifest containing reference, expected amount/currency, `createdAt`, `expiresAt`, output filename, generator version, and a payload digest. Run `validateKhqrCrc()` and `inspectKhqrPayload()` on every row before printing. Reconcile missed notifications with `get-transactions-by-mc-ref`, remembering that it returns at most 50 matches, has no pagination, and is limited to 10 requests per minute; a saturated response is not proof of complete history.
 
 ---
 
@@ -418,6 +441,15 @@ QR codes generated via the API have a limited lifetime:
 - **Transaction-list date filters must be `"YYYY-MM-DD HH:mm:ss"`** (e.g. `"2026-08-25 00:00:00"`). Compact (`20260825`), ISO-date (`2026-08-25`), and epoch formats all fail with HTTP 403 / code `49` "Invalid Start Date."
 - **QR `lifetime` minimum is 3 minutes — sandbox-pinned 2026-08-30, now enforced by the SDK.** `lifetime: 179` → HTTP 400 code `"04"` ("The given data was invalid"); `lifetime: 180` → success. The API takes **minutes**; the SDK accepts seconds, floors to whole minutes (a live QR never outlives the merchant's displayed countdown), and **rejects sub-180s values locally** with `PayWayConfigError` before any network call (exported constant: `QR_LIFETIME_MIN_SECONDS`). `checkout.purchase` is different: its `lifetime` is **minutes** (spec min 3, max 43200 = 30 days); sub-3-minute values are rejected locally with `PayWayConfigError` (gateway error-69 parity). QR maximum per the spec is 120 days (not locally enforced; ~27h confirmed accepted live).
 - **Duplicate `tran_id` on `generate-qr` is also silently accepted** (reconfirmed 2026-08-30): the same ID at $5.00 and then $7.77 both returned `code 00` with **two different live QR payloads** — whichever QR is scanned first wins and the other amount goes stale.
+
+### Confirmed by the ABA integration team (2026-09-12)
+
+- **Two clocks govern a QR**: the *scan/session window* the customer experiences, and the *transaction lifetime* (`lifetime`) the gateway keeps the record alive. They are independent — a QR image can stop scanning while the transaction record is still open (matches the sandbox observation of a 1440-min-lifetime KHQR refused at scan after ~2h). For long-lived invoices use the offline-KHQR/invoice pattern with its own validity, not a checkout QR.
+- **Hosted-checkout session timeouts per method** (front-end session, not transaction TTL): `abapay_khqr` 5 minutes; `abapay_khqr_deeplink`, cards, Alipay, and WeChat 3 minutes. The QR image itself may expire in as little as ~2 minutes while the transaction is open — after the window the customer must re-initiate (a fresh transaction/QR), not reuse the old `checkout_qr_url`.
+- **Default KHQR checkout expiry is 5 minutes after generation** (global setting, not per-merchant configurable). Some QR APIs default to a long validity (~30 days) when `lifetime` is omitted; KHQR is described as one-time-use with a 24-hour lifetime in other PayWay contexts. Keep the visible window short (3–5 min) and align `lifetime` + polling/expiry logic with it.
+- **Offline KHQR repeat payment and validity** (closes the open policy question in [SANDBOX-FINDINGS](./SANDBOX-FINDINGS.md)): a QR **may support multiple payment transactions during its applicable validity** (the UNPAID/PARTIALLY_PAID/PAID/OVERPAID model; dedupe on `transaction_id`, reconcile on `merchant_ref`) — but "payable multiple times" explicitly does **not** mean payable forever. Creation/expiry follow the current ABA KHQR (Bakong) spec timestamps.
+- **No signature on the offline-KHQR notification — by design.** ABA confirmed no separate HMAC/signature scheme exists for that callback; integrity comes from HTTPS, dedupe on `transaction_id`, `merchant_ref` reconciliation, and treating transaction inquiry (Check Transaction / `get-transactions-by-mc-ref`) as the source of truth. ABA configures/whitelists the merchant callback URL on the profile.
+- **Status enum confirmed**: `payment_status_code` 0 APPROVED, 2 PENDING (may persist up to ~24 h), 3 DECLINED, 4 REFUNDED, 7 CANCELLED (pre-auth). There is **no EXPIRED/CLOSED code** — long-PENDING is the gateway's terminal representation; expiry is merchant-side. (`DECLINDED` spellings in list output are the gateway's own typo — handle it.)
 
 ---
 
@@ -695,42 +727,22 @@ Thrown when polling is forcibly stopped (caught by `catch` around the `for await
 
 ## Validating a QR String
 
-You can parse the QR string to verify the embedded data:
+Use the exported byte-aware parser and CRC validator. Do not implement this with JavaScript string indexes: KHQR lengths are UTF-8 byte counts, and tags `30`, `62`, and `99` are nested templates.
 
 ```typescript
-/**
- * Simple KHQR payload parser.
- * Parses EMVCo TLV format to extract merchant ID, transaction ID, and amount.
- */
-function parseKhqrString(qrString: string): Record<string, string> | null {
-  try {
-    const result: Record<string, string> = {};
-    let pos = 0;
+import { inspectKhqrPayload, validateKhqrCrc } from 'aba-payway-ts';
 
-    while (pos < qrString.length - 4) { // Last 4 chars are CRC
-      const tag = qrString.substring(pos, pos + 2);
-      const length = parseInt(qrString.substring(pos + 2, pos + 4), 10);
-      const value = qrString.substring(pos + 4, pos + 4 + length);
-
-      result[tag] = value;
-      pos += 4 + length;
-    }
-
-    return result;
-  } catch {
-    return null;
-  }
+if (!validateKhqrCrc(qrString)) {
+  throw new Error('Do not distribute this QR: CRC mismatch');
 }
 
-const info = parseKhqrString(qrString);
+const info = inspectKhqrPayload(qrString);
+if (!info?.valid) {
+  throw new Error('Do not distribute this QR: malformed KHQR payload');
+}
+
 console.log(info);
-// {
-//   "00": "01",           // Payload Format Indicator
-//   "01": "12",           // Point of Initiation Method
-//   "30": "M001",         // Merchant ID (in sub-fields)
-//   "62": "REF-123",      // Additional Data (merchant reference)
-//   ...
-// }
+// { isStatic, currency, amount?, merchantName?, merchantCity?, merchantRef?, bakongId?, crcValid, valid }
 ```
 
 ---
@@ -741,7 +753,8 @@ console.log(info);
 |---|---|
 | **Physical POS (customer scans from phone screen)** | Use API-based `generateQr()` with polling |
 | **E-commerce (customer scans with phone camera)** | Use API-based `generateQr()` with polling and webhook |
-| **Static QR on invoice (same QR for multiple payments)** | Use configured offline `generateOfflineQR()` without `amount`; reconcile payments independently |
+| **Fixed-amount invoice batch** | Use configured offline `generateOfflineQR()` with `amount` and explicit `createdAt`/`expiresAt`; self-check every row before printing |
+| **Open/partial-amount invoice** | Omit `amount`; use an invoice-specific `merchantRef`, a payment ledger, and independent allocations |
 | **Telegram bot / messaging** | Send `qrImage` as a photo message |
 | **Mobile app (display QR to another device)** | Use `qrString` with a native QR renderer |
 

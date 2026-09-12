@@ -123,13 +123,14 @@ When you use the CLI, save each distinct credential set as a named profile rathe
 
 For sandbox testing, PayWay provides test card numbers that simulate different payment outcomes:
 
-| Card Number | Outcome | Use Case |
-|---|---|---|
-| `[TBD: Obtain from ABA developer portal]` | Approved | Test successful payment flow |
-| `[TBD: Obtain from ABA developer portal]` | Declined | Test failure handling |
-| `[TBD: Obtain from ABA developer portal]` | Insufficient Balance | Test error scenarios |
+| Card Number | Outcome | 3DS | Use Case |
+|---|---|---|---|
+| `5156 8399 3770 6777` (MasterCard, exp 01/30, CVV 993) | Approved | No | Test successful payment flow |
+| `4286 0900 0000 0206` (Visa, exp 04/30, CVV 777) | Approved | Yes | Success path incl. the 3DS challenge (test OTP arrives by email) |
+| `5156 8302 7256 1029` (MasterCard, exp 04/30, CVV 777) | Declined | Yes | Test failure handling |
+| `4156 8399 3770 6777` (Visa, exp 01/30, CVV 993) | Declined | No | Decline/error handling without 3DS |
 
-> 📋 **Source:** Test card numbers are available at [ABA PayWay Developer Portal - Test Cards](https://developer.payway.com.kh/resources-3305682f0). Contact ABA support for the latest test card numbers.
+> 📋 **Source:** ABA integration team (2026-09-12) — sandbox-only, never use real card data in sandbox, and these cards are **never valid in production**. ABA may rotate the list: if a card starts failing, request updated sandbox/UAT test cards from the Integration Team. The SDK ships the same list: `payway-sdk sandbox-test-cards` (or `listSandboxTestCards()`), and the ABA Mobile Simulator for ABA PAY / KHQR testing is covered in [Chapter 2](./02-prerequisites-and-setup.md#aba-mobile-simulator-sandbox-testing).
 
 > ⚠️ **Important:** Test cards only work in the sandbox environment. Using them in production will result in declined transactions.
 

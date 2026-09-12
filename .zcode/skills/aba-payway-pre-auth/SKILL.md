@@ -2,7 +2,7 @@
 name: aba-payway-pre-auth
 description: Complete, complete with payout, or cancel an ABA PayWay pre-authorization.
 metadata:
-  version: 1.2.0
+  version: 1.2.1
 ---
 
 # ABA PayWay Pre-Authorization
@@ -34,6 +34,9 @@ payout:
 // A KHR beneficiary/MID or an unknown account throws PayWayConfigError locally
 // BEFORE any request (see aba-payway-sandbox-beneficiaries).
 ```
+
+## Capture window
+Default hold window is **up to 30 days** from the initial pre-authorization (per-merchant configurable — confirm the profile value with ABA; constant `PRE_AUTH_DEFAULT_CAPTURE_WINDOW_DAYS`). Complete (full or partial) or cancel within the window; after it the hold **auto-cancels/auto-reverses with NO webhook** — poll Check Transaction to observe the terminal state (ABA-confirmed 2026-09-12).
 
 ## Error Handling
 ```ts

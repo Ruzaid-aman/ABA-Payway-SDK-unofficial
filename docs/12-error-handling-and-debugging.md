@@ -748,9 +748,12 @@ Use PayWay's test card numbers to trigger specific payment outcomes in the sandb
 
 | Test Card Number | Expected Outcome | What to Test |
 |---|---|---|
-| `[TBD: Obtain from ABA]` | **Approved** | Successful payment flow, webhook delivery, database update |
-| `[TBD: Obtain from ABA]` | **Declined** | Error handling, user feedback, retry logic |
-| `[TBD: Obtain from ABA]` | **Insufficient Balance** | Edge case handling, partial payment scenarios |
+| `5156 8399 3770 6777` (MasterCard, exp 01/30, CVV 993, no 3DS) | **Approved** | Successful payment flow, webhook delivery, database update |
+| `4286 0900 0000 0206` (Visa, exp 04/30, CVV 777, 3DS) | **Approved** | Success path incl. 3DS challenge (test OTP by email) |
+| `5156 8302 7256 1029` (MasterCard, exp 04/30, CVV 777, 3DS) | **Declined** | Error handling, user feedback, retry logic |
+| `4156 8399 3770 6777` (Visa, exp 01/30, CVV 993, no 3DS) | **Declined** | Decline/error handling without 3DS |
+
+No dedicated "insufficient balance" sandbox card is published; exercise balance-dependent paths (e.g. refund `PTL181`) against low-balance scenarios with the Integration Team. Cards are sandbox-only and may rotate — the SDK ships the same list via `payway-sdk sandbox-test-cards` / `listSandboxTestCards()` (ABA integration team, 2026-09-12).
 
 **Testing workflow:**
 1. Use the test card number in your checkout form

@@ -52,7 +52,7 @@ A **callback** (also called a **webhook**) is a server-to-server HTTP POST reque
 | **Who initiates it?** | Customer's browser (redirect) | PayWay's server (HTTP POST) |
 | **Trustworthy?** | ❌ No — user can manipulate/skip it | ✅ Online checkout: HMAC-SHA512 signed |
 | **When does it fire?** | After customer completes payment page | When payment is confirmed by PayWay's backend |
-| **Can it be retried?** | No — one-time browser redirect | Yes — PayWay retries if you don't respond |
+| **Can it be retried?** | No — one-time browser redirect | **No guaranteed retry** — a single best-effort delivery (confirmed by ABA, 2026-09-12). A one-off retry (~10 s apart) has been observed in some flows but must not be designed for; recover via Check Transaction polling |
 | **What should you do with it?** | Show a "Thank You" page | After online signature verification, update database and fulfil order |
 
 ---
@@ -255,7 +255,8 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     // The callback was still valid — log but don't re-respond
-    // PayWay will retry if we didn't return 200, but we already did
+    // No guaranteed PayWay retry (single best-effort delivery, confirmed
+    // 2026-09-12) — your Check Transaction reconciler recovers missed ones
     console.error('❌ Post-webhook processing failed:', {
       tran_id,
       error: error instanceof Error ? error.message : String(error),
@@ -391,9 +392,19 @@ POST /aba-payway-khqr-webhook
 
 Before relying on it, publish a stable HTTPS URL and ask ABA to configure and whitelist that exact URL for the merchant. Record that request separately from local SDK configuration: `confirmed-by-merchant` is an operator declaration, not proof that ABA completed provisioning. `payway.khqr.validateCallbackSetup()` checks an HTTPS URL, the declaration, and a non-`unknown` verification strategy, but cannot contact ABA or prove whitelisting.
 
-The listener persists headers, source IP, and the raw body before parsing. It preserves unknown fields and records parse errors so future ABA schema changes remain auditable. It intentionally accepts the published offline shape without requiring the online HMAC header. Treat the parsed `transaction_id` only as a deduplication key; reconcile it with your own `merchant_ref` and a verified ABA process before fulfilment. This capture listener must never decide that an order is paid. Do not use `tran_id`, online `status`, or `verifyCallback()` as assumptions for this offline notification.
+The listener persists headers, source IP, and the raw body before parsing. It preserves unknown fields and records parse errors so future ABA schema changes remain auditable. It intentionally accepts the published offline shape without requiring the online HMAC header. Treat the parsed `transaction_id` only as a deduplication key for the payment/delivery; use `merchant_ref` to locate the invoice or account and reconcile it through a verified ABA process before fulfilment. This capture listener must never decide that an order is paid. Do not use `tran_id`, online `status`, or `verifyCallback()` as assumptions for this offline notification.
 
 For a production receiver, apply the verification method ABA actually provides (for example, a confirmed HMAC, mTLS, or an IP allowlist), store the evidence with the raw delivery, and keep the decision to mark an order paid in your application—not in the capture listener.
+
+The supplied high-volume guidance says the same offline KHQR can be paid multiple times during its applicable validity; confirm that provider rule against the current merchant-issued ABA guideline. Regardless, distinguish these cases safely:
+
+- The same `transaction_id` is delivered or processed again: idempotently return the stored outcome; do not create another Payment.
+- A new `transaction_id` has the same `merchant_ref`: store a new Payment. It may be a legitimate installment or a real overpayment, not a duplicate callback.
+- The reference is unknown or the currency conflicts with the invoice: retain the Payment in an exception state for investigation.
+
+Keep Invoice, Payment, and Payment Allocation records separate. Allocate verified payments atomically, recompute the balance, and route excess value through the merchant's overpayment, credit, or refund policy.
+
+Callbacks are the event path, not the only recovery path. If a notification is missing, query `get-transactions-by-mc-ref` using the same recovery-safe reference. The endpoint returns at most 50 matches, exposes no pagination parameter, and is limited to 10 requests per minute. A saturated 50-row response may be incomplete, so compare it with the merchant ledger rather than declaring reconciliation complete.
 
 ---
 
@@ -466,7 +477,7 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 
 ## Next Steps
 
-- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](./16-webhook-setup-guide.md) — quick way to capture and inspect callbacks during development
+- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](./16-webhook-setup-guide.md) — quick way to capture and inspect callbacks during development; the [Local Webhook Workbench](./16-webhook-setup-guide.md#local-webhook-workbench) in the same chapter sends correctly-signed fixture callbacks (`webhook trigger`), forwards captures to your app (`--forward-to`), replays stored records (`webhook resend`), and explains failed verifications (`webhook verify-callback`) — all without the ABA Simulator
 - **For error handling** → [Chapter 12 — Error Handling & Debugging](./12-error-handling-and-debugging.md)
 - **For deployment** → [Chapter 13 — Deployment Checklist](./13-deployment-checklist.md)
 - **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](./03-web-implementation.md)

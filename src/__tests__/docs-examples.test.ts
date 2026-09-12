@@ -133,8 +133,12 @@ describe('Documentation examples', () => {
   });
 
   it('does not copy supplied ABA merchant values into published documentation', () => {
+    const suppliedConfigPath = ['example-khqr-config.json', 'khqr-config.json']
+      .map((name) => join(repoRoot, 'payway-boilerplate', 'ABA KHQR onsite generation', name))
+      .find(existsSync);
+    expect(suppliedConfigPath).toBeDefined();
     const suppliedConfig = JSON.parse(
-      readFileSync(join(repoRoot, 'payway-boilerplate', 'ABA KHQR onsite generation', 'khqr-config.json'), 'utf8'),
+      readFileSync(suppliedConfigPath as string, 'utf8'),
     ) as Record<string, string>;
     const documentation = khqrDocs.join('\n');
 
@@ -340,6 +344,51 @@ describe('Documentation examples', () => {
     // above it (callback reach depends on ABA routing/enrollment, not on
     // which tool produced the QR string) — it must not come back.
     expect(offline).not.toContain('unlike a locally built offline QR');
+  });
+
+  it('documents the offline KHQR expiry contract for invoice batches', () => {
+    const offline = readSkill('aba-payway-offline-qr');
+    const reference = readDoc('docs/SDK-AND-CLI-REFERENCE.md');
+    const qrGuide = readDoc('docs/07-qr-code-handling.md');
+
+    for (const content of [offline, reference, qrGuide]) {
+      expect(content).toContain('15 minutes');
+      expect(content).toContain('createdAt');
+      expect(content).toContain('expiresAt');
+      expect(content).toMatch(/batch/i);
+    }
+    expect(offline).toContain('`--lifetime` does not configure offline KHQR expiry');
+  });
+
+  it('documents repeat-payment accounting and separates payment identity from invoice reconciliation', () => {
+    const offline = readSkill('aba-payway-offline-qr');
+    const callbacks = readDoc('docs/11-callbacks-and-webhooks.md');
+
+    for (const content of [offline, callbacks]) {
+      expect(content).toContain('can be paid multiple times');
+      expect(content).toContain('`transaction_id`');
+      expect(content).toContain('`merchant_ref`');
+      expect(content).toMatch(/overpayment/i);
+    }
+  });
+
+  it('documents the safe merchant-reference intersection for generation and inquiry', () => {
+    const offline = readSkill('aba-payway-offline-qr');
+    const reference = readDoc('docs/SDK-AND-CLI-REFERENCE.md');
+
+    for (const content of [offline, reference]) {
+      expect(content).toContain('25 UTF-8 bytes');
+      expect(content).toContain('20 ASCII characters');
+      expect(content).toContain('get-transactions-by-mc-ref');
+    }
+  });
+
+  it('uses the byte-aware exported inspector instead of teaching a character-index KHQR parser', () => {
+    const qrGuide = readDoc('docs/07-qr-code-handling.md');
+
+    expect(qrGuide).toContain('inspectKhqrPayload');
+    expect(qrGuide).toContain('validateKhqrCrc');
+    expect(qrGuide).not.toContain('function parseKhqrString');
   });
 
   it('the token-lifecycle examples pass local request-id validation (F06)', () => {

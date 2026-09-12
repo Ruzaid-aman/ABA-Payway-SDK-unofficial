@@ -10,6 +10,7 @@ Follow the [quickstart](../QUICKSTART.md) to install, try the credential-free de
 | How do I go from zero to a verified test payment? | [Quickstart](../QUICKSTART.md) — the canonical beginner path |
 | How do I get ABA sandbox keys or configure profiles? | [Credentials and setup](./02-prerequisites-and-setup.md#how-to-get-sandbox-credentials) |
 | How do I receive a callback on my development machine? | [Webhook setup](./16-webhook-setup-guide.md#quick-start) |
+| How do I test my callback receiver without the ABA Simulator? | [Local webhook workbench](./16-webhook-setup-guide.md#local-webhook-workbench) — signed fixture triggers, forwarding, resend, verify |
 | How do verification and recovery work in an application? | [Runnable simulated walkthrough](./FIRST-PAYMENT-WALKTHROUGH.md) |
 
 The [one-page lifecycle reference](./QUICK-START-1-PAGER.md) is a reminder after onboarding. Numbered chapters are topic references; you do not need to read them sequentially.
@@ -21,6 +22,7 @@ The journey is **create -> show the artifact -> verify -> fulfill once**. Creati
 | Customer experience | Guide | Readiness |
 |---|---|---|
 | Scan an online QR | [QR payments](./07-qr-code-handling.md) | Server credentials and a public HTTPS callback |
+| Generate offline KHQR invoice batches | [QR payments — Offline KHQR](./07-qr-code-handling.md#official-aba-khqr-offline-generation-no-api-call-required) | ABA-issued KHQR fields, explicit validity, batch manifest, notification and inquiry recovery |
 | Pay on a hosted page | [Web checkout](./03-web-implementation.md) | Server credentials; signed browser form POST |
 | Open a shareable payment link | [Payment links](./17-payment-link.md) | Server credentials, RSA key, public HTTPS callback |
 
@@ -45,7 +47,7 @@ Use [callbacks and webhooks](./11-callbacks-and-webhooks.md), [webhook setup](./
 
 Follow the [deployment checklist](./13-deployment-checklist.md) and [support scope](../SUPPORT.md). Keep credentials in a server secret manager. Saved CLI profiles store plaintext credentials and are intended for protected development machines.
 
-Use the [SDK and CLI reference](./SDK-AND-CLI-REFERENCE.md) when you need additional options, [merchant scenarios](./15-merchant-scenario-requirements.md) for broader requirements, and [account/token lifecycle](./09-link-unlink-renew-lifecycle.md) for recurring payments.
+Use the [SDK and CLI reference](./SDK-AND-CLI-REFERENCE.md) when you need additional options, [merchant scenarios](./15-merchant-scenario-requirements.md) for broader requirements, [account/token lifecycle](./09-link-unlink-renew-lifecycle.md) for recurring payments, and [settlement, payouts, FX, and disputes](./20-settlement-and-disputes.md) for what happens after the payment is approved.
 
 ## Troubleshoot
 
@@ -78,4 +80,6 @@ These materials support maintenance and investigation; they are not onboarding p
 - [Contributing](../CONTRIBUTING.md), [handoff](../HANDOFF.md), [release readiness](./RELEASE-READINESS.md), [release checklist](./RELEASE_CHECKLIST.md), [versioning](./VERSIONING.md).
 - [Sandbox findings](./SANDBOX-FINDINGS.md), [close-transaction evidence](./CLOSE-TRANSACTION-FINDINGS.md), [open questions](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md).
 - [Error-code registry (generated)](./error-codes.json) — every `explain`-known code as versioned JSON; regenerate with `npm run gen:error-registry`.
+- [Integration gaps & consolidated ABA questions](./INTEGRATION-GAPS-AND-ABA-QUESTIONS.md) (2026-09-12 scan: what the docs cannot answer developers + the prioritized send-to-ABA list).
 - [Historical project status](./PROJECT_STATUS.md), [agent setup playbook](./AGENT-SETUP-PLAYBOOK.md), [callback capture recipe](./agents/callback-capture-recipe.md).
+- Competitive analyses: [Stripe/Razorpay CLI + npm ecosystem audit with the P0→Wave-2 roadmap](./competitive-analysis-cli-stripe-razorpay.md) (webhook workbench shipped 2026-09-10, re-audited with live evidence), [CutLuy comparison](./competitive-analysis-cutluy.md), [Canadia Bank portal comparison](./competitive-analysis-canadia.md) (2026-09-11: portal-polish leader, non-runnable samples — generated per-flow diagrams and a published error-code registry are the adoptable patterns), [Stripe-standard DX audit](./STRIPE-STANDARD-DX-AUDIT.md).

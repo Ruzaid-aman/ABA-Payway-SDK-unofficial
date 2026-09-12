@@ -28,7 +28,7 @@ Every parameter you pass to `createTransaction()` affects how the checkout page 
 |---|---|---|---|
 | **Payment Option** | `paymentOption` | `'cards'`, `'abapay_khqr'`, `'alipay'`, `'wechat'`, `'google_pay'`, `'abapay_khqr_deeplink'` | Which payment methods appear on the checkout page |
 | **View Type** | `viewType` | `'hosted_view'` (default) or `'popup'` | Full-page redirect vs. popup overlay |
-| **Language** | `[TBD]` | `[TBD: research from official docs]` | Locale/language of the checkout page |
+| **Language** | Not exposed by this SDK | The hosted page's label sets are portal/team-configured per profile (ABA integration team, 2026-09-12); no client-supplied language parameter is documented — request label/locale changes via the merchant portal or the Integration Team | Locale/language of the checkout page |
 | **QR Image Template** | `qrImageTemplate` (QR API only) | `'template1'`, `'template1_color'`, `'template2'` (default), `'template2_color'`, `'template3_color'`, `'template4'`, `'template4_color'` | Visual style of generated QR codes — the full `QR_TEMPLATES` validator list (7 values). Rendered samples per template: see the [template gallery](./07-qr-code-handling.md#qr-image-template-gallery) |
 
 ### Flow-Control Parameters
@@ -101,8 +101,8 @@ PayWay's hosted checkout page is a **security-sensitive** page. For PCI complian
 | **ABA / PayWay logo** | ❌ No | Required for brand trust and PCI compliance |
 | **SSL certificate indicator** | ❌ No | The browser's native padlock icon |
 | **Form field styling** | ❌ No | Card number, expiry, CVV fields are PayWay-controlled |
-| **Page background color** | `[TBD]` | May or may not be customizable — research needed |
-| **Custom CSS injection** | `[TBD]` | Not documented — may not be supported |
+| **Page background color** | Via profile only | Theme/primary colors are set server-side on the PayWay profile — provide assets to the Integration Team (confirmed 2026-09-12); no client-side control |
+| **Custom CSS injection** | ❌ No | Confirmed not supported (2026-09-12): custom CSS/JS cannot be injected and `checkout2-0.js`/the hosted HTML must not be modified client-side |
 | **Complete white-label** | ❌ No | PayWay is always branded as ABA PayWay |
 
 > 💡 **If you need full UI control**, use the **QR API** (`payway.qr.generateQr()`) instead of the redirect-based checkout. With QR, you build your own payment page and only display the QR image — you have full control over everything except the QR code itself.
