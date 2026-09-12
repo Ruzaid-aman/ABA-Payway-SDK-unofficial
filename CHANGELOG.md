@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### CLI/SDK contract fixes (2026-09-12 Tier-0 wave)
+
+- `generate-checkout` now accepts `-y`/`--non-interactive` — the documented agent
+  flag previously failed with `error: unknown option '-y'`. `--json` on
+  generate-checkout also forces non-interactive mode.
+- The `--json` error envelope (`{error:{kind,exitCode,…}}`) now covers
+  `exchange-rate`, `payout` (local validations and gateway failures),
+  `get-transactions-by-ref` (new `--json` flag), and `pre-auth
+  complete|complete-payout|cancel`; credential pre-flight checks on those
+  commands emit the envelope under `--json` as well.
+- `payout` suppresses its banner and "Calling PayWay payout API..." progress
+  lines under `--json`, so stdout is exactly one JSON document.
+- `generate-checkout` and `request-qr` accept an explicit-units
+  `--lifetime-minutes` flag; `--lifetime` remains a deprecated minutes alias
+  (generate-qr keeps `--lifetime` in seconds).
+- SDK: `PayWayAPIError` (and subclasses) carry `correlationId` — stamped in the
+  transport catch so classifier-built business errors are included — joining
+  errors to journal entries and request hooks; exposed via `toJSON()`.
+- SDK: `sanitizeForLog` propagates the parent key hint into arrays, so hex
+  secrets stored as lists (e.g. `payload: ["<40-hex>"]`) are masked.
+- Skills: `aba-payway-test-harness` no longer mislabels `payway-sdk demo` as
+  the suite runner; `aba-payway-purchase` documents `--lifetime-minutes`.
+- Tooling: lint gate widened to shipped skill scripts (`biome lint src skills`);
+  AGENTS.md canonical fence retagged `powershell` with a POSIX note; HANDOFF
+  stale counts and merge-state claims corrected.
+
 ### Offline KHQR high-volume billing guidance (2026-09-10)
 
 - Propagated the invoice/billing operating model across the Offline QR skill,

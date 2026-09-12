@@ -22,7 +22,7 @@ The same harness is reachable without writing code (true OFFLINE mock server —
 
 ```sh
 payway-sdk test    # run the PayWay sandbox test suite
-payway-sdk demo    # run the suite with pass/fail output
+payway-sdk demo    # credential-free localhost demo journey (--check to verify it)
 ```
 
 ## Error Handling

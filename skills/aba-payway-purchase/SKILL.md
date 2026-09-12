@@ -62,7 +62,8 @@ res.type(page.content_type).send(page.html); // Express — but see the CORS war
 > ⚠️ **`lifetime` on the purchase/checkout path is MINUTES** (minimum 3 — the SDK
 > throws below 3; the gateway would answer error 69). Only the **QR domain's**
 > `lifetime` is seconds. A copied `lifetime: 600` "seconds" habit silently buys a
-> 10-hour checkout window.
+> 10-hour checkout window. On the CLI, prefer the explicit-units flag
+> `--lifetime-minutes` (`--lifetime` remains a deprecated minutes alias).
 
 > ⚠️ **Serving Route B's captured HTML from your own origin is NOT supported**:
 > the page references relative `/_nuxt/*` assets and breaks with CORS/file-origin
@@ -71,7 +72,7 @@ res.type(page.content_type).send(page.html); // Express — but see the CORS war
 
 ## CLI flag set (generate-checkout)
 `generate-checkout` forwards the full purchase param surface:
-`--ctid --token-flag --frequency --type --firstname --lastname --email --phone --items --shipping --lifetime <minutes> --custom-fields --return-params --skip-success-page --view-type --continue-success-url --payout --additional-params --google-pay-token --return-deeplink --payment-gate <0|1> --payment-option`.
+`--ctid --token-flag --frequency --type --firstname --lastname --email --phone --items --shipping --lifetime-minutes <minutes> --custom-fields --return-params --skip-success-page --view-type --continue-success-url --payout --additional-params --google-pay-token --return-deeplink --payment-gate <0|1> --payment-option`.
 
 - `--payout` is JSON `[{acc, amt}]` or string (purchase-path keys — NOT the standalone payout domain's `{account, amount}`).
 - `--additional-params` is a object or string; `--return-deeplink` is JSON `{ios_scheme, android_scheme}` or string (both base64-encoded before hashing).
@@ -99,7 +100,7 @@ The purchase flow needs no bundled scripts — the CLI covers the whole lifecycl
 
 ```sh
 # Create + auto-poll a checkout (lifetime in MINUTES):
-payway-sdk generate-checkout -a 12.12 -c USD --return-url https://example.com/r --lifetime 5
+payway-sdk generate-checkout -a 12.12 -c USD --return-url https://example.com/r --lifetime-minutes 5 -y
 # Hosted checkout URL (checkout_qr_url) — Route A (deeplink + hosted_view + gate 0):
 #   payway.checkout.purchase({ ..., paymentOption: 'abapay_khqr_deeplink', viewType: 'hosted_view', paymentGate: 0 })
 # Hosted HTML page — Route B, or local browser form:

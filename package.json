@@ -51,7 +51,7 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "lint": "biome lint src",
+    "lint": "biome lint src skills",
     "lint:fix": "biome lint src --write",
     "format": "biome format src --write",
     "test": "vitest run --exclude src/__tests__/sandbox-contract.test.ts",

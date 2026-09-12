@@ -4,12 +4,14 @@ Prefer the SDK CLI over editing scripts. Read `npx tsx src/cli.ts <command> --he
 
 ## Canonical commands (run from repo root)
 
-```sh
+PowerShell syntax shown. On POSIX, replace `$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; ` with the inline form `NODE_TLS_REJECT_UNAUTHORIZED=0 ` (sandbox presents a self-signed cert chain).
+
+```powershell
 # Online QR: amount, currency, lifetime (seconds), template; auto tx ID + PNG + polling
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-qr -a 6.12 -c USD --lifetime 360 --template template3_color -y
 
-# Checkout link (full purchase flag set incl. --payout --additional-params --google-pay-token --return-deeplink)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-checkout -a 5.00 -c USD --return-url <url>
+# Checkout link (full purchase flag set incl. --payout --additional-params --google-pay-token --return-deeplink); -y is REQUIRED for agents
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-checkout -a 5.00 -c USD --return-url <url> -y
 
 # One-shot status / full detail
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts check-transaction -t <id>
@@ -68,7 +70,12 @@ PAYWAY_PARTNER_ID=<id> PAYWAY_PARTNER_API_KEY=<secret> npx tsx src/cli.ts self-a
 
 - `--json` success envelopes carry `correlationId`/`traceId` (join keys into the journal); poll timeouts on
   generate-qr/generate-checkout exit 3 (machine-visible, W5-11 fixed); create commands warn on duplicate
-  tran_ids seen in the journal (`--allow-duplicate-id` to suppress).
+  tran_ids seen in the journal (`--allow-duplicate-id` to suppress). The error envelope
+  (`{error:{kind,exitCode,…}}`) is a uniform contract across machine-mode commands — since 2026-09-12 it
+  covers exchange-rate, payout (local validations + gateway failures), get-transactions-by-ref (new
+  `--json` flag), and pre-auth complete|complete-payout|cancel; payout suppresses its banner/progress lines
+  under `--json` so stdout is exactly one JSON document. `PayWayAPIError.correlationId` now joins SDK-side
+  errors to the same journal cids.
 - Webhook workbench (2026-09-10, P0 W-1..W-4): `webhook trigger` signs online fixtures with the shared
   `signCallbackBody` (same canonicalization as `verifyCallbackDetailed` — never duplicate); pushback/KHQR
   fixtures carry NO hash by design (their real contracts have none; verify via check-transaction).
@@ -111,6 +118,7 @@ PAYWAY_PARTNER_ID=<id> PAYWAY_PARTNER_API_KEY=<secret> npx tsx src/cli.ts self-a
 - `close-transaction`: no CLOSED status exists in any read API (keep a local `closed` flag); customer-side it kills QRs (scan refused "transaction expired") but hosted-card sessions may still pay — `docs/CLOSE-TRANSACTION-FINDINGS.md`. Lifetime expiry behaves the same remotely: expired transactions read PENDING forever, no EXPIRED status anywhere (campaign W4-1).
 - `check-transaction --json` / `transaction-detail --json` / `generate-checkout --json` print a `{ "error": { kind, exitCode, message, paywayCode, … } }` envelope on failure (branch on it, not on stdout text). Since 2026-09-07 (audit F11) the `Using profile:` diagnostic goes to STDERR under `--json`/`--output json|ndjson` — stdout is exactly one JSON document; parse it directly.
 - As an agent, always pass `-y` to `generate-qr`/`generate-checkout` (an interactive-looking stdin can block at the lifetime prompt with no API call) and add `--no-polling --no-open-image` for one-shot runs.
+- On npm 12, every `npx tsx …` invocation emits `npm notice run …` lines on STDERR (an npx artifact, not CLI output). stdout-purity guarantees are unaffected; agents parsing stderr should ignore `npm notice` lines, or invoke the installed binary directly (`payway-sdk …` / `node dist/cli.js`).
 - COF (v1.3.6, live-docs parity): `cof link-account`/`link-card` require `--request-id`, `--ctid`, `--token-flag` (CITI_FLEX|CITO_FLEX); the token result (`pwt`) arrives via `callback_url`. `cof token details` takes `--request-id` ONLY (no ctid/pwt); `cof token remove` takes `--ctid` + `--token` (no request-id) — these per-endpoint shapes are gateway-verified (SANDBOX-FINDINGS §16). `link-card` always answers with an HTML hosted form — `cof link-card` saves it to `payway-output/link-card-<request-id>.html` and exits 0 (that IS the success signal); `cof link-card-form` (SDK: `credentialsOnFile.getLinkCardFormHtml()`) renders the same signed request as a local browser form, no API call. `beneficiary` commands need `PAYWAY_RSA_PUBLIC_KEY`. JSON-or-string flags (`--items`, `--payout`, `--custom-fields`, `--additional-params`, `--return-deeplink`) accept inline JSON or plain strings. Payout keys are per-endpoint: `generate-qr --payout` and the standalone payout domain use `{account, amount}`; `generate-checkout --payout`, `cof charge --payout`, pre-auth complete-payout, and `payment-link create --payout` use `{acc, amt}` (total must equal the link/transaction amount on payment-link; wrong keys now throw `PayWayConfigError` locally on the purchase path too — W1-5). `generate-checkout --payment-gate 0` returns hosted HTML; use `checkout-form --payment-gate 0` for browser navigation or SDK `checkout.purchaseHosted()` / `purchase({ paymentGate: 0 })` for the hosted response object.
 
 ## Current state & handoff
@@ -144,4 +152,4 @@ Issues and specs are tracked as local markdown files under `.scratch/<feature-sl
 
 ### Domain docs
 
-Single-context layout: one `CONTEXT.md` at the repo root with `docs/adr/`. See `docs/agents/domain.md`.
+Single-context layout: the working context is `docs/` (indexed by `docs/README.md`). If a `CONTEXT.md` / `docs/adr/` layer has been created, read it per `docs/agents/domain.md` — that layer is created lazily and may legitimately be absent; proceed silently in that case.

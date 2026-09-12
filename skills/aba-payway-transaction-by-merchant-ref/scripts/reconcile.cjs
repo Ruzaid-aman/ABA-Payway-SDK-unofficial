@@ -113,7 +113,7 @@ function postJson(url, body) {
  * admitted when their ID is unseen: delayed/out-of-order arrivals must be
  * caught on later runs.
  */
-function isCandidate(txn, watermark) {
+function isCandidate(_txn, watermark) {
   if (!watermark) return true;
   return true; // ID-based dedupe below is the sole "seen" gate; the watermark only advances the checkpoint.
 }
