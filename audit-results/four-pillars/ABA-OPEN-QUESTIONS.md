@@ -776,3 +776,9 @@ in writing. Full per-answer mapping with evidence:
 ### Repo propagation done from this batch (2026-09-12)
 
 docs/01, docs/02 (test cards + simulator + onboarding lifecycle), docs/03, docs/07, docs/08, docs/10, docs/11, docs/12, docs/15 (TC-013 resolved, TC-021/035/036/037), docs/17 §17.5, new docs/20, docs/README; SDK/CLI: `sandbox-test-cards` module + CLI command + exports, `buildAbaPayDeeplink()`, `PRE_AUTH_DEFAULT_CAPTURE_WINDOW_DAYS`, `PAYMENT_STATUS_CODES` confirmation note, `google_pay` advisory; AGENTS.md / HANDOFF.md; affected skills mirrored to `.zcode/skills/`.
+
+### Link-card review addendum (2026-09-12, agent review session — evidence SANDBOX-FINDINGS §24)
+
+- **Q7 (link-card hash skipping) — RESOLVED BY EVIDENCE, question mooted.** Controlled same-request replays: intact hash → hash layer passes (business code 104 returned); corrupted base64 → 302 `01 Wrong Hash`; missing hash → HTTP 400 `04` with `errors.hash = ["The hash field is required."]`. The sandbox DOES require and verify the link-card HMAC. The 2026-08-27 "skips hash" observation is superseded; no ABA reply needed unless production differs.
+- **Q18 (CoF callback contract) — evidence capture BLOCKED on the profile**: link-card answers code 104 "Merchant not enabled token flag" for both CITI_FLEX and CITO_FLEX on sandbox merchant `ec476910` (same enablement family as the §17 subscription 104). No card link can complete, so the `pwt` callback never fires. Ask ABA to enable the token-flag service on the sandbox profile; the capture rig is ready (`scripts/sandbox-probe-link-card-cycle.ts`).
+- **New observed contract detail (Q18-adjacent):** the hosted link-card result travels as `302 → Location: …/add-card/<base64 JSON>` (error or success handoff); the POST body itself is a static 42 KB shell with no result marker.
