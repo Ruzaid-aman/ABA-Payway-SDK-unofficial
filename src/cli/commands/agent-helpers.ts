@@ -56,7 +56,8 @@ export function blockedAgentResult(request: string): AgentCommandResultV1 {
     version: 'agent-command/v1',
     status: 'blocked',
     request,
-    message: 'Agent is not configured. Run `payway-sdk onboard` to configure a provider, then retry.',
+    message:
+      'Agent is not configured. Run `payway-sdk onboard` (guided wizard), or `payway-sdk agent setup --provider <p> --model <m> --acknowledge-privacy`, then verify with `payway-sdk agent doctor`.',
     error: { code: 'AGENT_NOT_CONFIGURED', message: 'No agent provider configuration found.' },
   };
 }

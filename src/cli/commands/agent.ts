@@ -203,7 +203,8 @@ export function registerAgentCommands(program: Command): void {
   agentCmd
     .command('doctor')
     .description('Print the agent capability matrix (provider, context, payment capabilities)')
-    .action(async () => {
+    .option('--json', 'Emit the capability matrix as one JSON document')
+    .action(async (opts: { json?: boolean }) => {
       const context = resolvePayWayContext({ profile: readProfile(program) });
       const config = readAgentConfig();
       const matrix = evaluateReadinessDetailed(context, config ?? defaultConfig(), {
@@ -217,6 +218,26 @@ export function registerAgentCommands(program: Command): void {
       }
       applyProviderConnectivity(matrix, connectivity);
 
+      if (opts.json) {
+        console.log(
+          JSON.stringify(
+            {
+              configured: !!config,
+              provider: config?.provider ?? null,
+              model: config?.model ?? null,
+              capabilityMode: config?.capabilityMode ?? null,
+              privacyAcknowledged: !!config?.privacyAcknowledgedAt,
+              connectivity: connectivity.status,
+              connectivityDetail: connectivity.detail,
+              rows: matrix,
+            },
+            null,
+            2,
+          ),
+        );
+        return;
+      }
+
       for (const line of renderDoctorOutput(matrix, {
         privacyAcknowledgedAt: config?.privacyAcknowledgedAt,
         hasConfig: !!config,
@@ -224,6 +245,42 @@ export function registerAgentCommands(program: Command): void {
       })) {
         console.log(line);
       }
+    });
+
+  // agent config
+  agentCmd
+    .command('config')
+    .description('Show the stored agent provider configuration (secrets are never stored)')
+    .option('--json', 'Print the raw agent-config JSON')
+    .action((opts: { json?: boolean }) => {
+      const config = readAgentConfig();
+      if (!config) {
+        const message = 'No agent configuration found. Run `payway-sdk onboard` or `payway-sdk agent setup --provider <p> --model <m> --acknowledge-privacy`.';
+        console.log(`  ${c.red('✗')} ${message}`);
+        process.exitCode = 1;
+        return;
+      }
+      if (opts.json) {
+        console.log(JSON.stringify(config, null, 2));
+        return;
+      }
+      console.log(`\n${c.bold('Agent configuration')}`);
+      console.log(`  Provider:        ${c.cyan(config.provider)}`);
+      console.log(`  Model:           ${c.cyan(config.model || '(none)')}`);
+      if (config.baseUrl) console.log(`  Base URL:        ${c.cyan(config.baseUrl)}`);
+      console.log(`  Capability mode: ${c.cyan(config.capabilityMode)}`);
+      if (config.timeoutMs) console.log(`  Timeout:         ${c.cyan(`${config.timeoutMs}ms`)}`);
+      if (config.maxTokens) console.log(`  Max tokens:      ${c.cyan(String(config.maxTokens))}`);
+      if (config.temperature !== undefined) console.log(`  Temperature:     ${c.cyan(String(config.temperature))}`);
+      if (config.topP !== undefined) console.log(`  Top-p:           ${c.cyan(String(config.topP))}`);
+      if (config.extraBody) console.log(`  Extra body:      ${c.cyan(JSON.stringify(config.extraBody))}`);
+      console.log(
+        `  Privacy ack:     ${
+          config.privacyAcknowledgedAt ? c.green(config.privacyAcknowledgedAt) : c.yellow('not acknowledged (run payway-sdk agent ack)')
+        }`,
+      );
+      console.log(`\n  ${c.dim('API key location: PAYWAY_AGENT_API_KEY environment variable (or .env) — never stored on disk.')}`);
+      console.log();
     });
 
   // agent ack

@@ -1115,17 +1115,61 @@ program
   .description('Validate environment configuration and connectivity')
   .option('--live', 'Also perform a real sandbox round-trip (exchange-rate) when credentials are present')
   .option('--route <route>', 'Readiness target: demo, online-qr, or hosted-checkout', 'online-qr')
-  .action(async (opts: { live?: boolean; route: string }) => {
+  .option('--json', 'Emit the check matrix as one JSON document (agent contract)')
+  .action(async (opts: { live?: boolean; route: string; json?: boolean }) => {
     if (!['demo', 'online-qr', 'hosted-checkout'].includes(opts.route)) {
       console.error(`--route must be demo, online-qr, or hosted-checkout, received: ${opts.route}`);
       process.exitCode = EXIT_VALIDATION;
       return;
     }
-    console.log(`\n${c.bold('ABA PayWay SDK Doctor')}\n`);
     const result = runDoctor({
       route: opts.route as 'demo' | 'online-qr' | 'hosted-checkout',
       profileName: selectedProfileName(),
     });
+
+    if (opts.json) {
+      // Machine path: silent live probe, one JSON document, no human banner.
+      let live: { status: 'ok' | 'fail' | 'skipped' } | undefined;
+      if (opts.live) {
+        const gateIds = ['env-PAYWAY_ENV', 'env-PAYWAY_MERCHANT_ID', 'env-PAYWAY_API_KEY'];
+        const credFailures = result.checks.filter((ch) => gateIds.includes(ch.id) && !ch.ok);
+        if (process.env.PAYWAY_MERCHANT_ID && process.env.PAYWAY_API_KEY && credFailures.length === 0) {
+          try {
+            const payway = new PayWay({ rateLimitThrottling: false });
+            await payway.checkout.getExchangeRate();
+            live = { status: 'ok' };
+          } catch {
+            live = { status: 'fail' };
+          }
+        } else {
+          live = { status: 'skipped' };
+        }
+      }
+      const blockingFailures = result.checks.filter(
+        (check) => !check.ok && check.id !== 'framework' && check.id !== 'journal',
+      );
+      const ok = blockingFailures.length === 0 && live?.status !== 'fail';
+      console.log(
+        JSON.stringify(
+          {
+            ok,
+            route: result.route,
+            context: result.context,
+            framework: result.framework,
+            frameworkEvidence: result.frameworkEvidence,
+            checks: result.checks,
+            envIssues: result.envIssues,
+            ...(live ? { live } : {}),
+          },
+          null,
+          2,
+        ),
+      );
+      process.exitCode = ok ? EXIT_OK : 1;
+      return;
+    }
+
+    console.log(`\n${c.bold('ABA PayWay SDK Doctor')}\n`);
 
     console.log(`  Route: ${c.cyan(result.route)}`);
     console.log(`  Credential source: ${c.cyan(result.context.credentialSource)}`);
@@ -1314,7 +1358,12 @@ program
 program
   .command('status')
   .description('Display payment status codes and refund error codes reference')
-  .action(() => {
+  .option('--json', 'Emit the code tables as one JSON document')
+  .action((opts: { json?: boolean }) => {
+    if (opts.json) {
+      console.log(JSON.stringify({ paymentStatusCodes: PAYMENT_STATUS_CODES, refundErrorCodes: REFUND_ERROR_CODES }, null, 2));
+      return;
+    }
     console.log(`\n${c.bold('ABA PayWay SDK')} — payment status reference\n`);
 
     console.log(`  ${c.bold('Payment Status Codes')}`);
