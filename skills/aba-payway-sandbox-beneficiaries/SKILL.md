@@ -2,7 +2,7 @@
 name: aba-payway-sandbox-beneficiaries
 description: Seeded sandbox-only beneficiary accounts and test MIDs for PayWay payout / split-payout testing.
 metadata:
-  version: 1.2.1
+  version: 1.2.2
 ---
 
 # Sandbox Beneficiaries (test fixtures)
@@ -57,7 +57,7 @@ PayWay returns **HTTP 403 / `PTL147`** (or numeric **`12`**). Use the seeded
 accounts for their currency: USD accounts with `currency: 'USD'`, test MIDs with
 `currency: 'KHR'`. The full error matrix (`PTL147` / `37` / `PTL146` /
 `PTL-PAYOUT-37` / `PTL46` / `PTL-PAYOUT-36` / `1` / `415`) lives in the
-[Payout](../aba-payway-payout/SKILL.md) skill and `docs/12-error-handling-and-debugging.md`.
+[Payout](../aba-payway-payout/SKILL.md) skill and `payway-sdk docs errors-and-debugging` (the full error matrix, served offline by the CLI).
 
 ## CLI
 ```bash

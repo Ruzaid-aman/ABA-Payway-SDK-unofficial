@@ -2,7 +2,7 @@
 name: aba-payway-refund
 description: Issue an ABA PayWay refund for a completed transaction.
 metadata:
-  version: 1.4.1
+  version: 1.4.2
 ---
 
 # ABA PayWay Refund
@@ -76,7 +76,7 @@ validation explicitly (the detail lookup is rate-limited to 10/min). Under
 `{ error: { kind: 'validation', … } }` envelope on stdout.
 
 ## No refund after payout/split
-Once a transaction has been processed via payout/split, the **standard refund API is not available** (ABA-confirmed 2026-09-12) — refunds are manual, or a pre-auth refund before the split. Design split flows to make refund decisions before completing the payout. See `docs/20-settlement-and-disputes.md` (settlement, payouts, FX, and disputes).
+Once a transaction has been processed via payout/split, the **standard refund API is not available** (ABA-confirmed 2026-09-12) — refunds are manual, or a pre-auth refund before the split. Design split flows to make refund decisions before completing the payout. See `payway-sdk docs settlement-disputes` (served offline: settlement, payouts, FX, and disputes).
 
 ## Related Skills
 - [Transaction Detail](../aba-payway-transaction-detail/SKILL.md)

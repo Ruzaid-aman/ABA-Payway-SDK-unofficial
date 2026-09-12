@@ -1,8 +1,8 @@
 ---
 name: aba-payway-agent
-description: Use when operating the agentic PayWay CLI with provider modes, the 13 tools, risk gates, the execution ledger, sessions, local journal queries, and secret redaction.
+description: Use when operating the agentic PayWay CLI with provider modes, the 14 tools (incl. query_knowledge), risk gates, the execution ledger, sessions, local journal queries, knowledge-base search, and secret redaction.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
 ---
 
 # ABA PayWay Agent (Agentic CLI)
@@ -54,7 +54,7 @@ const config = {
 
 Both modes funnel through the same safety pipeline; only the plan source differs.
 
-## The 13 tools
+## The 14 tools
 
 | # | Tool | Create? | Purpose / key inputs |
 |---|---|---|---|
@@ -71,6 +71,7 @@ Both modes funnel through the same safety pipeline; only the plan source differs
 | 11 | `save_artifact` | no | Persist a produced artifact to `./payway-output` |
 | 12 | `open_artifact` | no | Open a saved artifact |
 | 13 | `copy_to_clipboard` | no | Copy an artifact value to the clipboard |
+| 14 | `query_knowledge` | no | Read-only offline knowledge base: `query: search|read` over the 30-topic PayWay corpus (`payway-sdk docs`) — pull integration guidance, error hints, and sandbox-verified lessons into a plan |
 
 > `create_checkout_payload` builds a **local** signed payload; `create_checkout_purchase`
 > performs the actual **network** request. Treat them as distinct tools.
@@ -158,12 +159,11 @@ executes zero PayWay creates.
 
 ## Setup playbook & pitfalls (field-tested)
 
-Full notes: the repository's `docs/AGENT-SETUP-PLAYBOOK.md` (available in the
-SDK repository checkout; the published-package URL goes live when a release
-tag carrying that document is published — until then rely on this skill and
-`payway-sdk agent setup --help`).
+Full notes: `payway-sdk docs agent-setup-playbook` (served offline by the CLI —
+the same document previously referenced only from the SDK repository checkout).
 Architecture/maintenance notes (module map, stage order, gotchas): same doc,
-section "Implementation & architecture".
+section "Implementation & architecture". Inspect the stored configuration any
+time with `payway-sdk agent config [--json]`.
 
 1. **Preferred path: `payway-sdk onboard`.** It runs the whole flow
    (provider → profile → callback → privacy → verify) interactively, skips

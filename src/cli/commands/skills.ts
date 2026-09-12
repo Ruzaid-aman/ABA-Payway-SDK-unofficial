@@ -391,6 +391,31 @@ export async function removeSkills(
   }
 }
 
+/**
+ * Discoverability (2026-09-12): summarize an installed skill for `skills list`
+ * — frontmatter description (first sentence) + metadata.version, so agents and
+ * humans can pick the right guide without opening every SKILL.md.
+ */
+async function describeInstalledSkill(
+  directory: string,
+  name: string,
+): Promise<{ version?: string; summary?: string }> {
+  try {
+    const raw = await readFile(path.join(directory, name, 'SKILL.md'), 'utf8');
+    const frontmatter = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!frontmatter) return {};
+    const doc = parseDocument(frontmatter[1], { uniqueKeys: true });
+    const description = String(doc.get('description') ?? '').trim();
+    const firstSentence = description.split(/(?<=[.!?])\s/)[0] ?? description;
+    return {
+      version: String(doc.getIn(['metadata', 'version']) ?? '') || undefined,
+      summary: firstSentence.length > 96 ? `${firstSentence.slice(0, 95)}…` : firstSentence || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function listSkills(options: { dest?: string } = {}): Promise<void> {
   for (const [agent, defaultDir] of Object.entries(SKILL_AGENT_DIRS) as Array<[SkillAgent, string]>) {
     const directory = options.dest ?? defaultDir;
@@ -404,7 +429,10 @@ export async function listSkills(options: { dest?: string } = {}): Promise<void>
           `  ${c.green('●')} ${c.bold(agent)}  ${c.dim(`${installed.length} skill(s)`)}  ${c.dim(directory)}`,
         );
         for (const name of installed) {
-          console.log(`    ${c.dim('├')} ${name}`);
+          const { version, summary } = await describeInstalledSkill(directory, name);
+          const versionTag = version ? c.dim(` v${version}`) : '';
+          console.log(`    ${c.dim('├')} ${name}${versionTag}`);
+          if (summary) console.log(`    ${c.dim('│ ')} ${summary}`);
         }
       } else {
         console.log(`  ${c.dim('○')} ${c.bold(agent)}  ${c.dim('no skills installed')}  ${c.dim(directory)}`);

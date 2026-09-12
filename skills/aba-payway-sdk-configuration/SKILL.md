@@ -2,7 +2,7 @@
 name: aba-payway-sdk-configuration
 description: Configure aba-payway-ts with explicit options or PAYWAY environment variables.
 metadata:
-  version: 1.3.0
+  version: 1.3.1
 ---
 
 # SDK Configuration
@@ -20,7 +20,8 @@ Offline KHQR merchant data comes from `PAYWAY_KHQR_BAKONG_ID`, `PAYWAY_KHQR_ABA_
 Constructor-only / validation options:
 - `strictValidation: true` (or `PAYWAY_STRICT_VALIDATION=1`) — escalates every advisory warning (length caps, enum membership, payout-total mismatches, image limits) to `PayWayConfigError`. Default is advisory: warn once.
 - `allowPrivateCallbackHosts: true` — permits private/loopback callback hosts (local dev); rejected by default.
-- Resilience/observability (see docs/12): `logLevel`, `logFormat: 'json'`, `backoffJitter: 'full' | 'none'` (default `'none'`), `circuitBreaker: { failureThreshold, resetTimeoutMs }`.
+- Resilience/observability (see `payway-sdk docs errors-and-debugging`, served offline): `logLevel`, `logFormat: 'json'`, `backoffJitter: 'full' | 'none'` (default `'none'`), `circuitBreaker: { failureThreshold, resetTimeoutMs }`.
+- Machine-readable diagnostics for agents/CI: `payway-sdk doctor --json` (full check matrix; `--live` captured silently), `payway-sdk status --json` (code tables), `payway-sdk agent config --json` / `agent doctor --json` (provider configuration and readiness).
 - `allowUnverifiedTokenOperations` — **DEPRECATED escape hatch, default ALLOWED**: the token trio (renew/get-details/remove) was un-gated after its live-documented HMAC compositions were sandbox-verified on 2026-08-31. Setting it explicitly to `false` re-blocks; you never need to set it to `true`.
 
 ## Error Handling

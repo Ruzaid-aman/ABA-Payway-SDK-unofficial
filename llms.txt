@@ -1,7 +1,7 @@
 # aba-payway-ts
 
 > ABA PayWay payment-gateway toolkit: a typed TypeScript SDK, an agent-first CLI
-> (`payway-sdk`), and 32 installable agent skills — carrying sandbox-verified
+> (`payway-sdk`), and 34 installable agent skills — carrying sandbox-verified
 > integration knowledge for ABA Bank PayWay (KHQR, hosted checkout, COF, payment
 > links, payouts, pre-auth, webhooks).
 

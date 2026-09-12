@@ -2,7 +2,7 @@
 name: aba-payway-payment-link
 description: Create, inspect, and void hosted ABA PayWay payment links.
 metadata:
-  version: 1.5.1
+  version: 1.5.2
 ---
 
 # ABA PayWay Payment Link
@@ -88,13 +88,12 @@ Under `--json`, both commands print the machine-parseable error envelope `{ "err
 ## Full guide
 
 The complete parameter tables, datatype reality notes, permutations/recipes,
-pushback receiver, and troubleshooting live in the SDK repository's
-`docs/17-payment-link.md` (development checkout). The URL form is only valid
-after that document is published with a real release tag — until then rely on
-this skill plus `payway-sdk payment-link create --help`.
+pushback receiver, and troubleshooting are served offline by the CLI:
+`payway-sdk docs payment-link` (§17 of the knowledge corpus). This skill plus
+`payway-sdk payment-link create --help` cover the day-to-day surface.
 
 ## Related Skills
 - [Configuration](../aba-payway-sdk-configuration/SKILL.md)
 - [Payout](../aba-payway-payout/SKILL.md) (standalone payout domain — note its `{account, amount}` keys)
 - [First Payment](../aba-payway-first-payment/SKILL.md) (route selection)
-- [Agent CLI](../aba-payway-agent/SKILL.md) (the 13-tool catalog)
+- [Agent CLI](../aba-payway-agent/SKILL.md) (the 14-tool catalog)

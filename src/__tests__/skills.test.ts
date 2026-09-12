@@ -42,12 +42,12 @@ describe('packaged AI skills', () => {
       if (entry.isDirectory() && entry.name.startsWith('aba-payway-')) await compare(entry.name);
     }
   });
-  it('provides 32 discoverable skill guides with quick-start content', async () => {
+  it('provides 34 discoverable skill guides with quick-start content', async () => {
     const skillDirectories = (await readdir(skillsDirectory, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'))
       .map((entry) => entry.name);
 
-    expect(skillDirectories).toHaveLength(32);
+    expect(skillDirectories).toHaveLength(34);
     expect(skillDirectories).toContain('aba-payway-transaction-by-merchant-ref');
     expect(skillDirectories).toContain('aba-payway-agent');
     expect(skillDirectories).toContain('aba-payway-first-payment');
@@ -59,6 +59,9 @@ describe('packaged AI skills', () => {
     expect(skillDirectories).toContain('aba-payway-subscription');
     // Transaction Journal (Phases 1-3 of the transaction-data roadmap).
     expect(skillDirectories).toContain('aba-payway-journal');
+    // Knowledge wave (2026-09-12): coverage-gap additions, flipped consciously.
+    expect(skillDirectories).toContain('aba-payway-self-activation');
+    expect(skillDirectories).toContain('aba-payway-knowledge-base');
 
     for (const skillDirectory of skillDirectories) {
       const content = await readFile(path.join(skillsDirectory, skillDirectory, 'SKILL.md'), 'utf8');
