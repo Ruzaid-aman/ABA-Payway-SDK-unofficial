@@ -216,10 +216,13 @@ function printApiResultJson(result: unknown, payway?: PayWay): void {
  * tran_ids silently but the resulting QR can be unpayable. Advisory only
  * (never blocks); `--allow-duplicate-id` suppresses it.
  */
-function warnDuplicateTransactionId(transactionId: string, opts: { allowDuplicateId?: boolean; output?: string }): void {
+function warnDuplicateTransactionId(
+  transactionId: string,
+  opts: { allowDuplicateId?: boolean; output?: string; json?: boolean },
+): void {
   if (opts.allowDuplicateId) return;
   if (!journalSawCreateFor(transactionId)) return;
-  const warn = opts.output ? console.error : console.log;
+  const warn = opts.output || opts.json ? console.error : console.log;
   warn(
     `  ${c.yellow('⚠')} Transaction ID ${c.bold(transactionId)} already appears in the local journal` +
       ` (W5-7: the gateway accepts duplicate tran_ids but the duplicate QR can be unpayable).`,
@@ -3068,7 +3071,7 @@ program
       return;
     }
 
-    if (!outputMode) console.log(`\n${c.bold('ABA PayWay SDK')} — generate checkout QR URL\n`);
+    if (!outputMode && !opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — generate checkout QR URL\n`);
 
     const io =
       !outputMode && resolvePromptMode({ json: opts.json, nonInteractive: opts.nonInteractive }) === 'clack'
@@ -3161,7 +3164,7 @@ program
     }
 
     if (opts.callbackUrl) {
-      const warn = outputMode ? console.error : console.log;
+      const warn = outputMode || opts.json ? console.error : console.log;
       warn(
         `  ${c.yellow('⚠')} --callback-url is not sent by checkout purchase; use --return-url for the customer redirect.`,
       );
@@ -3209,7 +3212,7 @@ program
     try {
       const payway = new PayWay();
 
-      if (!outputMode) console.log(`  ${c.dim('Calling PayWay API...')}`);
+      if (!outputMode && !opts.json) console.log(`  ${c.dim('Calling PayWay API...')}`);
 
       const result = await payway.checkout.purchase({
         transactionId,

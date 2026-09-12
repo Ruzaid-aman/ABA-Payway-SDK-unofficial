@@ -579,6 +579,26 @@ describe('CLI API commands against the local mock gateway', () => {
     expect([undefined, 0]).toContain(exitCode as number);
   });
 
+  // CLI smoke 2026-09-12: under --json the banner and "Calling PayWay API..."
+  // progress line used to leak onto stdout ahead of the JSON document.
+  it('generate-checkout --json keeps stdout to exactly one JSON document', async () => {
+    const { stdout } = await run([
+      'generate-checkout',
+      '-a',
+      '5.00',
+      '-t',
+      'CO-PURITY-1',
+      '--return-url',
+      'https://example.com/r',
+      '--no-polling',
+      '--no-show-qr',
+      '--json',
+      '-y',
+    ]);
+    const parsed = JSON.parse(stdout) as { qrString?: string };
+    expect(parsed.qrString).toBeTruthy();
+  });
+
   // T0-3: explicit units for the checkout lifetime — --lifetime is minutes on
   // generate-checkout/request-qr but SECONDS on generate-qr, a silent 60x trap.
   it('generate-checkout sends lifetime from --lifetime-minutes and keeps --lifetime as alias', async () => {
