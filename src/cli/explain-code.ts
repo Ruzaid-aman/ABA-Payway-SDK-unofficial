@@ -17,6 +17,48 @@ export interface CodeExplanation {
   readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr' | 'payment-link';
   readonly title: string;
   readonly hint: string;
+  /** True when the code's meaning was reproduced against the live sandbox. */
+  readonly sandboxVerified?: boolean;
+  /** Evidence pointer into docs/SANDBOX-FINDINGS.md for live-verified codes. */
+  readonly evidence?: string;
+}
+
+/**
+ * Codes whose meaning was live-verified against the sandbox (see
+ * docs/SANDBOX-FINDINGS.md). Everything else in the explain maps is
+ * spec-derived or inferred. Drives `sandboxVerified`/`evidence` on
+ * CodeExplanation and the generated docs/error-codes.json registry.
+ */
+export const SANDBOX_VERIFIED_EVIDENCE: Record<string, string> = {
+  '1': 'SANDBOX-FINDINGS §6',
+  '2': 'SANDBOX-FINDINGS §21',
+  '5': 'SANDBOX-FINDINGS §8',
+  '8': 'SANDBOX-FINDINGS §6',
+  '12': 'SANDBOX-FINDINGS §9',
+  '26': 'SANDBOX-FINDINGS §6',
+  '32': 'SANDBOX-FINDINGS §22',
+  '37': 'SANDBOX-FINDINGS §9',
+  '49': 'SANDBOX-FINDINGS §8',
+  '96': 'SANDBOX-FINDINGS §22/§23',
+  '429': 'SANDBOX-FINDINGS §11',
+  '04': 'SANDBOX-FINDINGS §13',
+  '01': 'SANDBOX-FINDINGS §16',
+  '09': 'SANDBOX-FINDINGS §16',
+  '104': 'SANDBOX-FINDINGS §16',
+  '105': 'SANDBOX-FINDINGS §16',
+  PTL02: 'SANDBOX-FINDINGS §6/§9',
+  PTL04: 'SANDBOX-FINDINGS §9/§22',
+  PTL36: 'SANDBOX-FINDINGS §8/§9',
+  PTL59: 'SANDBOX-FINDINGS §9',
+  PTL62: 'SANDBOX-FINDINGS §6/§9',
+  PTL170: 'SANDBOX-FINDINGS §9',
+  PTL188: 'SANDBOX-FINDINGS §23',
+};
+
+/** Attach live-verification provenance to an explanation, if any exists. */
+function withProvenance(e: CodeExplanation): CodeExplanation {
+  const evidence = SANDBOX_VERIFIED_EVIDENCE[e.code];
+  return evidence ? { ...e, sandboxVerified: true, evidence } : e;
 }
 
 const REFUND_LABELS: Record<string, string> = {
@@ -122,45 +164,45 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
 
   // PTL* families
   if (code in REFUND_LABELS) {
-    return {
+    return withProvenance({
       code,
       family: code === REFUND_ERROR_CODES.SUCCESS ? 'gateway' : 'refund',
       title: REFUND_LABELS[code],
       hint: REFUND_HINTS[code] ?? '',
-    };
+    });
   }
   if (code in PRE_AUTH_TITLES) {
-    return { code, family: 'pre-auth', title: PRE_AUTH_TITLES[code], hint: PRE_AUTH_HINTS[code] ?? '' };
+    return withProvenance({ code, family: 'pre-auth', title: PRE_AUTH_TITLES[code], hint: PRE_AUTH_HINTS[code] ?? '' });
   }
   if (code in PAYOUT_TITLES) {
-    return { code, family: 'payout', title: PAYOUT_TITLES[code], hint: PAYOUT_HINTS[code] ?? '' };
+    return withProvenance({ code, family: 'payout', title: PAYOUT_TITLES[code], hint: PAYOUT_HINTS[code] ?? '' });
   }
 
   // Payment-link family (2026-09-06): PTL05/PTL99/PTL132 — PTL02/PTL04 are
   // claimed by the refund family and 96 by the QR family, so this branch only
   // claims the unclaimed payment-link codes.
   if (code in PAYMENT_LINK_TITLES) {
-    return { code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code], hint: PAYMENT_LINK_HINTS[code] ?? '' };
+    return withProvenance({ code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code], hint: PAYMENT_LINK_HINTS[code] ?? '' });
   }
 
   // COF / QR families (B5, live parity) — checked before the generic numeric
   // gateway table so codes like 04/98/104/105/PTL02 resolve to their family.
   const numeric = code.replace(/^0+(?=\d)/, '');
   if (code in COF_TITLES) {
-    return { code, family: 'cof', title: COF_TITLES[code], hint: COF_HINTS[code] ?? '' };
+    return withProvenance({ code, family: 'cof', title: COF_TITLES[code], hint: COF_HINTS[code] ?? '' });
   }
   if ((QR_CODES as readonly string[]).includes(numeric)) {
-    return {
+    return withProvenance({
       code: numeric,
       family: 'qr',
       title: QR_TITLES[numeric] ?? `QR gateway error code ${numeric}`,
       hint: QR_HINTS[numeric] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
-    };
+    });
   }
 
   // Numeric gateway codes
   const gateway = GATEWAY_CODE_HINTS[numeric];
-  if (gateway) return { code: numeric, family: 'gateway', title: gateway.title, hint: gateway.hint };
+  if (gateway) return withProvenance({ code: numeric, family: 'gateway', title: gateway.title, hint: gateway.hint });
 
   return undefined;
 }
@@ -169,36 +211,40 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
 export function explainAll(): CodeExplanation[] {
   const all: CodeExplanation[] = [];
   for (const [num, v] of Object.entries(GATEWAY_CODE_HINTS)) {
-    all.push({ code: num, family: 'gateway', title: v.title, hint: v.hint });
+    all.push(withProvenance({ code: num, family: 'gateway', title: v.title, hint: v.hint }));
   }
   for (const [name, code] of Object.entries(REFUND_ERROR_CODES)) {
     if (code === REFUND_ERROR_CODES.SUCCESS || name === 'SUCCESS') continue;
-    all.push({
-      code,
-      family: 'refund',
-      title: REFUND_LABELS[code] ?? name,
-      hint: REFUND_HINTS[code] ?? '',
-    });
+    all.push(
+      withProvenance({
+        code,
+        family: 'refund',
+        title: REFUND_LABELS[code] ?? name,
+        hint: REFUND_HINTS[code] ?? '',
+      }),
+    );
   }
   for (const [name, code] of Object.entries(PRE_AUTH_ERROR_CODES)) {
-    all.push({ code, family: 'pre-auth', title: PRE_AUTH_TITLES[code] ?? name, hint: PRE_AUTH_HINTS[code] ?? '' });
+    all.push(withProvenance({ code, family: 'pre-auth', title: PRE_AUTH_TITLES[code] ?? name, hint: PRE_AUTH_HINTS[code] ?? '' }));
   }
   for (const code of Object.keys(PAYOUT_TITLES)) {
-    all.push({ code, family: 'payout', title: PAYOUT_TITLES[code] ?? code, hint: PAYOUT_HINTS[code] ?? '' });
+    all.push(withProvenance({ code, family: 'payout', title: PAYOUT_TITLES[code] ?? code, hint: PAYOUT_HINTS[code] ?? '' }));
   }
   for (const code of Object.keys(PAYMENT_LINK_TITLES)) {
-    all.push({ code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code] ?? code, hint: PAYMENT_LINK_HINTS[code] ?? '' });
+    all.push(withProvenance({ code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code] ?? code, hint: PAYMENT_LINK_HINTS[code] ?? '' }));
   }
   for (const [code, title] of Object.entries(COF_TITLES)) {
-    all.push({ code, family: 'cof', title, hint: COF_HINTS[code] ?? '' });
+    all.push(withProvenance({ code, family: 'cof', title, hint: COF_HINTS[code] ?? '' }));
   }
   for (const code of QR_CODES) {
-    all.push({
-      code,
-      family: 'qr',
-      title: QR_TITLES[code] ?? `QR gateway error code ${code}`,
-      hint: QR_HINTS[code] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
-    });
+    all.push(
+      withProvenance({
+        code,
+        family: 'qr',
+        title: QR_TITLES[code] ?? `QR gateway error code ${code}`,
+        hint: QR_HINTS[code] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
+      }),
+    );
   }
   return all;
 }

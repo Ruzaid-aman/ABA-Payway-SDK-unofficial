@@ -18,7 +18,10 @@ if (packed.status !== 0) {
   throw new Error(`npm pack failed:\n${packed.stderr || packed.stdout}`);
 }
 
-const report = JSON.parse(packed.stdout)[0];
+// npm ≤11 emits an ARRAY of pack reports; npm 12 emits an OBJECT keyed by
+// package name. Normalize both before reading `files`.
+const parsedReport = JSON.parse(packed.stdout);
+const report = Array.isArray(parsedReport) ? parsedReport[0] : Object.values(parsedReport)[0];
 const files = report.files.map((entry) => entry.path.replaceAll('\\', '/'));
 const fileSet = new Set(files);
 const required = [

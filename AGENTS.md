@@ -56,6 +56,14 @@ npx tsx src/cli.ts webhook trigger --url http://localhost:3000/webhooks/aba --ev
 npx tsx src/cli.ts webhook verify-callback --body-file cb.json --sig "<X-PAYWAY-HMAC-SHA512>"        # exit 0 valid / 1 invalid
 npx tsx src/cli.ts webhook resend --record wh_xxx --to http://localhost:3000/webhooks/aba            # replay a capture
 npx tsx src/cli.ts webhook list                                           # record ids = resend/--record keys
+
+# Soundbox QR (spec-derived, NOT live-verified — amount omitted = keypad entry on device)
+npx tsx src/cli.ts request-qr -c USD --payment-option abapay --callback-url <url> [--lifetime <minutes>] -y
+
+# Merchant self-activation (partner credentials; spec-derived, NOT live-verified)
+PAYWAY_PARTNER_ID=<id> PAYWAY_PARTNER_API_KEY=<secret> npx tsx src/cli.ts self-activation new-merchant --pushback-url <url> --redirect-url <url> --register-ref req-1 --currency USD
+PAYWAY_PARTNER_ID=<id> PAYWAY_PARTNER_API_KEY=<secret> npx tsx src/cli.ts self-activation credential-info --register-ref req-1
+PAYWAY_PARTNER_ID=<id> PAYWAY_PARTNER_API_KEY=<secret> npx tsx src/cli.ts self-activation mc-info --merchant-key <key> --request-time <YYYYMMDDHHmmss>
 ```
 
 - `--json` success envelopes carry `correlationId`/`traceId` (join keys into the journal); poll timeouts on
@@ -67,6 +75,17 @@ npx tsx src/cli.ts webhook list                                           # reco
   `setup-webhook --forward-to <url>` re-POSTs captures after store; forward failure NEVER rejects or loses
   the original callback. `webhook resend`/`verify-callback --record` read `webhook_data/` (JSON then SQLite).
   Fixtures are synthetic — the gateway never saw the tran_id.
+- OpenAPI suite-coverage wave (2026-09-12, audit `.scratch/openapi-coverage-audit/`): the ABA-shared archived
+  spec has 33 endpoints — we implement 28 of them (20 full + 2 partial-fixed + 6 superseded by our v3 paths);
+  the 6 legacy v1 `/api/aof/*` + `v1/cof` endpoints are deliberately NOT implemented. Two spec-derived
+  additions are NOT live-verified (merchant sandbox can't exercise them): `request-qr` (Soundbox QR — its
+  spec b4hash is a corrupted copy-paste from generate-qr; `REQUEST_QR_HASH_FIELDS` keeps the 9 real schema
+  fields in spec order; a gateway code 1 means report hash drift to ABA) and the `self-activation` trio
+  (partner credentials, `requestWithPartnerAuth` — no merchant_id; HMAC is SHA256 except
+  get-mc-credential-info's SHA512, per the spec's own inconsistency). Purchase `payment_option` advisory now
+  uses `PURCHASE_PAYMENT_OPTIONS` (spec enum + live-verified `abapay_khqr_deeplink`/`google_pay`), not the QR
+  enum. 21 spec errors (stale hash orders, malformed exchange-rate schema, …) are listed in the audit's
+  fidelity-audit.md — candidates to send back to the ABA team.
 - Transaction journal (audit-results/transaction-data-audit/, docs/18): opt-in JSONL record of every
   exchange/command/poll/status/artifact/callback at `<cwd>/payway-data/journal.jsonl`. `--journal` arms one
   invocation; `PAYWAY_JOURNAL=1` (+`_DIR`, `_MODE=digest|full`) persists; SDK config `journal: true|{dir,mode}`.

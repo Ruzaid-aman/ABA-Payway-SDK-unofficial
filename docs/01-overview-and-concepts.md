@@ -2,6 +2,8 @@
 
 > **Estimated reading time:** 15 minutes
 
+Not sure which integration route fits your app? Start with the [platform decision tree](./diagrams/platform-decision-tree.md) — it routes web, native, WebView, Telegram, QR, and deep-linking scenarios to the right chapter.
+
 ---
 
 This is a community-maintained server-side SDK, not an official ABA Bank SDK. It requires Node.js 22.12 or later. See [support and compatibility](../SUPPORT.md) for verification limits.

@@ -5,3 +5,14 @@ export { createPaymentLinkDomain, type PaymentLinkDomain } from './payment-link.
 export { createPayoutDomain, type PayoutDomain } from './payout.js';
 export { createPreAuthDomain, type PreAuthDomain } from './pre-auth.js';
 export { createQrDomain, type QrDomain } from './qr.js';
+export {
+  createSelfActivationDomain,
+  type SelfActivationCredentialInfoParams,
+  type SelfActivationCredentialInfoResponse,
+  type SelfActivationDomain,
+  type SelfActivationMerchantInfoParams,
+  type SelfActivationMerchantInfoResponse,
+  type SelfActivationRegisterParams,
+  type SelfActivationRegisterResponse,
+  type SelfActivationStatus,
+} from './self-activation.js';

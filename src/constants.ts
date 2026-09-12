@@ -18,6 +18,7 @@ export const ENDPOINTS = {
   getTokenDetails: '/api/payment-credential/v3/token-management/get-token-details',
   removeToken: '/api/payment-credential/v3/token-management/remove-token',
   generateQr: '/api/payment-gateway/v1/payments/generate-qr',
+  requestQr: '/api/payment-gateway/v1/payments/request-qr',
   createPaymentLink: '/api/merchant-portal/merchant-access/payment-link/create',
   getPaymentLinkDetails: '/api/merchant-portal/merchant-access/payment-link/detail',
   voidPaymentLink: '/api/merchant-portal/merchant-access/payment-link/void',
@@ -27,6 +28,9 @@ export const ENDPOINTS = {
   updateBeneficiaryStatus: '/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status',
   addBeneficiary: '/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout',
   getTransactionsByMerchantRef: '/api/payment-gateway/v1/payments/get-transactions-by-mc-ref',
+  registerNewMerchant: '/api/merchant-portal/online-self-activation/new-merchant',
+  getMerchantCredentialInfo: '/api/merchant-portal/online-self-activation/get-mc-credential-info',
+  getMerchantInfo: '/api/merchant-portal/online-self-activation/get-mc-info',
 } as const;
 
 /**
@@ -41,6 +45,7 @@ export const ENDPOINTS = {
  */
 export const MUTATION_ENDPOINTS = new Set<string>([
   ENDPOINTS.generateQr,
+  ENDPOINTS.requestQr,
   ENDPOINTS.purchase,
   ENDPOINTS.refund,
   ENDPOINTS.closeTransaction,
@@ -56,6 +61,9 @@ export const MUTATION_ENDPOINTS = new Set<string>([
   ENDPOINTS.payout,
   ENDPOINTS.updateBeneficiaryStatus,
   ENDPOINTS.addBeneficiary,
+  ENDPOINTS.registerNewMerchant,
+  ENDPOINTS.getMerchantCredentialInfo,
+  ENDPOINTS.getMerchantInfo,
 ]);
 
 /**
@@ -167,6 +175,7 @@ export const PAYOUT_ERROR_CODES = {
  */
 export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }> = {
   '1': { title: 'Wrong Hash', hint: 'HMAC signature mismatch — check API key, field ordering, base64 vs hex encoding.' },
+  '2': { title: 'Transaction Not Closable', hint: 'Transaction status does not allow close — sandbox-verified: closing an already PAID transaction answers 403 code 2 (SANDBOX-FINDINGS §21). Only OPEN/PENDING transactions can be closed.' },
   '4': { title: 'Invalid Data', hint: 'Server-side binding/validation failed — see errors map in rawBody for per-field messages.' },
   '5': { title: 'Transaction Not Found', hint: 'Close/cancel target does not exist — verify tran_id.' },
   '6': { title: 'tran_id not found', hint: 'check-transaction found no transaction with this ID.' },
@@ -281,4 +290,23 @@ export const QR_TEMPLATE_NAMES: readonly string[] = QR_TEMPLATES.map((template) 
 export const PAYMENT_OPTIONS = ['cards', 'abapay_khqr', 'abapay_khqr_deeplink', 'alipay', 'wechat', 'google_pay'] as const;
 
 export type PaymentOptionName = (typeof PAYMENT_OPTIONS)[number];
+
+/**
+ * payment_option values documented for the PURCHASE path (generate-checkout /
+ * hosted checkout). The archived gateway spec
+ * (docs/archive/Default module.openapi.json) documents `cards`, `abapay`,
+ * `abapay_deeplink`; `abapay_khqr_deeplink` (the checkout default) and
+ * `google_pay` (requires googlePayToken — see checkout domain validation) are
+ * live-verified additions. QR-only values (`abapay_khqr`, `wechat`, `alipay`)
+ * are intentionally absent — use PAYMENT_OPTIONS for the QR endpoints.
+ */
+export const PURCHASE_PAYMENT_OPTIONS = [
+  'cards',
+  'abapay',
+  'abapay_deeplink',
+  'abapay_khqr_deeplink',
+  'google_pay',
+] as const;
+
+export type PurchasePaymentOptionName = (typeof PURCHASE_PAYMENT_OPTIONS)[number];
 

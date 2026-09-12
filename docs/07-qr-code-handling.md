@@ -3,6 +3,33 @@
 > **Estimated reading time:** 15 minutes  
 > **Goal:** Generate and display KHQR QR codes for customers to scan and pay with their banking app.
 
+## Flow at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Backend as ⚙️ Your Backend (SDK)
+    participant PayWay as 🏦 PayWay
+    participant Customer as 🧑 Customer
+    participant BankApp as 📲 Any Bank App
+
+    par online QR (generate-qr API)
+        Backend->>PayWay: generateQr (amount, currency, qrImageTemplate)
+        PayWay-->>Backend: qrString + qrImage (branded PNG)
+        Backend-->>Customer: display QR
+        Customer->>BankApp: scan + pay
+        Backend->>PayWay: poll / check-transaction until terminal
+    and offline ABA KHQR (no API call to create)
+        Backend->>Backend: khqr.generateOfflineQR() — local, EMVCo TLV + CRC
+        Backend-->>Customer: display plain KHQR (no branding)
+        Customer->>BankApp: scan + pay with ANY bank app
+        PayWay-->>Backend: POST /aba-payway-khqr-webhook (NO hash — untrusted)
+        Backend->>PayWay: check-transaction before trusting ✅
+    end
+
+    Note over Backend,BankApp: Offline QRs carry no ABA branding and cannot use templates — the template gallery is online-only.
+```
+
 ---
 
 ## QR String vs. QR Image — Understanding the Difference
@@ -291,6 +318,28 @@ export default router;
 </body>
 </html>
 ```
+
+---
+
+## QR Image Template Gallery
+
+The `qrImageTemplate` parameter (CLI `--template`) asks the **gateway** to render `qrImage` in one of seven styles. All seven are verified in sandbox (2026-08-30; per-template latency and acceptance notes in [SANDBOX-FINDINGS](./SANDBOX-FINDINGS.md)). `template2` is the API default. Templates are online-only — the [offline ABA KHQR](#official-aba-khqr-offline-generation-no-api-call-required) pipeline produces plain unbranded EMVCo payloads and cannot carry a template.
+
+Rendered samples (captured from the sandbox by `scripts/capture-qr-template-gallery.ts`):
+
+| Template | Sample | Style | Use it for |
+|---|---|---|---|
+| `template1` | ![template1](./images/qr-templates/template1.png) | Classic black & white card, no branding | Minimal digital displays, embedded devices, custom-branding hosts |
+| `template1_color` | ![template1_color](./images/qr-templates/template1_color.png) | Classic layout with ABA brand color | Same as template1 with recognizable ABA mark |
+| `template2` *(default)* | ![template2](./images/qr-templates/template2.png) | White card with ABA logo header | General checkout pages |
+| `template2_color` | ![template2_color](./images/qr-templates/template2_color.png) | Default layout with brand color | Checkout pages that match an ABA-branded theme |
+| `template3_color` | ![template3_color](./images/qr-templates/template3_color.png) | Compact color design | Customer-facing screens where vertical space is tight |
+| `template4` | ![template4](./images/qr-templates/template4.png) | Tall receipt style, black & white | Receipts and printed invoices (thermal printers) |
+| `template4_color` | ![template4_color](./images/qr-templates/template4_color.png) | Tall receipt style with brand color | Branded receipts and printed invoices |
+
+> 💡 Pick by placement, not preference: screens get `template2`/`template3_color`; print gets `template4`/`template4_color`; unbranded or self-branded hosts get `template1`. The samples above are 5.00 USD sandbox renders — amounts and merchant names render dynamically per transaction.
+
+CLI usage: `payway-sdk generate-qr -a 5.00 -c USD --template template4_color -y`. An unknown `--template` value warns (with a did-you-mean suggestion) but is still sent; the gateway answers `04` for values it does not know.
 
 ---
 

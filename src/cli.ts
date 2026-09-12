@@ -140,6 +140,36 @@ function assertRsaKeyPresent(json = false): boolean {
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Pre-flight partner-credential check for the online-self-activation group
+// (spec-derived endpoints; not covered by the merchant credential checks)
+// ---------------------------------------------------------------------------
+function assertPartnerCredentialsPresent(json = false): boolean {
+  const missing: string[] = [];
+  if (!process.env.PAYWAY_PARTNER_ID?.trim()) missing.push('PAYWAY_PARTNER_ID');
+  if (!process.env.PAYWAY_PARTNER_API_KEY?.trim() && !process.env.PAYWAY_API_KEY?.trim()) missing.push('PAYWAY_PARTNER_API_KEY');
+  if (!process.env.PAYWAY_RSA_PUBLIC_KEY?.trim()) missing.push('PAYWAY_RSA_PUBLIC_KEY');
+  if (missing.length === 0) return true;
+
+  const message = `Missing partner credentials for self-activation: ${missing.join(', ')}`;
+  if (json) {
+    printValidationErrorJson(message);
+    return false;
+  }
+
+  console.log(`\n  ${c.red('✗')} ${c.bold('Missing partner credentials')}\n`);
+  for (const item of missing) {
+    console.log(`    ${c.red('•')} ${item} is required`);
+  }
+  console.log();
+  console.log(`  ${c.dim('Self-activation endpoints authenticate a registration PARTNER (not a merchant):')}`);
+  console.log(`    ${c.cyan('PAYWAY_PARTNER_ID=<partner id from ABA>')}`);
+  console.log(`    ${c.cyan('PAYWAY_PARTNER_API_KEY=<partner HMAC secret (falls back to PAYWAY_API_KEY)>')}`);
+  console.log(`    ${c.cyan('PAYWAY_RSA_PUBLIC_KEY=<pem — RSA-encrypts request_data>')}`);
+  console.log();
+  return false;
+}
+
 // Parse a `--items`/`--custom-fields`/`--payout`/`--return-deeplink` value that
 // may be either inline JSON or a raw string (the SDK helpers accept both and
 // base64-encode object/array forms before signing). Returns `undefined` when
@@ -1308,11 +1338,25 @@ program
   .command('explain')
   .description('Decode a PayWay error/status code (e.g. explain PTL36, explain 49). No credentials needed.')
   .argument('[code]', 'PayWay code to explain — omit to list all known codes')
-  .action((code?: string) => {
+  .option('--json', 'Print machine-readable JSON: one document (or array for bare explain); error envelope on unknown code')
+  .action((code: string | undefined, opts: { json?: boolean }) => {
+    if (opts.json) {
+      if (!code) {
+        console.log(JSON.stringify(explainAll(), null, 2));
+        return;
+      }
+      const jsonExplanation = explainPayWayCode(code);
+      if (!jsonExplanation) {
+        process.exitCode = printValidationErrorJson(`Unknown or undocumented code: ${code}`);
+        return;
+      }
+      console.log(JSON.stringify(jsonExplanation, null, 2));
+      return;
+    }
     console.log(`\n${c.bold('ABA PayWay SDK')} — code reference\n`);
     if (!code) {
       for (const e of explainAll()) {
-        console.log(`  ${c.cyan(e.code.padEnd(7))} ${c.bold(`[${e.family}]`).padEnd(0)} ${e.title}`);
+        console.log(`  ${c.cyan(e.code.padEnd(7))} ${c.bold(`[${e.family}]`).padEnd(0)} ${e.title}${e.sandboxVerified ? c.green(' ✓') : ''}`);
         if (e.hint) console.log(`  ${''.padEnd(7)} ${c.dim(e.hint)}`);
       }
       console.log();
@@ -1327,6 +1371,7 @@ program
     }
     console.log(`  ${c.cyan(explanation.code)}  ${c.bold(explanation.title)}  ${c.dim(`(${explanation.family})`)}`);
     if (explanation.hint) console.log(`  → ${explanation.hint}`);
+    if (explanation.sandboxVerified) console.log(`  ${c.green('✓ sandbox-verified')} ${c.dim(`(${explanation.evidence})`)}`);
     console.log();
   });
 
@@ -2798,6 +2843,111 @@ program
         if (failStructuredQr(e)) return;
         process.exitCode = printApiError(e);
       }
+    }
+  });
+
+// --- request-qr (Soundbox) ---
+program
+  .command('request-qr')
+  .description(
+    'Create a Soundbox QR (payments/request-qr) — amount optional for on-device keypad entry; spec-derived contract, not yet live-verified',
+  )
+  .option('-a, --amount <number>', 'Payment amount (omit to let the Soundbox customer enter it on the device)')
+  .requiredOption('-c, --currency <code>', 'Currency: USD or KHR')
+  .requiredOption('--payment-option <option>', 'abapay | abapay_khqr | wechat (USD only) | alipay (USD only)')
+  .requiredOption('--callback-url <url>', 'Webhook callback URL (required by the endpoint)')
+  .option('-t, --transaction-id <id>', 'Transaction ID (auto-generated if omitted)')
+  .option('--lifetime <minutes>', 'QR lifetime in MINUTES — 3..43200 (gateway default: 30 days)')
+  .option('--purchase-type <type>', 'purchase (default) or pre-auth')
+  .option('--save-image <path>', 'Save the QR PNG to file (default: payway-output/<transaction-id>.png)')
+  .option('--no-save-image', 'Do not save the QR PNG')
+  .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
+  .option('--json', 'Print the raw JSON response')
+  .option('-y, --non-interactive', 'Accepted for agent compatibility (this command never prompts)')
+  .action(async (opts: {
+    amount?: string;
+    currency: string;
+    paymentOption: string;
+    callbackUrl: string;
+    transactionId?: string;
+    lifetime?: string;
+    purchaseType?: string;
+    saveImage?: string | boolean;
+    allowDuplicateId?: boolean;
+    json?: boolean;
+    nonInteractive?: boolean;
+  }) => {
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — Soundbox QR (request-qr)\n`);
+    if (!assertCredentialsPresent()) {
+      process.exitCode = 1;
+      return;
+    }
+
+    const currency = opts.currency.toUpperCase() as 'USD' | 'KHR';
+    const amount = opts.amount === undefined ? undefined : Number(opts.amount);
+    const transactionId = opts.transactionId ?? `sb${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    warnDuplicateTransactionId(transactionId, opts);
+
+    try {
+      const payway = new PayWay();
+      const qr = await payway.qr.requestQr({
+        transactionId,
+        amount: amount !== undefined && Number.isFinite(amount) ? amount : null,
+        currency,
+        paymentOption: opts.paymentOption,
+        callbackUrl: opts.callbackUrl,
+        lifetime: opts.lifetime !== undefined ? Number(opts.lifetime) : undefined,
+        purchaseType: opts.purchaseType as 'purchase' | 'pre-auth' | undefined,
+      });
+
+      if (opts.json) {
+        printApiResultJson(qr, payway);
+      } else {
+        console.log(`  ${c.green('✓')} Soundbox QR created (spec-derived endpoint — verify the QR with a live device)\n`);
+        console.log(`  ${c.bold('Transaction ID:')}  ${c.cyan(transactionId)}`);
+        console.log(`  ${c.bold('Amount:')}           ${amount !== undefined && Number.isFinite(amount) ? `${amount} ${currency}` : `(keyed on device) ${currency}`}`);
+        console.log(`  ${c.bold('Payment Option:')}   ${opts.paymentOption}`);
+        console.log(`  ${c.bold('Callback URL:')}     ${opts.callbackUrl}`);
+        if (opts.lifetime !== undefined) console.log(`  ${c.bold('Lifetime:')}         ${opts.lifetime} minutes`);
+        console.log();
+
+        if (qr.qr_string) {
+          console.log(`  ${c.bold('QR String:')}`);
+          console.log(`  ${c.dim(qr.qr_string)}`);
+          console.log();
+          if (shouldAutoRenderQr(process.stdout, true)) {
+            try {
+              const terminalQr = await renderQrToTerminal(qr.qr_string);
+              console.log(terminalQr);
+            } catch {
+              // terminal render is best-effort
+            }
+          }
+        }
+
+        if (opts.saveImage !== false) {
+          const outputPath =
+            typeof opts.saveImage === 'string'
+              ? opts.saveImage
+              : path.join(process.cwd(), 'payway-output', `${transactionId}.png`);
+          try {
+            const saved = await saveQrPng({ outputPath, qrString: qr.qr_string });
+            if (saved) console.log(`  ${c.bold('QR PNG:')}          ${saved}`);
+          } catch (e) {
+            console.log(`  ${c.yellow('⚠')} Could not save QR PNG: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        console.log();
+        console.log(`  ${c.dim(`Next: payway-sdk check-transaction -t ${transactionId}`)}`);
+        console.log();
+      }
+      process.exitCode = EXIT_OK;
+    } catch (e) {
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(e);
+        return;
+      }
+      process.exitCode = printApiError(e);
     }
   });
 
@@ -4452,6 +4602,150 @@ program
   .addCommand(preAuthComplete)
   .addCommand(preAuthCompletePayout)
   .addCommand(preAuthCancel);
+
+// --- self-activation (partner onboarding; spec-derived, not live-verified) ---
+const selfActivationNewMerchant = program
+  .command('new-merchant')
+  .description(
+    'Register a merchant via online-self-activation (partner credentials; returns the onboarding form URL + session token)',
+  )
+  .requiredOption('--pushback-url <url>', 'Public HTTPS URL that receives the merchant details after registration')
+  .requiredOption(
+    '--redirect-url <url-or-json>',
+    'Where to send the merchant after onboarding: https URL, or JSON {"ios_scheme":"...","android_scheme":"..."}',
+  )
+  .requiredOption('--register-ref <ref>', 'Unique request reference (duplicate refs answer PTL164)')
+  .requiredOption('--currency <code>', 'Onboarding currency: KHR or USD')
+  .option('--merchant-type <0|1>', '0 instore, 1 online (gateway default: 1)')
+  .option('--type <0|1>', '1 native app, 0 web (gateway default: 0)')
+  .option('--reference-id <id>', 'Optional top-level echo of register_ref (must match)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: {
+    pushbackUrl: string;
+    redirectUrl: string;
+    registerRef: string;
+    currency: string;
+    merchantType?: string;
+    type?: string;
+    referenceId?: string;
+    json?: boolean;
+  }) => {
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: register merchant\n`);
+    if (!assertPartnerCredentialsPresent(opts.json)) {
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      const merchantType = opts.merchantType !== undefined ? (Number(opts.merchantType) as 0 | 1) : undefined;
+      const type = opts.type !== undefined ? (Number(opts.type) as 0 | 1) : undefined;
+      const redirect = parseJsonOrString(opts.redirectUrl) as string | { ios_scheme: string; android_scheme: string };
+      const payway = new PayWay();
+      const result = await payway.selfActivation.registerMerchant({
+        pushbackUrl: opts.pushbackUrl,
+        redirectUrl: redirect,
+        registerRef: opts.registerRef,
+        currency: opts.currency.toUpperCase() as 'KHR' | 'USD',
+        merchantType,
+        type,
+        referenceId: opts.referenceId,
+      });
+      if (opts.json) {
+        printApiResultJson(result, payway);
+      } else {
+        console.log(`  ${c.green('✓')} Merchant registration request accepted`);
+        console.log(`  ${c.bold('Register ref:')} ${opts.registerRef}`);
+        if (result.url) console.log(`  ${c.bold('Onboarding URL:')} ${c.cyan(result.url)}`);
+        if (result.token) console.log(`  ${c.bold('Session token:')} ${result.token}`);
+        console.log();
+      }
+      process.exitCode = EXIT_OK;
+    } catch (error) {
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(error);
+        return;
+      }
+      process.exitCode = printApiError(error);
+    }
+  });
+
+const selfActivationCredentialInfo = program
+  .command('credential-info')
+  .description('Inquire encrypted merchant credential details by register_ref (get-mc-credential-info)')
+  .requiredOption('--register-ref <ref>', 'The register_ref used at new-merchant')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: { registerRef: string; json?: boolean }) => {
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: credential info\n`);
+    if (!assertPartnerCredentialsPresent(opts.json)) {
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.selfActivation.getCredentialInfo({ registerRef: opts.registerRef });
+      if (opts.json) {
+        printApiResultJson(result, payway);
+      } else {
+        console.log(`  ${c.green('✓')} Credential info retrieved`);
+        console.log(`  ${c.bold('Register ref:')} ${opts.registerRef}`);
+        if (result.data) console.log(`  ${c.bold('Encrypted data:')} ${c.dim(`${String(result.data).slice(0, 120)}…`)}`);
+        console.log();
+      }
+      process.exitCode = EXIT_OK;
+    } catch (error) {
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(error);
+        return;
+      }
+      process.exitCode = printApiError(error);
+    }
+  });
+
+const selfActivationMcInfo = program
+  .command('mc-info')
+  .description('Fetch merchant API info (accounts, payment methods) by merchant key (get-mc-info)')
+  .requiredOption('--merchant-key <key>', 'The merchant key to inquire')
+  .option('--request-time <utc>', 'Pin request_time (required: the HMAC covers partner_id + merchant_key + request_time)')
+  .option('--json', 'Print the raw JSON response')
+  .action(async (opts: { merchantKey: string; requestTime?: string; json?: boolean }) => {
+    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: merchant info\n`);
+    if (!assertPartnerCredentialsPresent(opts.json)) {
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      const payway = new PayWay();
+      const result = await payway.selfActivation.getMerchantInfo({
+        merchantKey: opts.merchantKey,
+        requestTime: opts.requestTime,
+      });
+      if (opts.json) {
+        printApiResultJson(result, payway);
+      } else {
+        console.log(`  ${c.green('✓')} Merchant info retrieved`);
+        const data = result.data;
+        if (data) {
+          console.log(`  ${c.bold('Outlet:')}           ${data.outlet_name ?? '-'}`);
+          console.log(`  ${c.bold('ABA account KHR:')}  ${data.aba_account_khr ?? '-'}`);
+          console.log(`  ${c.bold('ABA account USD:')}  ${data.aba_account_usd ?? '-'}`);
+        }
+        console.log();
+      }
+      process.exitCode = EXIT_OK;
+    } catch (error) {
+      if (opts.json) {
+        process.exitCode = printApiErrorJson(error);
+        return;
+      }
+      process.exitCode = printApiError(error);
+    }
+  });
+
+program
+  .command('self-activation')
+  .description('Merchant self-activation via partner credentials (new-merchant, credential-info, mc-info) — spec-derived, not live-verified')
+  .addCommand(selfActivationNewMerchant)
+  .addCommand(selfActivationCredentialInfo)
+  .addCommand(selfActivationMcInfo);
 
 // --- parse ---
 const firstPaymentHelp: Record<string, string> = {

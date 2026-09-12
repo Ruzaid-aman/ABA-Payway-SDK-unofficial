@@ -59,6 +59,7 @@
     "test:coverage": "vitest run --coverage",
     "test:sandbox": "node scripts/run-sandbox-contract.mjs",
     "docs:api": "typedoc --options typedoc.json",
+    "gen:error-registry": "tsx scripts/generate-error-registry.ts",
     "clean": "node scripts/clean.mjs",
     "check:package": "node scripts/check-package-contents.mjs",
     "check:public-docs": "node scripts/check-public-docs.mjs",

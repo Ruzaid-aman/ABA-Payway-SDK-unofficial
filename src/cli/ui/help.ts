@@ -15,7 +15,16 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
   { title: 'Setup', commands: ['init', 'doctor', 'config', 'profiles', 'onboard'] },
   {
     title: 'Payments',
-    commands: ['generate-qr', 'generate-checkout', 'cof', 'checkout-form', 'payment-link', 'setup-webhook', 'webhook'],
+    commands: [
+      'generate-qr',
+      'request-qr',
+      'generate-checkout',
+      'cof',
+      'checkout-form',
+      'payment-link',
+      'setup-webhook',
+      'webhook',
+    ],
   },
   {
     title: 'Transactions',
@@ -29,7 +38,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
       'tx-batch',
     ],
   },
-  { title: 'Money-out', commands: ['refund', 'payout', 'pre-auth', 'beneficiary'] },
+  { title: 'Money-out', commands: ['refund', 'payout', 'pre-auth', 'beneficiary', 'self-activation'] },
   {
     title: 'Reference',
     commands: ['status', 'explain', 'validate', 'exchange-rate', 'sandbox-beneficiaries'],
@@ -105,6 +114,10 @@ export const COMMAND_EXAMPLES: Record<string, string[]> = {
   'generate-qr': [
     'payway-sdk generate-qr -a 5.00 -c USD --lifetime 360',
     'payway-sdk generate-qr --offline --ref spring-sale',
+  ],
+  'request-qr': [
+    'payway-sdk request-qr -c USD --payment-option abapay --callback-url https://example.com/soundbox',
+    'payway-sdk request-qr -a 2.50 -c USD --payment-option abapay_khqr --callback-url https://example.com/soundbox',
   ],
   'generate-checkout': ['payway-sdk generate-checkout -a 5.00 --return-url https://example.com/return'],
   'checkout-form': ['payway-sdk checkout-form -a 15.00 --return-url https://example.com/return -o form.html'],

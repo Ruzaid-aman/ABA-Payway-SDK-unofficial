@@ -34,12 +34,12 @@ afterAll(() => {
 });
 
 /** Save/restore process.exitCode around an invocation. */
-async function run(argv: string[]): Promise<{ text: string; exitCode: typeof process.exitCode }> {
+async function run(argv: string[]): Promise<{ text: string; stdout: string; exitCode: typeof process.exitCode }> {
   const captured = captureConsole();
   const before = process.exitCode;
   try {
     await runCli(argv);
-    return { text: captured.text(), exitCode: process.exitCode };
+    return { text: captured.text(), stdout: captured.stdout(), exitCode: process.exitCode };
   } finally {
     captured.restore();
     process.exitCode = before;
@@ -96,6 +96,34 @@ describe('CLI in-process (runCli)', () => {
     const ptl188 = await run(['explain', 'PTL188']);
     expect(ptl188.text).toContain('Payment Link Already Voided');
     expect(ptl188.text).toContain('terminal state');
+  });
+
+  // Error-code registry (competitive portal-parity wave, 2026-09-12): --json
+  // emits one machine-readable document per the F11 stdout contract, and
+  // live-verified codes carry sandbox provenance.
+  it('explain --json prints one JSON doc; unknown code prints the error envelope', async () => {
+    const known = await run(['explain', 'PTL36', '--json']);
+    const doc = JSON.parse(known.stdout);
+    expect(doc).toMatchObject({ code: 'PTL36', family: 'refund', title: 'Transaction not found', sandboxVerified: true });
+    expect(doc.evidence).toMatch(/SANDBOX-FINDINGS §/);
+
+    const all = await run(['explain', '--json']);
+    const docs = JSON.parse(all.stdout);
+    expect(Array.isArray(docs)).toBe(true);
+    expect(docs.length).toBeGreaterThanOrEqual(40);
+    const verified = docs.filter((e: { sandboxVerified?: boolean }) => e.sandboxVerified);
+    expect(verified.length).toBeGreaterThanOrEqual(20);
+
+    const unknown = await run(['explain', 'NOPE-1', '--json']);
+    const envelope = JSON.parse(unknown.stdout);
+    expect(envelope.error.kind).toBe('validation');
+    expect(unknown.exitCode).toBe(1);
+  });
+
+  it('explain text mode marks sandbox-verified codes with their evidence', async () => {
+    const { text } = await run(['explain', 'PTL36']);
+    expect(text).toContain('sandbox-verified');
+    expect(text).toContain('SANDBOX-FINDINGS §8/§9');
   });
 
   it('validate accepts a valid amount and transaction id', async () => {

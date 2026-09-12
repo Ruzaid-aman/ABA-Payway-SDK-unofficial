@@ -2,6 +2,68 @@
 
 ## Unreleased
 
+### OpenAPI suite-coverage wave (2026-09-12, spec-derived gaps from the 33-endpoint gateway spec)
+
+Double-pass multi-agent audit of the ABA-shared archived spec
+(`docs/archive/Default module.openapi.json`, 33 endpoints) against the SDK +
+CLI (`.scratch/openapi-coverage-audit/FINAL-REPORT.md`): 20 COVERED,
+2 PARTIAL, 6 SUPERSEDED-LEGACY, 5 MISSING. This wave closes the 2 PARTIALs
+and the implementable MISSINGs (the self-activation trio was implemented
+despite its P3 partner-only posture, per user directive). Legacy v1
+`/api/aof/*` + `v1/cof` endpoints remain deliberately unimplemented — their
+v3 successors ship.
+
+- **PARTIAL fix — purchase `payment_option` advisory**: the advisory checked
+  the QR enum, so spec-documented `abapay`/`abapay_deeplink` warned on every
+  checkout. New `PURCHASE_PAYMENT_OPTIONS` (spec enum + live-verified
+  `abapay_khqr_deeplink`, `google_pay`); QR-only values still warn.
+- **MISSING — `request-qr` (Soundbox QR, spec-derived/NOT live-verified)**:
+  `payway.qr.requestQr()` + `payway-sdk request-qr` — nullable amount
+  (on-device keypad entry), REQUIRED `payment_option` (`abapay` |
+  `abapay_khqr` | `wechat` | `alipay`), REQUIRED public-https callback,
+  minute-unit lifetime (3..43200). `REQUEST_QR_HASH_FIELDS` is spec-derived:
+  the spec's b4hash for this endpoint is a corrupted copy-paste from
+  generate-qr, so it keeps the 9 real fields in spec relative order — if the
+  gateway answers code 1, report the drift to ABA. In `MUTATION_ENDPOINTS`.
+- **MISSING — online-self-activation trio (spec-derived/NOT live-verified)**:
+  `payway.selfActivation.{registerMerchant,getCredentialInfo,getMerchantInfo}`
+  + `payway-sdk self-activation {new-merchant,credential-info,mc-info}` —
+  partner credentials (`PAYWAY_PARTNER_ID`, `PAYWAY_PARTNER_API_KEY`, RSA
+  request_data; new `requestWithPartnerAuth` client path, no merchant_id).
+  Per-endpoint HMAC split preserved from the (inconsistent) spec prose:
+  SHA256 for new-merchant/get-mc-info, SHA512 for get-mc-credential-info.
+  CLI preflight asserts partner credentials with actionable guidance.
+- **Docs**: HANDOFF §behavior contract rows for both spec-derived endpoints;
+  AGENTS.md canonical-command entries. Skills pack + live sandbox probe are
+  follow-ups.
+
+### Competitive portal-parity wave (2026-09-12, from the Canadia developer-portal audit)
+
+Four adoptable patterns from `docs/competitive-analysis-canadia.md` (Canadia
+Gateway portal audit), implemented with a test-enforced docs acceptance bar:
+
+- **Error-code registry**: `explain` codes now carry `sandboxVerified` +
+  `evidence` provenance (22→28 live-verified codes, incl. new gateway code `2`
+  "Transaction Not Closable"); `payway-sdk explain [code] --json` emits one
+  JSON document (validation envelope on unknown codes); `npm run
+  gen:error-registry` generates the versioned `docs/error-codes.json` registry
+  (65 codes), pinned to the source maps by a drift test.
+- **Per-flow sequence diagrams + docs acceptance bar**: every payment-flow
+  chapter (03/04/05/06/07/08/11/17) opens with an inline Mermaid "Flow at a
+  glance" diagram; the four orphaned `docs/diagrams/` pages are now linked
+  from chapters 01/03/09/11 and indexed in a docs/README "Diagram Library";
+  `src/__tests__/docs-acceptance-bar.test.ts` enforces diagrams + example
+  blocks + diagram-library links, and link resolution now covers every
+  numbered chapter (52 docs).
+- **QR template gallery**: docs/07 gains a per-template gallery (image +
+  style + use case) rendered from 7 real sandbox `generate-qr` captures
+  (`scripts/capture-qr-template-gallery.ts`, idempotent, `--force` to
+  recapture); docs/10's template row routes to it.
+- **Flutter example**: `docs/examples/flutter/payment_screen.dart` (webview
+  checkout, return-URL interception, ABA Pay deeplink launcher with
+  not-installed fallback), cited from chapters 04/05/08; credential-free
+  guard in the acceptance bar. Suite 1721 → 1761.
+
 ### Payment-link void (2026-09-11, undocumented endpoint — SANDBOX-FINDINGS §23)
 
 ABA's `POST /api/merchant-portal/merchant-access/payment-link/void` has no

@@ -274,6 +274,11 @@ DECLINED) is `0`; read `payment_status` from the final JSON event.
 Programmatic code lookups without spawning the CLI:
 ```sh
 # The CLI is the supported surface — no subpath imports exist in package exports.
-payway-sdk explain PTL36   # { family:'refund', title:'Transaction not found', hint:'...' }
-payway-sdk explain         # list every known code + family
+payway-sdk explain PTL36          # { family:'refund', title:'Transaction not found', hint:'...', sandboxVerified:true, evidence:'SANDBOX-FINDINGS §8/§9' }
+payway-sdk explain PTL36 --json   # same object, exactly one JSON document on stdout
+payway-sdk explain                # list every known code + family
 ```
+`sandboxVerified: true` means the code's meaning was reproduced against the
+live sandbox and `evidence` points into the findings ledger; codes without the
+flag are spec-derived or inferred. The full registry ships as generated JSON in
+the repo checkout at `docs/error-codes.json` (not in the npm package).

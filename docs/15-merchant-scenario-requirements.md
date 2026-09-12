@@ -2,6 +2,13 @@
 
 This chapter maps the reviewed merchant scenarios to SDK and integrator responsibilities. “Guidance observed during integration” is not a universal PayWay guarantee; profile and commercial settings must be confirmed with ABA.
 
+Scenario-to-route mapping — verify your machine is ready for the route a scenario needs before coding it:
+
+```sh
+payway-sdk doctor --route online-qr        # QR / POS scenarios (TC-008–TC-011)
+payway-sdk doctor --route hosted-checkout  # checkout + popup scenarios (TC-001–TC-007)
+```
+
 ## TC-001 — Checkout routing
 
 `paymentGate: 0` is serialized as `payment_gate=0` by `createTransaction()`. Post the resulting signed fields from the browser. **Confirm with ABA** that the merchant profile routes this value to Ecommerce Checkout HTML rather than QR JSON.
