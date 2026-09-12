@@ -134,6 +134,17 @@ function buildActionSchemas(materialized: boolean): Array<Record<string, unknown
     },
     {
       ...base,
+      required: ['tool', 'query'],
+      properties: {
+        tool: { const: 'query_knowledge' },
+        query: { enum: ['search', 'read'] },
+        pattern: { type: 'string', minLength: 1 },
+        topic: { type: 'string', minLength: 1 },
+        rationale: { type: 'string' },
+      },
+    },
+    {
+      ...base,
       required: ['tool', 'transactionId'],
       properties: {
         tool: { const: 'check_transaction' },
@@ -335,6 +346,7 @@ const ledgerSchema = {
         'create_payment_link',
         'get_payment_link_details',
         'query_journal',
+        'query_knowledge',
         'check_transaction',
         'check_transaction_by_merchant_ref',
         'poll_transaction',

@@ -23,6 +23,7 @@ export type AgentToolName =
   | 'create_payment_link'
   | 'get_payment_link_details'
   | 'query_journal'
+  | 'query_knowledge'
   | 'check_transaction'
   | 'check_transaction_by_merchant_ref'
   | 'poll_transaction'
@@ -116,6 +117,20 @@ export interface QueryJournalParams {
   kind?: string;
   /** `timeline`: cap the returned events (default 100). */
   last?: number;
+  rationale?: string;
+}
+
+/**
+ * Knowledge-wave (2026-09-12): read-only access to the packaged knowledge
+ * corpus (the same content `payway-sdk docs` serves). Never hits the network.
+ */
+export interface QueryKnowledgeParams {
+  tool: 'query_knowledge';
+  query: 'search' | 'read';
+  /** Required for `read`: topic slug, e.g. payment-link. */
+  topic?: string;
+  /** Required for `search`: space-separated keywords (AND per line). */
+  pattern?: string;
   rationale?: string;
 }
 

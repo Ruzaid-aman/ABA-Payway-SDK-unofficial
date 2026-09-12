@@ -41,6 +41,7 @@ import type {
   OpenArtifactParams,
   PollTransactionParams,
   QueryJournalParams,
+  QueryKnowledgeParams,
   SaveArtifactParams,
 } from './contracts.js';
 import type { ExecutionContext, ToolExecutionResult } from './executor.js';
@@ -48,6 +49,7 @@ import { detectJournalAnomalies, explainTransaction } from '../journal/intellige
 import { reconcileTransactions } from '../journal/reconcile.js';
 import { computeJournalStats } from '../journal/stats.js';
 import { readJournalEvents } from '../journal/writer.js';
+import { readTopic, searchKnowledge } from '../knowledge/store.js';
 import { copyToClipboard, openArtifact } from './local-tools.js';
 
 /**
@@ -462,6 +464,93 @@ async function runQueryJournal(action: MaterializedAgentAction, _client: PayWay)
 
 // ─── Closed typed registry ──────────────────────────────────────────────────
 
+/**
+ * Knowledge wave (2026-09-12): offline search/read over the packaged knowledge
+ * corpus — the same content `payway-sdk docs` serves. Read-only, no network,
+ * no credentials.
+ */
+async function runQueryKnowledge(action: MaterializedAgentAction, _client: PayWay): Promise<ToolExecutionResult> {
+  const params = action as unknown as QueryKnowledgeParams;
+
+  if (params.query === 'read') {
+    if (!params.topic) {
+      return {
+        ok: false,
+        tool: 'query_knowledge',
+        error: { code: 'VALIDATION', message: 'query "read" requires topic (see query_knowledge description)' },
+      };
+    }
+    const read = readTopic(params.topic);
+    if (!read) {
+      return {
+        ok: false,
+        tool: 'query_knowledge',
+        error: {
+          code: 'KNOWLEDGE_UNAVAILABLE',
+          message: 'Knowledge corpus not found (packaged knowledge/ missing or not synced).',
+        },
+      };
+    }
+    if (read.status === 'missing') {
+      return {
+        ok: false,
+        tool: 'query_knowledge',
+        error: {
+          code: 'VALIDATION',
+          message: `Unknown knowledge topic "${params.topic}" — propose query:"search" first to discover topics.`,
+        },
+      };
+    }
+    if (read.status === 'ambiguous') {
+      return {
+        ok: false,
+        tool: 'query_knowledge',
+        error: {
+          code: 'VALIDATION',
+          message: `"${params.topic}" matches several topics: ${read.matches.map((t) => t.topic).join(', ')} — be more specific.`,
+        },
+      };
+    }
+    return {
+      ok: true,
+      tool: 'query_knowledge',
+      data: {
+        query: 'read',
+        topic: read.topic.topic,
+        title: read.topic.title,
+        source: read.topic.source,
+        content: read.content,
+      },
+    };
+  }
+
+  // search
+  const pattern = params.pattern?.trim();
+  if (!pattern) {
+    return {
+      ok: false,
+      tool: 'query_knowledge',
+      error: { code: 'VALIDATION', message: 'query "search" requires pattern (space-separated keywords)' },
+    };
+  }
+  const result = searchKnowledge(pattern);
+  if (!result) {
+    return {
+      ok: false,
+      tool: 'query_knowledge',
+      error: {
+        code: 'KNOWLEDGE_UNAVAILABLE',
+        message: 'Knowledge corpus not found (packaged knowledge/ missing or not synced).',
+      },
+    };
+  }
+  return {
+    ok: true,
+    tool: 'query_knowledge',
+    data: { query: 'search', pattern, totalHits: result.totalHits, truncated: result.truncated, hits: result.hits },
+  };
+}
+
 export const toolRegistry: Record<
   AgentToolName,
   (action: MaterializedAgentAction, client: PayWay, ctx: ExecutionContext) => Promise<ToolExecutionResult>
@@ -473,6 +562,7 @@ export const toolRegistry: Record<
   create_payment_link: runCreatePaymentLink,
   get_payment_link_details: runGetPaymentLinkDetails,
   query_journal: runQueryJournal,
+  query_knowledge: runQueryKnowledge,
   check_transaction: runCheckTransaction,
   check_transaction_by_merchant_ref: runCheckTransactionByMerchantRef,
   poll_transaction: runPollTransaction,

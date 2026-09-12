@@ -11,6 +11,7 @@
  */
 
 import type { AgentToolName } from './contracts.js';
+import { buildKnowledgeDigest } from './knowledge-digest.js';
 
 /** One OpenAI-style function/tool definition. */
 interface ToolDefinition {
@@ -233,6 +234,24 @@ function buildToolDefinitions(): ToolDefinition[] {
     {
       type: 'function',
       function: {
+        name: 'query_knowledge',
+        description: 'Search or read the built-in PayWay knowledge base offline (no network): integration guides, gateway error-code hints, and sandbox-verified lessons for web checkout, QR, callbacks/webhooks, payment links, COF, pre-auth, payouts, and deployment. Prefer this over guessing gateway behavior.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            query: str('One of: search | read.'),
+            pattern: opt(str('For search: space-separated keywords — every keyword must appear on the hit line.')),
+            topic: opt(str('For read: a topic slug, e.g. quickstart, web-implementation, callbacks-webhooks, errors-and-debugging, payment-link, sdk-cli-reference.')),
+            rationale: opt(str('Why this action is being proposed.')),
+          },
+          required: ['query'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'get_payment_link_details',
         description: 'Get the status and details of a payment link by its opaque Link ID (data.id from create — not the merchant ref, not the URL slug).',
         parameters: {
@@ -382,6 +401,11 @@ export function buildStrictJsonSystemPrompt(): string {
     '',
     'TOOL CATALOG — use these EXACT tool names and ONLY the listed parameters:',
     buildToolCatalog(),
+    '',
+    'DOMAIN CONSTRAINTS — sandbox-verified PayWay gateway facts. Follow these when',
+    'shaping a plan; use `query_knowledge` (read/search) to pull the full guides for',
+    'how-to or integration questions — its results appear in the command output:',
+    buildKnowledgeDigest(),
     '',
     'Rules:',
     '- `version` must be the literal string "agent-plan/v1".',
