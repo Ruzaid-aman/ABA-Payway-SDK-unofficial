@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+### OpenAPI suite-coverage wave (2026-09-12, spec-derived gaps from the 33-endpoint gateway spec)
+
+Double-pass multi-agent audit of the ABA-shared archived spec
+(`docs/archive/Default module.openapi.json`, 33 endpoints) against the SDK +
+CLI (`.scratch/openapi-coverage-audit/FINAL-REPORT.md`): 20 COVERED,
+2 PARTIAL, 6 SUPERSEDED-LEGACY, 5 MISSING. This wave closes the 2 PARTIALs
+and the implementable MISSINGs (the self-activation trio was implemented
+despite its P3 partner-only posture, per user directive). Legacy v1
+`/api/aof/*` + `v1/cof` endpoints remain deliberately unimplemented — their
+v3 successors ship.
+
+- **PARTIAL fix — purchase `payment_option` advisory**: the advisory checked
+  the QR enum, so spec-documented `abapay`/`abapay_deeplink` warned on every
+  checkout. New `PURCHASE_PAYMENT_OPTIONS` (spec enum + live-verified
+  `abapay_khqr_deeplink`, `google_pay`); QR-only values still warn.
+- **MISSING — `request-qr` (Soundbox QR, spec-derived/NOT live-verified)**:
+  `payway.qr.requestQr()` + `payway-sdk request-qr` — nullable amount
+  (on-device keypad entry), REQUIRED `payment_option` (`abapay` |
+  `abapay_khqr` | `wechat` | `alipay`), REQUIRED public-https callback,
+  minute-unit lifetime (3..43200). `REQUEST_QR_HASH_FIELDS` is spec-derived:
+  the spec's b4hash for this endpoint is a corrupted copy-paste from
+  generate-qr, so it keeps the 9 real fields in spec relative order — if the
+  gateway answers code 1, report the drift to ABA. In `MUTATION_ENDPOINTS`.
+- **MISSING — online-self-activation trio (spec-derived/NOT live-verified)**:
+  `payway.selfActivation.{registerMerchant,getCredentialInfo,getMerchantInfo}`
+  + `payway-sdk self-activation {new-merchant,credential-info,mc-info}` —
+  partner credentials (`PAYWAY_PARTNER_ID`, `PAYWAY_PARTNER_API_KEY`, RSA
+  request_data; new `requestWithPartnerAuth` client path, no merchant_id).
+  Per-endpoint HMAC split preserved from the (inconsistent) spec prose:
+  SHA256 for new-merchant/get-mc-info, SHA512 for get-mc-credential-info.
+  CLI preflight asserts partner credentials with actionable guidance.
+- **Docs**: HANDOFF §behavior contract rows for both spec-derived endpoints;
+  AGENTS.md canonical-command entries. Skills pack + live sandbox probe are
+  follow-ups.
+
 ### Payment-link void (2026-09-11, undocumented endpoint — SANDBOX-FINDINGS §23)
 
 ABA's `POST /api/merchant-portal/merchant-access/payment-link/void` has no

@@ -20,7 +20,7 @@
  * here instead of silently falling back to the generic wrong-hash message.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HASH_ORDER_HINTS, MERCHANT_AUTH_DEFAULT_HASH_FIELDS, type PayWayConfig } from '../client.js';
+import { HASH_ORDER_HINTS, MERCHANT_AUTH_DEFAULT_HASH_FIELDS, SELF_ACTIVATION_HASH_FIELDS, type PayWayConfig } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { createCredentialsOnFileDomain } from '../domains/credentials-on-file.js';
 import { createCheckoutDomain, PURCHASE_HASH_FIELDS } from '../domains/checkout.js';
@@ -28,7 +28,7 @@ import { createKhqrDomain } from '../domains/khqr.js';
 import { createPaymentLinkDomain } from '../domains/payment-link.js';
 import { createPayoutDomain } from '../domains/payout.js';
 import { createPreAuthDomain } from '../domains/pre-auth.js';
-import { createQrDomain, GENERATE_QR_HASH_FIELDS } from '../domains/qr.js';
+import { createQrDomain, GENERATE_QR_HASH_FIELDS, REQUEST_QR_HASH_FIELDS } from '../domains/qr.js';
 import { LINK_CARD_HMAC_FIELDS } from '../domains/credentials-on-file.js';
 import { generateTestRsaKeyPair } from '../test/test-utils.js';
 
@@ -99,6 +99,16 @@ describe('HASH_ORDER_HINTS pinned to exported hash-field constants', () => {
 
   it('generateQr hint equals GENERATE_QR_HASH_FIELDS', () => {
     expect(HASH_ORDER_HINTS[ENDPOINTS.generateQr]).toBe(GENERATE_QR_HASH_FIELDS.join('.'));
+  });
+
+  it('requestQr hint equals REQUEST_QR_HASH_FIELDS', () => {
+    expect(HASH_ORDER_HINTS[ENDPOINTS.requestQr]).toBe(REQUEST_QR_HASH_FIELDS.join('.'));
+  });
+
+  it('self-activation hints equal SELF_ACTIVATION_HASH_FIELDS (algorithm varies per endpoint, order does not)', () => {
+    expect(HASH_ORDER_HINTS[ENDPOINTS.registerNewMerchant]).toBe(SELF_ACTIVATION_HASH_FIELDS.join('.'));
+    expect(HASH_ORDER_HINTS[ENDPOINTS.getMerchantCredentialInfo]).toBe(SELF_ACTIVATION_HASH_FIELDS.join('.'));
+    expect(HASH_ORDER_HINTS[ENDPOINTS.getMerchantInfo]).toBe(SELF_ACTIVATION_HASH_FIELDS.join('.'));
   });
 
   it('refund / payment-link / beneficiary hints equal MERCHANT_AUTH_DEFAULT_HASH_FIELDS', () => {
@@ -191,6 +201,19 @@ describe('HASH_ORDER_HINTS pinned to the captured hmacFields of each domain call
     });
     expect(HASH_ORDER_HINTS[ENDPOINTS.generateQr]).toBe(calls[0].hmacFields.join('.'));
     expect(calls[0].hmacFields.join('.')).toBe(GENERATE_QR_HASH_FIELDS.join('.'));
+  });
+
+  it('qr domain: requestQr hint matches the captured order', async () => {
+    const { spy, calls } = makeRequestSpy();
+    const domain = createQrDomain(TEST_CONFIG as PayWayConfig, spy);
+    await domain.requestQr({
+      transactionId: 'sb-hint-1',
+      currency: 'USD',
+      paymentOption: 'abapay',
+      callbackUrl: 'https://example.com/soundbox',
+    });
+    expect(HASH_ORDER_HINTS[ENDPOINTS.requestQr]).toBe(calls[0].hmacFields.join('.'));
+    expect(calls[0].hmacFields.join('.')).toBe(REQUEST_QR_HASH_FIELDS.join('.'));
   });
 
   it('khqr domain: getTransactionsByMerchantRef hint matches the captured order', async () => {
@@ -306,6 +329,10 @@ describe('HASH_ORDER_HINTS structural guards', () => {
         ENDPOINTS.getTokenDetails,
         ENDPOINTS.removeToken,
         ENDPOINTS.generateQr,
+        ENDPOINTS.requestQr,
+        ENDPOINTS.registerNewMerchant,
+        ENDPOINTS.getMerchantCredentialInfo,
+        ENDPOINTS.getMerchantInfo,
         ENDPOINTS.createPaymentLink,
         ENDPOINTS.getPaymentLinkDetails,
         ENDPOINTS.voidPaymentLink,

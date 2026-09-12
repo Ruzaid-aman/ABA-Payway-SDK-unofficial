@@ -4,12 +4,19 @@ import * as crypto from 'node:crypto';
  * Generates the PayWay HMAC signature.
  * Concatenates the values of the fields in the order specified by the fieldList,
  * substituting empty string for undefined/null values.
+ *
+ * `algorithm` defaults to sha512 (every merchant-portal/gateway endpoint).
+ * The online-self-activation partner endpoints sign with sha256 per the
+ * archived spec — except get-mc-credential-info, whose prose says sha512
+ * (an in-spec inconsistency; see the self-activation domain). Callers that
+ * need the non-default algorithm pass it explicitly.
  */
 export function generateHmac(
   payload: Record<string, unknown>,
   fieldList: string[],
   apiKey: string,
   encoding: 'base64' | 'hex' = 'base64',
+  algorithm: 'sha512' | 'sha256' = 'sha512',
 ): string {
   const concatenated = fieldList
     .map((field) => {
@@ -21,7 +28,7 @@ export function generateHmac(
     })
     .join('');
 
-  return crypto.createHmac('sha512', apiKey).update(concatenated).digest(encoding);
+  return crypto.createHmac(algorithm, apiKey).update(concatenated).digest(encoding);
 }
 
 /**
