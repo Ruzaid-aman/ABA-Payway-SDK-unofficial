@@ -53,18 +53,18 @@ describe('query_knowledge tool', () => {
   it('validates params and unknown topics with actionable errors', async () => {
     const noPattern = await toolRegistry.query_knowledge(action({ query: 'search' }), client, ctx);
     expect(noPattern.ok).toBe(false);
-    if (!noPattern.ok) expect(noPattern.error.code).toBe('VALIDATION');
+    if (!noPattern.ok) expect(noPattern.error?.code).toBe('VALIDATION');
 
     const noTopic = await toolRegistry.query_knowledge(action({ query: 'read' }), client, ctx);
     expect(noTopic.ok).toBe(false);
 
     const unknown = await toolRegistry.query_knowledge(action({ query: 'read', topic: 'zzz' }), client, ctx);
     expect(unknown.ok).toBe(false);
-    if (!unknown.ok) expect(unknown.error.code).toBe('VALIDATION');
+    if (!unknown.ok) expect(unknown.error?.code).toBe('VALIDATION');
 
     const ambiguous = await toolRegistry.query_knowledge(action({ query: 'read', topic: 'e' }), client, ctx);
     expect(ambiguous.ok).toBe(false);
-    if (!ambiguous.ok) expect(ambiguous.error.message).toContain('matches several topics');
+    if (!ambiguous.ok) expect(ambiguous.error?.message).toContain('matches several topics');
   });
 });
 
