@@ -32,10 +32,16 @@
   a shared cache serving a stale form is a replay vector.
 - Docs/skills corrections from the review: docs/09's flagship `linkCard()`
   example taught an integration that can never work (`result.pwt` — the
-  method always throws); the "SDK treats the HTML page as the success signal"
-  sentence was wrong; the aba-payway-link-card skill's "sandbox does not
-  verify the hash" note was REFUTED by controlled replays (§24 LC-3).
-  Knowledge corpus re-synced.
+  method always throws; the link-account example had the same bug), the
+  "SDK treats the HTML page as the success signal" sentence was wrong, and
+  the aba-payway-link-card skill's "sandbox does not verify the hash" note
+  was REFUTED by controlled replays (§24 LC-3). docs/11 gained a
+  CoF-callbacks section (pwt delivery channel; Q18 schema unverified; no
+  callback on a failed link); docs/12's COF table rows now carry the live
+  messages (104 = profile-level "Merchant not enabled token flag",
+  remove-answers-00-on-unknown note). Propagated to skills link-card v1.3.0,
+  cof v1.1.0, token-lifecycle v1.1.0, remove-card/account v1.2.1 (with
+  `.zcode` mirrors); knowledge corpus and docs/api regenerated.
 
 ### Knowledge wave: docs command, agent knowledge tool, config ease (2026-09-12)
 

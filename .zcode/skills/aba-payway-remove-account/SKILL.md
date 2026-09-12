@@ -2,7 +2,7 @@
 name: aba-payway-remove-account
 description: Remove a stored ABA PayWay account token.
 metadata:
-  version: 1.2.0
+  version: 1.2.1
 ---
 
 # Remove Account
@@ -33,3 +33,7 @@ try { await payway.credentialsOnFile.removeToken(params); }
 catch (error) { if (error instanceof PayWayAPIError) console.error(error.statusCode); }
 ```
 Codes 104/105/09 carry token-state hints (invalid/expired — re-link or renew).
+
+> 📋 **§24 live fact (2026-09-12):** remove answers `00 Success` even for a
+> NON-EXISTENT token — it cannot probe existence or confirm anything was
+> deleted. Use `getTokenDetails()` (09 = not found) to check presence first.

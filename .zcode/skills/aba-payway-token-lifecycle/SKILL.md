@@ -2,7 +2,7 @@
 name: aba-payway-token-lifecycle
 description: Manage ABA PayWay stored tokens — renew, inspect details, remove, and track the 90-day expiry.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Token Lifecycle
@@ -51,9 +51,13 @@ allowed by default; only an explicit `false` re-blocks.
 
 ## Error Hints
 - `105` — token invalid or expired → re-link via linkAccount/linkCard, or renew.
-- `104` — merchant not enabled for the token flag → check the merchant profile.
+- `104` — merchant not enabled for the token flag → check the merchant profile (live 2026-09-12 §24 LC-1: the link-card hosted page answers this when card tokenization is not enabled — ask ABA).
 - `09` — token/ctid not found → wrong ctid or the token was removed.
 - `1`/`01` — Wrong Hash → `PayWaySignatureError` carries the endpoint's hash-order hint.
+
+> 📋 **§24 live fact (2026-09-12):** `removeToken` answers `00 Success` even for a
+> NON-EXISTENT token — it cannot probe existence. Use `getTokenDetails()`
+> (09 = not found) when you need to check whether a token is still present.
 
 ## CLI
 ```sh

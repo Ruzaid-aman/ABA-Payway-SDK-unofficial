@@ -1,8 +1,8 @@
 ---
 name: aba-payway-cof
-description: Credentials-on-file with ABA PayWay — link an account or card, then charge the stored token (both hosted-page routes plus the cof CLI group).
+description: Store an ABA account or card token once, then charge it on demand (MIT) or via recurring schedules.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Credentials on File (CoF)
@@ -69,7 +69,18 @@ const charge = await payway.credentialsOnFile.payment({
 ## Error families
 - `status.code "04"` + `errors{}` map → `PayWayBusinessError.fieldErrors` (per-field binding errors).
 - `1`/`01`/`PTL02` → `PayWaySignatureError` (carries the endpoint hash-order hint).
-- `98` merchant not found · `104` token flag not enabled for the merchant · `105` token invalid/expired · `09` token not found.
+- `98` merchant not found · `104` **Merchant not enabled token flag** (live 2026-09-12 §24 LC-1: the link-card hosted page answers this when the profile lacks card tokenization — ask ABA; profile-level, not per-token) · `105` invalid payment credential token (live: charge with an unknown pwt) · `09` data not found (live: getTokenDetails for a request that never linked).
+
+## §24 live facts (2026-09-12)
+- **Hosted outcome is readable server-side**: `linkCard()`'s thrown
+  `PayWayBusinessError` carries `responseUrl` + `hostedPage`
+  (`{url, payload, code, message}` decoded from the
+  `302 → /add-card/<base64>` redirect target) — the HTML body is only a shell.
+- **`removeToken` answers `00 Success` even for a NON-EXISTENT token** — it
+  cannot probe existence; use `getTokenDetails()` (09 = not found) instead.
+- **No CoF callback fires for a FAILED link attempt** — silence after a hosted
+  error page is expected (§24 LC-4). The exact pwt-callback body schema is
+  still unverified (Q18 — capture blocked by the 104 profile blocker).
 
 ## CLI
 ```sh

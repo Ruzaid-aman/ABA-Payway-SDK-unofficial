@@ -161,7 +161,10 @@ gateway question — drop it from the send list.
 
 **Tier 2 — production contract confirmations:**
 6. **Q12** — are the §16 per-endpoint hash orders frozen; change
-   announcement/versioning; production parity; sandbox `link-card` hash skipping.
+   announcement/versioning; production parity. *(2026-09-12: the "sandbox
+   `link-card` hash skipping" half is RESOLVED by evidence — controlled replays
+   show the hash IS required and enforced (§24 LC-3); only the freeze/production-parity
+   question remains.)*
 7. **Q5** — official per-endpoint rate limits; roadmap for HTTP 429 +
    `Retry-After`; production penalty model.
 8. **Q26** — what governs KHQR scan-time validity (fixed window vs `lifetime`,

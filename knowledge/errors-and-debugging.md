@@ -168,12 +168,17 @@ Codes observed on the credentials-on-file endpoints (`link-account`, `link-card`
 
 | Code | Meaning | Hint |
 |---|---|---|
-| `"04"` | Validation failure with per-field `errors{}` map | Read `error.fieldErrors` (see above) — each entry names the exact request field |
-| `"01"` / `"1"` / `"PTL02"` | Wrong Hash | `PayWaySignatureError` with the endpoint's hash-order hint; upgrade to ≥ v1.3.6 hash orders |
+| `"04"` | Validation failure with per-field `errors{}` map | Read `error.fieldErrors` (see above) — each entry names the exact request field. Live 2026-09-12 (§24 LC-3): link-card with a MISSING hash answers this shape with `errors.hash = ["The hash field is required."]` |
+| `"01"` / `"1"` / `"PTL02"` | Wrong Hash | `PayWaySignatureError` with the endpoint's hash-order hint; upgrade to ≥ v1.3.6 hash orders. On link-card the wrong hash renders as the hosted `01 Wrong Hash` page — the hash IS enforced in sandbox (§24 LC-3) |
 | `"98"` | Merchant profile not configured for CoF | Enable CoF on the merchant profile with ABA before linking |
-| `"104"` | Token not found / not in a usable state | Verify `ctid` + `paymentToken` match the linked token |
-| `"105"` | Token state error (e.g. expired, removed) | Renew the token or re-link the payment method |
-| `"09"` | Token operation not allowed in current state | Check the token's lifecycle state via `getTokenDetails()` |
+| `"104"` | **Merchant not enabled token flag** (live 2026-09-12, §24 LC-1: link-card hosted page — profile-level, not per-token) | Ask ABA to enable card tokenization on the merchant profile |
+| `"105"` | Invalid payment credential token (live 2026-09-12: `cof charge` with an unknown/expired pwt) | Re-link via linkAccount/linkCard, or renew via renewToken |
+| `"09"` | Data not found (live 2026-09-12: `getTokenDetails` for a request that never linked) | Check the token's lifecycle state via `getTokenDetails()` |
+
+> 📋 **§24 live notes (2026-09-12):** `removeToken` answers `00 Success` even for a
+> NON-EXISTENT token — it cannot probe existence; use `getTokenDetails()` (09 = not
+> found) instead. And no CoF callback fires for a FAILED link attempt (e.g. the 104
+> page) — silence after an error page is expected, not a lost delivery.
 
 ### QR error family *(new in v1.3.6)*
 

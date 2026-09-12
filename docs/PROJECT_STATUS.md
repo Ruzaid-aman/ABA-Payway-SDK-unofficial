@@ -590,3 +590,40 @@ Next task:                       SQLite webhook-storage coverage (HANDOFF §5.1)
   server; bin-name decision (`aba-payway-cli` free) before first publish.
 - Status on merged main: build/tsc/biome clean, **vitest 1,662 passed / 13
   skipped** (38 new tests).
+
+## Recent Session — Link-card full-cycle review + fix wave (2026-09-12, commits `034af4f` + `5cf62af`+)
+
+Superpowers-style review of the card-on-file (link-card) integration, then all
+fixes shipped. Review card: `.scratch/link-card-review/REVIEW-CARD.md` (with a
+§8 resolution record). Live facts: SANDBOX-FINDINGS **§24** (LC-1..LC-7).
+
+- **Review verdict**: no critical code defects; the two-path (form vs API)
+  design with the shared hash builder is sound. External blocker found: the
+  sandbox profile is NOT enabled for token flags — link-card's hosted page
+  answers code 104 "Merchant not enabled token flag", so no pwt can be
+  captured and the paid cycle + Q18 callback capture stay blocked on ABA.
+- **New live facts (§24)**: the hosted result travels as
+  `302 → /add-card/<base64 JSON>` (the 42 KB POST body is a static shell);
+  the sandbox hash IS enforced (controlled replays refute the old "skips
+  hash" note); no callback fires for a failed link; `removeToken` answers
+  `00 Success` even for a non-existent token; charge-105 / details-09 live
+  shapes captured.
+- **Fixes shipped**: SDK `linkCard()` error now carries `responseUrl` +
+  `hostedPage` (new exported `HostedPageOutcome` type); whole `cof` CLI group
+  emits the uniform `--json` error envelope; `cof link-card` reports the
+  hosted error code (human) and `hostedPage` + journal join keys (`--json`);
+  validation symmetry in `buildLinkCardPayload` (currency, frequency enum,
+  missing-callbackUrl advisory, '' guard); `getLinkCardFormHtml` no-store
+  meta; hardened page save; docs/09 flagship example rewritten (it taught
+  `result.pwt`, which never exists — link-account's example had the same bug)
+  plus the wrong "success signal" sentence; docs/11 gained a CoF callbacks
+  section; docs/12 COF rows updated with live messages; aba-payway-link-card
+  v1.3.0 / cof v1.1.0 / token-lifecycle v1.1.0 / remove-card+account v1.2.1
+  (`.zcode` mirrors synced); knowledge corpus re-synced; INTEGRATION-GAPS Q12
+  "hash skipping" half resolved-by-evidence.
+- **Tests**: +10 (link-card-hosted-outcome suite + mock-harness cof envelope
+  cases + form-test entity decoding). Gates: build/tsc/biome src+skills clean;
+  suite 1,856 passed / 14 skipped.
+- **Open**: ABA must enable the token-flag service on sandbox merchant
+  `ec476910`; re-run `scripts/sandbox-probe-link-card-cycle.ts` to capture the
+  pwt callback (answers Q18) and complete the paid legs.

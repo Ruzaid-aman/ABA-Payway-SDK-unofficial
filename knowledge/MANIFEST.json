@@ -118,9 +118,9 @@
       "description": "Credentials-on-file account/card lifecycle and token renewal.",
       "source": "docs/09-link-unlink-renew-lifecycle.md",
       "file": "link-lifecycle.md",
-      "bytes": 25406,
-      "sha256": "6ad0a502e6294567",
-      "sourceSha256": "409932fafb682ebf"
+      "bytes": 25560,
+      "sha256": "1a188296d4c11d69",
+      "sourceSha256": "f7ddbce5a34f1339"
     },
     {
       "topic": "ui-customization",
@@ -138,9 +138,9 @@
       "description": "Single best-effort callback delivery, HMAC verification, webhook workbench.",
       "source": "docs/11-callbacks-and-webhooks.md",
       "file": "callbacks-webhooks.md",
-      "bytes": 21622,
-      "sha256": "e24e92511d37252a",
-      "sourceSha256": "5c3a45371ba5c37d"
+      "bytes": 23110,
+      "sha256": "7dc798e38770a69f",
+      "sourceSha256": "a544f8c50ed918b1"
     },
     {
       "topic": "errors-and-debugging",
@@ -148,9 +148,9 @@
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
       "source": "docs/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
-      "bytes": 42255,
-      "sha256": "b48bd77b68c70e7c",
-      "sourceSha256": "abc70b50f2c1e858"
+      "bytes": 43028,
+      "sha256": "0809a96df6ffcdf8",
+      "sourceSha256": "936bf0685c3f719b"
     },
     {
       "topic": "deployment-checklist",

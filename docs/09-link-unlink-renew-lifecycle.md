@@ -117,13 +117,15 @@ async function linkCustomerAccount() {
       callbackUrl: `${process.env.BASE_URL}/api/cof-callback`,
     });
 
-    console.log('Account linked successfully:', result);
+    console.log('Account link requested:', result);
 
-    // The response contains a pwt (PayWay Token) and/or redirect info
-    // Store the pwt in your database alongside the ctid
+    // ⚠️ The response does NOT contain the pwt: the QR/deeplink for the
+    // customer to approve arrives in the response, and the token itself is
+    // delivered later to your callbackUrl webhook (like link-card). Verify
+    // the signed callback, then store the pwt against the ctid:
     // await db.query(
     //   'INSERT INTO saved_payments (ctid, pwt, type) VALUES ($1, $2, $3)',
-    //   ['customerabc123', result.pwt, 'account']
+    //   ['customerabc123', pwt, 'account']
     // );
 
     return result;

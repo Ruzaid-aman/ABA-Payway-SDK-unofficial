@@ -14,12 +14,19 @@
 <div class="tsd-comment tsd-typography"><p>Payment status codes returned by checkTransaction, getTransactionDetail,
 and getTransactionList.</p>
 <p>Discovered via sandbox testing — these numeric codes are undocumented in
-the OpenAPI spec but confirmed against live sandbox responses:</p>
+the OpenAPI spec but confirmed against live sandbox responses, and the
+canonical mapping was confirmed by the ABA integration team (2026-09-12):</p>
 <ul>
 <li><code>payment_status_code: 0</code> → <code>payment_status: &quot;APPROVED&quot;</code></li>
-<li><code>payment_status_code: 2</code> → <code>payment_status: &quot;PENDING&quot;</code></li>
+<li><code>payment_status_code: 2</code> → <code>payment_status: &quot;PENDING&quot;</code> (may persist up
+to ~24h before the gateway settles the final state)</li>
+<li><code>payment_status_code: 3</code> → <code>payment_status: &quot;DECLINED&quot;</code></li>
 <li><code>payment_status_code: 4</code> → <code>payment_status: &quot;REFUNDED&quot;</code></li>
+<li><code>payment_status_code: 7</code> → <code>payment_status: &quot;CANCELLED&quot;</code> (pre-auth)</li>
 </ul>
+<p>There is NO EXPIRED or CLOSED code — long-PENDING is the gateway's terminal
+representation of expired/closed transactions; merchants enforce expiry
+client-side (SANDBOX-FINDINGS §21, confirmed by ABA 2026-09-12).</p>
 <p>Use these constants instead of magic numbers:</p>
 </div>
 <div class="tsd-type-declaration">

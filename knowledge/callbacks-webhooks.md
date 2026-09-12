@@ -486,6 +486,33 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 
 ---
 
+## Credentials-on-File (CoF) callbacks — the pwt delivery channel
+
+Linking an account (`link-account`) or a card (`link-card`) never returns the
+payment token (`pwt`) in the API response — the token is delivered later, by
+POST to the `callback_url` supplied with the link request. This is the ONLY
+delivery channel: a link request without a reachable public-HTTPS
+`callback_url` produces a token you can never retrieve (the SDK warns on
+omission).
+
+- **Expected body schema: UNVERIFIED live (open question Q18).** The live docs
+  describe an HMAC-signed callback (verify with
+  `verifyCallback(body, signature, { stripHash: true })`), but the exact
+  field set has never been captured: the sandbox merchant profile is not
+  enabled for token flags, so no link completes and no callback fires
+  (SANDBOX-FINDINGS §24 LC-1). Validate heuristically and log the raw body on
+  first receipt.
+- **No callback fires for a FAILED link attempt** (live 2026-09-12, §24 LC-4):
+  two 104 error-page attempts with a live tunneled `callback_url` produced
+  zero deliveries. Silence after a hosted error page is expected — do not
+  wait for a failure callback; surface the hosted outcome instead (the SDK's
+  `linkCard()` error now decodes it into `error.hostedPage`, §24 LC-2).
+- **Charges** (`cof charge`) can also carry a `callback_url`; the transaction
+  itself is verifiable immediately via `check-transaction(tran_id)` — the
+  callback is a notification, not the source of truth.
+
+---
+
 ## Payment Link pushbacks (`return_url`) — no HMAC
 
 Payment links do **not** use the checkout webhook contract. On payment, PayWay
