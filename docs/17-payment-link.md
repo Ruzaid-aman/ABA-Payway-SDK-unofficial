@@ -112,7 +112,7 @@ const details = await payway.paymentLink.getDetails(linkId);  // the data.id —
 Status lifecycle:
 
 - **`OPEN`** — `payment_limit > total_trxn` (or no limit); payments still accepted.
-- **`PAID`** — `payment_limit == total_trxn`; the hosted page stops accepting payments. A link **without** `payment_limit` never reaches PAID.
+- **`PAID`** — `payment_limit == total_trxn`; the hosted page stops accepting payments. A link **without** `payment_limit` never reaches PAID. Refreshing a paid link's share URL shows the customer **"Payment link is no longer valid — Contact to seller for support."** (sandbox-verified 2026-09-13). Note: `detail` may still report `status: "OPEN"` right after the payment lands while `total_trxn`/`total_amount` already reflect it — branch on the totals, not the `status` string.
 - **`VOIDED`** — the link was permanently cancelled via the void endpoint (below); it can no longer receive payments. The hosted page answers HTTP 200 but renders an invalid-data shell (SSR state `page:"invalid-data"`, code `07`) — the customer-facing form is dead, unlike expiry which leaves it up (SANDBOX-FINDINGS §23).
 - **No EXPIRED status exists — expiry is advisory** (sandbox-verified 2026-09-06): after `expired_date` passes, `detail` still reports `status: "OPEN"` and the hosted page still answers HTTP 200. Enforce expiry on your side (check `expired_date` against the clock before fulfilling), exactly like purchase lifetimes (W4-1).
 - `expired_date` constraints (sandbox-verified): **past values and offsets under ~5 minutes are rejected at create with PTL04**; ≥ +300s accepted (number or string). Unset links echo `"0"` (string) in detail.
@@ -188,10 +188,11 @@ User-Agent: PayWayApp/3.0
 { "tran_id": "178865526240157", "status": 0, "merchant_ref_no": "plvr-v1-mtp34wx4" }
 ```
 
-- **There is NO `hash` field — confirmed live.** The pushback is a *notification only*: verify the payment with `check-transaction` using the pushed `tran_id` before fulfilling (that call is what carries the gateway's signed status). `verifyCallback()` does not apply here.
+- **There is NO `hash` field — confirmed live (twice, 2026-09-06 and 2026-09-13).** And no hash in the **headers** either — a full-header capture shows only `User-Agent: PayWayApp/3.0`, `Content-Type: application/json; charset=utf-8`, W3C `traceparent` tracing, and CDN hops; no signature header of any kind. The pushback is a *notification only*: verify the payment with `check-transaction` using the pushed `tran_id` before fulfilling (that call is what carries the gateway's signed status). `verifyCallback()` does not apply here.
 - `status` arrives as the **numeric `0`** (APPROVED), not the `"00"` string the official overview sample shows — accept both.
 - `tran_id` is a string here (though numeric-typed in the create/detail responses) — coerce.
 - One pushback per payment: a multi-payment link (payment_limit > 1) fires one per completion.
+- **`return_url` is pushback-only — the customer is NEVER redirected there** (sandbox-verified 2026-09-13, tunneled receiver on a real payment: zero browser hits after approval). There is **no `continue_success_url`** on the payment-link API (unlike purchase) and no other redirect hook. A post-payment "next step" page must be driven from your pushback handler, not the link.
 - The receiver must answer 200 quickly; ACK first, process after (the sample receiver below does exactly that).
 - **SDK helper:** `parsePaymentLinkPushback(rawBody)` (exported) parses/coerces the body — `status` numeric `0`/`"0"`/`"00"` → `'APPROVED'`, anything else `'UNKNOWN'` (raw preserved), `tran_id` coerced to string. The built-in webhook server's `/aba-payway-pushback` route uses it, so `payway-sdk setup-webhook` can host your pushback receiver too.
 
