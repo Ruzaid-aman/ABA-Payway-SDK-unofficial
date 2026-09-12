@@ -55,7 +55,12 @@ export function registerDocsCommand(program: Command): void {
     .action((target: string | undefined, query: string[], opts: { json?: boolean }) => {
       const found = listTopics();
       if (!found) {
-        process.exitCode = opts.json ? knowledgeUnavailableJson() : (printUnavailableHint(), 1);
+        if (opts.json) {
+          process.exitCode = knowledgeUnavailableJson();
+        } else {
+          printUnavailableHint();
+          process.exitCode = 1;
+        }
         return;
       }
       const { topics } = found;
@@ -80,14 +85,23 @@ export function registerDocsCommand(program: Command): void {
       if (action === 'search') {
         const needle = query.join(' ').trim();
         if (!needle) {
-          process.exitCode = opts.json
-            ? validationErrorJson('docs search requires at least one search term')
-            : (console.log(`  ${c.red('✗')} docs search requires at least one search term`), 1);
+          const message = 'docs search requires at least one search term';
+          if (opts.json) {
+            process.exitCode = validationErrorJson(message);
+          } else {
+            console.log(`  ${c.red('✗')} ${message}`);
+            process.exitCode = 1;
+          }
           return;
         }
         const result = searchKnowledge(needle);
         if (!result) {
-          process.exitCode = opts.json ? knowledgeUnavailableJson() : (printUnavailableHint(), 1);
+          if (opts.json) {
+            process.exitCode = knowledgeUnavailableJson();
+          } else {
+            printUnavailableHint();
+            process.exitCode = 1;
+          }
           return;
         }
         if (opts.json) {
@@ -106,16 +120,22 @@ export function registerDocsCommand(program: Command): void {
       const read = readTopic(action);
       if (!read || read.status === 'missing') {
         const message = `Unknown knowledge topic "${action}". Run payway-sdk docs list for available topics.`;
-        process.exitCode = opts.json
-          ? validationErrorJson(message)
-          : (console.log(`  ${c.red('✗')} ${message}`), 1);
+        if (opts.json) {
+          process.exitCode = validationErrorJson(message);
+        } else {
+          console.log(`  ${c.red('✗')} ${message}`);
+          process.exitCode = 1;
+        }
         return;
       }
       if (read.status === 'ambiguous') {
         const message = `"${action}" matches several topics: ${read.matches.map((t) => t.topic).join(', ')} — be more specific.`;
-        process.exitCode = opts.json
-          ? validationErrorJson(message)
-          : (console.log(`  ${c.red('✗')} ${message}`), 1);
+        if (opts.json) {
+          process.exitCode = validationErrorJson(message);
+        } else {
+          console.log(`  ${c.red('✗')} ${message}`);
+          process.exitCode = 1;
+        }
         return;
       }
       if (opts.json) {
