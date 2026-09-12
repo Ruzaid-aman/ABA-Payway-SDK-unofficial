@@ -72,6 +72,10 @@ let rejectRefund = false;
 let rejectExchangeRate = false;
 let rejectPreAuth = false;
 let voidCallCount = 0;
+// §24 review-wave behaviors (default preserves the pre-§24 pins).
+let linkCardMode: 'html' | 'redirect-error' | 'json-400' = 'html';
+let cofChargeFailureCode: string | undefined;
+let tokenDetailsFailureCode: string | undefined;
 
 /** Route by endpoint substring; payloads mirror sandbox-verified shapes. */
 function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): void {
@@ -162,7 +166,13 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('generate-qr')) {
     send(200, { status: { code: '00', message: 'Success' }, qrString: '000201010212', qrImage: FAKE_PNG_BASE64 });
   } else if (url.includes('purchase/payment-credential')) {
-    send(200, { status: { code: '00', message: 'Success' }, data: { tran_id: 'COF-1' } });
+    if (cofChargeFailureCode !== undefined) {
+      // 200-wrapped business failure (COF family — live 2026-09-12: unknown
+      // pwt answers code 105, SANDBOX-FINDINGS §24 LC-6).
+      send(200, { status: { code: cofChargeFailureCode, message: 'Invalid payment credential token.' } });
+    } else {
+      send(200, { status: { code: '00', message: 'Success' }, data: { tran_id: 'COF-1' } });
+    }
   } else if (url.includes('purchase')) {
     // Capture what the CLI sent so tests can pin the network-path hash
     // (audit D1). Only THIS branch: the CoF payment-credential endpoint above
@@ -192,15 +202,48 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
   } else if (url.includes('aof/link-account')) {
     capturedLinkAccountBodies.push(parsed);
     send(200, { status: { code: '00', message: 'Success', request_id: 'LA-1' } });
+  } else if (url.includes('/add-card/')) {
+    // §24 LC-2: the redirect target the link-card 302 sends the browser to —
+    // a static shell whose result lives in the URL itself.
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end('<!DOCTYPE html><html><body>add-card shell</body></html>');
   } else if (url.includes('cof/link-card')) {
     // Live-gateway parity (SANDBOX-FINDINGS §9a): this endpoint ALWAYS answers
     // with the hosted card-entry HTML page, success and error alike.
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end('<!DOCTYPE html><html><body>hosted card entry form</body></html>');
+    if (linkCardMode === 'redirect-error') {
+      // §24 LC-1/LC-2 live contract: 302 → /add-card/<base64 JSON error>.
+      const payload = Buffer.from(
+        JSON.stringify({
+          message: 'Merchant not enabled token flag.',
+          status: {
+            code: '104',
+            message: 'Merchant not enabled token flag.',
+            pw_tran_id: 'REQID010',
+            trace_id: 'mock',
+            version: 'v3',
+          },
+        }),
+      ).toString('base64');
+      res.writeHead(302, { Location: `${baseUrl}/add-card/${payload}` });
+      res.end();
+    } else if (linkCardMode === 'json-400') {
+      // §24 LC-3: a missing hash answers HTTP 400 04 + errors{} (JSON).
+      send(400, {
+        status: { code: '04', message: 'The given data was invalid.', errors: { hash: ['The hash field is required.'] } },
+      });
+    } else {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<!DOCTYPE html><html><body>hosted card entry form</body></html>');
+    }
   } else if (url.includes('renew-expired-account-token')) {
     send(200, { status: { code: '00', message: 'Success', request_id: 'RT-1' } });
   } else if (url.includes('get-token-details')) {
-    send(200, { status: { code: '00', message: 'Success' }, data: { ctid: 'CTID-1', status: 'ACTIVE' } });
+    if (tokenDetailsFailureCode !== undefined) {
+      // §24 LC-6 live shape: a request that never linked answers 09.
+      send(200, { status: { code: tokenDetailsFailureCode, message: 'Data not found.' } });
+    } else {
+      send(200, { status: { code: '00', message: 'Success' }, data: { ctid: 'CTID-1', status: 'ACTIVE' } });
+    }
   } else if (url.includes('remove-token')) {
     send(200, { status: { code: '00', message: 'Success' } });
   } else if (url.includes('add-whitelist-payout')) {
@@ -1217,6 +1260,133 @@ describe('CLI API commands against the local mock gateway', () => {
     expect(parsed.hostedHtmlPath).toContain('link-card-REQID002.html');
     expect(parsed.requestId).toBe('REQID002');
     expect([undefined, 0]).toContain(exitCode as number);
+  });
+
+  it('cof link-card --json surfaces the decoded hosted outcome and join keys (§24 LC-2)', async () => {
+    linkCardMode = 'redirect-error';
+    try {
+      const { text, exitCode } = await run([
+        'cof',
+        'link-card',
+        '-r',
+        'REQID010',
+        '-c',
+        'CTID0010',
+        '-f',
+        'CITI_FLEX',
+        '--frequency',
+        '1M',
+        '--json',
+      ]);
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as Record<string, unknown>;
+      expect(parsed.hostedHtmlPath).toContain('link-card-REQID010.html');
+      const hosted = parsed.hostedPage as { url: string; code: string; message: string };
+      expect(hosted.code).toBe('104');
+      expect(hosted.message).toBe('Merchant not enabled token flag.');
+      expect(hosted.url).toContain('/add-card/');
+      // The capture contract stays exit-0: the saved page is the evidence, the
+      // hostedPage field is where machines read the real outcome.
+      expect([undefined, 0]).toContain(exitCode as number);
+      const savedPath = path.join(tempDir, 'payway-output', 'link-card-REQID010.html');
+      expect(readFileSync(savedPath, 'utf8')).toContain('add-card shell');
+    } finally {
+      linkCardMode = 'html';
+    }
+  });
+
+  it('cof link-card human output reports the hosted error code (§24 LC-1)', async () => {
+    linkCardMode = 'redirect-error';
+    try {
+      const { text, exitCode } = await run([
+        'cof',
+        'link-card',
+        '-r',
+        'REQID013',
+        '-c',
+        'CTID0013',
+        '-f',
+        'CITI_FLEX',
+        '--no-open-page',
+      ]);
+      const flat = stripAnsi(text);
+      expect(flat).toContain('Hosted page reports an error: code 104');
+      expect(flat).toContain('Merchant not enabled token flag');
+      expect(flat).toContain('SANDBOX-FINDINGS §24 LC-1');
+      expect([undefined, 0]).toContain(exitCode as number);
+    } finally {
+      linkCardMode = 'html';
+    }
+  });
+
+  it('cof link-card --json emits the error envelope when the gateway answers JSON (§24 hardening)', async () => {
+    linkCardMode = 'json-400';
+    try {
+      const { text, exitCode } = await run([
+        'cof',
+        'link-card',
+        '-r',
+        'REQID011',
+        '-c',
+        'CTID0011',
+        '-f',
+        'CITI_FLEX',
+        '--json',
+      ]);
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as Record<string, unknown>;
+      const error = parsed.error as Record<string, unknown>;
+      expect(error).toBeDefined();
+      expect(error.kind).toBe('api');
+      expect(error.paywayCode).toBe('04');
+      expect(exitCode).toBe(2);
+      // A JSON rejection carries no page — nothing may be captured.
+      expect(existsSync(path.join(tempDir, 'payway-output', 'link-card-REQID011.html'))).toBe(false);
+    } finally {
+      linkCardMode = 'html';
+    }
+  });
+
+  it('cof charge --json emits the error envelope on a gateway failure (§24 LC-7)', async () => {
+    cofChargeFailureCode = '105';
+    try {
+      const { text, exitCode } = await run([
+        'cof',
+        'charge',
+        '-t',
+        'COF-FAIL-1',
+        '-a',
+        '4.50',
+        '--token',
+        'pwt_mock_unknown',
+        '--ctid',
+        'CTID0002',
+        '--token-flag',
+        'MITU_FLEX',
+        '--json',
+      ]);
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as Record<string, unknown>;
+      const error = parsed.error as Record<string, unknown>;
+      expect(error.kind).toBe('api');
+      expect(error.paywayCode).toBe('105');
+      expect(exitCode).toBe(2);
+      // stdout stays exactly one JSON document — no human block may leak.
+      expect(text).not.toContain('PayWay code');
+    } finally {
+      cofChargeFailureCode = undefined;
+    }
+  });
+
+  it('cof token details --json emits the error envelope on a gateway failure (§24 LC-7)', async () => {
+    tokenDetailsFailureCode = '09';
+    try {
+      const { text, exitCode } = await run(['cof', 'token', 'details', '-r', 'REQID012', '--json']);
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as Record<string, unknown>;
+      const error = parsed.error as Record<string, unknown>;
+      expect(error.kind).toBe('api');
+      expect(error.paywayCode).toBe('09');
+      expect(exitCode).toBe(2);
+    } finally {
+      tokenDetailsFailureCode = undefined;
+    }
   });
 
   it('cof link-card-form renders a signed local form without a network call', async () => {

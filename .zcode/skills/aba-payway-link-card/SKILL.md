@@ -2,7 +2,7 @@
 name: aba-payway-link-card
 description: Link a payment card for ABA PayWay credential-on-file payments.
 metadata:
-  version: 1.2.0
+  version: 1.3.0
 ---
 
 # Link Card
@@ -66,21 +66,32 @@ payway-sdk cof link-card -r link001 --ctid customerabc --token-flag CITI_FLEX
 > In the SDK repository checkout, the same commands run as
 > `npx tsx src/cli.ts <args>` (requires `aba-payway-ts` installed or linked).
 
-## Sandbox Facts (2026-09-01)
+## Sandbox Facts (2026-09-01, re-verified 2026-09-12)
 
 - Form-urlencoded only (SDK handles encoding); `request_id`, `ctid`,
   `token_flag` required, `currency` defaults USD. `frequency` (1W|1M|2M) is
   live-documented as **required** — the SDK accepts its omission but warns
   (advisory) because card linking may fail without it.
 - Live-verified 2026-09-01: the locally-built form's hidden fields POST
-  exactly like a browser → HTTP 200 + the real 42 KB hosted "PayWay -
-  Checkout" page (sandbox-verified 2026-09-01).
+  exactly like a browser → HTTP 200 + the 42 KB hosted "PayWay - Checkout"
+  page. 2026-09-12 nuance (§24 LC-2): that body is a static shell — the REAL
+  result travels in the `302 → /add-card/<base64 JSON>` redirect target, so
+  the shell alone proves nothing about success.
+- Hosted outcome is machine-readable: the thrown `PayWayBusinessError` now
+  carries `responseUrl` (post-redirect URL) and `hostedPage`
+  (`{ url, payload, code, message }` decoded from `/add-card/<base64>`).
+  Live: a profile without token flags renders code **104** "Merchant not
+  enabled token flag" (SANDBOX-FINDINGS §24 LC-1) — ask ABA to enable card
+  tokenization; no callback fires for a failed attempt (§24 LC-4).
 - Hash order (§16-verified, merchant_id first):
   `merchant_id.request_time.ctid.callback_url.request_id.token_flag.frequency.amount.currency.continue_success_url`
   — `amount` is a hash position with NO body field (live-doc quirk; hashes the
-  literal empty string regardless of any amount value supplied).
-- Sandbox does not verify the hash on this endpoint — do not treat that as a
-  security control (open question to ABA).
+  literal empty string regardless of any amount value supplied); `frequency`
+  hashes its supplied value, or `''` when omitted.
+- Hash IS enforced in sandbox (2026-09-12 controlled replays, §24 LC-3 — the
+  earlier "sandbox skips hash" note was wrong): a corrupted hash answers
+  hosted `01 Wrong Hash`; a missing hash answers HTTP 400
+  `04 errors.hash = "The hash field is required."`.
 - The `pwt` token arrives ONLY via `callback_url` — verify it with
   `verifyCallback(body, signature, { stripHash: true })`.
 
@@ -92,7 +103,8 @@ try { await payway.credentialsOnFile.linkCard(params); }
 catch (error) {
   if (error instanceof PayWayBusinessError && typeof error.rawBody === 'string'
       && /<!doctype html|<html/i.test(error.rawBody)) {
-    // Expected on the API path — rawBody is the hosted card form.
+    // Expected on the API path — rawBody is the hosted card form. The decoded
+    // hosted result (e.g. status.code "104") is on error.hostedPage.
   } else if (error instanceof PayWayConfigError) console.error(error.message);
 }
 ```

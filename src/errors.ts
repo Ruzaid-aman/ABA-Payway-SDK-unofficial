@@ -25,6 +25,24 @@ export class PayWayConfigError extends PayWayError {
   }
 }
 
+/**
+ * Decoded outcome of a hosted gateway page that reports its result in the
+ * redirect target URL (`/add-card/<base64 JSON>` on link-card, live-verified
+ * 2026-09-12 — SANDBOX-FINDINGS §24 LC-2). The POST response body is a static
+ * shell with no result marker, so this redirect payload is the only
+ * server-side signal of a hosted rejection (e.g. profile code 104).
+ */
+export interface HostedPageOutcome {
+  /** Final URL after redirect-following (the `/add-card/<base64>` target). */
+  url: string;
+  /** The full decoded JSON payload embedded in the URL (empty object when undecodable). */
+  payload: Record<string, unknown>;
+  /** Convenience read of `payload.status.code` (e.g. `"104"`, `"01"`). */
+  code?: string;
+  /** Convenience read of `payload.status.message`. */
+  message?: string;
+}
+
 export interface PayWayAPIErrorOptions {
   statusCode?: number;
   paywayCode?: string;
@@ -36,6 +54,10 @@ export interface PayWayAPIErrorOptions {
   fieldErrors?: Record<string, string>;
   /** Request correlation id (cid) — joins this error to journal entries and request hooks. */
   correlationId?: string;
+  /** Final URL after redirects (populated for hosted-page endpoints such as link-card). */
+  responseUrl?: string;
+  /** Decoded hosted-page outcome (link-card: the `/add-card/<base64>` payload), when the final URL carries one. */
+  hostedPage?: HostedPageOutcome;
 }
 
 export class PayWayAPIError extends PayWayError {
@@ -46,6 +68,8 @@ export class PayWayAPIError extends PayWayError {
   public readonly retryable?: boolean;
   public readonly rateLimitInfo?: Record<string, unknown>;
   public readonly fieldErrors?: Record<string, string>;
+  public readonly responseUrl?: string;
+  public readonly hostedPage?: HostedPageOutcome;
   /**
    * Mutable on purpose: transport code stamps the request cid onto errors it
    * did not construct (classifier-built business errors) after the fact.
@@ -63,6 +87,8 @@ export class PayWayAPIError extends PayWayError {
     this.retryable = options.retryable;
     this.rateLimitInfo = options.rateLimitInfo;
     this.fieldErrors = options.fieldErrors;
+    this.responseUrl = options.responseUrl;
+    this.hostedPage = options.hostedPage;
     this.correlationId = options.correlationId;
   }
 
@@ -78,6 +104,8 @@ export class PayWayAPIError extends PayWayError {
       rateLimitInfo: this.rateLimitInfo,
       fieldErrors: this.fieldErrors,
       correlationId: this.correlationId,
+      responseUrl: this.responseUrl,
+      hostedPage: this.hostedPage,
       rawBody: this.rawBody,
     };
   }

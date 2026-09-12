@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+### Card-on-file improvements (2026-09-12 review wave — `.scratch/link-card-review/REVIEW-CARD.md`)
+
+- **Hosted outcome detection on link-card** (SANDBOX-FINDINGS §24 LC-2): the
+  endpoint answers `302 → /add-card/<base64 JSON>` carrying the hosted page's
+  real result; Node fetch followed the redirect silently, so the 42 KB shell
+  was all a server ever saw. The `PayWayBusinessError` thrown by
+  `linkCard()` now also carries `responseUrl` (post-redirect URL) and
+  `hostedPage` (`{ url, payload, code, message }`, new exported
+  `HostedPageOutcome` type) — how a hosted rejection (profile code 104
+  "Merchant not enabled token flag", wrong-hash 01) is detected server-side.
+  CLI `cof link-card` reports `Hosted page reports an error: code …` with a
+  hint (human) and adds `hostedPage` + `correlationId`/`traceId` to the
+  `--json` envelope (still exit 0 — the saved page is the evidence).
+- **Uniform `--json` error envelopes across the whole `cof` group**
+  (`link-account`, `link-card`, `charge`, `token renew|details|remove`):
+  gateway failures previously printed the human error block to stdout even
+  under `--json` (§24 LC-7); all catches now emit the
+  `{error:{kind,exitCode,paywayCode,…}}` envelope, matching
+  exchange-rate/payout/pre-auth.
+- **Validation symmetry in `buildLinkCardPayload`** (shared by `linkCard()`
+  and `getLinkCardFormHtml()`): `currency` is now validated (as
+  `linkAccount` always did), a non-1W|1M|2M `frequency` warns (strict mode
+  throws), a missing `callbackUrl` warns (the pwt is undeliverable without
+  it), and an empty-string `frequency` now hits the omission advisory
+  instead of travelling the wire.
+- `getLinkCardFormHtml()` emits `<meta http-equiv="Cache-Control"
+  content="no-store">` — the form embeds a per-customer signed payload, and
+  a shared cache serving a stale form is a replay vector.
+- Docs/skills corrections from the review: docs/09's flagship `linkCard()`
+  example taught an integration that can never work (`result.pwt` — the
+  method always throws); the "SDK treats the HTML page as the success signal"
+  sentence was wrong; the aba-payway-link-card skill's "sandbox does not
+  verify the hash" note was REFUTED by controlled replays (§24 LC-3).
+  Knowledge corpus re-synced.
+
 ### Knowledge wave: docs command, agent knowledge tool, config ease (2026-09-12)
 
 - **`payway-sdk docs`** serves the built-in knowledge base offline — 30 curated

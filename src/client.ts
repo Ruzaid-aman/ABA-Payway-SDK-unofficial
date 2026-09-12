@@ -34,6 +34,7 @@ import {
   PayWayNetworkError,
   PayWayRateLimitError,
   PayWaySignatureError,
+  type HostedPageOutcome,
 } from './errors.js';
 import { type KhqrMerchantConfiguration, resolveKhqrConfiguration } from './khqr-config.js';
 import {
@@ -592,8 +593,9 @@ export const SELF_ACTIVATION_HASH_FIELDS: readonly string[] = ['partner_id', 're
  *   subscription `token_flag` + `frequency` positions after
  *   `skip_success_page`). Pinned to the exported
  *   `PURCHASE_HASH_FIELDS` constant by the drift-guard test.
- * - linkCard: `frequency` and `amount` are hash positions with no
- *   corresponding body field — they hash as '' (live-doc quirk). Pinned to
+ * - linkCard: `amount` is a hash position with NO corresponding body field —
+ *   it hashes as '' (live-doc quirk). `frequency` IS sent as a body field when
+ *   provided and hashes its value; omitting it hashes ''. Pinned to
  *   the exported `LINK_CARD_HMAC_FIELDS`.
  * - payment (CoF charge): live 19-field order; `request_id` is NOT part of it
  *   (deprecated field, never sent).
@@ -624,8 +626,9 @@ export const HASH_ORDER_HINTS: Record<string, string> = {
   [ENDPOINTS.getExchangeRate]: 'req_time.merchant_id',
   [ENDPOINTS.refund]: MERCHANT_AUTH_DEFAULT_HASH_FIELDS.join('.'),
   [ENDPOINTS.linkAccount]: 'merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency',
-  // linkCard: amount/frequency are hash positions with no body field — they
-  // hash as '' (the drift-guard test pins this against LINK_CARD_HMAC_FIELDS).
+  // linkCard: `amount` has no body field (hashes ''); `frequency` hashes its
+  // supplied value, or '' when omitted (the drift-guard test pins this against
+  // LINK_CARD_HMAC_FIELDS).
   [ENDPOINTS.linkCard]: LINK_CARD_HMAC_FIELDS.join('.'),
   [ENDPOINTS.payment]:
     'request_time.merchant_id.tran_id.amount.currency.items.ctid.pwt.first_name.last_name.email.phone.purchase_type.callback_url.custom_fields.return_params.payout.token_flag.shipping_fee',
@@ -821,6 +824,35 @@ function isAbortError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   const e = error as { name?: string; code?: string };
   return e.name === 'AbortError' || e.code === 'ABORT_ERR';
+}
+
+/**
+ * Decode the hosted `/add-card/<base64 JSON>` redirect target (SANDBOX-FINDINGS
+ * §24 LC-2, live-verified 2026-09-12): the link-card POST answers 302 whose
+ * Location carries the hosted page's real result — error or handoff — as
+ * base64 JSON. Node fetch follows the redirect silently and keeps only the
+ * static shell, so this is derived from the post-redirect `response.url`.
+ * Returns undefined when the URL is not an `/add-card/` target.
+ */
+function decodeHostedPageOutcome(url: string | undefined): HostedPageOutcome | undefined {
+  if (!url) return undefined;
+  const marker = '/add-card/';
+  const idx = url.indexOf(marker);
+  if (idx < 0) return undefined;
+  const encoded = url.slice(idx + marker.length).split(/[?#]/)[0] ?? '';
+  let payload: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      payload = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Undecodable payload — still report the URL; the shell carries no marker.
+  }
+  const status = payload.status as Record<string, unknown> | undefined;
+  const code = typeof status?.code === 'string' || typeof status?.code === 'number' ? String(status.code) : undefined;
+  const message = typeof status?.message === 'string' ? status.message : undefined;
+  return { url, payload, code, message };
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
@@ -1529,16 +1561,28 @@ export class PayWay {
           // generic JSON-parse failure. The real link result arrives on the
           // callback_url the merchant supplied with the request.
           if (endpoint === ENDPOINTS.linkCard && /<!doctype html|<html/i.test(parsedBody)) {
+            // §24 LC-2 (live 2026-09-12): the hosted result travels in the
+            // redirect target `/add-card/<base64 JSON>`; Node fetch followed
+            // it silently, so the only surviving trace is response.url —
+            // decode it here or the hosted outcome (e.g. profile code 104,
+            // wrong-hash 01) is invisible server-side.
+            const responseUrl = response.url || undefined;
+            const hostedPage = decodeHostedPageOutcome(responseUrl);
+            const outcomeSuffix = hostedPage?.code
+              ? ` The hosted page reports code ${hostedPage.code}${hostedPage.message ? `: ${hostedPage.message}` : '.'}`
+              : '';
             throw new PayWayBusinessError(
               'link-card responded with an HTML page (this endpoint always does — both on success and failure). ' +
                 'The link outcome is delivered to the callback_url sent with the request; inspect that webhook ' +
-                'payload to confirm the card token. Raw body starts with: ' +
+                `payload to confirm the card token.${outcomeSuffix} Raw body starts with: ` +
                 parsedBody.trim().slice(0, 120).replace(/\s+/g, ' '),
               {
                 statusCode: response.status,
                 endpoint,
                 rawBody: parsedBody,
                 retryable: false,
+                responseUrl,
+                hostedPage,
               },
             );
           }

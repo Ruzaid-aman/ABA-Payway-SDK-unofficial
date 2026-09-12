@@ -139,9 +139,9 @@ async function linkCustomerAccount() {
 Save a customer's card — note the important differences from linking an account:
 
 ```typescript
-async function linkCustomerCard() {
+async function linkCustomerCard(res: Response) {
   try {
-    const result = await payway.credentialsOnFile.linkCard({
+    await payway.credentialsOnFile.linkCard({
       // Your unique request ID (required)
       requestId: `link${Date.now()}`,
 
@@ -151,32 +151,47 @@ async function linkCustomerCard() {
       // Token usage flag (required) — live-documented linking values
       tokenFlag: 'CITI_FLEX',
 
-      // Optional: billing frequency for card linking
+      // Live-documented as required for Link Card
       // '1W' = weekly, '1M' = monthly, '2M' = every 2 months
       frequency: '1M',
 
-      // Optional: base64-encoded target of the hosted form's "Done" button
+      // REQUIRED in practice: the pwt token is delivered ONLY to this URL
+      callbackUrl: `${process.env.BASE_URL}/api/cof-callback`,
+
+      // Optional: target of the hosted form's "Done" button
       // (the SDK base64-encodes a plain URL automatically)
       continueSuccessUrl: `${process.env.BASE_URL}/saved-cards`,
-
-      // Optional: Callback URL
-      callbackUrl: `${process.env.BASE_URL}/api/cof-callback`,
     });
-
-    console.log('Card linked successfully:', result);
-
-    // Store the token reference
-    // await db.query(
-    //   'INSERT INTO saved_payments (ctid, pwt, type, frequency) VALUES ($1, $2, $3, $4)',
-    //   ['customerabc123', result.pwt, 'card', '1M']
-    // );
-
-    return result;
   } catch (error) {
-    console.error('Failed to link card:', error);
+    // ⚠️ EXPECTED PATH: link-card ALWAYS answers with the hosted card-entry
+    // HTML page (success AND error), so linkCard() always THROWS a
+    // PayWayBusinessError carrying that page in rawBody — it never resolves.
+    if (error instanceof PayWayBusinessError
+        && typeof error.rawBody === 'string'
+        && /<!doctype html|<html/i.test(error.rawBody)) {
+      // Serve/redirect the customer to the hosted card-entry page:
+      res.type('html').send(error.rawBody);
+
+      // A hosted rejection (e.g. profile code 104 "Merchant not enabled
+      // token flag") is decoded from the /add-card/<base64> redirect target
+      // into error.hostedPage (SANDBOX-FINDINGS §24 LC-2) — read it when you
+      // need a server-side signal instead of serving the page:
+      if (error.hostedPage?.code) {
+        console.error('Hosted page error:', error.hostedPage.code, error.hostedPage.message);
+      }
+      return;
+    }
     throw error;
   }
 }
+
+// Later, on your callbackUrl webhook: the card token (pwt) arrives in the
+// signed callback — verify it (verifyCallback with the hash stripped) and
+// store it against the ctid:
+// await db.query(
+//   'INSERT INTO saved_payments (ctid, pwt, type, frequency) VALUES ($1, $2, $3, $4)',
+//   ['customerabc123', pwt, 'card', '1M']
+// );
 ```
 
 > ⚠️ **Critical difference:** `linkCard()` uses `application/x-www-form-urlencoded` (the SDK handles the encoding automatically) and answers with an **HTML page** (the hosted card-entry form). `linkAccount()` uses JSON. This was verified in sandbox testing — sending JSON to `link-card` will be rejected without being read. Note: `returnUrl`/`returnDeeplink` are **no longer sent** on link-card (absent from the live request); the hosted form's done-target is `continueSuccessUrl`.
@@ -210,12 +225,12 @@ npx tsx src/cli.ts cof link-card -r link67890 --ctid customerabc123 --token-flag
   --callback-url https://example.com/api/cof-callback
 ```
 
-`cof link-card` now treats the HTML page as the success artifact it is: it saves the page to `payway-output/link-card-<request-id>.html` (openable with `--open-page`, auto on interactive terminals) and exits 0 instead of surfacing the B5 structured error. With `--json` it prints a `{ hostedHtmlPath, requestId, ctid, note }` envelope.
+`cof link-card` treats the HTML page as the success artifact it is: it saves the page to `payway-output/link-card-<request-id>.html` (openable with `--open-page`, auto on interactive terminals) and exits 0 instead of surfacing the B5 structured error. With `--json` it prints a `{ hostedHtmlPath, requestId, ctid, note }` envelope. Since 2026-09-12 (§24) it also decodes the hosted outcome: when the page carries an `/add-card/<base64>` result (e.g. code 104 "Merchant not enabled token flag", wrong-hash 01), human output reports `Hosted page reports an error: code …` with a hint, and the `--json` envelope gains `hostedPage: { url, code, message }` plus the `correlationId`/`traceId` journal join keys — still exit 0, because the saved page is the evidence.
 
-### Sandbox-verified facts (2026-08-25 scope campaign; hash orders re-verified 2026-08-31 — see §16)
+### Sandbox-verified facts (2026-08-25 scope campaign; hash orders re-verified 2026-08-31 — see §16; hosted-page outcome + hash enforcement re-verified 2026-09-12 — see §24)
 
 - **`linkCard()` also requires `currency`** — the SDK now defaults it to `'USD'`; pass the customer's currency explicitly. Server rejects without it: `"The currency field is required."`
-- **A successful `linkCard()` returns an HTTP 200 HTML page** (the hosted card-entry checkout), not JSON — redirect the customer to it / embed it. The SDK detects the HTML shape and treats it as the success signal for this one endpoint (a structured error is raised only when the page indicates failure).
+- **A successful `linkCard()` call answers HTTP 200 with an HTML page body** (the hosted card-entry checkout), not JSON — and because of that the SDK **throws** a `PayWayBusinessError` carrying the page in `rawBody` for EVERY link-card answer; the SDK performs no page-content success/failure discrimination. Capture-and-serve is the integration (the CLI `cof link-card` does exactly that and exits 0). Since 2026-09-12 the thrown error also carries `responseUrl` + `hostedPage` — the hosted result decoded from the `302 → /add-card/<base64>` redirect target (SANDBOX-FINDINGS §24 LC-2).
 - **Valid `token_flag` values differ per endpoint:**
   - Linking (`link-account`, `link-card`): `CITI_FLEX | CITO_FLEX` (live-documented set; other values warn)
   - Charging (`payment-credential`): `CITU_FLEX | MITU_FLEX | MITU_FIX | MITR_FLEX | MITR_FIX`
@@ -226,7 +241,7 @@ npx tsx src/cli.ts cof link-card -r link67890 --ctid customerabc123 --token-flag
   - `removeToken()` takes **`{ ctid, paymentToken }`** — no `requestId` (hash order `merchant_id.ctid.request_time.pwt`).
   - The old shared `TokenParams` shape was wrong for two of the three endpoints and is deprecated.
 - **✅ Token management trio is UN-GATED (2026-08-31):** the earlier TD-03 capability guard is resolved by probe evidence — every live-documented hash composition is **hash-ACCEPTED** by the gateway (business codes 105/09/00/104 past the hash layer), while the §9a-era SDK orders are now rejected with `01 Wrong Hash` (the gateway tightened CoF hash validation since the August campaign). `renewToken()` / `getTokenDetails()` / `removeToken()` work out of the box; `allowUnverifiedTokenOperations: false` re-blocks as a deprecated escape hatch. Evidence: `docs/SANDBOX-FINDINGS` §16, `test-output/token-trio/`, probe script `scripts/sandbox-probe-token-trio.ts`.
-- **CoF hash orders realigned (breaking, sandbox-verified 2026-08-31):** `link-account` hashes `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency`; `link-card` hashes the live order including empty `amount`/`frequency` positions with `continue_success_url` last; `cofPayment` hashes the live 19-field order. `linkCard()` no longer sends `returnUrl`/`returnDeeplink` (absent from the live request — use `continueSuccessUrl` for the hosted form's Done button); `cofPayment()` no longer sends `request_id` (deprecated param).
+- **CoF hash orders realigned (breaking, sandbox-verified 2026-08-31):** `link-account` hashes `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency`; `link-card` hashes the live order — `amount` always hashes as `''` (no body field), `frequency` hashes its supplied value or `''` when omitted — with `continue_success_url` last; `cofPayment` hashes the live 19-field order. `linkCard()` no longer sends `returnUrl`/`returnDeeplink` (absent from the live request — use `continueSuccessUrl` for the hosted form's Done button); `cofPayment()` no longer sends `request_id` (deprecated param).
 - **Client-side identifier parity (TD-06):** `requestId`/`ctid` must match the gateway rule `[a-zA-Z0-9]{5,24}` — letters/digits only, 5–24 chars, **no hyphens or underscores**. The SDK now fails fast locally instead of surfacing the gateway's per-field errors map. `transactionId` keeps its own rule (`[a-zA-Z0-9-]{1,20}`, hyphens allowed).
 - **`tokenFlag` is enum-validated client-side** with the exact sandbox enums above; `CITR_FIX` is rejected for linking, and charging-only flags are rejected on linking endpoints.
 - PayWay's binding layer answers malformed CoF payloads with **HTTP 400 code `"04"` plus a per-field `errors{}` map** — the SDK parses this into `PayWayBusinessError.fieldErrors` (also visible in `toJSON()`), so you can read exact field messages programmatically.

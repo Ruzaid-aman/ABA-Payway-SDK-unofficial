@@ -83,6 +83,20 @@ export interface CredentialsOnFileDomain {
     callOptions?: RequestCallOptions,
   ) => Promise<LinkCardResponse>;
   /**
+   * Submit the hosted card-link request server-to-server.
+   *
+   * ⚠️ This endpoint ALWAYS answers with the gateway's hosted card-entry HTML
+   * page (success AND error), so `linkCard()` always THROWS a
+   * `PayWayBusinessError` carrying that page in `rawBody` — there is never a
+   * resolved JSON result and no `pwt` in the response. The token arrives ONLY
+   * via the `callbackUrl` webhook. Since 2026-09-12 the thrown error also
+   * carries `responseUrl` (the post-redirect URL) and `hostedPage` (the
+   * decoded `/add-card/<base64>` outcome — SANDBOX-FINDINGS §24 LC-2), which
+   * is how a hosted rejection (e.g. profile code 104 "Merchant not enabled
+   * token flag") is detected server-side. Prefer
+   * {@link CredentialsOnFileDomain.getLinkCardFormHtml} to skip the roundtrip.
+   */
+  /**
    * Build a complete link-card HTML document (local-only, no network call).
    *
    * `link-card` rejected JSON bodies in sandbox verification and always
@@ -203,14 +217,31 @@ export function createCredentialsOnFileDomain(
       validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
         allowPrivateHosts: config.allowPrivateCallbackHosts === true,
       });
+    } else {
+      // The pwt is delivered ONLY via callback_url (no body/response carrier —
+      // §16/§24). linkAccount's sibling warns via the CLI; the API path needs
+      // the same advisory or the link result is silently undeliverable.
+      warnAdvisory(
+        config,
+        'linkCard: no callbackUrl supplied — the pwt token is delivered ONLY via the callback URL, so the link result cannot reach you without one',
+      );
     }
 
-    if (params.frequency === undefined) {
+    // `!params.frequency` covers '' too: filterParams keeps empty strings, and
+    // an empty frequency would travel the wire instead of being omitted.
+    if (!params.frequency) {
       warnAdvisory(
         config,
         'link-card frequency is live-documented as required for Link Card (1W|1M|2M); card linking may fail without it',
       );
+    } else if (!['1W', '1M', '2M'].includes(params.frequency)) {
+      warnAdvisory(
+        config,
+        `link-card frequency "${params.frequency}" is outside the live-documented set (1W, 1M, 2M) — verify the gateway accepts it for this profile`,
+      );
     }
+
+    validateCurrency(params.currency ?? 'USD');
 
     const body: Record<string, unknown> = {
       ...filterParams({
@@ -354,6 +385,7 @@ export function createCredentialsOnFileDomain(
   <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta http-equiv="Cache-Control" content="no-store"/>
     <title>Link your card — ABA PayWay</title>
   </head>
   <body>

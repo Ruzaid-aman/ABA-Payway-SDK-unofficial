@@ -24,10 +24,22 @@ const BASE_PARAMS = {
   callbackUrl: 'https://mywebsite.com/payway/link-callback',
 };
 
+function decodeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
 function extractHiddenFields(html: string): Map<string, string> {
   const fields = new Map<string, string>();
   for (const match of html.matchAll(/<input type="hidden" name="([^"]*)" value="([^"]*)"/g)) {
-    fields.set(match[1], match[2]);
+    // Browsers decode attribute entities before the value is submitted — the
+    // wire/form diff must compare the DECODED value, or a metacharacter in
+    // any merchant value would false-positive as drift.
+    fields.set(match[1], decodeHtmlAttribute(match[2]));
   }
   return fields;
 }
@@ -46,6 +58,10 @@ describe('getLinkCardFormHtml (PayWay wiring)', () => {
     expect(html).toContain('method="POST"');
     expect(html).toContain('id="aba_link_card_request"');
     expect(html).toContain('Link your card');
+    // no-store: the form embeds a per-customer signed payload (request_time
+    // stamped at render) — a shared cache serving a stale form is a replay
+    // vector and a stale-hash foot-gun.
+    expect(html).toContain('http-equiv="Cache-Control"');
   });
 
   it('honors a baseUrl override for the form action', () => {
@@ -97,6 +113,20 @@ describe('getLinkCardFormHtml (PayWay wiring)', () => {
     // No raw quote/script may escape an attribute value.
     expect(html).not.toContain('"><script>');
     expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('renders raw metacharacter values escaped, and the extractor decodes them like a browser', () => {
+    const payway = new PayWay({ merchantId: 'mid', apiKey: 'key', environment: 'sandbox' });
+    // A relative continue_success_url is NOT base64-encoded
+    // (encodeBase64IfNeeded only rewrites URL-looking values), so a raw `&`
+    // genuinely reaches the hidden attribute.
+    const html = payway.credentialsOnFile.getLinkCardFormHtml({
+      ...BASE_PARAMS,
+      continueSuccessUrl: 'cards/done?src=payway&step=2',
+    });
+    expect(html).toContain('src=payway&amp;step=2');
+    const fields = extractHiddenFields(html);
+    expect(fields.get('continue_success_url')).toBe('cards/done?src=payway&step=2');
   });
 
   it('autoSubmit adds a same-tab submit script', () => {

@@ -70,7 +70,7 @@ export type {
   SelfActivationStatus,
 } from './domains/self-activation.js';
 export { createSelfActivationDomain } from './domains/self-activation.js';
-export type { PollAbortReason } from './errors.js';
+export type { HostedPageOutcome, PollAbortReason } from './errors.js';
 export {
   PayWayAPIError,
   PayWayBusinessError,

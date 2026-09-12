@@ -3921,7 +3921,7 @@ cofCmd
       console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
       console.log(`  ${c.dim('Result arrives via the callback_url; then charge with "cof charge" using --token <pwt>.')}\n`);
     } catch (e) {
-      process.exitCode = printApiError(e);
+      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
   });
 
@@ -3943,8 +3943,10 @@ cofCmd
       process.exitCode = EXIT_VALIDATION;
       return;
     }
+    // Hoisted so the hosted-page catch below can attach the journal join keys.
+    let payway: PayWay | undefined;
     try {
-      const payway = new PayWay();
+      payway = new PayWay();
       const result = await payway.credentialsOnFile.linkCard({
         requestId: opts.requestId as string,
         ctid: opts.ctid as string,
@@ -3967,32 +3969,62 @@ cofCmd
       // success and error — SANDBOX-FINDINGS §9a/B5). The client surfaces it
       // as a structured PayWayBusinessError with the page preserved in
       // rawBody; capture it so the operator can actually open it instead of
-      // reading a 120-char prefix.
-      if (e instanceof PayWayBusinessError && typeof e.rawBody === 'string' && /<!doctype html|<html/i.test(e.rawBody)) {
+      // reading a 120-char prefix. A 4xx HTML answer keeps its body on the
+      // generic PayWayAPIError, so accept both shapes (§24 hardening).
+      const rawBody = e instanceof PayWayAPIError && typeof e.rawBody === 'string' ? e.rawBody : undefined;
+      if (rawBody !== undefined && /<!doctype html|<html/i.test(rawBody)) {
+        const outcome = e instanceof PayWayAPIError ? e.hostedPage : undefined;
         const { mkdirSync, writeFileSync } = await import('node:fs');
         const outPath = path.join(process.cwd(), 'payway-output', `link-card-${opts.requestId}.html`);
-        mkdirSync(path.dirname(outPath), { recursive: true });
-        writeFileSync(outPath, e.rawBody, 'utf8');
+        let saveError: string | undefined;
+        try {
+          mkdirSync(path.dirname(outPath), { recursive: true });
+          writeFileSync(outPath, rawBody, 'utf8');
+        } catch (saveErr) {
+          saveError = saveErr instanceof Error ? saveErr.message : String(saveErr);
+        }
         if (opts.json) {
           // This endpoint never speaks JSON against the real gateway — the
-          // closest machine-readable result is the captured-page envelope.
-          console.log(
-            JSON.stringify(
-              {
-                hostedHtmlPath: outPath,
-                requestId: opts.requestId,
-                ctid: opts.ctid,
-                note: 'link-card always answers with the hosted card-entry page; the token (pwt) arrives via callback_url.',
-              },
-              null,
-              2,
-            ),
-          );
+          // closest machine-readable result is the captured-page envelope,
+          // enriched with the decoded hosted outcome (§24 LC-2) and the
+          // journal join keys.
+          const envelope: Record<string, unknown> = {
+            requestId: opts.requestId,
+            ctid: opts.ctid,
+            note: 'link-card always answers with the hosted card-entry page; the token (pwt) arrives via callback_url.',
+          };
+          if (saveError === undefined) envelope.hostedHtmlPath = outPath;
+          else envelope.saveError = saveError;
+          if (outcome?.code !== undefined) {
+            envelope.hostedPage = { url: outcome.url, code: outcome.code, message: outcome.message };
+          }
+          if (payway?.lastCorrelationId !== undefined) envelope.correlationId = payway.lastCorrelationId;
+          if (payway?.lastTraceId !== undefined) envelope.traceId = payway.lastTraceId;
+          console.log(JSON.stringify(envelope, null, 2));
           process.exitCode = EXIT_OK;
           return;
         }
-        console.log(`  ${c.green('✓')} Hosted card-link page received and saved`);
-        console.log(`  ${c.bold('Page:')} ${c.cyan(outPath)}`);
+        if (outcome?.code !== undefined) {
+          console.log(
+            `  ${c.red('✗')} Hosted page reports an error: code ${c.bold(outcome.code)}${outcome.message ? ` — ${outcome.message}` : ''}`,
+          );
+          if (outcome.code === '104') {
+            console.log(
+              `  ${c.dim('Hint: the merchant profile is not enabled for this token flag — ask ABA to enable card tokenization (SANDBOX-FINDINGS §24 LC-1).')}`,
+            );
+          } else if (outcome.code === '1' || outcome.code === '01') {
+            console.log(
+              `  ${c.dim('Hint: wrong hash — verify the API key and that no intermediate proxy re-encoded the fields (SANDBOX-FINDINGS §24 LC-3).')}`,
+            );
+          }
+        } else {
+          console.log(`  ${c.green('✓')} Hosted card-link page received and saved`);
+        }
+        if (saveError !== undefined) {
+          console.log(`  ${c.yellow('⚠')} Could not save the page to ${c.cyan(outPath)}: ${saveError}`);
+        } else {
+          console.log(`  ${c.bold('Page:')} ${c.cyan(outPath)}`);
+        }
         console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
         console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
         console.log(
@@ -4012,7 +4044,7 @@ cofCmd
         process.exitCode = EXIT_OK;
         return;
       }
-      process.exitCode = printApiError(e);
+      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
   });
 
@@ -4162,7 +4194,7 @@ cofCmd
       if (data.tran_id) console.log(`  ${c.bold('Transaction ID:')} ${c.cyan(String(data.tran_id))}`);
       console.log(`  ${c.dim(`Next: verify with payway-sdk check-transaction -t ${String(data.tran_id)}`)}\n`);
     } catch (e) {
-      process.exitCode = printApiError(e);
+      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
   });
 
@@ -4194,7 +4226,7 @@ cofTokenCmd
       console.log(`  ${c.green('✓')} Token renew requested`);
       console.log(`  ${c.dim('Result arrives via the callback_url.')}\n`);
     } catch (e) {
-      process.exitCode = printApiError(e);
+      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
   });
 
@@ -4221,7 +4253,7 @@ cofTokenCmd
       console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
       console.log(`  ${c.dim(JSON.stringify(result).slice(0, 300))}\n`);
     } catch (e) {
-      process.exitCode = printApiError(e);
+      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
   });
 
@@ -4249,7 +4281,7 @@ cofTokenCmd
       console.log(`  ${c.green('✓')} Token removed`);
       console.log(`  ${c.bold('CTID:')} ${c.cyan(opts.ctid as string)}\n`);
     } catch (e) {
-      process.exitCode = printApiError(e);
+      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
   });
 
