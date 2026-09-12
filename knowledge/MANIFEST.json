@@ -198,9 +198,9 @@
       "description": "Payment-link create/detail/void contract incl. pushbacks and VOIDED semantics.",
       "source": "docs/17-payment-link.md",
       "file": "payment-link.md",
-      "bytes": 19608,
-      "sha256": "b09089051bb6fab8",
-      "sourceSha256": "378c10c00c2e8f24"
+      "bytes": 20590,
+      "sha256": "0a563ad97da49c00",
+      "sourceSha256": "968c0a9d334c8777"
     },
     {
       "topic": "transaction-journal",

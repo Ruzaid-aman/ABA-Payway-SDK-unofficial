@@ -146,7 +146,7 @@ returns zero results.
 ## 5. QR API (`generate-qr`) probe findings
 
 The QR API was verified against the sandbox on 2026-07-16 using
-`scratch/sandbox-probe-qr-api.ts`.
+`scripts/sandbox-probe-qr-api.ts`.
 
 - `POST /api/payment-gateway/v1/payments/generate-qr` accepts JSON.
 - The accepted HMAC-SHA512/Base64 plaintext order is
@@ -164,9 +164,9 @@ model does not apply to this endpoint.
 
 ## 6. Pre-auth, payout, KHQR, and checkout error probes
 
-Probed on 2026-07-16 using `scratch/sandbox-probe-pre-auth.ts`,
-`scratch/sandbox-probe-payout.ts`, `scratch/sandbox-probe-khqr.ts`, and
-`scratch/sandbox-probe-checkout-errors.ts`.
+Probed on 2026-07-16 using `scripts/sandbox-probe-pre-auth.ts`,
+`scripts/sandbox-probe-payout.ts`, `scripts/sandbox-probe-khqr.ts`, and
+`scripts/sandbox-probe-checkout-errors.ts`.
 
 - Pre-auth completion and completion-with-payout share
   `/pre-auth-completion`; both use JSON with RSA-encrypted `merchant_auth`.
@@ -893,3 +893,9 @@ A superpowers-style review + automated full-cycle test of the link-card integrat
 5. **(LC-5) Hosted error page is a dead end for the customer**: the rendered error page's OK button performs no navigation (URL unchanged) and `continue_success_url` is NOT honored on the error path.
 6. **(LC-6) Token-lifecycle negative paths, live**: `cof charge` with an unknown pwt → code **105** "Invalid payment credential token" (105-family hint fires); `cof token details` for a request that never linked → code **09** "Data not found"; **`cof token remove` with a NON-EXISTENT token answers `00 Success`** — remove does not verify token existence (idempotent-shaped; use get-token-details/09 to probe existence, never remove).
 7. **(LC-7) CLI contract gap hit live**: `cof charge --json` / `cof token details --json` on these gateway failures printed the HUMAN error block to stdout (exit 2), not the `{error:{kind,exitCode,…}}` envelope — the whole `cof` command group's catches call `printApiError` and never `printApiErrorJson` (src/cli.ts:3924, 4015, 4165, 4197, 4224, 4252). Machine-mode consumers must not parse cof `--json` stdout on failure until this is fixed.
+
+## 25. COF full-cycle audit — token-flag sweep + link-account cycle rig (2026-09-12, agent session; scripts `scripts/sandbox-probe-cof-flag-sweep.ts` + `scripts/sandbox-probe-link-account-cycle.ts`, raw results `.scratch/cof-full-cycle-audit/flag-sweep.json`)
+
+1. **(FS-1) The 104 blocker is PROFILE-level, not flag-specific.** One link-account POST per linking flag (`CITI_FLEX`, `CITO_FLEX`, `CITO_FIX`, `CITR_FLEX`) — all four answer identical `403 code 104 "Merchant not enabled token flag"` on profile ec476910 (the §24 LC-1 hosted-path 104 is the same blocker seen from the card side). No flag combination escapes it; unblocking is purely on ABA's side.
+2. **(FS-2) 104 precedes any callback** — the sweep needs NO live receiver (the probe used a dead tunnel URL harmlessly). This makes the sweep a cheap, re-runnable go/no-go diagnostic for "has ABA enabled tokenization on this profile yet". Now a CLI command: `payway-sdk cof token-flag-sweep [-c ctid] [--currency USD|KHR] [--callback-url url] [--skip-card] [--out path] [--json]` — one POST per `TOKEN_FLAG_LINKING` flag + one hosted card-leg probe (302 `/add-card/<base64>` outcome decoded per §24 LC-2), results saved to `payway-output/cof-flag-sweep-<ts>.json`. A uniform 104 prints the profile-blocker conclusion.
+3. **(FS-3) Re-test rig stands ready** (`scripts/sandbox-probe-link-account-cycle.ts`): the SDK's own webhook server + tunnel + linkAccount + QR presentation page + token-store watcher, wired to the §24-wave token persistence (`cof token list`, `cof charge --ctid` resolution). When ABA flips the flag, re-run it to capture the REAL link-callback field set and close Q18.

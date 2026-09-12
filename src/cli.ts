@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
@@ -58,12 +58,14 @@ import {
   setDefaultProfile,
 } from './config/profiles.js';
 import {
+  ENDPOINTS,
   PAYMENT_OPTIONS,
   PAYMENT_STATUS_CODES,
   PAYMENT_STATUS_LABELS,
   QR_LIFETIME_MIN_SECONDS,
   QR_TEMPLATE_NAMES,
   REFUND_ERROR_CODES,
+  TOKEN_FLAG_LINKING,
 } from './constants.js';
 import { listSandboxBeneficiaries } from './sandbox-beneficiaries.js';
 import { listSandboxTestCards, type SandboxTestCardOutcome } from './sandbox-test-cards.js';
@@ -4047,6 +4049,138 @@ cofCmd
       }
       process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
+  });
+
+// cof token-flag-sweep — diagnostic sweep: one link-account POST per linking
+// token flag plus one hosted card-leg probe. Surfaced from the 2026-09-12
+// full-cycle audit (SANDBOX-FINDINGS §25): 104-class rejections are
+// profile-level, so the sweep tells you WHETHER the profile is token-flag
+// enabled before debugging any individual link attempt. No receiver needed —
+// a business rejection precedes any callback, so the callback URL need not
+// even be live.
+cofCmd
+  .command('token-flag-sweep')
+  .description('Probe every linking token flag (one POST each) + hosted card leg; maps profile-level blockers like 104')
+  .option('-c, --ctid <ctid>', 'Customer token identifier used for every leg (5-24 alphanumeric)', 'custaudit01')
+  .option('--currency <code>', 'Payment currency: USD (default) or KHR', 'USD')
+  .option('--callback-url <url>', 'Callback URL carried on the requests (does NOT need to be reachable for a 104-class sweep)')
+  .option('--skip-card', 'Skip the hosted card-leg probe (link-account flags only)')
+  .option('--out <path>', 'Write the raw sweep results JSON here (default: payway-output/cof-flag-sweep-<ts>.json)')
+  .option('--json', 'Print the machine-readable summary instead of the table')
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
+    if (!assertCredentialsPresent()) {
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+    const ctid = opts.ctid as string;
+    const currency = (opts.currency ?? 'USD') as 'USD' | 'KHR';
+    const callbackUrl = (opts.callbackUrl as string | undefined) ?? 'https://callback-not-required.example/aba-payway-webhook';
+    const payway = new PayWay();
+    type SweepRecord = Record<string, unknown>;
+    const results: SweepRecord[] = [];
+    const flags = [...TOKEN_FLAG_LINKING] as string[];
+
+    for (const flag of flags) {
+      const requestId = `sweep${flag.toLowerCase().replace(/_/g, '')}`.slice(0, 24);
+      try {
+        const result = await payway.credentialsOnFile.linkAccount({
+          requestId,
+          ctid,
+          tokenFlag: flag,
+          currency,
+          callbackUrl,
+        });
+        results.push({ flag, requestId, outcome: 'SUCCESS', result });
+      } catch (e) {
+        const err = e as { paywayCode?: string; message?: string; type?: string; correlationId?: string };
+        results.push({
+          flag,
+          requestId,
+          outcome: 'REJECTED',
+          paywayCode: err.paywayCode,
+          type: err.type,
+          correlationId: err.correlationId,
+          message: err.message?.slice(0, 160),
+        });
+      }
+    }
+
+    // Card leg (hosted path, CITI_FLEX): render the same signed request the
+    // link-card form would submit and POST it once, reading the 302
+    // /add-card/<base64> redirect outcome (SANDBOX-FINDINGS §24).
+    if (opts.skipCard !== true) {
+      const requestId = 'sweepcard01';
+      try {
+        const html = payway.credentialsOnFile.getLinkCardFormHtml({
+          requestId,
+          ctid,
+          tokenFlag: 'CITI_FLEX',
+          currency,
+          frequency: '1M',
+          callbackUrl,
+        });
+        const fields = [...html.matchAll(/name="([a-z_]+)" value="([^"]*)"/g)].map(
+          (m) => [m[1], m[2]] as const,
+        );
+        const res = await fetch(`${payway.apiBaseUrl}${ENDPOINTS.linkCard}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(fields.map(([k, v]) => [k, v])).toString(),
+          redirect: 'manual',
+        });
+        const location = res.headers.get('location');
+        let decoded: unknown = null;
+        if (location?.includes('/add-card/')) {
+          try {
+            decoded = JSON.parse(Buffer.from(location.split('/add-card/')[1], 'base64').toString('utf8'));
+          } catch {
+            decoded = location;
+          }
+        }
+        results.push({
+          flag: 'CARD-CITI_FLEX',
+          requestId,
+          outcome: res.status < 400 ? 'HOSTED_PAGE' : 'REJECTED',
+          httpStatus: res.status,
+          hostedPayload: decoded,
+        });
+      } catch (e) {
+        const err = e as { paywayCode?: string; message?: string };
+        results.push({ flag: 'CARD-CITI_FLEX', requestId, outcome: 'ERROR', paywayCode: err.paywayCode, message: err.message?.slice(0, 160) });
+      }
+    }
+
+    const outPath =
+      (opts.out as string | undefined) ??
+      path.join(process.cwd(), 'payway-output', `cof-flag-sweep-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    try {
+      mkdirSync(path.dirname(outPath), { recursive: true });
+      writeFileSync(outPath, JSON.stringify(results, null, 2), 'utf8');
+    } catch (writeErr) {
+      console.error(`  ${c.yellow('⚠')} Could not save results file: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`);
+    }
+
+    if (opts.json) {
+      console.log(JSON.stringify({ results, resultsPath: outPath }, null, 2));
+    } else {
+      console.log(`\n  ${c.bold('Token-flag sweep')} (ctid ${c.cyan(ctid)}, ${currency})`);
+      for (const r of results) {
+        const flag = String(r.flag).padEnd(14);
+        if (r.outcome === 'SUCCESS') {
+          console.log(`  ${c.green('✓')} ${flag} SUCCESS — profile accepts this flag (unexpected on a blocked profile!)`);
+        } else if (r.outcome === 'HOSTED_PAGE') {
+          console.log(`  ${c.green('✓')} ${flag} hosted page HTTP ${r.httpStatus} — card leg reached the form`);
+        } else {
+          console.log(`  ${c.red('✗')} ${flag} ${r.type ?? 'error'} code=${r.paywayCode ?? '—'} ${String(r.message ?? '').slice(0, 80)}`);
+        }
+      }
+      const codes = new Set(results.map((r) => r.paywayCode).filter(Boolean));
+      if (codes.size === 1 && codes.has('104')) {
+        console.log(`  ${c.yellow('→')} Uniform 104 across all flags: PROFILE-level blocker (merchant not enabled for tokenization) — not a flag-specific problem.`);
+      }
+      console.log(`  ${c.dim(`Results saved → ${outPath}`)}\n`);
+    }
+    process.exitCode = EXIT_OK;
   });
 
 // cof link-card-form — local-only render of the signed link-card browser

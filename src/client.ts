@@ -1260,6 +1260,16 @@ export class PayWay {
   }
 
   /**
+   * Effective base URL of the resolved environment (config override or
+   * BASE_URLS[environment]) — lets local-only callers (e.g. the CLI's
+   * `cof token-flag-sweep` card leg) POST to a hosted endpoint directly
+   * without duplicating the env-resolution logic.
+   */
+  get apiBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  /**
    * The client's journal emitter — undefined unless journaling is enabled
    * (config `journal` / `PAYWAY_JOURNAL`). Lets hosts (CLI, agent) emit
    * command-level events into the same journal file as the transport events.

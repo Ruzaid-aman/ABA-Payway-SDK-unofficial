@@ -74,8 +74,7 @@
     "bundle": "npx @redocly/cli bundle payway-openapi/openapi.yaml -o dist/openapi.bundled.yaml",
     "generate-types": "npx openapi-typescript dist/openapi.bundled.yaml -o src/types.ts",
     "probe": "npx tsx scripts/sandbox-probe.ts",
-    "demo": "npx tsx scripts/zero-logic-purchase-flow.ts",
-    "payway-sdk": "npx tsx scripts/zero-logic-purchase-flow.ts"
+    "demo:zero-logic": "npx tsx scripts/zero-logic-purchase-flow.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",
