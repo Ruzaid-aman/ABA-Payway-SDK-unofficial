@@ -212,6 +212,22 @@ describe('checkResponseError (via API calls)', () => {
     }
   });
 
+  it('stamps the request correlation id onto API errors (journal/hook join key)', async () => {
+    const onRequest = vi.fn();
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: 6, message: 'Transaction not found' } }),
+    );
+    const paywayWithHook = new PayWay({ ...TEST_CONFIG, maxRetries: 0, onRequest });
+
+    const error = (await paywayWithHook.checkout.checkTransaction('TX-CID').catch((e: unknown) => e)) as PayWayAPIError;
+
+    expect(error).toBeInstanceOf(PayWayAPIError);
+    const hookCid = (onRequest.mock.calls[0]?.[2] as { correlationId?: string } | undefined)?.correlationId;
+    expect(hookCid).toBeTruthy();
+    expect(error.correlationId).toBe(hookCid);
+    expect((error.toJSON() as Record<string, unknown>).correlationId).toBe(hookCid);
+  });
+
   it('passes through when status.code is "0" (success)', async () => {
     const successBody = {
       status: { code: 0, message: 'Success' },

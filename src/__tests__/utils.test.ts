@@ -220,6 +220,12 @@ describe('sanitizeForLog', () => {
       Authorization: '***HIDDEN***',
     });
   });
+
+  it('propagates the key hint into arrays so hex secrets inside them are masked', () => {
+    expect(sanitizeForLog({ payload: ['c'.repeat(40), 'order-123'] })).toEqual({
+      payload: ['***HIDDEN***', 'order-123'],
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

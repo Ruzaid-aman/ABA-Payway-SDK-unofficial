@@ -724,7 +724,9 @@ function sanitizeValue(value: unknown, keyHint?: string): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => sanitizeValue(item));
+    // Arrays inherit the parent key hint — a hash/token stored as a list
+    // (e.g. `hash: ["<40-hex>"]`) must still hit the credential mask.
+    return value.map((item) => sanitizeValue(item, keyHint));
   }
 
   const sanitized: Record<string, unknown> = {};

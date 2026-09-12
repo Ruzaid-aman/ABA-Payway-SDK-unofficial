@@ -34,6 +34,8 @@ export interface PayWayAPIErrorOptions {
   rateLimitInfo?: Record<string, unknown>;
   /** Per-field validation errors from the gateway (COF family, `status.code "04"` + `errors{}`). */
   fieldErrors?: Record<string, string>;
+  /** Request correlation id (cid) — joins this error to journal entries and request hooks. */
+  correlationId?: string;
 }
 
 export class PayWayAPIError extends PayWayError {
@@ -44,6 +46,11 @@ export class PayWayAPIError extends PayWayError {
   public readonly retryable?: boolean;
   public readonly rateLimitInfo?: Record<string, unknown>;
   public readonly fieldErrors?: Record<string, string>;
+  /**
+   * Mutable on purpose: transport code stamps the request cid onto errors it
+   * did not construct (classifier-built business errors) after the fact.
+   */
+  public correlationId?: string;
 
   constructor(message: string, options: PayWayAPIErrorOptions = {}) {
     super(message, 'api_error');
@@ -56,6 +63,7 @@ export class PayWayAPIError extends PayWayError {
     this.retryable = options.retryable;
     this.rateLimitInfo = options.rateLimitInfo;
     this.fieldErrors = options.fieldErrors;
+    this.correlationId = options.correlationId;
   }
 
   public toJSON(): Record<string, unknown> {
@@ -69,6 +77,7 @@ export class PayWayAPIError extends PayWayError {
       retryable: this.retryable,
       rateLimitInfo: this.rateLimitInfo,
       fieldErrors: this.fieldErrors,
+      correlationId: this.correlationId,
       rawBody: this.rawBody,
     };
   }

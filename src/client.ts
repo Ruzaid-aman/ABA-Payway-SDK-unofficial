@@ -1619,6 +1619,9 @@ export class PayWay {
               ? // Caller-requested cancellation is never retried.
                 new PayWayNetworkError('Request aborted by caller signal', { endpoint, retryable: false })
               : createNetworkError(error, timeoutMs, endpoint);
+        // Stamp the request cid once, here, so every error shape — including
+        // classifier-built business errors — carries the journal/hook join key.
+        paywayError.correlationId ??= correlationId;
 
         // Error-path journaling: HTTP errors, empty-body guard, link-card
         // HTML, JSON-parse failures, network/timeout/abort. No integrator
@@ -1697,7 +1700,7 @@ export class PayWay {
       }
     }
 
-    throw new PayWayAPIError('Retry limit exceeded', { endpoint });
+    throw new PayWayAPIError('Retry limit exceeded', { endpoint, correlationId });
   }
 
   private async request<TResponse>(
