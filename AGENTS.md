@@ -29,6 +29,9 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token renew -r req
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token details -r req0001
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token remove -c customer123 --token <pwt>
 
+# Token-flag blocker sweep (diagnostic: one POST per linking flag + card leg; 104 = profile-level blocker, no receiver needed)
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token-flag-sweep -c customer123 --json
+
 # Link-card hosted page: local signed form (NO API call, urlencoded browser POST)
 npx tsx src/cli.ts cof link-card-form -c customer123 -f CITI_FLEX --callback-url <url> -o link-card.html
 # link-card API call: saves the hosted page to payway-output/ and opens it (TTY auto)
