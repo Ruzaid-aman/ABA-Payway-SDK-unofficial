@@ -288,9 +288,9 @@
       "description": "Every SDK domain method and CLI command with flags and contracts.",
       "source": "docs/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
-      "bytes": 43502,
-      "sha256": "8ea68f98f9a8c719",
-      "sourceSha256": "2006603c2946564b"
+      "bytes": 43856,
+      "sha256": "127c6a7faf7ec0a5",
+      "sourceSha256": "5ef2662b17fc56e1"
     },
     {
       "topic": "error-codes",
