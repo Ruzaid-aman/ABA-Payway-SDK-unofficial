@@ -103,6 +103,7 @@ export type {
   JournalSink,
 } from './journal/types.js';
 export { DEFAULT_JOURNAL_DIR_NAME, DEFAULT_JOURNAL_FILE_NAME, JOURNAL_VERSION } from './journal/types.js';
+export { PAYWAY_DATA_DIR_ENV, resolvePaywayDataRoot, resolveWebhookDir } from './config/data-root.js';
 export { createJournalEmitter, JsonlJournalSink, pruneJournal, readJournalEvents, resolveJournalConfig } from './journal/writer.js';
 export type { JournalFileRead, JournalPruneResult } from './journal/writer.js';
 export { reconcileTransactions } from './journal/reconcile.js';
