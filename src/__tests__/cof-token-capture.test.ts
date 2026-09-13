@@ -20,6 +20,7 @@ import {
   LINKED_TOKENS_FILE_NAME,
   loadLinkedTokens,
   maskPwt,
+  removeLinkedTokens,
   resolveTokenStoreDir,
   saveLinkedToken,
 } from '../webhook/token-store.js';
@@ -133,6 +134,21 @@ describe('Linked-token store', () => {
     expect(
       resolveTokenStoreDir(undefined, { PAYWAY_DATA_DIR: '/data', APPDATA: appData } as NodeJS.ProcessEnv),
     ).toBe('/data');
+  });
+
+  it('removeLinkedTokens deletes by ctid (or ctid+pwt) and returns the count', () => {
+    saveLinkedToken({ ctid: 'rm1', pwt: 'tok-a' }, dir);
+    saveLinkedToken({ ctid: 'rm1', pwt: 'tok-b' }, dir);
+    saveLinkedToken({ ctid: 'rm2', pwt: 'tok-c' }, dir);
+
+    expect(removeLinkedTokens('rm1', 'tok-a', dir)).toBe(1);
+    expect(loadLinkedTokens(dir).map((t) => t.pwt)).toEqual(['tok-b', 'tok-c']);
+
+    expect(removeLinkedTokens('rm1', undefined, dir)).toBe(1);
+    expect(loadLinkedTokens(dir).map((t) => t.ctid)).toEqual(['rm2']);
+
+    expect(removeLinkedTokens('never-existed', undefined, dir)).toBe(0);
+    expect(removeLinkedTokens('rm2', undefined, join(dir, 'no-such-store'))).toBe(0);
   });
 
   it('maskPwt keeps first/last 4 only', () => {

@@ -126,6 +126,32 @@ export function latestTokenForCtid(
   return tokens.length > 0 ? tokens[tokens.length - 1] : undefined;
 }
 
+/**
+ * Delete stored tokens for a ctid — optionally only one specific pwt — and
+ * rewrite the store atomically (same tmp+rename durability as save). Returns
+ * the number of records removed; a missing store removes nothing. This is
+ * the local half of token lifecycle (the gateway-side `cof token remove`
+ * does NOT prune this store by itself — see docs/09).
+ */
+export function removeLinkedTokens(
+  ctid: string,
+  pwt?: string,
+  dir?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const storeDir = resolveTokenStoreDir(dir, env);
+  if (!existsSync(tokensFilePath(storeDir))) return 0;
+  const existing = loadLinkedTokens(storeDir, env);
+  const kept = existing.filter((t) => t.ctid !== ctid || (pwt !== undefined && t.pwt !== pwt));
+  const removed = existing.length - kept.length;
+  if (removed === 0) return 0;
+  const file = tokensFilePath(storeDir);
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}\n`, 'utf8');
+  renameSync(tmp, file);
+  return removed;
+}
+
 /** Mask a pwt for display: keep the first 4 and last 4 characters. */
 export function maskPwt(pwt: string): string {
   if (pwt.length <= 8) return '*'.repeat(pwt.length);
