@@ -29,8 +29,7 @@ async function run(argv: string[]): Promise<{ stdout: string; stderr: string; ex
   // The completions command writes the script via process.stdout.write
   // (not console.log), so spy the stream directly alongside the console.
   const stdoutChunks: string[] = [];
-  const originalWrite = process.stdout.write.bind(process.stdout);
-  const stdoutSpy = vi
+  vi
     .spyOn(process.stdout, 'write')
     .mockImplementation(((chunk: string | Uint8Array) => {
       stdoutChunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
@@ -41,8 +40,7 @@ async function run(argv: string[]): Promise<{ stdout: string; stderr: string; ex
     await runCli(argv);
     return { stdout: stdoutChunks.join(''), stderr: captured.stderr(), exitCode: process.exitCode };
   } finally {
-    stdoutSpy.mockRestore();
-    originalWrite; // keep the bound original referenced for clarity
+    vi.restoreAllMocks();
     captured.restore();
     process.exitCode = before;
   }
