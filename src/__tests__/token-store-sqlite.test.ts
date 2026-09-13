@@ -41,6 +41,7 @@ maybeDescribe('SqliteLinkedTokenStore (driver installed)', () => {
     store.save({
       ctid: 'c1',
       pwt: 'pwt-aaaaaaaa1111',
+      renewedAt: '2026-09-10T00:00:00.000Z',
       linkType: 'card',
       tokenFlag: 'CITI_FLEX',
       frequency: '1M',
@@ -55,6 +56,7 @@ maybeDescribe('SqliteLinkedTokenStore (driver installed)', () => {
     expect(records[0]).toEqual({
       ctid: 'c1',
       pwt: 'pwt-aaaaaaaa1111',
+      renewedAt: '2026-09-10T00:00:00.000Z',
       linkType: 'card',
       tokenFlag: 'CITI_FLEX',
       frequency: '1M',
@@ -83,6 +85,23 @@ maybeDescribe('SqliteLinkedTokenStore (driver installed)', () => {
     store.save({ ctid: 'c2', pwt: 'other' });
     expect(store.latestForCtid('c1')?.pwt).toBe('new');
     expect(store.latestForCtid('missing')).toBeUndefined();
+    db.close();
+  });
+
+  it('migrates a wave-3 db (no renewed_at column) in place', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'payway-token-sqlite-mig-'));
+    tempDirs.push(dir);
+    const db = new Sqlite3(path.join(dir, 'legacy.db')) as SqliteDb;
+    db.pragma('journal_mode = WAL');
+    // Wave-3 schema: no renewed_at column.
+    db.exec(`CREATE TABLE linked_tokens (
+      ctid TEXT NOT NULL, pwt TEXT NOT NULL, link_type TEXT, token_flag TEXT, frequency TEXT,
+      currency TEXT, request_id TEXT, extra_fields TEXT, captured_at TEXT NOT NULL,
+      source_record_id TEXT, PRIMARY KEY (ctid, pwt))`);
+    const store = new SqliteLinkedTokenStore(db);
+    const saved = store.save({ ctid: 'legacy', pwt: 'tok', renewedAt: '2026-09-12T00:00:00.000Z' });
+    expect(saved.renewedAt).toBe('2026-09-12T00:00:00.000Z');
+    expect(store.load()[0].renewedAt).toBe('2026-09-12T00:00:00.000Z');
     db.close();
   });
 

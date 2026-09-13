@@ -28,10 +28,23 @@ export function prepareLinkedTokensSchema(db: SqliteDb): void {
       request_id TEXT,
       extra_fields TEXT,
       captured_at TEXT NOT NULL,
+      renewed_at TEXT,
       source_record_id TEXT,
       PRIMARY KEY (ctid, pwt)
     )
   `);
+  ensureRenewedAtColumn(db);
+}
+
+/** Add the renewal anchor to wave-3 databases (duplicate-tolerant in-place migration). */
+export function ensureRenewedAtColumn(db: SqliteDb): void {
+  try {
+    db.exec('ALTER TABLE linked_tokens ADD COLUMN renewed_at TEXT');
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    if (message.includes('duplicate column name') && message.includes('renewed_at')) return;
+    throw error;
+  }
 }
 
 interface TokenRow {
@@ -44,6 +57,7 @@ interface TokenRow {
   request_id: string | null;
   extra_fields: string | null;
   captured_at: string;
+  renewed_at: string | null;
   source_record_id: string | null;
 }
 
@@ -69,6 +83,7 @@ function rowToRecord(row: TokenRow): LinkedTokenRecord {
     ...(row.request_id ? { requestId: row.request_id } : {}),
     ...(extraFields ? { extraFields } : {}),
     capturedAt: row.captured_at,
+    ...(row.renewed_at ? { renewedAt: row.renewed_at } : {}),
     ...(row.source_record_id ? { sourceRecordId: row.source_record_id } : {}),
   };
 }
@@ -91,8 +106,8 @@ export class SqliteLinkedTokenStore {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO linked_tokens
-           (ctid, pwt, link_type, token_flag, frequency, currency, request_id, extra_fields, captured_at, source_record_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (ctid, pwt, link_type, token_flag, frequency, currency, request_id, extra_fields, captured_at, renewed_at, source_record_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         full.ctid,
@@ -104,6 +119,7 @@ export class SqliteLinkedTokenStore {
         full.requestId ?? null,
         full.extraFields ? JSON.stringify(full.extraFields) : null,
         full.capturedAt,
+        full.renewedAt ?? null,
         full.sourceRecordId ?? null,
       );
     return full;
