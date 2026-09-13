@@ -13,7 +13,7 @@
  */
 
 import path from 'node:path';
-import { readJournalEvents, resolveJournalConfig } from './writer.js';
+import { readJournalEvents, resolveJournalDir } from './writer.js';
 
 export interface JournalLatencyRow {
   endpoint: string;
@@ -89,8 +89,7 @@ export function isReadEndpoint(endpoint: string): boolean {
 }
 
 export function computeJournalStats(options: JournalStatsOptions = {}): JournalStatsReport {
-  const dir =
-    options.journalDir ?? resolveJournalConfig(undefined, process.env)?.dir ?? path.join(process.cwd(), 'payway-data');
+  const dir = options.journalDir ?? resolveJournalDir();
   const { events } = readJournalEvents(dir);
 
   // --- latency per endpoint (successful parsed 2xx only — error durations

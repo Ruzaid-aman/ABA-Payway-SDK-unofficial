@@ -12,7 +12,7 @@ import path from 'node:path';
 import { GATEWAY_CODE_HINTS } from '../constants.js';
 import type { JournalEventV1 } from './types.js';
 import { computeJournalStats } from './stats.js';
-import { readJournalEvents, resolveJournalConfig } from './writer.js';
+import { readJournalEvents, resolveJournalDir } from './writer.js';
 
 export interface RcaStep {
   at: string;
@@ -43,8 +43,7 @@ export function explainTransaction(
   transactionId: string,
   options: RcaOptions = {},
 ): RcaReport {
-  const dir =
-    options.journalDir ?? resolveJournalConfig(undefined, process.env)?.dir ?? path.join(process.cwd(), 'payway-data');
+  const dir = options.journalDir ?? resolveJournalDir();
   const { events } = readJournalEvents(dir);
 
   const relevant = events
@@ -169,8 +168,7 @@ export interface AnomaliesReport {
 }
 
 export function detectJournalAnomalies(options: RcaOptions = {}): AnomaliesReport {
-  const dir =
-    options.journalDir ?? resolveJournalConfig(undefined, process.env)?.dir ?? path.join(process.cwd(), 'payway-data');
+  const dir = options.journalDir ?? resolveJournalDir();
   const { events } = readJournalEvents(dir);
   const anomalies: JournalAnomaly[] = [];
 

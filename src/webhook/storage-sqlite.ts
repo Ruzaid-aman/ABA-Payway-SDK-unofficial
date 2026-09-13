@@ -8,10 +8,11 @@
 
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { resolveWebhookDir } from '../config/data-root.js';
 import type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
 
-const DEFAULT_PATH = './webhook_data/callbacks.db';
+const DEFAULT_PATH = (): string => join(resolveWebhookDir(), 'callbacks.db');
 
 interface BetterSqlite3Database {
   exec(sql: string): void;
@@ -118,7 +119,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       );
     }
 
-    const dbPath = filePath ? resolve(filePath) : resolve(DEFAULT_PATH);
+    const dbPath = filePath ? resolve(filePath) : resolve(DEFAULT_PATH());
     const dir = dirname(dbPath);
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });

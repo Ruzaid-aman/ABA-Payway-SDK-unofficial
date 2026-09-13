@@ -20,6 +20,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { Command } from 'commander';
 import { verifyCallbackDetailed } from '../../auth.js';
+import { resolveWebhookDir } from '../../config/data-root.js';
 import { currentPalette } from '../ui/theme.js';
 import {
   buildWebhookFixture,
@@ -36,7 +37,7 @@ const EXIT_NETWORK = 3;
 export interface WebhookCommandDeps {
   /**
    * Storage seam: resolves the webhook record store. Default reads the CLI
-   * store (PAYWAY_WEBHOOK_DIR or <cwd>/webhook_data, json then sqlite).
+   * store (PAYWAY_WEBHOOK_DIR or <data root>/webhook_data, json then sqlite).
    */
   loadStorage?: () => WebhookStorage;
   /** Body source for verify-callback (default: --body-file / stdin / --body). */
@@ -47,7 +48,7 @@ export interface WebhookCommandDeps {
 
 /** Resolve the captured-record store: JSON file first, SQLite fallback. */
 async function loadDefaultStorage(): Promise<WebhookStorage> {
-  const dir = process.env.PAYWAY_WEBHOOK_DIR?.trim() || 'webhook_data';
+  const dir = resolveWebhookDir();
   const { JsonWebhookStorage } = await import('../../webhook/storage-json.js');
   const jsonPath = `${dir.replace(/[\\/]+$/, '')}/callbacks.jsonl`;
   if (existsSync(jsonPath)) return new JsonWebhookStorage(jsonPath);

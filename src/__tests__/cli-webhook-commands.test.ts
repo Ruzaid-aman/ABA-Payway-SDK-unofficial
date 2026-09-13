@@ -16,6 +16,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { captureConsole } from '../test/test-utils.js';
 import { signCallbackBody } from '../auth.js';
+import { resolveWebhookDir } from '../config/data-root.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-webhook-'));
 const originalCwd = process.cwd();
@@ -75,7 +76,7 @@ function startReceiver(captured: { body: string; headers: Record<string, string 
 
 /** Write two captured records into the CLI's JSONL store and return their ids. */
 function seedCaptures(): string[] {
-  const dir = path.join(tempDir, 'webhook_data');
+  const dir = resolveWebhookDir();
   mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'callbacks.jsonl');
   const records = [
@@ -155,7 +156,7 @@ describe('webhook verify-callback (W-4)', () => {
   });
 
   it('reports an invalid stored verdict with exit 1', async () => {
-    const dir = path.join(tempDir, 'webhook_data');
+    const dir = resolveWebhookDir();
     mkdirSync(dir, { recursive: true });
     const file = path.join(dir, 'callbacks.jsonl');
     writeFileSync(

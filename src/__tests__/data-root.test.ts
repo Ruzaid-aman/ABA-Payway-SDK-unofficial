@@ -1,7 +1,7 @@
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PAYWAY_DATA_DIR_ENV, resolvePaywayDataRoot, resolveWebhookDir } from '../config/data-root.js';
 
 describe('resolvePaywayDataRoot', () => {
@@ -40,5 +40,21 @@ describe('resolveWebhookDir', () => {
     expect(resolveWebhookDir(undefined, { PAYWAY_DATA_DIR: '/data' })).toBe(
       path.join('/data', 'webhook_data'),
     );
+  });
+
+  it('JsonWebhookStorage default capture file lands under the data root', async () => {
+    const appData = mkdtempSync(path.join(tmpdir(), 'payway-appdata-'));
+    vi.stubEnv('APPDATA', appData);
+    try {
+      const { JsonWebhookStorage } = await import('../webhook/storage-json.js');
+      const store = new JsonWebhookStorage();
+      store.save({ headers: {}, body: '{}' });
+      const expected = path.join(appData, 'aba-payway-sdk', 'data', 'webhook_data', 'callbacks.jsonl');
+      expect(existsSync(expected)).toBe(true);
+      store.close();
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(appData, { recursive: true, force: true });
+    }
   });
 });

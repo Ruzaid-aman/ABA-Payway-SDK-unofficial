@@ -9,6 +9,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Command } from 'commander';
+import { resolveWebhookDir } from '../../config/data-root.js';
 import {
   DEFAULT_JOURNAL_FILE_NAME,
   type JournalEventV1,
@@ -42,10 +43,7 @@ function eventLine(event: JournalEventV1): string {
  * replay marker behind each callback step.
  */
 function loadWebhookRecordsById(): Map<string, WebhookRecord> {
-  const file = path.join(
-    process.env.PAYWAY_WEBHOOK_DIR?.trim() || path.join(process.cwd(), 'webhook_data'),
-    'callbacks.jsonl',
-  );
+  const file = path.join(resolveWebhookDir(), 'callbacks.jsonl');
   const byId = new Map<string, WebhookRecord>();
   if (!existsSync(file)) return byId;
   for (const line of readFileSync(file, 'utf8').split('\n')) {

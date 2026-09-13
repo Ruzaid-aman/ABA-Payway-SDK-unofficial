@@ -8,10 +8,11 @@
 
 import { randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { resolveWebhookDir } from '../config/data-root.js';
 import type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
 
-const DEFAULT_PATH = './webhook_data/callbacks.jsonl';
+const DEFAULT_PATH = (): string => join(resolveWebhookDir(), 'callbacks.jsonl');
 
 export interface JsonWebhookStorageOptions {
   /** Internal filesystem seam used to verify failed atomic replacements. */
@@ -23,7 +24,7 @@ export class JsonWebhookStorage implements WebhookStorage {
   private readonly renameFile: (oldPath: string, newPath: string) => void;
 
   constructor(filePath?: string, options: JsonWebhookStorageOptions = {}) {
-    this.filePath = filePath ? resolve(filePath) : resolve(DEFAULT_PATH);
+    this.filePath = filePath ? resolve(filePath) : resolve(DEFAULT_PATH());
     this.renameFile = options.renameFile ?? renameSync;
     const dir = dirname(this.filePath);
     if (!existsSync(dir)) {
