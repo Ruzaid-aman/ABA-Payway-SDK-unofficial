@@ -49,6 +49,7 @@ const REGISTERED_COMMANDS = [
   'onboard',
   'completions',
   'mcp',
+  'session',
 ];
 
 describe('COMMAND_GROUPS', () => {

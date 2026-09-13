@@ -98,6 +98,7 @@ import {
 import { saveQrPng } from './cli/qr-artifact.js';
 import { registerCompletionsCommand } from './cli/commands/completions.js';
 import { registerMcpCommand } from './cli/commands/mcp.js';
+import { registerSessionCommand } from './cli/commands/session.js';
 import { getUpdateCheckCachePath, isTopLevelHelpArgv, maybeNoticeUpdate } from './cli/update-check.js';
 
 // ---------------------------------------------------------------------------
@@ -984,8 +985,10 @@ function activateSelectedProfile(command: Command): void {
   // `docs` serves knowledge only — never credentials, so the profile notice
   // would be pure noise on top of served content. `completions` likewise:
   // it emits a machine-sourced script meant for redirect (`> file`),
-  // so any notice line would corrupt the artifact.
-  if (command.name() === 'docs' || command.name() === 'completions') return;
+  // so any notice line would corrupt the artifact. `session` resolves its
+  // own profile context inside the loop (and must stay clean when it
+  // rejects non-TTY runs).
+  if (command.name() === 'docs' || command.name() === 'completions' || command.name() === 'session') return;
   const selectedName =
     program.opts<{ profile?: string }>().profile ??
     process.env.PAYWAY_PROFILE ??
@@ -4756,6 +4759,7 @@ registerOnboardCommand(program);
 registerWebhookCommands(program);
 registerCompletionsCommand(program);
 registerMcpCommand(program);
+registerSessionCommand(program);
 
 // --- pre-auth (complete / complete-with-payout / cancel) ---
 const preAuthComplete = new Command('complete')
