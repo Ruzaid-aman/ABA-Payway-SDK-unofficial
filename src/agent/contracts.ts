@@ -31,6 +31,29 @@ export type AgentToolName =
   | 'open_artifact'
   | 'copy_to_clipboard';
 
+/**
+ * Closed runtime mirror of {@link AgentToolName}. Adding a member to the
+ * union without extending this array is a type error (`satisfies` guard),
+ * so every consumer that must enumerate all tools (MCP catalog, provider
+ * schemas) stays honest when the 14-tool catalog changes.
+ */
+export const AGENT_TOOL_NAMES = [
+  'generate_online_qr',
+  'generate_offline_khqr',
+  'create_checkout_payload',
+  'create_checkout_purchase',
+  'create_payment_link',
+  'get_payment_link_details',
+  'query_journal',
+  'query_knowledge',
+  'check_transaction',
+  'check_transaction_by_merchant_ref',
+  'poll_transaction',
+  'save_artifact',
+  'open_artifact',
+  'copy_to_clipboard',
+] as const satisfies readonly AgentToolName[];
+
 export type CreateActionTool =
   | 'generate_online_qr'
   | 'generate_offline_khqr'
