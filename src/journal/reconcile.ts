@@ -13,8 +13,9 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { resolveWebhookDir } from '../config/data-root.js';
 import { extractTransactionIdFrom } from './digest.js';
-import { readJournalEvents, resolveJournalConfig } from './writer.js';
+import { readJournalEvents, resolveJournalDir } from './writer.js';
 
 export interface ReconcileEntry {
   transactionId: string;
@@ -46,13 +47,11 @@ export interface ReconcileReport {
 }
 
 export interface ReconcileOptions {
-  /** Journal directory. Default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data. */
+  /** Journal directory. Default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root. */
   journalDir?: string;
-  /** Webhook capture directory holding callbacks.jsonl. Default: <cwd>/webhook_data. */
+  /** Webhook capture directory holding callbacks.jsonl. Default: PAYWAY_WEBHOOK_DIR or <data root>/webhook_data. */
   webhookDir?: string;
 }
-
-const DEFAULT_WEBHOOK_DIR_NAME = 'webhook_data';
 
 interface WebhookDelivery {
   transactionId?: string;
@@ -106,9 +105,8 @@ function extractDelivery(record: {
 }
 
 export function reconcileTransactions(options: ReconcileOptions = {}): ReconcileReport {
-  const journalDir = options.journalDir ?? resolveJournalConfig(undefined, process.env)?.dir ?? path.join(process.cwd(), 'payway-data');
-  const webhookDir =
-    options.webhookDir ?? (process.env.PAYWAY_WEBHOOK_DIR?.trim() || path.join(process.cwd(), DEFAULT_WEBHOOK_DIR_NAME));
+  const journalDir = options.journalDir ?? resolveJournalDir();
+  const webhookDir = options.webhookDir ?? resolveWebhookDir();
 
   const journal = readJournalEvents(journalDir);
   const webhookFile = path.join(webhookDir, 'callbacks.jsonl');
