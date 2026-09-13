@@ -68,7 +68,7 @@ describe('cof token list (local store)', () => {
   });
 
   it('lists captured tokens masked by default and in full with --show-token', async () => {
-    saveLinkedToken({ ctid: 'custlist1', pwt: 'pwt-abcd1234wxyz' }, path.join(tempDir, 'payway-data'));
+    saveLinkedToken({ ctid: 'custlist1', pwt: 'pwt-abcd1234wxyz' });
     const masked = await run(['cof', 'token', 'list']);
     expect(masked.text).toContain('custlist1');
     expect(masked.text).toContain('pwt-…wxyz');
@@ -100,8 +100,8 @@ describe('cof charge token resolution', () => {
   });
 
   it('resolves the latest captured pwt for --ctid and sends it as the pwt field', async () => {
-    saveLinkedToken({ ctid: 'custcharge1', pwt: 'pwt-old-token' }, path.join(tempDir, 'payway-data'));
-    saveLinkedToken({ ctid: 'custcharge1', pwt: 'pwt-new-token' }, path.join(tempDir, 'payway-data'));
+    saveLinkedToken({ ctid: 'custcharge1', pwt: 'pwt-old-token' });
+    saveLinkedToken({ ctid: 'custcharge1', pwt: 'pwt-new-token' });
 
     let capturedBody = '';
     const srv = http.createServer((req, res) => {

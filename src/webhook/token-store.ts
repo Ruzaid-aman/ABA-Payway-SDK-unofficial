@@ -9,8 +9,9 @@
  * on capture, `cof token list` inspects it, and `cof charge --ctid` resolves
  * the latest token without copy-pasting a `pwt`.
  *
- * Storage is a small JSON file (`linked-tokens.json`) in the payway-data
- * directory — same zero-dependency posture as the JSON webhook storage and
+ * Storage is a small JSON file (`linked-tokens.json`) in the PayWay data root
+ * (PAYWAY_DATA_DIR / app-data, see src/config/data-root.ts) — same
+ * zero-dependency posture as the JSON webhook storage and
  * the transaction journal. The pwt is a live payment credential: the file
  * holds it in plaintext (like `.env` holds the API key) but every display
  * surface masks it unless explicitly asked.
@@ -18,6 +19,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { resolvePaywayDataRoot } from '../config/data-root.js';
 
 /** One persisted linked-account/card token. */
 export interface LinkedTokenRecord {
@@ -55,12 +57,12 @@ export const LINKED_TOKENS_FILE_NAME = 'linked-tokens.json';
 
 /**
  * Resolve the token-store directory: explicit arg → PAYWAY_TOKEN_STORE_DIR →
- * `<cwd>/payway-data` (the shared payway-data directory).
+ * the PAYWAY_DATA_DIR data root (the shared app-data location).
  */
 export function resolveTokenStoreDir(explicit?: string, env: NodeJS.ProcessEnv = process.env): string {
   if (explicit) return explicit;
   if (env[TOKEN_STORE_DIR_ENV]) return env[TOKEN_STORE_DIR_ENV] as string;
-  return path.join(process.cwd(), 'payway-data');
+  return resolvePaywayDataRoot(undefined, env);
 }
 
 function tokensFilePath(dir: string): string {

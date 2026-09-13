@@ -123,10 +123,16 @@ describe('Linked-token store', () => {
     expect(file.tokens).toHaveLength(1);
   });
 
-  it('dir resolution: explicit arg wins over env over cwd default', () => {
+  it('dir resolution: explicit arg wins over env over the data root', () => {
     expect(resolveTokenStoreDir('/x', {})).toBe('/x');
     expect(resolveTokenStoreDir(undefined, { PAYWAY_TOKEN_STORE_DIR: '/y' } as NodeJS.ProcessEnv)).toBe('/y');
-    expect(resolveTokenStoreDir(undefined, {})).toBe(join(process.cwd(), 'payway-data'));
+    const appData = mkdtempSync(join(tmpdir(), 'payway-appdata-'));
+    expect(resolveTokenStoreDir(undefined, { APPDATA: appData } as NodeJS.ProcessEnv)).toBe(
+      join(appData, 'aba-payway-sdk', 'data'),
+    );
+    expect(
+      resolveTokenStoreDir(undefined, { PAYWAY_DATA_DIR: '/data', APPDATA: appData } as NodeJS.ProcessEnv),
+    ).toBe('/data');
   });
 
   it('maskPwt keeps first/last 4 only', () => {
