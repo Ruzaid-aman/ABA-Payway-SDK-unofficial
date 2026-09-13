@@ -39,6 +39,7 @@ import type { JournalContext, JournalEmitterInput, JournalMode } from '../journa
 import { readSqliteJournalEvents, pruneSqliteJournal, SqliteJournalSink, type SqliteDb } from '../journal/sink-sqlite.js';
 import {
   loadLinkedTokens,
+  markTokenRenewed,
   removeLinkedTokens,
   saveLinkedToken,
   type LinkedTokenRecord,
@@ -89,6 +90,8 @@ export interface StorageService {
     latestForCtid(ctid: string): LinkedTokenRecord | undefined;
     /** Delete by ctid (or one specific pwt); returns the removed count. */
     remove(ctid: string, pwt?: string): number;
+    /** Record a renewal on the stored (ctid,pwt) record — restarts the ~90-day docs/09 window. Preserves other fields; undefined when the store does not hold that token. */
+    markRenewed(ctid: string, pwt: string, renewedAt?: string): LinkedTokenRecord | undefined;
   };
   readonly webhooks: WebhookStorage;
   /** Release backend resources (closes the shared sqlite handle; json = no-op). */
@@ -139,7 +142,7 @@ export async function createStorageService(options: StorageServiceOptions = {}):
         read: () => readSqliteJournalEvents(db),
         prune: (before) => pruneSqliteJournal(db, before),
       },
-      tokens: new SqliteLinkedTokenStore(db),
+      tokens: new SqliteLinkedTokenStore(db),  // markRenewed is a native method on the sqlite store
       webhooks: SqliteWebhookStorage.fromDb(db),
       close: () => db.close(),
     };
@@ -175,6 +178,7 @@ export async function createStorageService(options: StorageServiceOptions = {}):
         return tokens.length > 0 ? tokens[tokens.length - 1] : undefined;
       },
       remove: (ctid, pwt) => removeLinkedTokens(ctid, pwt, dataRoot, env),
+      markRenewed: (ctid, pwt, renewedAt) => markTokenRenewed(ctid, pwt, renewedAt, dataRoot, env),
     },
     webhooks: new JsonWebhookStorage(webhookFile),
     close: () => undefined,

@@ -74,6 +74,17 @@ describe('createStorageService (json backend)', () => {
     service.close();
   });
 
+  it('tokens.markRenewed restarts the expiry window and preserves other fields', async () => {
+    const root = makeRoot();
+    const service = await createStorageService({ dir: root, backend: 'json' });
+    service.tokens.save({ ctid: 'c1', pwt: 'tok', tokenFlag: 'CITI_FLEX' });
+    const updated = service.tokens.markRenewed('c1', 'tok', '2026-09-13T00:00:00.000Z');
+    expect(updated?.renewedAt).toBe('2026-09-13T00:00:00.000Z');
+    expect(service.tokens.load()[0].tokenFlag).toBe('CITI_FLEX');
+    expect(service.tokens.markRenewed('missing', 'nope')).toBeUndefined();
+    service.close();
+  });
+
   it('webhooks save/getAll/count use the raw-capture contract', async () => {
     const root = makeRoot();
     const service = await createStorageService({ dir: root, backend: 'json' });

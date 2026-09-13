@@ -240,9 +240,13 @@ export type { LinkedTokenRecord } from './webhook/token-store.js';
 export {
   latestTokenForCtid,
   loadLinkedTokens,
+  markTokenRenewed,
   maskPwt,
   resolveTokenStoreDir,
   saveLinkedToken,
+  TOKEN_EXPIRING_SOON_DAYS,
+  tokenExpiryStatus,
+  type TokenExpiryStatus,
 } from './webhook/token-store.js';
 export type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, WebhookRecord, WebhookStorage } from './webhook/storage.js';
 export type { StorageType } from './webhook/storage-factory.js';

@@ -132,6 +132,17 @@ export class SqliteLinkedTokenStore {
     return row ? rowToRecord(row) : undefined;
   }
 
+  /** Record a renewal on the stored (ctid,pwt) record; preserves other fields; undefined when absent. */
+  markRenewed(ctid: string, pwt: string, renewedAt?: string): LinkedTokenRecord | undefined {
+    const row = this.db
+      .prepare('SELECT * FROM linked_tokens WHERE ctid = ? AND pwt = ?')
+      .get(ctid, pwt) as TokenRow | undefined;
+    if (!row) return undefined;
+    const updated: LinkedTokenRecord = { ...rowToRecord(row), renewedAt: renewedAt ?? new Date().toISOString() };
+    this.save(updated);
+    return updated;
+  }
+
   /** Delete by ctid — or one specific pwt — and return the removed count. */
   remove(ctid: string, pwt?: string): number {
     const result =

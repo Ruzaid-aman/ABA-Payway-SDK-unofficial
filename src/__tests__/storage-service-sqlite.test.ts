@@ -84,6 +84,17 @@ maybeDescribe('createStorageService (sqlite backend)', () => {
     expect(existsSync(dbPath)).toBe(false);
   });
 
+  it('tokens.markRenewed updates the stored record on the shared handle', async () => {
+    const root = makeRoot();
+    const service = await createStorageService({ dir: root, backend: 'sqlite' });
+    service.tokens.save({ ctid: 'c1', pwt: 'tok', tokenFlag: 'CITO_FLEX' });
+    const updated = service.tokens.markRenewed('c1', 'tok', '2026-09-13T00:00:00.000Z');
+    expect(updated?.renewedAt).toBe('2026-09-13T00:00:00.000Z');
+    expect(service.tokens.load()[0].tokenFlag).toBe('CITO_FLEX');
+    expect(service.tokens.markRenewed('missing', 'nope')).toBeUndefined();
+    service.close();
+  });
+
   it("backend 'auto' resolves to the detected backend and works end-to-end", async () => {
     const root = makeRoot();
     const service = await createStorageService({ dir: root, backend: 'auto' });
