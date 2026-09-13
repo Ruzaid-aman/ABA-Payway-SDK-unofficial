@@ -1185,6 +1185,7 @@ program
             context: result.context,
             framework: result.framework,
             frameworkEvidence: result.frameworkEvidence,
+            dataRoot: result.dataRoot,
             checks: result.checks,
             envIssues: result.envIssues,
             ...(live ? { live } : {}),
