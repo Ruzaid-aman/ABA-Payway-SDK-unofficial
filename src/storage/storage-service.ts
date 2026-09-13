@@ -45,7 +45,7 @@ import {
 } from '../webhook/token-store.js';
 import { SqliteLinkedTokenStore } from '../webhook/token-store-sqlite.js';
 import { JsonWebhookStorage } from '../webhook/storage-json.js';
-import { SqliteWebhookStorage } from '../webhook/storage-sqlite.js';
+import { loadBetterSqlite3, SqliteWebhookStorage } from '../webhook/storage-sqlite.js';
 import type { WebhookRecord, WebhookStorage } from '../webhook/storage.js';
 
 export type StorageBackend = 'json' | 'sqlite';
@@ -98,20 +98,17 @@ export interface StorageService {
 /** Resolve the effective backend for 'auto': sqlite iff better-sqlite3 is importable. */
 export async function probeStorageBackend(env: NodeJS.ProcessEnv = process.env): Promise<StorageBackend> {
   if (env.PAYWAY_FORCE_JSON_STORAGE === '1') return 'json';
-  try {
-    await import('better-sqlite3');
-    return 'sqlite';
-  } catch {
-    return 'json';
-  }
+  // Use the shared loader — a LITERAL `import('better-sqlite3')` is resolved by
+  // the bundler at build time (and the emitted chunk fails at runtime), while
+  // the loader's variable-indirect form survives as a true runtime import.
+  const driver = await loadBetterSqlite3();
+  return driver ? 'sqlite' : 'json';
 }
 
 async function openSqliteDb(dbPath: string): Promise<SqliteDb> {
-  const optionalPeer = 'better-sqlite3';
-  const mod = await import(optionalPeer);
-  // biome-ignore lint/suspicious/noExplicitAny: dynamic import of optional peer dependency
-  const Driver = (mod.default ?? mod) as any;
-  const db = new Driver(dbPath) as SqliteDb;
+  const Driver = await loadBetterSqlite3();
+  if (!Driver) throw new Error('better-sqlite3 is not installed');
+  const db = new Driver(dbPath) as unknown as SqliteDb;
   db.pragma('journal_mode = WAL');
   return db;
 }

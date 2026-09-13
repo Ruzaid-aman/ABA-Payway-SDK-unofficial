@@ -29,7 +29,7 @@ interface BetterSqlite3Database {
  * Attempt to load better-sqlite3 dynamically.
  * Returns the constructor or `null` if the module is not installed.
  */
-async function loadBetterSqlite3(): Promise<new (path: string) => BetterSqlite3Database> {
+export async function loadBetterSqlite3(): Promise<new (path: string) => BetterSqlite3Database> {
   try {
     const optionalPeer = 'better-sqlite3';
     const mod = await import(optionalPeer);
