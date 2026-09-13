@@ -95,6 +95,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "ajv": "^8.17.1",
     "commander": "^15.0.0",
     "qrcode": "^1.5.4",
