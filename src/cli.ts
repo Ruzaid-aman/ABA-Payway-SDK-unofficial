@@ -97,6 +97,7 @@ import {
 } from './cli/output.js';
 import { saveQrPng } from './cli/qr-artifact.js';
 import { registerCompletionsCommand } from './cli/commands/completions.js';
+import { getUpdateCheckCachePath, isTopLevelHelpArgv, maybeNoticeUpdate } from './cli/update-check.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (shared parser; supports multi-line quoted PEMs)
@@ -5172,31 +5173,52 @@ function registeredCommandNames(): string[] {
 }
 
 if (invokedDirectly) {
-  // Interactive bare invocation: a guided overview screen instead of
-  // commander's help-on-stderr. Non-TTY / CI / PAYWAY_UI=classic keep the
-  // historical fall-through (commander help on stderr, exit 1).
-  if (process.argv.slice(2).length === 0 && resolvePromptMode() === 'clack') {
-    renderBareInvocationHelp();
-    process.exit(0);
-  }
+  // Async IIFE, not top-level await: tsup also emits dist/cli.cjs, and
+  // top-level await cannot transpile to CJS. All existing behavior —
+  // bare-invocation help screen, unknown-command/option suggestions,
+  // error printing — is preserved inside the IIFE.
+  void (async () => {
+    const cliArgs = process.argv.slice(2);
+    // Update notice: bare invocation or top-level help ONLY. stderr-only,
+    // TTY-only, PAYWAY_NO_UPDATE_CHECK-gated inside maybeNoticeUpdate
+    // (src/cli/update-check.ts) — never on real commands, never on stdout.
+    if (cliArgs.length === 0 || isTopLevelHelpArgv(cliArgs)) {
+      await maybeNoticeUpdate({
+        argv: cliArgs,
+        currentVersion: readPackageVersion(),
+        env: process.env,
+        cachePath: getUpdateCheckCachePath(),
+        streams: { stdout: process.stdout, stderr: process.stderr },
+      });
+    }
+    // Interactive bare invocation: a guided overview screen instead of
+    // commander's help-on-stderr. Non-TTY / CI / PAYWAY_UI=classic keep the
+    // historical fall-through (commander help on stderr, exit 1).
+    if (cliArgs.length === 0 && resolvePromptMode() === 'clack') {
+      renderBareInvocationHelp();
+      process.exit(0);
+    }
 
-  runCli(process.argv.slice(2)).catch((err: unknown) => {
-    if (err instanceof CliCancelled) {
-      console.log('  Cancelled by user.');
-      process.exit(130);
+    try {
+      await runCli(cliArgs);
+    } catch (err: unknown) {
+      if (err instanceof CliCancelled) {
+        console.log('  Cancelled by user.');
+        process.exit(130);
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      const unknownOptionMatch = /unknown option '--?([^' ]+)'/.exec(message);
+      if (unknownOptionMatch) {
+        const suggestion = unknownOptionSuggestion(`--${unknownOptionMatch[1]}`, collectKnownFlags());
+        if (suggestion) console.error(`  ${suggestion}`);
+      }
+      const unknownCommandMatch = /unknown command '?([^' ]+)'?/.exec(message);
+      if (unknownCommandMatch) {
+        const suggestion = unknownCommandSuggestion(unknownCommandMatch[1], registeredCommandNames());
+        if (suggestion) console.error(`  ${suggestion}`);
+      }
+      console.error(err);
+      process.exitCode = 1;
     }
-    const message = err instanceof Error ? err.message : String(err);
-    const unknownOptionMatch = /unknown option '--?([^' ]+)'/.exec(message);
-    if (unknownOptionMatch) {
-      const suggestion = unknownOptionSuggestion(`--${unknownOptionMatch[1]}`, collectKnownFlags());
-      if (suggestion) console.error(`  ${suggestion}`);
-    }
-    const unknownCommandMatch = /unknown command '?([^' ]+)'?/.exec(message);
-    if (unknownCommandMatch) {
-      const suggestion = unknownCommandSuggestion(unknownCommandMatch[1], registeredCommandNames());
-      if (suggestion) console.error(`  ${suggestion}`);
-    }
-    console.error(err);
-    process.exitCode = 1;
-  });
+  })();
 }
