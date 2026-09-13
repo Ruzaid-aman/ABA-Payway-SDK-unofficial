@@ -851,6 +851,40 @@ changes exit codes or command output.
 
 ---
 
+## MCP server (v1.6.0)
+
+### `payway-sdk mcp`
+
+Serves the PayWay tool catalog as a **Model Context Protocol stdio server** so
+any MCP host (Claude Code, Codex, OpenCode, custom clients) can drive the SDK
+as tools. stdout belongs to the protocol; diagnostics go to stderr.
+
+- **Surface:** the 14 agent tools in schema parity (same JSON Schemas the
+  embedded agent uses, executors and error sanitization shared with
+  `payway-sdk agent`) plus 3 MCP-only read-only extras:
+  `list_transactions` (gateway window, UTC+7, ≤3 days), `journal_stats`,
+  `journal_timeline` (digest projection — request/response bodies never leave
+  the machine, even if the on-disk journal runs in full mode).
+- **Read-only by default:** mutation-class tools (create QR / checkout /
+  payment link) are **omitted from `tools/list` entirely** unless
+  `--allow-mutations` or `PAYWAY_MCP_ALLOW_MUTATIONS=1`. The server refuses
+  what it never exposed (`UNKNOWN_TOOL`); user confirmation is the host
+  client's responsibility. Tool annotations mirror the risk classes
+  (`readOnlyHint`).
+- **Preview without serving:** `payway-sdk mcp --list-tools [--json]` prints
+  the effective catalog (12 read-only / 17 with mutations).
+- **Client config (Claude Code style):**
+  `{"command":"npx","args":["tsx","src/cli.ts","mcp"]}` (or
+  `{"command":"payway-sdk","args":["mcp"]}` when installed globally).
+  Credentials resolve per call via profiles/env exactly like other commands;
+  journal/knowledge tools work offline without credentials.
+- Errors map to `isError:true` tool results with sanitized detail
+  (`PayWayAPIError.correlationId` included where present); transport errors
+  are JSON-RPC level. The server never mutates journal/ledger state and never
+  prompts.
+
+---
+
 ## Development & Contribution
 
 ### Setup & Commands

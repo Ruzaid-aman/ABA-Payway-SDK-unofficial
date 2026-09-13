@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### CLI modernization Phase 2 — MCP server (2026-09-13 — `.scratch/cli-modernization/`)
+
+- **`payway-sdk mcp`**: Model Context Protocol stdio server over the agent
+  tool registry (`@modelcontextprotocol/sdk@1.30.0`, exact-pinned). The 14
+  agent tools in schema parity plus 3 read-only extras (`list_transactions`,
+  `journal_stats`, `journal_timeline` — digest projection, bodies never leave
+  the machine). Read-only by default: mutation tools are omitted from
+  `tools/list` unless `--allow-mutations` / `PAYWAY_MCP_ALLOW_MUTATIONS=1`;
+  annotations mirror the risk classes; `--list-tools [--json]` previews the
+  effective catalog. Real stdio transport verified on Windows (dist smoke
+  test). Agent tool catalog count unchanged (14).
+
 ### CLI modernization Phase 1 (2026-09-13 — `.scratch/cli-modernization/`)
 
 - **`payway-sdk completions <bash|zsh|fish|powershell>`**: shell completion

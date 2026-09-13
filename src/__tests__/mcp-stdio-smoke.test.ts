@@ -43,7 +43,9 @@ function exchange(frames: unknown[]): Promise<{ responses: JsonRpcMessage[]; std
     const timeout = setTimeout(() => {
       child.kill();
       reject(new Error(`mcp stdio did not answer in time; got: ${responses.length} responses; stderr: ${stderr.slice(0, 400)}`));
-    }, 8000);
+      // 20s: the full suite runs many workers; a cold dist spawn under load
+      // can exceed a tighter budget (observed 8s flake).
+    }, 20_000);
 
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {

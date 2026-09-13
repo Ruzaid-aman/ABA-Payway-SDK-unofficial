@@ -60,6 +60,10 @@ npx tsx src/cli.ts journal reconcile --json                               # crea
 npx tsx src/cli.ts completions bash
 npx tsx src/cli.ts completions zsh   # also fish | powershell; unknown shell → exit 1, list on stderr
 
+# MCP server (stdio; read-only by default — mutations need --allow-mutations or PAYWAY_MCP_ALLOW_MUTATIONS=1)
+npx tsx src/cli.ts mcp --list-tools --json   # effective catalog (12 read-only / 17 with mutations), never starts stdio
+# Client config: {"command":"npx","args":["tsx","src/cli.ts","mcp"]} — stdout is the protocol, stderr is logs
+
 # Webhook workbench (local only — no API call, no ABA Simulator needed)
 npx tsx src/cli.ts webhook trigger --url http://localhost:3000/webhooks/aba --event payment.approved  # signed fixture
 npx tsx src/cli.ts webhook verify-callback --body-file cb.json --sig "<X-PAYWAY-HMAC-SHA512>"        # exit 0 valid / 1 invalid
