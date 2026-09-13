@@ -96,6 +96,7 @@ import {
   writeStructuredFinal,
 } from './cli/output.js';
 import { saveQrPng } from './cli/qr-artifact.js';
+import { registerCompletionsCommand } from './cli/commands/completions.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (shared parser; supports multi-line quoted PEMs)
@@ -979,8 +980,10 @@ function isProfilesCommand(command: Command): boolean {
 function activateSelectedProfile(command: Command): void {
   if (isProfilesCommand(command) || command.name() === 'demo' || command.name() === 'init') return;
   // `docs` serves knowledge only — never credentials, so the profile notice
-  // would be pure noise on top of served content.
-  if (command.name() === 'docs') return;
+  // would be pure noise on top of served content. `completions` likewise:
+  // it emits a machine-sourced script meant for redirect (`> file`),
+  // so any notice line would corrupt the artifact.
+  if (command.name() === 'docs' || command.name() === 'completions') return;
   const selectedName =
     program.opts<{ profile?: string }>().profile ??
     process.env.PAYWAY_PROFILE ??
@@ -4749,6 +4752,7 @@ registerDocsCommand(program);
 registerJournalCommands(program);
 registerOnboardCommand(program);
 registerWebhookCommands(program);
+registerCompletionsCommand(program);
 
 // --- pre-auth (complete / complete-with-payout / cancel) ---
 const preAuthComplete = new Command('complete')

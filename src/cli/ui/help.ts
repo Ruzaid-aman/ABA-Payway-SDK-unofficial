@@ -12,7 +12,7 @@ import { suggest, suggestMessage } from './suggest.js';
  * ...) are shown via the parent command's help, not as separate entries.
  */
 export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
-  { title: 'Setup', commands: ['init', 'doctor', 'config', 'profiles', 'onboard'] },
+  { title: 'Setup', commands: ['init', 'doctor', 'config', 'profiles', 'onboard', 'completions'] },
   {
     title: 'Payments',
     commands: [
