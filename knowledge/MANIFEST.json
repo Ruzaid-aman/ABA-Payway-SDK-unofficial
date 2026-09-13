@@ -118,9 +118,9 @@
       "description": "Credentials-on-file account/card lifecycle and token renewal.",
       "source": "docs/09-link-unlink-renew-lifecycle.md",
       "file": "link-lifecycle.md",
-      "bytes": 25560,
-      "sha256": "1a188296d4c11d69",
-      "sourceSha256": "f7ddbce5a34f1339"
+      "bytes": 26485,
+      "sha256": "39cb5c34943c7de7",
+      "sourceSha256": "7f1b8c806e0d185d"
     },
     {
       "topic": "ui-customization",

@@ -56,4 +56,9 @@ records carry the originating webhook record id (`sourceRecordId`); webhook reco
   non-payment, and no EXPIRED/CLOSED status exists remotely.
 - Not multi-merchant yet (records are not tagged per merchant profile).
 - The pwt is stored in plaintext like the JSON store (masking is a display concern — `maskPwt`);
-  token hardening (encryption, gateway-remove sync, 90-day expiry) is a separate wave.
+  encryption was deliberately deferred (data root lives outside the repo; key management would add
+  platform-specific deps without a threat model that justifies them).
+- Token lifecycle is enforced locally since wave 4: records carry `capturedAt` + `renewedAt`
+  (renewal restarts the ~90-day docs/09 window), `tokenExpiryStatus()` buckets each record, the CLI
+  `cof token remove` prunes the local copy after gateway success, and `cof charge --ctid` refuses
+  locally-expired tokens — see docs/09 §4a.
