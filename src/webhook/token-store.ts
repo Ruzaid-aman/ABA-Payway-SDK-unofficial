@@ -155,6 +155,34 @@ export function tokenExpiryStatus(
 }
 
 /**
+ * Record a successful renewal on the stored (ctid, pwt) record — restarts the
+ * ~90-day expiry window (docs/09 §4a: validity counts from grant/RENEWAL).
+ * Preserves every other field; unknown (ctid, pwt) pairs return undefined and
+ * write nothing (never fabricate partial records). Atomic rewrite.
+ */
+export function markTokenRenewed(
+  ctid: string,
+  pwt: string,
+  renewedAt?: string,
+  dir?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): LinkedTokenRecord | undefined {
+  const storeDir = resolveTokenStoreDir(dir, env);
+  const file = tokensFilePath(storeDir);
+  if (!existsSync(file)) return undefined;
+  const existing = loadLinkedTokens(storeDir, env);
+  const idx = existing.findIndex((t) => t.ctid === ctid && t.pwt === pwt);
+  if (idx < 0) return undefined;
+  const kept = existing.slice();
+  kept[idx] = { ...existing[idx], renewedAt: renewedAt ?? new Date().toISOString() };
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}
+`, 'utf8');
+  renameSync(tmp, file);
+  return kept[idx];
+}
+
+/**
  * Delete stored tokens for a ctid — optionally only one specific pwt — and
  * rewrite the store atomically (same tmp+rename durability as save). Returns
  * the number of records removed; a missing store removes nothing. This is

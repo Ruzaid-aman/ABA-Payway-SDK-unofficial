@@ -44,7 +44,7 @@ import { runInit } from './cli/commands/init.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
 import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/commands/skills.js';
 import { registerWebhookCommands } from './cli/commands/webhook.js';
-import { latestTokenForCtid, loadLinkedTokens, maskPwt } from './webhook/token-store.js';
+import { latestTokenForCtid, loadLinkedTokens, markTokenRenewed, maskPwt, removeLinkedTokens, tokenExpiryStatus } from './webhook/token-store.js';
 import { readMaskedInput } from './cli/masked-input.js';
 import { loadPaymentLinkImage } from './cli/payment-link-image.js';
 import { PayWay } from './client.js';
@@ -4394,12 +4394,26 @@ cofTokenCmd
         ctid: opts.ctid as string,
         paymentToken: opts.token as string,
       });
+      // Storage wave 4: a successful renewal restarts the ~90-day window —
+      // update the local store record (fail-open; note to stderr under --json
+      // so stdout stays one JSON document).
+      let localNote: string;
+      try {
+        const renewedRecord = markTokenRenewed(opts.ctid as string, opts.token as string);
+        localNote = renewedRecord
+          ? 'local store: expiry window restarted'
+          : 'local store: token not tracked locally — nothing to update';
+      } catch (error) {
+        localNote = `local store update failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
       if (opts.json) {
+        console.error(`  ${localNote}`);
         printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Token renew requested`);
-      console.log(`  ${c.dim('Result arrives via the callback_url.')}\n`);
+      console.log(`  ${c.dim('Result arrives via the callback_url.')}`);
+      console.log(`  ${c.dim(localNote)}\n`);
     } catch (e) {
       process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }

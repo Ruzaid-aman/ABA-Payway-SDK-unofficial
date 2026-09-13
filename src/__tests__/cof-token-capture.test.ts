@@ -19,6 +19,7 @@ import {
   latestTokenForCtid,
   LINKED_TOKENS_FILE_NAME,
   loadLinkedTokens,
+  markTokenRenewed,
   maskPwt,
   removeLinkedTokens,
   resolveTokenStoreDir,
@@ -180,6 +181,20 @@ describe('Linked-token store', () => {
       daysLeft: null,
       expiresAt: null,
     });
+  });
+
+  it('markTokenRenewed updates only the matching record and preserves its fields', () => {
+    saveLinkedToken({ ctid: 'ren1', pwt: 'tok-a', tokenFlag: 'CITI_FLEX', requestId: 'req-1' }, dir);
+    saveLinkedToken({ ctid: 'ren1', pwt: 'tok-b' }, dir);
+
+    const updated = markTokenRenewed('ren1', 'tok-a', '2026-09-13T00:00:00.000Z', dir);
+    expect(updated?.renewedAt).toBe('2026-09-13T00:00:00.000Z');
+    expect(updated?.tokenFlag).toBe('CITI_FLEX');
+    expect(updated?.requestId).toBe('req-1');
+    const all = loadLinkedTokens(dir);
+    expect(all.find((t) => t.pwt === 'tok-b')?.renewedAt).toBeUndefined();
+
+    expect(markTokenRenewed('never', 'nope', undefined, dir)).toBeUndefined();
   });
 
   it('maskPwt keeps first/last 4 only', () => {

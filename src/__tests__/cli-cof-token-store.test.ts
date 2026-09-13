@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { captureConsole } from '../test/test-utils.js';
-import { saveLinkedToken } from '../webhook/token-store.js';
+import { loadLinkedTokens, saveLinkedToken } from '../webhook/token-store.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-cof-tokens-'));
 const originalCwd = process.cwd();
@@ -97,6 +97,32 @@ describe('cof charge token resolution', () => {
     const { text, exitCode } = await run(['cof', 'charge', '-t', 'ord-1', '-a', '1.00', '--ctid', 'nosuchcust']);
     expect(text).toContain('No captured token');
     expect(exitCode).not.toBe(0);
+  });
+
+  it('cof token renew restarts the local expiry window on gateway success', async () => {
+    saveLinkedToken({ ctid: 'custren1', pwt: 'pwt-renew-token', tokenFlag: 'CITI_FLEX' });
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '00', message: 'Success' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'token', 'renew', '-r', 'reqren1', '-c', 'custren1', '--token', 'pwt-renew-token',
+      ]);
+      expect(text).toContain('Token renew requested');
+      expect(text).toContain('expiry window restarted');
+      const record = loadLinkedTokens().find((t) => t.pwt === 'pwt-renew-token');
+      expect(record?.renewedAt).toBeTruthy();
+      expect(record?.tokenFlag).toBe('CITI_FLEX');
+      expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
   });
 
   it('resolves the latest captured pwt for --ctid and sends it as the pwt field', async () => {
