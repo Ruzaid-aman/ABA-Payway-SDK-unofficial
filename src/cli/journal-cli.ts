@@ -25,6 +25,17 @@ export function cliJournal(): JournalContext | undefined {
   return standalone;
 }
 
+/**
+ * Drop the memoized CLI emitter so the next `cliJournal()` re-resolves from
+ * the current env. preAction calls this before applying the journal policy —
+ * `--no-journal` (or a falsy env) must suppress command-level emission even
+ * when an earlier in-process command already armed it (the CLI runs one
+ * command per process; in-process runCli reuse is the case that exposed it).
+ */
+export function resetCliJournalEmitter(): void {
+  standalone = undefined;
+}
+
 export function emitCliJournal(event: JournalEmitterInput): void {
   cliJournal()?.emit(event);
 }

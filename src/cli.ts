@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { Command, CommanderError, Help } from 'commander';
 import { confirmCheckoutSubmit } from './cli/flows/checkout-flow.js';
 import { chooseNextStep } from './cli/flows/next-steps.js';
+import { applyCliJournalPolicy } from './cli/journal-policy.js';
 import { collectQrParams } from './cli/flows/qr-flow.js';
 import { loadDotEnvIntoProcess } from './cli/dotenv.js';
 import { explainAll, explainPayWayCode } from './cli/explain-code.js';
@@ -33,6 +34,7 @@ import {
   emitCliJournal,
   emitStatusObserved,
   journalSawCreateFor,
+  resetCliJournalEmitter,
 } from './cli/journal-cli.js';
 import { buildResponseDigest } from './journal/digest.js';
 import { checkDemoApp, startDemoApp } from './cli/commands/demo.js';
@@ -950,8 +952,9 @@ program
   .option('--no-color', 'Disable ANSI colors in output')
   .option(
     '--journal',
-    'Record command lifecycle + every API exchange to the transaction journal (<cwd>/payway-data/journal.jsonl; same as PAYWAY_JOURNAL=1)',
+    'Force the transaction journal on (<data root>/journal.jsonl; ON by default for API commands)',
   )
+  .option('--no-journal', 'Disable the transaction journal for this invocation')
   .showSuggestionAfterError()
   .addHelpText(
     'after',
@@ -976,6 +979,15 @@ function isProfilesCommand(command: Command): boolean {
     current = current.parent ?? null;
   }
   return false;
+}
+
+/** Nearest command below the root program — the exemption key for journal policy. */
+function topLevelCommandName(command: Command): string {
+  let current: Command = command;
+  while (current.parent && current.parent.name() !== program.name()) {
+    current = current.parent;
+  }
+  return current.name();
 }
 
 function activateSelectedProfile(command: Command): void {
@@ -1016,12 +1028,18 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
   setColorOverride(optsColor);
   c = currentPalette();
   activateSelectedProfile(actionCommand);
-  // Phase 2: --journal (or PAYWAY_JOURNAL=1) turns on the transaction
-  // journal for the whole invocation. Setting the env var here also arms
-  // every `new PayWay()` constructed by command handlers downstream.
-  if (program.opts<{ journal?: boolean }>().journal) {
-    process.env.PAYWAY_JOURNAL = '1';
-  }
+  // Storage wave 1: the CLI journals BY DEFAULT for gateway-touching
+  // commands. --journal/--no-journal override; an explicitly falsy
+  // PAYWAY_JOURNAL in the environment is respected; pure-local commands are
+  // exempt so doctor/status report ambient truth and `journal *` never
+  // creates the file it queries. Setting the env var here still arms every
+  // `new PayWay()` constructed by command handlers downstream.
+  resetCliJournalEmitter();
+  applyCliJournalPolicy(
+    topLevelCommandName(actionCommand),
+    program.opts<{ journal?: boolean }>().journal,
+    process.env,
+  );
   emitCliCommandStarted(actionCommand);
 });
 
@@ -4719,7 +4737,7 @@ program
   .option('--storage <type>', 'Storage backend: json or sqlite (default: auto)')
   .option('--tunnel', 'Automatically start Cloudflare Tunnel (skip prompt)')
   .option('--url <url>', 'Public webhook URL (skip prompt, no tunnel)')
-  .option('--journal', 'Also enable the transaction journal in .env (PAYWAY_JOURNAL=1) so reconcile works out of the box')
+  .option('--journal', 'Persist PAYWAY_JOURNAL=1 into .env (pins the default-on CLI journal for SDK/embedded runs too)')
   .option(
     '--forward-to <url>',
     'Re-POST every captured callback to this local app URL after capture (test your receiver without the ABA Simulator)',
