@@ -225,3 +225,28 @@ maybeDescribe('SqliteWebhookStorage customerQr metadata (Customer Module callbac
     storage.close();
   });
 });
+
+
+maybeDescribe('SqliteWebhookStorage.fromDb (shared handle)', () => {
+  it('round-trips records on a caller-owned db the instance does not close', async () => {
+    const dir = makeTempDir();
+    const dbPath = path.join(dir, 'payway.db');
+    const mod = await import('better-sqlite3');
+    const Sqlite3 = (mod.default ?? mod) as new (p: string) => import('../journal/sink-sqlite.js').SqliteDb;
+    const db = new Sqlite3(dbPath);
+    db.pragma('journal_mode = WAL');
+
+    const storage = SqliteWebhookStorage.fromDb(db as never);
+    const record = storage.save({ headers: { 'user-agent': 'ua' }, body: '{"tran_id":"F1"}' });
+    expect(storage.getAll()).toHaveLength(1);
+    expect(storage.getAll()[0].id).toBe(record.id);
+
+    storage.close(); // shared mode: must NOT close the underlying handle
+    const reopened = SqliteWebhookStorage.fromDb(db as never);
+    expect(reopened.getAll()[0].id).toBe(record.id);
+
+    // The facade owns the handle; after IT closes, the file is released (Windows check).
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

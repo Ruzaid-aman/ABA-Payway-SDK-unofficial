@@ -101,9 +101,42 @@ export function ensureCustomerQrMetadataColumn(db: Pick<BetterSqlite3Database, '
 
 export class SqliteWebhookStorage implements WebhookStorage {
   private db: BetterSqlite3Database;
+  /** False for `fromDb` — the facade owns the shared handle, not this instance. */
+  private readonly ownsDb: boolean;
 
-  private constructor(db: BetterSqlite3Database) {
+  private constructor(db: BetterSqlite3Database, ownsDb: boolean) {
     this.db = db;
+    this.ownsDb = ownsDb;
+  }
+
+  /**
+   * Create the callbacks table + all additive metadata columns on a handle.
+   * Shared by `create()` (own handle) and `fromDb()` (facade-shared handle)
+   * so both paths run the exact same schema/migration sequence.
+   */
+  private static prepareSchema(db: BetterSqlite3Database): void {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS callbacks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        record_id TEXT NOT NULL,
+        received_at TEXT NOT NULL,
+        headers_json TEXT NOT NULL,
+        body TEXT NOT NULL,
+        source_ip TEXT,
+        khqr_json TEXT,
+        pushback_json TEXT,
+        customer_qr_json TEXT,
+        signature_verdict TEXT,
+        verification_reason TEXT,
+        matched_transaction_id TEXT,
+        matched_status TEXT,
+        replay INTEGER
+      )
+    `);
+    ensureKhqrMetadataColumn(db);
+    ensureCallbackMetadataColumns(db);
+    ensurePushbackMetadataColumn(db);
+    ensureCustomerQrMetadataColumn(db);
   }
 
   /**
@@ -128,28 +161,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
     const db = new Sqlite3(dbPath);
     try {
       db.pragma('journal_mode = WAL');
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS callbacks (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          record_id TEXT NOT NULL,
-          received_at TEXT NOT NULL,
-          headers_json TEXT NOT NULL,
-          body TEXT NOT NULL,
-          source_ip TEXT,
-          khqr_json TEXT,
-          pushback_json TEXT,
-          customer_qr_json TEXT,
-          signature_verdict TEXT,
-          verification_reason TEXT,
-          matched_transaction_id TEXT,
-          matched_status TEXT,
-          replay INTEGER
-        )
-      `);
-      ensureKhqrMetadataColumn(db);
-      ensureCallbackMetadataColumns(db);
-      ensurePushbackMetadataColumn(db);
-      ensureCustomerQrMetadataColumn(db);
+      SqliteWebhookStorage.prepareSchema(db);
     } catch (error) {
       // A failed open (corrupt file, bad pragma) must not leak the handle —
       // on Windows the open file blocks even the temp-dir cleanup.
@@ -157,7 +169,18 @@ export class SqliteWebhookStorage implements WebhookStorage {
       throw error;
     }
 
-    return new SqliteWebhookStorage(db);
+    return new SqliteWebhookStorage(db, true);
+  }
+
+  /**
+   * Wrap an EXISTING better-sqlite3 handle (shared-ownership mode: the
+   * StorageService facade opens one `<dataRoot>/payway.db` for every store
+   * and closes it once — this instance therefore never closes the db in its
+   * own close(), it only detaches).
+   */
+  static fromDb(db: BetterSqlite3Database): SqliteWebhookStorage {
+    SqliteWebhookStorage.prepareSchema(db);
+    return new SqliteWebhookStorage(db, false);
   }
 
   save(record: Omit<WebhookRecord, 'id' | 'receivedAt'>): WebhookRecord {
@@ -255,6 +278,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
   }
 
   close(): void {
+    if (!this.ownsDb) return; // shared handle — the facade closes it exactly once
     this.db.close();
   }
 }
