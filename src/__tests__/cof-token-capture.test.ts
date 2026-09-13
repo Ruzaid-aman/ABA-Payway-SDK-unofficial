@@ -19,9 +19,12 @@ import {
   latestTokenForCtid,
   LINKED_TOKENS_FILE_NAME,
   loadLinkedTokens,
+  markTokenRenewed,
   maskPwt,
+  removeLinkedTokens,
   resolveTokenStoreDir,
   saveLinkedToken,
+  tokenExpiryStatus,
 } from '../webhook/token-store.js';
 import { createWebhookServer, type WebhookServerResult } from '../webhook/server.js';
 import { JsonWebhookStorage } from '../webhook/storage-json.js';
@@ -133,6 +136,65 @@ describe('Linked-token store', () => {
     expect(
       resolveTokenStoreDir(undefined, { PAYWAY_DATA_DIR: '/data', APPDATA: appData } as NodeJS.ProcessEnv),
     ).toBe('/data');
+  });
+
+  it('removeLinkedTokens deletes by ctid (or ctid+pwt) and returns the count', () => {
+    saveLinkedToken({ ctid: 'rm1', pwt: 'tok-a' }, dir);
+    saveLinkedToken({ ctid: 'rm1', pwt: 'tok-b' }, dir);
+    saveLinkedToken({ ctid: 'rm2', pwt: 'tok-c' }, dir);
+
+    expect(removeLinkedTokens('rm1', 'tok-a', dir)).toBe(1);
+    expect(loadLinkedTokens(dir).map((t) => t.pwt)).toEqual(['tok-b', 'tok-c']);
+
+    expect(removeLinkedTokens('rm1', undefined, dir)).toBe(1);
+    expect(loadLinkedTokens(dir).map((t) => t.ctid)).toEqual(['rm2']);
+
+    expect(removeLinkedTokens('never-existed', undefined, dir)).toBe(0);
+    expect(removeLinkedTokens('rm2', undefined, join(dir, 'no-such-store'))).toBe(0);
+  });
+
+  it('tokenExpiryStatus buckets tokens by the ~90-day docs/09 window', () => {
+    const now = new Date('2026-09-13T00:00:00.000Z');
+    const iso = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).toISOString();
+
+    const expired = tokenExpiryStatus({ capturedAt: iso(91) }, now);
+    expect(expired.status).toBe('expired');
+    expect(expired.daysLeft).toBeLessThanOrEqual(0);
+    expect(expired.expiresAt).toBeInstanceOf(Date);
+
+    // Boundary day: exactly 90 days after grant floors to 0 days left → expired.
+    expect(tokenExpiryStatus({ capturedAt: iso(90) }, now).status).toBe('expired');
+
+    const expiring = tokenExpiryStatus({ capturedAt: iso(85) }, now);
+    expect(expiring.status).toBe('expiring-soon');
+    expect(expiring.daysLeft).toBe(5);
+
+    expect(tokenExpiryStatus({ capturedAt: iso(1) }, now).status).toBe('valid');
+
+    // Renewal restarts the window from renewedAt, not capturedAt.
+    const renewed = tokenExpiryStatus({ capturedAt: iso(100), renewedAt: iso(1) }, now);
+    expect(renewed.status).toBe('valid');
+    expect(renewed.daysLeft).toBe(89);
+
+    expect(tokenExpiryStatus({} as { capturedAt: string }, now)).toEqual({
+      status: 'unknown',
+      daysLeft: null,
+      expiresAt: null,
+    });
+  });
+
+  it('markTokenRenewed updates only the matching record and preserves its fields', () => {
+    saveLinkedToken({ ctid: 'ren1', pwt: 'tok-a', tokenFlag: 'CITI_FLEX', requestId: 'req-1' }, dir);
+    saveLinkedToken({ ctid: 'ren1', pwt: 'tok-b' }, dir);
+
+    const updated = markTokenRenewed('ren1', 'tok-a', '2026-09-13T00:00:00.000Z', dir);
+    expect(updated?.renewedAt).toBe('2026-09-13T00:00:00.000Z');
+    expect(updated?.tokenFlag).toBe('CITI_FLEX');
+    expect(updated?.requestId).toBe('req-1');
+    const all = loadLinkedTokens(dir);
+    expect(all.find((t) => t.pwt === 'tok-b')?.renewedAt).toBeUndefined();
+
+    expect(markTokenRenewed('never', 'nope', undefined, dir)).toBeUndefined();
   });
 
   it('maskPwt keeps first/last 4 only', () => {

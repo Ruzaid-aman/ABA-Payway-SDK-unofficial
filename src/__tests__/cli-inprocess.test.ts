@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { captureConsole } from '../test/test-utils.js';
+import { addProfile, loadProfileStore, saveProfileStore } from '../config/profiles.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-inprocess-'));
 const originalCwd = process.cwd();
@@ -139,17 +140,40 @@ describe('CLI in-process (runCli)', () => {
   });
 
   it('config reports the environment state with secrets masked', async () => {
-    const { text, exitCode } = await run(['config']);
-    expect(text).toContain('configuration');
-    expect(text).toContain('.env'); // present or absent — either way it reports
-    // Labels are printed, not raw variable names; the credential source
-    // banner (profile store > .env > env) is always shown.
-    expect(text).toContain('API Key');
-    expect(text).toContain('Using profile');
-    expect(text).not.toMatch(/sk[test_-][A-Za-z0-9]{8,}/); // never a raw secret
-    // Exit 0 when the environment validates; exit 1 with missing credentials
-    // (the hermetic test env has none) — both are valid completions.
-    expect([0, 1]).toContain(exitCode as number);
+    // Seeded profile store in an isolated app-data dir: this test used to
+    // depend (accidentally) on the developer's real %APPDATA% profile store.
+    const appData = mkdtempSync(path.join(tmpdir(), 'payway-config-appdata-'));
+    const previousAppData = process.env.APPDATA;
+    process.env.APPDATA = appData;
+    try {
+      const store = loadProfileStore();
+      addProfile(store, {
+        name: 'ci-profile',
+        environment: 'sandbox',
+        merchantId: 'ci-merchant-id',
+        apiKey: 'ci-api-key-secret-000',
+      });
+      store.defaultProfile = 'ci-profile';
+      saveProfileStore(store);
+
+      const { text, exitCode } = await run(['config']);
+      expect(text).toContain('configuration');
+      expect(text).toContain('.env'); // present or absent — either way it reports
+      // Labels are printed, not raw variable names; the credential source
+      // banner (profile store > .env > env) is always shown.
+      expect(text).toContain('API Key');
+      expect(text).toContain('Using profile');
+      expect(text).toContain('ci-profile');
+      expect(text).not.toContain('ci-api-key-secret-000'); // masked
+      expect(text).not.toMatch(/sk[test_-][A-Za-z0-9]{8,}/); // never a raw secret
+      // Exit 0 when the environment validates; exit 1 with missing credentials
+      // (no .env in the temp cwd) — both are valid completions.
+      expect([0, 1]).toContain(exitCode as number);
+    } finally {
+      if (previousAppData === undefined) delete process.env.APPDATA;
+      else process.env.APPDATA = previousAppData;
+      rmSync(appData, { recursive: true, force: true });
+    }
   });
 
   it('doctor completes without credentials and flags the gaps', async () => {

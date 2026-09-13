@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { captureConsole } from '../test/test-utils.js';
-import { saveLinkedToken } from '../webhook/token-store.js';
+import { loadLinkedTokens, saveLinkedToken } from '../webhook/token-store.js';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'payway-cli-cof-tokens-'));
 const originalCwd = process.cwd();
@@ -49,12 +49,12 @@ afterAll(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-async function run(argv: string[]): Promise<{ text: string; exitCode: typeof process.exitCode }> {
+async function run(argv: string[]): Promise<{ text: string; stdout: string; exitCode: typeof process.exitCode }> {
   const captured = captureConsole();
   const before = process.exitCode;
   try {
     await runCli(argv);
-    return { text: captured.text(), exitCode: process.exitCode };
+    return { text: captured.text(), stdout: captured.stdout(), exitCode: process.exitCode };
   } finally {
     captured.restore();
     process.exitCode = before;
@@ -97,6 +97,139 @@ describe('cof charge token resolution', () => {
     const { text, exitCode } = await run(['cof', 'charge', '-t', 'ord-1', '-a', '1.00', '--ctid', 'nosuchcust']);
     expect(text).toContain('No captured token');
     expect(exitCode).not.toBe(0);
+  });
+
+  it('cof token renew restarts the local expiry window on gateway success', async () => {
+    saveLinkedToken({ ctid: 'custren1', pwt: 'pwt-renew-token', tokenFlag: 'CITI_FLEX' });
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '00', message: 'Success' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'token', 'renew', '-r', 'reqren1', '-c', 'custren1', '--token', 'pwt-renew-token',
+      ]);
+      expect(text).toContain('Token renew requested');
+      expect(text).toContain('expiry window restarted');
+      const record = loadLinkedTokens().find((t) => t.pwt === 'pwt-renew-token');
+      expect(record?.renewedAt).toBeTruthy();
+      expect(record?.tokenFlag).toBe('CITI_FLEX');
+      expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('cof charge --ctid refuses a locally-expired token without a gateway call', async () => {
+    const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+    saveLinkedToken({ ctid: 'custdead', pwt: 'pwt-dead', capturedAt: iso(95) });
+
+    // NO receiver started: any gateway attempt would fail with a network error,
+    // so a validation exit + message proves the local guard fired first.
+    const { text, exitCode } = await run([
+      'cof', 'charge', '-t', 'ord-dead', '-a', '1.00', '--ctid', 'custdead',
+    ]);
+    expect(text).toContain('expired');
+    expect(text).toContain('docs/09: ~90-day validity');
+    expect(text).toContain('charge with an explicit --token');
+    expect(exitCode).toBe(1);
+  });
+
+  it('cof charge --ctid warns on an expiring-soon token and still charges', async () => {
+    const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+    saveLinkedToken({ ctid: 'custsoon', pwt: 'pwt-soon-charge', capturedAt: iso(85) });
+
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '00', message: 'Success' }, data: { tran_id: 'ord-soon' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'charge', '-t', 'ord-soon', '-a', '1.00', '--ctid', 'custsoon',
+      ]);
+      expect(text).toContain('expiring in');
+      expect(text).toContain('renew soon');
+      expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('cof token remove prunes the local store on gateway success', async () => {
+    saveLinkedToken({ ctid: 'custrm1', pwt: 'pwt-remove-me' });
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '00', message: 'Success' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'token', 'remove', '-c', 'custrm1', '--token', 'pwt-remove-me',
+      ]);
+      expect(text).toContain('Token removed');
+      expect(text).toContain('removed 1 captured token');
+      expect(loadLinkedTokens().find((t) => t.pwt === 'pwt-remove-me')).toBeUndefined();
+      expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('cof token remove keeps the local copy when the gateway rejects', async () => {
+    saveLinkedToken({ ctid: 'custrm2', pwt: 'pwt-keep-me' });
+    const srv = http.createServer((req, res) => {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '99', message: 'Rejected' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { exitCode } = await run([
+        'cof', 'token', 'remove', '-c', 'custrm2', '--token', 'pwt-keep-me',
+      ]);
+      expect(exitCode).not.toBe(0);
+      expect(loadLinkedTokens().find((t) => t.pwt === 'pwt-keep-me')).toBeDefined();
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('cof token list shows expiry state (human + json)', async () => {
+    const now = Date.now();
+    const iso = (daysAgo: number) => new Date(now - daysAgo * 86_400_000).toISOString();
+    saveLinkedToken({ ctid: 'exp1', pwt: 'pwt-fresh-token', capturedAt: iso(1) });
+    saveLinkedToken({ ctid: 'exp2', pwt: 'pwt-soon-token', capturedAt: iso(85) });
+    saveLinkedToken({ ctid: 'exp3', pwt: 'pwt-dead-token', capturedAt: iso(91) });
+
+    const { text } = await run(['cof', 'token', 'list']);
+    expect(text).toContain('✓ valid (');
+    expect(text).toContain('⚠ expiring soon (');
+    expect(text).toContain('✗ EXPIRED (');
+    expect(text).toContain('renew with: cof token renew');
+
+    const { stdout } = await run(['cof', 'token', 'list', '--json']);
+    const doc = JSON.parse(stdout) as { tokens: Array<{ ctid: string; expiry: { status: string; daysLeft: number | null } }> };
+    const byCtid = Object.fromEntries(doc.tokens.map((t) => [t.ctid, t]));
+    expect(byCtid.exp1?.expiry.status).toBe('valid');
+    expect(byCtid.exp2?.expiry.status).toBe('expiring-soon');
+    expect(byCtid.exp3?.expiry.status).toBe('expired');
   });
 
   it('resolves the latest captured pwt for --ctid and sends it as the pwt field', async () => {

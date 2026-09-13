@@ -338,6 +338,19 @@ if (daysLeft <= 7 && daysLeft > 0) {
 > renewal trigger and never assume charges work on the boundary day.
 > See ABA-OPEN-QUESTIONS.md.
 
+**The CLI tracks this for you (storage wave 4).** When tokens are captured by the webhook receiver
+they land in the local token store with their capture timestamp, and the CLI applies the window
+above automatically:
+
+- `payway-sdk cof token list` shows `expiry: ✓ valid / ⚠ expiring soon / ✗ EXPIRED` per token
+  (`--json` adds an `expiry: {status, daysLeft, expiresAt}` object per token).
+- `payway-sdk cof charge --ctid <ctid>` refuses locally-expired tokens before a doomed gateway call
+  (an explicit `--token <pwt>` bypasses the store and the guard) and warns at ≤7 days left.
+- `payway-sdk cof token renew` restarts the local window on gateway success (`renewedAt` on the
+  stored record — validity counts from grant/RENEWAL).
+- `payway-sdk cof token remove` prunes the local copy after the gateway removes it, so no stale
+  live credential lingers on disk (a gateway failure never touches the local store).
+
 ### 5. Renew an Expiring Token
 
 Tokens have a limited lifetime. Renew them before expiry:

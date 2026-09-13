@@ -24,7 +24,7 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-checkout -a 9
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof link-account -r req0001 -c customer123 -f CITI_FLEX --currency USD --callback-url <url>
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof charge -t order-0001 -a 4.50 --token <pwt> --currency USD
 
-# COF token lifecycle: renew (account tokens only), details (request_id ONLY), remove (irreversible)
+# COF token lifecycle: renew (account tokens only; restarts the local ~90d window), details (request_id ONLY), remove (irreversible; prunes the local store)
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token renew -r req0002 -c customer123 --token <pwt>
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token details -r req0001
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token remove -c customer123 --token <pwt>
@@ -50,8 +50,8 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link detail -i
 # Payment-link void — permanent, irreversible (prompts on TTY; -y/--json skip; PTL188 = already voided, exit 2)
 $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link void -i <link-id> -y --json
 
-# Transaction journal (local reads — no API call; recording is opt-in via --journal or PAYWAY_JOURNAL=1)
-npx tsx src/cli.ts --journal generate-qr -a 5.00 -c USD --no-polling -y   # record one invocation
+# Transaction journal (local reads — no API call; ON by default for API commands, --no-journal to disable)
+npx tsx src/cli.ts journal timeline -t <tran-id> --json                   # reconstruct one transaction
 npx tsx src/cli.ts journal timeline -t <tran-id> --json                   # reconstruct one transaction
 npx tsx src/cli.ts journal stats                                          # latency/retries/errors/funnel
 npx tsx src/cli.ts journal reconcile --json                               # creations vs callbacks
@@ -109,7 +109,7 @@ npx tsx src/cli.ts agent doctor --json
   `signCallbackBody` (same canonicalization as `verifyCallbackDetailed` — never duplicate); pushback/KHQR
   fixtures carry NO hash by design (their real contracts have none; verify via check-transaction).
   `setup-webhook --forward-to <url>` re-POSTs captures after store; forward failure NEVER rejects or loses
-  the original callback. `webhook resend`/`verify-callback --record` read `webhook_data/` (JSON then SQLite).
+  the original callback. `webhook resend`/`verify-callback --record` read the data root's `webhook_data/` (JSON then SQLite).
   Fixtures are synthetic — the gateway never saw the tran_id.
 - OpenAPI suite-coverage wave (2026-09-12, audit `.scratch/openapi-coverage-audit/`): the ABA-shared archived
   spec has 33 endpoints — we implement 28 of them (20 full + 2 partial-fixed + 6 superseded by our v3 paths);
@@ -122,10 +122,15 @@ npx tsx src/cli.ts agent doctor --json
   uses `PURCHASE_PAYMENT_OPTIONS` (spec enum + live-verified `abapay_khqr_deeplink`/`google_pay`), not the QR
   enum. 21 spec errors (stale hash orders, malformed exchange-rate schema, …) are listed in the audit's
   fidelity-audit.md — candidates to send back to the ABA team.
-- Transaction journal (audit-results/transaction-data-audit/, docs/18): opt-in JSONL record of every
-  exchange/command/poll/status/artifact/callback at `<cwd>/payway-data/journal.jsonl`. `--journal` arms one
-  invocation; `PAYWAY_JOURNAL=1` (+`_DIR`, `_MODE=digest|full`) persists; SDK config `journal: true|{dir,mode}`.
+- Transaction journal (audit-results/transaction-data-audit/, docs/18): JSONL record of every
+  exchange/command/poll/status/artifact/callback at `<data root>/journal.jsonl` — the CLI records API
+  commands BY DEFAULT (2026-09-13 storage wave; `--no-journal` opts out, falsy `PAYWAY_JOURNAL` is
+  respected, pure-local commands like doctor/journal/docs are exempt); the SDK library stays opt-in
+  (`journal: true|{dir,mode}`, `PAYWAY_JOURNAL=1` +`_DIR`, `_MODE=digest|full`). All local stores share
+  ONE data root: `PAYWAY_DATA_DIR` or `<APPDATA|~/.config>/aba-payway-sdk/data` (journal.jsonl,
+  linked-tokens.json, webhook_data/; surfaced as `doctor --json` `.dataRoot`).
   Digest mode allow-lists non-secret fields (no hash/pwt/PII). Query: `journal show|timeline|stats|reconcile|explain|anomalies|prune`.
+  StorageService (wave 3, docs/21): `createStorageService({backend:'auto'})` — one facade over journal+tokens+webhooks; json files default, ONE shared `<dataRoot>/payway.db` when better-sqlite3 is importable (`probeStorageBackend()`, `PAYWAY_FORCE_JSON_STORAGE=1` forces json).
   Missing callback ≠ non-payment (PayWay never retries); PENDING ≠ alive (no EXPIRED/CLOSED status remotely).
   Backlog: `.scratch/transaction-data-journal/IMPROVEMENTS.md`.
 - `payment-link create`: `--image <path>` (JPG/JPEG/PNG ≤3MB, enforced locally),

@@ -28,9 +28,9 @@
       "description": "The full documentation map: start-here routes, per-domain guides, troubleshooting.",
       "source": "docs/README.md",
       "file": "docs-index.md",
-      "bytes": 7008,
-      "sha256": "bb9388e4caa62fdc",
-      "sourceSha256": "bf7c10ae4cb64892"
+      "bytes": 7102,
+      "sha256": "acc62a39748ca2a4",
+      "sourceSha256": "b2c7df82fff369cf"
     },
     {
       "topic": "overview",
@@ -118,9 +118,9 @@
       "description": "Credentials-on-file account/card lifecycle and token renewal.",
       "source": "docs/09-link-unlink-renew-lifecycle.md",
       "file": "link-lifecycle.md",
-      "bytes": 25560,
-      "sha256": "1a188296d4c11d69",
-      "sourceSha256": "f7ddbce5a34f1339"
+      "bytes": 26485,
+      "sha256": "39cb5c34943c7de7",
+      "sourceSha256": "7f1b8c806e0d185d"
     },
     {
       "topic": "ui-customization",
@@ -148,9 +148,9 @@
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
       "source": "docs/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
-      "bytes": 43028,
-      "sha256": "0809a96df6ffcdf8",
-      "sourceSha256": "936bf0685c3f719b"
+      "bytes": 43019,
+      "sha256": "262f5dc89980c8ca",
+      "sourceSha256": "aca48cac2f342afa"
     },
     {
       "topic": "deployment-checklist",
@@ -188,9 +188,9 @@
       "description": "Local listener, tunnels, forwarding, and production webhook configuration.",
       "source": "docs/16-webhook-setup-guide.md",
       "file": "webhook-setup.md",
-      "bytes": 20626,
-      "sha256": "5dc3fc75c0392ba0",
-      "sourceSha256": "a0f08d66d6d756c5"
+      "bytes": 20956,
+      "sha256": "9ce9523789821680",
+      "sourceSha256": "f5409572902d451e"
     },
     {
       "topic": "payment-link",
@@ -208,9 +208,9 @@
       "description": "Opt-in JSONL journal: correlation ids, timeline/stats/reconcile/anomalies.",
       "source": "docs/18-transaction-journal.md",
       "file": "transaction-journal.md",
-      "bytes": 13146,
-      "sha256": "b267c70b2bba3491",
-      "sourceSha256": "b267c70b2bba3491"
+      "bytes": 13644,
+      "sha256": "cce144da57231c0e",
+      "sourceSha256": "cce144da57231c0e"
     },
     {
       "topic": "customer-module-qr",
@@ -288,9 +288,9 @@
       "description": "Every SDK domain method and CLI command with flags and contracts.",
       "source": "docs/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
-      "bytes": 46678,
-      "sha256": "65b198b8ac6f6c9e",
-      "sourceSha256": "dd662781f0c91f4a"
+      "bytes": 47163,
+      "sha256": "884330af3a6338b6",
+      "sourceSha256": "ebfcd5735cc9fadf"
     },
     {
       "topic": "error-codes",

@@ -118,19 +118,14 @@ export class JsonlJournalSink implements JournalSink {
 }
 
 /**
- * Build the journal emitter for a `PayWay` instance. Returns undefined when
- * journaling is disabled (the default) — a library must never write files
- * silently.
+ * Sink-agnostic emitter factory: fills the envelope (version/ts/eventId),
+ * validates, and delegates to the sink fail-open. The ONE write pipeline for
+ * every journal backend — JsonlJournalSink and SqliteJournalSink both go
+ * through this, so no backend ever re-implements envelope handling.
  */
-export function createJournalEmitter(
-  setting: boolean | JournalOptions | undefined,
-  env: NodeJS.ProcessEnv = process.env,
-): JournalContext | undefined {
-  const resolved = resolveJournalConfig(setting, env);
-  if (!resolved) return undefined;
-  const sink = new JsonlJournalSink(resolved);
+export function createJournalEmitterForSink(sink: JournalSink, mode: JournalMode): JournalContext {
   return {
-    mode: resolved.mode,
+    mode,
     emit(event: JournalEmitterInput): void {
       // Fill envelope fields first so validation sees the final record.
       const full: JournalEventV1 = {
@@ -143,10 +138,24 @@ export function createJournalEmitter(
       try {
         sink.emit(full);
       } catch {
-        // Belt and braces: sink.emit is already fail-open.
+        // Belt and braces: sinks are fail-open by contract.
       }
     },
   };
+}
+
+/**
+ * Build the journal emitter for a `PayWay` instance. Returns undefined when
+ * journaling is disabled (the default) — a library must never write files
+ * silently.
+ */
+export function createJournalEmitter(
+  setting: boolean | JournalOptions | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): JournalContext | undefined {
+  const resolved = resolveJournalConfig(setting, env);
+  if (!resolved) return undefined;
+  return createJournalEmitterForSink(new JsonlJournalSink(resolved), resolved.mode);
 }
 
 export interface JournalPruneResult {

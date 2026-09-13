@@ -34,6 +34,8 @@ export interface DoctorCheck {
 }
 
 export interface DoctorResult {
+  /** The unified local data root (PAYWAY_DATA_DIR / app-data) — where the journal, linked tokens, and webhook captures live. */
+  readonly dataRoot: string;
   readonly checks: readonly DoctorCheck[];
   readonly envIssues: readonly EnvIssue[];
   readonly framework: DetectedFramework;
@@ -163,8 +165,8 @@ function checkJournal(env: NodeJS.ProcessEnv): DoctorCheck[] {
         id: 'journal',
         label: 'Transaction journal',
         ok: true,
-        detail: 'recording off (opt-in)',
-        fix: 'Enable with --journal or PAYWAY_JOURNAL=1 to keep a local record of every exchange (docs/18)',
+        detail: 'recording off (the CLI journals by default — an override disabled it)',
+        fix: 'Remove the --no-journal flag or the falsy PAYWAY_JOURNAL value (0/false/no/off) to keep a local record of every exchange (docs/18)',
       },
     ];
   }
@@ -302,6 +304,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
   const detection = detectFramework(cwd);
 
   return {
+    dataRoot: resolvePaywayDataRoot(undefined, env),
     checks,
     envIssues,
     framework: detection.framework,

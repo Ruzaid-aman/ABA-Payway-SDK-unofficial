@@ -543,7 +543,7 @@ status, artifact, and captured callback:
 
 ```sh
 payway-sdk --journal generate-qr -a 5.00 -c USD --no-polling -y   # record one invocation
-grep '<correlationId>' payway-data/journal.jsonl                   # reconstruct the exchange
+grep '<correlationId>' "$(payway-sdk doctor --json | jq -r .dataRoot)/journal.jsonl"
 payway-sdk journal timeline -t <tran-id>                            # full transaction history
 ```
 

@@ -53,7 +53,7 @@ Use the [SDK and CLI reference](./SDK-AND-CLI-REFERENCE.md) when you need additi
 
 Start with [error handling](./12-error-handling-and-debugging.md) or [setup and profiles](./02-prerequisites-and-setup.md). After a timeout, check the existing transaction ID before creating a replacement. Missing callbacks do not prove non-payment.
 
-For recorded operations, use the opt-in [transaction journal and reconciliation](./18-transaction-journal.md). For terms and background, see [concepts](./01-overview-and-concepts.md), [glossary](./glossary.md), and [code examples](./14-appendix-code-snippets.md).
+For recorded operations, use the [transaction journal and reconciliation](./18-transaction-journal.md) and the unified [storage service facade](./21-storage-service.md) (one API over the journal, link tokens, and webhook captures). For terms and background, see [concepts](./01-overview-and-concepts.md), [glossary](./glossary.md), and [code examples](./14-appendix-code-snippets.md).
 
 ## Diagram Library
 

@@ -42,6 +42,31 @@
   effective catalog. Real stdio transport verified on Windows (dist smoke
   test). Agent tool catalog count unchanged (14).
 
+### Storage waves 1+3+4 (2026-09-13 — `.scratch/storage-service/`)
+
+- **Unified data root** (`PAYWAY_DATA_DIR`, default
+  `<APPDATA|~/.config>/aba-payway-sdk/data`): the transaction journal
+  (`journal.jsonl`), captured CoF link tokens (`linked-tokens.json`), and
+  webhook captures (`webhook_data/`) now resolve through one root
+  (`src/config/data-root.ts`; surfaced as `doctor --json` `.dataRoot`).
+  Store-specific env overrides still win over the shared one.
+- **CLI journals by default**: gateway-touching commands record every exchange
+  without flags; `--no-journal` opts out, a falsy `PAYWAY_JOURNAL` is
+  respected, and pure-local commands (doctor/status/journal/docs/…) are
+  exempt. The SDK library stays opt-in (never writes silently).
+- **`createStorageService()` facade** (docs/21): one API over the journal,
+  linked tokens, and webhook captures — JSON files default, or ONE shared
+  `<dataRoot>/payway.db` SQLite handle when `better-sqlite3` is importable
+  (`probeStorageBackend()`, `PAYWAY_FORCE_JSON_STORAGE=1`). Facade-owned
+  `close()`; store close() no-ops on shared handles.
+- **Token lifecycle hardening**: linked-token records carry `capturedAt` +
+  `renewedAt`; `tokenExpiryStatus()` buckets the ~90-day docs/09 window;
+  `cof token list` shows expiry badges (+`--json` per-token `expiry`);
+  `cof token renew` restarts the local window (`markTokenRenewed`);
+  `cof token remove` prunes the local copy after gateway success (a gateway
+  failure never touches the store); `cof charge --ctid` refuses
+  locally-expired tokens (explicit `--token` bypasses the store and guard).
+
 ### CLI modernization Phase 1 (2026-09-13 — `.scratch/cli-modernization/`)
 
 - **`payway-sdk completions <bash|zsh|fish|powershell>`**: shell completion

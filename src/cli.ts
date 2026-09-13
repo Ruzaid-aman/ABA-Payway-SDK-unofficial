@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { Command, CommanderError, Help } from 'commander';
 import { confirmCheckoutSubmit } from './cli/flows/checkout-flow.js';
 import { chooseNextStep } from './cli/flows/next-steps.js';
+import { applyCliJournalPolicy } from './cli/journal-policy.js';
 import { collectQrParams } from './cli/flows/qr-flow.js';
 import { loadDotEnvIntoProcess } from './cli/dotenv.js';
 import { explainAll, explainPayWayCode } from './cli/explain-code.js';
@@ -33,6 +34,7 @@ import {
   emitCliJournal,
   emitStatusObserved,
   journalSawCreateFor,
+  resetCliJournalEmitter,
 } from './cli/journal-cli.js';
 import { buildResponseDigest } from './journal/digest.js';
 import { checkDemoApp, startDemoApp } from './cli/commands/demo.js';
@@ -42,7 +44,7 @@ import { runInit } from './cli/commands/init.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
 import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/commands/skills.js';
 import { registerWebhookCommands } from './cli/commands/webhook.js';
-import { latestTokenForCtid, loadLinkedTokens, maskPwt } from './webhook/token-store.js';
+import { latestTokenForCtid, loadLinkedTokens, markTokenRenewed, maskPwt, removeLinkedTokens, tokenExpiryStatus } from './webhook/token-store.js';
 import { readMaskedInput } from './cli/masked-input.js';
 import { loadPaymentLinkImage } from './cli/payment-link-image.js';
 import { PayWay } from './client.js';
@@ -954,8 +956,9 @@ program
   .option('--no-color', 'Disable ANSI colors in output')
   .option(
     '--journal',
-    'Record command lifecycle + every API exchange to the transaction journal (<cwd>/payway-data/journal.jsonl; same as PAYWAY_JOURNAL=1)',
+    'Force the transaction journal on (<data root>/journal.jsonl; ON by default for API commands)',
   )
+  .option('--no-journal', 'Disable the transaction journal for this invocation')
   .showSuggestionAfterError()
   .addHelpText(
     'after',
@@ -980,6 +983,15 @@ function isProfilesCommand(command: Command): boolean {
     current = current.parent ?? null;
   }
   return false;
+}
+
+/** Nearest command below the root program — the exemption key for journal policy. */
+function topLevelCommandName(command: Command): string {
+  let current: Command = command;
+  while (current.parent && current.parent.name() !== program.name()) {
+    current = current.parent;
+  }
+  return current.name();
 }
 
 function activateSelectedProfile(command: Command): void {
@@ -1022,12 +1034,18 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
   setColorOverride(optsColor);
   c = currentPalette();
   activateSelectedProfile(actionCommand);
-  // Phase 2: --journal (or PAYWAY_JOURNAL=1) turns on the transaction
-  // journal for the whole invocation. Setting the env var here also arms
-  // every `new PayWay()` constructed by command handlers downstream.
-  if (program.opts<{ journal?: boolean }>().journal) {
-    process.env.PAYWAY_JOURNAL = '1';
-  }
+  // Storage wave 1: the CLI journals BY DEFAULT for gateway-touching
+  // commands. --journal/--no-journal override; an explicitly falsy
+  // PAYWAY_JOURNAL in the environment is respected; pure-local commands are
+  // exempt so doctor/status report ambient truth and `journal *` never
+  // creates the file it queries. Setting the env var here still arms every
+  // `new PayWay()` constructed by command handlers downstream.
+  resetCliJournalEmitter();
+  applyCliJournalPolicy(
+    topLevelCommandName(actionCommand),
+    program.opts<{ journal?: boolean }>().journal,
+    process.env,
+  );
   emitCliCommandStarted(actionCommand);
 });
 
@@ -1173,6 +1191,7 @@ program
             context: result.context,
             framework: result.framework,
             frameworkEvidence: result.frameworkEvidence,
+            dataRoot: result.dataRoot,
             checks: result.checks,
             envIssues: result.envIssues,
             ...(live ? { live } : {}),
@@ -4400,8 +4419,26 @@ cofCmd
         process.exitCode = EXIT_VALIDATION;
         return;
       }
+      // Storage wave 4: docs/09 — expired tokens cannot be charged. Refuse
+      // locally-expired tokens before a doomed gateway call (an explicit
+      // --token bypasses this store and this guard entirely).
+      const expiry = tokenExpiryStatus(stored);
+      if (expiry.status === 'expired') {
+        console.log(
+          `  ${c.red('✗')} Captured token for ${c.cyan(String(opts.ctid))} expired ${Math.abs(expiry.daysLeft ?? 0)}d ago — docs/09: ~90-day validity from grant/renewal.`,
+        );
+        console.log(`  ${c.dim('Renew it (cof token renew) or re-link the account, or charge with an explicit --token.')}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
       paymentToken = stored.pwt;
-      console.log(`  Using captured token ${c.cyan(maskPwt(stored.pwt))} ${c.dim(`(captured ${stored.capturedAt})`)}`);
+      const validityNote =
+        expiry.status === 'expiring-soon'
+          ? c.yellow(`⚠ expiring in ${expiry.daysLeft}d — renew soon (cof token renew)`)
+          : expiry.status === 'valid'
+            ? c.dim(`(${expiry.daysLeft}d of ~90d validity left)`)
+            : '';
+      console.log(`  Using captured token ${c.cyan(maskPwt(stored.pwt))} ${c.dim(`(captured ${stored.capturedAt})`)} ${validityNote}`.trimEnd());
     }
     try {
       const payway = new PayWay();
@@ -4458,12 +4495,26 @@ cofTokenCmd
         ctid: opts.ctid as string,
         paymentToken: opts.token as string,
       });
+      // Storage wave 4: a successful renewal restarts the ~90-day window —
+      // update the local store record (fail-open; note to stderr under --json
+      // so stdout stays one JSON document).
+      let localNote: string;
+      try {
+        const renewedRecord = markTokenRenewed(opts.ctid as string, opts.token as string);
+        localNote = renewedRecord
+          ? 'local store: expiry window restarted'
+          : 'local store: token not tracked locally — nothing to update';
+      } catch (error) {
+        localNote = `local store update failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
       if (opts.json) {
+        console.error(`  ${localNote}`);
         printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Token renew requested`);
-      console.log(`  ${c.dim('Result arrives via the callback_url.')}\n`);
+      console.log(`  ${c.dim('Result arrives via the callback_url.')}`);
+      console.log(`  ${c.dim(localNote)}\n`);
     } catch (e) {
       process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
@@ -4513,12 +4564,26 @@ cofTokenCmd
         ctid: opts.ctid as string,
         paymentToken: opts.token as string,
       });
+      // Storage wave 4: the gateway removed the token — prune the local copy
+      // so no stale live credential lingers (fail-open; stderr under --json).
+      let localNote: string;
+      try {
+        const pruned = removeLinkedTokens(opts.ctid as string, opts.token as string);
+        localNote =
+          pruned > 0
+            ? `local store: removed ${pruned} captured token${pruned === 1 ? '' : 's'}`
+            : 'local store: no captured copy';
+      } catch (error) {
+        localNote = `local store prune failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
       if (opts.json) {
+        console.error(`  ${localNote}`);
         printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Token removed`);
-      console.log(`  ${c.bold('CTID:')} ${c.cyan(opts.ctid as string)}\n`);
+      console.log(`  ${c.bold('CTID:')} ${c.cyan(opts.ctid as string)}`);
+      console.log(`  ${c.dim(localNote)}\n`);
     } catch (e) {
       process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
@@ -4527,7 +4592,7 @@ cofTokenCmd
 // Local token store (captured CoF link tokens) — offline read, no API call.
 cofTokenCmd
   .command('list')
-  .description('List locally captured CoF link tokens (offline read of payway-data/linked-tokens.json — no API call)')
+  .description('List locally captured CoF link tokens with expiry state (offline read of the data root store — no API call)')
   .option('-c, --ctid <ctid>', 'Show only tokens for this customer id')
   .option('--show-token', 'Reveal full pwt values (default: masked)')
   .option('--json', 'Print the store as one JSON document')
@@ -4535,7 +4600,18 @@ cofTokenCmd
     const tokens = loadLinkedTokens();
     const filtered = opts.ctid ? tokens.filter((t) => t.ctid === opts.ctid) : tokens;
     if (opts.json) {
-      console.log(JSON.stringify({ tokens: filtered }, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            tokens: filtered.map((t) => ({
+              ...t,
+              expiry: tokenExpiryStatus(t) as unknown as Record<string, unknown>,
+            })),
+          },
+          null,
+          2,
+        ),
+      );
       process.exitCode = EXIT_OK;
       return;
     }
@@ -4549,10 +4625,22 @@ cofTokenCmd
     for (const t of filtered) {
       const shown = opts.showToken ? t.pwt : maskPwt(t.pwt);
       console.log(`  ${c.bold('CTID:')} ${c.cyan(t.ctid)}  ${c.bold('pwt:')} ${c.cyan(shown)}`);
+      // Storage wave 4: surface the ~90-day docs/09 validity window.
+      const expiry = tokenExpiryStatus(t);
+      const expiresOn = expiry.expiresAt ? expiry.expiresAt.toISOString().slice(0, 10) : null;
+      let expiryBit: string;
+      if (expiry.status === 'valid') expiryBit = `✓ valid (${expiry.daysLeft}d left, expires ${expiresOn})`;
+      else if (expiry.status === 'expiring-soon')
+        expiryBit = `⚠ expiring soon (${expiry.daysLeft}d left, expires ${expiresOn}) — renew with: cof token renew`;
+      else if (expiry.status === 'expired')
+        expiryBit = `✗ EXPIRED (${Math.abs(expiry.daysLeft ?? 0)}d ago) — re-link the account or renew`;
+      else expiryBit = '– unknown (no capture timestamp)';
+      console.log(`    ${c.bold('expiry:')} ${expiryBit}`);
       const bits = [
         t.tokenFlag ? `flag=${t.tokenFlag}` : undefined,
         t.frequency ? `frequency=${t.frequency}` : undefined,
         `captured=${t.capturedAt}`,
+        t.renewedAt ? `renewed=${t.renewedAt}` : undefined,
         t.sourceRecordId ? `record=${t.sourceRecordId}` : undefined,
       ].filter(Boolean) as string[];
       console.log(`    ${c.dim(bits.join(' · '))}`);
@@ -4824,7 +4912,7 @@ program
   .option('--storage <type>', 'Storage backend: json or sqlite (default: auto)')
   .option('--tunnel', 'Automatically start Cloudflare Tunnel (skip prompt)')
   .option('--url <url>', 'Public webhook URL (skip prompt, no tunnel)')
-  .option('--journal', 'Also enable the transaction journal in .env (PAYWAY_JOURNAL=1) so reconcile works out of the box')
+  .option('--journal', 'Persist PAYWAY_JOURNAL=1 into .env (pins the default-on CLI journal for SDK/embedded runs too)')
   .option(
     '--forward-to <url>',
     'Re-POST every captured callback to this local app URL after capture (test your receiver without the ABA Simulator)',

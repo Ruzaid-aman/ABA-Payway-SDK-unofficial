@@ -149,7 +149,7 @@ describe('I-4: doctor journal row', () => {
     const journal = result.checks.find((c) => c.id === 'journal');
     expect(journal?.ok).toBe(true);
     expect(journal?.detail).toContain('recording off');
-    expect(journal?.fix).toContain('PAYWAY_JOURNAL=1');
+    expect(journal?.fix).toContain('--no-journal');
   });
 
   it('reports enabled state and warns above 50 MB', () => {

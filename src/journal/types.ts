@@ -96,7 +96,8 @@ export interface ResolvedJournalConfig extends JournalOptions {
 }
 
 export interface JournalSink {
-  readonly filePath: string;
+  /** Store location label, when the backend has one file (JSONL); optional since sqlite backends live in a shared db. */
+  readonly filePath?: string;
   emit(event: JournalEventV1): void;
 }
 

@@ -20,6 +20,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { resolvePaywayDataRoot } from '../config/data-root.js';
+import { computeTokenExpiry, daysUntilTokenExpiry } from '../utils.js';
 
 /** One persisted linked-account/card token. */
 export interface LinkedTokenRecord {
@@ -41,6 +42,8 @@ export interface LinkedTokenRecord {
   readonly extraFields?: Record<string, string>;
   /** ISO-8601 capture timestamp. */
   readonly capturedAt: string;
+  /** ISO-8601 of the last successful `cof token renew` — restarts the ~90-day window (docs/09 §4a). */
+  readonly renewedAt?: string;
   /** Webhook record id of the capture (joins into webhook_data). */
   readonly sourceRecordId?: string;
 }
@@ -124,6 +127,85 @@ export function latestTokenForCtid(
 ): LinkedTokenRecord | undefined {
   const tokens = loadLinkedTokens(dir, env).filter((t) => t.ctid === ctid);
   return tokens.length > 0 ? tokens[tokens.length - 1] : undefined;
+}
+
+export type TokenExpiryStatus = 'valid' | 'expiring-soon' | 'expired' | 'unknown';
+
+/** Days left that docs/09 treats as the renewal trigger (never assume the boundary day charges). */
+export const TOKEN_EXPIRING_SOON_DAYS = 7;
+
+/**
+ * Bucket a stored token against the ~90-day docs/09 §4a validity window
+ * (grant/renewal based — the gateway returns no per-token expiresAt). The
+ * anchor is `renewedAt ?? capturedAt` so a renewal restarts the window.
+ * The gateway stays authoritative: callers may warn or refuse locally, but
+ * docs say expired tokens cannot be charged.
+ */
+export function tokenExpiryStatus(
+  record: Pick<LinkedTokenRecord, 'capturedAt'> & { renewedAt?: string },
+  now: Date = new Date(),
+): { status: TokenExpiryStatus; daysLeft: number | null; expiresAt: Date | null } {
+  const anchor = record.renewedAt ?? record.capturedAt;
+  if (!anchor) return { status: 'unknown', daysLeft: null, expiresAt: null };
+  const expiresAt = computeTokenExpiry(anchor);
+  const daysLeft = daysUntilTokenExpiry(expiresAt, now);
+  if (daysLeft <= 0) return { status: 'expired', daysLeft, expiresAt };
+  if (daysLeft <= TOKEN_EXPIRING_SOON_DAYS) return { status: 'expiring-soon', daysLeft, expiresAt };
+  return { status: 'valid', daysLeft, expiresAt };
+}
+
+/**
+ * Record a successful renewal on the stored (ctid, pwt) record — restarts the
+ * ~90-day expiry window (docs/09 §4a: validity counts from grant/RENEWAL).
+ * Preserves every other field; unknown (ctid, pwt) pairs return undefined and
+ * write nothing (never fabricate partial records). Atomic rewrite.
+ */
+export function markTokenRenewed(
+  ctid: string,
+  pwt: string,
+  renewedAt?: string,
+  dir?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): LinkedTokenRecord | undefined {
+  const storeDir = resolveTokenStoreDir(dir, env);
+  const file = tokensFilePath(storeDir);
+  if (!existsSync(file)) return undefined;
+  const existing = loadLinkedTokens(storeDir, env);
+  const idx = existing.findIndex((t) => t.ctid === ctid && t.pwt === pwt);
+  if (idx < 0) return undefined;
+  const kept = existing.slice();
+  kept[idx] = { ...existing[idx], renewedAt: renewedAt ?? new Date().toISOString() };
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}
+`, 'utf8');
+  renameSync(tmp, file);
+  return kept[idx];
+}
+
+/**
+ * Delete stored tokens for a ctid — optionally only one specific pwt — and
+ * rewrite the store atomically (same tmp+rename durability as save). Returns
+ * the number of records removed; a missing store removes nothing. This is
+ * the local half of token lifecycle (the gateway-side `cof token remove`
+ * does NOT prune this store by itself — see docs/09).
+ */
+export function removeLinkedTokens(
+  ctid: string,
+  pwt?: string,
+  dir?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const storeDir = resolveTokenStoreDir(dir, env);
+  if (!existsSync(tokensFilePath(storeDir))) return 0;
+  const existing = loadLinkedTokens(storeDir, env);
+  const kept = existing.filter((t) => t.ctid !== ctid || (pwt !== undefined && t.pwt !== pwt));
+  const removed = existing.length - kept.length;
+  if (removed === 0) return 0;
+  const file = tokensFilePath(storeDir);
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}\n`, 'utf8');
+  renameSync(tmp, file);
+  return removed;
 }
 
 /** Mask a pwt for display: keep the first 4 and last 4 characters. */

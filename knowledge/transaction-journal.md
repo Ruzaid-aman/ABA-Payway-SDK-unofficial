@@ -22,11 +22,16 @@ correlation id, the attempt number, the duration, or the error paths.
 | Env | `PAYWAY_JOURNAL=1` (+ optional `PAYWAY_JOURNAL_DIR`, `PAYWAY_JOURNAL_MODE`) |
 
 Precedence: config wins; env fills anything the config omits; `journal: false` always
-disables. **Default is OFF** — a library must never write files silently.
+disables. **SDK default is OFF** — a library must never write files silently. **The CLI
+defaults ON for gateway-touching commands** (storage wave 1): `payway-sdk` arms journaling
+unless you pass `--no-journal`, set a falsy `PAYWAY_JOURNAL` (`0`/`false`/`no`/`off`), or run
+a pure-local command (`doctor`, `status`, `journal *`, `docs`, `completions`, `skills`,
+`profiles`, `init`, `demo`, `onboard`, `explain`, `webhook *`, sandbox listings are exempt
+so diagnostics report ambient truth).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| dir | `<cwd>/payway-data` | journal file lives at `<dir>/journal.jsonl` |
+| dir | `<data root>` | journal file lives at `<dir>/journal.jsonl` — the data root is `PAYWAY_DATA_DIR` or `<APPDATA|~/.config>/aba-payway-sdk/data` |
 | mode | `digest` | how much of each body is recorded (below) |
 
 The journal never throws and never blocks execution: a failed write degrades to a
@@ -117,7 +122,7 @@ store for `journal reconcile`.
   outcome to the exit code (terminal 0, consecutive-errors 2, timeout 3) — a
   poll timeout is no longer machine-invisible under `--json`.
 - **I-2**: every `--json` success envelope carries `correlationId` and, when
-  present, `traceId` — grep either value in `payway-data/journal.jsonl` to
+  present, `traceId` — grep either value in the data root's `journal.jsonl` to
   reconstruct the exchange from the journal.
 - **I-3 (W5-7 codified)**: `generate-qr`, `generate-checkout`, and `cof charge`
   warn when the journal already holds a create for the same transaction id

@@ -88,8 +88,8 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk payment-link create / detail / void` | Create, inspect, or void PayWay payment links (requires RSA credentials; `create --image <path>` attaches an image, `create --payout <json>` adds split-payout beneficiaries `[{acc, amt}]` — total must equal the amount; `void -i <id>` permanently cancels an unpaid link — irreversible, `-y` skips the prompt, PTL188 = already voided) |
 | `payway-sdk cof link-account / link-card` | Start a credentials-on-file link: returns the QR/deeplink (account; optional `--return-deeplink` for app deeplinks); `link-card` saves the gateway's hosted card page to `payway-output/` (that page IS the success signal); the token (`pwt`) arrives via `callback_url` |
 | `payway-sdk cof link-card-form` | Write the signed card-link HTML form locally (no API call — the browser POSTs urlencoded straight to the gateway's hosted card-entry page) |
-| `payway-sdk cof charge -t <id> -a <amount> --token <pwt>` | Charge a stored COF token (optional `--ctid`, `--token-flag`, payer fields, `--items`, `--payout`) |
-| `payway-sdk cof token renew / details / remove` | Token lifecycle — `details` takes `--request-id` only; `remove` takes `--ctid --token` (irreversible) |
+| `payway-sdk cof charge -t <id> -a <amount> --token <pwt>` | Charge a stored COF token (optional `--ctid`, `--token-flag`, payer fields, `--items`, `--payout`); with `--ctid` the token resolves from the local store and locally-expired tokens are refused (docs/09 ~90-day window; explicit `--token` bypasses the store and guard) |
+| `payway-sdk cof token list / renew / details / remove` | Token lifecycle + local store — `list` shows captured tokens with expiry state (offline); `renew` restarts the local ~90-day window on gateway success; `details` takes `--request-id` only; `remove` takes `--ctid --token` (irreversible; prunes the local copy after gateway success) |
 | `payway-sdk beneficiary add / update-status <payee>` | Manage the payout beneficiary whitelist (requires RSA key; `update-status -s 0\|1`) |
 | `payway-sdk self-activation new-merchant / credential-info / mc-info` | Merchant self-activation via PARTNER credentials (`PAYWAY_PARTNER_ID` + `PAYWAY_PARTNER_API_KEY` + RSA key; spec-derived, not live-verified) — register a merchant and get the onboarding URL, then inquire credential/merchant info |
 | `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks (`--forward-to <url>` also re-POSTs every capture to your app) |
@@ -106,8 +106,9 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 
 For automated payment creation, prefer `--output json` for a single stable result
 or `--output ndjson` when polling is enabled. Success envelopes include
-`correlationId` and, when PayWay returns one, `traceId`; enable `--journal` or
-`PAYWAY_JOURNAL=1` to join those IDs to the local transaction journal for
+`correlationId` and, when PayWay returns one, `traceId`; the CLI journals by default
+(`--no-journal` opts out; the SDK library enables via `journal: true` / `PAYWAY_JOURNAL=1`) —
+those IDs join to the data root's `journal.jsonl` (see `doctor --json` `.dataRoot`) for
 timeline, reconciliation, stats, anomaly, and root-cause queries.
 
 ### Interactive experience
@@ -836,7 +837,7 @@ is safe to copy verbatim.
 
 Subcommand chains complete two levels deep (`payment-link create`, `cof token
 renew`), options complete per path with the global flags (`--profile`,
-`--no-color`, `--journal`, `--help`, and `--version` at the root) inherited.
+`--no-color`, `--journal`/`--no-journal`, `--help`, and `--version` at the root) inherited.
 Unknown shells exit 1 with the known list on stderr and nothing on stdout.
 
 ### Update checker
