@@ -19,7 +19,7 @@ npm ci
 npm run build
 npm pack
 cd ../your-application
-npm install /absolute/path/to/the/generated/aba-payway-ts-1.5.0.tgz
+npm install /absolute/path/to/the/generated/aba-payway-ts-<version>.tgz
 ```
 
 Run the first three commands in the SDK checkout. Replace the application directory and tarball path with your actual paths (quote paths containing spaces). To explore directly in the checkout, skip `cd` and `npm install` and continue below.

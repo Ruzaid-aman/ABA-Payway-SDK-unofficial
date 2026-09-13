@@ -8,9 +8,9 @@
       "description": "First sandbox payment end to end: credentials, .env, generate-qr, check-transaction, polling.",
       "source": "QUICKSTART.md",
       "file": "quickstart.md",
-      "bytes": 12259,
-      "sha256": "af667bea47a1a2e7",
-      "sourceSha256": "af667bea47a1a2e7"
+      "bytes": 12263,
+      "sha256": "57b35672e7bfba44",
+      "sourceSha256": "57b35672e7bfba44"
     },
     {
       "topic": "quickstart-1-page",
@@ -28,9 +28,9 @@
       "description": "The full documentation map: start-here routes, per-domain guides, troubleshooting.",
       "source": "docs/README.md",
       "file": "docs-index.md",
-      "bytes": 7102,
-      "sha256": "acc62a39748ca2a4",
-      "sourceSha256": "b2c7df82fff369cf"
+      "bytes": 7388,
+      "sha256": "11dc1dbc658ee50a",
+      "sourceSha256": "48083af9d71ff689"
     },
     {
       "topic": "overview",
@@ -288,9 +288,9 @@
       "description": "Every SDK domain method and CLI command with flags and contracts.",
       "source": "docs/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
-      "bytes": 47163,
-      "sha256": "884330af3a6338b6",
-      "sourceSha256": "ebfcd5735cc9fadf"
+      "bytes": 47136,
+      "sha256": "7a1d1d1b0d5f9d09",
+      "sourceSha256": "9aabb0ad013db861"
     },
     {
       "topic": "error-codes",

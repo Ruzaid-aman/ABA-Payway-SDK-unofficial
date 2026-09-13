@@ -11,6 +11,7 @@ Use it to accept payments in your application and verify their outcome before de
 | Add payments to your application | The TypeScript/JavaScript **SDK**, running on your server |
 | Try payments and inspect transactions from a terminal | The **CLI** included with the SDK package |
 | Guide a coding assistant through an integration | Optional **agent skills**, alongside the SDK and CLI |
+| Drive the SDK from an AI agent over MCP | The built-in **MCP server** (`payway-sdk mcp`), read-only by default |
 
 You can explore the simulated demo without an ABA account. Gateway testing requires sandbox credentials issued by ABA.
 
@@ -44,6 +45,12 @@ The [first-payment reference app](https://github.com/antigravity-google/aba-payw
 - Test callback handling locally without the ABA Simulator: `setup-webhook --forward-to <your-app-url>` captures and forwards deliveries, and `webhook trigger --event payment.approved` sends a correctly-signed fixture to your receiver (see [Chapter 16](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/16-webhook-setup-guide.md)).
 - Expired or closed transactions can still read `PENDING`. Hosted-card sessions may remain payable after close. Enforce local order policy and reconcile late payments.
 - Saved CLI profiles contain plaintext credentials. Use protected local storage for development and a secret manager with explicit SDK configuration in deployed services.
+
+## For AI coding agents
+
+- **Skills:** install the packaged guides with `npm exec -- payway-sdk skills add claude` (also `codex`, `opencode`, `cursor`, `copilot`) — see [skills/README.md](./skills/README.md).
+- **MCP server:** expose the SDK to any MCP host with `npm exec -- payway-sdk mcp` (stdio; 12 read-only tools by default, `--allow-mutations` adds the create tools; preview with `mcp --list-tools`) — see the [reference](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/SDK-AND-CLI-REFERENCE.md#mcp-server).
+- **Offline knowledge base:** `npm exec -- payway-sdk docs list` / `docs <topic>` / `docs search "<terms>"` serves 30 integration topics without network access; the machine-readable index is [llms.txt](./llms.txt).
 
 ## Explore the SDK
 

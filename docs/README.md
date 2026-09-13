@@ -73,11 +73,13 @@ the [first-payment walkthrough](./FIRST-PAYMENT-WALKTHROUGH.md).
 
 Start with the [first-payment skill](../skills/aba-payway-first-payment/SKILL.md), then [webhook production](../skills/aba-payway-webhook-production/SKILL.md). Browse [all skills](../skills/README.md) or the [agent CLI guide](./AGENTIC-PAYWAY-CLI-USER-GUIDE.md) as needed.
 
+For tool-based integration without skills: expose the [MCP server](./SDK-AND-CLI-REFERENCE.md#mcp-server) (`payway-sdk mcp`, read-only by default) to any MCP host, serve the offline knowledge base with `payway-sdk docs`, and point agents at the generated [llms.txt](../llms.txt) index.
+
 ## Maintainer and Evidence
 
 These materials support maintenance and investigation; they are not onboarding prerequisites.
 
-- [Contributing](../CONTRIBUTING.md), [handoff](../HANDOFF.md), [release readiness](./RELEASE-READINESS.md), [release checklist](./RELEASE_CHECKLIST.md), [versioning](./VERSIONING.md).
+- [Contributing](../CONTRIBUTING.md), [handoff](../HANDOFF.md), [release readiness](./RELEASE-READINESS.md), [release checklist](./RELEASE_CHECKLIST.md), [versioning](./VERSIONING.md), [maintenance plan](./MAINTENANCE.md).
 - [Sandbox findings](./SANDBOX-FINDINGS.md), [close-transaction evidence](./CLOSE-TRANSACTION-FINDINGS.md), [open questions](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md).
 - [Error-code registry (generated)](./error-codes.json) — every `explain`-known code as versioned JSON; regenerate with `npm run gen:error-registry`.
 - [Integration gaps & consolidated ABA questions](./INTEGRATION-GAPS-AND-ABA-QUESTIONS.md) (2026-09-12 scan: what the docs cannot answer developers + the prioritized send-to-ABA list).

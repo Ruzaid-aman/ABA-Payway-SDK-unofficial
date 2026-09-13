@@ -45,7 +45,7 @@ npm run smoke:example
 ## Publish and verify
 
 - [ ] Confirm npm account/package ownership and package-name availability at release time.
-- [ ] Inspect `npm pack --dry-run --json`. The allowlist includes runtime/declaration files, 32 skills, README, QUICKSTART, CHANGELOG, LICENSE, and package metadata. Run `check:package`; do not rely on a hardcoded export count.
+- [ ] Inspect `npm pack --dry-run --json`. The allowlist includes runtime/declaration files, 34 skills, README, QUICKSTART, CHANGELOG, LICENSE, knowledge corpus, llms.txt, and package metadata. Run `check:package`; do not rely on a hardcoded export count.
 - [ ] Prefer [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) with OIDC and provenance from an approved tag workflow. Configure the npm trust relationship and GitHub environment before enabling publication.
 - [ ] Publish only after the repository, history, ownership, support, and CI gates are cleared.
 - [ ] Install the published package in a fresh consumer; verify ESM/CJS/types, `npm exec -- payway-sdk --help`, and `npm exec -- payway-sdk demo --check`.

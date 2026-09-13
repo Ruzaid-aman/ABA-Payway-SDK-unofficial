@@ -40,7 +40,7 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 
 The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk onboard`, `payway-sdk agent setup|doctor|sessions`). See the [1-pager agentic guide](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/QUICK-START-1-PAGER.md#agentic-payway-cli) and the skill guides:
 
-- [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) — provider modes, the 13 tools, risk gates, execution ledger, sessions, redaction, and read-only journal queries.
+- [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) — provider modes, the 14 tools, risk gates, execution ledger, sessions, redaction, and read-only journal queries.
 - [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md) — choosing QR / checkout / payment-link for a first payment.
 
 ```bash
@@ -819,7 +819,7 @@ try {
 
 ---
 
-## Shell completions & update checks (v1.6.0)
+## Shell completions & update checks
 
 ### `payway-sdk completions <shell>`
 
@@ -852,7 +852,7 @@ changes exit codes or command output.
 
 ---
 
-## MCP server (v1.6.0)
+## MCP server
 
 ### `payway-sdk mcp`
 
@@ -886,7 +886,7 @@ as tools. stdout belongs to the protocol; diagnostics go to stderr.
 
 ---
 
-## Session mode & REPL polish (v1.6.0)
+## Session mode & REPL polish
 
 ### `payway-sdk session`
 

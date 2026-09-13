@@ -73,11 +73,13 @@ the [first-payment walkthrough](payway-sdk docs first-payment-walkthrough).
 
 Start with the [first-payment skill](../skills/aba-payway-first-payment/SKILL.md), then [webhook production](../skills/aba-payway-webhook-production/SKILL.md). Browse [all skills](../skills/README.md) or the [agent CLI guide](payway-sdk docs agentic-cli-guide) as needed.
 
+For tool-based integration without skills: expose the [MCP server](payway-sdk docs sdk-cli-reference) (`payway-sdk mcp`, read-only by default) to any MCP host, serve the offline knowledge base with `payway-sdk docs`, and point agents at the generated llms.txt index.
+
 ## Maintainer and Evidence
 
 These materials support maintenance and investigation; they are not onboarding prerequisites.
 
-- Contributing, handoff, release readiness, release checklist, versioning.
+- Contributing, handoff, release readiness, release checklist, versioning, maintenance plan.
 - Sandbox findings, [close-transaction evidence](payway-sdk docs close-transaction-findings), open questions.
 - [Error-code registry (generated)](payway-sdk docs error-codes) — every `explain`-known code as versioned JSON; regenerate with `npm run gen:error-registry`.
 - Integration gaps & consolidated ABA questions (2026-09-12 scan: what the docs cannot answer developers + the prioritized send-to-ABA list).
