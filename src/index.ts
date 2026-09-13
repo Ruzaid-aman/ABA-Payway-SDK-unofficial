@@ -104,6 +104,17 @@ export type {
 } from './journal/types.js';
 export { DEFAULT_JOURNAL_DIR_NAME, DEFAULT_JOURNAL_FILE_NAME, JOURNAL_VERSION } from './journal/types.js';
 export { PAYWAY_DATA_DIR_ENV, resolvePaywayDataRoot, resolveWebhookDir } from './config/data-root.js';
+export {
+  createStorageService,
+  probeStorageBackend,
+  type StorageBackend,
+  type StorageService,
+  type StorageServiceOptions,
+  type StorageServicePaths,
+} from './storage/storage-service.js';
+export { SqliteJournalSink, prepareJournalSchema, pruneSqliteJournal, readSqliteJournalEvents, type SqliteDb } from './journal/sink-sqlite.js';
+export { SqliteLinkedTokenStore, prepareLinkedTokensSchema } from './webhook/token-store-sqlite.js';
+export { removeLinkedTokens } from './webhook/token-store.js';
 export { createJournalEmitter, JsonlJournalSink, pruneJournal, readJournalEvents, resolveJournalConfig } from './journal/writer.js';
 export type { JournalFileRead, JournalPruneResult } from './journal/writer.js';
 export { reconcileTransactions } from './journal/reconcile.js';

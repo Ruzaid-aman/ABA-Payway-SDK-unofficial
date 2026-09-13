@@ -53,7 +53,7 @@ Use the [SDK and CLI reference](payway-sdk docs sdk-cli-reference) when you need
 
 Start with [error handling](payway-sdk docs errors-and-debugging) or [setup and profiles](payway-sdk docs setup). After a timeout, check the existing transaction ID before creating a replacement. Missing callbacks do not prove non-payment.
 
-For recorded operations, use the opt-in [transaction journal and reconciliation](payway-sdk docs transaction-journal). For terms and background, see [concepts](payway-sdk docs overview), glossary, and [code examples](payway-sdk docs code-snippets).
+For recorded operations, use the [transaction journal and reconciliation](payway-sdk docs transaction-journal) and the unified storage service facade (one API over the journal, link tokens, and webhook captures). For terms and background, see [concepts](payway-sdk docs overview), glossary, and [code examples](payway-sdk docs code-snippets).
 
 ## Diagram Library
 

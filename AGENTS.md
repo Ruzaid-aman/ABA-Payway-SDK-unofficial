@@ -120,6 +120,7 @@ npx tsx src/cli.ts agent doctor --json
   ONE data root: `PAYWAY_DATA_DIR` or `<APPDATA|~/.config>/aba-payway-sdk/data` (journal.jsonl,
   linked-tokens.json, webhook_data/; surfaced as `doctor --json` `.dataRoot`).
   Digest mode allow-lists non-secret fields (no hash/pwt/PII). Query: `journal show|timeline|stats|reconcile|explain|anomalies|prune`.
+  StorageService (wave 3, docs/21): `createStorageService({backend:'auto'})` — one facade over journal+tokens+webhooks; json files default, ONE shared `<dataRoot>/payway.db` when better-sqlite3 is importable (`probeStorageBackend()`, `PAYWAY_FORCE_JSON_STORAGE=1` forces json).
   Missing callback ≠ non-payment (PayWay never retries); PENDING ≠ alive (no EXPIRED/CLOSED status remotely).
   Backlog: `.scratch/transaction-data-journal/IMPROVEMENTS.md`.
 - `payment-link create`: `--image <path>` (JPG/JPEG/PNG ≤3MB, enforced locally),
