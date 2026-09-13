@@ -99,6 +99,8 @@ import { saveQrPng } from './cli/qr-artifact.js';
 import { registerCompletionsCommand } from './cli/commands/completions.js';
 import { registerMcpCommand } from './cli/commands/mcp.js';
 import { registerSessionCommand } from './cli/commands/session.js';
+import { renderTable } from './cli/ui/tables.js';
+import { confirmSubmit } from './cli/flows/confirm-flow.js';
 import { getUpdateCheckCachePath, isTopLevelHelpArgv, maybeNoticeUpdate } from './cli/update-check.js';
 
 // ---------------------------------------------------------------------------
@@ -1962,16 +1964,35 @@ program
         console.log(`  ${c.green('✓')} ${list.length} transaction(s)\n`);
 
         if (list.length > 0) {
-          const idPad = 24;
-          console.log(`  ${'TRANSACTION ID'.padEnd(idPad)}${'STATUS'.padEnd(11)}${'AMOUNT'.padEnd(12)}DATE`);
-          console.log(`  ${'-'.repeat(idPad + 11 + 12 + 19)}`);
-          for (const t of list.slice(0, 20)) {
-            const id = String(t.transaction_id ?? '').slice(0, idPad - 1);
-            const statusStr = String(t.payment_status ?? '?');
-            const amount = `${String(t.original_amount ?? '')} ${String(t.original_currency ?? '')}`.trim();
-            console.log(
-              `  ${id.padEnd(idPad)}${statusStr.padEnd(11)}${amount.padEnd(12)}${String(t.transaction_date ?? '')}`,
+          if (resolvePromptMode() === 'clack') {
+            // TTY: aligned table (spec §7.2). Piped output keeps the legacy lines.
+            const table = renderTable(
+              [
+                { key: 'id', header: 'TRANSACTION ID' },
+                { key: 'status', header: 'STATUS' },
+                { key: 'amount', header: 'AMOUNT' },
+                { key: 'date', header: 'DATE' },
+              ],
+              list.slice(0, 20).map((t) => ({
+                id: String(t.transaction_id ?? ''),
+                status: String(t.payment_status ?? '?'),
+                amount: `${String(t.original_amount ?? '')} ${String(t.original_currency ?? '')}`.trim(),
+                date: String(t.transaction_date ?? ''),
+              })),
             );
+            for (const line of table) console.log(`  ${line}`);
+          } else {
+            const idPad = 24;
+            console.log(`  ${'TRANSACTION ID'.padEnd(idPad)}${'STATUS'.padEnd(11)}${'AMOUNT'.padEnd(12)}DATE`);
+            console.log(`  ${'-'.repeat(idPad + 11 + 12 + 19)}`);
+            for (const t of list.slice(0, 20)) {
+              const id = String(t.transaction_id ?? '').slice(0, idPad - 1);
+              const statusStr = String(t.payment_status ?? '?');
+              const amount = `${String(t.original_amount ?? '')} ${String(t.original_currency ?? '')}`.trim();
+              console.log(
+                `  ${id.padEnd(idPad)}${statusStr.padEnd(11)}${amount.padEnd(12)}${String(t.transaction_date ?? '')}`,
+              );
+            }
           }
           if (list.length > 20) console.log(`\n  ${c.dim(`… and ${list.length - 20} more (--json or --pagination)`)}`);
           console.log(`\n  ${c.dim('Next: payway-sdk transaction-detail -t <id>   ·   explain a code with payway-sdk explain')}`);
@@ -3407,6 +3428,25 @@ paymentLinkCmd
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
     if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
+    if (resolvePromptMode() === 'clack' && !opts.force && !opts.json) {
+      // Guided pre-flight (spec S7.1): summary + explicit confirm on a TTY.
+      const ok = await confirmSubmit(
+        createClackIO(),
+        'Create payment link',
+        [
+          { label: 'Title', value: String(opts.title) },
+          { label: 'Amount', value: `${String(opts.amount)} ${String(opts.currency ?? 'USD')}` },
+          { label: 'Merchant ref', value: String(opts.merchantRefNo) },
+          { label: 'Return URL', value: String(opts.returnUrl) },
+          ...(opts.payout ? [{ label: 'Payout', value: String(opts.payout) }] : []),
+        ],
+      );
+      if (!ok) {
+        console.log(`  ${c.yellow('Cancelled by user.')}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
 
     const amount = Number(opts.amount);
     const currency = (opts.currency ?? 'USD').toUpperCase();
@@ -3904,11 +3944,31 @@ cofCmd
   .option('--currency <code>', 'Profile-enabled currency (required by the gateway): USD or KHR', 'USD')
   .option('--callback-url <url>', 'Webhook callback URL for the link result')
   .option('--return-deeplink <json>', 'App deeplink (hash position) — JSON {ios_scheme, android_scheme} or string')
+  .option('-y, --force', 'Skip the interactive confirmation (for scripts/agents)', false)
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
+    }
+    if (resolvePromptMode() === 'clack' && !opts.force && !opts.json) {
+      // Guided pre-flight (spec S7.1): summary + explicit confirm on a TTY.
+      const ok = await confirmSubmit(
+        createClackIO(),
+        'Link ABA account (credentials on file)',
+        [
+          { label: 'Request ID', value: String(opts.requestId) },
+          { label: 'CTID', value: String(opts.ctid) },
+          { label: 'Token flag', value: String(opts.tokenFlag) },
+          { label: 'Currency', value: String(opts.currency ?? 'USD') },
+          ...(opts.callbackUrl ? [{ label: 'Callback URL', value: String(opts.callbackUrl) }] : []),
+        ],
+      );
+      if (!ok) {
+        console.log(`  ${c.yellow('Cancelled by user.')}`);
+        process.exitCode = 1;
+        return;
+      }
     }
     try {
       const payway = new PayWay();
@@ -4294,6 +4354,7 @@ cofCmd
   .option('--payout <json>', 'Split-payout instructions — JSON [{`acc`,`amt`}] or string')
   .option('--custom-fields <json>', 'Custom fields — JSON object or string')
   .option('--shipping-fee <number>', 'Shipping fee amount')
+  .option('-y, --force', 'Skip the interactive confirmation (for scripts/agents)', false)
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
     if (!assertCredentialsPresent()) {
@@ -4306,6 +4367,24 @@ cofCmd
       console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
       process.exitCode = EXIT_VALIDATION;
       return;
+    }
+    if (resolvePromptMode() === 'clack' && !opts.force && !opts.json) {
+      // Guided pre-flight (spec S7.1): summary + explicit confirm on a TTY.
+      const ok = await confirmSubmit(
+        createClackIO(),
+        'COF payment (charge stored credential)',
+        [
+          { label: 'Transaction ID', value: String(opts.transactionId) },
+          { label: 'Amount', value: `${String(opts.amount)} ${String(opts.currency ?? 'USD')}` },
+          { label: 'Token', value: opts.token ? 'explicit --token' : `stored for ctid ${String(opts.ctid)}` },
+          ...(opts.tokenFlag ? [{ label: 'Token flag', value: String(opts.tokenFlag) }] : []),
+        ],
+      );
+      if (!ok) {
+        console.log(`  ${c.yellow('Cancelled by user.')}`);
+        process.exitCode = 1;
+        return;
+      }
     }
     let paymentToken = opts.token as string | undefined;
     if (!paymentToken) {
@@ -4614,11 +4693,33 @@ profilesCmd
       console.log('No saved profiles. Run `payway-sdk profiles add`.');
       return;
     }
+    const merchantMask = (merchantId: string): string =>
+      merchantId.length > 6 ? `${merchantId.slice(0, 4)}•••` : '••••••';
+    if (resolvePromptMode() === 'clack') {
+      // TTY: aligned table (spec §7.2). Piped output keeps the legacy lines.
+      const table = renderTable(
+        [
+          { key: 'default', header: 'DEFAULT' },
+          { key: 'name', header: 'NAME' },
+          { key: 'environment', header: 'ENVIRONMENT' },
+          { key: 'merchant', header: 'MERCHANT' },
+          { key: 'note', header: 'NOTE' },
+        ],
+        store.profiles.map((profile) => ({
+          default: profile.name === store.defaultProfile ? '*' : '',
+          name: profile.name,
+          environment: profile.environment,
+          merchant: merchantMask(profile.merchantId),
+          note: profile.note ?? '',
+        })),
+      );
+      for (const line of table) console.log(`  ${line}`);
+      return;
+    }
     for (const profile of store.profiles) {
       const marker = profile.name === store.defaultProfile ? '*' : ' ';
-      const merchant = profile.merchantId.length > 6 ? `${profile.merchantId.slice(0, 4)}•••` : '••••••';
       console.log(
-        `${marker} ${profile.name} (${profile.environment})  merchant: ${merchant}${profile.note ? `  note: ${profile.note}` : ''}`,
+        `${marker} ${profile.name} (${profile.environment})  merchant: ${merchantMask(profile.merchantId)}${profile.note ? `  note: ${profile.note}` : ''}`,
       );
     }
   });

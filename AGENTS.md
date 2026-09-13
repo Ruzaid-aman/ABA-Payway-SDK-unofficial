@@ -68,6 +68,8 @@ npx tsx src/cli.ts mcp --list-tools --json   # effective catalog (12 read-only /
 npx tsx src/cli.ts session                    # :use <tran-id> sticks a tran id onto -t commands; :resume via --resume
 # Agent REPL (`payway-sdk agent`): :tools :docs <q> :journal <args> :status now work without an LLM turn
 
+# TUI: transaction-list + profiles list render tables on TTYs; payment-link create / cof link-account / cof charge confirm before submit (-y skips; --json and pipes unchanged)
+
 # Webhook workbench (local only — no API call, no ABA Simulator needed)
 npx tsx src/cli.ts webhook trigger --url http://localhost:3000/webhooks/aba --event payment.approved  # signed fixture
 npx tsx src/cli.ts webhook verify-callback --body-file cb.json --sig "<X-PAYWAY-HMAC-SHA512>"        # exit 0 valid / 1 invalid

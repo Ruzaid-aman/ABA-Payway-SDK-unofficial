@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### CLI modernization Phase 4 — TUI tables + guided confirmations (2026-09-13 — `.scratch/cli-modernization/`)
+
+- **TTY tables (clack mode only)**: `transaction-list` and `profiles list`
+  render aligned tables on interactive terminals (`src/cli/ui/tables.ts`,
+  zero-dependency, terminal-width aware); piped/classic output is
+  byte-identical. skills list deferred (printing lives in the installer
+  module — follow-up).
+- **Guided pre-flight confirmations**: `payment-link create`, `cof
+  link-account`, and `cof charge` now show a boxed summary + explicit
+  confirm before the API call on a TTY (`confirmSubmit` flow); `-y/--force`
+  skips, `--json` and non-TTY runs are unchanged. Spec §7.1 gap-filling
+  wizards were not possible for these commands (requiredOption gates the
+  params) — recorded deviation in the phase-4 plan.
+
 ### CLI modernization Phase 3 — session mode + REPL polish (2026-09-13 — `.scratch/cli-modernization/`)
 
 - **`payway-sdk session`**: interactive command-first shell (TTY-only). Bare
