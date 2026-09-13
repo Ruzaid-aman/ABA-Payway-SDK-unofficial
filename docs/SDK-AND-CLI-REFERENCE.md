@@ -106,8 +106,9 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 
 For automated payment creation, prefer `--output json` for a single stable result
 or `--output ndjson` when polling is enabled. Success envelopes include
-`correlationId` and, when PayWay returns one, `traceId`; enable `--journal` or
-`PAYWAY_JOURNAL=1` to join those IDs to the local transaction journal for
+`correlationId` and, when PayWay returns one, `traceId`; the CLI journals by default
+(`--no-journal` opts out; the SDK library enables via `journal: true` / `PAYWAY_JOURNAL=1`) —
+those IDs join to the data root's `journal.jsonl` (see `doctor --json` `.dataRoot`) for
 timeline, reconciliation, stats, anomaly, and root-cause queries.
 
 ### Interactive experience
@@ -836,7 +837,7 @@ is safe to copy verbatim.
 
 Subcommand chains complete two levels deep (`payment-link create`, `cof token
 renew`), options complete per path with the global flags (`--profile`,
-`--no-color`, `--journal`, `--help`, and `--version` at the root) inherited.
+`--no-color`, `--journal`/`--no-journal`, `--help`, and `--version` at the root) inherited.
 Unknown shells exit 1 with the known list on stderr and nothing on stdout.
 
 ### Update checker

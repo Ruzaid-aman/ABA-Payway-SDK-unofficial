@@ -23,7 +23,7 @@ When a payment is completed, PayWay can send a server-to-server HTTP POST callba
 Coming from the [first-payment quickstart](payway-sdk docs quickstart)? Run the tunnel command below in a separate terminal and leave it running. Copy the complete printed HTTPS URL including `/aba-payway-webhook` into `PAYWAY_CALLBACK_URL` in your payment terminal, then return to the quickstart. See [Cloudflare Tunnel](#cloudflare-tunnel) for prerequisites. The receiver captures test notifications; payment verification and durable fulfillment belong in your application.
 
 ```bash
-# Basic — starts server on port 8443, saves callbacks to ./webhook_data/callbacks.jsonl
+# Basic — starts server on port 8443, saves callbacks to the data root's webhook_data/callbacks.jsonl
 npm exec -- payway-sdk setup-webhook
 
 # With Cloudflare Tunnel (auto-generates a public URL)
@@ -99,7 +99,7 @@ Publish a stable HTTPS URL, then ask ABA to configure and whitelist that exact r
 
 ### JSON (default fallback)
 
-Appends each callback as a JSONL (JSON Lines) record to `./webhook_data/callbacks.jsonl`. Zero dependencies — works everywhere.
+Appends each callback as a JSONL (JSON Lines) record to the data root's `webhook_data/callbacks.jsonl` (`PAYWAY_WEBHOOK_DIR` or `PAYWAY_DATA_DIR` override; default `<APPDATA|~/.config>/aba-payway-sdk/data/webhook_data/`). Zero dependencies — works everywhere.
 
 ```bash
 npm exec -- payway-sdk setup-webhook --storage json
@@ -126,7 +126,7 @@ npm install better-sqlite3  # Optional peer dependency
 npm exec -- payway-sdk setup-webhook --storage sqlite
 ```
 
-Storage path: `./webhook_data/callbacks.db`
+Storage path: the data root's `webhook_data/callbacks.db`
 
 ---
 
@@ -274,7 +274,7 @@ The offline KHQR route has no assumed online HMAC contract. The listener retains
 $ npm exec -- payway-sdk setup-webhook --tunnel
 
   Starting webhook server on port 8443…
-  Storage: ./webhook_data/callbacks.jsonl
+  Storage: <data root>/webhook_data/callbacks.jsonl
 
   Starting Cloudflare Tunnel…
 
@@ -283,7 +283,7 @@ $ npm exec -- payway-sdk setup-webhook --tunnel
 
     Online callback URL: https://abc-123.trycloudflare.com/aba-payway-webhook
     Local online route:  http://localhost:8443/aba-payway-webhook
-    Callbacks directory: ./webhook_data/
+    Callbacks directory: <data root>/webhook_data/
 
     Press Ctrl+C to stop.
 
@@ -329,13 +329,13 @@ You can inspect stored callbacks using standard tools:
 
 ```bash
 # View all callbacks (JSONL → pretty-print)
-cat ./webhook_data/callbacks.jsonl | jq -s '.'
+cat "$(payway-sdk doctor --json | jq -r .dataRoot)/webhook_data/callbacks.jsonl" | jq -s '.'
 
 # Count callbacks
-wc -l ./webhook_data/callbacks.jsonl
+wc -l "$DATA_ROOT/webhook_data/callbacks.jsonl"   # DATA_ROOT = payway-sdk doctor --json | jq -r .dataRoot
 
 # Filter approved online checkout transactions
-cat ./webhook_data/callbacks.jsonl | jq -s '.[] | select(.body.status == "APPROVED")'
+cat "$DATA_ROOT/webhook_data/callbacks.jsonl" | jq -s '.[] | select(.body.status == "APPROVED")'   # DATA_ROOT as above
 ```
 
 ---

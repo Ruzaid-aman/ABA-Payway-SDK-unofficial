@@ -34,6 +34,8 @@ export interface DoctorCheck {
 }
 
 export interface DoctorResult {
+  /** The unified local data root (PAYWAY_DATA_DIR / app-data) — where the journal, linked tokens, and webhook captures live. */
+  readonly dataRoot: string;
   readonly checks: readonly DoctorCheck[];
   readonly envIssues: readonly EnvIssue[];
   readonly framework: DetectedFramework;
@@ -302,6 +304,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
   const detection = detectFramework(cwd);
 
   return {
+    dataRoot: resolvePaywayDataRoot(undefined, env),
     checks,
     envIssues,
     framework: detection.framework,

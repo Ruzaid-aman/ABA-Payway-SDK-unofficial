@@ -148,9 +148,9 @@
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
       "source": "docs/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
-      "bytes": 43028,
-      "sha256": "0809a96df6ffcdf8",
-      "sourceSha256": "936bf0685c3f719b"
+      "bytes": 43019,
+      "sha256": "262f5dc89980c8ca",
+      "sourceSha256": "aca48cac2f342afa"
     },
     {
       "topic": "deployment-checklist",
@@ -188,9 +188,9 @@
       "description": "Local listener, tunnels, forwarding, and production webhook configuration.",
       "source": "docs/16-webhook-setup-guide.md",
       "file": "webhook-setup.md",
-      "bytes": 20626,
-      "sha256": "5dc3fc75c0392ba0",
-      "sourceSha256": "a0f08d66d6d756c5"
+      "bytes": 20956,
+      "sha256": "9ce9523789821680",
+      "sourceSha256": "f5409572902d451e"
     },
     {
       "topic": "payment-link",
@@ -208,9 +208,9 @@
       "description": "Opt-in JSONL journal: correlation ids, timeline/stats/reconcile/anomalies.",
       "source": "docs/18-transaction-journal.md",
       "file": "transaction-journal.md",
-      "bytes": 13146,
-      "sha256": "b267c70b2bba3491",
-      "sourceSha256": "b267c70b2bba3491"
+      "bytes": 13644,
+      "sha256": "cce144da57231c0e",
+      "sourceSha256": "cce144da57231c0e"
     },
     {
       "topic": "customer-module-qr",
@@ -238,9 +238,9 @@
       "description": "Free-tier Cloudflare Worker webhook receiver setup.",
       "source": "docs/cloudflare-free-webhook.md",
       "file": "cloudflare-webhook.md",
-      "bytes": 25625,
-      "sha256": "267c3c4f15be79b8",
-      "sourceSha256": "267c3c4f15be79b8"
+      "bytes": 24658,
+      "sha256": "37b595f949e51f75",
+      "sourceSha256": "37b595f949e51f75"
     },
     {
       "topic": "agent-setup-playbook",
@@ -248,9 +248,9 @@
       "description": "Configuring the agentic CLI: providers, capability modes, privacy ack.",
       "source": "docs/AGENT-SETUP-PLAYBOOK.md",
       "file": "agent-setup-playbook.md",
-      "bytes": 13487,
-      "sha256": "b800a536e15adfd5",
-      "sourceSha256": "b800a536e15adfd5"
+      "bytes": 13284,
+      "sha256": "69694b9402dae37b",
+      "sourceSha256": "69694b9402dae37b"
     },
     {
       "topic": "agentic-cli-guide",
@@ -288,9 +288,9 @@
       "description": "Every SDK domain method and CLI command with flags and contracts.",
       "source": "docs/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
-      "bytes": 43371,
-      "sha256": "7605083035bb62c8",
-      "sourceSha256": "7de66fd58bbdad55"
+      "bytes": 43502,
+      "sha256": "8ea68f98f9a8c719",
+      "sourceSha256": "2006603c2946564b"
     },
     {
       "topic": "error-codes",
