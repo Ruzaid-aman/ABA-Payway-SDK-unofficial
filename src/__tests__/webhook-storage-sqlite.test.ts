@@ -158,7 +158,7 @@ maybeDescribe('SqliteWebhookStorage round-trip (driver installed)', () => {
   });
 });
 
-describe('SqliteWebhookStorage customerQr metadata (Customer Module callbacks)', () => {
+maybeDescribe('SqliteWebhookStorage customerQr metadata (Customer Module callbacks)', () => {
   it('round-trips the parsed Customer Module callback (driver installed)', async () => {
     const dir = makeTempDir();
     const storage = await SqliteWebhookStorage.create(path.join(dir, 'callbacks.db'));

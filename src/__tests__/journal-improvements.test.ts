@@ -153,7 +153,7 @@ describe('I-4: doctor journal row', () => {
   });
 
   it('reports enabled state and warns above 50 MB', () => {
-    const enabled = runDoctor({ cwd: dir, env: { PAYWAY_JOURNAL: '1' } });
+    const enabled = runDoctor({ cwd: dir, env: { PAYWAY_JOURNAL: '1', PAYWAY_DATA_DIR: dir } });
     const enabledRow = enabled.checks.find((c) => c.id === 'journal');
     expect(enabledRow?.ok).toBe(true);
     expect(enabledRow?.detail).toContain('no events yet');
