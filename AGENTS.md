@@ -56,6 +56,10 @@ npx tsx src/cli.ts journal timeline -t <tran-id> --json                   # reco
 npx tsx src/cli.ts journal stats                                          # latency/retries/errors/funnel
 npx tsx src/cli.ts journal reconcile --json                               # creations vs callbacks
 
+# Shell completions (script derived live from the command registry; stdout=script, stderr=install hint)
+npx tsx src/cli.ts completions bash
+npx tsx src/cli.ts completions zsh   # also fish | powershell; unknown shell → exit 1, list on stderr
+
 # Webhook workbench (local only — no API call, no ABA Simulator needed)
 npx tsx src/cli.ts webhook trigger --url http://localhost:3000/webhooks/aba --event payment.approved  # signed fixture
 npx tsx src/cli.ts webhook verify-callback --body-file cb.json --sig "<X-PAYWAY-HMAC-SHA512>"        # exit 0 valid / 1 invalid

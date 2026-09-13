@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### CLI modernization Phase 1 (2026-09-13 — `.scratch/cli-modernization/`)
+
+- **`payway-sdk completions <bash|zsh|fish|powershell>`**: shell completion
+  scripts derived at request time from the live commander registry (no
+  hand-maintained list — new commands appear automatically). Script on stdout,
+  install hint on stderr; subcommand chains complete two levels deep with
+  per-path flags and inherited globals. Unknown shell → exit 1, list on stderr.
+- **Update checker**: notices only on bare / top-level-`--help` invocations,
+  stderr-only, TTY-only, 24h-cached npm registry check (atomic write to
+  `<appdata>/aba-payway-sdk/update-check.json`), 1.5s timeout, fails silently,
+  `PAYWAY_NO_UPDATE_CHECK=1` opt-out. Never touches command output or exit codes.
+- `completions` joins the `Setup` help group (`COMMAND_GROUPS` +
+  `REGISTERED_COMMANDS` pins); the direct-invocation block in `src/cli.ts` moved
+  into an async IIFE (tsup also emits CJS, which forbids top-level await).
+
 ### Card-on-file improvements (2026-09-12 review wave — `.scratch/link-card-review/REVIEW-CARD.md`)
 
 - **Hosted outcome detection on link-card** (SANDBOX-FINDINGS §24 LC-2): the

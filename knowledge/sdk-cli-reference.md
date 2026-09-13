@@ -818,6 +818,39 @@ try {
 
 ---
 
+## Shell completions & update checks (v1.6.0)
+
+### `payway-sdk completions <shell>`
+
+Emits a completion script for `bash`, `zsh`, `fish`, or `powershell`. Scripts are
+derived at request time from the live command registry — new commands and flags
+appear automatically; there is no hand-maintained list. The script goes to
+**stdout**; the install hint goes to **stderr**, so
+`payway-sdk completions zsh > ~/.zsh-payway-sdk && source ~/.zsh-payway-sdk`
+is safe to copy verbatim.
+
+- bash: `complete -F _payway_sdk payway-sdk` (no bash-completion dependency)
+- zsh: `#compdef payway-sdk` with per-command descriptions
+- fish: universal `complete -c payway-sdk` lines with descriptions
+- powershell: `Register-ArgumentCompleter -Native`
+
+Subcommand chains complete two levels deep (`payment-link create`, `cof token
+renew`), options complete per path with the global flags (`--profile`,
+`--no-color`, `--journal`, `--help`, and `--version` at the root) inherited.
+Unknown shells exit 1 with the known list on stderr and nothing on stdout.
+
+### Update checker
+
+On a bare `payway-sdk` invocation or a top-level `--help`, the CLI may print an
+update notice (stderr, never stdout) when npm has a newer version than the
+installed one. It is cached for 24h in
+`<appdata>/aba-payway-sdk/update-check.json` (`%APPDATA%` on Windows,
+`~/.config` elsewhere), times out after 1.5s, fails silently offline, never runs
+for real commands, and is disabled with `PAYWAY_NO_UPDATE_CHECK=1`. It never
+changes exit codes or command output.
+
+---
+
 ## Development & Contribution
 
 ### Setup & Commands
