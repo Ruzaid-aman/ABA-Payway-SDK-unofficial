@@ -61,9 +61,15 @@ describe('resolveJournalConfig', () => {
   });
 
   it('env alone enables when config omits the setting', () => {
-    const resolved = resolveJournalConfig(undefined, { PAYWAY_JOURNAL: '1' });
-    expect(resolved?.mode).toBe('digest');
-    expect(resolved?.dir).toContain('payway-data');
+    const appData = makeTempDir();
+    vi.stubEnv('APPDATA', appData);
+    try {
+      const resolved = resolveJournalConfig(undefined, { PAYWAY_JOURNAL: '1' });
+      expect(resolved?.mode).toBe('digest');
+      expect(resolved?.dir).toBe(path.join(appData, 'aba-payway-sdk', 'data'));
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('config object wins over env but accepts env fallbacks per field', () => {

@@ -9,9 +9,9 @@
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { resolvePaywayDataRoot } from '../config/data-root.js';
 import { validateJournalEvent } from './schema.js';
 import {
-  DEFAULT_JOURNAL_DIR_NAME,
   DEFAULT_JOURNAL_FILE_NAME,
   JOURNAL_VERSION,
   type JournalContext,
@@ -35,7 +35,7 @@ function parseMaxAgeDays(value: string | undefined): number | undefined {
 }
 
 function defaultJournalDir(): string {
-  return path.join(process.cwd(), DEFAULT_JOURNAL_DIR_NAME);
+  return resolvePaywayDataRoot();
 }
 
 function resolveDir(explicit: string | undefined, env: NodeJS.ProcessEnv): string {
@@ -160,9 +160,9 @@ export interface JournalFileRead {
   malformed: number;
 }
 
-/** Resolve the effective journal directory: explicit arg > env > <cwd>/payway-data. */
+/** Resolve the effective journal directory: explicit arg > env > the PAYWAY_DATA_DIR data root. */
 export function resolveJournalDir(explicit?: string): string {
-  return explicit ?? resolveJournalConfig(undefined, process.env)?.dir ?? path.join(process.cwd(), DEFAULT_JOURNAL_DIR_NAME);
+  return explicit ?? resolveJournalConfig(undefined, process.env)?.dir ?? resolvePaywayDataRoot();
 }
 
 /**

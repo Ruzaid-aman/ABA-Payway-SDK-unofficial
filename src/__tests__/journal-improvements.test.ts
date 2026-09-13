@@ -158,12 +158,12 @@ describe('I-4: doctor journal row', () => {
     expect(enabledRow?.ok).toBe(true);
     expect(enabledRow?.detail).toContain('no events yet');
 
-    // Oversized journal: doctor uses cwd/payway-data when enabled without _DIR.
-    const dataDir = path.join(dir, 'payway-data');
-    mkdirSync(dataDir, { recursive: true });
+    // Oversized journal: doctor defaults to the PAYWAY_DATA_DIR data root when
+    // enabled without _DIR.
+    mkdirSync(dir, { recursive: true });
     const big = 'x'.repeat(51 * 1024 * 1024);
-    writeFileSync(path.join(dataDir, 'journal.jsonl'), big, 'utf8');
-    const oversize = runDoctor({ cwd: dir, env: { PAYWAY_JOURNAL: '1' } });
+    writeFileSync(path.join(dir, 'journal.jsonl'), big, 'utf8');
+    const oversize = runDoctor({ cwd: dir, env: { PAYWAY_JOURNAL: '1', PAYWAY_DATA_DIR: dir } });
     const journal = oversize.checks.find((c) => c.id === 'journal');
     expect(journal?.ok).toBe(false);
     expect(journal?.fix).toContain('journal prune');

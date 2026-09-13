@@ -1,5 +1,6 @@
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { resolvePaywayDataRoot } from '../../config/data-root.js';
 import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
 import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
 import { BASE_URLS } from '../../constants.js';
@@ -150,10 +151,10 @@ function checkEnvVars(env: NodeJS.ProcessEnv): DoctorCheck[] {
 }
 
 /** Advisory-only journal health (improvement I-4): never a red failure — recording is opt-in. */
-function checkJournal(cwd: string, env: NodeJS.ProcessEnv): DoctorCheck[] {
+function checkJournal(env: NodeJS.ProcessEnv): DoctorCheck[] {
   const enabled =
     TRUTHY_ENV.has((env.PAYWAY_JOURNAL ?? '').trim().toLowerCase()) || env.PAYWAY_JOURNAL_DIR !== undefined;
-  const dir = env.PAYWAY_JOURNAL_DIR?.trim() || path.join(cwd, 'payway-data');
+  const dir = env.PAYWAY_JOURNAL_DIR?.trim() || resolvePaywayDataRoot(undefined, env);
   const journalPath = path.join(dir, 'journal.jsonl');
 
   if (!enabled) {
@@ -278,7 +279,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
   const frameworkCheck = checkFramework(cwd);
   const envVarChecks = checkEnvVars(mergedEnv);
   const callbackCheck = checkCallbackUrl(mergedEnv);
-  const journalChecks = checkJournal(cwd, mergedEnv);
+  const journalChecks = checkJournal(mergedEnv);
   const rsaCheck = checkRsaPem(mergedEnv);
 
   const checks =

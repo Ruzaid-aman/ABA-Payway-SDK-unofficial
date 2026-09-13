@@ -71,7 +71,7 @@ export function registerJournalCommands(program: Command): void {
     .option('--kind <kind>', 'Filter by event kind (e.g. execution.request, poll.attempt)')
     .option('--tran <id>', 'Filter by transaction id')
     .option('--last <n>', 'Limit to the most recent N events', '50')
-    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
     .option('--json', 'Machine-readable output')
     .action((opts: { kind?: string; tran?: string; last?: string; dir?: string; json?: boolean }) => {
       const c = currentPalette();
@@ -99,7 +99,7 @@ export function registerJournalCommands(program: Command): void {
     .command('timeline')
     .description('Reconstruct the chronological history of one transaction')
     .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
-    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
     .option('--with-webhooks', 'Enrich callback steps with the persisted signature verdict/matched status from the webhook capture store')
     .option('--json', 'Machine-readable output')
     .action((opts: { transactionId: string; dir?: string; withWebhooks?: boolean; json?: boolean }) => {
@@ -141,7 +141,7 @@ export function registerJournalCommands(program: Command): void {
     .command('prune')
     .description('Delete journal events older than a cutoff')
     .option('--before <cutoff>', 'Days back (e.g. 30) or ISO-8601 timestamp', '30')
-    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
     .option('--json', 'Machine-readable output')
     .action((opts: { before?: string; dir?: string; json?: boolean }) => {
       const raw = opts.before ?? '30';
@@ -168,8 +168,8 @@ export function registerJournalCommands(program: Command): void {
     .description(
       'Join journal creations with webhook captures: which transactions never received a callback, which callbacks have no tracked creation.',
     )
-    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
-    .option('--webhook-dir <path>', 'Webhook capture directory (default: <cwd>/webhook_data)')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
+    .option('--webhook-dir <path>', 'Webhook capture directory (default: PAYWAY_WEBHOOK_DIR or <data root>/webhook_data)')
     .option('--json', 'Machine-readable output')
     .action((opts: { dir?: string; webhookDir?: string; json?: boolean }) => {
       const c = currentPalette();
@@ -207,7 +207,7 @@ export function registerJournalCommands(program: Command): void {
   journalCmd
     .command('stats')
     .description('Aggregate analytics: latency percentiles, retry rates, provider errors, creation funnel')
-    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
     .option('--json', 'Machine-readable output')
     .action((opts: { dir?: string; json?: boolean }) => {
       const c = currentPalette();
@@ -247,7 +247,7 @@ export function registerJournalCommands(program: Command): void {
     .command('explain')
     .description('Root-cause narrative for one transaction from its journal timeline')
     .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
-    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
     .option('--json', 'Machine-readable output')
     .action((opts: { transactionId: string; dir?: string; json?: boolean }) => {
       const c = currentPalette();
@@ -277,7 +277,7 @@ export function registerJournalCommands(program: Command): void {
   journalCmd
     .command('anomalies')
     .description('Detect error spikes, retry bursts and latency outliers (documented heuristics)')
-    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or <cwd>/payway-data)')
+    .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
     .option('--json', 'Machine-readable output')
     .action((opts: { dir?: string; json?: boolean }) => {
       const c = currentPalette();
