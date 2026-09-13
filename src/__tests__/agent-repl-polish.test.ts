@@ -40,7 +40,11 @@ describe('agent REPL polish (runRepl seam)', () => {
     const output = new PassThrough();
     const captured = classifyLines();
     try {
-      const replDone = runRepl({ input, output, interactive: false });
+      const replDone = runRepl({
+        input: input as unknown as NodeJS.ReadableStream,
+        output: output as unknown as NodeJS.WritableStream,
+        interactive: false,
+      });
       for (const line of lines) input.write(`${line}\n`);
       input.write(':exit\n');
       input.end();

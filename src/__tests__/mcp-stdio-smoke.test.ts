@@ -18,7 +18,12 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  rmSync(tempDir, { recursive: true, force: true });
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    // Windows can hold the dir briefly after child.kill() — a leftover temp
+    // dir is harmless; never fail the suite over cleanup.
+  }
 });
 
 interface JsonRpcMessage {

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### CLI modernization Phase 3 — session mode + REPL polish (2026-09-13 — `.scratch/cli-modernization/`)
+
+- **`payway-sdk session`**: interactive command-first shell (TTY-only). Bare
+  lines run CLI commands through a shared validated dispatcher; `:use
+  <tran-id>` sticks a transaction id onto `-t/--transaction-id` commands;
+  history persists to `<appdata>/aba-payway-sdk/sessions/cli/<id>.json` with
+  `--resume`. No LLM, no privacy gate — it is the manual CLI, threaded.
+- **Agent REPL polish** (`payway-sdk agent`): new offline directives `:tools`
+  (14-tool catalog with risk classes), `:docs` (knowledge search/read),
+  `:journal` (journal queries), `:status` (profile + provider connectivity),
+  and did-you-mean on unknown directives. The `:run` dispatch logic moved to
+  a shared `repl-dispatch.ts` used by both REPL and session — no behavior
+  change.
+
 ### CLI modernization Phase 2 — MCP server (2026-09-13 — `.scratch/cli-modernization/`)
 
 - **`payway-sdk mcp`**: Model Context Protocol stdio server over the agent

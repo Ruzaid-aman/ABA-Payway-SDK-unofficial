@@ -153,7 +153,10 @@ describe('I-4: doctor journal row', () => {
   });
 
   it('reports enabled state and warns above 50 MB', () => {
-    const enabled = runDoctor({ cwd: dir, env: { PAYWAY_JOURNAL: '1' } });
+    // Isolate the data root: since 155b104 the default journal dir follows
+    // PAYWAY_DATA_DIR, so without this the enabled row would read the real
+    // machine journal instead of the test's empty one.
+    const enabled = runDoctor({ cwd: dir, env: { PAYWAY_JOURNAL: '1', PAYWAY_DATA_DIR: dir } });
     const enabledRow = enabled.checks.find((c) => c.id === 'journal');
     expect(enabledRow?.ok).toBe(true);
     expect(enabledRow?.detail).toContain('no events yet');

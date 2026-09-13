@@ -23,15 +23,24 @@ function makeProgram(): { program: Command; received: Array<string[]> } {
     .command('check-transaction')
     .description('check')
     .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
-    .action((opts: Record<string, unknown>) => received.push(['check-transaction', String(opts.transactionId)]));
+    .action((opts: Record<string, unknown>): void => {
+      received.push(['check-transaction', String(opts.transactionId)]);
+    });
   const group = program.command('pre-auth').description('pre-auth group');
   group
     .command('complete')
     .description('complete')
     .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
     .option('-a, --amount <n>', 'amount')
-    .action((opts: Record<string, unknown>) => received.push(['pre-auth complete', String(opts.transactionId), String(opts.amount ?? '-')]));
-  program.command('exchange-rate').description('no -t here').action(() => received.push(['exchange-rate']));
+    .action((opts: Record<string, unknown>): void => {
+      received.push(['pre-auth complete', String(opts.transactionId), String(opts.amount ?? '-')]);
+    });
+  program
+    .command('exchange-rate')
+    .description('no -t here')
+    .action((): void => {
+      received.push(['exchange-rate']);
+    });
   return { program, received };
 }
 
@@ -42,8 +51,8 @@ async function runSession(lines: string[], opts: { resume?: boolean; sessionDir:
   const captured = capture();
   try {
     const loop = runSessionLoop({
-      input,
-      output,
+      input: input as unknown as NodeJS.ReadableStream,
+      output: output as unknown as NodeJS.WritableStream,
       interactive: false,
       resume: opts.resume,
       sessionDir: opts.sessionDir,
@@ -82,7 +91,13 @@ describe('runSessionLoop', () => {
     const output = new PassThrough();
     const captured = capture();
     try {
-      const loop = runSessionLoop({ input, output, interactive: false, sessionDir: tempDir, program });
+      const loop = runSessionLoop({
+        input: input as unknown as NodeJS.ReadableStream,
+        output: output as unknown as NodeJS.WritableStream,
+        interactive: false,
+        sessionDir: tempDir,
+        program,
+      });
       input.write(':use TRX-777\n');
       input.write('check-transaction\n');
       input.write('pre-auth complete -a 2.00\n');
@@ -105,7 +120,13 @@ describe('runSessionLoop', () => {
     const input = new PassThrough();
     const output = new PassThrough();
     try {
-      const loop = runSessionLoop({ input, output, interactive: false, sessionDir: tempDir, program });
+      const loop = runSessionLoop({
+        input: input as unknown as NodeJS.ReadableStream,
+        output: output as unknown as NodeJS.WritableStream,
+        interactive: false,
+        sessionDir: tempDir,
+        program,
+      });
       input.write(':use TRX-A\n');
       input.write('check-transaction -t TRX-B\n');
       input.write(':exit\n');

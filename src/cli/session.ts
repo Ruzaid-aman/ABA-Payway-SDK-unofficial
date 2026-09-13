@@ -130,7 +130,7 @@ export async function runSessionLoop(io: SessionIo): Promise<void> {
   if (!io.interactive) console.log(`${c.dim('(non-interactive: reading commands from stdin)')}`);
   console.log();
 
-  function prompt(): string {
+  function prompt(): void {
     if (!io.interactive) return;
     const suffix = `${profile ? ` ${c.dim(`[${profile}]`)}` : ''}${stickyTranId ? ` ${c.cyan(`· ${stickyTranId}`)}` : ''} `;
     io.output.write(`${SESSION_PROMPT_PREFIX}${suffix}`);
@@ -165,6 +165,7 @@ export async function runSessionLoop(io: SessionIo): Promise<void> {
     if (!trimmed) return;
 
     if (trimmed === ':exit' || trimmed === ':quit') {
+      exitRequested = true;
       rl.close();
       return;
     }
@@ -219,16 +220,16 @@ export async function runSessionLoop(io: SessionIo): Promise<void> {
     // Bare line → CLI dispatch with sticky -t injection. Re-quote tokens with
     // spaces so the dispatcher's safeParseArgs restores them exactly.
     const tokens = stickyInjected(safeParseArgs(trimmed));
-    const priorExitCode = process.exitCode;
     await dispatch(tokens.map((token) => (token.includes(' ') ? `"${token}"` : token)).join(' '));
     history.push(tokens.join(' '));
-    persist(tokens, typeof process.exitCode === 'number' ? process.exitCode : priorExitCode);
+    persist(tokens, typeof process.exitCode === 'number' ? process.exitCode : null);
   }
 
   const lineQueue: string[] = [];
   let resolveLine: ((value: string | null) => void) | null = null;
   let eof = false;
   let running = true;
+  let exitRequested = false;
   rl.on('line', (l: string) => {
     if (resolveLine) {
       const r = resolveLine;
@@ -260,7 +261,7 @@ export async function runSessionLoop(io: SessionIo): Promise<void> {
     const line = await nextLine();
     if (line === null) break;
     await handleLine(line);
-    if (rl.closed) running = false;
+    if (exitRequested) running = false;
   }
 
   console.log(`\n${c.dim(`Session ${started.id} — ${started.entries.length} command(s) recorded.`)}\n`);

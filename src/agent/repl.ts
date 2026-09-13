@@ -149,7 +149,7 @@ export async function runRepl(
     if (query.startsWith('read ')) {
       const topic = query.slice('read '.length).trim();
       const read = topic ? readTopic(topic) : null;
-      if (!read || read.status !== 'exact') {
+      if (!read || read.status !== 'ok') {
         console.log(`  ${c.red('✗')} Unknown topic "${topic}" — use :docs <keywords> to search first.`);
         return;
       }
@@ -168,7 +168,7 @@ export async function runRepl(
     }
     console.log(`\n${c.bold(`Knowledge search: "${query}"`)} ${c.dim(`— ${result.totalHits} hit(s)${result.truncated ? ' (truncated)' : ''}`)}`);
     for (const hit of result.hits.slice(0, 10)) {
-      console.log(`  ${c.cyan(hit.topic)}  ${c.dim(hit.title ?? '')}`);
+      console.log(`  ${c.cyan(hit.topic)}  ${c.dim(hit.text.slice(0, 70))}`);
     }
     console.log(`  ${c.dim('Read one with: :docs read <topic>')}\n`);
   }

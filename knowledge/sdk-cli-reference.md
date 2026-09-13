@@ -885,6 +885,38 @@ as tools. stdout belongs to the protocol; diagnostics go to stderr.
 
 ---
 
+## Session mode & REPL polish (v1.6.0)
+
+### `payway-sdk session`
+
+An interactive, command-first shell over the manual CLI (TTY-only; non-TTY
+runs print a hint on stderr and exit 2). No LLM, no privacy gate — every bare
+line is dispatched through the same Commander program as the manual commands.
+
+- **Directives:** `:help`, `:use [tran-id]`, `:profile [name]`, `:history`,
+  `:clear`, `:exit`. Unknown directives get a did-you-mean hint.
+- **Sticky transaction (`:use`):** after `:use <tran-id>`, any dispatched
+  command whose resolved Command declares the standard `-t, --transaction-id`
+  option inherits that id when you omit it (e.g. `check-transaction`,
+  `transaction-detail`, `pre-auth complete`). Passing `-t` explicitly always
+  wins; `:use off` clears it. The prompt shows the active profile and the
+  sticky id.
+- **History:** each dispatched command is appended to
+  `<appdata>/aba-payway-sdk/sessions/cli/<id>.json` (`cli-session/v1`,
+  atomic writes); `session --resume` reopens the most recent.
+
+### Agent REPL polish (`payway-sdk agent`)
+
+The agent REPL gains offline directives that never need an LLM turn:
+`:tools` (the 14-tool catalog with risk classes), `:docs <keywords…>` /
+`:docs read <topic>` (knowledge base), `:journal <args…>` (journal queries
+via the shared dispatcher), and `:status` (profile + provider connectivity).
+Unknown directives suggest the closest real one. Both the agent REPL and
+`session` share one validated dispatcher (`src/agent/repl-dispatch.ts`) —
+registered commands only, never shells/paths/URIs.
+
+---
+
 ## Development & Contribution
 
 ### Setup & Commands
