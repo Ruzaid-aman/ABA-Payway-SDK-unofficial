@@ -125,6 +125,52 @@ describe('cof charge token resolution', () => {
     }
   });
 
+  it('cof token remove prunes the local store on gateway success', async () => {
+    saveLinkedToken({ ctid: 'custrm1', pwt: 'pwt-remove-me' });
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '00', message: 'Success' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'token', 'remove', '-c', 'custrm1', '--token', 'pwt-remove-me',
+      ]);
+      expect(text).toContain('Token removed');
+      expect(text).toContain('removed 1 captured token');
+      expect(loadLinkedTokens().find((t) => t.pwt === 'pwt-remove-me')).toBeUndefined();
+      expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('cof token remove keeps the local copy when the gateway rejects', async () => {
+    saveLinkedToken({ ctid: 'custrm2', pwt: 'pwt-keep-me' });
+    const srv = http.createServer((req, res) => {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '99', message: 'Rejected' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { exitCode } = await run([
+        'cof', 'token', 'remove', '-c', 'custrm2', '--token', 'pwt-keep-me',
+      ]);
+      expect(exitCode).not.toBe(0);
+      expect(loadLinkedTokens().find((t) => t.pwt === 'pwt-keep-me')).toBeDefined();
+    } finally {
+      srv.close();
+    }
+  });
+
   it('resolves the latest captured pwt for --ctid and sends it as the pwt field', async () => {
     saveLinkedToken({ ctid: 'custcharge1', pwt: 'pwt-old-token' });
     saveLinkedToken({ ctid: 'custcharge1', pwt: 'pwt-new-token' });

@@ -4463,12 +4463,26 @@ cofTokenCmd
         ctid: opts.ctid as string,
         paymentToken: opts.token as string,
       });
+      // Storage wave 4: the gateway removed the token — prune the local copy
+      // so no stale live credential lingers (fail-open; stderr under --json).
+      let localNote: string;
+      try {
+        const pruned = removeLinkedTokens(opts.ctid as string, opts.token as string);
+        localNote =
+          pruned > 0
+            ? `local store: removed ${pruned} captured token${pruned === 1 ? '' : 's'}`
+            : 'local store: no captured copy';
+      } catch (error) {
+        localNote = `local store prune failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
       if (opts.json) {
+        console.error(`  ${localNote}`);
         printApiResultJson(result, payway);
         return;
       }
       console.log(`  ${c.green('✓')} Token removed`);
-      console.log(`  ${c.bold('CTID:')} ${c.cyan(opts.ctid as string)}\n`);
+      console.log(`  ${c.bold('CTID:')} ${c.cyan(opts.ctid as string)}`);
+      console.log(`  ${c.dim(localNote)}\n`);
     } catch (e) {
       process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
     }
