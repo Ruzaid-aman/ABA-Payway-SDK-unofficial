@@ -49,7 +49,7 @@ afterAll(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-async function run(argv: string[]): Promise<{ text: string; exitCode: typeof process.exitCode }> {
+async function run(argv: string[]): Promise<{ text: string; stdout: string; exitCode: typeof process.exitCode }> {
   const captured = captureConsole();
   const before = process.exitCode;
   try {
@@ -119,6 +119,46 @@ describe('cof charge token resolution', () => {
       const record = loadLinkedTokens().find((t) => t.pwt === 'pwt-renew-token');
       expect(record?.renewedAt).toBeTruthy();
       expect(record?.tokenFlag).toBe('CITI_FLEX');
+      expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('cof charge --ctid refuses a locally-expired token without a gateway call', async () => {
+    const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+    saveLinkedToken({ ctid: 'custdead', pwt: 'pwt-dead', capturedAt: iso(95) });
+
+    // NO receiver started: any gateway attempt would fail with a network error,
+    // so a validation exit + message proves the local guard fired first.
+    const { text, exitCode } = await run([
+      'cof', 'charge', '-t', 'ord-dead', '-a', '1.00', '--ctid', 'custdead',
+    ]);
+    expect(text).toContain('expired');
+    expect(text).toContain('docs/09: ~90-day validity');
+    expect(text).toContain('charge with an explicit --token');
+    expect(exitCode).toBe(1);
+  });
+
+  it('cof charge --ctid warns on an expiring-soon token and still charges', async () => {
+    const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+    saveLinkedToken({ ctid: 'custsoon', pwt: 'pwt-soon-charge', capturedAt: iso(85) });
+
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '00', message: 'Success' }, data: { tran_id: 'ord-soon' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'charge', '-t', 'ord-soon', '-a', '1.00', '--ctid', 'custsoon',
+      ]);
+      expect(text).toContain('expiring in');
+      expect(text).toContain('renew soon');
       expect([0, undefined]).toContain(exitCode);
     } finally {
       srv.close();

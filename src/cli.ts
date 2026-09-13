@@ -4336,8 +4336,26 @@ cofCmd
         process.exitCode = EXIT_VALIDATION;
         return;
       }
+      // Storage wave 4: docs/09 — expired tokens cannot be charged. Refuse
+      // locally-expired tokens before a doomed gateway call (an explicit
+      // --token bypasses this store and this guard entirely).
+      const expiry = tokenExpiryStatus(stored);
+      if (expiry.status === 'expired') {
+        console.log(
+          `  ${c.red('✗')} Captured token for ${c.cyan(String(opts.ctid))} expired ${Math.abs(expiry.daysLeft ?? 0)}d ago — docs/09: ~90-day validity from grant/renewal.`,
+        );
+        console.log(`  ${c.dim('Renew it (cof token renew) or re-link the account, or charge with an explicit --token.')}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
       paymentToken = stored.pwt;
-      console.log(`  Using captured token ${c.cyan(maskPwt(stored.pwt))} ${c.dim(`(captured ${stored.capturedAt})`)}`);
+      const validityNote =
+        expiry.status === 'expiring-soon'
+          ? c.yellow(`⚠ expiring in ${expiry.daysLeft}d — renew soon (cof token renew)`)
+          : expiry.status === 'valid'
+            ? c.dim(`(${expiry.daysLeft}d of ~90d validity left)`)
+            : '';
+      console.log(`  Using captured token ${c.cyan(maskPwt(stored.pwt))} ${c.dim(`(captured ${stored.capturedAt})`)} ${validityNote}`.trimEnd());
     }
     try {
       const payway = new PayWay();
