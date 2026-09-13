@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Publish-prep docs wave (2026-09-14)
+
+- **`docs/RELEASE-READINESS.md` rewritten as the maintainer's manual-actions
+  publish register** (items A–I: history/tree disposition, redistribution
+  review, destination repo, security mailbox, version selection, npm
+  publisher setup, release candidate, publish, follow-through) with
+  2026-09-14 gate evidence: repository boundary + public-docs checks PASS,
+  npm name `aba-payway-ts` free / `payway-sdk` squatted by an unrelated
+  package.
+- **New `docs/MAINTENANCE.md`**: maintenance plan — per-change gates, the
+  count-pin registry (skills 34, agent tools 14, MCP 12/17, topics 30),
+  knowledge-corpus freshness rule, and per-release/monthly/ABA-event
+  cadences.
+- README: added the MCP server to the "You want to…" table and a "For AI
+  coding agents" block (skills installer, `payway-sdk mcp`, offline `docs`,
+  `llms.txt`); docs/README Coding Agents + Maintainer sections extended.
+- Parity fixes: SDK-AND-CLI-REFERENCE agent-tool count 13→14 and the three
+  `(v1.6.0)` reference headings neutralized; skills count 32→34 in
+  RELEASE_CHECKLIST + `.agents/AGENTS.md`; QUICKSTART tarball example
+  genericized to `<version>`.
+- Knowledge corpus re-synced (QUICKSTART, docs/README, SDK-AND-CLI-REFERENCE
+  are corpus sources).
+
 ### CLI modernization Phase 4 — TUI tables + guided confirmations (2026-09-13 — `.scratch/cli-modernization/`)
 
 - **TTY tables (clack mode only)**: `transaction-list` and `profiles list`

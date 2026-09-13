@@ -627,3 +627,27 @@ fixes shipped. Review card: `.scratch/link-card-review/REVIEW-CARD.md` (with a
 - **Open**: ABA must enable the token-flag service on sandbox merchant
   `ec476910`; re-run `scripts/sandbox-probe-link-card-cycle.ts` to capture the
   pwt callback (answers Q18) and complete the paid legs.
+
+## Recent Session — Publish-readiness docs wave (2026-09-14, on `main`)
+
+Docs-only preparation for the first public release; no code, version, tag,
+remote, or publish changes (those are register items now).
+
+- **`docs/RELEASE-READINESS.md` rewritten as the manual-actions publish
+  register (items A–I)** for the maintainer: history + public-tree
+  disposition (recommendation: fresh orphan history of a curated tree),
+  redistribution review, destination repo, security mailbox, version
+  selection (recommendation: 2.0.0 per the Node-22.12 breaking-floor rule),
+  npm publisher setup (trusted publishing/OIDC), release candidate, publish,
+  post-publish follow-through.
+- **Gate evidence 2026-09-14**: `check:repository` PASS (1,317 tracked paths
+  — the 275-path artifact backlog from 2026-09-08 is resolved),
+  `check:public-docs` PASS (239 files); npm registry checked directly:
+  `aba-payway-ts` free, `payway-sdk` squatted (unrelated Argentine-PayWay SDK,
+  lefcott v1.1.1) — README/QUICKSTART warnings stay.
+- **New `docs/MAINTENANCE.md`**: per-change gates, count-pin registry, corpus
+  freshness, cadences (release / monthly / ABA-event / sandbox-profile).
+- **Parity fixes**: SDK-AND-CLI-REFERENCE "13 tools"→"14 tools" and the three
+  `(v1.6.0)` headings neutralized; skills 32→34 in RELEASE_CHECKLIST +
+  `.agents/AGENTS.md`; QUICKSTART tarball genericized; README + docs/README
+  now surface the MCP server, offline `docs`, and `llms.txt` for AI agents.
