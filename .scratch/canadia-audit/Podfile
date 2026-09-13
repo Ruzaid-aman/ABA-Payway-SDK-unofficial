@@ -1,0 +1,10 @@
+platform :ios, '12.0'
+
+token = 'REPLACE_WITH_PAT'
+
+target 'paymentgateway-sample-ios-pod' do
+  use_frameworks!
+
+  
+  pod 'cpg_framework', :git => "https://#{token}@github.com/ctg-digital/cpg-ios-sdk.git", :tag => '0.0.1'
+end

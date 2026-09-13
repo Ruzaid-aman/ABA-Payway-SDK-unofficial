@@ -1,0 +1,878 @@
+diff --git a/.agents/AGENTS.md b/.agents/AGENTS.md
+index 2bfc029..d013aea 100644
+--- a/.agents/AGENTS.md
++++ b/.agents/AGENTS.md
+@@ -14,6 +14,10 @@
+ - **HMAC-SHA512**:
+   - Key: API Key.
+   - Format: Raw binary digest, then base64 encoded.
++- **Callback signing & verification are ONE canonicalization (2026-09-10, webhook workbench)**:
++  - `verifyCallbackDetailed` (verify) and `signCallbackBody` (sign) live together in `src/auth.ts` and share the exact sorted-key-concat → HMAC-SHA512 → Base64 canonicalization (`hash` field stripped when `stripHash: true`).
++  - Anything that must produce or check a callback signature — webhook fixtures (`buildWebhookFixture`), tests, future tooling — goes through those two functions. Never re-implement the canonicalization elsewhere (D1/D3 anti-checklist; the drift-guard suite pattern exists for a reason).
++  - Callback-signing scope: online checkout callbacks ONLY. Payment-link pushbacks (`{tran_id, status: 0, merchant_ref_no}`, no hash) and offline KHQR notifications have no signature contract — verify via check-transaction / reconciliation.
+ - **RSA Public Key Encryption**:
+   - Key: 1024-bit PEM public key.
+   - Padding: `RSA_PKCS1_PADDING`.
+@@ -116,3 +120,4 @@
+ - The packaged `skills/` directory contains 32 focused `aba-payway-*` guides (including journal queries and production webhook fulfillment).
+ - Several guides bundle dependency-free `.cjs` tools under their `scripts/` folder (KHQR decode/CRC validation, request signing, callback verification, mock callbacks, reconciliation cron, checkout payload builder, status decoder) — each SKILL.md documents its own tools.
+ - From the repo root, install all of them (including bundled scripts and references) with `npx tsx src/cli.ts skills add <agent>`, where agent is `claude`, `codex`, `opencode`, `cursor`, or `copilot`.
++- **Webhook workbench (2026-09-10)**: the first-class `payway-sdk webhook trigger|verify-callback|resend|list` group and `setup-webhook --forward-to <url>` cover the hash skill's `.cjs` verify/mock tools natively (`--json` envelopes, record-store integration). The scripts remain only for checkout installs without the CLI; the skills point to the CLI first. Local loop: `setup-webhook --forward-to <app-url>` + `webhook trigger --event payment.approved` exercises a receiver's full verify/handle path without the ABA Simulator — fixtures are synthetic (the gateway never saw the tran_id; never fulfill on them).
+diff --git a/.zcode/skills/aba-payway-offline-qr/SKILL.md b/.zcode/skills/aba-payway-offline-qr/SKILL.md
+index 3e7b565..c4e5df3 100644
+--- a/.zcode/skills/aba-payway-offline-qr/SKILL.md
++++ b/.zcode/skills/aba-payway-offline-qr/SKILL.md
+@@ -2,7 +2,7 @@
+ name: aba-payway-offline-qr
+ description: Generate an offline EMVCo KHQR payload without calling ABA PayWay APIs.
+ metadata:
+-  version: 1.4.0
++  version: 1.5.0
+ ---
+ 
+ # Offline KHQR
+@@ -14,6 +14,37 @@ const payload = payway.khqr.generateOfflineQR({ amount: 10, currency: 'USD', mer
+ 
+ Offline QR uses EMVCo TLV plus CRC-16 CCITT. It does not use online HMAC signing, and generating it never calls PayWay. **Generation itself does not enroll any callback** — downstream payment notifications depend on ABA's routing/enrollment for your Bakong account, which local QR creation neither configures nor proves.
+ 
++## Invoice mode and validity
++
++- Fixed invoice amount: provide `amount`; the SDK emits dynamic KHQR (`01=12`) with tag `54`.
++- Flexible, installment, or partial amount: omit `amount`; the SDK emits static KHQR (`01=11`) and omits tag `54`.
++
++Both modes contain creation and expiry timestamps in nested tag `99`. If omitted, `createdAt` is the generation time and `expiresAt` defaults to **15 minutes** later. A static QR is therefore not automatically permanent. For invoice batches, choose an ABA-approved validity window explicitly so QRs do not expire while queued for printing or delivery:
++
++```ts
++const createdAt = Date.now();
++const expiresAt = createdAt + 30 * 24 * 60 * 60 * 1000; // example policy; confirm with ABA
++
++const fixedInvoiceQr = payway.khqr.generateOfflineQR({
++  amount: 125,
++  currency: 'USD',
++  merchantRef: 'INV2026000158',
++  createdAt,
++  expiresAt,
++});
++
++const openAmountQr = payway.khqr.generateOfflineQR({
++  currency: 'USD',
++  merchantRef: 'INV2026000159',
++  createdAt,
++  expiresAt,
++});
++```
++
++The CLI does not currently expose `createdAt` or `expiresAt`: `--lifetime` does not configure offline KHQR expiry. Use the typed SDK for pre-generated billing batches that require an explicit validity window.
++
++`merchantRef` is encoded in `62.01`. The payload accepts at most **25 UTF-8 bytes**, while `get-transactions-by-mc-ref` has a narrower 20-character gateway cap. Use unique references of at most **20 ASCII characters** when inquiry-based recovery is required.
++
+ ## Payload self-check (offline decode + CRC verification)
+ 
+ Before printing or distributing a QR, decode and verify it locally — exported from the package barrel:
+@@ -42,6 +73,20 @@ The SDK models the downstream contract explicitly:
+ 
+ Do NOT apply the online transaction-ID/HMAC callback assumptions to these notifications, and never treat the QR's CRC-16 as authenticity — it is a payload integrity check only.
+ 
++A locally generated QR is not a pre-created PayWay transaction, but a routed payment can produce a PayWay transaction that is recoverable after payment. The supplied high-volume guidance says the same KHQR can be paid multiple times during its applicable validity; confirm that provider rule against the current merchant-issued ABA guideline and never treat uniqueness of the printed QR as a single-use payment control. Store every successful transfer as a separate Payment, deduplicate delivery/replay by `transaction_id`, and use `merchant_ref` only to find the invoice or account. A new `transaction_id` for an already settled invoice is a real additional payment—preserve it and route it through the merchant's overpayment, credit, or refund policy.
++
++Do not rely on callbacks alone. The merchant-reference endpoint returns at most 50 matches, exposes no pagination parameter, and is limited to 10 requests per minute. Treat a 50-row response as a possible reconciliation gap rather than complete history.
++
++## High-volume batch controls
++
++Before distributing a billing batch:
++
++1. Reject duplicate invoice references and enforce the 20-ASCII-character recovery-safe reference policy.
++2. Record reference, expected amount/currency, `createdAt`, `expiresAt`, output filename, generator version, and a payload digest in a batch manifest.
++3. Run `validateKhqrCrc()` and `inspectKhqrPayload()` on every payload; reject malformed, mismatched, or expired rows.
++4. Keep Invoice, Payment, and Payment Allocation records separate so partial payments, multiple payments, currency mismatches, and overpayments remain auditable.
++5. Exercise both the ABA-provisioned notification path and inquiry recovery before production rollout.
++
+ ## Configuration (required)
+ 
+ Offline KHQR needs the merchant identity from env or config — **all 7 `PAYWAY_KHQR_*` vars** (a bare `generate-qr --offline` without them fails locally with 7 `KHQR_*_REQUIRED` codes, exit 1; the repo `.env` does NOT ship them):
+diff --git a/.zcode/skills/aba-payway-transaction-by-merchant-ref/SKILL.md b/.zcode/skills/aba-payway-transaction-by-merchant-ref/SKILL.md
+index e430b39..0950edd 100644
+--- a/.zcode/skills/aba-payway-transaction-by-merchant-ref/SKILL.md
++++ b/.zcode/skills/aba-payway-transaction-by-merchant-ref/SKILL.md
+@@ -2,7 +2,7 @@
+ name: aba-payway-transaction-by-merchant-ref
+ description: Retrieve ABA PayWay transactions by merchant reference through the SDK or CLI.
+ metadata:
+-  version: 1.3.0
++  version: 1.4.0
+ ---
+ 
+ # Get transactions by merchant reference
+@@ -13,7 +13,7 @@ Use this workflow when the user supplies a `merchant_ref` and asks to find the c
+ 
+ ```ts
+ const result = await payway.khqr.getTransactionsByMerchantRef('INV-12345678');
+-console.log(result.data);
++console.log(result.rows); // normalized rows; result.raw = untouched gateway envelope
+ ```
+ 
+ ## CLI
+@@ -33,6 +33,7 @@ The command reads `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`, signs the request,
+ ## Constraints
+ 
+ - The merchant reference must be non-empty.
++- The inquiry endpoint has a 20-character gateway cap. Although offline KHQR tag `62.01` accepts up to 25 UTF-8 bytes, use unique references of at most 20 ASCII characters when the same value must work for generation and inquiry recovery.
+ - PayWay returns at most 50 matching historical transactions.
+ - Limit requests to 10 per minute.
+ 
+@@ -46,4 +47,3 @@ The command reads `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`, signs the request,
+   Exit codes: **0** success (even with no new rows) · **1** API/network failure (clean message, no stack trace) · **2** usage error / missing credentials. Credentials come from `--merchant-id/--api-key`, `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY`, or a `.env` in the cwd (loaded automatically; exported env wins).
+ 
+   **Completeness caveat (do not over-promise):** the endpoint returns at most 50 matches and exposes NO pagination parameter. When a response is saturated (50 rows), the script prints a `GAP:` warning — history may be truncated and the run must NOT be treated as complete reconciliation. There is no way to page further with this API; cross-check against your own records. The rate limit (10/min) applies to every call; the watch interval is floored at 10s.
+-
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a58a3a5..06aa958 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,25 @@
+ 
+ ## Unreleased
+ 
++### Offline KHQR high-volume billing guidance (2026-09-10)
++
++- Propagated the invoice/billing operating model across the Offline QR skill,
++  SDK/CLI reference, QR guide, webhook guide, deployment checklist, and
++  merchant-scenario requirements.
++- Documented the SDK's 15-minute default offline expiry, explicit
++  `createdAt`/`expiresAt` controls, and the current CLI limitation (`--lifetime`
++  does not configure offline KHQR expiry).
++- Added fixed/dynamic versus open/static invoice recipes, the 20-ASCII-character
++  recovery-safe reference policy, batch manifests and payload self-checks.
++- Added repeat/partial/overpayment accounting guidance: deduplicate by
++  `transaction_id`, reconcile by `merchant_ref`, and keep Invoice, Payment,
++  and Payment Allocation separate. Provider-specific repeat-payment and
++  validity rules remain marked for ABA confirmation.
++- Replaced the character-index KHQR parser example with the exported,
++  byte-aware `inspectKhqrPayload()` and `validateKhqrCrc()` helpers.
++- Updated `aba-payway-offline-qr` to v1.5.0 and
++  `aba-payway-transaction-by-merchant-ref` to v1.4.0.
++
+ ### Payment-link void (2026-09-11, undocumented endpoint — SANDBOX-FINDINGS §23)
+ 
+ ABA's `POST /api/merchant-portal/merchant-access/payment-link/void` has no
+diff --git a/HANDOFF.md b/HANDOFF.md
+index 95807b1..420fc27 100644
+--- a/HANDOFF.md
++++ b/HANDOFF.md
+@@ -2,7 +2,11 @@
+ 
+ ## Current release state — 2026-09-08
+ 
+-- **Payment-link void (2026-09-11, branch `feat/payment-link-void` — worktree `.worktrees/payment-link-void`, NOT merged)**: ABA's undocumented `POST /api/merchant-portal/merchant-access/payment-link/void` was surfaced by the user, live-mapped (SANDBOX-FINDINGS §23, commit `432d6ab`), and implemented end-to-end: SDK `paymentLink.void(id)` (signs like detail — RSA `{mc_id, id}` merchant_auth, default-trio HMAC; `MUTATION_ENDPOINTS` member; OpenAPI `VoidPaymentLink*` schemas + regenerated types), CLI `payment-link void -i <id> [-y] [--json]` (TTY confirm, PTL188→exit-2 envelope, `explain PTL188`), PTL188 in the `PAYMENT_LINK_*` hint family, mock-harness void route, §23 pins in the gated `sandbox-contract` suite, e2e evidence `test-output/payment-link-void-e2e/`. New gateway fact: **VOIDED is a real status** (detail reports it; hosted page 200s with an invalid-data shell code 07 — customer form dead, unlike expiry). NOT idempotent (double-void → 403 PTL188; bogus id → 403 96). Open: void-on-paid/partially-paid links, in-flight pushbacks after void — don't void paid links, refund instead. Merge pending user direction (main checkout had another agent's uncommitted webhook/offline-KHQR work + a branch switch to `feat/customer-module-qr` during this session).
++- **Payment-link void (2026-09-11/12, branch `feat/payment-link-void`, MERGED into `feat/customer-module-qr` 2026-09-12 — main merge pending user direction)**: ABA's undocumented `POST /api/merchant-portal/merchant-access/payment-link/void` was surfaced by the user, live-mapped (SANDBOX-FINDINGS §23, commit `432d6ab`), and implemented end-to-end: SDK `paymentLink.void(id)` (signs like detail — RSA `{mc_id, id}` merchant_auth, default-trio HMAC; `MUTATION_ENDPOINTS` member; OpenAPI `VoidPaymentLink*` schemas + regenerated types), CLI `payment-link void -i <id> [-y] [--json]` (TTY confirm, PTL188→exit-2 envelope, `explain PTL188`), PTL188 in the `PAYMENT_LINK_*` hint family, mock-harness void route, §23 pins in the gated `sandbox-contract` suite, e2e evidence `test-output/payment-link-void-e2e/`. New gateway fact: **VOIDED is a real status** (detail reports it; hosted page 200s with an invalid-data shell code 07 — customer form dead, unlike expiry). NOT idempotent (double-void → 403 PTL188; bogus id → 403 96). Open: void-on-paid/partially-paid links, in-flight pushbacks after void — don't void paid links, refund instead.
++
++- **Webhook workbench shipped, live-verified, and re-audited (2026-09-10, commits `9435301`+`f7b9b5d`, re-audit `86b1604`).** P0 Wave 1 of `docs/competitive-analysis-cli-stripe-razorpay.md` (the Stripe listen/trigger/events-resend analog): new `payway-sdk webhook trigger|verify-callback|resend|list` command group (`src/cli/commands/webhook.ts`) plus `setup-webhook --forward-to <url> [--forward-headers]` (forwarder `src/webhook/forwarder.ts`). Contracts pinned by tests AND a live dist-CLI e2e run (evidence `.scratch/audit-webhook-e2e/`): fixtures sign via shared `signCallbackBody` (auth.ts — the verify inverse; NEVER re-implement the canonicalization, D1/D3); pushback/KHQR fixtures carry NO hash by design; forward failures never reject or lose the captured callback; exit 0 valid / 1 invalid+reason / 3 network. Suite **1,662 passed / 13 skipped** on merged main (38 new tests). Open P3 follow-ups from the verification run (re-audit §"New findings"): pushback captures don't populate `matchedTransactionId/matchedStatus` (server.ts one-liner); `webhook list` doesn't report which storage backend is live. Wave 2 next: `docs/llms.txt` + `docs` command (smallest), MCP server (largest).
++
++- Offline KHQR high-volume billing guidance was propagated on 2026-09-10 across the Offline QR and merchant-reference skills plus docs 07/11/13/15/16 and the SDK/CLI reference. The public guidance now exposes the SDK's 15-minute default expiry and explicit `createdAt`/`expiresAt` controls, warns that CLI `--lifetime` does not configure offline expiry, recommends 20-character ASCII references for generation-plus-inquiry recovery, and models repeat/partial/overpayments as separate Payment records and allocations. The supplied builder examples remain corroborating material only; repeat-payment and long-validity policy claims require ABA confirmation.
+ 
+ - Beginner onboarding documentation now follows README → QUICKSTART → setup/webhook references → simulated application walkthrough. Sandbox signup and emailed credentials are sourced to ABA's official guidance; quickstart includes test-payer access, callback setup, unique attempt IDs, and verification outcomes. First-payment skill follows the same path. This is documentation-only; publication remains separately gated.
+ 
+diff --git a/QUICKSTART.md b/QUICKSTART.md
+index f0d4e89..ae38ec1 100644
+--- a/QUICKSTART.md
++++ b/QUICKSTART.md
+@@ -80,6 +80,8 @@ npm exec -- payway-sdk setup-webhook --tunnel
+ 
+ Keep that terminal running. Follow its tunnel setup instructions and copy the complete public HTTPS URL, including `/aba-payway-webhook`. In your payment terminal, replace `PAYWAY_CALLBACK_URL` from step 3 with that URL. A localhost URL is not reachable by ABA. See [webhook setup and tunnel prerequisites](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/16-webhook-setup-guide.md) if the tunnel cannot start. This listener captures deliveries for development; it is not an order-fulfillment service.
+ 
++To check a receiver before any real payment, run it against the captured deliveries: add `--forward-to http://localhost:<your-app-port>/webhooks/aba` to the command above, then in a third terminal run `npm exec -- payway-sdk webhook trigger --event payment.approved`. The receiver gets a correctly-signed fixture callback in seconds — no ABA Simulator and no sandbox payment. Fixture callbacks are synthetic; never fulfill on them. Details: [Local Webhook Workbench](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/16-webhook-setup-guide.md#local-webhook-workbench).
++
+ Online QR is the default below. For a hosted payment page, use `doctor --route hosted-checkout` and the signed form command in step 6. For a shareable link, follow the [payment-link guide](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/17-payment-link.md); it additionally needs an RSA key.
+ 
+ Check the intended route:
+diff --git a/docs/07-qr-code-handling.md b/docs/07-qr-code-handling.md
+index ac68d63..0c4b286 100644
+--- a/docs/07-qr-code-handling.md
++++ b/docs/07-qr-code-handling.md
+@@ -319,10 +319,13 @@ const readiness = payway.khqr.validateConfiguration();
+ if (!readiness.ready) throw new Error(readiness.issues.map((issue) => issue.code).join(', '));
+ 
+ // Generate an official ABA KHQR string locally.
++const createdAt = Date.now();
+ const qrString = payway.khqr.generateOfflineQR({
+   amount: 15.00,
+   currency: 'USD',
+   merchantRef: 'REF-123', // Your internal reference
++  createdAt,
++  expiresAt: createdAt + 30 * 24 * 60 * 60 * 1000, // example only; confirm the validity policy with ABA
+ });
+ 
+ console.log(qrString);
+@@ -336,9 +339,29 @@ console.log(qrString);
+ 
+ The seven configuration fields can be supplied in the constructor (highest priority), environment (`PAYWAY_KHQR_BAKONG_ID`, `PAYWAY_KHQR_ABA_MERCHANT_ID`, `PAYWAY_KHQR_ACQUIRER_NAME`, `PAYWAY_KHQR_MERCHANT_CATEGORY_CODE`, `PAYWAY_KHQR_MERCHANT_NAME`, `PAYWAY_KHQR_MERCHANT_CITY`, and `PAYWAY_KHQR_PAYWAY_DATA`), or an optional local CLI profile. Keep them private and obtain them from ABA; do not infer or reuse another merchant's values.
+ 
+-Omit `amount` for a static QR (`01=11`); provide it for a dynamic QR (`01=12` with tag `54`). The payload uses byte-aware TLV lengths, includes merchant reference `62.01`, ABA-provided PayWay data `62.68`, and CRC tag `63`. Earlier SDK versions used a private offline format; migrate by removing legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments.
++Omit `amount` for a static QR (`01=11`) with an open amount and tag `54` omitted; provide it for a dynamic QR (`01=12` with a fixed amount in tag `54`). Both modes carry `createdAt` and `expiresAt` as 13-digit epoch-millisecond values in nested tag `99`. If omitted, the SDK uses the generation time and expires the payload **15 minutes** later. Static does not mean permanent.
+ 
+-> ⚠️ **Important:** Offline-generated QRs cannot be tracked by PayWay for status. For server-side status tracking, use the API-based `generateQr()`. A payment notification, when ABA has provisioned one, still needs separate reconciliation.
++For invoice batches, set the validity explicitly and confirm the permitted window with ABA. The CLI currently does not expose offline `createdAt`/`expiresAt`; its `--lifetime` flag applies to the online QR request and does not configure offline KHQR expiry. Use the typed SDK when QRs will wait in a print or delivery queue.
++
++The payload permits `merchantRef` values up to **25 UTF-8 bytes**, but `get-transactions-by-mc-ref` has a narrower 20-character gateway cap. Use a unique reference of no more than **20 ASCII characters** when the invoice must be recoverable through that inquiry API.
++
++Earlier SDK versions used a private offline format; migrate by removing legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments.
++
++> ⚠️ **Important:** Local generation does not pre-create a PayWay transaction, so there is nothing to poll immediately after generation. When ABA has provisioned routing and the customer pays, the resulting payment transaction may arrive through the dedicated KHQR notification or be recovered by `merchant_ref`. The notification remains unverified until you implement the verification contract ABA confirms for your merchant.
++
++### High-volume invoice and billing pattern
++
++Use dynamic KHQR for an exact invoice amount and static KHQR for an open, installment, or partial amount. In both cases, make `62.01` invoice-specific. The supplied high-volume guidance says the same QR **can be paid multiple times** during its applicable validity; confirm that provider rule against the current merchant-issued ABA guideline. A unique QR must not be treated as a guaranteed single-use payment control.
++
++Persist three separate concepts:
++
++- **Invoice:** the obligation, expected currency, amount due, balance, and business status.
++- **Payment:** one actual PayWay transfer, uniquely deduplicated by `transaction_id`.
++- **Payment Allocation:** how much of a Payment settles an Invoice.
++
++Use `merchant_ref` to locate the obligation, not as the payment idempotency key. If a new `transaction_id` arrives for an already paid invoice, store it as a real additional payment and route it to the merchant's overpayment, credit, or refund workflow. Unknown references and currency mismatches belong in an exception queue, not in discarded callbacks.
++
++For each batch, reject duplicate references and retain a manifest containing reference, expected amount/currency, `createdAt`, `expiresAt`, output filename, generator version, and a payload digest. Run `validateKhqrCrc()` and `inspectKhqrPayload()` on every row before printing. Reconcile missed notifications with `get-transactions-by-mc-ref`, remembering that it returns at most 50 matches, has no pagination, and is limited to 10 requests per minute; a saturated response is not proof of complete history.
+ 
+ ---
+ 
+@@ -646,42 +669,22 @@ Thrown when polling is forcibly stopped (caught by `catch` around the `for await
+ 
+ ## Validating a QR String
+ 
+-You can parse the QR string to verify the embedded data:
++Use the exported byte-aware parser and CRC validator. Do not implement this with JavaScript string indexes: KHQR lengths are UTF-8 byte counts, and tags `30`, `62`, and `99` are nested templates.
+ 
+ ```typescript
+-/**
+- * Simple KHQR payload parser.
+- * Parses EMVCo TLV format to extract merchant ID, transaction ID, and amount.
+- */
+-function parseKhqrString(qrString: string): Record<string, string> | null {
+-  try {
+-    const result: Record<string, string> = {};
+-    let pos = 0;
++import { inspectKhqrPayload, validateKhqrCrc } from 'aba-payway-ts';
+ 
+-    while (pos < qrString.length - 4) { // Last 4 chars are CRC
+-      const tag = qrString.substring(pos, pos + 2);
+-      const length = parseInt(qrString.substring(pos + 2, pos + 4), 10);
+-      const value = qrString.substring(pos + 4, pos + 4 + length);
+-
+-      result[tag] = value;
+-      pos += 4 + length;
+-    }
++if (!validateKhqrCrc(qrString)) {
++  throw new Error('Do not distribute this QR: CRC mismatch');
++}
+ 
+-    return result;
+-  } catch {
+-    return null;
+-  }
++const info = inspectKhqrPayload(qrString);
++if (!info?.valid) {
++  throw new Error('Do not distribute this QR: malformed KHQR payload');
+ }
+ 
+-const info = parseKhqrString(qrString);
+ console.log(info);
+-// {
+-//   "00": "01",           // Payload Format Indicator
+-//   "01": "12",           // Point of Initiation Method
+-//   "30": "M001",         // Merchant ID (in sub-fields)
+-//   "62": "REF-123",      // Additional Data (merchant reference)
+-//   ...
+-// }
++// { isStatic, currency, amount?, merchantName?, merchantCity?, merchantRef?, bakongId?, crcValid, valid }
+ ```
+ 
+ ---
+@@ -692,7 +695,8 @@ console.log(info);
+ |---|---|
+ | **Physical POS (customer scans from phone screen)** | Use API-based `generateQr()` with polling |
+ | **E-commerce (customer scans with phone camera)** | Use API-based `generateQr()` with polling and webhook |
+-| **Static QR on invoice (same QR for multiple payments)** | Use configured offline `generateOfflineQR()` without `amount`; reconcile payments independently |
++| **Fixed-amount invoice batch** | Use configured offline `generateOfflineQR()` with `amount` and explicit `createdAt`/`expiresAt`; self-check every row before printing |
++| **Open/partial-amount invoice** | Omit `amount`; use an invoice-specific `merchantRef`, a payment ledger, and independent allocations |
+ | **Telegram bot / messaging** | Send `qrImage` as a photo message |
+ | **Mobile app (display QR to another device)** | Use `qrString` with a native QR renderer |
+ 
+diff --git a/docs/11-callbacks-and-webhooks.md b/docs/11-callbacks-and-webhooks.md
+index 6fe8ab6..259f3f7 100644
+--- a/docs/11-callbacks-and-webhooks.md
++++ b/docs/11-callbacks-and-webhooks.md
+@@ -364,10 +364,20 @@ POST /aba-payway-khqr-webhook
+ 
+ Before relying on it, publish a stable HTTPS URL and ask ABA to configure and whitelist that exact URL for the merchant. Record that request separately from local SDK configuration: `confirmed-by-merchant` is an operator declaration, not proof that ABA completed provisioning. `payway.khqr.validateCallbackSetup()` checks an HTTPS URL, the declaration, and a non-`unknown` verification strategy, but cannot contact ABA or prove whitelisting.
+ 
+-The listener persists headers, source IP, and the raw body before parsing. It preserves unknown fields and records parse errors so future ABA schema changes remain auditable. It intentionally accepts the published offline shape without requiring the online HMAC header. Treat the parsed `transaction_id` only as a deduplication key; reconcile it with your own `merchant_ref` and a verified ABA process before fulfilment. This capture listener must never decide that an order is paid. Do not use `tran_id`, online `status`, or `verifyCallback()` as assumptions for this offline notification.
++The listener persists headers, source IP, and the raw body before parsing. It preserves unknown fields and records parse errors so future ABA schema changes remain auditable. It intentionally accepts the published offline shape without requiring the online HMAC header. Treat the parsed `transaction_id` only as a deduplication key for the payment/delivery; use `merchant_ref` to locate the invoice or account and reconcile it through a verified ABA process before fulfilment. This capture listener must never decide that an order is paid. Do not use `tran_id`, online `status`, or `verifyCallback()` as assumptions for this offline notification.
+ 
+ For a production receiver, apply the verification method ABA actually provides (for example, a confirmed HMAC, mTLS, or an IP allowlist), store the evidence with the raw delivery, and keep the decision to mark an order paid in your application—not in the capture listener.
+ 
++The supplied high-volume guidance says the same offline KHQR can be paid multiple times during its applicable validity; confirm that provider rule against the current merchant-issued ABA guideline. Regardless, distinguish these cases safely:
++
++- The same `transaction_id` is delivered or processed again: idempotently return the stored outcome; do not create another Payment.
++- A new `transaction_id` has the same `merchant_ref`: store a new Payment. It may be a legitimate installment or a real overpayment, not a duplicate callback.
++- The reference is unknown or the currency conflicts with the invoice: retain the Payment in an exception state for investigation.
++
++Keep Invoice, Payment, and Payment Allocation records separate. Allocate verified payments atomically, recompute the balance, and route excess value through the merchant's overpayment, credit, or refund policy.
++
++Callbacks are the event path, not the only recovery path. If a notification is missing, query `get-transactions-by-mc-ref` using the same recovery-safe reference. The endpoint returns at most 50 matches, exposes no pagination parameter, and is limited to 10 requests per minute. A saturated 50-row response may be incomplete, so compare it with the merchant ledger rather than declaring reconciliation complete.
++
+ ---
+ 
+ ## Local Testing with curl
+@@ -439,7 +449,7 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
+ 
+ ## Next Steps
+ 
+-- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](./16-webhook-setup-guide.md) — quick way to capture and inspect callbacks during development
++- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](./16-webhook-setup-guide.md) — quick way to capture and inspect callbacks during development; the [Local Webhook Workbench](./16-webhook-setup-guide.md#local-webhook-workbench) in the same chapter sends correctly-signed fixture callbacks (`webhook trigger`), forwards captures to your app (`--forward-to`), replays stored records (`webhook resend`), and explains failed verifications (`webhook verify-callback`) — all without the ABA Simulator
+ - **For error handling** → [Chapter 12 — Error Handling & Debugging](./12-error-handling-and-debugging.md)
+ - **For deployment** → [Chapter 13 — Deployment Checklist](./13-deployment-checklist.md)
+ - **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](./03-web-implementation.md)
+diff --git a/docs/13-deployment-checklist.md b/docs/13-deployment-checklist.md
+index 62a6d88..65f78ae 100644
+--- a/docs/13-deployment-checklist.md
++++ b/docs/13-deployment-checklist.md
+@@ -142,6 +142,34 @@ Go through **every** item before switching from sandbox to production. A missed
+ - [ ] **QR expiry timer is displayed to the user**  
+   Show a countdown or "QR expires in X minutes" message.
+ 
++- [ ] **Offline KHQR validity matches the distribution workflow**
++  The SDK defaults `expiresAt` to **15 minutes** after `createdAt`, including
++  static KHQR. For print or billing batches, set both explicitly and confirm
++  the permitted validity window with ABA; the CLI's `--lifetime` does not
++  configure offline expiry.
++
++- [ ] **Every offline batch has a verified manifest**
++  Reject duplicate references; record reference, amount/currency,
++  `createdAt`, `expiresAt`, output filename, generator version, and payload
++  digest; run `validateKhqrCrc()` plus `inspectKhqrPayload()` on every row.
++
++- [ ] **Invoice references remain inquiry-safe**
++  KHQR accepts 25 UTF-8 bytes, but `get-transactions-by-mc-ref` has a
++  20-character cap. Use unique references of at most 20 ASCII characters
++  when inquiry recovery is required.
++
++- [ ] **Repeat and partial payment handling is production-ready**
++  The supplied high-volume guidance says the same KHQR can be paid multiple
++  times; confirm the provider rule with ABA. Deduplicate by `transaction_id`,
++  reconcile by `merchant_ref`, and preserve separate Invoice, Payment, and
++  Payment Allocation records with defined overpayment/refund handling.
++
++- [ ] **Offline notification recovery is tested**
++  Confirm ABA routing/whitelisting and its actual verification contract, then
++  test both the notification path and `get-transactions-by-mc-ref` recovery.
++  Treat a 50-row response as potentially incomplete because the endpoint has
++  no pagination.
++
+ ### Network & Infrastructure
+ 
+ - [ ] **Firewall allows outbound HTTPS to `checkout.payway.com.kh`** (production) or `checkout-sandbox.payway.com.kh` (sandbox)**  
+@@ -256,4 +284,4 @@ You've completed the implementation guide! Here's what to do next:
+ - **[Chapter 14 — Appendix: Code Snippets](./14-appendix-code-snippets.md)** — Full copy-paste-ready examples
+ - **[README](./README.md)** — Documentation index with all chapters
+ 
+-> ← [Previous: Error Handling & Debugging](./12-error-handling-and-debugging.md) | [Next: Appendix →](./14-appendix-code-snippets.md)
+\ No newline at end of file
++> ← [Previous: Error Handling & Debugging](./12-error-handling-and-debugging.md) | [Next: Appendix →](./14-appendix-code-snippets.md)
+diff --git a/docs/15-merchant-scenario-requirements.md b/docs/15-merchant-scenario-requirements.md
+index 4dd6e44..df81429 100644
+--- a/docs/15-merchant-scenario-requirements.md
++++ b/docs/15-merchant-scenario-requirements.md
+@@ -128,3 +128,42 @@ caveats (2026-09-05):** the gateway signs `ctid` in the 27-field purchase hash
+ §17), and the current sandbox profile answers `104` "Merchant not enabled
+ token flag" — subscription enablement is an ABA-side prerequisite for this
+ scenario. See the `aba-payway-subscription` skill.
++
++## TC-030 — High-volume offline KHQR validity
++
++For locally generated invoice batches, record `createdAt` and set `expiresAt`
++explicitly. The SDK default is 15 minutes, including static KHQR, which is
++usually unsuitable for QRs queued for printing or later delivery. **Confirm
++with ABA** the permitted creation/expiry policy for the merchant before
++choosing a longer window. The current CLI does not expose these fields;
++`--lifetime` does not configure offline KHQR expiry.
++
++## TC-031 — Fixed versus open invoice amount
++
++Use dynamic KHQR (`01=12`, tag `54`) when the payer must pay the exact invoice
++amount. Use static KHQR (`01=11`, tag `54` omitted) for installments or an
++open amount. Both modes need an invoice-specific `merchant_ref` and the same
++payment-ledger safeguards.
++
++## TC-032 — Recovery-safe invoice reference
++
++The offline payload accepts `merchantRef` up to 25 UTF-8 bytes, but the
++`get-transactions-by-mc-ref` recovery endpoint has a narrower 20-character
++cap. Use unique references of at most 20 ASCII characters when recovery by
++reference is part of the merchant journey.
++
++## TC-033 — Repeat, partial, and overpayment handling
++
++The supplied high-volume KHQR guidance says the same QR can be paid multiple
++times. Treat that statement as **Confirm with ABA** until it is traced to the
++current merchant-issued guideline. Regardless, the receiver must deduplicate
++only the same `transaction_id`; a new transaction with the same
++`merchant_ref` is stored as a separate Payment and allocated or routed to an
++overpayment/refund exception according to merchant policy.
++
++## TC-034 — Offline notification recovery capacity
++
++Test the ABA-provisioned notification path and the inquiry fallback. The
++merchant-reference endpoint returns at most 50 matches, exposes no pagination,
++and is limited to 10 requests per minute. A 50-row result cannot prove complete
++reconciliation during a high-volume interval or extended callback outage.
+diff --git a/docs/16-webhook-setup-guide.md b/docs/16-webhook-setup-guide.md
+index 05d7232..6c25a5c 100644
+--- a/docs/16-webhook-setup-guide.md
++++ b/docs/16-webhook-setup-guide.md
+@@ -435,8 +435,10 @@ The callback will appear in your terminal and be saved to disk.
+ 
+ 1. Configure the ABA-issued offline KHQR merchant fields through explicit `PayWay` configuration, `PAYWAY_KHQR_*` environment variables, or a local CLI profile. `payway.khqr.validateConfiguration()` reports missing or invalid fields without exposing their values.
+ 2. Publish `https://your-public-host/aba-payway-khqr-webhook` and request ABA provisioning/whitelisting for that route.
+-3. Keep raw notification records, deduplicate `transaction_id`, and reconcile with `merchant_ref` before any fulfilment decision.
++3. Keep raw notification records, deduplicate delivery/processing on `transaction_id`, and reconcile the invoice or account with `merchant_ref` before any fulfilment decision.
+ 4. Do not assume online HMAC authentication; implement only the verification strategy ABA confirms for this notification.
++5. The supplied high-volume guidance says the same KHQR can be paid multiple times; confirm the provider rule with ABA. The same `transaction_id` is a replay, but a new `transaction_id` with the same `merchant_ref` is a separate Payment that may create a partial payment or overpayment.
++6. Recover missed notifications with `get-transactions-by-mc-ref`. It returns at most 50 matches, has no pagination parameter, and is limited to 10 requests per minute; treat a saturated response as a possible reconciliation gap.
+ 
+ ---
+ 
+diff --git a/docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md b/docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md
+index 80d9731..8c7fb97 100644
+--- a/docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md
++++ b/docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md
+@@ -418,6 +418,27 @@ explicit approval flag.
+ 
+ ---
+ 
++## 9a. Local webhook testing (agent-friendly)
++
++The `webhook` command group (2026-09-10) gives automation and agents a fully local receiver test loop — no gateway calls, no ABA Simulator, machine-readable envelopes:
++
++```bash
++# Send a correctly-signed fixture callback to any receiver
++payway-sdk webhook trigger --url http://localhost:3000/webhooks/aba --event payment.approved --json
++
++# Verify a body+signature pair (exit 0 valid / 1 invalid+reason) or a captured record
++payway-sdk webhook verify-callback --body-file cb.json --sig "<X-PAYWAY-HMAC-SHA512>" --json
++payway-sdk webhook verify-callback --record wh_xxx --json
++
++# List captures; replay one to any URL
++payway-sdk webhook list --json
++payway-sdk webhook resend --record wh_xxx --to http://localhost:3000/webhooks/aba --json
++```
++
++Combine with `setup-webhook --forward-to http://localhost:3000/webhooks/aba` to exercise the app end-to-end while capturing every delivery for the journal. Fixture events: the five online-checkout statuses (HMAC-signed), `khqr.notification` and `payment-link.pushback` (both unsigned by design — verify those via check-transaction). Fixtures are synthetic: the gateway never saw the `tran_id`; never fulfill on them. Full contract: [Local Webhook Workbench](./16-webhook-setup-guide.md#local-webhook-workbench).
++
++---
++
+ ## 10. Limitations & notes
+ 
+ - The provider adapter targets **OpenAI-compatible** `/chat/completions` endpoints
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index dc2185f..e6a2e5b 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -548,7 +548,7 @@ Next task:                       SQLite webhook-storage coverage (HANDOFF §5.1)
+ - Tests: payout/pre-auth fixtures moved to seeded `500000001`; new test asserts KHR→USD rejection.
+ - Status: `npx tsc --noEmit` clean, `vitest` 754 passing / 0 failing, `biome lint` clean.
+ 
+-## Recent Session — Payment-link void (2026-09-11/12, branch `feat/payment-link-void`, not merged)
++## Recent Session — Payment-link void (2026-09-11/12, branch `feat/payment-link-void`, merged into `feat/customer-module-qr` 2026-09-12)
+ 
+ - Surfaced + live-verified ABA's **undocumented** `payment-link/void` endpoint (SANDBOX-FINDINGS §23): signs like detail, `VOIDED` is a real status, double-void → 403 PTL188, bogus id → 403 96.
+ - **SDK**: `payway.paymentLink.void(id)` — merchant-auth family, `MUTATION_ENDPOINTS` single-attempt member, `VoidPaymentLink*` OpenAPI schemas + regenerated types, `HASH_ORDER_HINTS` entry.
+@@ -556,3 +556,37 @@ Next task:                       SQLite webhook-storage coverage (HANDOFF §5.1)
+ - Tests: hash-order/mutation-retry/client/domain pins + mock-harness void route + gated §23 sandbox-contract pin; live e2e 6/6 legs (`scripts/e2e-payment-link-void.ts`).
+ - Docs/skills: docs/17 §17.4 (+renumber, cross-refs swept), docs/12 rows, skill v1.5.0 + mirror, AGENTS/.agents/HANDOFF/CHANGELOG, typedoc regen.
+ - Gates: build/tsc/lint clean; suite 1673 passed (+1 pre-existing npm-12 pack-format failure, fix in flight on main checkout); sandbox 14/14; check:repository passed.
++
++## Recent Session — CLI competitive audit + P0 webhook workbench (2026-09-10, commits `cc6c635`→`86b1604`)
++
++- Audited Stripe CLI, Razorpay CLI, and the live npm ecosystem (competitors
++  `aba-payway` v0.2.2 — verified gateway-contract bugs: QR lifetime in minutes
++  vs the seconds contract, close→CANCELLED claim, no 200-wrapped error
++  handling; `aba-payway-sdk` v0.2.35 — false "Official" claim, wrong host in
++  quick-start). Findings + roadmap + re-audit live in
++  `docs/competitive-analysis-cli-stripe-razorpay.md`.
++- **Shipped P0 Wave 1** (`9435301`+`f7b9b5d`, ff-merged to main): new
++  `payway-sdk webhook trigger|verify-callback|resend|list` command group +
++  `setup-webhook --forward-to/--forward-headers`. New library surface:
++  `src/webhook/forwarder.ts` (capture-survives-forward-failure contract),
++  `src/webhook/fixtures.ts` (7 fixture events across the three callback
++  contracts), `signCallbackBody` in `src/auth.ts` (the shared signing inverse
++  of `verifyCallbackDetailed` — one canonicalization, D1/D3).
++- Contracts: signed online fixtures round-trip through the SDK verifier;
++  pushback/KHQR fixtures carry NO hash by design (§22 V-1); exit 0 valid /
++  1 invalid+reason / 3 network; forward failures never reject the original
++  callback.
++- Live e2e verification with the built dist CLI (not just suite): trigger →
++  receiver → wire-byte verify; capture → forward with signature preserved;
++  SQLite store read by `webhook list`; resend; invalid-sig exit 1; no-hash
++  pushback leg. Evidence: `.scratch/audit-webhook-e2e/`.
++- Docs/skills propagated: docs/16 "Local Webhook Workbench" section, README,
++  SDK-AND-CLI-REFERENCE, AGENTS.md canonical list + contract bullet,
++  CHANGELOG Unreleased, `aba-payway-hash` v1.4.0 + `aba-payway-webhook-production`
++  v1.1.0 (canonical + `.zcode` mirrors), COMMAND_EXAMPLES.
++- Open follow-ups: P3-A pushback captures don't populate
++  `matchedTransactionId/matchedStatus`; P3-B `webhook list` doesn't report the
++  active storage backend; Wave 2 = `docs/llms.txt`+`docs` command, then an MCP
++  server; bin-name decision (`aba-payway-cli` free) before first publish.
++- Status on merged main: build/tsc/biome clean, **vitest 1,662 passed / 13
++  skipped** (38 new tests).
+diff --git a/docs/README.md b/docs/README.md
+index 24697fe..1d8ab4c 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -10,6 +10,7 @@ Follow the [quickstart](../QUICKSTART.md) to install, try the credential-free de
+ | How do I go from zero to a verified test payment? | [Quickstart](../QUICKSTART.md) — the canonical beginner path |
+ | How do I get ABA sandbox keys or configure profiles? | [Credentials and setup](./02-prerequisites-and-setup.md#how-to-get-sandbox-credentials) |
+ | How do I receive a callback on my development machine? | [Webhook setup](./16-webhook-setup-guide.md#quick-start) |
++| How do I test my callback receiver without the ABA Simulator? | [Local webhook workbench](./16-webhook-setup-guide.md#local-webhook-workbench) — signed fixture triggers, forwarding, resend, verify |
+ | How do verification and recovery work in an application? | [Runnable simulated walkthrough](./FIRST-PAYMENT-WALKTHROUGH.md) |
+ 
+ The [one-page lifecycle reference](./QUICK-START-1-PAGER.md) is a reminder after onboarding. Numbered chapters are topic references; you do not need to read them sequentially.
+@@ -21,6 +22,7 @@ The journey is **create -> show the artifact -> verify -> fulfill once**. Creati
+ | Customer experience | Guide | Readiness |
+ |---|---|---|
+ | Scan an online QR | [QR payments](./07-qr-code-handling.md) | Server credentials and a public HTTPS callback |
++| Generate offline KHQR invoice batches | [QR payments — Offline KHQR](./07-qr-code-handling.md#official-aba-khqr-offline-generation-no-api-call-required) | ABA-issued KHQR fields, explicit validity, batch manifest, notification and inquiry recovery |
+ | Pay on a hosted page | [Web checkout](./03-web-implementation.md) | Server credentials; signed browser form POST |
+ | Open a shareable payment link | [Payment links](./17-payment-link.md) | Server credentials, RSA key, public HTTPS callback |
+ 
+@@ -66,4 +68,6 @@ These materials support maintenance and investigation; they are not onboarding p
+ 
+ - [Contributing](../CONTRIBUTING.md), [handoff](../HANDOFF.md), [release readiness](./RELEASE-READINESS.md), [release checklist](./RELEASE_CHECKLIST.md), [versioning](./VERSIONING.md).
+ - [Sandbox findings](./SANDBOX-FINDINGS.md), [close-transaction evidence](./CLOSE-TRANSACTION-FINDINGS.md), [open questions](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md).
++- [Integration gaps & consolidated ABA questions](./INTEGRATION-GAPS-AND-ABA-QUESTIONS.md) (2026-09-12 scan: what the docs cannot answer developers + the prioritized send-to-ABA list).
+ - [Historical project status](./PROJECT_STATUS.md), [agent setup playbook](./AGENT-SETUP-PLAYBOOK.md), [callback capture recipe](./agents/callback-capture-recipe.md).
++- Competitive analyses: [Stripe/Razorpay CLI + npm ecosystem audit with the P0→Wave-2 roadmap](./competitive-analysis-cli-stripe-razorpay.md) (webhook workbench shipped 2026-09-10, re-audited with live evidence), [CutLuy comparison](./competitive-analysis-cutluy.md), [Canadia Bank portal comparison](./competitive-analysis-canadia.md) (2026-09-11: portal-polish leader, non-runnable samples — generated per-flow diagrams and a published error-code registry are the adoptable patterns), [Stripe-standard DX audit](./STRIPE-STANDARD-DX-AUDIT.md).
+diff --git a/docs/SDK-AND-CLI-REFERENCE.md b/docs/SDK-AND-CLI-REFERENCE.md
+index fafe30c..0fb1dbc 100644
+--- a/docs/SDK-AND-CLI-REFERENCE.md
++++ b/docs/SDK-AND-CLI-REFERENCE.md
+@@ -512,16 +512,27 @@ const payway = new PayWay({
+ const readiness = payway.khqr.validateConfiguration();
+ if (!readiness.ready) throw new Error(readiness.issues.map((issue) => issue.code).join(', '));
+ 
++const createdAt = Date.now();
+ const qrString = payway.khqr.generateOfflineQR({
+   amount: 1.50,
+   currency: 'USD',
+   merchantRef: 'REF-123',
++  createdAt,
++  expiresAt: createdAt + 30 * 24 * 60 * 60 * 1000, // example only; confirm the permitted window with ABA
+ });
+ 
+ console.log(qrString);
+ ```
+ 
+-With `amount`, the payload is dynamic (`01=12` and tag `54`); without it, it is static (`01=11`). The payload contains ABA merchant data in nested tag `30`, your reference in `62.01`, ABA-provided PayWay data in `62.68`, timestamp data in `99`, and a CRC in `63`. Generation is local only: it neither submits the QR nor confirms payment status.
++With `amount`, the payload is dynamic (`01=12` and tag `54`) for a fixed invoice amount; without it, it is static (`01=11`) with tag `54` omitted for an amount the payer supplies. The payload contains ABA merchant data in nested tag `30`, your reference in `62.01`, ABA-provided PayWay data in `62.68`, timestamp data in `99`, and a CRC in `63`. Generation is local only: it neither submits the QR nor confirms payment status.
++
++`createdAt` and `expiresAt` accept `Date` objects or 13-digit epoch-millisecond numbers. When omitted, creation is the current time and expiry defaults to **15 minutes** later—even for static KHQR. For batches prepared before printing or delivery, set both fields explicitly and confirm the permitted validity window with ABA. `generate-qr --offline` does not currently expose these fields, and `--lifetime` does not configure offline KHQR expiry; use the typed SDK for such batches.
++
++KHQR tag `62.01` accepts a `merchantRef` of at most **25 UTF-8 bytes**. The recovery endpoint `get-transactions-by-mc-ref` has a narrower 20-character cap, so use unique references of at most **20 ASCII characters** when end-to-end inquiry is required.
++
++The supplied high-volume guidance says the same KHQR can be paid multiple times during its applicable validity; confirm that provider rule against the current merchant-issued ABA guideline. Treat `transaction_id` as the payment-level deduplication key and `merchant_ref` as the invoice/account reconciliation key. Preserve each new payment and handle partial payments, overpayments, credits, and refunds in the merchant ledger; a unique invoice QR is not a single-use payment guarantee.
++
++A local QR has no pre-created PayWay transaction to poll. After payment, an ABA-routed notification or `get-transactions-by-mc-ref` inquiry may expose the resulting transaction. Do not fulfil from the notification alone until the ABA-confirmed verification contract is implemented. Merchant-reference inquiry returns at most 50 matches, exposes no pagination parameter, and is limited to 10 requests per minute; a 50-row result may be incomplete.
+ 
+ Earlier SDK releases emitted a private offline TLV format. This method now produces official ABA KHQR, so remove legacy `merchantId`, `transactionId`, tip, fee, and transaction-type arguments. Obtain the required fields from ABA before deploying; do not copy sample values from another merchant.
+ 
+diff --git a/docs/competitive-analysis-cli-stripe-razorpay.md b/docs/competitive-analysis-cli-stripe-razorpay.md
+index 2053e10..b52714d 100644
+--- a/docs/competitive-analysis-cli-stripe-razorpay.md
++++ b/docs/competitive-analysis-cli-stripe-razorpay.md
+@@ -129,7 +129,7 @@ Ordered by leverage. Items W-1..W-4 form one coherent "webhook workbench" wave;
+ - [Stripe CLI reference](https://docs.stripe.com/cli) — fetched and read in full this session (login/context/sandbox/agent setup/config/completion/docs/logs tail/open/listen/trigger/events resend/resources/get/post/delete/fixtures/projects/tools/plugins/telemetry/global flags).
+ - [Razorpay CLI — About](https://razorpay.com/docs/cli) and [Install](https://razorpay.com/docs/cli/install-cli) — fetched via curl and read this session (resource commands, supported API families, platforms, brew/scoop/deb/rpm/curl install, `configure`, `/llms.txt`, MCP server in docs nav).
+ - Current repository: `src/cli.ts` command tree, [src/cli/commands/](../src/cli/commands/), [src/webhook/](../src/webhook/), [src/agent/](../src/agent/), [src/journal/](../src/journal/), [src/test/index.ts](../src/test/index.ts), [src/config/profiles.ts](../src/config/profiles.ts), [src/cli/output.ts](../src/cli/output.ts), [docs/17-payment-link.md](17-payment-link.md) §17.7, [docs/SANDBOX-FINDINGS.md](SANDBOX-FINDINGS.md) §21/§22.
+-- Prior related analysis: [competitive-analysis-cutluy.md](competitive-analysis-cutluy.md) (first-payment path, `webhooks test/replay/inspect` proposal), [STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md) (SDK-level audit, mostly shipped).
++- Prior related analysis: [competitive-analysis-cutluy.md](competitive-analysis-cutluy.md) (first-payment path, `webhooks test/replay/inspect` proposal), [competitive-analysis-canadia.md](competitive-analysis-canadia.md) (2026-09-11 bank-portal audit: per-endpoint sequence diagrams, semantic error-code table, Flutter coverage as the adoptable patterns; their samples don't run), [STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md) (SDK-level audit, mostly shipped).
+ 
+ ---
+ 
+diff --git a/payway-boilerplate/ABA KHQR onsite generation/khqr-config.json b/payway-boilerplate/ABA KHQR onsite generation/khqr-config.json
+deleted file mode 100644
+index d557cac..0000000
+--- a/payway-boilerplate/ABA KHQR onsite generation/khqr-config.json	
++++ /dev/null
+@@ -1,14 +0,0 @@
+-{
+-  "t30_00": "abaakhppxxx@abaa",
+-  "t30_01": "323080411495479",
+-  "t30_02": "ABA Bank",
+-  "t52": "5544",
+-  "t53": "840",
+-  "t54": "33.33",
+-  "t59": "LUCKY SUPER MARKET 102",
+-  "t60": "PHNOM PENH",
+-  "t62_01": "camp-5d",
+-  "t62_68": "0010PAYWAY@ABA020610259006049E4C",
+-  "t99_00": "1767440520000",
+-  "t99_01": "1768045320000"
+-}
+\ No newline at end of file
+diff --git a/scripts/check-package-contents.mjs b/scripts/check-package-contents.mjs
+index 71dd5d8..f9f7ee2 100644
+--- a/scripts/check-package-contents.mjs
++++ b/scripts/check-package-contents.mjs
+@@ -18,7 +18,10 @@ if (packed.status !== 0) {
+   throw new Error(`npm pack failed:\n${packed.stderr || packed.stdout}`);
+ }
+ 
+-const report = JSON.parse(packed.stdout)[0];
++// npm ≤11 emits an ARRAY of pack reports; npm 12 emits an OBJECT keyed by
++// package name. Normalize both before reading `files`.
++const parsedReport = JSON.parse(packed.stdout);
++const report = Array.isArray(parsedReport) ? parsedReport[0] : Object.values(parsedReport)[0];
+ const files = report.files.map((entry) => entry.path.replaceAll('\\', '/'));
+ const fileSet = new Set(files);
+ const required = [
+diff --git a/skills/README.md b/skills/README.md
+index 92e1ac2..ebed32d 100644
+--- a/skills/README.md
++++ b/skills/README.md
+@@ -57,7 +57,7 @@ reference. Recursive parity is checked by the offline test suite.
+ - [aba-payway-purchase](./aba-payway-purchase/SKILL.md) — signed checkout purchases, hosted checkout links, the full `generate-checkout` flag set (incl. the S1 additions), and the minutes-vs-seconds lifetime trap.
+ - [aba-payway-subscription](./aba-payway-subscription/SKILL.md) — recurring billing on the purchase path: `ctid` + `CITR_FIX` + `frequency`, the 27-field hash (live 2026-09-05 order; the documented 26-field order is rejected with Wrong Hash), and merchant-initiated follow-up charges.
+ - [aba-payway-qr](./aba-payway-qr/SKILL.md) — online KHQR generation, the 9 optional params, PNG auto-open.
+-- [aba-payway-offline-qr](./aba-payway-offline-qr/SKILL.md) — official ABA KHQR offline generation (no API call).
++- [aba-payway-offline-qr](./aba-payway-offline-qr/SKILL.md) — official ABA KHQR offline generation, invoice-batch validity, repeat-payment accounting, and recovery (no generation API call).
+ - [aba-payway-customer-qr](./aba-payway-customer-qr/SKILL.md) — Merchant Portal static QRs (Printed QR channel) + KHQR decode/CRC validator.
+ - [aba-payway-first-payment](./aba-payway-first-payment/SKILL.md) — route decision matrix (checkout / subscription / online QR / offline KHQR / payment link) and result handling.
+ - [aba-payway-payment-link](./aba-payway-payment-link/SKILL.md) — hosted payment links incl. images, split payout, and void.
+@@ -86,7 +86,7 @@ reference. Recursive parity is checked by the offline test suite.
+ - [aba-payway-check-transaction](./aba-payway-check-transaction/SKILL.md) — one-shot status checks + polling (grace periods, rate limits).
+ - [aba-payway-transaction-detail](./aba-payway-transaction-detail/SKILL.md) — full detail (`apv`, `bank_ref`, operations).
+ - [aba-payway-transaction-list](./aba-payway-transaction-list/SKILL.md) — date/amount/status windows (3-day cap, local pre-validation).
+-- [aba-payway-transaction-by-merchant-ref](./aba-payway-transaction-by-merchant-ref/SKILL.md) — lookups by merchant reference + reconciliation cron tool.
++- [aba-payway-transaction-by-merchant-ref](./aba-payway-transaction-by-merchant-ref/SKILL.md) — recovery-safe reference policy, lookups by merchant reference, and reconciliation cron tool.
+ - [aba-payway-transaction-close](./aba-payway-transaction-close/SKILL.md) — close/void unpaid transactions (advisory in sandbox).
+ - [aba-payway-bulk-operations](./aba-payway-bulk-operations/SKILL.md) — `tx-batch close/check/detail` over many IDs (per-item envelopes, pacing, `--report`).
+ 
+diff --git a/skills/aba-payway-offline-qr/SKILL.md b/skills/aba-payway-offline-qr/SKILL.md
+index 3e7b565..c4e5df3 100644
+--- a/skills/aba-payway-offline-qr/SKILL.md
++++ b/skills/aba-payway-offline-qr/SKILL.md
+@@ -2,7 +2,7 @@
+ name: aba-payway-offline-qr
+ description: Generate an offline EMVCo KHQR payload without calling ABA PayWay APIs.
+ metadata:
+-  version: 1.4.0
++  version: 1.5.0
+ ---
+ 
+ # Offline KHQR
+@@ -14,6 +14,37 @@ const payload = payway.khqr.generateOfflineQR({ amount: 10, currency: 'USD', mer
+ 
+ Offline QR uses EMVCo TLV plus CRC-16 CCITT. It does not use online HMAC signing, and generating it never calls PayWay. **Generation itself does not enroll any callback** — downstream payment notifications depend on ABA's routing/enrollment for your Bakong account, which local QR creation neither configures nor proves.
+ 
++## Invoice mode and validity
++
++- Fixed invoice amount: provide `amount`; the SDK emits dynamic KHQR (`01=12`) with tag `54`.
++- Flexible, installment, or partial amount: omit `amount`; the SDK emits static KHQR (`01=11`) and omits tag `54`.
++
++Both modes contain creation and expiry timestamps in nested tag `99`. If omitted, `createdAt` is the generation time and `expiresAt` defaults to **15 minutes** later. A static QR is therefore not automatically permanent. For invoice batches, choose an ABA-approved validity window explicitly so QRs do not expire while queued for printing or delivery:
++
++```ts
++const createdAt = Date.now();
++const expiresAt = createdAt + 30 * 24 * 60 * 60 * 1000; // example policy; confirm with ABA
++
++const fixedInvoiceQr = payway.khqr.generateOfflineQR({
++  amount: 125,
++  currency: 'USD',
++  merchantRef: 'INV2026000158',
++  createdAt,
++  expiresAt,
++});
++
++const openAmountQr = payway.khqr.generateOfflineQR({
++  currency: 'USD',
++  merchantRef: 'INV2026000159',
++  createdAt,
++  expiresAt,
++});
++```
++
++The CLI does not currently expose `createdAt` or `expiresAt`: `--lifetime` does not configure offline KHQR expiry. Use the typed SDK for pre-generated billing batches that require an explicit validity window.
++
++`merchantRef` is encoded in `62.01`. The payload accepts at most **25 UTF-8 bytes**, while `get-transactions-by-mc-ref` has a narrower 20-character gateway cap. Use unique references of at most **20 ASCII characters** when inquiry-based recovery is required.
++
+ ## Payload self-check (offline decode + CRC verification)
+ 
+ Before printing or distributing a QR, decode and verify it locally — exported from the package barrel:
+@@ -42,6 +73,20 @@ The SDK models the downstream contract explicitly:
+ 
+ Do NOT apply the online transaction-ID/HMAC callback assumptions to these notifications, and never treat the QR's CRC-16 as authenticity — it is a payload integrity check only.
+ 
++A locally generated QR is not a pre-created PayWay transaction, but a routed payment can produce a PayWay transaction that is recoverable after payment. The supplied high-volume guidance says the same KHQR can be paid multiple times during its applicable validity; confirm that provider rule against the current merchant-issued ABA guideline and never treat uniqueness of the printed QR as a single-use payment control. Store every successful transfer as a separate Payment, deduplicate delivery/replay by `transaction_id`, and use `merchant_ref` only to find the invoice or account. A new `transaction_id` for an already settled invoice is a real additional payment—preserve it and route it through the merchant's overpayment, credit, or refund policy.
++
++Do not rely on callbacks alone. The merchant-reference endpoint returns at most 50 matches, exposes no pagination parameter, and is limited to 10 requests per minute. Treat a 50-row response as a possible reconciliation gap rather than complete history.
++
++## High-volume batch controls
++
++Before distributing a billing batch:
++
++1. Reject duplicate invoice references and enforce the 20-ASCII-character recovery-safe reference policy.
++2. Record reference, expected amount/currency, `createdAt`, `expiresAt`, output filename, generator version, and a payload digest in a batch manifest.
++3. Run `validateKhqrCrc()` and `inspectKhqrPayload()` on every payload; reject malformed, mismatched, or expired rows.
++4. Keep Invoice, Payment, and Payment Allocation records separate so partial payments, multiple payments, currency mismatches, and overpayments remain auditable.
++5. Exercise both the ABA-provisioned notification path and inquiry recovery before production rollout.
++
+ ## Configuration (required)
+ 
+ Offline KHQR needs the merchant identity from env or config — **all 7 `PAYWAY_KHQR_*` vars** (a bare `generate-qr --offline` without them fails locally with 7 `KHQR_*_REQUIRED` codes, exit 1; the repo `.env` does NOT ship them):
+diff --git a/skills/aba-payway-transaction-by-merchant-ref/SKILL.md b/skills/aba-payway-transaction-by-merchant-ref/SKILL.md
+index e430b39..0950edd 100644
+--- a/skills/aba-payway-transaction-by-merchant-ref/SKILL.md
++++ b/skills/aba-payway-transaction-by-merchant-ref/SKILL.md
+@@ -2,7 +2,7 @@
+ name: aba-payway-transaction-by-merchant-ref
+ description: Retrieve ABA PayWay transactions by merchant reference through the SDK or CLI.
+ metadata:
+-  version: 1.3.0
++  version: 1.4.0
+ ---
+ 
+ # Get transactions by merchant reference
+@@ -13,7 +13,7 @@ Use this workflow when the user supplies a `merchant_ref` and asks to find the c
+ 
+ ```ts
+ const result = await payway.khqr.getTransactionsByMerchantRef('INV-12345678');
+-console.log(result.data);
++console.log(result.rows); // normalized rows; result.raw = untouched gateway envelope
+ ```
+ 
+ ## CLI
+@@ -33,6 +33,7 @@ The command reads `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`, signs the request,
+ ## Constraints
+ 
+ - The merchant reference must be non-empty.
++- The inquiry endpoint has a 20-character gateway cap. Although offline KHQR tag `62.01` accepts up to 25 UTF-8 bytes, use unique references of at most 20 ASCII characters when the same value must work for generation and inquiry recovery.
+ - PayWay returns at most 50 matching historical transactions.
+ - Limit requests to 10 per minute.
+ 
+@@ -46,4 +47,3 @@ The command reads `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY`, signs the request,
+   Exit codes: **0** success (even with no new rows) · **1** API/network failure (clean message, no stack trace) · **2** usage error / missing credentials. Credentials come from `--merchant-id/--api-key`, `PAYWAY_MERCHANT_ID`/`PAYWAY_API_KEY`, or a `.env` in the cwd (loaded automatically; exported env wins).
+ 
+   **Completeness caveat (do not over-promise):** the endpoint returns at most 50 matches and exposes NO pagination parameter. When a response is saturated (50 rows), the script prints a `GAP:` warning — history may be truncated and the run must NOT be treated as complete reconciliation. There is no way to page further with this API; cross-check against your own records. The rate limit (10/min) applies to every call; the watch interval is floored at 10s.
+-
+diff --git a/src/__tests__/cli.test.ts b/src/__tests__/cli.test.ts
+index 06612a4..31ed922 100644
+--- a/src/__tests__/cli.test.ts
++++ b/src/__tests__/cli.test.ts
+@@ -61,6 +61,25 @@ describe('built CLI', () => {
+     expect(output).toContain('transaction-detail');
+   });
+ 
++  it('scopes the generate-qr lifetime option to online mode in built help', async () => {
++    const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
++    temporaryDirectories.push(cwd);
++
++    const result = await runBuiltCli(['generate-qr', '--help'], {
++      cwd,
++      env: {
++        PATH: process.env.PATH ?? '',
++        SystemRoot: process.env.SystemRoot ?? '',
++      },
++    });
++
++    const output = stripAnsi(`${result.stdout}\n${result.stderr}`);
++    const compactOutput = output.replace(/\s+/g, ' ');
++    expect(result.status).toBe(0);
++    expect(compactOutput).toContain('Online QR lifetime in seconds');
++    expect(compactOutput).toContain('does not configure offline KHQR expiry');
++  });
++
+   it('prints a first-payment quickstart in doctor output when credentials exist but online QR is not ready', async () => {
+     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
+     temporaryDirectories.push(cwd);
+diff --git a/src/__tests__/docs-examples.test.ts b/src/__tests__/docs-examples.test.ts
+index 862e686..057b13b 100644
+--- a/src/__tests__/docs-examples.test.ts
++++ b/src/__tests__/docs-examples.test.ts
+@@ -117,8 +117,12 @@ describe('Documentation examples', () => {
+   });
+ 
+   it('does not copy supplied ABA merchant values into published documentation', () => {
++    const suppliedConfigPath = ['example-khqr-config.json', 'khqr-config.json']
++      .map((name) => join(repoRoot, 'payway-boilerplate', 'ABA KHQR onsite generation', name))
++      .find(existsSync);
++    expect(suppliedConfigPath).toBeDefined();
+     const suppliedConfig = JSON.parse(
+-      readFileSync(join(repoRoot, 'payway-boilerplate', 'ABA KHQR onsite generation', 'khqr-config.json'), 'utf8'),
++      readFileSync(suppliedConfigPath as string, 'utf8'),
+     ) as Record<string, string>;
+     const documentation = khqrDocs.join('\n');
+ 
+@@ -326,6 +330,51 @@ describe('Documentation examples', () => {
+     expect(offline).not.toContain('unlike a locally built offline QR');
+   });
+ 
++  it('documents the offline KHQR expiry contract for invoice batches', () => {
++    const offline = readSkill('aba-payway-offline-qr');
++    const reference = readDoc('docs/SDK-AND-CLI-REFERENCE.md');
++    const qrGuide = readDoc('docs/07-qr-code-handling.md');
++
++    for (const content of [offline, reference, qrGuide]) {
++      expect(content).toContain('15 minutes');
++      expect(content).toContain('createdAt');
++      expect(content).toContain('expiresAt');
++      expect(content).toMatch(/batch/i);
++    }
++    expect(offline).toContain('`--lifetime` does not configure offline KHQR expiry');
++  });
++
++  it('documents repeat-payment accounting and separates payment identity from invoice reconciliation', () => {
++    const offline = readSkill('aba-payway-offline-qr');
++    const callbacks = readDoc('docs/11-callbacks-and-webhooks.md');
++
++    for (const content of [offline, callbacks]) {
++      expect(content).toContain('can be paid multiple times');
++      expect(content).toContain('`transaction_id`');
++      expect(content).toContain('`merchant_ref`');
++      expect(content).toMatch(/overpayment/i);
++    }
++  });
++
++  it('documents the safe merchant-reference intersection for generation and inquiry', () => {
++    const offline = readSkill('aba-payway-offline-qr');
++    const reference = readDoc('docs/SDK-AND-CLI-REFERENCE.md');
++
++    for (const content of [offline, reference]) {
++      expect(content).toContain('25 UTF-8 bytes');
++      expect(content).toContain('20 ASCII characters');
++      expect(content).toContain('get-transactions-by-mc-ref');
++    }
++  });
++
++  it('uses the byte-aware exported inspector instead of teaching a character-index KHQR parser', () => {
++    const qrGuide = readDoc('docs/07-qr-code-handling.md');
++
++    expect(qrGuide).toContain('inspectKhqrPayload');
++    expect(qrGuide).toContain('validateKhqrCrc');
++    expect(qrGuide).not.toContain('function parseKhqrString');
++  });
++
+   it('the token-lifecycle examples pass local request-id validation (F06)', () => {
+     const lifecycle = readSkill('aba-payway-token-lifecycle');
+     expect(lifecycle).not.toContain('req-renew-1');
+diff --git a/src/cli.ts b/src/cli.ts
+index 2127b85..94b1e07 100644
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -2228,7 +2228,7 @@ program
+   .option('--template <name>', 'QR image template for online mode')
+   .option(
+     '--lifetime <seconds>',
+-    'Transaction lifetime in seconds — minimum 180, sent to the API as whole minutes (default: 180)',
++    'Online QR lifetime in seconds — minimum 180, sent to the API as whole minutes; does not configure offline KHQR expiry (default: 180)',
+   )
+   .option('--ref <reference>', 'Merchant reference (required for offline mode)')
+   .option('--save-image <path>', 'Save a QR PNG to file (online image or locally rendered offline QR)')

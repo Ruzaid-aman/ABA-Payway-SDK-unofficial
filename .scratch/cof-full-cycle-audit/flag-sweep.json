@@ -1,0 +1,36 @@
+[
+  {
+    "flag": "CITI_FLEX",
+    "requestId": "sweepcitiflex",
+    "paywayCode": "104",
+    "type": "business_error",
+    "message": "Merchant not enabled token flag. Hint: Token flag/ctid rejected — check that the account token exists and the token_flag"
+  },
+  {
+    "flag": "CITO_FLEX",
+    "requestId": "sweepcitoflex",
+    "paywayCode": "104",
+    "type": "business_error",
+    "message": "Merchant not enabled token flag. Hint: Token flag/ctid rejected — check that the account token exists and the token_flag"
+  },
+  {
+    "flag": "CITO_FIX",
+    "requestId": "sweepcitofix",
+    "paywayCode": "104",
+    "type": "business_error",
+    "message": "Merchant not enabled token flag. Hint: Token flag/ctid rejected — check that the account token exists and the token_flag"
+  },
+  {
+    "flag": "CITR_FLEX",
+    "requestId": "sweepcitrflex",
+    "paywayCode": "104",
+    "type": "business_error",
+    "message": "Merchant not enabled token flag. Hint: Token flag/ctid rejected — check that the account token exists and the token_flag"
+  },
+  {
+    "flag": "CARD-CITI_FLEX",
+    "requestId": "sweepcard01",
+    "httpStatus": 404,
+    "hostedPayload": null
+  }
+]

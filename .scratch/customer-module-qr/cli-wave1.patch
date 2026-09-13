@@ -1,0 +1,27 @@
+diff --git a/src/cli.ts b/src/cli.ts
+index 519fa24..03e756e 100644
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -1330,8 +1330,8 @@ program
+ // --- get-transactions-by-ref ---
+ program
+   .command('get-transactions-by-ref')
+-  .description('Get up to 50 transactions by merchant reference')
+-  .requiredOption('-r, --merchant-ref <reference>', 'Merchant reference to look up')
++  .description('Get up to 50 transactions by merchant reference (Customer Module reconciliation: use the portal Customer ID as the reference)')
++  .requiredOption('-r, --merchant-ref <reference>', 'Merchant reference to look up (portal Customer ID for Customer Module QRs)')
+   .option('--request-time <YYYYMMDDHHmmss>', 'Optional PayWay request timestamp')
+   .action(async (opts: { merchantRef: string; requestTime?: string }) => {
+     if (!assertCredentialsPresent()) {
+@@ -1342,6 +1342,11 @@ program
+     try {
+       const payway = new PayWay();
+       const result = await payway.khqr.getTransactionsByMerchantRef(opts.merchantRef, opts.requestTime);
++      if (result.rows.length >= 50) {
++        console.error(
++          `  ${c.yellow('⚠')} 50 rows returned (endpoint cap) — history may be truncated; cross-check against your own records.`,
++        );
++      }
+       printApiResultJson(result, payway);
+     } catch (error) {
+       process.exitCode = printApiError(error);

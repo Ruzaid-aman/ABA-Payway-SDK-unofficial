@@ -1,0 +1,1 @@
+import{r as e}from"./BfumYQnK.js";function t(t){let{title:n,description:r,ogImage:i,...a}=t,o=n?`Canadia Bank - ${n}`:`Canadia Bank`;e({title:o,...r&&{description:r},...i&&{ogImage:i},...a})}export{t};
