@@ -18,7 +18,8 @@ describe('renderTable', () => {
     expect(lines[0]).toBe(`${'NAME'.padEnd(19)}  ${'ENV'.padEnd(10)}`.trimEnd());
     expect(lines[1]).toBe(`${'─'.repeat(19)}  ${'─'.repeat(10)}`);
     expect(lines[2]).toContain('sandbox');
-    expect(lines[2].indexOf('sandbox')).toBe(lines[0].indexOf('ENV'));
+    expect(lines[3]).toContain('production-merchant');
+    expect(lines[3].indexOf('production')).toBe(lines[0].indexOf('ENV'));
   });
 
   it('ellipsizes overflowing cells to the capped width', () => {
