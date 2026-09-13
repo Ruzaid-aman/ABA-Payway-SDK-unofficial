@@ -4491,7 +4491,7 @@ cofTokenCmd
 // Local token store (captured CoF link tokens) — offline read, no API call.
 cofTokenCmd
   .command('list')
-  .description('List locally captured CoF link tokens (offline read of payway-data/linked-tokens.json — no API call)')
+  .description('List locally captured CoF link tokens with expiry state (offline read of the data root store — no API call)')
   .option('-c, --ctid <ctid>', 'Show only tokens for this customer id')
   .option('--show-token', 'Reveal full pwt values (default: masked)')
   .option('--json', 'Print the store as one JSON document')
@@ -4499,7 +4499,18 @@ cofTokenCmd
     const tokens = loadLinkedTokens();
     const filtered = opts.ctid ? tokens.filter((t) => t.ctid === opts.ctid) : tokens;
     if (opts.json) {
-      console.log(JSON.stringify({ tokens: filtered }, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            tokens: filtered.map((t) => ({
+              ...t,
+              expiry: tokenExpiryStatus(t) as unknown as Record<string, unknown>,
+            })),
+          },
+          null,
+          2,
+        ),
+      );
       process.exitCode = EXIT_OK;
       return;
     }
@@ -4513,10 +4524,22 @@ cofTokenCmd
     for (const t of filtered) {
       const shown = opts.showToken ? t.pwt : maskPwt(t.pwt);
       console.log(`  ${c.bold('CTID:')} ${c.cyan(t.ctid)}  ${c.bold('pwt:')} ${c.cyan(shown)}`);
+      // Storage wave 4: surface the ~90-day docs/09 validity window.
+      const expiry = tokenExpiryStatus(t);
+      const expiresOn = expiry.expiresAt ? expiry.expiresAt.toISOString().slice(0, 10) : null;
+      let expiryBit: string;
+      if (expiry.status === 'valid') expiryBit = `✓ valid (${expiry.daysLeft}d left, expires ${expiresOn})`;
+      else if (expiry.status === 'expiring-soon')
+        expiryBit = `⚠ expiring soon (${expiry.daysLeft}d left, expires ${expiresOn}) — renew with: cof token renew`;
+      else if (expiry.status === 'expired')
+        expiryBit = `✗ EXPIRED (${Math.abs(expiry.daysLeft ?? 0)}d ago) — re-link the account or renew`;
+      else expiryBit = '– unknown (no capture timestamp)';
+      console.log(`    ${c.bold('expiry:')} ${expiryBit}`);
       const bits = [
         t.tokenFlag ? `flag=${t.tokenFlag}` : undefined,
         t.frequency ? `frequency=${t.frequency}` : undefined,
         `captured=${t.capturedAt}`,
+        t.renewedAt ? `renewed=${t.renewedAt}` : undefined,
         t.sourceRecordId ? `record=${t.sourceRecordId}` : undefined,
       ].filter(Boolean) as string[];
       console.log(`    ${c.dim(bits.join(' · '))}`);

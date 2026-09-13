@@ -54,7 +54,7 @@ async function run(argv: string[]): Promise<{ text: string; exitCode: typeof pro
   const before = process.exitCode;
   try {
     await runCli(argv);
-    return { text: captured.text(), exitCode: process.exitCode };
+    return { text: captured.text(), stdout: captured.stdout(), exitCode: process.exitCode };
   } finally {
     captured.restore();
     process.exitCode = before;
@@ -169,6 +169,27 @@ describe('cof charge token resolution', () => {
     } finally {
       srv.close();
     }
+  });
+
+  it('cof token list shows expiry state (human + json)', async () => {
+    const now = Date.now();
+    const iso = (daysAgo: number) => new Date(now - daysAgo * 86_400_000).toISOString();
+    saveLinkedToken({ ctid: 'exp1', pwt: 'pwt-fresh-token', capturedAt: iso(1) });
+    saveLinkedToken({ ctid: 'exp2', pwt: 'pwt-soon-token', capturedAt: iso(85) });
+    saveLinkedToken({ ctid: 'exp3', pwt: 'pwt-dead-token', capturedAt: iso(91) });
+
+    const { text } = await run(['cof', 'token', 'list']);
+    expect(text).toContain('✓ valid (');
+    expect(text).toContain('⚠ expiring soon (');
+    expect(text).toContain('✗ EXPIRED (');
+    expect(text).toContain('renew with: cof token renew');
+
+    const { stdout } = await run(['cof', 'token', 'list', '--json']);
+    const doc = JSON.parse(stdout) as { tokens: Array<{ ctid: string; expiry: { status: string; daysLeft: number | null } }> };
+    const byCtid = Object.fromEntries(doc.tokens.map((t) => [t.ctid, t]));
+    expect(byCtid.exp1?.expiry.status).toBe('valid');
+    expect(byCtid.exp2?.expiry.status).toBe('expiring-soon');
+    expect(byCtid.exp3?.expiry.status).toBe('expired');
   });
 
   it('resolves the latest captured pwt for --ctid and sends it as the pwt field', async () => {
