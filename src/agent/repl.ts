@@ -32,8 +32,11 @@ import { maybeAutoOnboard, onboardingHintText } from '../cli/commands/onboard.js
 import { isInteractiveTerminal, PRODUCTION_CONFIRMATION_PHRASE } from './terminal.js';
 import { ansi as c } from './ansi.js';
 import { contactingProviderLine, createProgressPrinter, providerProposalFailedHint } from './progress.js';
-import { classifyReplLine, REPL_HELP, REPL_PROMPT } from './repl-helpers.js';
+import { classifyReplLine, REPL_DIRECTIVES, REPL_HELP, REPL_PROMPT } from './repl-helpers.js';
 import { createDispatcher } from './repl-dispatch.js';
+import { buildToolSchemas } from './provider-prompts.js';
+import { isReadOnlyTool } from './planning.js';
+import { suggestMessage } from '../cli/ui/suggest.js';
 
 // The REPL re-dispatches recognized commands through the shared Commander
 // program. It is injected at registration time (see registerAgentCommands) so
@@ -120,6 +123,78 @@ export async function runRepl(
     // Shared dispatcher (also used by `payway-sdk session`): validates against
     // the live program, traps process.exit, restores the exit code.
     await createDispatcher(() => dispatchProgram)(rest);
+  }
+
+  /** `:tools` — the agent tool catalog with risk classes (offline, no LLM turn). */
+  function handleToolsDirective(): void {
+    const schemas = buildToolSchemas() as Array<{
+      function: { name: string; description: string };
+    }>;
+    const width = schemas.reduce((max, def) => Math.max(max, def.function.name.length), 0);
+    console.log(`\n${c.bold('Agent tool catalog')} ${c.dim('(14 tools; MCP exposure mirrors this)')}`);
+    for (const def of schemas) {
+      const risk = isReadOnlyTool(def.function.name) ? c.dim('read-only') : c.yellow('mutation ');
+      console.log(`  ${def.function.name.padEnd(width)}  [${risk}]  ${def.function.description}`);
+    }
+    console.log();
+  }
+
+  /** `:docs` — direct query_knowledge executor (offline; no provider call). */
+  async function handleDocsDirective(query: string): Promise<void> {
+    if (!query) {
+      console.log(`  ${c.dim('Usage: :docs <keywords…> to search, :docs read <topic> to read one')}`);
+      return;
+    }
+    const { readTopic, searchKnowledge } = await import('../knowledge/store.js');
+    if (query.startsWith('read ')) {
+      const topic = query.slice('read '.length).trim();
+      const read = topic ? readTopic(topic) : null;
+      if (!read || read.status !== 'exact') {
+        console.log(`  ${c.red('✗')} Unknown topic "${topic}" — use :docs <keywords> to search first.`);
+        return;
+      }
+      console.log(`\n${c.bold(read.topic.title)} ${c.dim(`(${read.topic.topic})`)}\n`);
+      console.log(read.content);
+      return;
+    }
+    const result = searchKnowledge(query);
+    if (!result) {
+      console.log(`  ${c.red('✗')} Knowledge corpus not found (packaged knowledge/ missing or not synced).`);
+      return;
+    }
+    if (result.hits.length === 0) {
+      console.log(`  ${c.dim(`No hits for "${query}" — try different keywords.`)}`);
+      return;
+    }
+    console.log(`\n${c.bold(`Knowledge search: "${query}"`)} ${c.dim(`— ${result.totalHits} hit(s)${result.truncated ? ' (truncated)' : ''}`)}`);
+    for (const hit of result.hits.slice(0, 10)) {
+      console.log(`  ${c.cyan(hit.topic)}  ${c.dim(hit.title ?? '')}`);
+    }
+    console.log(`  ${c.dim('Read one with: :docs read <topic>')}\n`);
+  }
+
+  /** `:status` — active profile + agent provider connectivity (silent on failure). */
+  async function handleStatusDirective(): Promise<void> {
+    console.log(`  profile: ${c.cyan(profile ?? '(none)')}  ${c.dim(`(${context.displayLabel})`)}`);
+    try {
+      const config = readAgentConfig();
+      if (!config) {
+        console.log(`  agent: ${c.dim('not configured (payway-sdk onboard)')} — :run and :docs work without it`);
+        return;
+      }
+      const provider = createProviderAdapter(config);
+      const connectivity = await provider.checkConnectivity();
+      const line =
+        connectivity.status === 'ready'
+          ? c.green('✓ reachable')
+          : connectivity.status === 'blocked'
+            ? c.red(`✗ ${connectivity.detail ?? 'blocked'}`)
+            : c.dim(`? ${connectivity.detail ?? 'unverified'}`);
+      console.log(`  agent: ${c.cyan(`${config.provider}/${config.model}`)} ${line}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`  agent: ${c.red(`✗ connectivity check failed: ${message}`)}`);
+    }
   }
 
   async function handleRequest(text: string): Promise<void> {
@@ -209,12 +284,29 @@ export async function runRepl(
         }
         console.log(`  session: ${c.cyan(sessionId)}`);
         return;
+      case 'tools':
+        handleToolsDirective();
+        return;
+      case 'docs':
+        await handleDocsDirective(directive.query);
+        return;
+      case 'journal':
+        // Journal subcommands are manual-CLI reads — re-dispatch through the
+        // shared dispatcher (same safety rules as :run).
+        await dispatch(`journal ${directive.args}`.trim());
+        return;
+      case 'status':
+        await handleStatusDirective();
+        return;
       case 'run':
         await dispatch(directive.rest);
         return;
-      case 'unknown-directive':
+      case 'unknown-directive': {
         console.log(`  ${c.red('✗')} Unknown directive: ${directive.line} (try :help)`);
+        const suggestion = suggestMessage(directive.line.split(/\s+/)[0], REPL_DIRECTIVES, 'directive');
+        if (suggestion) console.log(`  ${c.dim(suggestion)}`);
         return;
+      }
       case 'request':
         await handleRequest(directive.text);
         return;

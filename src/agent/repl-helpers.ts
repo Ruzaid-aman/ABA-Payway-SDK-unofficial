@@ -15,11 +15,30 @@ ${c.bold('REPL directives')}
   :history           Show command history
   :clear             Clear the screen
   :session           Show / create the active session id
+  :tools             List the agent tool catalog with risk classes
+  :docs <query>      Search the offline knowledge base (:docs read <topic> reads one)
+  :journal <args>    Query the transaction journal (e.g. :journal timeline -t <id>)
+  :status            Show profile + agent provider connectivity
   :run <cmd>         Re-dispatch a recognized PayWay command (e.g. :run generate-qr --amount 3)
   :exit              Leave the REPL
 
 Any other line is sent to the agent as a free-form request.
 `;
+
+/** Directive names known to the REPL — used for did-you-mean on typos. */
+export const REPL_DIRECTIVES = [
+  ':help',
+  ':profile',
+  ':history',
+  ':clear',
+  ':session',
+  ':tools',
+  ':docs',
+  ':journal',
+  ':status',
+  ':run',
+  ':exit',
+] as const;
 
 /** Agent-management and meta commands must never be re-dispatched from the REPL. */
 const FORBIDDEN_DISPATCH = new Set(['agent', 'ask']);
@@ -74,6 +93,10 @@ export type ReplLine =
   | { kind: 'profile-show' }
   | { kind: 'profile-switch'; profile: string }
   | { kind: 'session' }
+  | { kind: 'tools' }
+  | { kind: 'docs'; query: string }
+  | { kind: 'journal'; args: string }
+  | { kind: 'status' }
   | { kind: 'run'; rest: string }
   | { kind: 'unknown-directive'; line: string }
   | { kind: 'request'; text: string };
@@ -93,6 +116,14 @@ export function classifyReplLine(trimmed: string): ReplLine {
     return { kind: 'profile-switch', profile: trimmed.slice(':profile '.length).trim() };
   }
   if (trimmed === ':session') return { kind: 'session' };
+  if (trimmed === ':tools') return { kind: 'tools' };
+  if (trimmed === ':docs' || trimmed.startsWith(':docs ')) {
+    return { kind: 'docs', query: trimmed.slice(':docs'.length).trim() };
+  }
+  if (trimmed.startsWith(':journal ') || trimmed === ':journal') {
+    return { kind: 'journal', args: trimmed.slice(':journal'.length).trim() };
+  }
+  if (trimmed === ':status') return { kind: 'status' };
   if (trimmed.startsWith(':run ')) return { kind: 'run', rest: trimmed.slice(':run '.length).trim() };
   if (trimmed.startsWith(':')) return { kind: 'unknown-directive', line: trimmed };
   return { kind: 'request', text: trimmed };
