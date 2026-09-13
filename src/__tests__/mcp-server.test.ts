@@ -107,6 +107,17 @@ describe('payway-sdk MCP server', () => {
     expect(typeof payload.data.totalHits).toBe('number');
   });
 
+  it('answers a gateway read tool without credentials with CONFIG_ERROR', async () => {
+    client = await connect();
+    const result = await client.callTool({ name: 'check_transaction', arguments: { transactionId: 'ANY' } });
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as {
+      error: { code: string; message: string };
+    };
+    expect(payload.error.code).toBe('CONFIG_ERROR');
+    expect(payload.error.message).toContain('credentials missing');
+  });
+
   it('calls check_transaction against the mock gateway', async () => {
     await wireMockGateway();
     client = await connect();

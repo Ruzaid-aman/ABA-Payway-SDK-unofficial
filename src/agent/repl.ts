@@ -149,7 +149,7 @@ export async function runRepl(
     if (query.startsWith('read ')) {
       const topic = query.slice('read '.length).trim();
       const read = topic ? readTopic(topic) : null;
-      if (!read || read.status !== 'ok') {
+      if (read?.status !== 'ok') {
         console.log(`  ${c.red('✗')} Unknown topic "${topic}" — use :docs <keywords> to search first.`);
         return;
       }

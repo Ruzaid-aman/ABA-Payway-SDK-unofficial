@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Command } from 'commander';
 import { PassThrough } from 'node:stream';
 import { stripAnsi } from '../test/test-utils.js';
-import { runSessionLoop, getSessionDir, declaresTransactionIdOption } from '../cli/session.js';
+import { runSessionLoop, declaresTransactionIdOption } from '../cli/session.js';
 
 function capture(): { stdout: string[]; restore: () => void } {
   const stdout: string[] = [];

@@ -177,7 +177,9 @@ export async function runSessionLoop(io: SessionIo): Promise<void> {
       if (history.length === 0) {
         console.log(`  ${c.dim('(no commands yet)')}`);
       } else {
-        history.forEach((entry, i) => console.log(`  ${c.dim(`${i + 1}.`)} ${entry}`));
+        history.forEach((entry, i) => {
+          console.log(`  ${c.dim(`${i + 1}.`)} ${entry}`);
+        });
       }
       return;
     }

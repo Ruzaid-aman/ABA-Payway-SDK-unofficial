@@ -27,7 +27,8 @@ import type { AgentToolName, MaterializedAgentAction } from '../agent/contracts.
 import type { ExecutionContext } from '../agent/executor.js';
 import { createAgentPayWay, resolvePayWayContext } from '../agent/context.js';
 import type { PayWay } from '../client.js';
-import { buildMcpToolCatalog, isMutationParityTool, type McpToolDef } from './tool-catalog.js';
+import { PayWayConfigError } from '../errors.js';
+import { buildMcpToolCatalog, type McpToolDef } from './tool-catalog.js';
 import { runMcpExtra, type McpExtraResult } from './extras.js';
 import { MCP_EXTRAS, type McpExtraName } from './tool-catalog.js';
 
@@ -117,11 +118,18 @@ export function createPayWayMcpServer(options: McpServerOptions = {}): Server {
         sessionId: 'mcp',
         execution,
       };
-      const result = await toolRegistry[toolName](args as MaterializedAgentAction, client, ctx);
+      const result = await toolRegistry[toolName](
+        args as MaterializedAgentAction,
+        client ?? lazyUnauthenticatedClient(),
+        ctx,
+      );
       return result.ok
         ? toolResultJson({ tool: result.tool, data: result.data })
         : errorResult(result.error?.code ?? 'TOOL_ERROR', result.error?.message ?? 'Tool execution failed');
     } catch (error) {
+      if (error instanceof PayWayConfigError) {
+        return errorResult('CONFIG_ERROR', error.message);
+      }
       return errorResult(
         'INTERNAL',
         error instanceof Error ? error.message : String(error),
@@ -132,14 +140,32 @@ export function createPayWayMcpServer(options: McpServerOptions = {}): Server {
   return server;
 }
 
-async function resolveClient(options: McpServerOptions, create: boolean): Promise<PayWay> {
+const CREDENTIALS_MISSING_MESSAGE =
+  'PayWay credentials missing (PAYWAY_ENV/PAYWAY_MERCHANT_ID/PAYWAY_API_KEY or a saved profile)';
+
+/**
+ * Stand-in client for read-only calls that resolved no credentials: local
+ * tools (knowledge, journal, artifacts) never touch it and run offline; any
+ * gateway access throws a typed PayWayConfigError (mapped to CONFIG_ERROR)
+ * instead of the constructor's bare "merchantId is required".
+ */
+function lazyUnauthenticatedClient(): PayWay {
+  return new Proxy({} as PayWay, {
+    get() {
+      throw new PayWayConfigError(CREDENTIALS_MISSING_MESSAGE);
+    },
+  });
+}
+
+async function resolveClient(options: McpServerOptions, create: boolean): Promise<PayWay | undefined> {
   const context = resolvePayWayContext({ profile: options.profile, env: options.env ?? process.env });
   if (!context.merchantId || !context.apiKey) {
-    // Read-only extras (journal/knowledge) work without credentials; gateway
-    // tools will surface this as CONFIG_ERROR from their own paths.
     if (create) {
-      throw new Error('PayWay credentials missing (PAYWAY_ENV/PAYWAY_MERCHANT_ID/PAYWAY_API_KEY or a saved profile)');
+      throw new PayWayConfigError(CREDENTIALS_MISSING_MESSAGE);
     }
+    // Read-only extras and local registry tools work without credentials —
+    // extras handle `undefined` themselves (CONFIG_ERROR on gateway access).
+    return undefined;
   }
   return createAgentPayWay(context, create ? 'create' : 'read');
 }
