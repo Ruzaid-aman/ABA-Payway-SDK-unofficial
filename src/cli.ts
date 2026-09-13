@@ -97,6 +97,7 @@ import {
 } from './cli/output.js';
 import { saveQrPng } from './cli/qr-artifact.js';
 import { registerCompletionsCommand } from './cli/commands/completions.js';
+import { registerMcpCommand } from './cli/commands/mcp.js';
 import { getUpdateCheckCachePath, isTopLevelHelpArgv, maybeNoticeUpdate } from './cli/update-check.js';
 
 // ---------------------------------------------------------------------------
@@ -4754,6 +4755,7 @@ registerJournalCommands(program);
 registerOnboardCommand(program);
 registerWebhookCommands(program);
 registerCompletionsCommand(program);
+registerMcpCommand(program);
 
 // --- pre-auth (complete / complete-with-payout / cancel) ---
 const preAuthComplete = new Command('complete')

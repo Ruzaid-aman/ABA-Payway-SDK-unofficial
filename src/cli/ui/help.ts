@@ -43,7 +43,7 @@ export const COMMAND_GROUPS: Array<{ title: string; commands: string[] }> = [
     title: 'Reference',
     commands: ['docs', 'status', 'explain', 'validate', 'exchange-rate', 'sandbox-beneficiaries', 'sandbox-test-cards'],
   },
-  { title: 'Agent & skills', commands: ['ask', 'agent', 'skills', 'demo', 'test'] },
+  { title: 'Agent & skills', commands: ['ask', 'agent', 'skills', 'demo', 'test', 'mcp'] },
 ];
 
 /**
