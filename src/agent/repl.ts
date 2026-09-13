@@ -32,7 +32,8 @@ import { maybeAutoOnboard, onboardingHintText } from '../cli/commands/onboard.js
 import { isInteractiveTerminal, PRODUCTION_CONFIRMATION_PHRASE } from './terminal.js';
 import { ansi as c } from './ansi.js';
 import { contactingProviderLine, createProgressPrinter, providerProposalFailedHint } from './progress.js';
-import { classifyReplLine, REPL_HELP, REPL_PROMPT, validateDispatch } from './repl-helpers.js';
+import { classifyReplLine, REPL_HELP, REPL_PROMPT } from './repl-helpers.js';
+import { createDispatcher } from './repl-dispatch.js';
 
 // The REPL re-dispatches recognized commands through the shared Commander
 // program. It is injected at registration time (see registerAgentCommands) so
@@ -116,39 +117,9 @@ export async function runRepl(
   }
 
   async function dispatch(rest: string): Promise<void> {
-    const program = dispatchProgram;
-    const decision = validateDispatch(rest, program?.commands.map((cmd) => cmd.name()) ?? []);
-    if (!decision.ok) {
-      console.log(`  ${c.red('✗')} ${decision.message}`);
-      return;
-    }
-    if (!program) return; // unreachable: decision.ok implies a registered command matched
-    const tokens = decision.tokens;
-
-    console.log(`  ${c.cyan('→')} Running: payway-sdk ${tokens.join(' ')}`);
-    // Prevent an unexpected process.exit (e.g. missing required option) from
-    // terminating the REPL; capture it and continue the loop.
-    const originalExit = process.exit;
-    const priorExitCode = process.exitCode;
-    let exited = false;
-    (process as { exit: (code?: number) => never }).exit = ((code?: number) => {
-      exited = true;
-      throw new Error(`__repl_exit__${code ?? 0}`);
-    }) as (code?: number) => never;
-    try {
-      await program.parseAsync(tokens, { from: 'user' });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.startsWith('__repl_exit__')) {
-        console.log(`  ${c.dim(`dispatch error: ${message}`)}`);
-      }
-    } finally {
-      (process as { exit: (code?: number) => never }).exit = originalExit as (code?: number) => never;
-      // A dispatched subcommand may set process.exitCode; do not let it leak
-      // into the REPL session exit code.
-      process.exitCode = priorExitCode;
-    }
-    void exited;
+    // Shared dispatcher (also used by `payway-sdk session`): validates against
+    // the live program, traps process.exit, restores the exit code.
+    await createDispatcher(() => dispatchProgram)(rest);
   }
 
   async function handleRequest(text: string): Promise<void> {
