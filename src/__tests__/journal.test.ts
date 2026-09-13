@@ -6,6 +6,7 @@ import { PayWay } from '../client.js';
 import { buildRequestDigest, buildResponseDigest, parseRequestBodyPayload } from '../journal/digest.js';
 import {
   createJournalEmitter,
+  createJournalEmitterForSink,
   JsonlJournalSink,
   pruneJournal,
   resolveJournalConfig,
@@ -58,6 +59,16 @@ describe('resolveJournalConfig', () => {
 
   it('explicit false overrides the environment', () => {
     expect(resolveJournalConfig(false, { PAYWAY_JOURNAL: '1' })).toBeUndefined();
+  });
+
+  it('createJournalEmitterForSink fills the envelope for any sink', () => {
+    const seen: JournalEventV1[] = [];
+    const emitter = createJournalEmitterForSink({ emit: (e) => seen.push(e) }, 'digest');
+    emitter.emit({ kind: 'execution.request', correlationId: 'c-x', attempt: 0 });
+    expect(seen).toHaveLength(1);
+    expect(seen[0].version).toBe(JOURNAL_VERSION);
+    expect(seen[0].eventId).toBeTruthy();
+    expect(seen[0].correlationId).toBe('c-x');
   });
 
   it('env alone enables when config omits the setting', () => {
