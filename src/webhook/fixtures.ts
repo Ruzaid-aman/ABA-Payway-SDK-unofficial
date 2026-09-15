@@ -2,7 +2,7 @@
  * Signed callback fixtures for local webhook testing (P0 W-2 of
  * docs/competitive-analysis-cli-stripe-razorpay.md — Stripe `trigger` analog).
  *
- * Three fixture families mirror the three webhook-server routes:
+ * Four fixture families mirror the webhook-server routes:
  *  - `payment.approved` / `payment.declined` … — online checkout callbacks:
  *    the full documented callback body, SIGNED with the merchant's API key
  *    (same algorithm as the gateway: sorted-key concat → HMAC-SHA512 →
@@ -12,6 +12,12 @@
  *  - `payment-link.pushback` — payment-link pushback, live-verified shape
  *    `{tran_id, status: 0, merchant_ref_no}` with NO hash field
  *    (SANDBOX-FINDINGS §22 V-1); verify via check-transaction, not HMAC.
+ *  - `cof-link.linked` — credentials-on-file link callback rehearsal
+ *    (Q18): the pwt/ctid/request_id body with the HMAC carried in the
+ *    classic body `hash` FIELD (docs/09 §5 shape) and NO signature header —
+ *    exercises the receiver's body-hash verification + token persistence
+ *    before a real customer link exists. SYNTHETIC: the field set is our
+ *    best guess until the first live capture pins the real contract.
  *
  * Status code values come from `PAYMENT_STATUS_CODES` (sandbox-pinned), and
  * the online-checkout body mirrors the mock-callback.cjs fixture that the
@@ -30,7 +36,8 @@ export type WebhookFixtureEvent =
   | 'payment.cancelled'
   | 'customer-qr.payment'
   | 'khqr.notification'
-  | 'payment-link.pushback';
+  | 'payment-link.pushback'
+  | 'cof-link.linked';
 
 export const WEBHOOK_FIXTURE_EVENTS: readonly WebhookFixtureEvent[] = [
   'payment.approved',
@@ -41,6 +48,7 @@ export const WEBHOOK_FIXTURE_EVENTS: readonly WebhookFixtureEvent[] = [
   'customer-qr.payment',
   'khqr.notification',
   'payment-link.pushback',
+  'cof-link.linked',
 ];
 
 export interface WebhookFixtureOverrides {
@@ -56,6 +64,12 @@ export interface WebhookFixtureOverrides {
   payerName?: string;
   /** Customer Module only: portal customer name inside the nested customer object. */
   customerName?: string;
+  /** CoF link fixture only: customer token identifier (default `mockcust01`). */
+  ctid?: string;
+  /** CoF link fixture only: token flag echoed in the delivery (default `CITI_FLEX`). */
+  tokenFlag?: string;
+  /** CoF link fixture only: the delivered pwt (auto-generated when omitted). */
+  pwt?: string;
 }
 
 export interface WebhookFixture {
@@ -67,13 +81,19 @@ export interface WebhookFixture {
   body: string;
   /** Parsed body (the fixture JSON). */
   parsed: Record<string, unknown>;
-  /** HMAC-SHA512 Base64 signature over the body (online route only). */
+  /** HMAC-SHA512 Base64 signature over the body (signed fixtures only). */
   signature?: string;
+  /**
+   * Where the signature travels: 'header' (default — X-PAYWAY-HMAC-SHA512)
+   * or 'body' (the classic `hash` FIELD, CoF link fixture — the receiver
+   * must verify the body hash, no header is sent).
+   */
+  signatureChannel?: 'header' | 'body';
   /** Embedded transaction id (correlation key for check-transaction). */
   tranId: string;
   /**
    * How the receiving app must verify this delivery:
-   * 'hmac' — X-PAYWAY-HMAC-SHA512 verifyCallback path;
+   * 'hmac' — signature verification path (header or body hash);
    * 'check-transaction' — no signature contract; reconcile via the gateway.
    */
   verification: 'hmac' | 'check-transaction';
@@ -96,7 +116,10 @@ function formatTransactionDate(date: Date): string {
 }
 
 const STATUS_BY_EVENT: Record<
-  Exclude<WebhookFixtureEvent, 'khqr.notification' | 'payment-link.pushback' | 'customer-qr.payment'>,
+  Exclude<
+    WebhookFixtureEvent,
+    'khqr.notification' | 'payment-link.pushback' | 'customer-qr.payment' | 'cof-link.linked'
+  >,
   { status: keyof typeof PAYMENT_STATUS_CODES; code: number }
 > = {
   'payment.approved': { status: 'APPROVED', code: PAYMENT_STATUS_CODES.APPROVED },
@@ -224,6 +247,41 @@ export function buildWebhookFixture(
       parsed,
       tranId,
       verification: 'check-transaction',
+    };
+  }
+
+  if (event === 'cof-link.linked') {
+    // Credentials-on-file link callback rehearsal (Q18). The REAL delivery
+    // contract is uncaptured; this SYNTHETIC body carries the documented pwt
+    // plus our best-guess echo fields, HMAC-signed over the sorted keys and
+    // embedded as the classic body `hash` FIELD (docs/09 §5 shape) with NO
+    // signature header — exercising the receiver's body-hash verification
+    // and token persistence before any real customer link exists.
+    if (apiKey === undefined || apiKey.trim() === '') {
+      throw new Error(
+        `fixture "${event}" is a body-hash-signed CoF link callback and needs the merchant API key (PAYWAY_API_KEY) to sign with`,
+      );
+    }
+    const requestId = overrides.tranId ?? autoTranId('cof');
+    const ctid = overrides.ctid ?? 'mockcust01';
+    const parsed: Record<string, unknown> = {
+      pwt: overrides.pwt ?? `pwt-${randomBytes(12).toString('hex')}`,
+      ctid,
+      request_id: requestId,
+      token_flag: overrides.tokenFlag ?? 'CITI_FLEX',
+      status: '00',
+    };
+    const signature = signCallbackBody(parsed, apiKey);
+    const bodyWithHash: Record<string, unknown> = { ...parsed, hash: signature };
+    return {
+      event,
+      route: '/aba-payway-webhook',
+      body: JSON.stringify(bodyWithHash),
+      parsed: bodyWithHash,
+      signature,
+      signatureChannel: 'body',
+      tranId: requestId,
+      verification: 'hmac',
     };
   }
 

@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { verifyCallbackDetailed } from '../auth.js';
 import { WebhookForwarder, parseForwardHeaders } from '../webhook/forwarder.js';
 import { buildWebhookFixture, WEBHOOK_FIXTURE_EVENTS } from '../webhook/fixtures.js';
-import { parseCustomerQrCallback } from '../webhook/customer-callback.js';
+import { classifyCallback, parseCustomerQrCallback } from '../webhook/customer-callback.js';
 
 const API_KEY = 'test-api-key-123';
 
@@ -100,7 +100,7 @@ describe('WebhookForwarder', () => {
 });
 
 describe('buildWebhookFixture', () => {
-  it('exposes exactly the eight documented fixture events', () => {
+  it('exposes exactly the nine documented fixture events', () => {
     expect(WEBHOOK_FIXTURE_EVENTS).toEqual([
       'payment.approved',
       'payment.declined',
@@ -110,7 +110,41 @@ describe('buildWebhookFixture', () => {
       'customer-qr.payment',
       'khqr.notification',
       'payment-link.pushback',
+      'cof-link.linked',
     ]);
+  });
+
+  it('builds the CoF link rehearsal: hash in the BODY, header channel NOT set, round-trips through the body-hash verifier', () => {
+    const fixture = buildWebhookFixture('cof-link.linked', API_KEY, {
+      tranId: 'cofreq001',
+      ctid: 'cofcust01',
+      tokenFlag: 'CITO_FLEX',
+    });
+    expect(fixture.route).toBe('/aba-payway-webhook');
+    expect(fixture.signatureChannel).toBe('body');
+    expect(fixture.verification).toBe('hmac');
+    expect(fixture.tranId).toBe('cofreq001');
+    expect(fixture.parsed.ctid).toBe('cofcust01');
+    expect(fixture.parsed.token_flag).toBe('CITO_FLEX');
+    expect(typeof fixture.parsed.pwt).toBe('string');
+    expect(typeof fixture.parsed.hash).toBe('string');
+
+    // Round-trip: the receiver strips the body hash and re-verifies exactly
+    // this way (computeSignatureVerdict's body channel).
+    const verdict = verifyCallbackDetailed(
+      fixture.parsed,
+      fixture.signature as string,
+      API_KEY,
+      { stripHash: true },
+    );
+    expect(verdict).toEqual({ valid: true });
+    // The discriminator holds: classifyCallback tags it as a CoF link.
+    expect(classifyCallback(fixture.parsed)).toBe('cof-link');
+  });
+
+  it('refuses to build the CoF link fixture without an API key (it is signed)', () => {
+    expect(() => buildWebhookFixture('cof-link.linked', undefined)).toThrow(/PAYWAY_API_KEY/);
+    expect(() => buildWebhookFixture('cof-link.linked', '')).toThrow(/PAYWAY_API_KEY/);
   });
 
   it('builds the SIGNED Customer Module callback: KHQR fields + nested customer object, route /aba-payway-khqr-webhook', () => {

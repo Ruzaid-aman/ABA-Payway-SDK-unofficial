@@ -222,6 +222,63 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       return;
     });
 
+  // --- webhook show (Q18/evidence inspection) -----------------------------
+  const show = new Command('show')
+    .description('Print one captured webhook record in full — headers, raw body, verdicts, metadata (evidence inspection)')
+    .requiredOption('--record <id>', 'Webhook record id (see webhook list)')
+    .option('--json', 'Machine-readable output envelope (the full stored record)')
+    .action(async (opts: Record<string, string | boolean | undefined>) => {
+      const json = opts.json === true;
+      const recordId = String(opts.record);
+      if (!isRecordId(recordId)) {
+        if (json) log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, message: `invalid webhook record id: ${recordId}` } }));
+        else log(`  ${c.red('✗')} Not a webhook record id (expected wh_…): ${c.red(recordId)}`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      const storage = await loadStorage();
+      let record: WebhookRecord | undefined;
+      try {
+        record = storage.getAll().find((entry) => entry.id === recordId);
+      } finally {
+        storage.close();
+      }
+      if (!record) {
+        if (json) log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, message: `webhook record ${recordId} not found` } }));
+        else log(`  ${c.red('✗')} Webhook record ${c.red(recordId)} not found — run ${c.cyan('payway-sdk webhook list')} for ids.`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+
+      if (json) {
+        log(JSON.stringify(record, null, 2));
+        return;
+      }
+
+      const verdict = record.signatureVerdict ?? 'unsigned';
+      log(`\n${c.bold('Captured webhook record')} ${recordId}`);
+      log(`  received:   ${record.receivedAt}${record.sourceIp ? `  from ${record.sourceIp}` : ''}`);
+      log(`  signature:  ${verdict === 'verified' ? c.green(`✓ verified (${record.signatureSource ?? '?'}-hash)`) : verdict === 'invalid' ? c.red(`✗ invalid (${record.verificationReason ?? 'unknown'})`) : c.yellow('unsigned (no signature header or body hash)')}`);
+      if (record.matchedTransactionId) log(`  tran_id:    ${record.matchedTransactionId}${record.matchedStatus ? `  status=${record.matchedStatus}` : ''}`);
+      if (record.replay) log(`  ${c.yellow('replay')} — the same (tran_id, status) pair was captured before`);
+      if (record.khqr?.parsed) log(`  route:      khqr (${record.khqr.parsed.kind})`);
+      if (record.paymentLinkPushback?.parsed) log('  route:      payment-link pushback');
+      if (record.customerQr?.parsed) log(`  route:      customer-qr (${record.customerQr.parsed.kind})`);
+
+      log(`\n${c.bold('Headers')}`);
+      for (const [key, value] of Object.entries(record.headers)) {
+        log(`  ${c.dim(key)}: ${Array.isArray(value) ? value.join(', ') : (value ?? '')}`);
+      }
+
+      log(`\n${c.bold('Body')}`);
+      try {
+        log(JSON.stringify(JSON.parse(record.body), null, 2));
+      } catch {
+        log(record.body);
+      }
+      log('');
+    });
+
   // --- webhook list ------------------------------------------------------
   const list = new Command('list')
     .description('List captured webhook records (ids are the resend/verify --record keys)')
@@ -327,6 +384,7 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
     .option('-c, --currency <code>', 'Fixture currency: USD (default) or KHR', 'USD')
     .option('--payer-name <name>', 'Payer name shown in the fixture', 'Mock Payer')
     .option('--customer-name <name>', 'Customer Module fixtures only: portal customer name in the nested customer object', 'Mock Customer')
+    .option('--ctid <ctid>', 'CoF link fixture only: customer token identifier (default mockcust01)')
     .option('--api-key <key>', 'Merchant API key for signing (or PAYWAY_API_KEY env)')
     .option('--forward-headers <headers>', 'Extra headers: "Key1:Value1, Key2:Value2"')
     .option('--json', 'Machine-readable output envelope')
@@ -358,6 +416,7 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
           currency,
           payerName: opts.payerName as string | undefined,
           customerName: opts.customerName as string | undefined,
+          ctid: opts.ctid as string | undefined,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -373,14 +432,26 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
         'User-Agent': 'aba-payway-sdk-trigger/1',
         ...parseForwardHeaders(opts.forwardHeaders as string | undefined),
       };
-      if (fixture.signature) headers['X-PAYWAY-HMAC-SHA512'] = fixture.signature;
+      // Body-channel fixtures (CoF link) carry the HMAC inside the body
+      // `hash` field — no signature header, so the receiver's body-hash
+      // verification path is what gets exercised.
+      if (fixture.signature && fixture.signatureChannel !== 'body') {
+        headers['X-PAYWAY-HMAC-SHA512'] = fixture.signature;
+      }
+
+      const signedNote =
+        fixture.signature === undefined
+          ? c.yellow('no — this contract carries no hash; verify via check-transaction')
+          : fixture.signatureChannel === 'body'
+            ? c.green('yes (body `hash` field — no header)')
+            : c.green('yes (X-PAYWAY-HMAC-SHA512)');
 
       if (!json) {
         log(`\n${c.bold('Triggering fixture webhook')} ${fixture.event}`);
         log(`  to:        ${opts.url}`);
         log(`  route:     ${fixture.route}`);
         log(`  tran_id:   ${fixture.tranId}`);
-        log(`  signed:    ${fixture.signature ? c.green('yes (X-PAYWAY-HMAC-SHA512)') : c.yellow('no — this contract carries no hash; verify via check-transaction')}`);
+        log(`  signed:    ${signedNote}`);
         log('');
       }
 
@@ -394,13 +465,18 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
               route: fixture.route,
               tranId: fixture.tranId,
               signed: fixture.verification === 'hmac',
+              signatureChannel: fixture.signatureChannel ?? 'header',
               httpStatus: response.status,
               ok: response.ok,
             }),
           );
         } else {
           log(`  ${response.ok ? c.green(`✓ receiver acknowledged [HTTP ${response.status}]`) : c.yellow(`→ receiver answered HTTP ${response.status}`)}`);
-          log(`  ${c.dim('Next: payway-sdk check-transaction -t ' + fixture.tranId + ' — fixture callbacks are synthetic; the gateway never saw this tran_id')}`);
+          const next =
+            event === 'cof-link.linked'
+              ? `Next: payway-sdk cof token list — the receiver persists the fixture pwt when the body-hash verifies (fixture is synthetic; the gateway never saw it)`
+              : `Next: payway-sdk check-transaction -t ${fixture.tranId} — fixture callbacks are synthetic; the gateway never saw this tran_id`;
+          log(`  ${c.dim(next)}`);
         }
         if (!response.ok) process.exitCode = EXIT_NETWORK;
       } catch (error) {
@@ -412,6 +488,7 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
     });
 
   webhook.addCommand(verify);
+  webhook.addCommand(show);
   webhook.addCommand(list);
   webhook.addCommand(resend);
   webhook.addCommand(trigger);

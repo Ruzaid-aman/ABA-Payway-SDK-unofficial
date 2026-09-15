@@ -4029,8 +4029,20 @@ cofCmd
         console.log(`  ${c.green('✓')} Account link requested`);
         console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
         console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
-        console.log();
-        console.log(`  ${c.bold('Scan this QR in ABA Mobile to approve the link')} ${c.dim('(valid ~10 minutes per live docs)')}`);
+        // §26 AOF-5: expire_in reads as an ABSOLUTE epoch (expiry instant,
+        // seconds) on live AOF responses — render the wall-clock deadline
+        // when it parses as one; fall back to the documented 10-minute TTL.
+        const expireEpoch =
+          typeof data.expire_in === 'number'
+            ? data.expire_in
+            : typeof data.expire_in === 'string' && /^\d+$/.test(data.expire_in)
+              ? Number(data.expire_in)
+              : NaN;
+        const windowNote =
+          Number.isFinite(expireEpoch) && expireEpoch > 1_000_000_000
+            ? `expires ${new Date((expireEpoch > 1e12 ? expireEpoch : expireEpoch * 1000)).toISOString()} (~${Math.max(0, Math.round(((expireEpoch > 1e12 ? expireEpoch : expireEpoch * 1000) - Date.now()) / 60000))} min left)`
+            : 'valid ~10 minutes per live docs';
+        console.log(`  ${c.bold('Scan this QR in ABA Mobile to approve the link')} ${c.dim(`(${windowNote})`)}`);
         if (qrPngPath) console.log(`  ${c.bold('QR PNG:')}    ${c.cyan(qrPngPath)}`);
         if (typeof data.deeplink === 'string' && data.deeplink.length > 0) {
           console.log(`  ${c.bold('Deeplink:')}  ${c.dim(data.deeplink)}`);
@@ -4419,9 +4431,11 @@ cofCmd
   .option('--payout <json>', 'Split-payout instructions — JSON [{`acc`,`amt`}] or string')
   .option('--custom-fields <json>', 'Custom fields — JSON object or string')
   .option('--shipping-fee <number>', 'Shipping fee amount')
+  .option('--open-image', 'Open the charge QR PNG with the OS default viewer, when the response carries one (default: auto when interactive)')
+  .option('--no-open-image', 'Never open the charge QR PNG automatically')
   .option('-y, --force', 'Skip the interactive confirmation (for scripts/agents)', false)
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: Record<string, string | undefined>) => {
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -4493,27 +4507,50 @@ cofCmd
         amount,
         paymentToken,
         currency: (opts.currency ?? 'USD') as 'USD' | 'KHR',
-        ctid: opts.ctid,
-        tokenFlag: opts.tokenFlag,
-        callbackUrl: opts.callbackUrl,
-        firstName: opts.firstName,
-        lastName: opts.lastName,
-        email: opts.email,
-        phone: opts.phone,
+        ctid: opts.ctid as string | undefined,
+        tokenFlag: opts.tokenFlag as string | undefined,
+        callbackUrl: opts.callbackUrl as string | undefined,
+        firstName: opts.firstName as string | undefined,
+        lastName: opts.lastName as string | undefined,
+        email: opts.email as string | undefined,
+        phone: opts.phone as string | undefined,
         purchaseType: opts.purchaseType === undefined ? undefined : (opts.purchaseType as 'purchase' | 'pre-auth'),
-        items: parseJsonOrString(opts.items) as ItemEntry[] | string | undefined,
-        returnParams: opts.returnParams,
-        payout: parseJsonOrString(opts.payout) as Array<{ acc: string; amt: number }> | string | undefined,
-        customFields: parseJsonOrString(opts.customFields) as Record<string, unknown> | string | undefined,
+        items: parseJsonOrString(opts.items as string | undefined) as ItemEntry[] | string | undefined,
+        returnParams: opts.returnParams as string | undefined,
+        payout: parseJsonOrString(opts.payout as string | undefined) as Array<{ acc: string; amt: number }> | string | undefined,
+        customFields: parseJsonOrString(opts.customFields as string | undefined) as Record<string, unknown> | string | undefined,
         shippingFee: opts.shippingFee !== undefined ? Number(opts.shippingFee) : undefined,
       });
+      // The documented CofPaymentResponse carries only status/tran_id — but
+      // the live charge behavior on an AOF-enabled profile is uncaptured, and
+      // a customer-initiated charge may answer with an approval QR. Present
+      // one scannable if it appears (same treatment as link-account).
+      const chargeData = ((result as Record<string, unknown>).data ?? {}) as { qr_string?: string };
+      let chargeQrPath: string | undefined;
+      if (typeof chargeData.qr_string === 'string' && chargeData.qr_string.length > 0) {
+        try {
+          const outPath = path.join(process.cwd(), 'payway-output', `cof-charge-${opts.transactionId}.png`);
+          const saved = await saveQrPng({ outputPath: outPath, qrString: chargeData.qr_string });
+          if (saved) chargeQrPath = saved;
+        } catch (saveErr) {
+          console.log(`  ${c.yellow('⚠')} Could not save the charge QR PNG: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+        }
+      }
       if (opts.json) {
-        printApiResultJson(result, payway);
+        printApiResultJson(result, payway, chargeQrPath ? { qrPngPath: chargeQrPath } : undefined);
         return;
       }
       const data = ((result as Record<string, unknown>).data ?? result) as Record<string, unknown>;
       console.log(`  ${c.green('✓')} COF charge submitted`);
       if (data.tran_id) console.log(`  ${c.bold('Transaction ID:')} ${c.cyan(String(data.tran_id))}`);
+      if (chargeQrPath) {
+        console.log(`  ${c.bold('Approval QR:')}  ${c.cyan(chargeQrPath)} ${c.dim('— the response carries a QR; the customer approves in ABA Mobile')}`);
+        const shouldOpen = opts.openImage === true || (opts.openImage !== false && Boolean(process.stdout.isTTY));
+        if (shouldOpen) {
+          const opened = await openImageInDefaultViewer(chargeQrPath);
+          if (!opened.opened) console.log(`  ${c.dim(`Open it manually: ${chargeQrPath}`)}`);
+        }
+      }
       console.log(`  ${c.dim(`Next: verify with payway-sdk check-transaction -t ${String(data.tran_id)}`)}\n`);
     } catch (e) {
       process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);

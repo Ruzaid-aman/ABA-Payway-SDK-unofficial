@@ -89,6 +89,7 @@ function seedCaptures(): string[] {
       matchedTransactionId: 'seed-1',
       matchedStatus: 'APPROVED',
       signatureVerdict: 'verified',
+      signatureSource: 'header',
     },
     {
       id: 'wh_seed2',
@@ -300,6 +301,64 @@ describe('webhook trigger (W-2)', () => {
     expect(exitCode).toBe(1);
     const parsed = JSON.parse(stripJson(text)) as { error: { kind: string } };
     expect(parsed.error.kind).toBe('validation');
+  });
+
+  it('cof-link.linked carries the HMAC in the BODY — no signature header, cof next-hint', async () => {
+    const captured: { body: string; headers: Record<string, string | string[] | undefined> }[] = [];
+    const rx = await startReceiver(captured);
+    try {
+      const { text } = await run([
+        'webhook', 'trigger', '--event', 'cof-link.linked',
+        '--url', `http://127.0.0.1:${rx.port}/aba-payway-webhook`,
+        '--ctid', 'fxtcust9', '--tran-id', 'fxtreq9', '--api-key', 'cli-key-1',
+      ]);
+      expect(text).toContain('body `hash`');
+      expect(text).toContain('cof token list');
+      expect(captured[0].headers['x-payway-hmac-sha512']).toBeUndefined();
+      const parsedBody = JSON.parse(captured[0].body) as { hash?: string; ctid?: string; pwt?: string; request_id?: string };
+      expect(typeof parsedBody.hash).toBe('string');
+      expect(parsedBody.ctid).toBe('fxtcust9');
+      expect(parsedBody.request_id).toBe('fxtreq9');
+      expect(typeof parsedBody.pwt).toBe('string');
+    } finally {
+      await rx.close();
+    }
+  });
+});
+
+describe('webhook show (full record dump)', () => {
+  it('prints headers, raw body, and the verdict for a seeded record', async () => {
+    const ids = seedCaptures();
+    const { text } = await run(['webhook', 'show', '--record', ids[0] /* wh_seed1 */]);
+    expect(text).toContain('Captured webhook record');
+    expect(text).toContain('verified (header-hash)');
+    expect(text).toContain('x-payway-hmac-sha512');
+    expect(text).toContain('seed-sig-1');
+    expect(text).toContain('seed-1');
+  });
+
+  it('prints a pushback record without inventing a signature', async () => {
+    const ids = seedCaptures();
+    const { text } = await run(['webhook', 'show', '--record', ids[1] /* wh_seed2 */]);
+    expect(text).toContain('unsigned');
+    expect(text).toContain('payment-link pushback');
+    expect(text).toContain('mref-2');
+  });
+
+  it('--json emits the full stored record', async () => {
+    const ids = seedCaptures();
+    const { text } = await run(['webhook', 'show', '--record', ids[0], '--json']);
+    const doc = JSON.parse(stripJson(text)) as { id: string; body: string; signatureSource?: string };
+    expect(doc.id).toBe('wh_seed1');
+    expect(doc.body).toContain('seed-1');
+    expect(doc.signatureSource).toBe('header');
+  });
+
+  it('errors on an unknown or malformed record id', async () => {
+    const { exitCode } = await run(['webhook', 'show', '--record', 'wh_nope', '--json']);
+    expect(exitCode).toBe(1);
+    const { exitCode: bad } = await run(['webhook', 'show', '--record', 'not-an-id']);
+    expect(bad).toBe(1);
   });
 });
 

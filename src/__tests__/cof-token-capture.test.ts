@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { classifyCallback } from '../webhook/customer-callback.js';
 import { isCofLinkCallback, parseCofLinkCallback } from '../webhook/cof-callback.js';
+import { buildWebhookFixture } from '../webhook/fixtures.js';
 import {
   latestTokenForCtid,
   LINKED_TOKENS_FILE_NAME,
@@ -346,5 +347,21 @@ describe('Server CoF token capture', () => {
     expect(status).toBe(200);
     const stored = latestTokenForCtid('customer123', join(tempDir, 'tokens'));
     expect(stored?.pwt).toBe('pwt-khqr-bodyhash');
+  });
+
+  it('the cof-link.linked fixture drives the full body-hash capture path end-to-end', async () => {
+    const fixture = buildWebhookFixture('cof-link.linked', apiKey, { ctid: 'fxtcust01', tranId: 'fxtreq01' });
+    expect(fixture.signatureChannel).toBe('body');
+    expect(fixture.verification).toBe('hmac');
+    // Delivered exactly as `webhook trigger` would: body only, NO header.
+    const status = await httpRequest(port, '/aba-payway-webhook', fixture.body, {});
+    expect(status).toBe(200);
+    const stored = latestTokenForCtid('fxtcust01', join(tempDir, 'tokens'));
+    expect(stored?.pwt).toBe(fixture.parsed.pwt);
+    expect(stored?.requestId).toBe('fxtreq01');
+    const records = storage.getAll();
+    const last = records[records.length - 1];
+    expect(last.signatureVerdict).toBe('verified');
+    expect(last.signatureSource).toBe('body');
   });
 });

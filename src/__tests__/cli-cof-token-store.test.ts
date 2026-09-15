@@ -101,7 +101,7 @@ describe('cof charge token resolution', () => {
 
   it('cof token renew restarts the local expiry window on gateway success', async () => {
     saveLinkedToken({ ctid: 'custren1', pwt: 'pwt-renew-token', tokenFlag: 'CITI_FLEX' });
-    const srv = http.createServer((req, res) => {
+    const srv = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: { code: '00', message: 'Success' } }));
     });
@@ -144,7 +144,7 @@ describe('cof charge token resolution', () => {
     const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
     saveLinkedToken({ ctid: 'custsoon', pwt: 'pwt-soon-charge', capturedAt: iso(85) });
 
-    const srv = http.createServer((req, res) => {
+    const srv = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: { code: '00', message: 'Success' }, data: { tran_id: 'ord-soon' } }));
     });
@@ -167,7 +167,7 @@ describe('cof charge token resolution', () => {
 
   it('cof token remove prunes the local store on gateway success', async () => {
     saveLinkedToken({ ctid: 'custrm1', pwt: 'pwt-remove-me' });
-    const srv = http.createServer((req, res) => {
+    const srv = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: { code: '00', message: 'Success' } }));
     });
@@ -191,7 +191,7 @@ describe('cof charge token resolution', () => {
 
   it('cof token remove keeps the local copy when the gateway rejects', async () => {
     saveLinkedToken({ ctid: 'custrm2', pwt: 'pwt-keep-me' });
-    const srv = http.createServer((req, res) => {
+    const srv = http.createServer((_req, res) => {
       res.writeHead(403, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: { code: '99', message: 'Rejected' } }));
     });
@@ -268,7 +268,7 @@ describe('cof charge token resolution', () => {
 
 describe('cof link-account QR presentation', () => {
   it('saves the linking QR PNG and prints deeplink + expiry guidance (human mode)', async () => {
-    const srv = http.createServer((req, res) => {
+    const srv = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
@@ -302,7 +302,7 @@ describe('cof link-account QR presentation', () => {
   });
 
   it('--json envelope gains qrPngPath (and still one JSON document)', async () => {
-    const srv = http.createServer((req, res) => {
+    const srv = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
@@ -330,7 +330,7 @@ describe('cof link-account QR presentation', () => {
   });
 
   it('handles a response without qr_string without crashing (blocked-profile shape)', async () => {
-    const srv = http.createServer((req, res) => {
+    const srv = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: { code: '00', message: 'Success' }, data: {} }));
     });
@@ -346,6 +346,85 @@ describe('cof link-account QR presentation', () => {
       expect(text).toContain('Account link requested');
       expect(text).not.toContain('QR PNG:');
       expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('renders the expire_in epoch as a wall-clock deadline (§26 AOF-5)', async () => {
+    const srv = http.createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          status: { code: '00', message: 'Success' },
+          data: { qr_string: '00020101-expiry-qr', expire_in: Math.floor(Date.now() / 1000) + 600 },
+        }),
+      );
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text } = await run([
+        'cof', 'link-account', '-r', 'qrtest004', '-c', 'qrcycle01', '-f', 'CITI_FLEX', '--currency', 'USD', '-y',
+      ]);
+      expect(text).toContain('expires 20');
+      expect(text).toContain('~10 min left');
+    } finally {
+      srv.close();
+    }
+  });
+});
+
+describe('cof charge approval-QR presentation (defensive, §26)', () => {
+  it('renders + saves a QR when the live charge response carries qr_string', async () => {
+    const srv = http.createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          status: { code: '00', message: 'Success', tran_id: 'ord-qr1' },
+          data: { qr_string: '00020101-charge-approval-qr' },
+        }),
+      );
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'charge', '-t', 'ord-qr1', '-a', '1.00', '--token', 'pwt-qr-charge', '--no-open-image',
+      ]);
+      expect(text).toContain('COF charge submitted');
+      expect(text).toContain('Approval QR:');
+      expect(text).toContain('cof-charge-ord-qr1.png');
+      expect([0, undefined]).toContain(exitCode);
+      const { existsSync } = await import('node:fs');
+      expect(existsSync(path.join(tempDir, 'payway-output', 'cof-charge-ord-qr1.png'))).toBe(true);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('--json gains qrPngPath only when the response carries a QR', async () => {
+    const srv = http.createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '00', message: 'Success', tran_id: 'ord-qr2' } }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { stdout } = await run([
+        'cof', 'charge', '-t', 'ord-qr2', '-a', '1.00', '--token', 'pwt-qr-charge', '--json',
+      ]);
+      const doc = JSON.parse(stdout) as { qrPngPath?: string };
+      expect(doc.qrPngPath).toBeUndefined();
     } finally {
       srv.close();
     }

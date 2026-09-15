@@ -86,10 +86,11 @@ const charge = await payway.credentialsOnFile.payment({
 - **§26**: `link-account` succeeds on AOF-enabled profiles — `00` + `data.qr_string`
   (an `ABAAOF…` payload) + a `type=account_on_file` deeplink (NOT the payment
   `type=payway` form — use the gateway-supplied `data.deeplink`, don't build it
-  yourself); `expire_in` reads as an absolute epoch (expiry instant), not a TTL.
-  The CLI presents the QR end-to-end: PNG to
+  yourself); `expire_in` reads as an absolute epoch (expiry instant), not a TTL —
+  the CLI renders the wall-clock deadline. The CLI presents the QR end-to-end: PNG to
   `payway-output/cof-link-account-<request-id>.png`, `--open-image`/`--no-open-image`
-  (auto on TTY), `--json` gains `qrPngPath`.
+  (auto on TTY), `--json` gains `qrPngPath`. `cof charge` renders an approval QR the
+  same way IF the live response ever carries one (schema says it won't — defensive).
 
 ## CLI
 ```sh
@@ -99,6 +100,8 @@ payway-sdk cof link-card-form -c customer123 -f CITI_FLEX --callback-url <url> -
 payway-sdk cof link-card -r req0002 -c customer123 -f CITI_FLEX --frequency 1M --callback-url <url>
 payway-sdk cof charge -t order-0001 -a 4.50 --token <pwt> --ctid customer123 --token-flag MITU_FLEX
 payway-sdk cof token-flag-sweep -c customer123 --json   # diagnostic: 1 POST per linking flag + card leg; uniform 104 = profile blocker (no receiver needed)
+payway-sdk webhook trigger --event cof-link.linked --url <receiver>/aba-payway-webhook --ctid customer123   # dry-run the capture path (synthetic pwt, body-hash channel)
+payway-sdk webhook show --record wh_…   # full record dump: headers + raw body + signature source (Q18 evidence inspection)
 ```
 
 ## Error Handling

@@ -27,6 +27,7 @@ select an account; the resulting token (`pwt`) is delivered to your
   do NOT build it with the payment deeplink helper.
 - `expire_in` reads as an **absolute epoch (expiry instant, seconds)**, not a
   TTL — the ~10-minute window is the gap between response time and `expire_in`.
+  The CLI renders the wall-clock deadline ("expires …Z (~N min left)").
 - Undocumented flags (`CITO_FIX`, `CITR_FLEX`) answer `104 "Merchant not
   enabled token flag"` even on AOF-enabled profiles — stick to
   `CITI_FLEX | CITO_FLEX`.
