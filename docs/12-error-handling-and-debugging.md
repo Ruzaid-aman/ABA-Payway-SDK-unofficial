@@ -145,22 +145,38 @@ try {
 
 | Code | Message | HTTP Status | Meaning | How to Fix |
 |---|---|---|---|---|
+| `"0"` / `"00"` | Success / Success! | 200 | Business success — `"00"` on purchase, exchange-rate, close-transaction, transaction-list and the merchant-portal APIs; generate-qr and payout report `"0"` | — |
 | `"1"` | Wrong Hash | 403 | HMAC signature doesn't match | Check API key, field ordering, encoding (Base64 vs hex) |
 | `"04"` | The given data was invalid | 400 | String form of the binding/validation code — observed on `generate-qr` when `lifetime` is below the 3-minute minimum (the SDK now rejects sub-180s locally) | Send `lifetime >= 180` seconds; if you still hit `"04"`, another field is malformed — compare against the OpenAPI request schema |
+| `"3"` | Invalid Transaction Amount | 400 | Amount rejected (non-positive, wrong decimal scale, or mismatch) — purchase / pre-auth-completion / refund telemetry | Check the amount against the currency's decimal rules and the operation's amount constraints |
+| `"4"` | Duplicated Transaction ID | 400 | `tran_id` already exists for this merchant (purchase, generate-qr, payout — production telemetry 2026-09) | Send a fresh unique `tran_id`. The STRING code `"04"` is the separate validation failure |
+| `"5"` | Transaction not found | 404 | Close target does not exist (close-transaction telemetry) | Verify `tran_id` |
+| `"6"` | Requested Domain is not in whitelist | 403 | On purchase: the request origin/return domain is not whitelisted for the merchant profile (production telemetry 2026-09). Legacy gateway gloss: `tran_id` not found on check-transaction | Ask PayWay to whitelist the domain |
 | `"7"` | Invalid Request Data | 400/403 | Missing or malformed field | Check parameter types and required fields |
+| `"8"` | merchant_id not found — or generic failure | 403/500 | Sandbox-verified: merchant identity rejected on check-transaction (check `PAYWAY_MERCHANT_ID`). Production telemetry: on refund / payout / transaction-list / generate-qr an `8` is instead a generic 500-class "Something went wrong… digital support team" | Verify merchant config; generic-8 → retry once, then contact PayWay support with the trace id |
 | `"15"` | Invalid Merchant | 403 | Merchant ID not recognized | Verify `merchantId` in your config |
-| `"16"` | Invalid Amount | 400 | Amount format is wrong | Use `formatAmount()` helper; check decimal places |
-| `"17"` | Invalid Currency | 400 | Currency not `'USD'` or `'KHR'` | Set `currency` to `'USD'` or `'KHR'` |
+| `"16"` | Invalid First Name | 400 | purchase `first_name` validation — no numbers/special characters, ≤ 100 chars (production telemetry 2026-09; the legacy "invalid amount" gloss does not match what the gateway sends) | Sanitize the name fields |
+| `"17"` | Invalid Last Name | 400 | purchase `last_name` validation — same rules as `first_name` | Sanitize the name fields |
+| `"19"` | Invalid Email | 400 | purchase `email` malformed | Validate the email before submit |
+| `"29"` | Card inactive | 402 | Issuer reports the card inactive ("your card is inactive. Please use another card.") | Customer uses another card |
+| `"30"` / `"58"` / `"68"` / `"75"` | Card declined by issuer bank | 402 | Issuer declined without further detail; `"30"` adds "make sure your card is active", `"75"` advises another card | Customer contacts the issuer bank or uses another card |
+| `"52"` | Incorrect card details | 400 | Card number/expiry/CVV failed | Customer re-enters the card details |
+| `"59"` | Card insufficient funds | 402 | Card funds/limit exhausted | Customer uses another card or frees funds |
+| `"60"` | Card usage limit reached | 402 | Card hit its issuer usage limit | Another card, or issuer-bank support |
+| `"44"` | Purchase has reached transaction limit | 403 | Merchant/profile transaction limit reached | Raise the limit with PayWay or wait for the window to reset |
 | `"12"` / `"PTL147"` | Payment currency not allowed | 403 | Payout currency doesn't match the beneficiary account currency or the merchant credential currency | Send USD to a USD account and KHR to a KHR account; align the merchant profile currency |
 | `"22"` | Expired Transaction | 403 | Token or transaction has expired | Call `renew()` for tokens, or create new transaction |
 | `"23"` | Transaction Not Found | 403 | No transaction with given `tran_id` | Check transaction ID, it may have been closed |
 | `"24"` | Invalid Beneficiary Data | 403 | RSA-encrypted beneficiary data is wrong | Verify public key PEM and beneficiary account format |
-| `"37"` | Payout Whitelist | 403 | Payout account not whitelisted | Call `addBeneficiary()` first (sandbox-verified) |
+| `"37"` | Payout Whitelist | 403 | Payout account not whitelisted ("Payout accounts are not in whitelist.") | Call `addBeneficiary()` first (sandbox-verified) |
 | `"49"` | Invalid Request | 400/403 | Generic validation error — for lists, dates must be `"YYYY-MM-DD HH:mm:ss"` | Check all parameters against the OpenAPI spec |
 | `"69"` | Lifetime below minimum | 400 | purchase `lifetime` < 3 minutes (checkout API takes minutes; spec-documented, max 43200 = 30 days; the SDK now rejects sub-3-minute values locally) | Send `lifetime >= 3` (minutes) |
-| `"96"` | Payee Not Found / Invalid merchant data | 403 | Beneficiary not whitelisted, or payment-link id invalid | Whitelist the payee; verify the link id |
+| `"96"` | Payee Not Found / Invalid merchant data | 403 | Beneficiary not whitelisted, payment-link id invalid, or merchant data rejected (generate-qr / add-whitelist telemetry) | Whitelist the payee; verify the link id / merchant credential |
+| `"500"` | Something went wrong | 500 | Generic gateway failure (transaction-list, generate-qr, payment-link detail telemetry) | Retry once, then contact PayWay support with the trace id |
+| `"503"` | System under maintenance | 503 | PayWay maintenance window (purchase telemetry) | Pause and retry later |
+| `"999"` | Something went wrong. Please try again later. | 500 | Generic gateway failure (purchase telemetry) | Retry with backoff; not a merchant config issue |
 
-> 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema and verified against sandbox probe responses. The full hint map ships in `GATEWAY_CODE_HINTS` and is queryable via `payway-sdk explain <code>`.
+> 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema, verified against sandbox probe responses, and — as of 2026-09-15 — cross-checked against **ABA production telemetry** (dev-team CSV of code+message occurrences per API). Telemetry superseded several legacy glosses (notably `4`, `16`, `17`, `21`, `44`) and added the card-decline, CDA, and 5xx codes. The full hint map ships in `GATEWAY_CODE_HINTS` and is queryable via `payway-sdk explain <code>`; `docs/error-codes.json` carries the per-API `observedOn` fields.
 
 ### COF error family *(new in v1.3.6)*
 
@@ -182,22 +198,22 @@ Codes observed on the credentials-on-file endpoints (`link-account`, `link-card`
 
 ### QR error family *(new in v1.3.6)*
 
-String codes observed on `generate-qr` (KHQR). Note: `"8"` and `"12"` intentionally stay in the gateway/payout families (they are not KHQR-specific):
+String codes observed on `generate-qr` (KHQR). Note: `"8"` and `"12"` intentionally stay in the gateway/payout families (they are not KHQR-specific). Meanings for `6`, `12`, `16`, `17`, `19`, `21`, `32`, `44`, `96` come from **ABA production telemetry (2026-09-15)** — the shared numeric code space is also used by the purchase validators, and several old spec-page glosses (`16` "invalid amount", `19` "invalid QR request", `21` "invalid transaction ID", `32` "invalid lifetime", `44` "invalid template") do **not** match what the gateway actually sends:
 
 | Code | Meaning |
 |---|---|
-| `"6"` | Invalid merchant data |
-| `"16"` | Invalid amount |
-| `"17"` | Invalid currency |
-| `"18"` | Invalid request data |
-| `"19"` | Invalid QR request |
-| `"21"` | Invalid transaction ID |
+| `"6"` | Requested Domain is not in whitelist (purchase telemetry; ask PayWay to whitelist the domain) |
+| `"16"` | Invalid First Name — no numbers/special chars, ≤ 100 chars |
+| `"17"` | Invalid Last Name — same rules |
+| `"18"` | Invalid request data *(spec-page gloss, not yet telemetry-observed)* |
+| `"19"` | Invalid Email (purchase field validation) |
+| `"21"` | End of API lifetime — the QR/transaction lifetime elapsed before payment; create a fresh transaction |
 | `"23"` | Transaction not found |
-| `"32"` | Invalid lifetime |
+| `"32"` | "Service is not enable." — the feature this call needs is not provisioned on the merchant profile (e.g. pushback); sandbox-verified on payment-link create (§22) |
 | `"35"` | Invalid hash |
-| `"44"` | Invalid template |
-| `"47"` | Invalid items data |
-| `"48"` | Invalid purchase type |
+| `"44"` | Purchase has reached transaction limit |
+| `"47"` | Invalid items data *(spec-page gloss, not yet telemetry-observed)* |
+| `"48"` | Invalid purchase type *(spec-page gloss, not yet telemetry-observed)* |
 | `"96"` | Invalid merchant data / payee not found |
 | `"102"` | QR request limit exceeded |
 | `"403"` | Forbidden (merchant not enabled for this operation) |
@@ -213,10 +229,12 @@ Discovered by exercising a real pre-auth lifecycle in sandbox (`purchase` with
 
 | Code | Constant | Meaning | How to Fix |
 |---|---|---|---|
-| `PTL59` | `PRE_AUTH_ERROR_CODES.UNABLE_TO_COMPLETE` | Cannot capture — transaction status invalid | Only authorized OPEN pre-auths can be completed |
+| `PTL59` | `PRE_AUTH_ERROR_CODES.UNABLE_TO_COMPLETE` | Cannot capture — transaction status invalid **or the completion amount is incorrect** (production message checks both) | Only authorized OPEN pre-auths can be completed; verify the completion amount against the original authorization |
 | `PTL62` | `PRE_AUTH_ERROR_CODES.MERCHANT_INVALID` | Merchant info invalid for this operation | Sandbox profile lacks permission (e.g. complete-with-payout) — contact PayWay |
 | `PTL170` | `PRE_AUTH_ERROR_CODES.UNABLE_TO_CANCEL` | Cannot cancel — transaction status invalid | Only unpaid OPEN pre-auths can be cancelled |
+| `PTL172` | `PRE_AUTH_ERROR_CODES.COMPLETION_FAILED` | Completion failed — the payment service provider returned an unexpected response (production telemetry 2026-09) | Retry once, then contact PayWay support with the trace id |
 | `PTL36` | *(shared with refunds)* | Transaction not found or invalid | Verify the `tran_id` |
+| `PTL168` / `PTL04` | *(shared with refunds)* | Concurrent request in progress / parameter validation required | Retry after the in-flight request settles / fix the parameters |
 
 ### Refund-Specific Error Codes
 
@@ -258,9 +276,9 @@ try {
 | `PTL04` | `REFUND_ERROR_CODES.PARAMETER_VALIDATION` | Amount below minimum or invalid format | Ensure ≥ $0.01 USD or ≥ 1 KHR |
 | `PTL36` | `REFUND_ERROR_CODES.REFUND_TARGET_NOT_FOUND` | Transaction not found or is invalid (HTTP 403) | Verify the original `tran_id`; refunds require a captured transaction |
 | `PTL37` | `REFUND_ERROR_CODES.REFUND_EXCEEDS_ORIGINAL` | Refund > original payment | Reduce refund amount |
-| `PTL57` | `REFUND_ERROR_CODES.UNABLE_TO_REFUND` | Cannot process refund | Check transaction status |
-| `PTL58` | `REFUND_ERROR_CODES.REFUND_FAILED` | Refund processing failed | Contact PayWay support |
-| `PTL168` | `REFUND_ERROR_CODES.CONCURRENT_REJECTED` | Duplicate concurrent request | Retry after the first request completes |
+| `PTL57` | `REFUND_ERROR_CODES.UNABLE_TO_REFUND` | "Invalid transaction status or an incorrect refund amount" (production telemetry) — check BOTH | Check transaction status; ensure amount ≤ paid − already-refunded |
+| `PTL58` | `REFUND_ERROR_CODES.REFUND_FAILED` | Refund processing failed — PSP returned an unexpected response | Retry once, then contact PayWay support |
+| `PTL168` | `REFUND_ERROR_CODES.CONCURRENT_REJECTED` | "Another request is already in progress" — shared by refund AND pre-auth completion/cancellation | Retry after the first request completes |
 | `PTL181` | `REFUND_ERROR_CODES.INSUFFICIENT_BALANCE` | Insufficient merchant balance | Top up merchant account |
 
 > ℹ️ **Client-side validation:** The SDK validates refund amounts before making the API call. Use `validateRefundAmount(amount, currency)` to catch invalid amounts locally. The `refund()` method calls this automatically.
@@ -276,11 +294,15 @@ Payouts (`payway.payout.payout`) go through the direct payout API and have their
 | Code | Constant | Meaning | How to Fix |
 |---|---|---|---|
 | `12` / `PTL147` | `PAYOUT_ERROR_CODES.CURRENCY_NOT_ALLOWED` | Payment currency not allowed | Payout currency must match the beneficiary account currency **and** merchant credential currency (USD→USD, KHR→KHR) |
-| `37` / `PTL146` / `PTL-PAYOUT-37` / `PTL46` | `PAYOUT_ERROR_CODES.ACCOUNT_NOT_WHITELISTED` | Beneficiary not whitelisted | Register the payee via `addBeneficiary()` (or the payment-link whitelist) first |
+| `37` / `PTL146` / `PTL-PAYOUT-37` / `PTL46` | `PAYOUT_ERROR_CODES.ACCOUNT_NOT_WHITELISTED` | Beneficiary not whitelisted ("Payout accounts are not in whitelist.") | Register the payee via `addBeneficiary()` (or the payment-link whitelist) first |
 | `PTL-PAYOUT-36` | `PAYOUT_ERROR_CODES.AMOUNT_MISMATCH` | Payout amount mismatch | Sum of `beneficiaries[].amount` must equal the payout (transaction complete) amount |
+| `PTL148` | — | Payee already exists (add-whitelist telemetry — the most common add response; benign) | No action needed; re-enable via update-whitelist-status if it was disabled |
+| `4` | *(shared with gateway)* | Duplicated Transaction ID (payout telemetry) | Send a fresh unique `tran_id` |
 | `1` | *(shared with gateway)* | Wrong Hash | Check API key, HMAC field ordering, base64 vs hex encoding |
 | `24` | *(shared with gateway)* | Invalid Beneficiary Data | RSA-encrypted beneficiaries malformed — verify public key + account format |
 | `415` (HTTP) | — | Unsupported Media Type | Direct payout API requires `Content-Type: application/json` (not form-encoded) |
+
+> 📋 **Whitelist endpoints** (production telemetry 2026-09): `add-whitelist-payout` answers `00` / `PTL148` (already exists) / `PTL04` (validation) / `96` (merchant data); `update-whitelist-status` answers `00`.
 
 > 🧪 **Sandbox-verified (2026-08-25):** Payout to a non-whitelisted account → HTTP 403, numeric code **`37`** ("Payout accounts are not in whitelist"). Beneficiaries are RSA-encrypted and the HMAC is **hex**-encoded for this endpoint.
 >
@@ -315,6 +337,48 @@ The payment-link endpoints (`create`, `detail`, `void`) use the `PTL*` family in
 > `test-output/payment-link-void-e2e/`, gitignored).
 
 Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](./17-payment-link.md)**.
+
+### ABA production telemetry — codes by API *(added 2026-09-15)*
+
+The ABA dev team shared a telemetry export grouping every gateway response by **API path + business code + message**. It is now folded into the registry: each code in [`error-codes.json`](./error-codes.json) can carry `observedOn` (the APIs below, as short labels) and `observedMessage` (the exact gateway string). Provenance rules: `sandboxVerified` still means reproduced in the live sandbox; `observedOn` means seen in ABA production. Where telemetry and old spec-page glosses disagreed, telemetry won (`4`, `16`, `17`, `19`, `21`, `44`) — see the gateway/QR tables above.
+
+| API label | Gateway path | Codes observed (beyond `00`/`0` success) |
+|---|---|---|
+| `purchase` | `/api/payment-gateway/v1/payments/purchase` | `CDA00` `CDA45` `CDA09` `105` `4` `04` `3` `999` `16` `6` `19` `1` `59` `44` `17` `52` `12` `8` `60` `58` `29` `30` `503` `75` `32` `68` |
+| `generate-qr` | `/api/payment-gateway/v1/payments/generate-qr` | `4` `96` `32` `04` `12` `21` `1` `500` |
+| `close-transaction` | `/api/payment-gateway/v1/payments/close-transaction` | `5` |
+| `exchange-rate` | `/api/payment-gateway/v1/exchange-rate` | `26` (live-confirms the sandbox mapping) |
+| `transaction-list` | `/api/payment-gateway/v1/payments/transaction-list-2` | `500` |
+| `payout` | `/api/payment-gateway/v2/direct-payment/merchant/payout` | `8` `37` `4` |
+| `cof-charge` | `/api/payment-gateway/v3/purchase/payment-credential` | failures mostly arrive without a code label — expect HTTP-level errors plus `105` |
+| `cof-link-account` | `/api/payment-credential/v3/aof/link-account` | link outcomes arrive via callback; only `00` observed on the API itself |
+| `refund` | `/api/merchant-portal/merchant-access/online-transaction/refund` | `PTL57` `8` `PTL36` `PTL58` `3` |
+| `pre-auth-complete` | `/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion` | `3` `PTL59` `PTL172` `PTL04` `PTL168` |
+| `pre-auth-cancel` | `/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation` | `PTL36` `PTL168` `PTL170` |
+| `whitelist-add` | `/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout` | `PTL148` `PTL04` `96` |
+| `whitelist-status` | `/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status` | — (only `00` observed) |
+| `payment-link-create` | `/api/merchant-portal/merchant-access/payment-link/create` | `PTL04` |
+| `payment-link-detail` | `/api/merchant-portal/merchant-access/payment-link/detail` | `500` |
+
+Corrections and confirmations worth calling out:
+
+- **`4` = Duplicated Transaction ID** (purchase, generate-qr, payout) — the earlier "Invalid Data" gloss is retired; send a fresh `tran_id`.
+- **`16`/`17`/`19` are purchase field validations** (first name / last name / email), not amount/currency codes.
+- **`21` = End of API lifetime** on generate-qr — the QR window elapsed; regenerate.
+- **`PTL168` is shared** by refund AND pre-auth completion/cancellation; `PTL36` spans refund and pre-auth cancellation.
+- **`PTL148` "Payee already exists"** is the most common add-whitelist response (6.4k occurrences) — benign.
+- **`26` Invalid Merchant Profile** live-confirms the sandbox-verified exchange-rate mapping.
+- `cof charge` (v3 `payment-credential`) failures mostly arrive **without a code label** — expect HTTP-level errors plus `105` for bad/expired pwt.
+
+### ABA-account (CDA) codes *(new family)*
+
+When the payer pays a `purchase` from an **ABA Mobile account**, the gateway wraps the payer-account result and echoes its code — repeated as a `[CDAxx]` suffix inside the message. Queryable via `payway-sdk explain CDA45` etc.:
+
+| Code | Meaning | How to Fix |
+|---|---|---|
+| `CDA00` | OK — payer-account success | Treat like `00` success |
+| `CDA09` | "Sorry, we couldn't process the payment. Please try again in few minutes…" | Transient decline — surface the message; retry shortly |
+| `CDA45` | "Payer account has insufficient funds." | Customer tops up the ABA account or pays from another account |
 
 ### Interpreting a successful refund
 

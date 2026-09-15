@@ -22,7 +22,7 @@ const registry = {
   generated: new Date().toISOString(),
   source: 'src/cli/explain-code.ts',
   description:
-    'Consolidated ABA PayWay error/status code registry. sandboxVerified: true means the meaning was reproduced against the live sandbox; evidence points into docs/SANDBOX-FINDINGS.md. Regenerate with `npm run gen:error-registry`.',
+    'Consolidated ABA PayWay error/status code registry. sandboxVerified: true means the meaning was reproduced against the live sandbox; evidence points into docs/SANDBOX-FINDINGS.md. observedOn/observedMessage carry ABA production telemetry (dev-team CSV, 2026-09-15): the gateway APIs where the code was seen and the exact gateway message; API labels map to paths in docs/12 (errors-and-debugging topic). Regenerate with `npm run gen:error-registry`.',
   codes,
 };
 

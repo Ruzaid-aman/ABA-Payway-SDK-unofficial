@@ -152,6 +152,8 @@ export const PRE_AUTH_ERROR_CODES = {
   MERCHANT_INVALID: 'PTL62',
   /** Unable to cancel pre-authorization — transaction status invalid */
   UNABLE_TO_CANCEL: 'PTL170',
+  /** Completion failed — the payment service provider returned an unexpected response (production telemetry 2026-09) */
+  COMPLETION_FAILED: 'PTL172',
 } as const;
 
 /**
@@ -193,13 +195,15 @@ export const PAYOUT_ERROR_CODES = {
  * Sources: docs/12 error table + 2026-08-25 sandbox campaigns.
  */
 export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }> = {
+  '0': { title: 'Success', hint: 'Business success. purchase/exchange-rate/close-transaction/transaction-list and the merchant-portal APIs report "00"; generate-qr and payout report "0".' },
   '1': { title: 'Wrong Hash', hint: 'HMAC signature mismatch — check API key, field ordering, base64 vs hex encoding.' },
   '2': { title: 'Transaction Not Closable', hint: 'Transaction status does not allow close — sandbox-verified: closing an already PAID transaction answers 403 code 2 (SANDBOX-FINDINGS §21). Only OPEN/PENDING transactions can be closed.' },
-  '4': { title: 'Invalid Data', hint: 'Server-side binding/validation failed — see errors map in rawBody for per-field messages.' },
+  '3': { title: 'Invalid Transaction Amount', hint: 'Amount rejected (non-positive, wrong decimal scale, or mismatched) — seen on purchase, pre-auth-completion and refund (production telemetry 2026-09).' },
+  '4': { title: 'Duplicated Transaction ID', hint: 'tran_id already exists for this merchant — send a fresh unique tran_id (production telemetry 2026-09: purchase, generate-qr, payout). The STRING code "04" is the separate validation/binding failure.' },
   '5': { title: 'Transaction Not Found', hint: 'Close/cancel target does not exist — verify tran_id.' },
-  '6': { title: 'tran_id not found', hint: 'check-transaction found no transaction with this ID.' },
+  '6': { title: 'tran_id not found', hint: 'check-transaction found no transaction with this ID. On purchase the same numeric code means "Requested Domain is not in whitelist" (production telemetry 2026-09) — ask PayWay to whitelist the domain.' },
   '7': { title: 'Invalid Request Data', hint: 'Missing or malformed field - check parameter types.' },
-  '8': { title: 'merchant_id not found', hint: 'Merchant identity rejected on this endpoint (sandbox-verified HTTP 403 on check-transaction) - check PAYWAY_MERCHANT_ID or the active profile.' },
+  '8': { title: 'merchant_id not found', hint: 'Merchant identity rejected on this endpoint (sandbox-verified HTTP 403 on check-transaction) - check PAYWAY_MERCHANT_ID or the active profile. Production telemetry 2026-09: on refund/payout/transaction-list/generate-qr an 8 is instead a GENERIC 500-class "Something went wrong" — retry once, then contact PayWay support with the trace id.' },
   '12': { title: 'Payment currency not allowed', hint: 'Payout currency must match the beneficiary account currency and your merchant credential currency (e.g. send USD to a USD account).' },
   '15': { title: 'Invalid Merchant', hint: 'merchant_id not recognized in this environment.' },
   '16': { title: 'Invalid Amount', hint: 'Amount format wrong — use formatAmount()/decimal rules for the currency.' },
@@ -208,10 +212,21 @@ export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }>
   '23': { title: 'Transaction Not Found', hint: 'No transaction with this tran_id (may have been closed).' },
   '24': { title: 'Invalid Beneficiary Data', hint: 'RSA-encrypted beneficiaries malformed — verify public key + account format.' },
   '26': { title: 'Invalid Merchant Profile', hint: 'Merchant identity rejected (sandbox-verified HTTP 400 on exchange-rate with unknown merchant_id) — check PAYWAY_MERCHANT_ID or the active profile.' },
-  '37': { title: 'Payout Whitelist', hint: 'Payout account not whitelisted — call addBeneficiary() first.' },
+  '29': { title: 'Card Inactive', hint: 'Issuer reports the card inactive — customer uses another card (purchase telemetry 2026-09: "your card is inactive").' },
+  '30': { title: 'Card Declined By Issuer', hint: 'Issuer declined — customer verifies the card is active or uses another card.' },
+  '37': { title: 'Payout Whitelist', hint: 'Payout account not whitelisted — call addBeneficiary() first (production message: "Payout accounts are not in whitelist.").' },
   '49': { title: 'Invalid Request', hint: "Validation failed. For transaction-list dates use \"YYYY-MM-DD HH:mm:ss\"." },
+  '52': { title: 'Incorrect Card Details', hint: 'Card number/expiry/CVV failed — customer re-enters the card details.' },
+  '58': { title: 'Card Declined By Issuer', hint: 'Issuer declined without detail — customer contacts the issuer bank or uses another card.' },
+  '59': { title: 'Card Insufficient Funds', hint: 'Card funds/limit exhausted — customer uses another card or frees funds first.' },
+  '60': { title: 'Card Usage Limit Reached', hint: 'Card hit its issuer usage limit — another card, or issuer-bank support.' },
+  '68': { title: 'Card Declined By Issuer', hint: 'Issuer declined without detail — customer contacts the issuer bank or uses another card.' },
   '69': { title: 'Lifetime Below Minimum', hint: 'Checkout purchase lifetime must be >= 3 minutes (API takes minutes; max 43200 = 30 days; spec-documented).' },
+  '75': { title: 'Card Declined By Issuer', hint: 'Issuer declined; message advises another card or issuer-bank support.' },
   '96': { title: 'Payee / Merchant Data', hint: 'Beneficiary payee unknown, or payment-link id invalid (detail).' },
+  '500': { title: 'Gateway Error', hint: 'Generic 500-class failure ("Something went wrong... digital support team") — retry once, then contact PayWay support with the trace id (telemetry: transaction-list, generate-qr, payment-link detail).' },
+  '503': { title: 'System Under Maintenance', hint: 'PayWay is under maintenance — pause and retry later (telemetry: purchase).' },
+  '999': { title: 'Something Went Wrong', hint: 'Generic gateway failure, "please try again later" — retry with backoff; not a merchant config issue (telemetry: purchase).' },
 };
 
 /**

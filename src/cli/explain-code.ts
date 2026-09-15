@@ -14,13 +14,17 @@ import {
 
 export interface CodeExplanation {
   readonly code: string;
-  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr' | 'payment-link';
+  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr' | 'cda' | 'payment-link';
   readonly title: string;
   readonly hint: string;
   /** True when the code's meaning was reproduced against the live sandbox. */
   readonly sandboxVerified?: boolean;
   /** Evidence pointer into docs/SANDBOX-FINDINGS.md for live-verified codes. */
   readonly evidence?: string;
+  /** Gateway APIs (short labels, see docs/12 telemetry section) where ABA production telemetry observed this code, 2026-09-15 CSV. */
+  readonly observedOn?: string[];
+  /** Exact gateway message for this code in the same telemetry. */
+  readonly observedMessage?: string;
 }
 
 /**
@@ -55,14 +59,84 @@ export const SANDBOX_VERIFIED_EVIDENCE: Record<string, string> = {
   PTL188: 'SANDBOX-FINDINGS §23',
 };
 
-/** Attach live-verification provenance to an explanation, if any exists. */
+/**
+ * ABA production telemetry (dev-team CSV export, 2026-09-15): the gateway APIs
+ * where each code was observed, with the exact message the gateway sends.
+ * Keyed `family:code` (a numeric code can legitimately mean different things
+ * per family — e.g. gateway `6` vs qr `6`). API labels map 1:1 to gateway
+ * paths in the docs/12 telemetry table. This is production provenance — it
+ * deliberately does NOT set `sandboxVerified`, which stays reserved for codes
+ * reproduced against the live sandbox.
+ */
+export const ABA_TELEMETRY: Record<string, { apis: string[]; message?: string }> = {
+  'gateway:0': {
+    apis: [
+      'purchase', 'generate-qr', 'close-transaction', 'exchange-rate', 'transaction-list', 'payout',
+      'cof-charge', 'cof-link-account', 'refund', 'pre-auth-complete', 'pre-auth-cancel',
+      'whitelist-add', 'whitelist-status', 'payment-link-create', 'payment-link-detail',
+    ],
+  },
+  'gateway:1': { apis: ['purchase', 'generate-qr'], message: 'Wrong Hash.' },
+  'gateway:3': { apis: ['purchase', 'pre-auth-complete', 'refund'], message: 'Invalid Transaction Amount.' },
+  'gateway:4': { apis: ['purchase', 'generate-qr', 'payout'], message: 'Duplicated Transaction ID.' },
+  'gateway:5': { apis: ['close-transaction'], message: 'Transaction not found' },
+  'gateway:8': {
+    apis: ['purchase', 'generate-qr', 'payout', 'refund', 'transaction-list'],
+    message: 'Something went wrong. Please reach out to our digital support team for assistance',
+  },
+  'gateway:12': { apis: ['purchase', 'generate-qr'], message: 'Payment currency is not allowed.' },
+  'gateway:26': { apis: ['exchange-rate'], message: 'Invalid Merchant Profile' },
+  'gateway:29': { apis: ['purchase'], message: 'Sorry, your payment cannot be processed as your card is inactive. Please use another card.' },
+  'gateway:30': { apis: ['purchase'], message: 'Your payment is declined by the card issuer bank. Please make sure your card is active, or contact your issuer bank for support.' },
+  'gateway:37': { apis: ['payout'], message: 'Payout accounts are not in whitelist.' },
+  'gateway:44': { apis: ['purchase'], message: 'Purchase has reached transaction limit.' },
+  'gateway:52': { apis: ['purchase'], message: 'Incorrect card details. Please check and try again.' },
+  'gateway:58': { apis: ['purchase'], message: 'Your payment is declined by the card issuer bank. Please contact issuer bank for support.' },
+  'gateway:59': { apis: ['purchase'], message: 'Your payment card has insufficient funds. Please check and try again.' },
+  'gateway:60': { apis: ['purchase'], message: 'Your payment card has reached its usage limit. Please use another card, or contact issuer bank for support.' },
+  'gateway:68': { apis: ['purchase'], message: 'Your payment is declined by the card issuer bank. Please contact issuer bank for support.' },
+  'gateway:75': { apis: ['purchase'], message: 'Your payment is declined by the card issuer bank. Please use another card, or contact issuer bank for support.' },
+  'gateway:96': { apis: ['generate-qr', 'whitelist-add'], message: 'Invalid merchant data' },
+  'gateway:500': {
+    apis: ['transaction-list', 'generate-qr', 'payment-link-detail'],
+    message: 'Something went wrong. Please reach out to our digital support team for assistance',
+  },
+  'gateway:503': { apis: ['purchase'], message: "System under maintenance. We'll update you when available. Thanks for your patience." },
+  'gateway:999': { apis: ['purchase'], message: 'Something went wrong. Please try again later.' },
+  'cof:04': { apis: ['purchase', 'generate-qr'], message: 'The given data was invalid.' },
+  'cof:105': { apis: ['purchase'], message: 'Invalid pwt or ctid.' },
+  'qr:6': { apis: ['purchase'], message: 'Requested Domain is not in whitelist.' },
+  'qr:12': { apis: ['generate-qr', 'purchase'], message: 'Payment currency is not allowed.' },
+  'qr:16': { apis: ['purchase'], message: 'Invalid First Name. It must not contain numbers or special characters or not more than 100 characters.' },
+  'qr:17': { apis: ['purchase'], message: 'Invalid Last Name. It must not contain numbers or special characters or not more than 100 characters.' },
+  'qr:19': { apis: ['purchase'], message: 'Invalid Email.' },
+  'qr:21': { apis: ['generate-qr'], message: 'End of API lifetime.' },
+  'qr:32': { apis: ['generate-qr', 'purchase'], message: 'Service is not enable.' },
+  'refund:PTL04': { apis: ['payment-link-create', 'pre-auth-complete', 'whitelist-add'], message: 'Parameter validation required' },
+  'refund:PTL36': { apis: ['refund', 'pre-auth-cancel'], message: 'Transaction not found or is invalid' },
+  'refund:PTL57': { apis: ['refund'], message: 'Unable to process refund due to an invalid transaction status or an incorrect refund amount' },
+  'refund:PTL58': { apis: ['refund'], message: 'Refund failed: The payment service provider returned an unexpected response' },
+  'refund:PTL168': { apis: ['refund', 'pre-auth-complete', 'pre-auth-cancel'], message: 'Another request is already in progress. Please wait a few seconds and try again.' },
+  'pre-auth:PTL59': { apis: ['pre-auth-complete'], message: 'Unable to complete pre-authorization: The transaction status is invalid or the completion amount is incorrect' },
+  'pre-auth:PTL170': { apis: ['pre-auth-cancel'], message: 'Unable to cancel pre-authorization: The transaction status is invalid' },
+  'pre-auth:PTL172': { apis: ['pre-auth-complete'], message: 'Pre-authorization completion failed: The payment service provider returned an unexpected response' },
+  'payout:12': { apis: ['purchase', 'generate-qr'], message: 'Payment currency is not allowed.' },
+  'payout:PTL148': { apis: ['whitelist-add'], message: 'Payee already exists.' },
+  'cda:CDA00': { apis: ['purchase'], message: 'OK' },
+  'cda:CDA09': { apis: ['purchase'], message: "Sorry, we couldn't process the payment. Please try again in few minutes or contact to the merchant directly." },
+  'cda:CDA45': { apis: ['purchase'], message: 'Payer account has insufficient funds.' },
+};
+
+/** Attach live-verification provenance (sandbox evidence + ABA production telemetry), if any exists. */
 function withProvenance(e: CodeExplanation): CodeExplanation {
   const evidence = SANDBOX_VERIFIED_EVIDENCE[e.code];
-  return evidence ? { ...e, sandboxVerified: true, evidence } : e;
+  const telemetry = ABA_TELEMETRY[`${e.family}:${e.code}`];
+  const base = evidence ? { ...e, sandboxVerified: true, evidence } : e;
+  return telemetry ? { ...base, observedOn: telemetry.apis, observedMessage: telemetry.message } : base;
 }
 
 const REFUND_LABELS: Record<string, string> = {
-  [REFUND_ERROR_CODES.SUCCESS]: 'Refund accepted',
+  [REFUND_ERROR_CODES.SUCCESS]: 'Success',
   [REFUND_ERROR_CODES.INVALID_HASH]: 'Invalid hash',
   [REFUND_ERROR_CODES.REFUND_TARGET_NOT_FOUND]: 'Transaction not found',
   [REFUND_ERROR_CODES.PARAMETER_VALIDATION]: 'Parameter validation required',
@@ -74,13 +148,17 @@ const REFUND_LABELS: Record<string, string> = {
 };
 
 const REFUND_HINTS: Record<string, string> = {
+  [REFUND_ERROR_CODES.SUCCESS]: 'Business success — on the refund endpoint this means the refund was accepted.',
   [REFUND_ERROR_CODES.INVALID_HASH]: 'Check API key and HMAC field ordering.',
   [REFUND_ERROR_CODES.REFUND_TARGET_NOT_FOUND]: 'Verify the original tran_id — refunds need a captured transaction.',
   [REFUND_ERROR_CODES.PARAMETER_VALIDATION]: 'Amount must be ≥ $0.01 USD / ≥ 1 KHR; check other required fields.',
   [REFUND_ERROR_CODES.REFUND_EXCEEDS_ORIGINAL]: 'Reduce the refund amount to fit the remaining refundable balance.',
-  [REFUND_ERROR_CODES.UNABLE_TO_REFUND]: 'Transaction may not be refundable — check its status via transaction-detail.',
-  [REFUND_ERROR_CODES.REFUND_FAILED]: 'PayWay could not process the refund — contact PayWay support with the trace id.',
-  [REFUND_ERROR_CODES.CONCURRENT_REJECTED]: 'Another refund for this transaction is in flight — retry after it settles.',
+  [REFUND_ERROR_CODES.UNABLE_TO_REFUND]:
+    'Production message: "invalid transaction status or an incorrect refund amount" — check BOTH the transaction status (transaction-detail) and that the amount fits paid − already-refunded.',
+  [REFUND_ERROR_CODES.REFUND_FAILED]:
+    'PayWay could not process the refund (PSP returned an unexpected response) — retry once, then contact PayWay support with the trace id.',
+  [REFUND_ERROR_CODES.CONCURRENT_REJECTED]:
+    'Another request for this transaction is in flight — retry after it settles. Shared by refund AND pre-auth completion/cancellation ("Another request is already in progress. Please wait a few seconds and try again.").',
   [REFUND_ERROR_CODES.INSUFFICIENT_BALANCE]: 'Top up the merchant account before retrying.',
 };
 
@@ -88,13 +166,17 @@ const PRE_AUTH_TITLES: Record<string, string> = {
   [PRE_AUTH_ERROR_CODES.UNABLE_TO_COMPLETE]: 'Unable to complete pre-auth',
   [PRE_AUTH_ERROR_CODES.MERCHANT_INVALID]: 'Merchant information invalid',
   [PRE_AUTH_ERROR_CODES.UNABLE_TO_CANCEL]: 'Unable to cancel pre-auth',
+  [PRE_AUTH_ERROR_CODES.COMPLETION_FAILED]: 'Pre-auth completion failed (PSP error)',
 };
 
 const PRE_AUTH_HINTS: Record<string, string> = {
-  [PRE_AUTH_ERROR_CODES.UNABLE_TO_COMPLETE]: 'Transaction status does not allow capture (never authorized, already completed/cancelled).',
+  [PRE_AUTH_ERROR_CODES.UNABLE_TO_COMPLETE]:
+    'Transaction status does not allow capture, OR the completion amount is incorrect (never authorized, already completed/cancelled) — production message checks both.',
   [PRE_AUTH_ERROR_CODES.MERCHANT_INVALID]:
     'Sandbox profile lacks permission for this operation (e.g. complete-with-payout) — contact PayWay to provision.',
   [PRE_AUTH_ERROR_CODES.UNABLE_TO_CANCEL]: 'Only OPEN/PENDING pre-auths can be cancelled — check current status first.',
+  [PRE_AUTH_ERROR_CODES.COMPLETION_FAILED]:
+    'The payment service provider returned an unexpected response during completion — retry once, then contact PayWay support with the trace id (production telemetry 2026-09).',
 };
 
 // Payout / split-payout error codes (direct payout API). The currency must
@@ -107,6 +189,7 @@ const PAYOUT_TITLES: Record<string, string> = {
   'PTL-PAYOUT-37': 'Payout account not whitelisted',
   PTL46: 'Payout account not whitelisted',
   [PAYOUT_ERROR_CODES.AMOUNT_MISMATCH]: 'Payout amount mismatch',
+  PTL148: 'Payee already exists',
 };
 
 const PAYOUT_HINTS: Record<string, string> = {
@@ -117,6 +200,8 @@ const PAYOUT_HINTS: Record<string, string> = {
   'PTL-PAYOUT-37': 'Whitelist the beneficiary first via addBeneficiary().',
   PTL46: 'Whitelist the beneficiary first via addBeneficiary().',
   [PAYOUT_ERROR_CODES.AMOUNT_MISMATCH]: 'Sum of beneficiary amounts must equal the payout (transaction complete) amount.',
+  PTL148:
+    'The payee is already on the payout whitelist — benign, no action needed (production telemetry 2026-09: the most common add-whitelist response). Re-enable via update-whitelist-status if it was disabled.',
 };
 
 // Credentials-on-file family (live-documented codes, 2026-08-31 audit §6).
@@ -137,24 +222,61 @@ const COF_HINTS: Record<string, string> = {
   '09': 'The ctid/request_id does not reference a known account token — verify or re-link.',
   '98': 'Merchant ID not found — verify the merchant credential (env/profile) for the target environment.',
   '104': 'The merchant account is not enabled for this token_flag — contact PayWay to provision, or use a linking enum (CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX).',
-  '105': 'The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken.',
+  '105': 'The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken. On purchase/charge the gateway also words it "Invalid pwt or ctid." — for ctid-keyed charges check the ctid→pwt resolution first (production telemetry 2026-09).',
+};
+
+// ABA-account (CDA) response codes echoed on purchase when the payer pays
+// from an ABA Mobile account (ABA production telemetry, 2026-09-15). The
+// gateway wraps the payer-account result and repeats the code as a [CDAxx]
+// suffix in the message.
+const CDA_TITLES: Record<string, string> = {
+  CDA00: 'ABA account payment OK',
+  CDA09: 'ABA account payment declined — transient',
+  CDA45: 'ABA account insufficient funds',
+};
+
+const CDA_HINTS: Record<string, string> = {
+  CDA00: 'Payer-account success — treat like 00 (purchase telemetry: tens of thousands of occurrences).',
+  CDA09: 'Payer-account decline, usually transient — the customer-facing message advises retrying in a few minutes; safe to surface as-is.',
+  CDA45: 'The payer ABA account lacks funds — customer tops up or pays from another account.',
 };
 
 /**
  * QR string-code family (generate-qr responses carry string codes; live docs,
- * 2026-08-31 audit §6). Individual meanings beyond the well-known ones are not
- * published — consult the generate-qr spec page.
+ * 2026-08-31 audit §6). Meanings for 6/12/16/17/19/21/32/44/96 come from ABA
+ * production telemetry (2026-09-15 CSV) — the shared numeric code space is
+ * also used by the purchase validators, and several spec-page glosses
+ * ("invalid amount" for 16, "invalid transaction ID" for 21, "invalid
+ * template" for 44) do NOT match what the gateway actually sends.
  */
 const QR_CODES = ['1', '6', '12', '16', '17', '18', '19', '21', '23', '32', '35', '44', '47', '48', '96', '102', '403', '429'] as const;
 
 const QR_TITLES: Record<string, string> = {
   '1': 'QR request rejected (wrong hash or malformed request)',
+  '6': 'Requested Domain is not in whitelist',
+  '12': 'Payment currency not allowed',
+  '16': 'Invalid First Name',
+  '17': 'Invalid Last Name',
+  '19': 'Invalid Email',
+  '21': 'End of API lifetime',
+  '32': 'Service is not enabled',
+  '44': 'Purchase has reached transaction limit',
+  '96': 'Invalid merchant data',
   '403': 'Forbidden',
   '429': 'Rate limit exceeded',
 };
 
 const QR_HINTS: Record<string, string> = {
   '1': 'Check the 19-field HMAC order (req_time..payout) and the API key.',
+  '6': 'The request origin/return domain is not whitelisted for this merchant profile — ask PayWay to whitelist it (purchase telemetry 2026-09). Legacy gateway gloss: tran_id not found on check-transaction.',
+  '12': 'Currency not enabled for the merchant profile — use USD/KHR or ask PayWay to enable it (generate-qr + purchase telemetry).',
+  '16': 'first_name must not contain numbers/special characters and is capped at 100 chars (purchase field validation — the spec-page gloss "invalid amount" does not match production).',
+  '17': 'last_name must not contain numbers/special characters and is capped at 100 chars (purchase field validation).',
+  '19': 'The email field is malformed (purchase field validation).',
+  '21': 'The transaction/QR lifetime elapsed before payment completed — create a fresh transaction (generate-qr telemetry; the spec-page gloss "invalid transaction ID" does not match production).',
+  '32': 'The service/feature this call needs is not enabled on the merchant profile (e.g. pushback) — ask PayWay to provision it; sandbox-verified on payment-link create (§22). Gateway message literally reads "Service is not enable."',
+  '44': 'The merchant/profile transaction limit was reached (purchase telemetry; the spec-page gloss "invalid template" does not match production).',
+  '96': 'Merchant data rejected — verify merchant_id/credential for the target environment (generate-qr + add-whitelist-payout telemetry).',
   '403': 'Merchant credential not authorized for generate-qr in this environment.',
   '429': 'Pace requests — the SDK throttles locally, but concurrent callers share the window.',
 };
@@ -190,6 +312,9 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
   const numeric = code.replace(/^0+(?=\d)/, '');
   if (code in COF_TITLES) {
     return withProvenance({ code, family: 'cof', title: COF_TITLES[code], hint: COF_HINTS[code] ?? '' });
+  }
+  if (code in CDA_TITLES) {
+    return withProvenance({ code, family: 'cda', title: CDA_TITLES[code], hint: CDA_HINTS[code] ?? '' });
   }
   if ((QR_CODES as readonly string[]).includes(numeric)) {
     return withProvenance({
@@ -235,6 +360,9 @@ export function explainAll(): CodeExplanation[] {
   }
   for (const [code, title] of Object.entries(COF_TITLES)) {
     all.push(withProvenance({ code, family: 'cof', title, hint: COF_HINTS[code] ?? '' }));
+  }
+  for (const [code, title] of Object.entries(CDA_TITLES)) {
+    all.push(withProvenance({ code, family: 'cda', title, hint: CDA_HINTS[code] ?? '' }));
   }
   for (const code of QR_CODES) {
     all.push(

@@ -116,6 +116,41 @@ describe('explainPayWayCode', () => {
     expect(invalidProfile ? invalidProfile.hint : '').toContain('PAYWAY_MERCHANT_ID');
   });
 
+  it('explains ABA production telemetry codes (2026-09-15 CSV): cda family, PTL172, PTL148', () => {
+    const cda = explainPayWayCode('CDA45');
+    expect(cda?.family).toBe('cda');
+    expect(cda ? cda.title : '').toMatch(/insufficient funds/i);
+    expect(cda?.observedOn).toContain('purchase');
+
+    const preAuthPsp = explainPayWayCode('PTL172');
+    expect(preAuthPsp?.family).toBe('pre-auth');
+
+    const payee = explainPayWayCode('PTL148');
+    expect(payee?.family).toBe('payout');
+    expect(payee ? payee.title : '').toMatch(/already exists/i);
+  });
+
+  it('attaches ABA telemetry (observedOn/observedMessage) to production-observed codes', () => {
+    // Production telemetry corrected the legacy "Invalid Data" gloss for 4.
+    expect(explainPayWayCode('4')?.title).toMatch(/duplicated/i);
+    expect(explainPayWayCode('4')?.observedOn).toEqual(expect.arrayContaining(['purchase', 'generate-qr', 'payout']));
+
+    const lifetime = explainPayWayCode('21');
+    expect(lifetime?.title).toMatch(/lifetime/i);
+    expect(lifetime?.observedOn).toContain('generate-qr');
+    expect(lifetime?.observedMessage).toBe('End of API lifetime.');
+
+    expect(explainPayWayCode('PTL57')?.observedMessage).toMatch(/incorrect refund amount/);
+    expect(explainPayWayCode('500')?.observedOn).toContain('transaction-list');
+
+    // Unobserved codes carry no telemetry fields.
+    expect(explainPayWayCode('69')?.observedOn).toBeUndefined();
+  });
+
+  it('treats 00 as a family-agnostic success, not refund-specific wording', () => {
+    expect(explainPayWayCode('00')?.title).toBe('Success');
+  });
+
   it('returns undefined for unknown codes', () => {
     expect(explainPayWayCode('ZZZ999')).toBeUndefined();
   });
