@@ -251,12 +251,13 @@ export function buildWebhookFixture(
   }
 
   if (event === 'cof-link.linked') {
-    // Credentials-on-file link callback rehearsal (Q18). The REAL delivery
-    // contract is uncaptured; this SYNTHETIC body carries the documented pwt
-    // plus our best-guess echo fields, HMAC-signed over the sorted keys and
-    // embedded as the classic body `hash` FIELD (docs/09 §5 shape) with NO
-    // signature header — exercising the receiver's body-hash verification
-    // and token persistence before any real customer link exists.
+    // Credentials-on-file link callback rehearsal — now the LIVE shape
+    // (first capture 2026-09-15, §26 AOF-7): request_id at the top level,
+    // everything token-specific nested in payment_credential. The gateway's
+    // header-signature canonicalization is still undocumented (§26 AOF-8),
+    // so the fixture keeps signing via the classic body `hash` FIELD
+    // (sorted-key HMAC, no signature header) — exercising the receiver's
+    // body-hash verification and token persistence.
     if (apiKey === undefined || apiKey.trim() === '') {
       throw new Error(
         `fixture "${event}" is a body-hash-signed CoF link callback and needs the merchant API key (PAYWAY_API_KEY) to sign with`,
@@ -265,11 +266,20 @@ export function buildWebhookFixture(
     const requestId = overrides.tranId ?? autoTranId('cof');
     const ctid = overrides.ctid ?? 'mockcust01';
     const parsed: Record<string, unknown> = {
-      pwt: overrides.pwt ?? `pwt-${randomBytes(12).toString('hex')}`,
-      ctid,
       request_id: requestId,
-      token_flag: overrides.tokenFlag ?? 'CITI_FLEX',
-      status: '00',
+      payment_credential: {
+        ctid,
+        pwt: overrides.pwt ?? `pwt-${randomBytes(12).toString('hex')}`,
+        source_of_fund: '*****0003',
+        type: 'ABA ACCOUNT',
+        status: 1,
+        expired_at: new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString(),
+        token_flag: overrides.tokenFlag ?? 'CITI_FLEX',
+        frequency: '',
+        subscribed_amount: 0.0,
+        amount_limit_per_tran: 50,
+        currency: 'USD',
+      },
     };
     const signature = signCallbackBody(parsed, apiKey);
     const bodyWithHash: Record<string, unknown> = { ...parsed, hash: signature };

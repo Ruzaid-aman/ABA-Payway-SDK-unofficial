@@ -242,7 +242,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
   getAll(): WebhookRecord[] {
     const rows = this.db
       .prepare(
-        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, customer_qr_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay FROM callbacks ORDER BY rowid ASC',
+        'SELECT record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, customer_qr_json, signature_verdict, signature_source, verification_reason, matched_transaction_id, matched_status, replay FROM callbacks ORDER BY rowid ASC',
       )
       .all() as Array<{
       record_id: string;

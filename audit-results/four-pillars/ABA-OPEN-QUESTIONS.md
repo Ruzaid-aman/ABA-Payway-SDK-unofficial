@@ -298,7 +298,7 @@ workarounds in every example (and teaching integrators a dangerous habit).
 2. If self-signed is deliberate, will ABA publish the chain so integrators can pin it via
    `ca:` options instead of disabling verification entirely?
 
-**Q18 — CoF callback contract (token delivery + user-initiated removal)** 🟡 (evidence phase OPEN — profile unblocked 2026-09-15)
+**Q18 — CoF callback contract (token delivery + user-initiated removal)** 🟡 (payload CAPTURED 2026-09-15 §26 AOF-7; signature canonicalization + app-side-removal legs OPEN)
 The `pwt` token arrives only via `callback_url` on link-account/link-card; ABA Mobile users
 can remove a token themselves, and the merchant then receives a CoF callback with status 0
 (per live docs, encoded in SDK types).
@@ -317,6 +317,19 @@ receiver now verifies both signature channels (header + classic body `hash`) and
 Capture itself is still pending (the go/no-go sweep deliberately carried a dead callback
 URL); the full-cycle plan resumes at the link leg. Sub-questions 2/4 (app-side removal
 callbacks) are the later legs of the same cycle.
+
+**Status update 2026-09-15, later (first REAL capture — §26 AOF-7/AOF-8):** sub-question 1
+is CLOSED BY EVIDENCE: the live delivery is `{request_id, payment_credential:{ctid, pwt,
+source_of_fund, type, status(=1 credential-active), expired_at, token_flag, frequency,
+subscribed_amount, amount_limit_per_tran, currency}}` with `x-payway-topic:
+PaymentNotification`. NEW sub-question 5 (the signature half): the `x-payway-hmac-sha512`
+header on this delivery does NOT verify under our documented sorted-key canonicalization,
+and 19 offline candidate orderings failed — please publish the exact CoF-callback HMAC
+plaintext (field order/canonicalization), or confirm the callback signature scheme
+differs from the request scheme. Until then the receiver treats real CoF deliveries as
+unverifiable and recovers the token via `get-token-details` (request_id as proof of
+linkage). Sub-questions 2/4 (app-side removal callbacks) remain open — the last
+un-executed leg of the cycle (needs the human at the phone).
 
 ### Updated answer log
 

@@ -56,7 +56,11 @@ const charge = await payway.credentialsOnFile.payment({
 
 **Charging flags (live docs):** `CITU_FLEX | MITU_FLEX | MITU_FIX | MITR_FLEX | MITR_FIX`
 (customer-initiated vs merchant-initiated, fixed vs variable). Linking flags
-(`CITI_FLEX | CITO_FLEX`) belong to the link endpoints, NOT to charges.
+(`CITI_FLEX | CITO_FLEX`) belong to the link endpoints, NOT to charges — the CLI
+rejects them for charging locally. LIVE (2026-09-15, §26 AOF-9): `CITU_FLEX` is the
+verified-good charge flag on an account token (it is a request classification, NOT a
+copy of the link-time flag — a CITI_FLEX-linked token charges fine under CITU_FLEX);
+MIT flags answer `105` on this profile; omitting the flag is a gateway `04`.
 
 ## §16 hash orders (sandbox-verified 2026-08-31)
 - link-account: `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency`
@@ -69,7 +73,7 @@ const charge = await payway.credentialsOnFile.payment({
 ## Error families
 - `status.code "04"` + `errors{}` map → `PayWayBusinessError.fieldErrors` (per-field binding errors).
 - `1`/`01`/`PTL02` → `PayWaySignatureError` (carries the endpoint hash-order hint).
-- `98` merchant not found · `104` **Merchant not enabled token flag** — since 2026-09-15 (§26) this is FLAG-SCOPED on profiles with account-on-file enabled: CITI_FLEX/CITO_FLEX link-account succeeds (`00` + qr_string), while CITO_FIX/CITR_FLEX still 104 and the card leg stays 104 (account-only enablement). Read it as "this flag/channel is not enabled", not "the profile is dead" · `105` invalid payment credential token (live: charge with an unknown pwt) · `09` data not found (live: getTokenDetails for a request that never linked).
+- `98` merchant not found · `104` **Merchant not enabled token flag** — since 2026-09-15 (§26) this is FLAG-SCOPED on profiles with account-on-file enabled: CITI_FLEX/CITO_FLEX link-account succeeds (`00` + qr_string), while CITO_FIX/CITR_FLEX still 104 and the card leg stays 104 (account-only enablement). Read it as "this flag/channel is not enabled", not "the profile is dead" · `105` invalid payment credential token (live 2026-09-15 §26: unknown/expired pwt, MIT flags on an account token, or a charge against a REMOVED token — no +87-style "removed" discriminator on the account leg) · `09` data not found (live: getTokenDetails for a request that never linked).
 
 ## §24 live facts (2026-09-12) + §26 AOF enablement (2026-09-15)
 - **Hosted outcome is readable server-side**: `linkCard()`'s thrown
@@ -79,18 +83,29 @@ const charge = await payway.credentialsOnFile.payment({
 - **`removeToken` answers `00 Success` even for a NON-EXISTENT token** — it
   cannot probe existence; use `getTokenDetails()` (09 = not found) instead.
 - **No CoF callback fires for a FAILED link attempt** — silence after a hosted
-  error page is expected (§24 LC-4). The exact pwt-callback body schema is
-  still unverified (Q18 — capture pending; the receiver now verifies BOTH the
-  `x-payway-hmac-sha512` header and the classic body `hash` field and records
-  which channel carried it via `signatureSource`).
+  error page is expected (§24 LC-4). The pwt-callback body schema is NOW
+  LIVE-CAPTURED (§26 AOF-7): `{request_id, payment_credential:{ctid, pwt,
+  source_of_fund, type, status: 1, expired_at, token_flag, frequency,
+  subscribed_amount, amount_limit_per_tran, currency}}` — `payment_credential.status`
+  is the CREDENTIAL status (1 = active), not a transaction status. The callback's
+  `x-payway-hmac-sha512` header does NOT verify under our canonicalization and 19
+  offline orderings failed (§26 AOF-8) — the receiver refuses to persist unverifiable
+  pwts; recover via `getTokenDetails(request_id)` (transitive auth). The receiver still
+  verifies BOTH channels (`signatureSource: header|body`) for fixtures/other contracts.
 - **§26**: `link-account` succeeds on AOF-enabled profiles — `00` + `data.qr_string`
   (an `ABAAOF…` payload) + a `type=account_on_file` deeplink (NOT the payment
   `type=payway` form — use the gateway-supplied `data.deeplink`, don't build it
-  yourself); `expire_in` reads as an absolute epoch (expiry instant), not a TTL —
-  the CLI renders the wall-clock deadline. The CLI presents the QR end-to-end: PNG to
-  `payway-output/cof-link-account-<request-id>.png`, `--open-image`/`--no-open-image`
-  (auto on TTY), `--json` gains `qrPngPath`. `cof charge` renders an approval QR the
-  same way IF the live response ever carries one (schema says it won't — defensive).
+  yourself); `expire_in` is an absolute epoch (expiry instant) — and the live
+  QR window is creation + **~90 SECONDS**, not the documented 10 minutes
+  (§26 AOF-12); the CLI renders the wall-clock deadline. The
+  CLI presents the QR end-to-end: PNG to `payway-output/cof-link-account-<request-id>.png`,
+  `--open-image`/`--no-open-image` (auto on TTY), `--json` gains `qrPngPath`. `cof charge`
+  renders an approval QR the same way IF the live response ever carries one (live shape is
+  status-only — defensive). Charge success returns ONLY `{status:{code:"00"}}` — no
+  tran_id; YOUR tran_id + `check-transaction` is the reconciliation path (live: APPROVED
+  + apv, amount fields read 0 on the credential tran, §26 AOF-9/10). Lifecycle ops live-00:
+  renew (90-day window restarts, pwt unchanged), remove (local prune; charge-after-remove
+  = 105), re-link (fresh QR + epoch expire_in).
 
 ## CLI
 ```sh
@@ -98,7 +113,7 @@ payway-sdk cof link-account -r req0001 -c customer123 -f CITI_FLEX --currency US
   --return-deeplink '{"ios_scheme":"myapp://linked","android_scheme":"myapp://linked"}'
 payway-sdk cof link-card-form -c customer123 -f CITI_FLEX --callback-url <url> -o link-card.html   # local, no API call
 payway-sdk cof link-card -r req0002 -c customer123 -f CITI_FLEX --frequency 1M --callback-url <url>
-payway-sdk cof charge -t order-0001 -a 4.50 --token <pwt> --ctid customer123 --token-flag MITU_FLEX
+payway-sdk cof charge -t order-0001 -a 4.50 --token <pwt> --ctid customer123 --token-flag CITU_FLEX   # live-verified charge flag (§26 AOF-9)
 payway-sdk cof token-flag-sweep -c customer123 --json   # diagnostic: 1 POST per linking flag + card leg; uniform 104 = profile blocker (no receiver needed)
 payway-sdk webhook trigger --event cof-link.linked --url <receiver>/aba-payway-webhook --ctid customer123   # dry-run the capture path (synthetic pwt, body-hash channel)
 payway-sdk webhook show --record wh_…   # full record dump: headers + raw body + signature source (Q18 evidence inspection)

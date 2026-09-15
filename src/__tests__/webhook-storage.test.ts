@@ -303,3 +303,32 @@ describe('JsonWebhookStorage customerQr metadata (Customer Module callbacks)', (
     expect(() => storage.updateCustomerQrMetadata('wh_missing', { parseError: 'x' })).toThrow(/not found/);
   });
 });
+
+describe('SqliteWebhookStorage (gated on the optional better-sqlite3 peer)', () => {
+  it('round-trips signatureSource through save/getAll — the live dry-run caught the SELECT dropping it', async () => {
+    const { loadBetterSqlite3, SqliteWebhookStorage } = await import('../webhook/storage-sqlite.js');
+    const Driver = await loadBetterSqlite3();
+    if (!Driver) return; // peer dep absent in this environment — the JSON store covers the contract
+
+    const db = new Driver(':memory:');
+    try {
+      const storage = SqliteWebhookStorage.fromDb(db);
+      storage.save({
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pwt: 'pwt-x', ctid: 'c1' }),
+        signatureVerdict: 'verified',
+        signatureSource: 'body',
+      });
+      storage.save({ headers: {}, body: '{}', signatureVerdict: 'unsigned' });
+
+      const all = storage.getAll();
+      expect(all).toHaveLength(2);
+      expect(all[0].signatureVerdict).toBe('verified');
+      expect(all[0].signatureSource).toBe('body');
+      expect(all[1].signatureVerdict).toBe('unsigned');
+      expect(all[1].signatureSource).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+});

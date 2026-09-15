@@ -315,11 +315,16 @@ describe('webhook trigger (W-2)', () => {
       expect(text).toContain('body `hash`');
       expect(text).toContain('cof token list');
       expect(captured[0].headers['x-payway-hmac-sha512']).toBeUndefined();
-      const parsedBody = JSON.parse(captured[0].body) as { hash?: string; ctid?: string; pwt?: string; request_id?: string };
+      // Live shape (§26 AOF-7): request_id top level, token fields nested.
+      const parsedBody = JSON.parse(captured[0].body) as {
+        hash?: string;
+        request_id?: string;
+        payment_credential?: { ctid?: string; pwt?: string };
+      };
       expect(typeof parsedBody.hash).toBe('string');
-      expect(parsedBody.ctid).toBe('fxtcust9');
       expect(parsedBody.request_id).toBe('fxtreq9');
-      expect(typeof parsedBody.pwt).toBe('string');
+      expect(parsedBody.payment_credential?.ctid).toBe('fxtcust9');
+      expect(typeof parsedBody.payment_credential?.pwt).toBe('string');
     } finally {
       await rx.close();
     }

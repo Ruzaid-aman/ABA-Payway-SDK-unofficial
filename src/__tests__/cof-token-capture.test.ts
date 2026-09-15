@@ -39,7 +39,47 @@ describe('CoF link-callback parsing', () => {
     expect(isCofLinkCallback(null)).toBe(false);
   });
 
-  it('parses documented fields and preserves extras (minus hash) for Q18 capture', () => {
+  it('recognizes the LIVE nested payment_credential shape (§26 AOF-7, captured 2026-09-15)', () => {
+    // Verbatim field set from the first real capture (wh_mu2hf6i6_7c84ba65).
+    const live = {
+      request_id: 'aoflink001',
+      payment_credential: {
+        ctid: 'aofcycle01',
+        pwt: 'pwt-live-capture',
+        source_of_fund: '*****0003',
+        type: 'ABA ACCOUNT',
+        status: 1,
+        expired_at: '2026-12-14T16:41:13.8919367+07:00',
+        token_flag: 'CITI_FLEX',
+        frequency: '',
+        subscribed_amount: 0.0,
+        amount_limit_per_tran: 50,
+        currency: 'USD',
+      },
+    };
+    expect(isCofLinkCallback(live)).toBe(true);
+    expect(isCofLinkCallback({ request_id: 'r', payment_credential: { pwt: '' } })).toBe(false);
+    expect(isCofLinkCallback({ request_id: 'r', payment_credential: 'not-an-object' })).toBe(false);
+
+    const parsed = parseCofLinkCallback(live);
+    expect(parsed.pwt).toBe('pwt-live-capture');
+    expect(parsed.ctid).toBe('aofcycle01');
+    expect(parsed.requestId).toBe('aoflink001');
+    expect(parsed.status).toBe('1');
+    expect(parsed.tokenFlag).toBe('CITI_FLEX');
+    // Numeric + string credential metadata survives stringified in extraFields.
+    expect(parsed.extraFields).toEqual({
+      source_of_fund: '*****0003',
+      type: 'ABA ACCOUNT',
+      expired_at: '2026-12-14T16:41:13.8919367+07:00',
+      frequency: '',
+      subscribed_amount: '0',
+      amount_limit_per_tran: '50',
+      currency: 'USD',
+    });
+  });
+
+  it('parses documented fields and preserves extras (minus hash) for legacy flat deliveries', () => {
     const parsed = parseCofLinkCallback({
       pwt: 'tok123',
       ctid: 'customer123',
@@ -57,14 +97,14 @@ describe('CoF link-callback parsing', () => {
     expect(parsed.extraFields).toEqual({ some_unknown_field: 'keep-me' });
   });
 
-  it('accepts alternate spellings (cust_id/req_id) — schema is unverified live', () => {
+  it('accepts alternate spellings (cust_id/req_id) on the flat shape', () => {
     const parsed = parseCofLinkCallback({ pwt: 'tok', cust_id: 'c9', req_id: 'r9' });
     expect(parsed.ctid).toBe('c9');
     expect(parsed.requestId).toBe('r9');
   });
 
   it('throws on a delivery without pwt', () => {
-    expect(() => parseCofLinkCallback({ tran_id: 't' })).toThrow(/no string `pwt`/);
+    expect(() => parseCofLinkCallback({ tran_id: 't' })).toThrow(/no `pwt` field/);
   });
 
   it('classification: pwt presence wins over online-checkout shape', () => {
@@ -357,8 +397,10 @@ describe('Server CoF token capture', () => {
     const status = await httpRequest(port, '/aba-payway-webhook', fixture.body, {});
     expect(status).toBe(200);
     const stored = latestTokenForCtid('fxtcust01', join(tempDir, 'tokens'));
-    expect(stored?.pwt).toBe(fixture.parsed.pwt);
+    const fixturePwt = (fixture.parsed.payment_credential as Record<string, unknown>).pwt as string;
+    expect(stored?.pwt).toBe(fixturePwt);
     expect(stored?.requestId).toBe('fxtreq01');
+    expect(stored?.tokenFlag).toBe('CITI_FLEX');
     const records = storage.getAll();
     const last = records[records.length - 1];
     expect(last.signatureVerdict).toBe('verified');

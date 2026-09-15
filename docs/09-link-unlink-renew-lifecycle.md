@@ -119,13 +119,27 @@ async function linkCustomerAccount() {
 
     console.log('Account link requested:', result);
 
-    // ⚠️ The response does NOT contain the pwt: the QR/deeplink for the
-    // customer to approve arrives in the response, and the token itself is
-    // delivered later to your callbackUrl webhook (like link-card). Verify
-    // the signed callback, then store the pwt against the ctid:
+    // ⚠️ The response does NOT contain the pwt: the response carries the
+    // approval QR/deeplink (`data.qr_string`, `data.deeplink` — form
+    // `abamobilebank://ababank.com?type=account_on_file&qrcode=…` — and
+    // `data.expire_in`, an epoch-seconds EXPIRY INSTANT — the live scan
+    // window is only ~90 s (§26 AOF-12; the "10 minutes" in the docs is
+    // wrong for link-account QRs). The
+    // token itself is delivered later to your callbackUrl webhook. LIVE shape
+    // (captured 2026-09-15, SANDBOX-FINDINGS §26 AOF-7): only `request_id` at
+    // the top level, everything else nested in `payment_credential`
+    // (`{ctid, pwt, source_of_fund, type, status: 1, expired_at, token_flag,
+    // frequency, subscribed_amount, amount_limit_per_tran, currency}`) — that
+    // `status` is the CREDENTIAL status (1 = active), NOT a transaction
+    // status. ⚠️ The callback's `X-PAYWAY-HMAC-SHA512` header does NOT verify
+    // under the documented sorted-key canonicalization (§26 AOF-8; the
+    // callback canonicalization is unpublished — ABA question Q18.5): confirm
+    // via `getTokenDetails({ requestId })` (transitive auth) before trusting
+    // the delivery, then store the pwt against the ctid:
+    // const details = await payway.credentialsOnFile.getTokenDetails({ requestId: body.request_id });
     // await db.query(
     //   'INSERT INTO saved_payments (ctid, pwt, type) VALUES ($1, $2, $3)',
-    //   ['customerabc123', pwt, 'account']
+    //   ['customerabc123', details.pwt, 'account']
     // );
 
     return result;
@@ -269,8 +283,13 @@ async function chargeSavedCard() {
       // ⚠️ The field name is 'pwt', NOT 'paymentToken' (verified in sandbox)
       paymentToken: 'REPLACE_ME', // This gets mapped to 'pwt' by the SDK
 
-      // Token usage flag
-      tokenFlag: 'CITR_FLEX',
+      // Token usage flag — CHARGE-TIME classification, not a copy of the
+      // link-time flag. Live-verified (2026-09-15, §26 AOF-9): `CITU_FLEX`
+      // (customer-initiated) succeeds against a CITI_FLEX-linked account
+      // token; MIT flags (`MITU_FLEX`/`MITU_FIX`/`MITR_FLEX`) answer 105 on
+      // this profile; omitting the flag is a gateway 04 (required field).
+      // The CLI rejects link-only flags (CITI_FLEX/CITO_FLEX) locally.
+      tokenFlag: 'CITU_FLEX',
 
       // Currency
       currency: 'USD',
@@ -289,6 +308,12 @@ async function chargeSavedCard() {
 ```
 
 > 🐛 **Field name quirk:** In sandbox testing, PayWay strictly requires the token field to be named `pwt` in the API request (not `payment_token`). The SDK automatically maps `paymentToken` to `pwt` in the payload.
+
+> 📌 **Charge response + reconciliation (live 2026-09-15, §26 AOF-9/AOF-10):** a
+> successful credential charge answers ONLY `{status:{code:"00",message:"Success."}}` —
+> no `tran_id`, no `data`. Your `transactionId` IS the tran_id; reconcile via
+> `check-transaction` (live: `APPROVED` + an `apv` approval code; amount fields read 0
+> on the credential-charge tran) or `transaction-list`.
 
 ### 4. Check Token Status / Get Details
 

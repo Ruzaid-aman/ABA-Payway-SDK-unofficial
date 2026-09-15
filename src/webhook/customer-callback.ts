@@ -240,10 +240,18 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 export function classifyCallback(payload: unknown): CallbackKind {
   if (!isPlainObject(payload)) return 'unknown';
 
-  // CoF link result: the pwt discriminator. No other callback contract
-  // carries a token — check BEFORE online-checkout, which also carries
-  // `status` (field set unverified live, Q18).
+  // CoF link result: the pwt discriminator — top level (historic flat
+  // deliveries) or nested in payment_credential (live shape, §26 AOF-7).
+  // No other callback contract carries a token — check BEFORE
+  // online-checkout, which also carries `status`.
   if (typeof payload.pwt === 'string' && payload.pwt.length > 0) {
+    return 'cof-link';
+  }
+  if (
+    isPlainObject(payload.payment_credential) &&
+    typeof payload.payment_credential.pwt === 'string' &&
+    payload.payment_credential.pwt.length > 0
+  ) {
     return 'cof-link';
   }
 

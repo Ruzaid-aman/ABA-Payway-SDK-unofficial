@@ -50,9 +50,21 @@ const result = await payway.credentialsOnFile.linkAccount({
   returnDeeplink: { ios_scheme: 'myapp://linked', android_scheme: 'myapp://linked' }, // optional app deeplink
 });
 // result carries the QR/deeplink for the customer; the pwt arrives via callback.
+// LIVE (2026-09-15): data.deeplink is abamobilebank://ababank.com?type=account_on_file&qrcode=…
+// and data.expire_in is an epoch-seconds EXPIRY INSTANT — the live scan
+// window is only ~90 s (docs claim 10 min; §26 AOF-12). Scan immediately.
 ```
 
 The callback URL must be public HTTPS. Store returned credential identifiers securely.
+
+**Callback contract (live-captured 2026-09-15, SANDBOX-FINDINGS §26 AOF-7):**
+`{request_id, payment_credential:{ctid, pwt, source_of_fund, type: "ABA ACCOUNT",
+status: 1, expired_at, token_flag, frequency, subscribed_amount,
+amount_limit_per_tran, currency}}` — only `request_id` is top-level; `status` is
+the CREDENTIAL status (1 = active), not a transaction status. ⚠️ The callback's
+`X-PAYWAY-HMAC-SHA512` header does NOT verify under the documented sorted-key
+canonicalization (§26 AOF-8; unpublished callback canonicalization = ABA Q18.5) —
+confirm via `getTokenDetails({ requestId })` before trusting the delivery.
 
 Hash order (§16-verified, merchant_id first):
 `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency`.

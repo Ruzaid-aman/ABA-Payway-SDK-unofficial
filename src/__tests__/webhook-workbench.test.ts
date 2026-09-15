@@ -124,9 +124,12 @@ describe('buildWebhookFixture', () => {
     expect(fixture.signatureChannel).toBe('body');
     expect(fixture.verification).toBe('hmac');
     expect(fixture.tranId).toBe('cofreq001');
-    expect(fixture.parsed.ctid).toBe('cofcust01');
-    expect(fixture.parsed.token_flag).toBe('CITO_FLEX');
-    expect(typeof fixture.parsed.pwt).toBe('string');
+    // Live shape (§26 AOF-7): token fields nested in payment_credential.
+    const credential = fixture.parsed.payment_credential as Record<string, unknown>;
+    expect(credential.ctid).toBe('cofcust01');
+    expect(credential.token_flag).toBe('CITO_FLEX');
+    expect(typeof credential.pwt).toBe('string');
+    expect(fixture.parsed.request_id).toBe('cofreq001');
     expect(typeof fixture.parsed.hash).toBe('string');
 
     // Round-trip: the receiver strips the body hash and re-verifies exactly
