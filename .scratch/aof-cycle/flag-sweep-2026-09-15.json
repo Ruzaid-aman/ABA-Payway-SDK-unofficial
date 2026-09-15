@@ -1,0 +1,70 @@
+[
+  {
+    "flag": "CITI_FLEX",
+    "requestId": "sweepcitiflex",
+    "outcome": "SUCCESS",
+    "result": {
+      "status": {
+        "code": "00",
+        "message": "Success.",
+        "trace_id": "932ca0715f7412d0f9ae1ec341207f7a"
+      },
+      "data": {
+        "deeplink": "abamobilebank://ababank.com?type=account_on_file&qrcode=ABAAOFmYj%2bWlOACIi17C44f5HkyABjPmvgOSquAhLixyEtc32fcdOAm7TexhWI117FFUvd",
+        "qr_string": "ABAAOFmYj+WlOACIi17C44f5HkyABjPmvgOSquAhLixyEtc32fcdOAm7TexhWI117FFUvd",
+        "expire_in": 1789450458
+      }
+    }
+  },
+  {
+    "flag": "CITO_FLEX",
+    "requestId": "sweepcitoflex",
+    "outcome": "SUCCESS",
+    "result": {
+      "status": {
+        "code": "00",
+        "message": "Success.",
+        "trace_id": "fa9229e5b8a021d2a210374a18e99d88"
+      },
+      "data": {
+        "deeplink": "abamobilebank://ababank.com?type=account_on_file&qrcode=ABAAOFmYj%2bWlOACIi17C44f5HkyABjPmvgOSquAhLixyEtc312pbUjdkpX8VMr4cIvxH57",
+        "qr_string": "ABAAOFmYj+WlOACIi17C44f5HkyABjPmvgOSquAhLixyEtc312pbUjdkpX8VMr4cIvxH57",
+        "expire_in": 1789450458
+      }
+    }
+  },
+  {
+    "flag": "CITO_FIX",
+    "requestId": "sweepcitofix",
+    "outcome": "REJECTED",
+    "paywayCode": "104",
+    "type": "business_error",
+    "correlationId": "c7fe5bbe66008745",
+    "message": "Merchant not enabled token flag. Hint: Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FL"
+  },
+  {
+    "flag": "CITR_FLEX",
+    "requestId": "sweepcitrflex",
+    "outcome": "REJECTED",
+    "paywayCode": "104",
+    "type": "business_error",
+    "correlationId": "1e6c579edcac8feb",
+    "message": "Merchant not enabled token flag. Hint: Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FL"
+  },
+  {
+    "flag": "CARD-CITI_FLEX",
+    "requestId": "sweepcard01",
+    "outcome": "HOSTED_PAGE",
+    "httpStatus": 302,
+    "hostedPayload": {
+      "message": "Merchant not enabled token flag.",
+      "status": {
+        "code": "104",
+        "message": "Merchant not enabled token flag.",
+        "pw_tran_id": "sweepcard01",
+        "trace_id": "1e4ec2fde8bcb9130e9251802de24ca5",
+        "version": "v3"
+      }
+    }
+  }
+]

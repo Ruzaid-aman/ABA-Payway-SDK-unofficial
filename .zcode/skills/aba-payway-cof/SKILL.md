@@ -69,9 +69,9 @@ const charge = await payway.credentialsOnFile.payment({
 ## Error families
 - `status.code "04"` + `errors{}` map → `PayWayBusinessError.fieldErrors` (per-field binding errors).
 - `1`/`01`/`PTL02` → `PayWaySignatureError` (carries the endpoint hash-order hint).
-- `98` merchant not found · `104` **Merchant not enabled token flag** (live 2026-09-12 §24 LC-1: the link-card hosted page answers this when the profile lacks card tokenization — ask ABA; profile-level, not per-token) · `105` invalid payment credential token (live: charge with an unknown pwt) · `09` data not found (live: getTokenDetails for a request that never linked).
+- `98` merchant not found · `104` **Merchant not enabled token flag** — since 2026-09-15 (§26) this is FLAG-SCOPED on profiles with account-on-file enabled: CITI_FLEX/CITO_FLEX link-account succeeds (`00` + qr_string), while CITO_FIX/CITR_FLEX still 104 and the card leg stays 104 (account-only enablement). Read it as "this flag/channel is not enabled", not "the profile is dead" · `105` invalid payment credential token (live: charge with an unknown pwt) · `09` data not found (live: getTokenDetails for a request that never linked).
 
-## §24 live facts (2026-09-12)
+## §24 live facts (2026-09-12) + §26 AOF enablement (2026-09-15)
 - **Hosted outcome is readable server-side**: `linkCard()`'s thrown
   `PayWayBusinessError` carries `responseUrl` + `hostedPage`
   (`{url, payload, code, message}` decoded from the
@@ -80,7 +80,16 @@ const charge = await payway.credentialsOnFile.payment({
   cannot probe existence; use `getTokenDetails()` (09 = not found) instead.
 - **No CoF callback fires for a FAILED link attempt** — silence after a hosted
   error page is expected (§24 LC-4). The exact pwt-callback body schema is
-  still unverified (Q18 — capture blocked by the 104 profile blocker).
+  still unverified (Q18 — capture pending; the receiver now verifies BOTH the
+  `x-payway-hmac-sha512` header and the classic body `hash` field and records
+  which channel carried it via `signatureSource`).
+- **§26**: `link-account` succeeds on AOF-enabled profiles — `00` + `data.qr_string`
+  (an `ABAAOF…` payload) + a `type=account_on_file` deeplink (NOT the payment
+  `type=payway` form — use the gateway-supplied `data.deeplink`, don't build it
+  yourself); `expire_in` reads as an absolute epoch (expiry instant), not a TTL.
+  The CLI presents the QR end-to-end: PNG to
+  `payway-output/cof-link-account-<request-id>.png`, `--open-image`/`--no-open-image`
+  (auto on TTY), `--json` gains `qrPngPath`.
 
 ## CLI
 ```sh

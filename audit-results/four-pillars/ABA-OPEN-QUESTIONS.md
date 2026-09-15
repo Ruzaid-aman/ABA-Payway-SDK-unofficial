@@ -298,7 +298,7 @@ workarounds in every example (and teaching integrators a dangerous habit).
 2. If self-signed is deliberate, will ABA publish the chain so integrators can pin it via
    `ca:` options instead of disabling verification entirely?
 
-**Q18 — CoF callback contract (token delivery + user-initiated removal)** 🟡
+**Q18 — CoF callback contract (token delivery + user-initiated removal)** 🟡 (evidence phase OPEN — profile unblocked 2026-09-15)
 The `pwt` token arrives only via `callback_url` on link-account/link-card; ABA Mobile users
 can remove a token themselves, and the merchant then receives a CoF callback with status 0
 (per live docs, encoded in SDK types).
@@ -308,6 +308,15 @@ can remove a token themselves, and the merchant then receives a CoF callback wit
 3. Are CoF callback redeliveries also signed with `X-PAYWAY-HMAC-SHA512` (Q6.2 extension)?
 4. Does a user-initiated removal in ABA Mobile emit a callback even if the merchant never
    configured a `callback_url` for the original link request?
+
+**Status 2026-09-15 (SANDBOX-FINDINGS §26):** the 104 capture blocker is GONE for the
+account leg — `link-account` answers `00 Success` with a real `qr_string`/`deeplink`
+(CITI_FLEX and CITO_FLEX; card leg still 104 — account-on-file-only enablement). The
+receiver now verifies both signature channels (header + classic body `hash`) and records
+`signatureSource` so the first live capture will pin sub-questions 1/3 mechanically.
+Capture itself is still pending (the go/no-go sweep deliberately carried a dead callback
+URL); the full-cycle plan resumes at the link leg. Sub-questions 2/4 (app-side removal
+callbacks) are the later legs of the same cycle.
 
 ### Updated answer log
 

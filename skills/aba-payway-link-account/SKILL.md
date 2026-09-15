@@ -11,6 +11,31 @@ metadata:
 select an account; the resulting token (`pwt`) is delivered to your
 `callback_url` (the QR/deeplink expires in 10 minutes).
 
+## Live-verified success shape (2026-09-15, §26 — AOF-enabled profile)
+```json
+{
+  "status": { "code": "00", "message": "Success.", "trace_id": "…" },
+  "data": {
+    "qr_string": "ABAAOFmYj+WlOACIi17C44f5Hky…",   // ABAAOF-prefixed linking payload
+    "deeplink": "abamobilebank://ababank.com?type=account_on_file&qrcode=…",
+    "expire_in": 1789450458
+  }
+}
+```
+- The linking deeplink uses **`type=account_on_file`** — a distinct variant
+  from payment QRs (`type=payway`). Use the gateway-supplied `data.deeplink`;
+  do NOT build it with the payment deeplink helper.
+- `expire_in` reads as an **absolute epoch (expiry instant, seconds)**, not a
+  TTL — the ~10-minute window is the gap between response time and `expire_in`.
+- Undocumented flags (`CITO_FIX`, `CITR_FLEX`) answer `104 "Merchant not
+  enabled token flag"` even on AOF-enabled profiles — stick to
+  `CITI_FLEX | CITO_FLEX`.
+
+CLI presents the QR end-to-end: PNG saved to
+`payway-output/cof-link-account-<request-id>.png` (auto-opens on TTY;
+`--open-image` forces, `--no-open-image` suppresses), `--json` envelope
+gains `qrPngPath`.
+
 ## Quick Start
 ```ts
 // requestId/ctid must match the gateway rule [a-zA-Z0-9]{5,24} — no hyphens.
