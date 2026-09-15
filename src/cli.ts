@@ -210,12 +210,12 @@ const EXIT_NETWORK = 3;
  * correlation join keys — grep either value in payway-data/journal.jsonl to
  * reconstruct the exchange from the transaction journal.
  */
-function printApiResultJson(result: unknown, payway?: PayWay): void {
+function printApiResultJson(result: unknown, payway?: PayWay, extra?: Record<string, unknown>): void {
   if (result === null || typeof result !== 'object') {
     console.log(JSON.stringify(result ?? null, null, 2));
     return;
   }
-  const envelope = { ...(result as Record<string, unknown>) };
+  const envelope = { ...(result as Record<string, unknown>), ...extra };
   if (payway?.lastCorrelationId !== undefined) envelope.correlationId = payway.lastCorrelationId;
   if (payway?.lastTraceId !== undefined) envelope.traceId = payway.lastTraceId;
   console.log(JSON.stringify(envelope, null, 2));
@@ -3963,9 +3963,11 @@ cofCmd
   .option('--currency <code>', 'Profile-enabled currency (required by the gateway): USD or KHR', 'USD')
   .option('--callback-url <url>', 'Webhook callback URL for the link result')
   .option('--return-deeplink <json>', 'App deeplink (hash position) — JSON {ios_scheme, android_scheme} or string')
+  .option('--open-image', 'Open the linking QR PNG with the OS default viewer (default: auto when interactive)')
+  .option('--no-open-image', 'Never open the linking QR PNG automatically')
   .option('-y, --force', 'Skip the interactive confirmation (for scripts/agents)', false)
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: Record<string, string | undefined>) => {
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -3996,12 +3998,56 @@ cofCmd
         ctid: opts.ctid as string,
         tokenFlag: opts.tokenFlag as string,
         currency: (opts.currency ?? 'USD') as 'KHR' | 'USD',
-        callbackUrl: opts.callbackUrl,
-        returnDeeplink: parseJsonOrString(opts.returnDeeplink) as
+        callbackUrl: opts.callbackUrl as string | undefined,
+        returnDeeplink: parseJsonOrString(opts.returnDeeplink as string | undefined) as
           | { ios_scheme: string; android_scheme: string }
           | string
           | undefined,
       });
+      // A successful link answer carries data.qr_string + deeplink (the
+      // customer scans the QR / opens the deeplink in ABA Mobile); the QR is
+      // scan-valid ~10 minutes. Present it like request-qr/generate-qr so a
+      // human can actually complete the link from the CLI.
+      const data = ((result as Record<string, unknown>).data ?? {}) as {
+        qr_string?: string;
+        deeplink?: string;
+        expire_in?: unknown;
+      };
+      let qrPngPath: string | undefined;
+      if (typeof data.qr_string === 'string' && data.qr_string.length > 0) {
+        try {
+          const outPath = path.join(process.cwd(), 'payway-output', `cof-link-account-${opts.requestId}.png`);
+          const saved = await saveQrPng({ outputPath: outPath, qrString: data.qr_string });
+          if (saved) qrPngPath = saved;
+        } catch (saveErr) {
+          console.log(`  ${c.yellow('⚠')} Could not save the linking QR PNG: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+        }
+        if (opts.json) {
+          printApiResultJson(result, payway, qrPngPath ? { qrPngPath } : undefined);
+          return;
+        }
+        console.log(`  ${c.green('✓')} Account link requested`);
+        console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
+        console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
+        console.log();
+        console.log(`  ${c.bold('Scan this QR in ABA Mobile to approve the link')} ${c.dim('(valid ~10 minutes per live docs)')}`);
+        if (qrPngPath) console.log(`  ${c.bold('QR PNG:')}    ${c.cyan(qrPngPath)}`);
+        if (typeof data.deeplink === 'string' && data.deeplink.length > 0) {
+          console.log(`  ${c.bold('Deeplink:')}  ${c.dim(data.deeplink)}`);
+        }
+        const shouldOpen = opts.openImage === true || (opts.openImage !== false && Boolean(process.stdout.isTTY));
+        if (qrPngPath && shouldOpen) {
+          const opened = await openImageInDefaultViewer(qrPngPath);
+          if (opened.opened) {
+            console.log(`  ${c.green('✓')} Opened in default viewer ${c.dim(`(${opened.viewer})`)}`);
+          } else {
+            console.log(`  ${c.yellow('⚠')} Could not open automatically ${c.dim(`(${opened.error ?? opened.reason})`)}`);
+            console.log(`  ${c.dim(`Open it manually: ${qrPngPath}`)}`);
+          }
+        }
+        console.log(`  ${c.dim('The pwt token arrives via the callback_url; then charge with "cof charge" using --ctid or --token <pwt>.')}\n`);
+        return;
+      }
       if (opts.json) {
         printApiResultJson(result, payway);
         return;

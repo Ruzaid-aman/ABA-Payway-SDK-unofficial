@@ -220,37 +220,69 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
   /**
    * Compute the signature verdict for a signed delivery, mirroring the online
    * route's Phase-3 contract (verdict becomes part of the durable record).
-   * Used by BOTH the online route and the khqr route when the delivery carries
-   * `x-payway-hmac-sha512` (Customer Module callbacks are signed; offline
-   * KHQR notifications carry no header and stay `'unsigned'`).
+   * Used by BOTH the online route and the khqr route.
+   *
+   * Two signature channels are recognized (Q18): the
+   * `x-payway-hmac-sha512` HEADER (online checkout, Customer Module) and the
+   * classic body `hash` FIELD (docs/09 §5 CoF webhook guidance). The header
+   * wins when present; a body `hash` is only consulted when no header
+   * signature traveled. `unsigned` means neither channel carried a signature.
    */
   function computeSignatureVerdict(
     body: string,
     receivedSignature: unknown,
-  ): { verdict: WebhookSignatureVerdict; reason?: WebhookRecord['verificationReason'] } {
-    if (!apiKey || typeof receivedSignature !== 'string') {
+  ): { verdict: WebhookSignatureVerdict; reason?: WebhookRecord['verificationReason']; source?: 'header' | 'body' } {
+    // No key configured → nothing to verify against: stay 'unsigned'
+    // (parity with the pre-Q18 behavior for header deliveries).
+    if (typeof apiKey !== 'string' || apiKey.length === 0) {
       return { verdict: 'unsigned' };
     }
-    try {
+    const key = apiKey;
+
+    const verify = (
+      payload: Record<string, unknown> | undefined,
+      signature: unknown,
+    ): { verdict: WebhookSignatureVerdict; reason?: WebhookRecord['verificationReason'] } => {
+      if (!payload) {
+        return { verdict: 'invalid', reason: 'signature_mismatch' };
+      }
+      try {
+        const detailed = verifyCallbackDetailed(
+          payload,
+          signature as string,
+          key,
+          { stripHash: true },
+        );
+        return detailed.valid
+          ? { verdict: 'verified' }
+          : { verdict: 'invalid', reason: detailed.reason };
+      } catch {
+        return { verdict: 'invalid', reason: 'signature_mismatch' };
+      }
+    };
+
+    if (typeof receivedSignature === 'string' && receivedSignature.length > 0) {
       // HTML-tolerant extraction (same tolerance as the khqr route's parser):
       // a valid signature wrapped in an intermediate HTML page must not read
       // as invalid. Only a body with NO recoverable JSON can never verify.
       const payload = extractJsonPayloadSilent(body);
-      if (!payload) {
-        return { verdict: 'invalid', reason: 'signature_mismatch' };
-      }
-      const detailed = verifyCallbackDetailed(
-        payload as Record<string, unknown>,
-        receivedSignature,
-        apiKey,
-        { stripHash: true },
-      );
-      return detailed.valid
-        ? { verdict: 'verified' }
-        : { verdict: 'invalid', reason: detailed.reason };
-    } catch {
-      return { verdict: 'invalid', reason: 'signature_mismatch' };
+      const result = verify(payload, receivedSignature);
+      return result.verdict === 'verified' ? { ...result, source: 'header' } : result;
     }
+
+    // No header signature: fall back to the classic body `hash` field (the
+    // shape docs/09 §5 prescribes for CoF callbacks). `stripHash: true`
+    // removes it from the concatenated payload before HMAC comparison.
+    {
+      const payload = extractJsonPayloadSilent(body);
+      const bodyHash = payload && typeof payload.hash === 'string' ? payload.hash : undefined;
+      if (bodyHash !== undefined && bodyHash.length > 0) {
+        const result = verify(payload, bodyHash);
+        return result.verdict === 'verified' ? { ...result, source: 'body' } : result;
+      }
+    }
+
+    return { verdict: 'unsigned' };
   }
 
   /**
@@ -264,6 +296,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
     parsedBody: Record<string, unknown> | undefined,
     signatureVerdict: WebhookSignatureVerdict,
     recordId: string,
+    signatureSource?: 'header' | 'body',
   ): void {
     if (!parsedBody || !isCofLinkCallback(parsedBody)) return;
     const parsed = parseCofLinkCallback(parsedBody);
@@ -287,7 +320,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         dir,
       );
       log(
-        `  \x1b[32m✓ CoF token captured [${recordId}]: ctid=${saved.ctid} token=${maskPwt(saved.pwt)} → ${dir}\\linked-tokens.json\x1b[0m`,
+        `  \x1b[32m✓ CoF token captured [${recordId}]: ctid=${saved.ctid} token=${maskPwt(saved.pwt)} (${signatureSource ?? '?'}-hash) → ${dir}\\linked-tokens.json\x1b[0m`,
       );
     } catch (error) {
       log(`  Unable to persist CoF token: ${error instanceof Error ? error.message : String(error)}`);
@@ -377,12 +410,12 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
 
           // Signature verdict whenever the delivery is signed and an apiKey is
           // configured; unsigned deliveries (offline KHQR) stay 'unsigned'.
-          const { verdict: signatureVerdict, reason: verificationReason } = computeSignatureVerdict(
+          const { verdict: signatureVerdict, reason: verificationReason, source: signatureSource } = computeSignatureVerdict(
             body,
             req.headers['x-payway-hmac-sha512'],
           );
           if (signatureVerdict !== 'unsigned') {
-            log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}`);
+            log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}${signatureSource ? ` (${signatureSource}-hash)` : ''}`);
           }
 
           const matchedTransactionId = extractTransactionIdFrom(khqrBody);
@@ -405,13 +438,14 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
             body,
             sourceIp,
             signatureVerdict,
+            ...(signatureSource ? { signatureSource } : {}),
             verificationReason,
             matchedTransactionId,
             matchedStatus,
             replay,
           });
 
-          captureCofToken(khqrBody, signatureVerdict, record.id);
+          captureCofToken(khqrBody, signatureVerdict, record.id, signatureSource);
 
           // Journal the capture before any rejection path: a 401-rejected
           // delivery must still appear in journal reconcile's callback side.
@@ -498,12 +532,12 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
 
         // Verify BEFORE saving so the verdict is part of the durable record
         // (Phase 3 — previously computed, logged, then dropped: audit gap G7).
-        const { verdict: signatureVerdict, reason: verificationReason } = computeSignatureVerdict(
+        const { verdict: signatureVerdict, reason: verificationReason, source: signatureSource } = computeSignatureVerdict(
           body,
           req.headers['x-payway-hmac-sha512'],
         );
         if (signatureVerdict !== 'unsigned') {
-          log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}`);
+          log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}${signatureSource ? ` (${signatureSource}-hash)` : ''}`);
         }
 
         // Correlate the delivery with its transaction (gap G8) and flag
@@ -523,13 +557,14 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           body,
           sourceIp,
           signatureVerdict,
+          ...(signatureSource ? { signatureSource } : {}),
           verificationReason,
           matchedTransactionId,
           matchedStatus,
           replay,
         });
 
-        captureCofToken(parsedBody, signatureVerdict, record.id);
+        captureCofToken(parsedBody, signatureVerdict, record.id, signatureSource);
 
         // A Customer Module delivery on the online route: attach the
         // customer-qr metadata too (same parser as the khqr route).

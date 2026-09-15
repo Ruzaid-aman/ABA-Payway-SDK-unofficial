@@ -65,6 +65,9 @@ export function ensureCallbackMetadataColumns(db: Pick<BetterSqlite3Database, 'e
     ['matched_transaction_id', 'TEXT'],
     ['matched_status', 'TEXT'],
     ['replay', 'INTEGER'],
+    // Q18: where a VERIFIED signature traveled (header vs body hash) — the
+    // first live CoF link capture pins the real contract.
+    ['signature_source', 'TEXT'],
   ];
   for (const [name, type] of columns) {
     try {
@@ -127,6 +130,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
         pushback_json TEXT,
         customer_qr_json TEXT,
         signature_verdict TEXT,
+        signature_source TEXT,
         verification_reason TEXT,
         matched_transaction_id TEXT,
         matched_status TEXT,
@@ -192,7 +196,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
 
     this.db
       .prepare(
-        'INSERT INTO callbacks (record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, customer_qr_json, signature_verdict, verification_reason, matched_transaction_id, matched_status, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO callbacks (record_id, received_at, headers_json, body, source_ip, khqr_json, pushback_json, customer_qr_json, signature_verdict, signature_source, verification_reason, matched_transaction_id, matched_status, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .run(
         entry.id,
@@ -204,6 +208,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
         entry.paymentLinkPushback ? JSON.stringify(entry.paymentLinkPushback) : null,
         entry.customerQr ? JSON.stringify(entry.customerQr) : null,
         entry.signatureVerdict ?? null,
+        entry.signatureSource ?? null,
         entry.verificationReason ?? null,
         entry.matchedTransactionId ?? null,
         entry.matchedStatus ?? null,
@@ -265,6 +270,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       paymentLinkPushback: row.pushback_json ? JSON.parse(row.pushback_json) : undefined,
       customerQr: row.customer_qr_json ? JSON.parse(row.customer_qr_json) : undefined,
       signatureVerdict: (row.signature_verdict ?? undefined) as WebhookRecord['signatureVerdict'],
+      signatureSource: (row.signature_source ?? undefined) as WebhookRecord['signatureSource'],
       verificationReason: (row.verification_reason ?? undefined) as WebhookRecord['verificationReason'],
       matchedTransactionId: row.matched_transaction_id ?? undefined,
       matchedStatus: row.matched_status ?? undefined,

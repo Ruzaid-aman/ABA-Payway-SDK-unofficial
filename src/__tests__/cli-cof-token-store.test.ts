@@ -265,3 +265,89 @@ describe('cof charge token resolution', () => {
     }
   });
 });
+
+describe('cof link-account QR presentation', () => {
+  it('saves the linking QR PNG and prints deeplink + expiry guidance (human mode)', async () => {
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          status: { code: '00', message: 'Success' },
+          data: { qr_string: '00020101-link-qr-payload', deeplink: 'abamobilebank://ababank.com?type=payway&qrcode=00020101-link-qr-payload' },
+        }),
+      );
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'link-account', '-r', 'qrtest001', '-c', 'qrcycle01', '-f', 'CITI_FLEX', '--currency', 'USD', '-y',
+      ]);
+      expect(text).toContain('Account link requested');
+      expect(text).toContain('QR PNG:');
+      expect(text).toContain('cof-link-account-qrtest001.png');
+      expect(text).toContain('Deeplink:');
+      expect(text).toContain('abamobilebank://');
+      expect(text).toContain('10 min');
+      expect([0, undefined]).toContain(exitCode);
+      // The PNG actually landed on disk.
+      const { existsSync } = await import('node:fs');
+      expect(existsSync(path.join(tempDir, 'payway-output', 'cof-link-account-qrtest001.png'))).toBe(true);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('--json envelope gains qrPngPath (and still one JSON document)', async () => {
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          status: { code: '00', message: 'Success' },
+          data: { qr_string: '00020101-json-qr-payload', deeplink: 'abamobilebank://ababank.com?type=payway&qrcode=x' },
+        }),
+      );
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { stdout, exitCode } = await run([
+        'cof', 'link-account', '-r', 'qrtest002', '-c', 'qrcycle01', '-f', 'CITI_FLEX', '--currency', 'USD', '-y', '--json',
+      ]);
+      const doc = JSON.parse(stdout) as { status?: { code?: string }; data?: { qr_string?: string }; qrPngPath?: string };
+      expect(doc.status?.code).toBe('00');
+      expect(doc.qrPngPath).toContain('cof-link-account-qrtest002.png');
+      expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('handles a response without qr_string without crashing (blocked-profile shape)', async () => {
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: { code: '00', message: 'Success' }, data: {} }));
+    });
+    const port = await new Promise<number>((resolve) => {
+      srv.listen(0, '127.0.0.1', () => resolve((srv.address() as { port: number }).port));
+    });
+    process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
+
+    try {
+      const { text, exitCode } = await run([
+        'cof', 'link-account', '-r', 'qrtest003', '-c', 'qrcycle01', '-f', 'CITI_FLEX', '--currency', 'USD', '-y',
+      ]);
+      expect(text).toContain('Account link requested');
+      expect(text).not.toContain('QR PNG:');
+      expect([0, undefined]).toContain(exitCode);
+    } finally {
+      srv.close();
+    }
+  });
+});

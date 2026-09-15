@@ -84,7 +84,9 @@ function describeRecord(record: WebhookRecord): string {
   const bits = [record.id, record.receivedAt];
   if (record.matchedTransactionId) bits.push(`tran_id=${record.matchedTransactionId}`);
   if (record.matchedStatus) bits.push(`status=${record.matchedStatus}`);
-  if (record.signatureVerdict) bits.push(`sig=${record.signatureVerdict}`);
+  if (record.signatureVerdict) {
+    bits.push(`sig=${record.signatureVerdict}${record.signatureSource ? `(${record.signatureSource})` : ''}`);
+  }
   if (record.replay) bits.push('replay');
   if (record.khqr?.parsed) bits.push('route=khqr');
   if (record.paymentLinkPushback?.parsed) bits.push('route=pushback');
@@ -141,11 +143,11 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
           }
           const verdict = record.signatureVerdict ?? 'unsigned';
           if (json) {
-            log(JSON.stringify({ record: recordId, verdict, reason: record.verificationReason ?? null, matchedTransactionId: record.matchedTransactionId ?? null, matchedStatus: record.matchedStatus ?? null, replay: record.replay ?? false }));
+            log(JSON.stringify({ record: recordId, verdict, signatureSource: record.signatureSource ?? null, reason: record.verificationReason ?? null, matchedTransactionId: record.matchedTransactionId ?? null, matchedStatus: record.matchedStatus ?? null, replay: record.replay ?? false }));
           } else {
             log(`\n${c.bold('Captured webhook record')} ${recordId}`);
             log(`  received:  ${record.receivedAt}`);
-            log(`  signature: ${verdict === 'verified' ? c.green('✓ verified') : verdict === 'invalid' ? c.red(`✗ invalid (${record.verificationReason ?? 'unknown'})`) : c.yellow('unsigned (no signature header captured)')}`);
+            log(`  signature: ${verdict === 'verified' ? c.green(`✓ verified (${record.signatureSource ?? '?'}-hash)`) : verdict === 'invalid' ? c.red(`✗ invalid (${record.verificationReason ?? 'unknown'})`) : c.yellow('unsigned (no signature header or body hash captured)')}`);
             if (record.matchedTransactionId) log(`  tran_id:    ${record.matchedTransactionId}${record.matchedStatus ? `  status=${record.matchedStatus}` : ''}`);
             if (record.replay) log(`  ${c.yellow('replay')} — the same (tran_id, status) pair was captured before`);
             log('');
@@ -232,7 +234,7 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       try {
         const records = storage.getAll().slice(-limit);
         if (json) {
-          log(JSON.stringify({ count: records.length, records: records.map((r) => ({ id: r.id, receivedAt: r.receivedAt, matchedTransactionId: r.matchedTransactionId ?? null, matchedStatus: r.matchedStatus ?? null, signatureVerdict: r.signatureVerdict ?? 'unsigned', replay: r.replay ?? false })) }));
+          log(JSON.stringify({ count: records.length, records: records.map((r) => ({ id: r.id, receivedAt: r.receivedAt, matchedTransactionId: r.matchedTransactionId ?? null, matchedStatus: r.matchedStatus ?? null, signatureVerdict: r.signatureVerdict ?? 'unsigned', signatureSource: r.signatureSource ?? null, replay: r.replay ?? false })) }));
           return;
         }
         log(`\n${c.bold('Captured webhook records')} (newest ${records.length})`);

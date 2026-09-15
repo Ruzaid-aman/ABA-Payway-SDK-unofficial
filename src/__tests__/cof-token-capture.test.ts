@@ -292,4 +292,59 @@ describe('Server CoF token capture', () => {
     await httpRequest(port, '/aba-payway-webhook', JSON.stringify(body), { 'x-payway-hmac-sha512': sig });
     expect(loadLinkedTokens(join(tempDir, 'tokens'))).toEqual([]);
   });
+
+  // Q18 contingency: the classic PayWay callback contract carries the HMAC in
+  // the BODY `hash` field (docs/09 §5), not the x-payway-hmac-sha512 header.
+  // If the never-captured CoF link callback uses that shape, the pwt must
+  // still persist — and the record must say WHERE the verified signature
+  // came from so the first live capture pins the real contract.
+  it('persists the pwt when the signature travels in the BODY hash field (no header)', async () => {
+    const body = { pwt: 'pwt-bodyhash987', ctid: 'customer123', status: '00' };
+    const sig = signCallbackBody(body, apiKey);
+    const status = await httpRequest(port, '/aba-payway-webhook', JSON.stringify({ ...body, hash: sig }), {});
+    expect(status).toBe(200);
+    const stored = latestTokenForCtid('customer123', join(tempDir, 'tokens'));
+    expect(stored?.pwt).toBe('pwt-bodyhash987');
+    const [record] = storage.getAll();
+    expect(record.signatureVerdict).toBe('verified');
+    expect(record.signatureSource).toBe('body');
+  });
+
+  it('records signatureSource header when the header form is used', async () => {
+    const body = { tran_id: 't-src-1', status: '0' };
+    const sig = signCallbackBody(body, apiKey);
+    await httpRequest(port, '/aba-payway-webhook', JSON.stringify(body), { 'x-payway-hmac-sha512': sig });
+    const [record] = storage.getAll();
+    expect(record.signatureVerdict).toBe('verified');
+    expect(record.signatureSource).toBe('header');
+  });
+
+  it('a TAMPERED body hash is invalid — token captured raw but NOT persisted', async () => {
+    const body = { pwt: 'pwt-forged', ctid: 'attacker', hash: 'c3VwZXJzaWNyZXRub3A=' };
+    const status = await httpRequest(port, '/aba-payway-webhook', JSON.stringify(body), {});
+    expect(status).toBe(200);
+    expect(storage.getAll()).toHaveLength(1);
+    expect(loadLinkedTokens(join(tempDir, 'tokens'))).toEqual([]);
+    const [record] = storage.getAll();
+    expect(record.signatureVerdict).toBe('invalid');
+  });
+
+  it('a delivery with neither header nor body hash stays unsigned (no persistence)', async () => {
+    const body = { pwt: 'pwt-no-sig', ctid: 'customer123' };
+    const status = await httpRequest(port, '/aba-payway-webhook', JSON.stringify(body), {});
+    expect(status).toBe(200);
+    expect(loadLinkedTokens(join(tempDir, 'tokens'))).toEqual([]);
+    const [record] = storage.getAll();
+    expect(record.signatureVerdict).toBe('unsigned');
+    expect(record.signatureSource).toBeUndefined();
+  });
+
+  it('khqr-route CoF delivery with a body hash also persists (all routes share the fallback)', async () => {
+    const body = { pwt: 'pwt-khqr-bodyhash', ctid: 'customer123', status: '00' };
+    const sig = signCallbackBody(body, apiKey);
+    const status = await httpRequest(port, '/aba-payway-khqr-webhook', JSON.stringify({ ...body, hash: sig }), {});
+    expect(status).toBe(200);
+    const stored = latestTokenForCtid('customer123', join(tempDir, 'tokens'));
+    expect(stored?.pwt).toBe('pwt-khqr-bodyhash');
+  });
 });

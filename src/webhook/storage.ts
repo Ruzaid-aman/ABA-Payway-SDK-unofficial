@@ -34,6 +34,13 @@ export interface WebhookRecord {
    * older versions; the KHQR route never sets it (no published auth contract).
    */
   readonly signatureVerdict?: WebhookSignatureVerdict;
+  /**
+   * Where a VERIFIED signature traveled: the `x-payway-hmac-sha512` header
+   * or the classic body `hash` field (the Q18 CoF callback contract may use
+   * either; first live capture pins it). Unset when no signature verified
+   * (unsigned/invalid/legacy records).
+   */
+  readonly signatureSource?: 'header' | 'body';
   /** Why verification failed — only present when `signatureVerdict === 'invalid'`. */
   readonly verificationReason?: 'signature_mismatch' | 'malformed_signature' | 'empty_body';
   /** `tran_id`/`transaction_id` extracted best-effort from the raw body — the correlation join key (gap G8). */

@@ -216,7 +216,7 @@ describe('JsonWebhookStorage Phase 3 fields', () => {
 });
 
 describe('ensureCallbackMetadataColumns', () => {
-  it('attempts all five Phase 3 columns and tolerates duplicates', () => {
+  it('attempts all Phase-3 + Q18 columns and tolerates duplicates', () => {
     const executed: string[] = [];
     const db = {
       exec: (sql: string) => {
@@ -229,9 +229,10 @@ describe('ensureCallbackMetadataColumns', () => {
     };
 
     expect(() => ensureCallbackMetadataColumns(db)).not.toThrow();
-    expect(executed).toHaveLength(5);
+    expect(executed).toHaveLength(6);
     expect(executed[0]).toContain('signature_verdict');
     expect(executed[4]).toContain('replay');
+    expect(executed[5]).toContain('signature_source');
   });
 
   it('propagates a SQLite error unrelated to an existing column', () => {
