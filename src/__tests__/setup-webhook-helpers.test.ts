@@ -3,11 +3,12 @@
  * webhook URL computation, PAYWAY_CALLBACK_URL upsert/restore semantics,
  * and the cloudflared install hint.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   cloudflaredMissingLines,
   computeWebhookUrl,
   formatPortBusyMessage,
+  computeWebhookRouteUrls,
   restoreEnvCallbackUrl,
   upsertEnvCallbackUrl,
   validatePort,
@@ -17,6 +18,28 @@ describe('formatPortBusyMessage', () => {
   it('includes a scoped cleanup command for non-interactive runs', () => {
     expect(formatPortBusyMessage(8443, true)).toContain('Port 8443 is already in use');
     expect(formatPortBusyMessage(8443, true)).toContain('webhook stop');
+  });
+});
+
+describe('computeWebhookRouteUrls', () => {
+  it('normalizes a supplied callback URL before adding the three receiver routes', () => {
+    expect(computeWebhookRouteUrls('https://tunnel.example/aba-payway-webhook')).toEqual({
+      baseUrl: 'https://tunnel.example',
+      online: 'https://tunnel.example/aba-payway-webhook',
+      customerQr: 'https://tunnel.example/aba-payway-khqr-webhook',
+      pushback: 'https://tunnel.example/aba-payway-pushback',
+    });
+  });
+});
+
+describe('probeWebhookUrl', () => {
+  it('accepts only an acknowledged capture response', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ acknowledged: true, id: 'wh_probe' }), { status: 200 })));
+    await expect((await import('../cli/commands/setup-webhook-helpers.js')).probeWebhookUrl('https://tunnel.example/aba-payway-khqr-webhook')).resolves.toEqual({
+      acknowledged: true,
+      id: 'wh_probe',
+    });
+    vi.unstubAllGlobals();
   });
 });
 

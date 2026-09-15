@@ -70,6 +70,7 @@ function makeHarness(envFile: string, input?: PassThrough): Harness {
       state.serverOptions = opts ?? null;
       return server;
     },
+    probeWebhook: async () => ({ acknowledged: true, id: 'wh_test_probe' }),
     envFile,
     exit: exitSpy,
     registerSignal: (signal, handler) => signalHandlers.set(signal, handler),

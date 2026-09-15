@@ -30,6 +30,7 @@ import {
 } from '../../webhook/fixtures.js';
 import { parseForwardHeaders } from '../../webhook/forwarder.js';
 import type { WebhookRecord, WebhookStorage } from '../../webhook/storage.js';
+import { clearLifecycleState, readLifecycleState } from '../../webhook/lifecycle.js';
 
 const EXIT_VALIDATION = 1;
 const EXIT_NETWORK = 3;
@@ -103,6 +104,22 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
   const loadStorage = deps.loadStorage ?? (() => loadDefaultStorage());
 
   const webhook = new Command('webhook').description('Local webhook workbench: verify, trigger, resend captured callbacks');
+
+  const status = new Command('status').description('Show the owned local webhook receiver state').option('--json').action((opts: { json?: boolean }) => {
+    const state = readLifecycleState();
+    const running = state ? (() => { try { process.kill(state.pid, 0); return true; } catch { return false; } })() : false;
+    const result = { state: state ? (running ? 'running' : 'stale') : 'absent', receiver: state };
+    if (opts.json) log(JSON.stringify(result));
+    else log(state ? `Webhook receiver: ${result.state} (pid ${state.pid}, port ${state.port})` : 'Webhook receiver: absent');
+  });
+
+  const stop = new Command('stop').description('Stop the owned local webhook receiver').option('--json').action((opts: { json?: boolean }) => {
+    const state = readLifecycleState();
+    if (!state) { if (opts.json) log(JSON.stringify({ stopped: false, state: 'absent' })); else log('Webhook receiver is not running.'); return; }
+    try { process.kill(state.pid, 'SIGTERM'); } catch { /* stale process */ }
+    clearLifecycleState();
+    if (opts.json) log(JSON.stringify({ stopped: true, pid: state.pid })); else log(`Stopped webhook receiver pid ${state.pid}.`);
+  });
 
   // --- webhook verify-callback (W-4) -------------------------------------
   const verify = new Command('verify-callback')
@@ -492,5 +509,7 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
   webhook.addCommand(list);
   webhook.addCommand(resend);
   webhook.addCommand(trigger);
+  webhook.addCommand(status);
+  webhook.addCommand(stop);
   program.addCommand(webhook);
 }

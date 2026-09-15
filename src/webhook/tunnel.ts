@@ -20,6 +20,23 @@ export interface TunnelManager {
   readonly isRunning: boolean;
 }
 
+/** One bounded retry for transient quick-tunnel startup failures. */
+export async function startTunnelWithRetry(
+  start: (port: number) => Promise<string>,
+  localPort: number,
+  attempts = 2,
+): Promise<string> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await start(localPort);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 // Match tunnel URLs like https://random-name-123.trycloudflare.com
 // but NOT informational log messages like "api.trycloudflare.com"
 // Tunnel URLs have at least 6 chars in the subdomain (random hex/gibberish)

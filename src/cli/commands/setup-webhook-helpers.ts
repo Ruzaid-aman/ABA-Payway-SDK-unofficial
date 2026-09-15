@@ -24,7 +24,36 @@ export function validatePort(input?: string): PortValidation {
 
 /** The webhook path the local listener serves. */
 export function computeWebhookUrl(publicUrl: string | null, port: number): string {
-  return publicUrl ? `${publicUrl}/aba-payway-webhook` : `http://localhost:${port}/aba-payway-webhook`;
+  return publicUrl ? computeWebhookRouteUrls(publicUrl).online : `http://localhost:${port}/aba-payway-webhook`;
+}
+
+export function computeWebhookRouteUrls(publicUrl: string): {
+  baseUrl: string;
+  online: string;
+  customerQr: string;
+  pushback: string;
+} {
+  const baseUrl = publicUrl.replace(/\/(aba-payway-webhook|aba-payway-khqr-webhook|aba-payway-pushback)\/?$/, '');
+  return {
+    baseUrl,
+    online: `${baseUrl}/aba-payway-webhook`,
+    customerQr: `${baseUrl}/aba-payway-khqr-webhook`,
+    pushback: `${baseUrl}/aba-payway-pushback`,
+  };
+}
+
+export async function probeWebhookUrl(url: string): Promise<{ acknowledged: true; id: string }> {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ probe: true }),
+  });
+  if (!response.ok) throw new Error(`Webhook readiness probe returned HTTP ${response.status}`);
+  const body = (await response.json()) as { acknowledged?: unknown; id?: unknown };
+  if (body.acknowledged !== true || typeof body.id !== 'string' || body.id.length === 0) {
+    throw new Error('Webhook readiness probe did not return an acknowledged capture');
+  }
+  return { acknowledged: true, id: body.id };
 }
 
 export interface UpsertResult {

@@ -92,8 +92,8 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk cof token list / renew / details / remove` | Token lifecycle + local store — `list` shows captured tokens with expiry state (offline); `renew` restarts the local ~90-day window on gateway success; `details` takes `--request-id` only; `remove` takes `--ctid --token` (irreversible; prunes the local copy after gateway success) |
 | `payway-sdk beneficiary add / update-status <payee>` | Manage the payout beneficiary whitelist (requires RSA key; `update-status -s 0\|1`) |
 | `payway-sdk self-activation new-merchant / credential-info / mc-info` | Merchant self-activation via PARTNER credentials (`PAYWAY_PARTNER_ID` + `PAYWAY_PARTNER_API_KEY` + RSA key; spec-derived, not live-verified) — register a merchant and get the onboarding URL, then inquire credential/merchant info |
-| `payway-sdk setup-webhook` | Start a local webhook listener for PayWay callbacks (`--forward-to <url>` also re-POSTs every capture to your app) |
-| `payway-sdk webhook trigger / verify-callback / resend / list` | Local webhook workbench — signed fixture callbacks without the ABA Simulator, one-shot signature checks, replay captured records |
+| `payway-sdk setup-webhook` | Start a local webhook listener; `--tunnel --non-interactive` binds locally, retries one transient tunnel failure, and probes public readiness before saving the callback URL (`--forward-to <url>` also re-POSTs every capture to your app) |
+| `payway-sdk webhook trigger / verify-callback / resend / list / status / stop` | Local webhook workbench — signed fixtures, signature checks, replay, captured records, and state-aware development receiver lifecycle commands |
 | `payway-sdk config` | Display loaded configuration and validate environment variables |
 | `payway-sdk skills add <agent>` | Install AI skill guides for one or more agents |
 | `payway-sdk skills remove <agent>` | Remove skill guides from one or more agents |

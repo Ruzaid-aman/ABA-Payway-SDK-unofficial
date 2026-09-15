@@ -17,7 +17,7 @@ vi.mock('node:child_process', () => {
 });
 
 import { exec } from 'node:child_process';
-import { createTunnelManager, findCloudflared } from '../webhook/tunnel.js';
+import { createTunnelManager, findCloudflared, startTunnelWithRetry } from '../webhook/tunnel.js';
 
 const mockExec = vi.mocked(exec);
 
@@ -72,5 +72,13 @@ describe('TunnelManager', () => {
   it('stop is safe to call when not running', async () => {
     await tunnel.stop();
     expect(tunnel.isRunning).toBe(false);
+  });
+});
+
+describe('startTunnelWithRetry', () => {
+  it('retries one transient startup failure and returns the next tunnel URL', async () => {
+    const start = vi.fn().mockRejectedValueOnce(new Error('quick tunnel exited')).mockResolvedValueOnce('https://second.trycloudflare.com');
+    await expect(startTunnelWithRetry(start, 8443)).resolves.toBe('https://second.trycloudflare.com');
+    expect(start).toHaveBeenCalledTimes(2);
   });
 });

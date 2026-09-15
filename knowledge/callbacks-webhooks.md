@@ -41,6 +41,8 @@ A **callback** (also called a **webhook**) is a server-to-server HTTP POST reque
 | Online checkout callback | Your checkout callback route | Verify the documented `X-PAYWAY-HMAC-SHA512` signature before trusting it. |
 | Offline ABA KHQR notification | `/aba-payway-khqr-webhook` | Capture the raw delivery and reconcile it; do **not** assume it has the online HMAC contract or mark an order paid until ABA supplies and you implement its actual verification contract. |
 
+Customer Module / Printed QR payments are delivered to the same KHQR route. Start the local capture receiver with `payway-sdk setup-webhook --tunnel --non-interactive`; wait for its public readiness probe, then use the generated `/aba-payway-khqr-webhook` route for sandbox verification. The SDK stores the raw delivery and customer-QR metadata; verify approved state and reconcile `merchant_ref` before fulfilment. Use `payway-sdk webhook status` or `webhook stop` only for the locally owned development receiver.
+
 > ⚠️ **Golden Rule:** Never mark an order as "Paid" based on a client-side return URL. For offline KHQR notifications, parsing or receiving a payload is not payment verification.
 
 ---

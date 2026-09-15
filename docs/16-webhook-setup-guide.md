@@ -264,6 +264,9 @@ The offline KHQR route has no assumed online HMAC contract. The listener retains
 | Malformed JSON body | Logged as warning, saved as raw text, server returns 200 |
 | Port already in use (EADDRINUSE) | Prints the port and exits; non-TTY output includes the scoped cleanup command |
 | Background run without `--url` or `--tunnel` | Fails with exit code 2 instead of waiting for an interactive prompt |
+| Public tunnel origin unavailable | Listener is stopped and callback URL is not persisted |
+| Transient quick-tunnel startup failure | One retry is attempted; a second failure shuts down cleanly |
+| Receiver cleanup | `npm exec -- payway-sdk webhook stop` stops only the receiver owned by saved lifecycle state |
 | Missing `PAYWAY_API_KEY` | Online HMAC verification skipped; both routes are still saved |
 | SIGINT / SIGTERM | Graceful shutdown — finishes processing current request, stops server |
 

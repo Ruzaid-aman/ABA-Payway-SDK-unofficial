@@ -19,15 +19,18 @@ import readline from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 import { createWebhookServer, type WebhookServerResult } from '../../webhook/server.js';
 import { createStorage, type StorageType } from '../../webhook/storage-factory.js';
-import { createTunnelManager, findCloudflared, type TunnelManager } from '../../webhook/tunnel.js';
+import { createTunnelManager, findCloudflared, startTunnelWithRetry, type TunnelManager } from '../../webhook/tunnel.js';
 import { appendEnvVar } from './onboard-helpers.js';
 import {
   cloudflaredMissingLines,
   computeWebhookUrl,
+  computeWebhookRouteUrls,
+  probeWebhookUrl,
   restoreEnvCallbackUrl,
   upsertEnvCallbackUrl,
   validatePort,
 } from './setup-webhook-helpers.js';
+import { clearLifecycleState, writeLifecycleState } from '../../webhook/lifecycle.js';
 
 // ---------------------------------------------------------------------------
 // ANSI helpers (matching cli.ts conventions)
@@ -75,6 +78,7 @@ export interface SetupWebhookDeps {
   createTunnel?: (cloudflaredPath: string) => TunnelManager;
   storageFactory?: typeof createStorage;
   serverFactory?: typeof createWebhookServer;
+  probeWebhook?: typeof probeWebhookUrl;
   /** Target .env file for the PAYWAY_CALLBACK_URL upsert (default <cwd>/.env). */
   envFile?: string;
   /**
@@ -194,14 +198,52 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   }
   // If publicUrl is set via --url, no tunnel needed
 
+  // Bind the receiver before starting any tunnel. This makes port conflicts
+  // fail before tunnel creation and guarantees the tunnel has a live origin.
+  const storageType = opts.storage ?? 'auto';
+  const storageFactory = deps.storageFactory ?? createStorage;
+  const storage = await storageFactory(storageType);
+  const serverFactory = deps.serverFactory ?? createWebhookServer;
+  const webhookServer: WebhookServerResult = serverFactory(storage, {
+    port,
+    apiKey,
+    forwardTo: opts.forwardTo,
+    forwardHeaders: opts.forwardHeaders,
+  });
+  try {
+    await webhookServer.start();
+  } catch (err) {
+    log(`  ${c.red('✗')} ${err instanceof Error ? err.message : String(err)}\n`);
+    storage.close();
+    exit(1);
+    return;
+  }
+
   // ── Step 3: Start tunnel if needed ───────────────────────────────────
   if (tunnel) {
+    const manager = tunnel;
     log(`\n  ${c.bold('Starting Cloudflare Tunnel...')}`);
     try {
-      publicUrl = await tunnel.start(port);
+      publicUrl = await startTunnelWithRetry((localPort) => manager.start(localPort), port);
       log(`  ${c.green('✓')} Tunnel established: ${c.cyan(publicUrl)}`);
     } catch (err) {
       log(`\n  ${c.red('✗')} Tunnel failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      await webhookServer.stop().catch(() => undefined);
+      storage.close();
+      exit(1);
+      return;
+    }
+  }
+
+  if (publicUrl) {
+    try {
+      const probe = await (deps.probeWebhook ?? probeWebhookUrl)(computeWebhookRouteUrls(publicUrl).customerQr);
+      log(`  ${c.green('✓')} Public customer-KHQR route verified (capture ${probe.id})`);
+    } catch (err) {
+      log(`\n  ${c.red('✗')} Public webhook readiness probe failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      if (tunnel?.isRunning) await tunnel.stop().catch(() => undefined);
+      await webhookServer.stop().catch(() => undefined);
+      storage.close();
       exit(1);
       return;
     }
@@ -209,6 +251,12 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
 
   // ── Step 4: Compute webhook URL ──────────────────────────────────────
   const webhookUrl = computeWebhookUrl(publicUrl, port);
+  const routeUrls = publicUrl ? computeWebhookRouteUrls(publicUrl) : {
+    baseUrl: `http://localhost:${port}`,
+    online: webhookUrl,
+    customerQr: `http://localhost:${port}/aba-payway-khqr-webhook`,
+    pushback: `http://localhost:${port}/aba-payway-pushback`,
+  };
 
   // ── Step 5: Persist tunnel URL to .env as PAYWAY_CALLBACK_URL ──────
   let previousCallbackUrl: string | null = null; // Save original value to restore on shutdown
@@ -231,13 +279,23 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     log('');
   }
 
+  writeLifecycleState({
+    version: 1,
+    pid: process.pid,
+    port,
+    publicBaseUrl: publicUrl,
+    callbackUrl: publicUrl ? webhookUrl : null,
+    previousCallbackUrl,
+    startedAt: new Date().toISOString(),
+  });
+
   // ── Step 6: Display webhook URL and instructions ─────────────────────
   log('');
   log(`  ${c.bold('Webhook endpoint:')}`);
   log(`    ${c.cyan(webhookUrl)}`);
   log(`  ${c.dim('The same listener also serves:')}`);
-  log(`    ${c.dim(`${webhookUrl.replace(/\/$/, '')}/aba-payway-khqr-webhook — offline KHQR notifications`)}`);
-  log(`    ${c.dim(`${webhookUrl.replace(/\/$/, '')}/aba-payway-pushback — payment-link pushbacks (use as the link's return_url; no hash — verify via check-transaction)`)}`);
+  log(`    ${c.dim(`${routeUrls.customerQr} — offline KHQR and customer QR notifications`)}`);
+  log(`    ${c.dim(`${routeUrls.pushback} — payment-link pushbacks (use as the link's return_url; no hash — verify via check-transaction)`)}`);
   if (opts.forwardTo) {
     log('');
     log(`  ${c.bold('Forwarding captured callbacks to:')}`);
@@ -260,19 +318,7 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     log('');
   }
 
-  // ── Step 7: Start webhook server ─────────────────────────────────────
-  const storageType = opts.storage ?? 'auto';
-  const storageFactory = deps.storageFactory ?? createStorage;
-  const storage = await storageFactory(storageType);
-  const serverFactory = deps.serverFactory ?? createWebhookServer;
-  const webhookServer: WebhookServerResult = serverFactory(storage, {
-    port,
-    apiKey,
-    forwardTo: opts.forwardTo,
-    forwardHeaders: opts.forwardHeaders,
-  });
-
-  // ── Step 8: Set up graceful shutdown (WH-REQ-08, WH-TC-06) ──────────
+  // ── Step 7: Set up graceful shutdown (WH-REQ-08, WH-TC-06) ──────────
   let shuttingDown = false;
 
   const shutdown = async (): Promise<void> => {
@@ -300,6 +346,7 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
 
     await webhookServer.stop();
     storage.close();
+    clearLifecycleState();
     exit(0);
   };
 
@@ -311,18 +358,4 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     shutdown().catch(() => process.exit(1));
   });
 
-  try {
-    await webhookServer.start();
-  } catch (err) {
-    log(`  ${c.red('✗')} ${err instanceof Error ? err.message : String(err)}\n`);
-    if (tunnel?.isRunning) await tunnel.stop().catch(() => undefined);
-    if (publicUrl) {
-      restoreEnvCallbackUrl(readFile, writeFile, envFile, previousCallbackUrl);
-      if (previousCallbackUrl) process.env.PAYWAY_CALLBACK_URL = previousCallbackUrl;
-      else delete process.env.PAYWAY_CALLBACK_URL;
-    }
-    storage.close();
-    exit(1);
-    return;
-  }
 }

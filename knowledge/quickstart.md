@@ -75,8 +75,10 @@ Profiles are also supported. The CLI resolves `--profile`, then `PAYWAY_PROFILE`
 A callback is a server-to-server payment notification. For local development, open another terminal in the same project and run:
 
 ```bash
-npm exec -- payway-sdk setup-webhook --tunnel
+npm exec -- payway-sdk setup-webhook --tunnel --non-interactive
 ```
+
+The listener binds locally, creates a temporary tunnel, and verifies the public callback before saving `PAYWAY_CALLBACK_URL`. For Customer Module QR payments, give ABA the dedicated route ending in `/aba-payway-khqr-webhook`, not the online-checkout route. Inspect or stop an SDK-owned development receiver with `npm exec -- payway-sdk webhook status` and `npm exec -- payway-sdk webhook stop`.
 
 Keep that terminal running. Follow its tunnel setup instructions and copy the complete public HTTPS URL, including `/aba-payway-webhook`. In your payment terminal, replace `PAYWAY_CALLBACK_URL` from step 3 with that URL. A localhost URL is not reachable by ABA. See [webhook setup and tunnel prerequisites](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/16-webhook-setup-guide.md) if the tunnel cannot start. This listener captures deliveries for development; it is not an order-fulfillment service.
 

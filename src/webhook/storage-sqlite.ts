@@ -254,6 +254,7 @@ export class SqliteWebhookStorage implements WebhookStorage {
       pushback_json: string | null;
       customer_qr_json: string | null;
       signature_verdict: string | null;
+      signature_source: string | null;
       verification_reason: string | null;
       matched_transaction_id: string | null;
       matched_status: string | null;

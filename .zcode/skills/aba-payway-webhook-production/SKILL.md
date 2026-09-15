@@ -51,6 +51,11 @@ a run starts clean and ends clean:
    # or
    npm exec -- payway-sdk setup-webhook --url https://your-public-url.example --non-interactive
    ```
+   Inspect or stop a receiver owned by this workspace with:
+   ```sh
+   npm exec -- payway-sdk webhook status
+   npm exec -- payway-sdk webhook stop
+   ```
    Check the port before starting anything:
    ```sh
    # Windows
@@ -61,6 +66,10 @@ a run starts clean and ends clean:
    # macOS/Linux
    lsof -iTCP:8443 -sTCP:LISTEN
    ```
+   The CLI binds the local receiver before creating a tunnel, then probes the public
+   customer-KHQR route. It writes `PAYWAY_CALLBACK_URL` only after that probe returns
+   `200` with an acknowledged capture ID. A quick-tunnel startup gets one bounded retry;
+   a second failure stops the receiver and leaves no callback URL active.
 2. **Start detached with logs** (Windows):
    ```sh
    Start-Process -FilePath "npx.cmd" -ArgumentList 'tsx','src/cli.ts','setup-webhook','--tunnel','--port','8443' -RedirectStandardOutput out.log -RedirectStandardError err.log -WindowStyle Hidden
@@ -79,6 +88,8 @@ a run starts clean and ends clean:
    curl -i -X POST "https://<tunnel>/aba-payway-webhook" -H 'Content-Type: application/json' -d '{"probe":true}'
    # expect 200 + {"acknowledged":true,"id":"wh_..."}
    ```
+   The verified customer-specific route is `/aba-payway-khqr-webhook`; the online route is
+   `/aba-payway-webhook`. Do not append the customer route to the online route.
 5. **Tunnels are ephemeral.** `*.trycloudflare.com` URLs die with the process and are for
    sandbox verification only. ABA provisions a callback URL at the merchant-profile level
    (one URL per profile, changes via support ticket) — never hand them an ephemeral tunnel
