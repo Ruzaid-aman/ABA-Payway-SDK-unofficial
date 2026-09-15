@@ -28,9 +28,9 @@
       "description": "The full documentation map: start-here routes, per-domain guides, troubleshooting.",
       "source": "docs/README.md",
       "file": "docs-index.md",
-      "bytes": 7388,
-      "sha256": "11dc1dbc658ee50a",
-      "sourceSha256": "48083af9d71ff689"
+      "bytes": 7700,
+      "sha256": "7c609355e4438643",
+      "sourceSha256": "f0b11d2c1b10aad4"
     },
     {
       "topic": "overview",
@@ -233,6 +233,16 @@
       "sourceSha256": "7d21aed9410b9363"
     },
     {
+      "topic": "api-datetime-timezones",
+      "title": "API datetime & timezones",
+      "description": "Endpoint-specific UTC, UTC+7, epoch, naive datetime, callback, and parsing rules.",
+      "source": "docs/22-api-datetime-and-timezones.md",
+      "file": "api-datetime-timezones.md",
+      "bytes": 8332,
+      "sha256": "cbd2ed3a8eaf4404",
+      "sourceSha256": "cbd2ed3a8eaf4404"
+    },
+    {
       "topic": "cloudflare-webhook",
       "title": "Cloudflare webhook (free tier)",
       "description": "Free-tier Cloudflare Worker webhook receiver setup.",
@@ -289,8 +299,8 @@
       "source": "docs/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
       "bytes": 47136,
-      "sha256": "7a1d1d1b0d5f9d09",
-      "sourceSha256": "9aabb0ad013db861"
+      "sha256": "f1b0696ba7b2907a",
+      "sourceSha256": "af1a7c7152cf5e13"
     },
     {
       "topic": "error-codes",

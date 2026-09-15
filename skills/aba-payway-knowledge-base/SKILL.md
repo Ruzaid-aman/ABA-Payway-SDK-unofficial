@@ -1,13 +1,13 @@
 ---
 name: aba-payway-knowledge-base
-description: Use when you need PayWay integration guidance offline — the built-in knowledge base of 30 topics (setup, web/QR/COF/payment-link/settlement guides, error-code hints, sandbox-verified lessons) served by `payway-sdk docs list|<topic>|search` and the agent's query_knowledge tool.
+description: Use when you need PayWay integration guidance offline — the built-in knowledge base of 31 topics (setup, web/QR/COF/payment-link/settlement/timezone guides, error-code hints, sandbox-verified lessons) served by `payway-sdk docs list|<topic>|search` and the agent's query_knowledge tool.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # PayWay Knowledge Base (offline docs)
 
-The CLI ships a curated 30-topic corpus (~530 KB) generated from the SDK's
+The CLI ships a curated 31-topic corpus generated from the SDK's
 documentation: every integration guide, the sandbox learnings, the full
 error-code registry, and the machine reference. No network, no credentials.
 
@@ -33,6 +33,7 @@ payway-sdk docs payment-link --json         # metadata + full content as one JSO
 | `errors-and-debugging` | every PayWay code with actionable hints |
 | `payment-link` | full link lifecycle incl. pushbacks and VOIDED |
 | `settlement-disputes` | settlement timing, chargebacks, refund boundaries |
+| `api-datetime-timezones` | endpoint-specific UTC, UTC+7, epoch, and naive datetime rules |
 | `sdk-cli-reference` | every SDK method and CLI command |
 | `error-codes` | the machine-readable registry (JSON) |
 

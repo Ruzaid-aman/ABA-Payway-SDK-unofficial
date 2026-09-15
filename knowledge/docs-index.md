@@ -55,6 +55,8 @@ Start with [error handling](payway-sdk docs errors-and-debugging) or [setup and 
 
 For recorded operations, use the [transaction journal and reconciliation](payway-sdk docs transaction-journal) and the unified storage service facade (one API over the journal, link tokens, and webhook captures). For terms and background, see [concepts](payway-sdk docs overview), glossary, and [code examples](payway-sdk docs code-snippets).
 
+For API timestamps, expiry values, transaction-list windows, and callback datetime parsing, use the [API datetime and timezone reference](payway-sdk docs api-datetime-timezones). PayWay mixes UTC, UTC+7, epoch seconds, and naive values; apply the endpoint-specific rule instead of a global timezone assumption.
+
 ## Diagram Library
 
 Standalone, GitHub-rendered diagrams covering the flows every integrator needs:

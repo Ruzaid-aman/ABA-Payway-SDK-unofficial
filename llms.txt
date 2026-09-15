@@ -51,6 +51,7 @@ Every doc below is also served by the CLI itself, offline:
 - [Transaction journal](docs/18-transaction-journal.md): Opt-in JSONL journal: correlation ids, timeline/stats/reconcile/anomalies.
 - [Customer module QR](docs/19-customer-module-qr.md): Portal Customer-ID keyed QR generation and merchant-reference reconciliation.
 - [Settlement & disputes](docs/20-settlement-and-disputes.md): Settlement timing, chargebacks, and refund boundaries per payment method.
+- [API datetime & timezones](docs/22-api-datetime-and-timezones.md): Endpoint-specific UTC, UTC+7, epoch, naive datetime, callback, and parsing rules.
 - [Cloudflare webhook (free tier)](docs/cloudflare-free-webhook.md): Free-tier Cloudflare Worker webhook receiver setup.
 - [Agent setup playbook](docs/AGENT-SETUP-PLAYBOOK.md): Configuring the agentic CLI: providers, capability modes, privacy ack.
 - [Agentic CLI user guide](docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md): ask / agent REPL / sessions / ledger — the full agent surface.

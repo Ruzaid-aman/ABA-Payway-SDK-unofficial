@@ -53,6 +53,18 @@ describe('knowledge store', () => {
     expect(prefixed?.status).toBe('ok');
   });
 
+  it('serves endpoint-specific API datetime and timezone guidance', () => {
+    const result = readTopic('api-datetime-timezones', corpusDir);
+    expect(result?.status).toBe('ok');
+    if (result?.status !== 'ok') return;
+
+    expect(result.content).toContain('Asia/Phnom_Penh');
+    expect(result.content).toContain('Get Token Details');
+    expect(result.content).toContain('explicit UTC');
+    expect(result.content).toContain('Payout');
+    expect(result.content).toContain('explicit UTC+7');
+  });
+
   it('reports ambiguous prefixes instead of guessing', () => {
     const ambiguous = readTopic('e', corpusDir); // errors-and-debugging, error-codes, …
     expect(ambiguous?.status).toBe('ambiguous');

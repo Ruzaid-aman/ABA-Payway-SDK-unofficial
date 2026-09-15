@@ -32,6 +32,7 @@ export const SOURCES = [
   { topic: 'transaction-journal', source: 'docs/18-transaction-journal.md', title: 'Transaction journal', description: 'Opt-in JSONL journal: correlation ids, timeline/stats/reconcile/anomalies.' },
   { topic: 'customer-module-qr', source: 'docs/19-customer-module-qr.md', title: 'Customer module QR', description: 'Portal Customer-ID keyed QR generation and merchant-reference reconciliation.' },
   { topic: 'settlement-disputes', source: 'docs/20-settlement-and-disputes.md', title: 'Settlement & disputes', description: 'Settlement timing, chargebacks, and refund boundaries per payment method.' },
+  { topic: 'api-datetime-timezones', source: 'docs/22-api-datetime-and-timezones.md', title: 'API datetime & timezones', description: 'Endpoint-specific UTC, UTC+7, epoch, naive datetime, callback, and parsing rules.' },
   { topic: 'cloudflare-webhook', source: 'docs/cloudflare-free-webhook.md', title: 'Cloudflare webhook (free tier)', description: 'Free-tier Cloudflare Worker webhook receiver setup.' },
   { topic: 'agent-setup-playbook', source: 'docs/AGENT-SETUP-PLAYBOOK.md', title: 'Agent setup playbook', description: 'Configuring the agentic CLI: providers, capability modes, privacy ack.' },
   { topic: 'agentic-cli-guide', source: 'docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md', title: 'Agentic CLI user guide', description: 'ask / agent REPL / sessions / ledger — the full agent surface.' },

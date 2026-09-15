@@ -55,6 +55,8 @@ Start with [error handling](./12-error-handling-and-debugging.md) or [setup and 
 
 For recorded operations, use the [transaction journal and reconciliation](./18-transaction-journal.md) and the unified [storage service facade](./21-storage-service.md) (one API over the journal, link tokens, and webhook captures). For terms and background, see [concepts](./01-overview-and-concepts.md), [glossary](./glossary.md), and [code examples](./14-appendix-code-snippets.md).
 
+For API timestamps, expiry values, transaction-list windows, and callback datetime parsing, use the [API datetime and timezone reference](./22-api-datetime-and-timezones.md). PayWay mixes UTC, UTC+7, epoch seconds, and naive values; apply the endpoint-specific rule instead of a global timezone assumption.
+
 ## Diagram Library
 
 Standalone, GitHub-rendered diagrams covering the flows every integrator needs:

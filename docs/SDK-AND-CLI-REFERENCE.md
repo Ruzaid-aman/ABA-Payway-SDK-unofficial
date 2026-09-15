@@ -69,7 +69,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk poll-transaction -t <id>` | Watch a transaction until terminal status (`--json` events for agents) |
 | `payway-sdk status` | Display payment status codes and refund error codes reference |
 | `payway-sdk explain [code]` | Decode a PayWay error code (e.g. `explain PTL36`, `explain 49`) with a fix hint — no credentials needed |
-| `payway-sdk docs list` | List the built-in knowledge base (30 topics: guides, sandbox learnings, error registry) |
+| `payway-sdk docs list` | List the built-in knowledge base (31 topics: guides, sandbox learnings, error registry) |
 | `payway-sdk docs <topic>` | Print one knowledge topic offline (e.g. `docs quickstart`, `docs errors-and-debugging`, `docs payment-link`; `--json` adds metadata + envelope errors) |
 | `payway-sdk docs search <terms>` | AND-search the whole corpus (`--json` for structured hits); also available to the agent as the `query_knowledge` tool |
 | `payway-sdk validate` | Validate a refund amount or transaction ID locally |

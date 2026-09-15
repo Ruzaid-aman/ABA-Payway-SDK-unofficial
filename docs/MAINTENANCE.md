@@ -14,7 +14,7 @@ How this repo stays coherent day to day and release to release. For the one-off 
 | You changed… | Also do (same commit) |
 |---|---|
 | Any gateway contract (params, hash orders, statuses, error shapes) | Grep `skills/` + the `.zcode/skills` mirror + `README.md` + the relevant docs chapter for the old shape; bump affected skills' `metadata.version`; append live evidence to SANDBOX-FINDINGS if probed |
-| A knowledge-corpus source | Run `npm run sync:knowledge` — never hand-edit `knowledge/` or `llms.txt`; the freshness gate (`src/__tests__/knowledge.test.ts`) fails on drift. Sources are pinned in `scripts/knowledge-sources.mjs` (QUICKSTART, docs/README, chapters 01–21, SDK-AND-CLI-REFERENCE, quick-start 1-pager, agent guides, FIRST-PAYMENT-WALKTHROUGH, CLOSE-TRANSACTION-FINDINGS, error-codes.json) |
+| A knowledge-corpus source | Run `npm run sync:knowledge` — never hand-edit `knowledge/` or `llms.txt`; the freshness gate (`src/__tests__/knowledge.test.ts`) fails on drift. Sources are pinned in `scripts/knowledge-sources.mjs` (QUICKSTART, docs/README, chapters 01–20 and 22, SDK-AND-CLI-REFERENCE, quick-start 1-pager, agent guides, FIRST-PAYMENT-WALKTHROUGH, CLOSE-TRANSACTION-FINDINGS, error-codes.json) |
 | Public exports or JSDoc | `npm run docs:api` and commit the regenerated `docs/api/` tree WHOLE — pages for symbols from earlier waves can sit untracked |
 | Agent tool catalog | Flip the count pin + every surface in the registry below; a mutation-class tool also needs a risk classification |
 | Packaged skills (add/remove) | Count pin + `skills/README.md` + root `AGENTS.md` + `.agents/AGENTS.md` + HANDOFF; keep the `.zcode/skills` mirror byte-identical |
@@ -31,7 +31,7 @@ How this repo stays coherent day to day and release to release. For the one-off 
 | Packaged skills | 34 | `src/__tests__/skills.test.ts` (`toHaveLength(34)`), `skills/README.md`, root `AGENTS.md`, `.agents/AGENTS.md`, HANDOFF current-state, `llms.txt` (generated) |
 | Agent tools (LLM REPL) | 14 | `agent-provider.test.ts` pin, `skills/aba-payway-agent/SKILL.md` + `.zcode` mirror, `skills/README.md`, `docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md`, `docs/SDK-AND-CLI-REFERENCE.md`, root `AGENTS.md`, HANDOFF when cited |
 | MCP catalog | 12 read-only / 17 with mutations | Compile-enforced via `AGENT_TOOL_NAMES` + catalog tests; prose pins in `docs/SDK-AND-CLI-REFERENCE.md` and root `AGENTS.md` |
-| Knowledge topics | 30 | `scripts/knowledge-sources.mjs` SOURCES, root `AGENTS.md`, corpus `MANIFEST.json` (generated) |
+| Knowledge topics | 31 | `scripts/knowledge-sources.mjs` SOURCES, root `AGENTS.md`, corpus `MANIFEST.json` (generated) |
 | Test count | 2,012 passing | HANDOFF §6 gate line — refresh when you run the suite; avoid stale absolute counts anywhere else |
 | Export count | check, don't hardcode | `npm run check:package` replaces a hardcoded number (RELEASE_CHECKLIST rule) |
 
