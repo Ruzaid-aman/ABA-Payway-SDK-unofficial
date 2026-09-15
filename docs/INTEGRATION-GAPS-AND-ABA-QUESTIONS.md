@@ -400,3 +400,49 @@ Original checklist kept below for reference.
    fold §4.4 statuses into the answer log and file the genuinely new items
    (session-timeout table, production-key temp expiry, no-refund-after-split,
    Google Pay availability) as Q38+; also file N1–N12 adoptees there.
+
+## Part 5 — 2026-09-15 AOF live-cycle addendum: new gaps + relay items
+
+**Source:** the full Account-on-File live test cycle executed on sandbox `ec476910`
+(account leg enabled by ABA the same day). Evidence: `docs/SANDBOX-FINDINGS.md`
+§26 AOF-1..AOF-14; canonical register:
+`audit-results/four-pillars/ABA-OPEN-QUESTIONS.md` (Q18 status update + Q41–Q43).
+
+**Answered by this cycle (no ABA reply needed):**
+
+- **CoF link-callback payload contract (Q18.1)** — captured live: `application/json`
+  with `x-payway-topic: PaymentNotification`, body
+  `{request_id, payment_credential:{ctid, pwt, source_of_fund, type, status(=1),
+  expired_at, token_flag, frequency, subscribed_amount, amount_limit_per_tran,
+  currency}}`. Only `request_id` is top-level; `status` is the credential status,
+  not a transaction status.
+- **Customer-initiated unlink behavior (Q18.2/18.4)** — removing the account in ABA
+  Mobile kills charging (`105`) but delivers **no callback** to the request-level
+  `callback_url`, and `get-token-details` keeps reporting `status: 1` (active).
+  Merchant detection is charge-time only. Q18.6 now asks whether ANY removal
+  notification channel exists and whether details should reflect removal.
+- **Charge flag semantics** — charge-time `token_flag` is a request classification,
+  not a copy of the link-time flag (`CITU_FLEX` charges fine on a CITI_FLEX-linked
+  token); MIT flags reject with `105` (→ Q41 enablement ask).
+- **Link QR window** — `expire_in` is an absolute epoch expiry instant = creation +
+  ~90 s, not the documented 10 minutes (→ Q42 confirmation ask).
+- **pwt stability** — re-linking the same ctid+account+flag after any removal
+  returns the IDENTICAL pwt; treat (ctid, pwt) as idempotent.
+
+**Still open for the team (newly filed):**
+
+- **Q18.5** — the CoF callback's `x-payway-hmac-sha512` plaintext/canonicalization
+  (our sorted-key scheme does not verify it; 19 offline candidates failed). Until
+  answered, verify link deliveries via `get-token-details(request_id)` transitive
+  auth rather than the callback signature.
+- **Q41** — enable merchant-initiated tokenization (MIT flags) on the sandbox
+  profile, or document the dependency.
+- **Q42** — confirm `expire_in` = epoch-of-expiry and the intended QR window.
+- **Q43** — card-leg enablement: hosted `link-card` still answers `104` on this
+  profile; card tokenization cycles remain un-testable end-to-end.
+
+**Merchant-facing codification already shipped:** docs/09 (link/unlink/renew
+lifecycle) now carries the live callback shape, the transitive-auth recovery path,
+the charge-time-only unlink detection rule, and the status-only charge response
+with tran_id-based reconciliation. Skills (`aba-payway-cof`, `aba-payway-link-account`)
+and the packaged knowledge corpus are synced to the same content.

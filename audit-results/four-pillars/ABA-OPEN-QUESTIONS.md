@@ -817,3 +817,28 @@ docs/01, docs/02 (test cards + simulator + onboarding lifecycle), docs/03, docs/
 - **Q7 (link-card hash skipping) — RESOLVED BY EVIDENCE, question mooted.** Controlled same-request replays: intact hash → hash layer passes (business code 104 returned); corrupted base64 → 302 `01 Wrong Hash`; missing hash → HTTP 400 `04` with `errors.hash = ["The hash field is required."]`. The sandbox DOES require and verify the link-card HMAC. The 2026-08-27 "skips hash" observation is superseded; no ABA reply needed unless production differs.
 - **Q18 (CoF callback contract) — evidence capture BLOCKED on the profile**: link-card answers code 104 "Merchant not enabled token flag" for both CITI_FLEX and CITO_FLEX on sandbox merchant `ec476910` (same enablement family as the §17 subscription 104). No card link can complete, so the `pwt` callback never fires. Ask ABA to enable the token-flag service on the sandbox profile; the capture rig is ready (`scripts/sandbox-probe-link-card-cycle.ts`).
 - **New observed contract detail (Q18-adjacent):** the hosted link-card result travels as `302 → Location: …/add-card/<base64 JSON>` (error or success handoff); the POST body itself is a static 42 KB shell with no result marker.
+
+### AOF cycle addendum (2026-09-15, live test cycle — evidence SANDBOX-FINDINGS §26 AOF-1..AOF-14)
+
+Supersedes the "capture BLOCKED" framing above: the account leg is ENABLED and the
+full cycle executed. Q18 payload half CLOSED by evidence (AOF-7); Q18 sub-question 5
+(callback HMAC canonicalization, 19 candidates failed) and sub-question 6 (removal
+callback / profile webhook existence + `get-token-details` reporting removed tokens
+as `status: 1`) are filed in the Q18 status update above. Three further items from
+the cycle were NOT yet in this register and are now formally filed:
+
+1. **Q41 — MIT charge enablement on the account leg.** `payment-credential` charges
+   with `MITU_FLEX` / `MITU_FIX` / `MITR_FLEX` answer `403 code 105` against a valid,
+   active account token on `ec476910` (§26 AOF-9); `CITU_FLEX` succeeds. Is
+   merchant-initiated-tokenization a separate enablement (like the 104 flag service),
+   and can it be switched on for the sandbox profile?
+2. **Q42 — `expire_in` semantics + typing.** Live links consistently deliver
+   `data.expire_in` as an ABSOLUTE epoch-seconds expiry instant = creation + ~90 s
+   (§26 AOF-5/AOF-12) — not the documented "10 minutes", and not a TTL. Please
+   confirm the semantic (epoch-of-expiry) and the intended QR window; the OpenAPI
+   schema leaves `expire_in` untyped.
+3. **Q43 — Card-leg AOF enablement (re-filed as a current question).** The hosted
+   `link-card` leg still answers `104 "Merchant not enabled token flag"` on
+   `ec476910` (§26 AOF-3), so card tokenization cycles remain un-testable
+   end-to-end. Request the same enablement the account leg received (procedure per
+   the Q22 answer), or confirm the plan/timeline.
