@@ -1,25 +1,43 @@
 # AOF Live Test Cycle — campaign state
 
-**Status:** IN FLIGHT — Phases A–C + offline gap wave DONE. **RESUME at Phase D** (needs the user at the desk to scan QRs in ABA Mobile).
-**Constraint:** CLI/SDK/knowledge-base ONLY — no standalone test scripts (user directive; improve CLI/SDK/skills instead).
-**Pacing:** stage-gated, 10–15 s sleeps between gateway calls.
-**Commits:** `840aaf6` (QR presentation + body-hash verification), `baa0fe6` (§26 + skills), this wave (offline gap fixes).
+**Status:** COMPLETE except ONE leg — the app-side (ABA Mobile) unlink callback
+(Q18 sub-questions 2/4). Everything gateway-side is live-verified and codified.
+**Committed:** `efce6bc` (2026-09-15, main) — nested callback contract + charge
+matrix + lifecycle ops + §26 AOF-7..11 + corpus sync. Suite 2035/2035.
+Earlier: `840aaf6` (QR presentation + body-hash verify), `baa0fe6` (§26 AOF-1..6),
+`c8b78cb` (offline gap wave), `269f397` (user's before-testing, datetime wave).
 
-## Live facts pinned so far (SANDBOX-FINDINGS §26)
-- CITI_FLEX + CITO_FLEX link-account → `00 Success` (first ever on this profile).
-- CITO_FIX / CITR_FLEX still `104`; **card leg still `104`** — account-only enablement.
-- Deeplink: `abamobilebank://ababank.com?type=account_on_file&qrcode=…` (NOT `type=payway`).
-- `expire_in` = absolute epoch (expiry instant); CLI now renders the wall-clock deadline.
-- The real pwt-callback contract (Q18) is still UNCAPTURED — that is Phase D's prize.
+## Results (full detail: docs/SANDBOX-FINDINGS.md §26 AOF-1..AOF-11)
+- **Q18 payload half CLOSED** — live capture `wh_mu2hf6i6_7c84ba65`:
+  `{request_id, payment_credential:{ctid,pwt,source_of_fund,type,status:1,
+  expired_at,token_flag,frequency,subscribed_amount,amount_limit_per_tran,currency}}`.
+  Parser/fixture/classifier all speak the nested shape (flat legacy still parses).
+- **Q18 signature half OPEN (new sub-question 5)** — the header HMAC does not
+  verify under our canonicalization; 19 offline orderings failed (§26 AOF-8).
+  Recovery: `cof token details -r <request_id>` (transitive auth).
+- **Charge matrix** (§26 AOF-9): CITU_FLEX → 00 + check-transaction APPROVED
+  (apv 101349); MITU_FLEX/MITU_FIX/MITR_FLEX → 105; no token_flag → 04.
+  Success response is status-ONLY (no tran_id) — reconcile via your tran_id (AOF-10).
+- **Lifecycle live-00**: renew (window restart, pwt unchanged), remove (local
+  prune; charge-after-remove = 105, no +87 discriminator on the account leg),
+  CITO_FLEX re-link (fresh QR; expire_in epoch CONFIRMED on 3 links, AOF-11).
 
-## Phase D resume checklist (user at desk)
-1. `NODE_TLS_REJECT_UNAUTHORIZED=0 npx tsx src/cli.ts setup-webhook --tunnel --port 8443` (background; note the fresh `<tunnel>` URL; it upserts `PAYWAY_CALLBACK_URL` in `.env`). After teardown, **taskkill any orphan `cloudflared.exe`** (survives the background-task stop on Windows).
-2. Optional dry-run (no user needed): `... webhook trigger --event cof-link.linked --url <tunnel>/aba-payway-webhook --ctid dryrun01` → `cof token list` shows the synthetic pwt → `webhook show --record wh_…` (signatureSource must read `body`) → `cof token remove -c dryrun01 --token <pwt>` (gateway 00 idempotent + local prune).
-3. `NODE_TLS_REJECT_UNAUTHORIZED=0 npx tsx src/cli.ts cof link-account -r aoflink001 -c aofcycle01 -f CITI_FLEX --currency USD --callback-url <tunnel>/aba-payway-webhook --open-image -y` → **USER SCANS + approves in ABA Mobile** (QR window per `expire_in`).
-4. First Q18 capture: receiver log ("✓ CoF token captured … (body-hash|header-hash)") → `webhook list` → `webhook show --record wh_…` (headers + raw body + verdict) → `cof token list -c aofcycle01 --json` (extraFields = real contract) → `cof token details -r aoflink001`.
-5. Continue per plan: E charge matrix (CITU_FLEX first; watch for an approval QR — the CLI now renders one if it appears) → F renew → G merchant unlink (+ expect 87 on charge-after-removal) → H CITO_FLEX re-link + app-side unlink in ABA Mobile → I codification (cof-callback.ts knowns from the real capture, §26 append, Q18 close, corpus sync SAME commit) → J teardown + report.
+## The one open leg (resume recipe)
+User removes the linked account in ABA Mobile → receiver should capture the
+status-0 CoF callback (Q18.2 semantics) and the app-side behavior (Q18.4).
+1. Restart the rig (runbook now in `skills/aba-payway-webhook-production`):
+   pre-flight port 8443 check → `setup-webhook --tunnel --port 8443` (detached,
+   logs to files) → note fresh tunnel URL (it upserts PAYWAY_CALLBACK_URL in .env).
+2. `cof link-account -r aofunlink1 -c aofcycle01 -f CITI_FLEX --currency USD
+   --callback-url <tunnel>/aba-payway-webhook -y` → user scans + approves.
+3. User: ABA Mobile → linked accounts → remove.
+4. `webhook list` / `webhook show --record wh_…` (expect signatureVerdict
+   invalid per AOF-8 — the SHAPE is the prize, not the verdict) → then codify
+   the removal-callback shape + close Q18.2/18.4 (§27 or AOF-12+).
 
 ## Environment notes
-- `.env` `PAYWAY_CALLBACK_URL` currently holds the DEAD 05:32Z tunnel URL — the next `setup-webhook --tunnel` overwrites it (designed flow).
-- Store baselines at park time: token store EMPTY, webhook captures EMPTY (clean slate for D).
-- `docs/09` + knowledge-corpus content edits are deliberately DEFERRED to Phase I: the separate datetime wave owns the uncommitted `knowledge/` + `llms.txt` + `docs/22` changes; mixing would tangle both waves.
+- Rig is DOWN (verified: port 8443 free, 0 cloudflared). `.env`
+  `PAYWAY_CALLBACK_URL` holds a DEAD tunnel URL (red-major-tiny-waves) — the
+  next `setup-webhook --tunnel` overwrites it (designed flow).
+- No token is linked right now (remove in G + re-links never scanned). The
+  charge matrix token `5276…93A` was removed gateway-side in Phase G.
