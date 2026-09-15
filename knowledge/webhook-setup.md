@@ -262,7 +262,8 @@ The offline KHQR route has no assumed online HMAC contract. The listener retains
 | Scenario | Behavior |
 |---|---|
 | Malformed JSON body | Logged as warning, saved as raw text, server returns 200 |
-| Port already in use (EADDRINUSE) | Prints clear error with port number and exits |
+| Port already in use (EADDRINUSE) | Prints the port and exits; non-TTY output includes the scoped cleanup command |
+| Background run without `--url` or `--tunnel` | Fails with exit code 2 instead of waiting for an interactive prompt |
 | Missing `PAYWAY_API_KEY` | Online HMAC verification skipped; both routes are still saved |
 | SIGINT / SIGTERM | Graceful shutdown — finishes processing current request, stops server |
 

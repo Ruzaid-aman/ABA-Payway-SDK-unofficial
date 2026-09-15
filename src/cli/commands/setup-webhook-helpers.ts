@@ -6,6 +6,13 @@
 
 export type PortValidation = { ok: true; port: number } | { ok: false; message: string };
 
+/** Stable operator-facing error for occupied listener ports. */
+export function formatPortBusyMessage(port: number, nonInteractive = false): string {
+  return nonInteractive
+    ? `Port ${port} is already in use. Stop the existing receiver with: payway-sdk webhook stop`
+    : `Port ${port} is already in use. Please free the port.`;
+}
+
 /** Validates the `--port` flag: finite integer 1–65535. */
 export function validatePort(input?: string): PortValidation {
   const port = input === undefined || input === '' ? 8443 : Number(input);

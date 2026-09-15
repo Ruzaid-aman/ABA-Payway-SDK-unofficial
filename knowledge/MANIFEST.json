@@ -188,9 +188,9 @@
       "description": "Local listener, tunnels, forwarding, and production webhook configuration.",
       "source": "docs/16-webhook-setup-guide.md",
       "file": "webhook-setup.md",
-      "bytes": 20956,
-      "sha256": "9ce9523789821680",
-      "sourceSha256": "f5409572902d451e"
+      "bytes": 21107,
+      "sha256": "758115b558d0e94c",
+      "sourceSha256": "56d880ac8d70498a"
     },
     {
       "topic": "payment-link",

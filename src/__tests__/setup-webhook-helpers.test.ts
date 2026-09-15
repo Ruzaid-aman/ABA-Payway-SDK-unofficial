@@ -7,10 +7,18 @@ import { describe, expect, it } from 'vitest';
 import {
   cloudflaredMissingLines,
   computeWebhookUrl,
+  formatPortBusyMessage,
   restoreEnvCallbackUrl,
   upsertEnvCallbackUrl,
   validatePort,
 } from '../cli/commands/setup-webhook-helpers.js';
+
+describe('formatPortBusyMessage', () => {
+  it('includes a scoped cleanup command for non-interactive runs', () => {
+    expect(formatPortBusyMessage(8443, true)).toContain('Port 8443 is already in use');
+    expect(formatPortBusyMessage(8443, true)).toContain('webhook stop');
+  });
+});
 
 describe('validatePort', () => {
   it('defaults to 8443 when the flag is omitted or empty', () => {

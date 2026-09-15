@@ -25,6 +25,7 @@ import { parsePaymentLinkPushback } from '../domains/payment-link.js';
 import { isCofLinkCallback, parseCofLinkCallback } from './cof-callback.js';
 import { maskPwt, resolveTokenStoreDir, saveLinkedToken } from './token-store.js';
 import { WebhookForwarder, parseForwardHeaders } from './forwarder.js';
+import { formatPortBusyMessage } from '../cli/commands/setup-webhook-helpers.js';
 import { extractJsonPayload, parseKhqrPaymentNotification } from './khqr-notification.js';
 import type { WebhookRecord, WebhookSignatureVerdict, WebhookStorage } from './storage.js';
 
@@ -619,7 +620,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
 
         server.on('error', (err: NodeJS.ErrnoException) => {
           if (err.code === 'EADDRINUSE') {
-            log(`\n  \x1b[31m✗\x1b[0m \x1b[1mPort ${port} is busy.\x1b[0m Please free the port.`);
+            log(`\n  \x1b[31m✗\x1b[0m ${formatPortBusyMessage(port, !process.stdin.isTTY || !process.stdout.isTTY)}`);
             process.exitCode = 1;
             reject(new Error(`Port ${port} is already in use`));
           } else {

@@ -60,6 +60,8 @@ export interface SetupWebhookOptions {
   forwardTo?: string;
   /** Extra headers attached to forwarded deliveries (`"Key:Value, K2:V2"`). */
   forwardHeaders?: string;
+  /** Refuse implicit prompts when running from a background/non-TTY process. */
+  nonInteractive?: boolean;
 }
 
 export interface SetupWebhookDeps {
@@ -124,6 +126,9 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     return;
   }
   const port = portCheck.port;
+  const nonInteractive =
+    opts.nonInteractive === true ||
+    (deps.input === undefined && deps.output === undefined && (!process.stdin.isTTY || !process.stdout.isTTY));
 
   // ── Step 1: Resolve API key for signature verification ────────────────
   const apiKey = process.env.PAYWAY_API_KEY?.trim() || undefined;
@@ -142,6 +147,11 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   };
 
   if (!publicUrl && !opts.tunnel) {
+    if (nonInteractive) {
+      log(`\n  ${c.red('✗')} setup-webhook needs --url, --tunnel, or an interactive terminal.\n`);
+      exit(2);
+      return;
+    }
     // Interactive mode: ask the user
     const rl = readline.createInterface({
       input: (deps.input ?? process.stdin) as never,
@@ -305,6 +315,12 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     await webhookServer.start();
   } catch (err) {
     log(`  ${c.red('✗')} ${err instanceof Error ? err.message : String(err)}\n`);
+    if (tunnel?.isRunning) await tunnel.stop().catch(() => undefined);
+    if (publicUrl) {
+      restoreEnvCallbackUrl(readFile, writeFile, envFile, previousCallbackUrl);
+      if (previousCallbackUrl) process.env.PAYWAY_CALLBACK_URL = previousCallbackUrl;
+      else delete process.env.PAYWAY_CALLBACK_URL;
+    }
     storage.close();
     exit(1);
     return;

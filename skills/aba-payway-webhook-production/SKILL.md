@@ -43,15 +43,20 @@ The capture server (`setup-webhook`) is a long-running listener. When you start 
 from an interactive TTY — background job, CI, agent, hidden window — follow this recipe so
 a run starts clean and ends clean:
 
-1. **Pre-flight — confirm the port is free before starting anything.** `setup-webhook`
-   starts the tunnel and writes `PAYWAY_CALLBACK_URL` into `.env` **before** binding the
-   listener; a busy port leaves a dead URL propagated to `.env` and can hang the run on a
-   non-TTY "port busy" prompt instead of failing fast.
+1. **Use explicit background arguments.** A non-TTY run without `--url` or `--tunnel`
+   now fails with exit code 2 instead of waiting on prompts. Always pass one of these
+   options for agents, CI, and hidden windows:
+   ```sh
+   npm exec -- payway-sdk setup-webhook --tunnel --port 8443 --non-interactive
+   # or
+   npm exec -- payway-sdk setup-webhook --url https://your-public-url.example --non-interactive
+   ```
+   Check the port before starting anything:
    ```sh
    # Windows
    Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue
-   # then identify an orphan listener by command line and kill it
-   Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'setup-webhook' }
+   # identify the listener before taking any cleanup action
+   Get-NetTCPConnection -LocalPort 8443 -State Listen | Select-Object OwningProcess
 
    # macOS/Linux
    lsof -iTCP:8443 -sTCP:LISTEN
@@ -64,7 +69,7 @@ a run starts clean and ends clean:
    node/cloudflared processes that outlive the npx PID:
    ```sh
    # Windows: taskkill guarantees the listener AND its tunnel die together
-   taskkill /PID <real-pid> /T /F     # real-pid = the process listening on the port
+   taskkill /PID <real-pid> /T /F     # verify this is your receiver first
    ```
    A force-killed receiver never runs its graceful `.env` restore — re-verify
    `PAYWAY_CALLBACK_URL` afterwards.
