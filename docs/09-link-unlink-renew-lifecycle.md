@@ -437,6 +437,15 @@ async function unlinkToken() {
 }
 ```
 
+> ⚠️ **The reverse direction — customer removes the account in ABA Mobile (live
+> 2026-09-15, SANDBOX-FINDINGS §26 AOF-14):** the app-side unlink kills the token for
+> charging (`payment-credential` → `105`) but, on this profile, delivers **no callback**
+> to your `callback_url` and leaves `getTokenDetails()` reporting `status: 1` (active)
+> with full credential data. Detection of user-initiated unlink is therefore
+> charge-time only — plan a reconciliation loop (attempt a low-value charge or treat
+> charge 105 as "re-link required"), and never treat `details.status === 1` as proof
+> the customer still consents.
+
 ---
 
 ## Best Practices

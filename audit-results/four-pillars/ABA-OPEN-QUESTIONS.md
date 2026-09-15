@@ -298,7 +298,7 @@ workarounds in every example (and teaching integrators a dangerous habit).
 2. If self-signed is deliberate, will ABA publish the chain so integrators can pin it via
    `ca:` options instead of disabling verification entirely?
 
-**Q18 — CoF callback contract (token delivery + user-initiated removal)** 🟡 (payload CAPTURED 2026-09-15 §26 AOF-7; signature canonicalization + app-side-removal legs OPEN)
+**Q18 — CoF callback contract (token delivery + user-initiated removal)** 🟡 (payload CAPTURED 2026-09-15 §26 AOF-7; removal = NO callback, details lies — AOF-14; only the signature canonicalization sub-question 5 + new 6 remain OPEN)
 The `pwt` token arrives only via `callback_url` on link-account/link-card; ABA Mobile users
 can remove a token themselves, and the merchant then receives a CoF callback with status 0
 (per live docs, encoded in SDK types).
@@ -330,6 +330,19 @@ differs from the request scheme. Until then the receiver treats real CoF deliver
 unverifiable and recovers the token via `get-token-details` (request_id as proof of
 linkage). Sub-questions 2/4 (app-side removal callbacks) remain open — the last
 un-executed leg of the cycle (needs the human at the phone).
+
+**Status update 2026-09-15, final (app-side unlink executed — §26 AOF-14):**
+sub-questions 2 and 4 CLOSED AS NEGATIVE EVIDENCE: the customer removed BOTH linked
+accounts in ABA Mobile while a live receiver watched the per-request `callback_url` —
+ZERO callbacks were delivered (neither the documented status-0 removal notification nor
+anything else; 3 link-approval callbacks arrived fine on the same URL, so delivery
+works). Removal is only detectable reactively: `payment-credential` (charge) on the
+removed pwts answers `105`; and `get-token-details` KEEPS REPORTING `status: 1`
+(active) with full credential data for the removed tokens — an inconsistency that
+makes proactive detection impossible. NEW sub-question 6: (a) does a user-initiated
+removal callback or profile-level merchant webhook exist at all (and where is it
+configured in the portal)? (b) should `get-token-details` report removed tokens
+differently (status 0 / code 09) instead of `status: 1`?
 
 ### Updated answer log
 

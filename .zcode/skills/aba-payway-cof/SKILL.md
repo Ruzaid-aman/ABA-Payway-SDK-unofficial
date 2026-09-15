@@ -73,7 +73,7 @@ MIT flags answer `105` on this profile; omitting the flag is a gateway `04`.
 ## Error families
 - `status.code "04"` + `errors{}` map → `PayWayBusinessError.fieldErrors` (per-field binding errors).
 - `1`/`01`/`PTL02` → `PayWaySignatureError` (carries the endpoint hash-order hint).
-- `98` merchant not found · `104` **Merchant not enabled token flag** — since 2026-09-15 (§26) this is FLAG-SCOPED on profiles with account-on-file enabled: CITI_FLEX/CITO_FLEX link-account succeeds (`00` + qr_string), while CITO_FIX/CITR_FLEX still 104 and the card leg stays 104 (account-only enablement). Read it as "this flag/channel is not enabled", not "the profile is dead" · `105` invalid payment credential token (live 2026-09-15 §26: unknown/expired pwt, MIT flags on an account token, or a charge against a REMOVED token — no +87-style "removed" discriminator on the account leg) · `09` data not found (live: getTokenDetails for a request that never linked).
+- `98` merchant not found · `104` **Merchant not enabled token flag** — since 2026-09-15 (§26) this is FLAG-SCOPED on profiles with account-on-file enabled: CITI_FLEX/CITO_FLEX link-account succeeds (`00` + qr_string), while CITO_FIX/CITR_FLEX still 104 and the card leg stays 104 (account-only enablement). Read it as "this flag/channel is not enabled", not "the profile is dead" · `105` invalid payment credential token (live 2026-09-15 §26: unknown/expired pwt, MIT flags on an account token, or a token the CUSTOMER removed in ABA Mobile — the app-side unlink kills charging but `getTokenDetails` keeps reporting `status: 1` and NO removal callback fires, so 105 at charge time is the ONLY detection signal) · `09` data not found (live: getTokenDetails for a request that never linked).
 
 ## §24 live facts (2026-09-12) + §26 AOF enablement (2026-09-15)
 - **Hosted outcome is readable server-side**: `linkCard()`'s thrown
@@ -105,7 +105,12 @@ MIT flags answer `105` on this profile; omitting the flag is a gateway `04`.
   tran_id; YOUR tran_id + `check-transaction` is the reconciliation path (live: APPROVED
   + apv, amount fields read 0 on the credential tran, §26 AOF-9/10). Lifecycle ops live-00:
   renew (90-day window restarts, pwt unchanged), remove (local prune; charge-after-remove
-  = 105), re-link (fresh QR + epoch expire_in).
+  = 105), re-link (fresh QR + epoch expire_in). **App-side unlink (AOF-14):** when the
+  customer removes the account in ABA Mobile, charging dies (105) but `getTokenDetails`
+  still says `status: 1` and NO callback is delivered — poll charges, don't trust details,
+  don't wait for a removal webhook. **pwt stability (AOF-13):** re-linking the same
+  ctid+account+flag after ANY removal returns the IDENTICAL pwt. **QR window (AOF-12):
+  creation + ~90 seconds, not the documented 10 minutes** — scan immediately.
 
 ## CLI
 ```sh

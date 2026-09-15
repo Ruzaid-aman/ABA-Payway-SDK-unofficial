@@ -66,6 +66,11 @@ the CREDENTIAL status (1 = active), not a transaction status. ⚠️ The callbac
 canonicalization (§26 AOF-8; unpublished callback canonicalization = ABA Q18.5) —
 confirm via `getTokenDetails({ requestId })` before trusting the delivery.
 
+**Customer-side removal (live 2026-09-15, §26 AOF-14):** when the customer
+unlinks the account in ABA Mobile, charging that pwt dies with `105` — but
+`getTokenDetails` keeps returning `status: 1` and NO removal callback is
+delivered to the request's `callback_url`. Detection is charge-time only.
+
 Hash order (§16-verified, merchant_id first):
 `merchant_id.request_time.ctid.return_deeplink.callback_url.request_id.token_flag.currency`.
 `returnDeeplink` (SDK) / `--return-deeplink` (CLI, JSON-or-string) is optional

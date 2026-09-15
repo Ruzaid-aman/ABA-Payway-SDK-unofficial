@@ -8,9 +8,9 @@
       "description": "First sandbox payment end to end: credentials, .env, generate-qr, check-transaction, polling.",
       "source": "QUICKSTART.md",
       "file": "quickstart.md",
-      "bytes": 12263,
-      "sha256": "57b35672e7bfba44",
-      "sourceSha256": "57b35672e7bfba44"
+      "bytes": 12677,
+      "sha256": "1d23a589d3858dc3",
+      "sourceSha256": "1d23a589d3858dc3"
     },
     {
       "topic": "quickstart-1-page",
@@ -118,9 +118,9 @@
       "description": "Credentials-on-file account/card lifecycle and token renewal.",
       "source": "docs/09-link-unlink-renew-lifecycle.md",
       "file": "link-lifecycle.md",
-      "bytes": 28372,
-      "sha256": "5f4c03f2cbd8906d",
-      "sourceSha256": "80913c62775db51e"
+      "bytes": 29004,
+      "sha256": "0d69d3a056799657",
+      "sourceSha256": "8b045833c9db249c"
     },
     {
       "topic": "ui-customization",
@@ -138,9 +138,9 @@
       "description": "Single best-effort callback delivery, HMAC verification, webhook workbench.",
       "source": "docs/11-callbacks-and-webhooks.md",
       "file": "callbacks-webhooks.md",
-      "bytes": 23110,
-      "sha256": "7dc798e38770a69f",
-      "sourceSha256": "a544f8c50ed918b1"
+      "bytes": 23626,
+      "sha256": "85a9325c8a0533a9",
+      "sourceSha256": "61891b1a3c92ed74"
     },
     {
       "topic": "errors-and-debugging",
@@ -188,9 +188,9 @@
       "description": "Local listener, tunnels, forwarding, and production webhook configuration.",
       "source": "docs/16-webhook-setup-guide.md",
       "file": "webhook-setup.md",
-      "bytes": 21107,
-      "sha256": "758115b558d0e94c",
-      "sourceSha256": "56d880ac8d70498a"
+      "bytes": 21421,
+      "sha256": "349c629aaee4aa53",
+      "sourceSha256": "9db897ad6964f656"
     },
     {
       "topic": "payment-link",
@@ -298,9 +298,9 @@
       "description": "Every SDK domain method and CLI command with flags and contracts.",
       "source": "docs/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
-      "bytes": 47136,
-      "sha256": "f1b0696ba7b2907a",
-      "sourceSha256": "af1a7c7152cf5e13"
+      "bytes": 47287,
+      "sha256": "21117c9343eaeeba",
+      "sourceSha256": "521b45bd2611595c"
     },
     {
       "topic": "error-codes",
