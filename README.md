@@ -35,21 +35,21 @@ To install this checkout in another application, run `npm pack`, then install th
 
 Follow [QUICKSTART.md](./QUICKSTART.md): try the demo → obtain sandbox credentials → prepare a callback URL → create and pay → verify → integrate your server. It includes ABA's official registration link and test-payment guidance. The same create, verify, and fulfill-once journey applies to the SDK, CLI, and skills.
 
-The [first-payment reference app](https://github.com/antigravity-google/aba-payway-ts/tree/main/examples/first-payment) demonstrates server-side pricing, verification, idempotent fulfillment, and reconciliation. It starts in simulated mode without credentials.
+The [first-payment reference app](examples/first-payment) demonstrates server-side pricing, verification, idempotent fulfillment, and reconciliation. It starts in simulated mode without credentials.
 
 ## Integration rules
 
 - Run the SDK on the server. Never expose merchant API keys or COF payment tokens to browser code or an AI provider.
 - Creation acceptance is not payment confirmation. Verify the transaction, amount, and currency before fulfilling an order, and fulfill only once.
 - Callback verification depends on the payment route. Payment-link pushbacks are unsigned and require a status lookup; online checkout verification does not apply to offline KHQR notifications.
-- Test callback handling locally without the ABA Simulator: `setup-webhook --forward-to <your-app-url>` captures and forwards deliveries, and `webhook trigger --event payment.approved` sends a correctly-signed fixture to your receiver (see [Chapter 16](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/16-webhook-setup-guide.md)).
+- Test callback handling locally without the ABA Simulator: `setup-webhook --forward-to <your-app-url>` captures and forwards deliveries, and `webhook trigger --event payment.approved` sends a correctly-signed fixture to your receiver (see [Chapter 16](docs/16-webhook-setup-guide.md)).
 - Expired or closed transactions can still read `PENDING`. Hosted-card sessions may remain payable after close. Enforce local order policy and reconcile late payments.
 - Saved CLI profiles contain plaintext credentials. Use protected local storage for development and a secret manager with explicit SDK configuration in deployed services.
 
 ## For AI coding agents
 
 - **Skills:** install the packaged guides with `npm exec -- payway-sdk skills add claude` (also `codex`, `opencode`, `cursor`, `copilot`) — see [skills/README.md](./skills/README.md).
-- **MCP server:** expose the SDK to any MCP host with `npm exec -- payway-sdk mcp` (stdio; 12 read-only tools by default, `--allow-mutations` adds the create tools; preview with `mcp --list-tools`) — see the [reference](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/SDK-AND-CLI-REFERENCE.md#mcp-server).
+- **MCP server:** expose the SDK to any MCP host with `npm exec -- payway-sdk mcp` (stdio; 12 read-only tools by default, `--allow-mutations` adds the create tools; preview with `mcp --list-tools`) — see the [reference](docs/SDK-AND-CLI-REFERENCE.md#mcp-server).
 - **Offline knowledge base:** `npm exec -- payway-sdk docs list` / `docs <topic>` / `docs search "<terms>"` serves 30 integration topics without network access; the machine-readable index is [llms.txt](./llms.txt).
 
 ## Explore the SDK
@@ -57,17 +57,17 @@ The [first-payment reference app](https://github.com/antigravity-google/aba-payw
 | Task | Guide |
 |---|---|
 | Set up your first payment | [Quickstart](./QUICKSTART.md) |
-| Browse commands and SDK examples | [SDK and CLI reference](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/SDK-AND-CLI-REFERENCE.md) |
-| Choose an integration path | [Documentation index](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/README.md) |
-| Understand verification limits | [Support and compatibility](https://github.com/antigravity-google/aba-payway-ts/blob/main/SUPPORT.md) |
+| Browse commands and SDK examples | [SDK and CLI reference](docs/SDK-AND-CLI-REFERENCE.md) |
+| Choose an integration path | [Documentation index](docs/README.md) |
+| Understand verification limits | [Support and compatibility](SUPPORT.md) |
 | Install coding-agent guides | [Skills](./skills/README.md) |
 | Review changes | [Changelog](./CHANGELOG.md) |
 
 ## Contribute and get support
 
-Start with [CONTRIBUTING.md](https://github.com/antigravity-google/aba-payway-ts/blob/main/CONTRIBUTING.md). Most contributions can be tested without gateway credentials.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). Most contributions can be tested without gateway credentials.
 
-Report reproducible SDK bugs through the issue tracker once the public repository is available. See [SUPPORT.md](https://github.com/antigravity-google/aba-payway-ts/blob/main/SUPPORT.md) for support scope and [SECURITY.md](https://github.com/antigravity-google/aba-payway-ts/blob/main/SECURITY.md) for private vulnerability reporting. Never attach credentials, raw callbacks, or customer data to an issue.
+Report reproducible SDK bugs through the issue tracker once the public repository is available. See [SUPPORT.md](SUPPORT.md) for support scope and [SECURITY.md](SECURITY.md) for private vulnerability reporting. Never attach credentials, raw callbacks, or customer data to an issue.
 
 Documentation links target the development branch during preparation. Release preparation must pin them to the actual published tag and verify the destination repository.
 

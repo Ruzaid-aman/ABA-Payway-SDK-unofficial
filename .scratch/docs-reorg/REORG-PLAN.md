@@ -1,7 +1,7 @@
 # Docs & Knowledge Reorganization — Proposal v1 (REVIEW ONLY)
 
 **Status: PROPOSAL. Nothing has been moved.** Working branch: `docs-reorg-plan`.
-Deliverables on this branch: [`INVENTORY.md`](INVENTORY.md) (all 335 living `.md` files classified) + this plan.
+Deliverables on this branch: [`INVENTORY.md`](INVENTORY.md) (all 335 living `.md` files classified), [`SKILL-REFERENCES-AUDIT.md`](SKILL-REFERENCES-AUDIT.md) (skills → docs reference-integrity pre-check) + this plan.
 **Nothing executes until you approve** — then each phase lands as a separate commit for review.
 
 ---
@@ -97,12 +97,12 @@ Supporting changes:
 
 | # | Dependency | Action |
 |---|---|---|
-| G1 | `scripts/knowledge-sources.mjs` (31 entries; 28 of them point into `docs/`) | Update `source:` paths in the SAME commit; run `npm run sync:knowledge` — `src/__tests__/knowledge.test.ts` freshness gate fails otherwise |
+| G1 | `scripts/knowledge-sources.mjs` (31 entries; 28 of them point into `docs/`) | Update `source:` paths in the SAME commit; run `npm run sync:knowledge` — `src/__tests__/knowledge.test.ts` freshness gate fails otherwise. **Skill-consumed topics:** `setup`, `errors-and-debugging`, `payment-link`, `settlement-disputes`, `agent-setup-playbook` are the five moved sources actively invoked as `payway-sdk docs <topic>` by 8 packaged skills — breaking them degrades those skills' "served offline by the CLI" claims, not just docs nav (see [`SKILL-REFERENCES-AUDIT.md`](SKILL-REFERENCES-AUDIT.md) §2) |
 | G2 | Relative links INSIDE moved files | Depth changes (`../QUICKSTART.md` → `../../QUICKSTART.md`) — rewrite per file |
-| G3 | Inbound links from other md/ts/mjs | Path-qualified refs swept (e.g. `docs/17-payment-link.md`); bare `SANDBOX-FINDINGS §NN` citations in `src/` are move-safe |
+| G3 | Inbound links from other md/ts/mjs | Path-qualified refs swept (e.g. `docs/17-payment-link.md`); bare `SANDBOX-FINDINGS §NN` citations in `src/` are move-safe. **Named item:** the literal `docs/16-webhook-setup-guide.md` constant in `src/__tests__/docs-examples.test.ts` (a skill↔docs content-parity gate pairing it with `skills/aba-payway-offline-qr/SKILL.md`) must switch to `docs/guides/16-webhook-setup-guide.md` in the same commit |
 | G4 | `scripts/check-package-contents.mjs` | Denylist switches to `docs/internal/**` prefix rule (+ keep explicit names for anything left outside); confirm `knowledge/` packaging unaffected |
 | G5 | `docs/README.md` + `docs/VISUAL-GUIDE.md` | Index/routing rewritten to the new tree |
-| G6 | Skills rule "packaged skills must not link into `docs/`" | Verify still true after the sweep (grep) |
+| G6 | Skills contract: "packaged skills must not link into `docs/`" + the one pinned path | Formalized check (expect 0 matches): `grep -rE '\]\((\.\./)*(docs/)' skills/` — verified true today (audit §6). The single prose pointer `docs/error-codes.json` in `skills/aba-payway-agent/SKILL.md` stays valid because that file is NOT in the 49 moves; **any future move of `docs/error-codes.json` must carry that skill line and the knowledge sync script** (audit §1, §7) |
 | G7 | Gates | Full vitest suite + lint + package-contents check green per phase |
 | G8 | Concurrent agents | `.scratch/publish-prep/PUBLIC-SURFACE-MAP.md` (untracked, in flight) maps the public surface by path — sequence this reorg AFTER that campaign closes or fold path updates into it; no merges without your instruction |
 
@@ -128,6 +128,7 @@ Supporting changes:
 | Packaging regression (internal dossier ships publicly) | G4 prefix rule + `check-package-contents` gate per phase |
 | Concurrent-agent collisions (another campaign moves docs mid-wave) | G8 sequencing; reorg stays on `docs-reorg-plan`; per-user instruction for merges |
 | Broken §-citation convention | Filenames of §-cited dossiers never change; only directories move |
+| Packaged skills silently degraded (docs nav moves, skills don't follow) | Skills reach docs only via CLI topics (G1 topic ids untouched) and hold zero `docs/` links (G6 grep, audit §6); the one pinned path (`docs/error-codes.json`) is out of the move list |
 | Corpus topic drift | Topic ids and descriptions untouched in `knowledge-sources.mjs` — only `source:` paths change |
 
 ## 8. Open decisions for you
