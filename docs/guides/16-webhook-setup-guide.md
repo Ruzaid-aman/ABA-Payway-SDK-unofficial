@@ -461,4 +461,4 @@ The callback will appear in your terminal and be saved to disk.
 
 - [Chapter 11 — Callbacks & Webhooks](11-callbacks-and-webhooks.md) — production webhook handler implementation with Express.js
 - [Chapter 12 — Error Handling & Debugging](12-error-handling-and-debugging.md) — troubleshooting callback issues
-- [Cloudflare Free Webhook Guide](../../recipes/cloudflare-free-webhook.md) — permanent webhook archiver using Cloudflare Workers + D1
+- [Cloudflare Free Webhook Guide](../recipes/cloudflare-free-webhook.md) — permanent webhook archiver using Cloudflare Workers + D1

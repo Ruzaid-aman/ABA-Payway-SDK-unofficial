@@ -98,7 +98,7 @@ parsed.notification.customer;             // portal profile snapshot
 parsed.unknownFields;                     // forward-compatible catch-all
 ```
 
-The parser never authenticates anything — parse, then **verify the signature**, then check state + money + dedupe before fulfilling (see the [Customer Module QR skill](../../../skills/aba-payway-customer-qr/SKILL.md) for the full outbox/idempotency handler).
+The parser never authenticates anything — parse, then **verify the signature**, then check state + money + dedupe before fulfilling (see the [Customer Module QR skill](../../skills/aba-payway-customer-qr/SKILL.md) for the full outbox/idempotency handler).
 
 ### 2.2 Receiving with the SDK webhook server
 

@@ -342,7 +342,7 @@ Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](17-p
 
 ### ABA production telemetry — codes by API *(added 2026-09-15)*
 
-The ABA dev team shared a telemetry export grouping every gateway response by **API path + business code + message**. It is now folded into the registry: each code in [`error-codes.json`](../../error-codes.json) can carry `observedOn` (the APIs below, as short labels) and `observedMessage` (the exact gateway string). Provenance rules: `sandboxVerified` still means reproduced in the live sandbox; `observedOn` means seen in ABA production. Where telemetry and old spec-page glosses disagreed, telemetry won (`4`, `16`, `17`, `19`, `21`, `44`) — see the gateway/QR tables above.
+The ABA dev team shared a telemetry export grouping every gateway response by **API path + business code + message**. It is now folded into the registry: each code in [`error-codes.json`](../error-codes.json) can carry `observedOn` (the APIs below, as short labels) and `observedMessage` (the exact gateway string). Provenance rules: `sandboxVerified` still means reproduced in the live sandbox; `observedOn` means seen in ABA production. Where telemetry and old spec-page glosses disagreed, telemetry won (`4`, `16`, `17`, `19`, `21`, `44`) — see the gateway/QR tables above.
 
 | API label | Gateway path | Codes observed (beyond `00`/`0` success) |
 |---|---|---|
