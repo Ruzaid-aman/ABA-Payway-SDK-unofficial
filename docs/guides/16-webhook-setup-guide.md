@@ -22,7 +22,7 @@ When a payment is completed, PayWay can send a server-to-server HTTP POST callba
 
 ## Quick Start
 
-Coming from the [first-payment quickstart](../../../QUICKSTART.md#4-prepare-a-callback-and-check-your-route)? Run the tunnel command below in a separate terminal and leave it running. Copy the complete printed HTTPS URL including `/aba-payway-webhook` into `PAYWAY_CALLBACK_URL` in your payment terminal, then return to the quickstart. See [Cloudflare Tunnel](#cloudflare-tunnel) for prerequisites. The receiver captures test notifications; payment verification and durable fulfillment belong in your application.
+Coming from the [first-payment quickstart](../../QUICKSTART.md#4-prepare-a-callback-and-check-your-route)? Run the tunnel command below in a separate terminal and leave it running. Copy the complete printed HTTPS URL including `/aba-payway-webhook` into `PAYWAY_CALLBACK_URL` in your payment terminal, then return to the quickstart. See [Cloudflare Tunnel](#cloudflare-tunnel) for prerequisites. The receiver captures test notifications; payment verification and durable fulfillment belong in your application.
 
 ```bash
 # Basic — starts server on port 8443, saves callbacks to the data root's webhook_data/callbacks.jsonl
@@ -219,7 +219,7 @@ Full lifecycle: [17. Payment Link API](17-payment-link.md) §17.7.
 
 ### Online Checkout Signature Logging and Offline KHQR Notifications
 
-For the **online checkout route**, the server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then logs HMAC-SHA512 verification using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../../../src/auth.ts)).
+For the **online checkout route**, the server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then logs HMAC-SHA512 verification using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../../src/auth.ts)).
 
 - ✅ **Signature valid** → logs `✓ Signature verified`
 - ❌ **Signature invalid** → logs `✗ Signature mismatch (expected: ...)` but still saves the record

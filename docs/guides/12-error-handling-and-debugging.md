@@ -442,7 +442,7 @@ The same lookup is available programmatically via `explainPayWayCode()` in `aba-
 
 ### Machine-readable registry
 
-Every code the CLI knows is also published as a versioned JSON artifact: [`error-codes.json`](../../error-codes.json). It is **generated**, not hand-maintained — the source of truth is the typed data behind `explain` (`src/cli/explain-code.ts` + `src/constants.ts`), and a drift test (`src/__tests__/error-registry.test.ts`) fails if the committed JSON ever diverges from it. Regenerate after changing any explain data:
+Every code the CLI knows is also published as a versioned JSON artifact: [`error-codes.json`](../error-codes.json). It is **generated**, not hand-maintained — the source of truth is the typed data behind `explain` (`src/cli/explain-code.ts` + `src/constants.ts`), and a drift test (`src/__tests__/error-registry.test.ts`) fails if the committed JSON ever diverges from it. Regenerate after changing any explain data:
 
 ```bash
 npm run gen:error-registry
@@ -457,7 +457,7 @@ Fields:
 | `title` | Short human-readable meaning |
 | `hint` | Branch/recovery advice (what to check next) |
 | `sandboxVerified` | `true` when the meaning was reproduced against the live sandbox; absent means spec-derived or inferred |
-| `evidence` | For live-verified codes: pointer into [`SANDBOX-FINDINGS.md`](../../internal/SANDBOX-FINDINGS.md) (e.g. `SANDBOX-FINDINGS §8/§9`) |
+| `evidence` | For live-verified codes: pointer into [`SANDBOX-FINDINGS.md`](../internal/SANDBOX-FINDINGS.md) (e.g. `SANDBOX-FINDINGS §8/§9`) |
 
 The CLI surfaces the same provenance: `payway-sdk explain PTL36` prints a `✓ sandbox-verified` line in text mode, and `payway-sdk explain PTL36 --json` emits the exact registry entry as one JSON document (`explain --json` with no code lists all of them).
 
