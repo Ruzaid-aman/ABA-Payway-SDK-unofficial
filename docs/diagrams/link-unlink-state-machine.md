@@ -108,8 +108,8 @@ stateDiagram-v2
 
 ## Related Sections
 
-- [Chapter 9 — Link / Unlink / Renew Lifecycle](../09-link-unlink-renew-lifecycle.md) — Full implementation guide
-- [Chapter 1 — Overview & Concepts](../01-overview-and-concepts.md) — Token concepts explained
-- [Glossary](../glossary.md) — Definitions of pwt, ctid, CoF, token flag
+- [Chapter 9 — Link / Unlink / Renew Lifecycle](../guides/09-link-unlink-renew-lifecycle.md) — Full implementation guide
+- [Chapter 1 — Overview & Concepts](../guides/01-overview-and-concepts.md) — Token concepts explained
+- [Glossary](../reference/glossary.md) — Definitions of pwt, ctid, CoF, token flag
 
 > ← [Back to Documentation Home](../README.md)

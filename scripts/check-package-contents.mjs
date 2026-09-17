@@ -43,7 +43,7 @@ const missing = required.filter((entry) => !fileSet.has(entry));
 const forbiddenPathPatterns = [
   /(?:^|\/)src\//,
   /^scripts\//,
-  /(?:^|\/)docs\//,
+  /^docs\/internal\//,
   /(?:^|\/)examples\//,
   /(?:^|\/)payway-boilerplate\//,
   /(?:^|\/)(?:test-output|test-logs|audit-results|\.scratch|\.agents)\//,

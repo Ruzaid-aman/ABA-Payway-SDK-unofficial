@@ -66,4 +66,4 @@ The wider installed-workflow soak (F10), harness expansion (F12), and selective
 shortening of long skill entrypoints remain enhancements. This pass adds
 targeted coverage and one supporting reference; it does not claim complete
 workflow coverage for every skill. Provider/owner and history decisions remain
-in [release readiness](../../docs/RELEASE-READINESS.md).
+in [release readiness](../../docs/project/RELEASE-READINESS.md).

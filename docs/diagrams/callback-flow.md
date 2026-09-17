@@ -120,8 +120,8 @@ export function verifyCallbackSignature(
 
 ## Related Sections
 
-- [Chapter 11 — Callbacks & Webhooks](../11-callbacks-and-webhooks.md) — Full implementation guide
-- [Chapter 12 — Error Handling & Debugging](../12-error-handling-and-debugging.md) — Common callback errors
-- [Chapter 13 — Deployment Checklist](../13-deployment-checklist.md) — Go-live verification
+- [Chapter 11 — Callbacks & Webhooks](../guides/11-callbacks-and-webhooks.md) — Full implementation guide
+- [Chapter 12 — Error Handling & Debugging](../guides/12-error-handling-and-debugging.md) — Common callback errors
+- [Chapter 13 — Deployment Checklist](../guides/13-deployment-checklist.md) — Go-live verification
 
 > ← [Back to Documentation Home](../README.md)

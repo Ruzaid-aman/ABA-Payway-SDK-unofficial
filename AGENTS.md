@@ -96,6 +96,9 @@ npx tsx src/cli.ts agent config --json
 npx tsx src/cli.ts agent doctor --json
 ```
 
+Note: For maintainers and agents, the canonical internal dossier hub is at `docs/internal/README.md`.
+Consult `docs/internal/` for internal findings and `docs/guides/` for public-facing guides.
+
 - `--json` success envelopes carry `correlationId`/`traceId` (join keys into the journal); poll timeouts on
   generate-qr/generate-checkout exit 3 (machine-visible, W5-11 fixed); create commands warn on duplicate
   tran_ids seen in the journal (`--allow-duplicate-id` to suppress). The error envelope

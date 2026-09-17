@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/13-deployment-checklist.md for compatibility. Do not edit here. -->
+
 # Chapter 13 — Deployment Checklist
 
 > **Estimated reading time:** 10 minutes  
@@ -110,7 +112,7 @@ Go through **every** item before switching from sandbox to production. A missed 
 ### Transaction Lifecycle
 
 - [ ] **`unlink()` / `removeToken()` is called when user removes a payment method**  
-  See [Chapter 9 — Link / Unlink / Renew Lifecycle](./09-link-unlink-renew-lifecycle.md).
+  See [Chapter 9 — Link / Unlink / Renew Lifecycle](09-link-unlink-renew-lifecycle.md).
 
 - [ ] **Transaction IDs are unique per payment attempt**  
   ```typescript
@@ -132,7 +134,7 @@ Go through **every** item before switching from sandbox to production. A missed 
   `return_url` must be public HTTPS accepting `POST application/json` (the
   pushback carries no hash — verify via `check-transaction`). Run
   `payway-sdk doctor` to confirm the key. See
-  [17. Payment Link API](./17-payment-link.md).
+  [17. Payment Link API](17-payment-link.md).
 
 ### QR Codes
 
@@ -281,7 +283,7 @@ Print this and keep it handy during launch:
 
 You've completed the implementation guide! Here's what to do next:
 
-- **[Chapter 14 — Appendix: Code Snippets](./14-appendix-code-snippets.md)** — Full copy-paste-ready examples
-- **[README](./README.md)** — Documentation index with all chapters
+- **[Chapter 14 — Appendix: Code Snippets](14-appendix-code-snippets.md)** — Full copy-paste-ready examples
+- **[README](../README.md)** — Documentation index with all chapters
 
-> ← [Previous: Error Handling & Debugging](./12-error-handling-and-debugging.md) | [Next: Appendix →](./14-appendix-code-snippets.md)
+> ← [Previous: Error Handling & Debugging](12-error-handling-and-debugging.md) | [Next: Appendix →](14-appendix-code-snippets.md)

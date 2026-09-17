@@ -1,10 +1,9 @@
 # Open Questions for ABA (PayWay Gateway) — Consolidated 2026-08-27
 
-> **Superseded-in-part 2026-09-02:** see the **"Re-audit 2026-09-02"** section at the bottom
-> for current statuses — Q1/Q2 are resolved-by-evidence, Q3/Q4/Q9/Q10 gained new evidence,
-> and **Q11–Q18 are new questions** discovered by the v1.3.6 live-parity campaign,
-> the §14–§16 sandbox findings, and the payout/beneficiary probes. The Q1–Q10 bodies
-> below are kept verbatim (append-only audit discipline).
+> **SUPERSEDED (in part) — 2026-09-02:** This consolidated register has been partially superseded by the
+> canonical internal question register at `docs/internal/INTEGRATION-GAPS-AND-ABA-QUESTIONS.md` (use that
+> file for the latest Q-status table and answers). The original Q1–Q10 bodies are retained here as an
+> append-only audit transcript; for current actionable status consult the internal register.
 
 **Purpose:** a ready-to-send clarification list for ABA PayWay integration
 support / developer relations, consolidating every blocker discovered during the

@@ -975,7 +975,7 @@ extension CheckoutViewController: ABAPayWayDelegate {
 ## See Also
 
 - [Android SDK Documentation](../android/README.md)
-- [Web Implementation Guide](../../docs/03-web-implementation.md)
-- [Deep Linking Guide](../../docs/08-deep-linking.md)
-- [API Reference](../../docs/11-callbacks-and-webhooks.md)
-- [Error Handling Guide](../../docs/12-error-handling-and-debugging.md)
+- [Web Implementation Guide](../../../../docs/guides/03-web-implementation.md)
+- [Deep Linking Guide](../../../../docs/guides/08-deep-linking.md)
+- [API Reference](../../../../docs/guides/11-callbacks-and-webhooks.md)
+- [Error Handling Guide](../../../../docs/guides/12-error-handling-and-debugging.md)

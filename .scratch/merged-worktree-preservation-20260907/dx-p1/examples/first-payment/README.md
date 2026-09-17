@@ -56,9 +56,9 @@ PUBLIC_BASE_URL=https://your-public-host.example
 
 ## Safety contracts shown in code
 
-- The browser submits only `productId`; [`src/order-store.ts`](./src/order-store.ts) owns price and currency.
-- [`src/payment-service.ts`](./src/payment-service.ts) stores a `SUBMITTING` attempt before the create call. A network or timeout error becomes `PAYMENT_OUTCOME_UNKNOWN`, which blocks another create until reconciliation.
-- [`src/app.ts`](./src/app.ts) returns sanitized payment artifacts. It never returns credentials, signatures, or raw PayWay responses.
+- The browser submits only `productId`; [`src/order-store.ts`](src/order-store.ts) owns price and currency.
+- [`src/payment-service.ts`](src/payment-service.ts) stores a `SUBMITTING` attempt before the create call. A network or timeout error becomes `PAYMENT_OUTCOME_UNKNOWN`, which blocks another create until reconciliation.
+- [`src/app.ts`](src/app.ts) returns sanitized payment artifacts. It never returns credentials, signatures, or raw PayWay responses.
 - A signed online callback and a status/detail lookup may fulfill. `/api/payway/khqr-notification` is captured as unverified and cannot mark an order paid because offline ABA KHQR notification semantics are separate.
 - Approved payments must match the stored transaction, amount, and currency. Fulfillment and refund IDs are idempotent.
 - Local closure is advisory. A later approval becomes `RESOLUTION_REQUIRED`; the app does not auto-refund it.

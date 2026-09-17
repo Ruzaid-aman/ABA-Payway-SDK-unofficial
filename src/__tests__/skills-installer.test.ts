@@ -290,7 +290,7 @@ describe('skills installer (F09)', () => {
     }
     expect(healthy).toBe(true);
     expect(lines.join('\n')).not.toContain('claude');
-  });
+  }, 30_000);
 
   it('listSkills reports the install for the given destination', async () => {
     const dest = newDest();

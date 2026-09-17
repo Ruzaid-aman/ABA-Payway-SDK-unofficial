@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/20-settlement-and-disputes.md for compatibility. Do not edit here. -->
+
 # Chapter 20 — Settlement, Payouts, FX, and Disputes
 
 Money movement *after* the payment is approved: when funds settle, how to
@@ -5,9 +7,9 @@ reconcile, when payouts land, how currency conversion works, and what happens in
 a dispute. Everything marked **confirmed** comes from the ABA integration team
 (2026-09-12); anything still unconfirmed says so.
 
-For payment-acceptance flows start at [Chapter 3](./03-web-implementation.md) or
-[Chapter 7](./07-qr-code-handling.md); for refund mechanics and error codes see
-[Chapter 12](./12-error-handling-and-debugging.md).
+For payment-acceptance flows start at [Chapter 3](03-web-implementation.md) or
+[Chapter 7](07-qr-code-handling.md); for refund mechanics and error codes see
+[Chapter 12](12-error-handling-and-debugging.md).
 
 ## 20.1 Callback delivery is best-effort — reconciliation is mandatory
 
@@ -26,7 +28,7 @@ Required pattern:
 - Recovery: Check Transaction / `get-transactions-by-mc-ref` polling for
   anything that did not produce a verified callback (poll only pending
   transactions; stop at final status or lifetime).
-- Never treat a missing callback as non-payment — see [Chapter 18](./18-transaction-journal.md) for the local journal and `journal reconcile`.
+- Never treat a missing callback as non-payment — see [Chapter 18](18-transaction-journal.md) for the local journal and `journal reconcile`.
 
 ## 20.2 Settlement cycle (T+N)
 
@@ -79,8 +81,8 @@ Keep a consistent internal ledger: `your_order_id ↔ tran_id ↔ bank_ref`.
   before the split. Design split flows to make refund decisions before
   completing the payout. (confirmed 2026-09-12)
 
-Mechanics: [Chapter 12 — Payout error codes](./12-error-handling-and-debugging.md),
-[Chapter 17 §17.5](./17-payment-link.md#175-split-payout), and the seeded
+Mechanics: [Chapter 12 — Payout error codes](12-error-handling-and-debugging.md),
+[Chapter 17 §17.5](17-payment-link.md#175-split-payout), and the seeded
 `sandbox-beneficiaries` fixtures.
 
 ## 20.5 Currency conversion (FX)
@@ -130,7 +132,7 @@ expiry is enforced merchant-side. The canonical mapping was confirmed by ABA
 
 A partial refund flips the whole `payment_status` to `REFUNDED` — verify actual
 refunded amounts via `refund_amount` / `transaction_operations` in
-transaction-detail, not the status string ([Chapter 12](./12-error-handling-and-debugging.md)).
+transaction-detail, not the status string ([Chapter 12](12-error-handling-and-debugging.md)).
 
 ```ts
 import { PAYMENT_STATUS_CODES } from 'aba-payway-ts';

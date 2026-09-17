@@ -94,8 +94,8 @@ This is handled automatically by `payway.verifyCallback()` in the SDK.
 
 ## Related Sections
 
-- [Chapter 1 — Overview & Concepts](../01-overview-and-concepts.md) — High-level concepts
-- [Chapter 11 — Callbacks & Webhooks](../11-callbacks-and-webhooks.md) — Detailed webhook implementation
-- [Chapter 3 — Web Implementation](../03-web-implementation.md) — Building your first checkout flow
+- [Chapter 1 — Overview & Concepts](../guides/01-overview-and-concepts.md) — High-level concepts
+- [Chapter 11 — Callbacks & Webhooks](../guides/11-callbacks-and-webhooks.md) — Detailed webhook implementation
+- [Chapter 3 — Web Implementation](../guides/03-web-implementation.md) — Building your first checkout flow
 
 > ← [Back to Documentation Home](../README.md)

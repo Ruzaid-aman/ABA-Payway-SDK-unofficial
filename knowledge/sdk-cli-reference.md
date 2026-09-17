@@ -38,7 +38,7 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 
 ### Agentic PayWay CLI
 
-The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk onboard`, `payway-sdk agent setup|doctor|sessions`). See the [1-pager agentic guide](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/QUICK-START-1-PAGER.md#agentic-payway-cli) and the skill guides:
+The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk onboard`, `payway-sdk agent setup|doctor|sessions`). See the [1-pager agentic guide](payway-sdk docs quickstart-1-page) and the skill guides:
 
 - [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) — provider modes, the 14 tools, risk gates, execution ledger, sessions, redaction, and read-only journal queries.
 - [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md) — choosing QR / checkout / payment-link for a first payment.
@@ -56,7 +56,7 @@ payway-sdk agent setup --provider opencode --model x-preview-f-free \
 payway-sdk ask "Generate an online QR for 3 USD" --yolo
 ```
 
-> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. The strict-JSON planning prompt embeds a full tool catalog, off-schema plans get one automatic repair round, and transient provider errors (429/5xx) are retried with backoff. Model-supplied callback URLs are overridden by your merchant profile's configured callback. Every agent action has a fully-supported manual equivalent. Setup requires a saved credential profile and a public HTTPS callback — see the [Agent Setup Playbook](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/AGENT-SETUP-PLAYBOOK.md) for the field-tested path.
+> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. The strict-JSON planning prompt embeds a full tool catalog, off-schema plans get one automatic repair round, and transient provider errors (429/5xx) are retried with backoff. Model-supplied callback URLs are overridden by your merchant profile's configured callback. Every agent action has a fully-supported manual equivalent. Setup requires a saved credential profile and a public HTTPS callback — see the [Agent Setup Playbook](payway-sdk docs agent-setup-playbook) for the field-tested path.
 
 ### CLI commands
 
@@ -148,7 +148,7 @@ Online `generate-qr` saves the QR PNG by default to `payway-output/<transaction-
 - `--open-image` — force-open regardless of environment.
 - `--no-open-image` — never open; use `--save-image <path>` still controls where the file lands.
 
-The same opener is available programmatically via the exported [`openImageInDefaultViewer()`](https://github.com/antigravity-google/aba-payway-ts/blob/main/src/open-image.ts) helper (allowlisted per-platform command, spawned without a shell, never throws).
+The same opener is available programmatically via the exported `openImageInDefaultViewer()` helper (allowlisted per-platform command, spawned without a shell, never throws).
 
 ### Fastest refund follow-up
 
@@ -601,7 +601,7 @@ const linkWithPayout = await payway.paymentLink.create({
 //   --payout '[{"acc":"500000001","amt":100.00},{"acc":"500000002","amt":50.00}]'
 ```
 
-Full lifecycle guide — parameter tables, datatype reality notes, pushback receiver, permutations & recipes, troubleshooting: **[docs/17-payment-link.md](https://github.com/antigravity-google/aba-payway-ts/blob/main/docs/17-payment-link.md)**.
+Full lifecycle guide — parameter tables, datatype reality notes, pushback receiver, permutations & recipes, troubleshooting: **[docs/17-payment-link.md](payway-sdk docs payment-link)**.
 
 ```sh
 # Inspecting a link from the CLI — the opaque Link ID from create's data.id:

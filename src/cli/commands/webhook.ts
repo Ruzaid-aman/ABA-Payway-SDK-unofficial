@@ -1,6 +1,6 @@
 /**
  * `payway-sdk webhook` — local webhook workbench (P0 Wave 1 of
- * docs/competitive-analysis-cli-stripe-razorpay.md; the Stripe
+ * docs/strategy/competitive-analysis-cli-stripe-razorpay.md; the Stripe
  * listen/trigger/events-resend analog for PayWay).
  *
  * Subcommands:

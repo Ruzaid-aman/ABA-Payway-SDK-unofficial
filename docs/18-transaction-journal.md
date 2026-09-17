@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/18-transaction-journal.md for compatibility. Do not edit here. -->
+
 # 18 — Transaction Journal
 
 > Shipped as Phase 1 (Observability) of the transaction-data modernization roadmap —

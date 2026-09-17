@@ -1,6 +1,6 @@
 /**
  * Webhook forwarder — re-POST a captured/raw PayWay callback to a local app
- * (P0 W-1 of docs/competitive-analysis-cli-stripe-razorpay.md).
+ * (P0 W-1 of docs/strategy/competitive-analysis-cli-stripe-razorpay.md).
  *
  * The forwarder is the Stripe `listen --forward-to` analog for PayWay: the
  * capture server (`setup-webhook`) keeps its capture/store/journal contract

@@ -1,6 +1,6 @@
 # Security policy
 
-Report suspected SDK vulnerabilities privately to `security@antigravity.dev`. Maintainers must confirm this mailbox is owned and monitored before public launch; that operational check is tracked in the [release checklist](docs/RELEASE_CHECKLIST.md).
+Report suspected SDK vulnerabilities privately to `security@antigravity.dev`. Maintainers must confirm this mailbox is owned and monitored before public launch; that operational check is tracked in the [release checklist](docs/project/RELEASE_CHECKLIST.md).
 
 Include the SDK/Node versions, impact, and a minimal reproduction using synthetic data. Never send real merchant credentials, COF tokens, or customer data. Do not open a public issue containing exploit details or secrets.
 
