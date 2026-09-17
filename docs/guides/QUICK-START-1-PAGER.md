@@ -1,6 +1,6 @@
 # First Payment
 
-The [canonical quickstart](../QUICKSTART.md) contains installation, sandbox setup, and the first runnable payment. Start there.
+The [canonical quickstart](../../QUICKSTART.md) contains installation, sandbox setup, and the first runnable payment. Start there.
 
 **Create -> show the artifact -> verify -> fulfill once.**
 
@@ -14,7 +14,7 @@ The [canonical quickstart](../QUICKSTART.md) contains installation, sandbox setu
 
 Expiry and closure are local policy, not durable gateway statuses. A redirect, timeout, or missing callback is not proof of payment or failure. Payment-link notifications are unsigned and require a server-side lookup.
 
-Use the [documentation index](./README.md) to choose a route, verify payments, or troubleshoot.
+Use the [documentation index](../README.md) to choose a route, verify payments, or troubleshoot.
 
 ## Automation
 
@@ -22,4 +22,4 @@ Use `--output json` for one create result or `--output ndjson` for a stream. Exi
 
 ## Agentic PayWay CLI
 
-For optional conversational workflows, see the [agent CLI guide](./AGENTIC-PAYWAY-CLI-USER-GUIDE.md) and [skills](../skills/README.md). They are not required for your first payment.
+For optional conversational workflows, see the [agent CLI guide](AGENTIC-PAYWAY-CLI-USER-GUIDE.md) and [skills](../../skills/README.md). They are not required for your first payment.

@@ -43,7 +43,7 @@ The earlier audit was too broad in treating the hosted URL contract as obsolete.
 | **R6** | **P2** | `reconcile.cjs:133`–143: a legacy timestamp file and its sibling `.seen.json` load with an empty ID set. The new inclusive timestamp policy can then re-emit old transactions. | Migrate the legacy pair into the new checkpoint before processing; add an upgrade/restart fixture. |
 | **R7** | **P2** | `src/cli/commands/skills.ts:doctorSkills`: change a packaged guide after installing it; doctor still returns true for the old installed copy. It compares installed bytes with the old manifest, not the new package. | Compare package, installed and baseline hashes; distinguish outdated, locally modified, missing and incompatible. Parse frontmatter instead of checking only its opening delimiter. |
 
-`reconcile.cjs` above means `skills/aba-payway-transaction-by-merchant-ref/scripts/reconcile.cjs`. Full original explanations remain in [the previous review](../skills-improvements-review-2026-09-07.md); today's outcomes are recorded in [results.json](./results.json).
+`reconcile.cjs` above means `skills/aba-payway-transaction-by-merchant-ref/scripts/reconcile.cjs`. Full original explanations remain in [the previous review](../skills-improvements-review-2026-09-07.md); today's outcomes are recorded in [results.json](results.json).
 
 These are local behavior defects. In particular, R1 does not establish that the gateway permits an excessive refund, and R2 does not establish that every production callback uses the fixture shape. It establishes that the recommended handler cannot process the project's own supported approved fixture.
 
@@ -180,7 +180,7 @@ Run the synthetic probes from the repository root after build:
 npx tsx audit-results/second-pass-2026-09-08/probes.mts
 ```
 
-The [probe source](./probes.mts) writes [results.json](./results.json). It uses temporary installation directories, synthetic credentials, a stubbed refund fetch, and locally generated KHQR data. Callback signature verification is intentionally stubbed successful to isolate post-verification handler behavior. No real PayWay network requests, charges, refunds or customer callbacks are sent. Temporary fixture folders are reported in the results and retained for inspection.
+The [probe source](probes.mts) writes [results.json](results.json). It uses temporary installation directories, synthetic credentials, a stubbed refund fetch, and locally generated KHQR data. Callback signature verification is intentionally stubbed successful to isolate post-verification handler behavior. No real PayWay network requests, charges, refunds or customer callbacks are sent. Temporary fixture folders are reported in the results and retained for inspection.
 
 Build outputs were regenerated. Tracked source stayed unchanged, and HEAD stayed at `b12e301`. Coverage, hosted CI, new production verification and exhaustive security testing were not run.
 

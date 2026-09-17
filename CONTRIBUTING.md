@@ -50,6 +50,6 @@ Use your own sandbox merchant account; never use production credentials for cont
 
 ## Review and release
 
-Run required checks before requesting review. Maintainers decide release versions, external verification, tags, and publication using the [release checklist](docs/RELEASE_CHECKLIST.md). Raising the supported Node.js floor is a breaking change.
+Run required checks before requesting review. Maintainers decide release versions, external verification, tags, and publication using the [release checklist](docs/project/RELEASE_CHECKLIST.md). Raising the supported Node.js floor is a breaking change.
 
 For SDK questions see [SUPPORT.md](SUPPORT.md). Report vulnerabilities privately using [SECURITY.md](SECURITY.md).

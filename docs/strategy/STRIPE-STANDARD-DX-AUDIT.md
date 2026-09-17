@@ -28,7 +28,7 @@ These nine principles are the rubric applied below.
 
 ## 1. Executive Summary
 
-The ABA PayWay TypeScript SDK is **already substantially more mature than a typical "vibecoded" SDK**. Prior work (documented in `docs/PROJECT_STATUS.md` and this session's direct verification) has already closed out most of the *critical* bugs a first audit would normally lead with: `cancel_url`/`continue_success_url`/`return_params` are now consistently base64-encoded ([src/domains/checkout.ts](../src/domains/checkout.ts#L62-L75)), errors use `Object.setPrototypeOf` for reliable `instanceof`, retries with exponential backoff exist, rate-limit throttling exists, and 136 tests pass cleanly across 5 files.
+The ABA PayWay TypeScript SDK is **already substantially more mature than a typical "vibecoded" SDK**. Prior work (documented in `docs/PROJECT_STATUS.md` and this session's direct verification) has already closed out most of the *critical* bugs a first audit would normally lead with: `cancel_url`/`continue_success_url`/`return_params` are now consistently base64-encoded ([src/domains/checkout.ts](../../src/domains/checkout.ts#L62-L75)), errors use `Object.setPrototypeOf` for reliable `instanceof`, retries with exponential backoff exist, rate-limit throttling exists, and 136 tests pass cleanly across 5 files.
 
 What remains is not "make it work" — it's **"make it feel like Stripe."** Concretely, three things separate this SDK from Stripe-grade DX today:
 
@@ -59,7 +59,7 @@ These gates are intentionally stricter than a normal library project because pay
 | Signal | Stripe | PayWay SDK | Verdict |
 |---|---|---|---|
 | Single command install | `npm install stripe` | `npm install aba-payway-ts` | ✅ Parity |
-| Time to first (real) call | Minutes — key + one call | Minutes — `new PayWay({...})` then `payway.checkout.createTransaction(...)` is a **local, synchronous, non-network HMAC-signing call** ([src/client.ts](../src/client.ts)); the *first async network call* a merchant makes is typically `checkTransaction` after redirect | ✅ Actually easier to smoke-test than Stripe — no live network call required to validate wiring |
+| Time to first (real) call | Minutes — key + one call | Minutes — `new PayWay({...})` then `payway.checkout.createTransaction(...)` is a **local, synchronous, non-network HMAC-signing call** ([src/client.ts](../../src/client.ts)); the *first async network call* a merchant makes is typically `checkTransaction` after redirect | ✅ Actually easier to smoke-test than Stripe — no live network call required to validate wiring |
 | One documented "canonical" starting doc | `docs.stripe.com/development` | `README.md` exists but **does not link to** `docs/README.md`'s 15-chapter guide, diagrams, or examples folder | ❌ Gap — a new developer reading only the npm README will never discover the deeper docs |
 | Correct first webhook example | Verified against API reference | **Wrong** — reads `req.body.hash` (README.md:151, docs/11-callbacks-and-webhooks.md:64,150) vs. spec's `X-PAYWAY-HMAC-SHA512` header (payway-openapi/components/webhooks.yaml:8-26) | 🔴 Critical — breaks trust the moment a merchant implements webhooks, which is one of the first things any payment integration needs working |
 | Table of contents / navigability | Yes | No TOC in README.md | ❌ Minor gap |
@@ -71,8 +71,8 @@ These gates are intentionally stricter than a normal library project because pay
 Verified directly against source:
 
 - **Domain factory pattern is consistent** across all 7 domains (`checkout`, `credentialsOnFile`, `qr`, `paymentLink`, `preAuth`, `payout`, `khqr`) — each exports an interface + a `create<Domain>Domain(config, request, requestWithMerchantAuth)` factory. This is a genuinely good, Stripe-like "resource namespace" architecture (`payway.checkout.x`, `payway.payout.y` mirrors `stripe.customers.x`, `stripe.charges.y`).
-- **Input validation is inconsistent across domains.** `checkout.createTransaction` calls `validateTransactionId`, `validatePositiveAmount`, `validateCurrency`, `validateLifetime` ([src/domains/checkout.ts](../src/domains/checkout.ts#L56-L60)). `paymentLink.create` accepts an `amount` field but calls **none** of these validators ([src/domains/payment-link.ts](../src/domains/payment-link.ts#L20-L33)). A merchant who passes a negative amount or a 3-decimal USD value gets caught in `checkout` but not in `paymentLink` — same bug class, different domain, different outcome.
-- **Lint configuration under-enforces.** `biome.json` sets `noExplicitAny` and `noNonNullAssertion` to `"warn"` ([biome.json](../biome.json#L5-L11)), which does not fail CI or `npm run lint` (Biome warnings are non-blocking by default). For a payment SDK, both rules should be `"error"`.
+- **Input validation is inconsistent across domains.** `checkout.createTransaction` calls `validateTransactionId`, `validatePositiveAmount`, `validateCurrency`, `validateLifetime` ([src/domains/checkout.ts](../../src/domains/checkout.ts#L56-L60)). `paymentLink.create` accepts an `amount` field but calls **none** of these validators ([src/domains/payment-link.ts](../../src/domains/payment-link.ts#L20-L33)). A merchant who passes a negative amount or a 3-decimal USD value gets caught in `checkout` but not in `paymentLink` — same bug class, different domain, different outcome.
+- **Lint configuration under-enforces.** `biome.json` sets `noExplicitAny` and `noNonNullAssertion` to `"warn"` ([biome.json](../../biome.json#L5-L11)), which does not fail CI or `npm run lint` (Biome warnings are non-blocking by default). For a payment SDK, both rules should be `"error"`.
 - **Error hierarchy is shallow.** `src/errors.ts` has exactly 3 classes: `PayWayError` → `PayWayConfigError` / `PayWayAPIError`. `PayWayAPIError` carries good *data* (`statusCode`, `paywayCode`, `endpoint`, `retryable`, `rateLimitInfo`, `toJSON()`), but no *type discrimination* — callers must inspect string fields rather than `catch`-and-`instanceof`/`switch` on distinct classes.
 - **Naming has no single verb convention** across domains: `checkout.checkTransaction`, `credentialsOnFile.payment`, `payout.payout`, `qr.generateQr`, `khqr.getTransactionsByMerchantRef`. Functionally fine, but a new contributor writing an 8th domain has no style guide to follow.
 - **Strengths worth preserving:** timing-safe webhook comparison (`crypto.timingSafeEqual` in `src/auth.ts`), correct RSA PKCS1 117-byte chunking with round-trip tests, token-bucket rate-limit throttling, and generic `_executeFetch` de-duplicating retry/timeout/parsing logic across `request()` and `requestWithMerchantAuth()`.
@@ -146,9 +146,9 @@ This is the exact order I would use to execute Priority 1.
 Purpose: eliminate the security-relevant doc mismatch before adding any new examples.
 
 Files:
-- [README.md](../README.md)
-- [docs/11-callbacks-and-webhooks.md](11-callbacks-and-webhooks.md)
-- [docs/README.md](README.md)
+- [README.md](../../README.md)
+- [docs/11-callbacks-and-webhooks.md](../guides/11-callbacks-and-webhooks.md)
+- [docs/README.md](../README.md)
 
 Changes:
 - Replace every `req.body.hash` example with header-based extraction from `X-PAYWAY-HMAC-SHA512`.
@@ -173,8 +173,8 @@ Done when:
 Purpose: remove ambiguity for Stripe-experienced developers and make the test posture explicit.
 
 Files:
-- [README.md](../README.md)
-- [docs/12-error-handling-and-debugging.md](12-error-handling-and-debugging.md)
+- [README.md](../../README.md)
+- [docs/12-error-handling-and-debugging.md](../guides/12-error-handling-and-debugging.md)
 
 Changes:
 - Add one short FAQ section explaining that PayWay does not currently expose Stripe-style idempotency keys (if that remains true after verification).
@@ -197,8 +197,8 @@ Done when:
 Purpose: ensure the prose examples are backed by runnable code so docs regressions fail CI.
 
 Files:
-- [docs/examples/backend/](../docs/examples/backend/)
-- [src/__tests__/docs-examples.test.ts](../src/__tests__/docs-examples.test.ts)
+- [docs/examples/backend/](../examples/backend)
+- [src/__tests__/docs-examples.test.ts](../../src/__tests__/docs-examples.test.ts)
 
 Changes:
 - Extract the webhook verification example into a small reusable example module.
@@ -222,8 +222,8 @@ Done when:
 Purpose: make the deep docs discoverable from the npm landing page.
 
 Files:
-- [README.md](../README.md)
-- [docs/README.md](README.md)
+- [README.md](../../README.md)
+- [docs/README.md](../README.md)
 
 Changes:
 - Add a short table of contents or quick-links block near the top of the README.
@@ -248,11 +248,11 @@ This is the exact order I would use to execute Priority 2.
 Purpose: make PayWay errors classifiable without string parsing.
 
 Files:
-- [src/errors.ts](../src/errors.ts)
-- [src/client.ts](../src/client.ts)
-- [src/__tests__/client.test.ts](../src/__tests__/client.test.ts)
-- [README.md](../README.md)
-- [docs/12-error-handling-and-debugging.md](12-error-handling-and-debugging.md)
+- [src/errors.ts](../../src/errors.ts)
+- [src/client.ts](../../src/client.ts)
+- [src/__tests__/client.test.ts](../../src/__tests__/client.test.ts)
+- [README.md](../../README.md)
+- [docs/12-error-handling-and-debugging.md](../guides/12-error-handling-and-debugging.md)
 
 Changes:
 - Add narrow subclasses or a discriminated `type` field for business, network, rate-limit, and config failures.
@@ -278,14 +278,14 @@ Done when:
 Purpose: make input validation consistent wherever the SDK accepts money, currency, or identifiers.
 
 Files:
-- [src/domains/payment-link.ts](../src/domains/payment-link.ts)
-- [src/domains/pre-auth.ts](../src/domains/pre-auth.ts)
-- [src/domains/payout.ts](../src/domains/payout.ts)
-- [src/domains/khqr.ts](../src/domains/khqr.ts)
-- [src/utils.ts](../src/utils.ts)
-- [src/__tests__/client.test.ts](../src/__tests__/client.test.ts)
-- [src/__tests__/utils.test.ts](../src/__tests__/utils.test.ts)
-- [src/__tests__/merchant-scenario-coverage.test.ts](../src/__tests__/merchant-scenario-coverage.test.ts)
+- [src/domains/payment-link.ts](../../src/domains/payment-link.ts)
+- [src/domains/pre-auth.ts](../../src/domains/pre-auth.ts)
+- [src/domains/payout.ts](../../src/domains/payout.ts)
+- [src/domains/khqr.ts](../../src/domains/khqr.ts)
+- [src/utils.ts](../../src/utils.ts)
+- [src/__tests__/client.test.ts](../../src/__tests__/client.test.ts)
+- [src/__tests__/utils.test.ts](../../src/__tests__/utils.test.ts)
+- [src/__tests__/merchant-scenario-coverage.test.ts](../../src/__tests__/merchant-scenario-coverage.test.ts)
 
 Changes:
 - Apply the same `validatePositiveAmount` and `validateCurrency` checks used in checkout to the other money-moving domains.
@@ -310,11 +310,11 @@ Done when:
 Purpose: make the linter actually block unsafe patterns instead of just warning about them.
 
 Files:
-- [biome.json](../biome.json)
-- [src/client.ts](../src/client.ts)
-- [src/errors.ts](../src/errors.ts)
-- [src/utils.ts](../src/utils.ts)
-- [src/__tests__/*.ts](../src/__tests__)
+- [biome.json](../../biome.json)
+- [src/client.ts](../../src/client.ts)
+- [src/errors.ts](../../src/errors.ts)
+- [src/utils.ts](../../src/utils.ts)
+- [src/__tests__/*.ts](../../src/__tests__)
 
 Changes:
 - Change `noExplicitAny` and `noNonNullAssertion` to `error`.
@@ -338,10 +338,10 @@ Done when:
 Purpose: make the project ready for outside contributors and security reporters.
 
 Files:
-- [CONTRIBUTING.md](../CONTRIBUTING.md)
-- [SECURITY.md](../SECURITY.md)
-- [README.md](../README.md)
-- [.github/](../.github/)
+- [CONTRIBUTING.md](../../CONTRIBUTING.md)
+- [SECURITY.md](../../SECURITY.md)
+- [README.md](../../README.md)
+- [.github/](../../.github)
 
 Changes:
 - Add a short contribution guide that explains how to run tests, lint, typecheck, and sandbox verification.
@@ -366,8 +366,8 @@ Purpose: make sandbox verification a repeatable release requirement instead of a
 
 Files:
 - [docs/STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md)
-- [README.md](../README.md)
-- [docs/README.md](README.md)
+- [README.md](../../README.md)
+- [docs/README.md](../README.md)
 
 Changes:
 - Add a short checklist telling maintainers to record the sandbox command, credentials source, and observed result for every user-facing change.
@@ -393,15 +393,15 @@ This is the exact order I would use to execute Priority 3.
 Purpose: give advanced users a narrow escape hatch without forcing global config changes.
 
 Files:
-- [src/client.ts](../src/client.ts)
-- [src/domains/checkout.ts](../src/domains/checkout.ts)
-- [src/domains/payment-link.ts](../src/domains/payment-link.ts)
-- [src/domains/qr.ts](../src/domains/qr.ts)
-- [src/domains/pre-auth.ts](../src/domains/pre-auth.ts)
-- [src/domains/payout.ts](../src/domains/payout.ts)
-- [src/domains/credentials-on-file.ts](../src/domains/credentials-on-file.ts)
-- [src/domains/khqr.ts](../src/domains/khqr.ts)
-- [src/__tests__/client.test.ts](../src/__tests__/client.test.ts)
+- [src/client.ts](../../src/client.ts)
+- [src/domains/checkout.ts](../../src/domains/checkout.ts)
+- [src/domains/payment-link.ts](../../src/domains/payment-link.ts)
+- [src/domains/qr.ts](../../src/domains/qr.ts)
+- [src/domains/pre-auth.ts](../../src/domains/pre-auth.ts)
+- [src/domains/payout.ts](../../src/domains/payout.ts)
+- [src/domains/credentials-on-file.ts](../../src/domains/credentials-on-file.ts)
+- [src/domains/khqr.ts](../../src/domains/khqr.ts)
+- [src/__tests__/client.test.ts](../../src/__tests__/client.test.ts)
 
 Changes:
 - Add a small per-call options shape for timeout and abort signal handling.
@@ -425,11 +425,11 @@ Done when:
 Purpose: turn existing JSDoc into a published reference that developers can browse outside the editor.
 
 Files:
-- [package.json](../package.json)
-- [tsup.config.ts](../tsup.config.ts)
-- [docs/README.md](README.md)
-- [README.md](../README.md)
-- [src/index.ts](../src/index.ts)
+- [package.json](../../package.json)
+- [tsup.config.ts](../../tsup.config.ts)
+- [docs/README.md](../README.md)
+- [README.md](../../README.md)
+- [src/index.ts](../../src/index.ts)
 
 Changes:
 - Add a docs generation script such as `typedoc`.
@@ -453,10 +453,10 @@ Done when:
 Purpose: make compatibility promises explicit for maintainers and consumers.
 
 Files:
-- [docs/VERSIONING.md](../docs/VERSIONING.md)
-- [CHANGELOG.md](../CHANGELOG.md)
-- [README.md](../README.md)
-- [package.json](../package.json)
+- [docs/VERSIONING.md](../project/VERSIONING.md)
+- [CHANGELOG.md](../../CHANGELOG.md)
+- [README.md](../../README.md)
+- [package.json](../../package.json)
 
 Changes:
 - Document the SemVer rules this SDK actually follows.
@@ -481,9 +481,9 @@ Done when:
 Purpose: translate the new error taxonomy into a user-facing decision guide.
 
 Files:
-- [docs/12-error-handling-and-debugging.md](12-error-handling-and-debugging.md)
-- [README.md](../README.md)
-- [src/errors.ts](../src/errors.ts)
+- [docs/12-error-handling-and-debugging.md](../guides/12-error-handling-and-debugging.md)
+- [README.md](../../README.md)
+- [src/errors.ts](../../src/errors.ts)
 
 Changes:
 - Add a table that maps each error category to the recommended response.
@@ -508,9 +508,9 @@ Purpose: keep Stripe-style safety expectations honest without pretending PayWay 
 
 Files:
 - [docs/STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md)
-- [README.md](../README.md)
-- [docs/12-error-handling-and-debugging.md](12-error-handling-and-debugging.md)
-- [src/client.ts](../src/client.ts)
+- [README.md](../../README.md)
+- [docs/12-error-handling-and-debugging.md](../guides/12-error-handling-and-debugging.md)
+- [src/client.ts](../../src/client.ts)
 
 Changes:
 - Document the decision clearly, even if the answer is to do nothing.
@@ -533,20 +533,20 @@ Done when:
 
 Use this as the single run list for implementation. The detailed priority sections above remain the reference, but this is the checklist to execute and tick off.
 
-- [ ] **P1.1 Fix webhook docs** - Files: [README.md](../README.md), [docs/11-callbacks-and-webhooks.md](11-callbacks-and-webhooks.md), [docs/README.md](README.md). Tests: `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/auth.test.ts`, `npm run lint`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> PAYWAY_PUBLIC_KEY_PEM=<sandbox_public_key_path_or_value> npm run probe`.
-- [ ] **P1.2 Add README navigation** - Files: [README.md](../README.md), [docs/README.md](README.md). Tests: `npm run lint`, `npx vitest run src/__tests__/client.test.ts`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P1.3 Add idempotency and test-strategy note** - Files: [README.md](../README.md), [docs/12-error-handling-and-debugging.md](12-error-handling-and-debugging.md). Tests: `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/merchant-scenario-coverage.test.ts`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P1.4 Make doc examples executable** - Files: [docs/examples/backend/](../docs/examples/backend/), [src/__tests__/docs-examples.test.ts](../src/__tests__/docs-examples.test.ts). Tests: `npx vitest run src/__tests__/docs-examples.test.ts`, `npm test`, `npm run build`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> PAYWAY_PUBLIC_KEY_PEM=<sandbox_public_key_path_or_value> npm run probe`.
-- [ ] **P2.1 Add typed error taxonomy** - Files: [src/errors.ts](../src/errors.ts), [src/client.ts](../src/client.ts), [src/__tests__/client.test.ts](../src/__tests__/client.test.ts), [README.md](../README.md), [docs/12-error-handling-and-debugging.md](12-error-handling-and-debugging.md). Tests: `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/auth.test.ts`, `npm run lint`, `npm run typecheck`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P2.2 Backfill validation parity** - Files: [src/domains/payment-link.ts](../src/domains/payment-link.ts), [src/domains/pre-auth.ts](../src/domains/pre-auth.ts), [src/domains/payout.ts](../src/domains/payout.ts), [src/domains/khqr.ts](../src/domains/khqr.ts), [src/utils.ts](../src/utils.ts), [src/__tests__/client.test.ts](../src/__tests__/client.test.ts), [src/__tests__/utils.test.ts](../src/__tests__/utils.test.ts), [src/__tests__/merchant-scenario-coverage.test.ts](../src/__tests__/merchant-scenario-coverage.test.ts). Tests: `npx vitest run src/__tests__/utils.test.ts`, `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/merchant-scenario-coverage.test.ts`, `npm run typecheck`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P2.3 Tighten Biome enforcement** - Files: [biome.json](../biome.json), [src/client.ts](../src/client.ts), [src/errors.ts](../src/errors.ts), [src/utils.ts](../src/utils.ts), [src/__tests__/*.ts](../src/__tests__). Tests: `npm run lint`, `npm run typecheck`, `npx vitest run`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P2.4 Add contribution and security entry points** - Files: [CONTRIBUTING.md](../CONTRIBUTING.md), [SECURITY.md](../SECURITY.md), [README.md](../README.md), [.github/](../.github/). Tests: `npx vitest run`, `npm run lint`, `npm run build`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P2.5 Add release-gate checklist** - Files: [docs/STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md), [README.md](../README.md), [docs/README.md](README.md). Tests: `npm run lint`, `npx vitest run src/__tests__/client.test.ts`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> PAYWAY_PUBLIC_KEY_PEM=<sandbox_public_key_path_or_value> npm run probe`.
-- [ ] **P3.1 Add per-call request options** - Files: [src/client.ts](../src/client.ts), [src/domains/checkout.ts](../src/domains/checkout.ts), [src/domains/payment-link.ts](../src/domains/payment-link.ts), [src/domains/qr.ts](../src/domains/qr.ts), [src/domains/pre-auth.ts](../src/domains/pre-auth.ts), [src/domains/payout.ts](../src/domains/payout.ts), [src/domains/credentials-on-file.ts](../src/domains/credentials-on-file.ts), [src/domains/khqr.ts](../src/domains/khqr.ts), [src/__tests__/client.test.ts](../src/__tests__/client.test.ts). Tests: `npx vitest run src/__tests__/client.test.ts`, `npm run typecheck`, `npm run lint`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P3.2 Generate a browsable API reference** - Files: [package.json](../package.json), [tsup.config.ts](../tsup.config.ts), [docs/README.md](README.md), [README.md](../README.md), [src/index.ts](../src/index.ts). Tests: `npm run build`, `npm run typecheck`, `npm run lint`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P3.3 Formalize versioning and support policy** - Files: [docs/VERSIONING.md](../docs/VERSIONING.md), [CHANGELOG.md](../CHANGELOG.md), [README.md](../README.md), [package.json](../package.json). Tests: `npm run lint`, `npm run typecheck`, `npx vitest run`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P3.4 Add error taxonomy documentation table** - Files: [docs/12-error-handling-and-debugging.md](12-error-handling-and-debugging.md), [README.md](../README.md), [src/errors.ts](../src/errors.ts). Tests: `npx vitest run src/__tests__/client.test.ts`, `npm run lint`, `npm run typecheck`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
-- [ ] **P3.5 Decide on client-side idempotency mitigation** - Files: [docs/STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md), [README.md](../README.md), [docs/12-error-handling-and-debugging.md](12-error-handling-and-debugging.md), [src/client.ts](../src/client.ts). Tests: `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/merchant-scenario-coverage.test.ts`, `npm run lint`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P1.1 Fix webhook docs** - Files: [README.md](../../README.md), [docs/11-callbacks-and-webhooks.md](../guides/11-callbacks-and-webhooks.md), [docs/README.md](../README.md). Tests: `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/auth.test.ts`, `npm run lint`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> PAYWAY_PUBLIC_KEY_PEM=<sandbox_public_key_path_or_value> npm run probe`.
+- [ ] **P1.2 Add README navigation** - Files: [README.md](../../README.md), [docs/README.md](../README.md). Tests: `npm run lint`, `npx vitest run src/__tests__/client.test.ts`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P1.3 Add idempotency and test-strategy note** - Files: [README.md](../../README.md), [docs/12-error-handling-and-debugging.md](../guides/12-error-handling-and-debugging.md). Tests: `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/merchant-scenario-coverage.test.ts`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P1.4 Make doc examples executable** - Files: [docs/examples/backend/](../examples/backend), [src/__tests__/docs-examples.test.ts](../../src/__tests__/docs-examples.test.ts). Tests: `npx vitest run src/__tests__/docs-examples.test.ts`, `npm test`, `npm run build`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> PAYWAY_PUBLIC_KEY_PEM=<sandbox_public_key_path_or_value> npm run probe`.
+- [ ] **P2.1 Add typed error taxonomy** - Files: [src/errors.ts](../../src/errors.ts), [src/client.ts](../../src/client.ts), [src/__tests__/client.test.ts](../../src/__tests__/client.test.ts), [README.md](../../README.md), [docs/12-error-handling-and-debugging.md](../guides/12-error-handling-and-debugging.md). Tests: `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/auth.test.ts`, `npm run lint`, `npm run typecheck`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P2.2 Backfill validation parity** - Files: [src/domains/payment-link.ts](../../src/domains/payment-link.ts), [src/domains/pre-auth.ts](../../src/domains/pre-auth.ts), [src/domains/payout.ts](../../src/domains/payout.ts), [src/domains/khqr.ts](../../src/domains/khqr.ts), [src/utils.ts](../../src/utils.ts), [src/__tests__/client.test.ts](../../src/__tests__/client.test.ts), [src/__tests__/utils.test.ts](../../src/__tests__/utils.test.ts), [src/__tests__/merchant-scenario-coverage.test.ts](../../src/__tests__/merchant-scenario-coverage.test.ts). Tests: `npx vitest run src/__tests__/utils.test.ts`, `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/merchant-scenario-coverage.test.ts`, `npm run typecheck`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P2.3 Tighten Biome enforcement** - Files: [biome.json](../../biome.json), [src/client.ts](../../src/client.ts), [src/errors.ts](../../src/errors.ts), [src/utils.ts](../../src/utils.ts), [src/__tests__/*.ts](../../src/__tests__). Tests: `npm run lint`, `npm run typecheck`, `npx vitest run`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P2.4 Add contribution and security entry points** - Files: [CONTRIBUTING.md](../../CONTRIBUTING.md), [SECURITY.md](../../SECURITY.md), [README.md](../../README.md), [.github/](../../.github). Tests: `npx vitest run`, `npm run lint`, `npm run build`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P2.5 Add release-gate checklist** - Files: [docs/STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md), [README.md](../../README.md), [docs/README.md](../README.md). Tests: `npm run lint`, `npx vitest run src/__tests__/client.test.ts`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> PAYWAY_PUBLIC_KEY_PEM=<sandbox_public_key_path_or_value> npm run probe`.
+- [ ] **P3.1 Add per-call request options** - Files: [src/client.ts](../../src/client.ts), [src/domains/checkout.ts](../../src/domains/checkout.ts), [src/domains/payment-link.ts](../../src/domains/payment-link.ts), [src/domains/qr.ts](../../src/domains/qr.ts), [src/domains/pre-auth.ts](../../src/domains/pre-auth.ts), [src/domains/payout.ts](../../src/domains/payout.ts), [src/domains/credentials-on-file.ts](../../src/domains/credentials-on-file.ts), [src/domains/khqr.ts](../../src/domains/khqr.ts), [src/__tests__/client.test.ts](../../src/__tests__/client.test.ts). Tests: `npx vitest run src/__tests__/client.test.ts`, `npm run typecheck`, `npm run lint`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P3.2 Generate a browsable API reference** - Files: [package.json](../../package.json), [tsup.config.ts](../../tsup.config.ts), [docs/README.md](../README.md), [README.md](../../README.md), [src/index.ts](../../src/index.ts). Tests: `npm run build`, `npm run typecheck`, `npm run lint`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P3.3 Formalize versioning and support policy** - Files: [docs/VERSIONING.md](../project/VERSIONING.md), [CHANGELOG.md](../../CHANGELOG.md), [README.md](../../README.md), [package.json](../../package.json). Tests: `npm run lint`, `npm run typecheck`, `npx vitest run`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P3.4 Add error taxonomy documentation table** - Files: [docs/12-error-handling-and-debugging.md](../guides/12-error-handling-and-debugging.md), [README.md](../../README.md), [src/errors.ts](../../src/errors.ts). Tests: `npx vitest run src/__tests__/client.test.ts`, `npm run lint`, `npm run typecheck`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
+- [ ] **P3.5 Decide on client-side idempotency mitigation** - Files: [docs/STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md), [README.md](../../README.md), [docs/12-error-handling-and-debugging.md](../guides/12-error-handling-and-debugging.md), [src/client.ts](../../src/client.ts). Tests: `npx vitest run src/__tests__/client.test.ts`, `npx vitest run src/__tests__/merchant-scenario-coverage.test.ts`, `npm run lint`. Sandbox: `PAYWAY_MERCHANT_ID=<sandbox_merchant_id> PAYWAY_API_KEY=<sandbox_api_key> npm run probe`.
 
 ---
 
@@ -569,5 +569,5 @@ Use this as the single run list for implementation. The detailed priority sectio
 
 - Version: `1.0.0` · Tests: **136 passing / 5 files** (verified via `npx vitest run` this session)
 - `.npmignore` **exists** and already excludes `docs/`, `scripts/`, `payway-boilerplate/`, `*.yaml`, test files — publish hygiene is already handled, contrary to what a naive `grep` for the file might suggest if run against a stale cache.
-- `cancel_url`, `continue_success_url`, `return_params` **are already** consistently `encodeBase64IfNeeded()`-wrapped in [src/domains/checkout.ts](../src/domains/checkout.ts#L62-L75) — the "critical encoding bug" recorded in earlier session memory (`docs/PROJECT_STATUS.md` Task 1) is resolved and should not be re-flagged in future passes.
+- `cancel_url`, `continue_success_url`, `return_params` **are already** consistently `encodeBase64IfNeeded()`-wrapped in [src/domains/checkout.ts](../../src/domains/checkout.ts#L62-L75) — the "critical encoding bug" recorded in earlier session memory (`docs/PROJECT_STATUS.md` Task 1) is resolved and should not be re-flagged in future passes.
 - Real, currently-open gaps confirmed by direct file inspection this session: webhook signature doc/spec mismatch (README.md:151, docs/11:64,150 vs payway-openapi/components/webhooks.yaml:8-26), `biome.json` permissive lint rules, missing `CONTRIBUTING.md`/`SECURITY.md`/`.github/`, validation gap in `src/domains/payment-link.ts`, shallow error taxonomy in `src/errors.ts`.

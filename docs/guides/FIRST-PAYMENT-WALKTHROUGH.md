@@ -1,6 +1,6 @@
 # First payment: create, verify, recover
 
-This is the simulated application exercise after the [quickstart](../QUICKSTART.md). For ABA sandbox registration, callback setup, and completing an actual gateway test payment, follow that guide first. This exercise teaches verification and recovery without ABA test-payer access.
+This is the simulated application exercise after the [quickstart](../../QUICKSTART.md). For ABA sandbox registration, callback setup, and completing an actual gateway test payment, follow that guide first. This exercise teaches verification and recovery without ABA test-payer access.
 
 This exercise uses the existing reference app and simulated payments. Run from
 the repository root with Node 22.12+ and dependencies installed. In a fresh shell,
@@ -47,7 +47,7 @@ result is not permission to create another charge.
 
 ## Move to your application
 
-Use the [quickstart SDK sequence](../QUICKSTART.md#6-integrate-the-server) on your
+Use the [quickstart SDK sequence](../../QUICKSTART.md#6-integrate-the-server) on your
 server. Return only the selected artifact to the authorized customer. Bind verified
 transaction ID, amount and currency to your stored order before fulfilling it.
 Payment-link callbacks require lookup because they are unsigned.

@@ -18,9 +18,9 @@ describe('Documentation examples', () => {
 
   const khqrDocs = [
     'README.md',
-    'docs/07-qr-code-handling.md',
-    'docs/11-callbacks-and-webhooks.md',
-    'docs/16-webhook-setup-guide.md',
+    'docs/guides/07-qr-code-handling.md',
+    'docs/guides/11-callbacks-and-webhooks.md',
+    'docs/guides/16-webhook-setup-guide.md',
     'skills/aba-payway-offline-qr/SKILL.md',
   ].map((path) => readFileSync(join(repoRoot, path), 'utf8'));
   const readDoc = (path: string) => readFileSync(join(repoRoot, path), 'utf8');
@@ -34,7 +34,7 @@ describe('Documentation examples', () => {
   });
 
   it('documents webhook verification correctly in the appendix snippets', () => {
-    const appendix = readFileSync(join(repoRoot, 'docs', '14-appendix-code-snippets.md'), 'utf8');
+    const appendix = readFileSync(join(repoRoot, 'docs', 'guides', '14-appendix-code-snippets.md'), 'utf8');
 
     expect(appendix).toContain('x-payway-hmac-sha512');
     expect(appendix).toContain('verifyCallback');
@@ -85,11 +85,11 @@ describe('Documentation examples', () => {
   const linkCheckedDocs = [
     'README.md',
     'docs/README.md',
-    'docs/QUICK-START-1-PAGER.md',
-    ...readdirSync(join(repoRoot, 'docs'))
+    'docs/guides/QUICK-START-1-PAGER.md',
+    ...readdirSync(join(repoRoot, 'docs', 'guides'))
       .filter((f) => /^\d{2}-.*\.md$/.test(f))
       .sort()
-      .map((f) => `docs/${f}`),
+      .map((f) => `docs/guides/${f}`),
     ...readdirSync(join(repoRoot, 'docs', 'diagrams'))
       .filter((f) => f.endsWith('.md'))
       .sort()
@@ -110,7 +110,7 @@ describe('Documentation examples', () => {
   });
 
   it('keeps the public onboarding path executable and credential safe', () => {
-    const onboarding = ['QUICKSTART.md', 'docs/QUICK-START-1-PAGER.md']
+    const onboarding = ['QUICKSTART.md', 'docs/guides/QUICK-START-1-PAGER.md']
       .map(readDoc)
       .join('\n');
 
@@ -150,7 +150,7 @@ describe('Documentation examples', () => {
 
   it('keeps the README concise and retains the official offline KHQR reference', () => {
     const readme = readDoc('README.md');
-    const reference = readDoc('docs/SDK-AND-CLI-REFERENCE.md');
+    const reference = readDoc('docs/reference/SDK-AND-CLI-REFERENCE.md');
     const offlineSection = reference.slice(
       reference.indexOf('### 3.1 Offline QR Generation'),
       reference.indexOf('### 4. Payment Link'),
@@ -168,7 +168,7 @@ describe('Documentation examples', () => {
   });
 
   it('documents official offline KHQR configuration, static/dynamic modes, no-network limit, and migration in the QR guide', () => {
-    const qrGuide = readDoc('docs/07-qr-code-handling.md');
+    const qrGuide = readDoc('docs/guides/07-qr-code-handling.md');
     const offlineSection = qrGuide.slice(
       qrGuide.indexOf('## Official ABA KHQR Offline Generation'),
       qrGuide.indexOf('## QR Lifecycle'),
@@ -196,7 +196,7 @@ describe('Documentation examples', () => {
   });
 
   it('scopes online HMAC guidance and documents offline KHQR callback provisioning and reconciliation', () => {
-    const callbacks = readDoc('docs/11-callbacks-and-webhooks.md');
+    const callbacks = readDoc('docs/guides/11-callbacks-and-webhooks.md');
 
     expect(callbacks).toContain('Online checkout callback');
     expect(callbacks).toContain('Offline ABA KHQR notification');
@@ -212,7 +212,7 @@ describe('Documentation examples', () => {
   });
 
   it('scopes the CLI listener documentation by callback type and preserves offline KHQR safety constraints', () => {
-    const setupGuide = readDoc('docs/16-webhook-setup-guide.md');
+    const setupGuide = readDoc('docs/guides/16-webhook-setup-guide.md');
 
     expect(setupGuide).toContain('/aba-payway-khqr-webhook');
     expect(setupGuide).toContain('configure and whitelist');
@@ -226,7 +226,7 @@ describe('Documentation examples', () => {
   });
 
   it('documents the payment-link lifecycle in the dedicated chapter (docs/17)', () => {
-    const chapter = readDoc('docs/17-payment-link.md');
+    const chapter = readDoc('docs/guides/17-payment-link.md');
     expect(chapter).toContain('paymentLink.create');
     expect(chapter).toContain('getDetails');
     expect(chapter).toContain('{acc, amt}');
@@ -348,8 +348,8 @@ describe('Documentation examples', () => {
 
   it('documents the offline KHQR expiry contract for invoice batches', () => {
     const offline = readSkill('aba-payway-offline-qr');
-    const reference = readDoc('docs/SDK-AND-CLI-REFERENCE.md');
-    const qrGuide = readDoc('docs/07-qr-code-handling.md');
+    const reference = readDoc('docs/reference/SDK-AND-CLI-REFERENCE.md');
+    const qrGuide = readDoc('docs/guides/07-qr-code-handling.md');
 
     for (const content of [offline, reference, qrGuide]) {
       expect(content).toContain('15 minutes');
@@ -362,7 +362,7 @@ describe('Documentation examples', () => {
 
   it('documents repeat-payment accounting and separates payment identity from invoice reconciliation', () => {
     const offline = readSkill('aba-payway-offline-qr');
-    const callbacks = readDoc('docs/11-callbacks-and-webhooks.md');
+    const callbacks = readDoc('docs/guides/11-callbacks-and-webhooks.md');
 
     for (const content of [offline, callbacks]) {
       expect(content).toContain('can be paid multiple times');
@@ -374,7 +374,7 @@ describe('Documentation examples', () => {
 
   it('documents the safe merchant-reference intersection for generation and inquiry', () => {
     const offline = readSkill('aba-payway-offline-qr');
-    const reference = readDoc('docs/SDK-AND-CLI-REFERENCE.md');
+    const reference = readDoc('docs/reference/SDK-AND-CLI-REFERENCE.md');
 
     for (const content of [offline, reference]) {
       expect(content).toContain('25 UTF-8 bytes');
@@ -384,7 +384,7 @@ describe('Documentation examples', () => {
   });
 
   it('uses the byte-aware exported inspector instead of teaching a character-index KHQR parser', () => {
-    const qrGuide = readDoc('docs/07-qr-code-handling.md');
+    const qrGuide = readDoc('docs/guides/07-qr-code-handling.md');
 
     expect(qrGuide).toContain('inspectKhqrPayload');
     expect(qrGuide).toContain('validateKhqrCrc');

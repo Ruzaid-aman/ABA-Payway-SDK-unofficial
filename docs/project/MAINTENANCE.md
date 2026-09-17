@@ -56,5 +56,5 @@ How this repo stays coherent day to day and release to release. For the one-off 
 ## Escalation points
 
 - **Live gateway drift** (a hash order or status behaves differently than pinned): capture evidence, document it, file the ABA question, add an advisory — never silently change a hash order; the drift-guard suites exist for exactly this.
-- **Secret exposure:** follow [SECURITY.md](SECURITY.md); history decisions belong to the maintainer via [HISTORY-SECRET-TRIAGE.md](HISTORY-SECRET-TRIAGE.md).
+- **Secret exposure:** follow [SECURITY.md](../../SECURITY.md); history decisions belong to the maintainer via [HISTORY-SECRET-TRIAGE.md](HISTORY-SECRET-TRIAGE.md).
 - **Internal-dossier boundary:** SANDBOX-FINDINGS, INTEGRATION-GAPS, audit dossiers, and PROJECT_STATUS are deliberately NOT packaged into the knowledge corpus — keep them out of `scripts/knowledge-sources.mjs` and the npm `files` allowlist.

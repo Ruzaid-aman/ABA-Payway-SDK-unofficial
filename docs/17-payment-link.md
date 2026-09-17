@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/17-payment-link.md for compatibility. Do not edit here. -->
+
 # 17. Payment Link API — Complete Implementation Guide
 
 > Payment links are shareable hosted checkout URLs — no website needed. Create a link with an exact amount, send it by SMS, email, chat, or QR, and PayWay notifies your server when it is paid. This chapter covers the full lifecycle: create → share → pushback → reconcile → refunds.
@@ -160,7 +162,7 @@ Rules (all pinned by tests):
 - Pre-encoded payout strings pass through unvalidated (the SDK can't total them).
 - The response resolves each entry with `acc_name` (sandbox evidence pending on the exact placement of `payout` in the response — top-level per apidog schema, inside `data` per ABA's own sample; verification item V-2).
 - **Beneficiaries are paid at completion, not T+N** — split instructions settle to the whitelisted accounts the moment the link is paid (integration team, 2026-09-12). Production requires beneficiary whitelisting AND the payout service enabled on the MID (sandbox: code 32 "Service is not enable" until provisioned — Q19).
-- **No standard refund after payout/split** — once a transaction is processed via payout/split, the refund API is not available; refunds are handled manually, or via pre-auth refund before the split (integration team, 2026-09-12). See [Chapter 20](./20-settlement-and-disputes.md).
+- **No standard refund after payout/split** — once a transaction is processed via payout/split, the refund API is not available; refunds are handled manually, or via pre-auth refund before the split (integration team, 2026-09-12). See [Chapter 20](20-settlement-and-disputes.md).
 
 ## 17.6 Images
 

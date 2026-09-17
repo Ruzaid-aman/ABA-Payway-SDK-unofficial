@@ -1,12 +1,14 @@
+<!-- GENERATED STUB: copy of docs/guides/01-overview-and-concepts.md for compatibility. Do not edit here. -->
+
 # Chapter 1 — Overview & Core Concepts
 
 > **Estimated reading time:** 15 minutes
 
-Not sure which integration route fits your app? Start with the [platform decision tree](./diagrams/platform-decision-tree.md) — it routes web, native, WebView, Telegram, QR, and deep-linking scenarios to the right chapter.
+Not sure which integration route fits your app? Start with the [platform decision tree](../diagrams/platform-decision-tree.md) — it routes web, native, WebView, Telegram, QR, and deep-linking scenarios to the right chapter.
 
 ---
 
-This is a community-maintained server-side SDK, not an official ABA Bank SDK. It requires Node.js 22.12 or later. See [support and compatibility](../SUPPORT.md) for verification limits.
+This is a community-maintained server-side SDK, not an official ABA Bank SDK. It requires Node.js 22.12 or later. See [support and compatibility](../../SUPPORT.md) for verification limits.
 
 ## What Is ABA PayWay?
 
@@ -117,7 +119,7 @@ Tokens allow **Credentials-on-File (CoF)** — charging a customer without them 
 | **Test Cards** | Uses PayWay's test card numbers | Real customer cards only |
 | **Behavior Quirks** | Some endpoints behave slightly differently (see sandbox findings) | Full production behavior |
 
-When you use the CLI, save each distinct credential set as a named profile rather than overwriting one `.env` file. A profile is explicitly tagged `sandbox` or `production`; see [Chapter 2 — Credential Profiles](./02-prerequisites-and-setup.md#credential-profiles-for-the-cli) for setup, selection, and storage guidance.
+When you use the CLI, save each distinct credential set as a named profile rather than overwriting one `.env` file. A profile is explicitly tagged `sandbox` or `production`; see [Chapter 2 — Credential Profiles](02-prerequisites-and-setup.md#credential-profiles-for-the-cli) for setup, selection, and storage guidance.
 
 ### Test Card Numbers
 
@@ -130,7 +132,7 @@ For sandbox testing, PayWay provides test card numbers that simulate different p
 | `5156 8302 7256 1029` (MasterCard, exp 04/30, CVV 777) | Declined | Yes | Test failure handling |
 | `4156 8399 3770 6777` (Visa, exp 01/30, CVV 993) | Declined | No | Decline/error handling without 3DS |
 
-> 📋 **Source:** ABA integration team (2026-09-12) — sandbox-only, never use real card data in sandbox, and these cards are **never valid in production**. ABA may rotate the list: if a card starts failing, request updated sandbox/UAT test cards from the Integration Team. The SDK ships the same list: `payway-sdk sandbox-test-cards` (or `listSandboxTestCards()`), and the ABA Mobile Simulator for ABA PAY / KHQR testing is covered in [Chapter 2](./02-prerequisites-and-setup.md#aba-mobile-simulator-sandbox-testing).
+> 📋 **Source:** ABA integration team (2026-09-12) — sandbox-only, never use real card data in sandbox, and these cards are **never valid in production**. ABA may rotate the list: if a card starts failing, request updated sandbox/UAT test cards from the Integration Team. The SDK ships the same list: `payway-sdk sandbox-test-cards` (or `listSandboxTestCards()`), and the ABA Mobile Simulator for ABA PAY / KHQR testing is covered in [Chapter 2](02-prerequisites-and-setup.md#aba-mobile-simulator-sandbox-testing).
 
 > ⚠️ **Important:** Test cards only work in the sandbox environment. Using them in production will result in declined transactions.
 
@@ -190,8 +192,8 @@ Endpoints like **Pre-Auth**, **Payout**, and **Payment Link** require RSA-encryp
 
 ## Next Steps
 
-Now that you understand the concepts, proceed to **[Chapter 2 — Prerequisites & Setup](./02-prerequisites-and-setup.md)** to get your credentials and environment configured.
+Now that you understand the concepts, proceed to **[Chapter 2 — Prerequisites & Setup](02-prerequisites-and-setup.md)** to get your credentials and environment configured.
 
-> 🤖 **Agentic CLI:** You can also let a supported provider drive these payments through the risk-gated agentic CLI. See the [Agentic PayWay CLI guide](./QUICK-START-1-PAGER.md#agentic-payway-cli) and the [aba-payway-agent](../skills/aba-payway-agent/SKILL.md) / [aba-payway-first-payment](../skills/aba-payway-first-payment/SKILL.md) skill guides.
+> 🤖 **Agentic CLI:** You can also let a supported provider drive these payments through the risk-gated agentic CLI. See the [Agentic PayWay CLI guide](QUICK-START-1-PAGER.md#agentic-payway-cli) and the [aba-payway-agent](../../skills/aba-payway-agent/SKILL.md) / [aba-payway-first-payment](../../skills/aba-payway-first-payment/SKILL.md) skill guides.
 
-> ← [Back to Documentation Home](./README.md) | [Next: Prerequisites & Setup →](./02-prerequisites-and-setup.md)
+> ← [Back to Documentation Home](../README.md) | [Next: Prerequisites & Setup →](02-prerequisites-and-setup.md)

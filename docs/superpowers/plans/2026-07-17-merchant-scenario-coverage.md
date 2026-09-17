@@ -396,8 +396,8 @@ The JSON object must follow the requested `summary` and `cases` schema exactly, 
 Add a Part 5 table row in `docs/README.md`:
 
 ```md
-| 15. Merchant Scenario Requirements | [15-merchant-scenario-requirements.md](./15-merchant-scenario-requirements.md) | Reference |
-| Coverage Report | [aba-payway-test-case-coverage.md](./aba-payway-test-case-coverage.md) | Audit |
+| 15. Merchant Scenario Requirements | [15-merchant-scenario-requirements.md](15-merchant-scenario-requirements.md) | Reference |
+| Coverage Report | [aba-payway-test-case-coverage.md](aba-payway-test-case-coverage.md) | Audit |
 ```
 
 - [ ] **Step 4: Validate report integrity**

@@ -56,6 +56,12 @@ function rewriteLinks(content, sourcePath, targetMap) {
 function transform(content, sourcePath, targetMap) {
   let out = content;
   if (sourcePath.endsWith('.md')) out = rewriteLinks(out, sourcePath, targetMap);
+  // Normalize skill links for the packaged knowledge copy: docs source files
+  // often use '../../skills/...' (relative to docs/guides). When copied into
+  // `knowledge/` we want `../skills/...` so the package link checker resolves
+  // them inside the package. Do this after rewriteLinks so we only affect
+  // generated corpus content.
+  out = out.replaceAll('../../skills/', '../skills/');
   return out
     .replaceAll('SANDBOX-FINDINGS.md', 'SANDBOX-FINDINGS')
     .replaceAll('HANDOFF.md', 'the repo HANDOFF');

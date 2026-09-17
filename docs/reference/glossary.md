@@ -184,7 +184,7 @@ PayWay uses numeric status codes to indicate transaction states:
 - `6` — Pending
 - `22` — Expired
 - `49` — Invalid Request
-- Others — See the full error table in [Chapter 12 — Error Handling](./12-error-handling-and-debugging.md)
+- Others — See the full error table in [Chapter 12 — Error Handling](../guides/12-error-handling-and-debugging.md)
 
 ---
 

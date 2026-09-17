@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/04-native-app-implementation.md for compatibility. Do not edit here. -->
+
 # Chapter 4 — Native App Implementation (iOS & Android)
 
 > **Estimated reading time:** 15 minutes  
@@ -24,7 +26,7 @@ sequenceDiagram
     Note over App,Backend: Intercept the return-URL prefix in the WebView delegate; the redirect itself proves nothing.
 ```
 
-Runnable examples: [Android `PaymentActivity.kt`](./examples/android/PaymentActivity.kt) · [iOS `PaymentViewController.swift`](./examples/ios/PaymentViewController.swift).
+Runnable examples: [Android `PaymentActivity.kt`](../examples/android/PaymentActivity.kt) · [iOS `PaymentViewController.swift`](../examples/ios/PaymentViewController.swift).
 
 ---
 
@@ -593,7 +595,7 @@ Both iOS and Android implementations follow the same pattern:
 3. The **webhook callback** (Chapter 11) is still the authoritative source for database updates
 4. The native app's status check is for UX only — to show "Payment Successful" vs "Payment Failed"
 
-> **Flutter?** The identical architecture in Dart (webview checkout + return-URL interception + ABA Pay deeplink launcher) lives in [`examples/flutter/payment_screen.dart`](./examples/flutter/payment_screen.dart), documented in [Chapter 5](./05-webview-implementation.md#flutter-webview_flutter).
+> **Flutter?** The identical architecture in Dart (webview checkout + return-URL interception + ABA Pay deeplink launcher) lives in [`examples/flutter/payment_screen.dart`](../examples/flutter/payment_screen.dart), documented in [Chapter 5](05-webview-implementation.md#flutter-webview_flutter).
 
 ---
 
@@ -613,8 +615,8 @@ If you prefer the official native approach:
 
 ## Next Steps
 
-- **For WebView-specific details** → [Chapter 5 — WebView Implementation](./05-webview-implementation.md)
-- **For deep linking** → [Chapter 8 — Deep Linking](./08-deep-linking.md)
-- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](./11-callbacks-and-webhooks.md)
+- **For WebView-specific details** → [Chapter 5 — WebView Implementation](05-webview-implementation.md)
+- **For deep linking** → [Chapter 8 — Deep Linking](08-deep-linking.md)
+- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](11-callbacks-and-webhooks.md)
 
-> ← [Previous: Web Implementation](./03-web-implementation.md) | [Next: WebView Implementation →](./05-webview-implementation.md)
+> ← [Previous: Web Implementation](03-web-implementation.md) | [Next: WebView Implementation →](05-webview-implementation.md)

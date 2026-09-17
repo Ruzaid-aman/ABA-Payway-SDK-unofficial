@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/22-api-datetime-and-timezones.md for compatibility. Do not edit here. -->
+
 # 22 — API Datetime and Timezone Reference
 
 PayWay does not use one datetime representation across every API. Treat each

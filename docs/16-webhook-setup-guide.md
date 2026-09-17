@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/16-webhook-setup-guide.md for compatibility. Do not edit here. -->
+
 # Chapter 16 — Webhook Setup with the CLI
 
 This chapter explains how to receive ABA PayWay online checkout callbacks and offline ABA KHQR notifications using the built-in `setup-webhook` CLI command. It starts a local HTTP server that logs and persists every incoming delivery, with optional Cloudflare Tunnel integration for exposing the server to the public internet during development.
@@ -20,7 +22,7 @@ When a payment is completed, PayWay can send a server-to-server HTTP POST callba
 
 ## Quick Start
 
-Coming from the [first-payment quickstart](../QUICKSTART.md#4-prepare-a-callback-and-check-your-route)? Run the tunnel command below in a separate terminal and leave it running. Copy the complete printed HTTPS URL including `/aba-payway-webhook` into `PAYWAY_CALLBACK_URL` in your payment terminal, then return to the quickstart. See [Cloudflare Tunnel](#cloudflare-tunnel) for prerequisites. The receiver captures test notifications; payment verification and durable fulfillment belong in your application.
+Coming from the [first-payment quickstart](../../QUICKSTART.md#4-prepare-a-callback-and-check-your-route)? Run the tunnel command below in a separate terminal and leave it running. Copy the complete printed HTTPS URL including `/aba-payway-webhook` into `PAYWAY_CALLBACK_URL` in your payment terminal, then return to the quickstart. See [Cloudflare Tunnel](#cloudflare-tunnel) for prerequisites. The receiver captures test notifications; payment verification and durable fulfillment belong in your application.
 
 ```bash
 # Basic — starts server on port 8443, saves callbacks to the data root's webhook_data/callbacks.jsonl
@@ -213,11 +215,11 @@ Differences from checkout webhooks (live-captured 2026-09-06, real payment):
 curl -X POST https://your-host/payway/pushback   -H 'Content-Type: application/json'   -d '{"tran_id":"123456789","status":"00","merchant_ref_no":"ref0001"}'
 ```
 
-Full lifecycle: [17. Payment Link API](./17-payment-link.md) §17.7.
+Full lifecycle: [17. Payment Link API](17-payment-link.md) §17.7.
 
 ### Online Checkout Signature Logging and Offline KHQR Notifications
 
-For the **online checkout route**, the server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then logs HMAC-SHA512 verification using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../src/auth.ts)).
+For the **online checkout route**, the server extracts the `X-PAYWAY-HMAC-SHA512` header and the `hash` field from the body, then logs HMAC-SHA512 verification using sorted-key concatenation (matching the algorithm in [`src/auth.ts`](../../src/auth.ts)).
 
 - ✅ **Signature valid** → logs `✓ Signature verified`
 - ❌ **Signature invalid** → logs `✗ Signature mismatch (expected: ...)` but still saves the record
@@ -450,13 +452,13 @@ The callback will appear in your terminal and be saved to disk.
 
 - [ ] Never expose the webhook server to production traffic without the verification contract ABA confirmed for that callback type
 - [ ] The `setup-webhook` command is for **development and testing only**
-- [ ] For online callbacks, implement HMAC verification that **rejects** invalid callbacks; for offline KHQR, use only the verification ABA actually provides (see [Chapter 11 — Callbacks & Webhooks](./11-callbacks-and-webhooks.md))
+- [ ] For online callbacks, implement HMAC verification that **rejects** invalid callbacks; for offline KHQR, use only the verification ABA actually provides (see [Chapter 11 — Callbacks & Webhooks](11-callbacks-and-webhooks.md))
 - [ ] Rotate your `PAYWAY_API_KEY` if it has been exposed in logs
 
 ---
 
 ## Next Steps
 
-- [Chapter 11 — Callbacks & Webhooks](./11-callbacks-and-webhooks.md) — production webhook handler implementation with Express.js
-- [Chapter 12 — Error Handling & Debugging](./12-error-handling-and-debugging.md) — troubleshooting callback issues
-- [Cloudflare Free Webhook Guide](./cloudflare-free-webhook.md) — permanent webhook archiver using Cloudflare Workers + D1
+- [Chapter 11 — Callbacks & Webhooks](11-callbacks-and-webhooks.md) — production webhook handler implementation with Express.js
+- [Chapter 12 — Error Handling & Debugging](12-error-handling-and-debugging.md) — troubleshooting callback issues
+- [Cloudflare Free Webhook Guide](../recipes/cloudflare-free-webhook.md) — permanent webhook archiver using Cloudflare Workers + D1

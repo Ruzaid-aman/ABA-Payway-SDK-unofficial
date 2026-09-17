@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/11-callbacks-and-webhooks.md for compatibility. Do not edit here. -->
+
 # Chapter 11 — Callbacks & Webhooks
 
 > **Estimated reading time:** 15 minutes  
@@ -28,7 +30,7 @@ sequenceDiagram
     Endpoint->>DB: reconcile (Missing callback ≠ non-payment; PayWay never retries)
 ```
 
-Full diagram: [Callback Flow](./diagrams/callback-flow.md).
+Full diagram: [Callback Flow](../diagrams/callback-flow.md).
 
 ---
 
@@ -479,12 +481,12 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 
 ## Next Steps
 
-- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](./16-webhook-setup-guide.md) — quick way to capture and inspect callbacks during development; the [Local Webhook Workbench](./16-webhook-setup-guide.md#local-webhook-workbench) in the same chapter sends correctly-signed fixture callbacks (`webhook trigger`), forwards captures to your app (`--forward-to`), replays stored records (`webhook resend`), and explains failed verifications (`webhook verify-callback`) — all without the ABA Simulator
-- **For error handling** → [Chapter 12 — Error Handling & Debugging](./12-error-handling-and-debugging.md)
-- **For deployment** → [Chapter 13 — Deployment Checklist](./13-deployment-checklist.md)
-- **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](./03-web-implementation.md)
+- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](16-webhook-setup-guide.md) — quick way to capture and inspect callbacks during development; the [Local Webhook Workbench](16-webhook-setup-guide.md#local-webhook-workbench) in the same chapter sends correctly-signed fixture callbacks (`webhook trigger`), forwards captures to your app (`--forward-to`), replays stored records (`webhook resend`), and explains failed verifications (`webhook verify-callback`) — all without the ABA Simulator
+- **For error handling** → [Chapter 12 — Error Handling & Debugging](12-error-handling-and-debugging.md)
+- **For deployment** → [Chapter 13 — Deployment Checklist](13-deployment-checklist.md)
+- **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](03-web-implementation.md)
 
-> ← [Previous: UI Customization](./10-ui-customization.md) | [Next: Error Handling →](./12-error-handling-and-debugging.md)
+> ← [Previous: UI Customization](10-ui-customization.md) | [Next: Error Handling →](12-error-handling-and-debugging.md)
 
 ---
 
@@ -536,5 +538,5 @@ User-Agent: PayWayApp/3.0
 - Receiver requirements: accept `POST` + `application/json`, answer 200 fast.
 
 Receiver setup (tunnel, storage, routes) is covered in
-[16. Webhook Setup](./16-webhook-setup-guide.md); the full payment-link
-lifecycle in [17. Payment Link API](./17-payment-link.md) §17.7.
+[16. Webhook Setup](16-webhook-setup-guide.md); the full payment-link
+lifecycle in [17. Payment Link API](17-payment-link.md) §17.7.

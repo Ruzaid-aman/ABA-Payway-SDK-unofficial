@@ -228,7 +228,7 @@ sequenceDiagram
 - Test: `src/__tests__/docs-acceptance-bar.test.ts`
 
 - [ ] Gallery section: per-template image + style + use-case rows, from `QR_TEMPLATES` hints (constants.ts:261-269) + SANDBOX-FINDINGS per-template notes (:75-81, :105-111): template1 = unbranded/compact POS; template2 = default white card + ABA logo; template2_color = brand color; template3_color = compact color; template4/4_color = tall receipt (thermal printing). Note: templates are gateway-rendered (online generateQr only — offline KHQR cannot be branded); `template2` is the API default.
-- [ ] docs/10 table: add "Rendered samples: see the [template gallery](./07-qr-code-handling.md#qr-image-template-gallery)".
+- [ ] docs/10 table: add "Rendered samples: see the [template gallery](07-qr-code-handling.md#qr-image-template-gallery)".
 - [ ] Test:
 
 ```ts

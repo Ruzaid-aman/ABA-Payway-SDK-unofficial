@@ -470,7 +470,7 @@ code 00 → post-close still PENDING. Extra observations:
   local closed flag, watch webhooks for late APPROVED events, and refund.
 
 > 📁 **Full close-API dossier (evidence, reproduction, questions for ABA,
-> post-fix validation checklist): [CLOSE-TRANSACTION-FINDINGS.md](./CLOSE-TRANSACTION-FINDINGS.md)**
+> post-fix validation checklist): [CLOSE-TRANSACTION-FINDINGS.md](CLOSE-TRANSACTION-FINDINGS.md)**
 
 ## 13. Edge-case campaign: QR lifecycle bounds, duplicates, response shapes (2026-08-30)
 

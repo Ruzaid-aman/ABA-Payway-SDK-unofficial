@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/03-web-implementation.md for compatibility. Do not edit here. -->
+
 # Chapter 3 — Web Implementation
 
 > **Estimated reading time:** 20 minutes  
@@ -30,7 +32,7 @@ sequenceDiagram
     Note over Backend,PayWay: The callback is the only trusted source of truth — the redirect is not.
 ```
 
-Full diagram: [Payment Lifecycle](./diagrams/payment-lifecycle.md) · Callback details: [Chapter 11](./11-callbacks-and-webhooks.md).
+Full diagram: [Payment Lifecycle](../diagrams/payment-lifecycle.md) · Callback details: [Chapter 11](11-callbacks-and-webhooks.md).
 
 ---
 
@@ -205,7 +207,7 @@ const html = payway.checkout.getCheckoutFormHtml(params, { popupMode: true });
 
 Options: `autoSubmit` (submit on page load, same-tab) — mutually exclusive with `popupMode` (form targets the `aba_webservice` frame opened by `checkout2-0.js` and the submit button calls `AbaPayway.checkout()`), plus `formId`, `submitLabel`, and `omitSubmitButton`. All merchant-provided values are HTML-escaped. The CLI equivalent is `payway-sdk checkout-form -a 15.00 --return-url <url> -o form.html` (writes the same document locally; diagnostics go to stderr so `checkout-form … > form.html` stays clean).
 
-> **Same pattern for saving cards:** `credentialsOnFile.getLinkCardFormHtml()` builds the identical kind of locally-signed form for the `link-card` endpoint (which requires urlencoded and always answers with the gateway's hosted card-entry page). See [Chapter 9](./09-link-unlink-renew-lifecycle.md) and `payway-sdk cof link-card-form`.
+> **Same pattern for saving cards:** `credentialsOnFile.getLinkCardFormHtml()` builds the identical kind of locally-signed form for the `link-card` endpoint (which requires urlencoded and always answers with the gateway's hosted card-entry page). See [Chapter 9](09-link-unlink-renew-lifecycle.md) and `payway-sdk cof link-card-form`.
 
 The manual markup below is what the helper generates — kept for reference and for fully custom integrations.
 
@@ -552,7 +554,7 @@ For a more "in-app" feel on desktop, use PayWay's `checkout2-0.js` library to op
 </html>
 ```
 
-> 📎 **Full runnable example:** See [`docs/examples/web/checkout-popup.html`](./examples/web/checkout-popup.html) for the complete implementation with payment method selection and error handling.
+> 📎 **Full runnable example:** See [`docs/examples/web/checkout-popup.html`](../examples/web/checkout-popup.html) for the complete implementation with payment method selection and error handling.
 
 ---
 
@@ -733,7 +735,7 @@ export default router;
 
 This is the **most critical step**. PayWay sends a server-to-server POST when payment is confirmed. This is where you update your database.
 
-See **[Chapter 11 — Callbacks & Webhooks](./11-callbacks-and-webhooks.md)** for the complete webhook handler implementation.
+See **[Chapter 11 — Callbacks & Webhooks](11-callbacks-and-webhooks.md)** for the complete webhook handler implementation.
 
 A minimal version:
 
@@ -836,8 +838,8 @@ curl -X POST "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/paym
 
 ## Next Steps
 
-- **For QR code payments** → [Chapter 7 — QR Code Handling](./07-qr-code-handling.md)
-- **For saving cards for future charges** → [Chapter 9 — Link / Unlink / Renew Lifecycle](./09-link-unlink-renew-lifecycle.md)
-- **For production deployment** → [Chapter 13 — Deployment Checklist](./13-deployment-checklist.md)
+- **For QR code payments** → [Chapter 7 — QR Code Handling](07-qr-code-handling.md)
+- **For saving cards for future charges** → [Chapter 9 — Link / Unlink / Renew Lifecycle](09-link-unlink-renew-lifecycle.md)
+- **For production deployment** → [Chapter 13 — Deployment Checklist](13-deployment-checklist.md)
 
-> ← [Previous: Prerequisites & Setup](./02-prerequisites-and-setup.md) | [Next: QR Code Handling →](./07-qr-code-handling.md)
+> ← [Previous: Prerequisites & Setup](02-prerequisites-and-setup.md) | [Next: QR Code Handling →](07-qr-code-handling.md)

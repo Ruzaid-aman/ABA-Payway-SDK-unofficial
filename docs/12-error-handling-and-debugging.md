@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/12-error-handling-and-debugging.md for compatibility. Do not edit here. -->
+
 # Chapter 12 — Error Handling & Debugging
 
 > **Estimated reading time:** 15 minutes  
@@ -336,11 +338,11 @@ The payment-link endpoints (`create`, `detail`, `void`) use the `PTL*` family in
 > (gated) and `scripts/e2e-payment-link-void.ts` (evidence:
 > `test-output/payment-link-void-e2e/`, gitignored).
 
-Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](./17-payment-link.md)**.
+Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](17-payment-link.md)**.
 
 ### ABA production telemetry — codes by API *(added 2026-09-15)*
 
-The ABA dev team shared a telemetry export grouping every gateway response by **API path + business code + message**. It is now folded into the registry: each code in [`error-codes.json`](./error-codes.json) can carry `observedOn` (the APIs below, as short labels) and `observedMessage` (the exact gateway string). Provenance rules: `sandboxVerified` still means reproduced in the live sandbox; `observedOn` means seen in ABA production. Where telemetry and old spec-page glosses disagreed, telemetry won (`4`, `16`, `17`, `19`, `21`, `44`) — see the gateway/QR tables above.
+The ABA dev team shared a telemetry export grouping every gateway response by **API path + business code + message**. It is now folded into the registry: each code in [`error-codes.json`](../error-codes.json) can carry `observedOn` (the APIs below, as short labels) and `observedMessage` (the exact gateway string). Provenance rules: `sandboxVerified` still means reproduced in the live sandbox; `observedOn` means seen in ABA production. Where telemetry and old spec-page glosses disagreed, telemetry won (`4`, `16`, `17`, `19`, `21`, `44`) — see the gateway/QR tables above.
 
 | API label | Gateway path | Codes observed (beyond `00`/`0` success) |
 |---|---|---|
@@ -440,7 +442,7 @@ The same lookup is available programmatically via `explainPayWayCode()` in `aba-
 
 ### Machine-readable registry
 
-Every code the CLI knows is also published as a versioned JSON artifact: [`error-codes.json`](./error-codes.json). It is **generated**, not hand-maintained — the source of truth is the typed data behind `explain` (`src/cli/explain-code.ts` + `src/constants.ts`), and a drift test (`src/__tests__/error-registry.test.ts`) fails if the committed JSON ever diverges from it. Regenerate after changing any explain data:
+Every code the CLI knows is also published as a versioned JSON artifact: [`error-codes.json`](../error-codes.json). It is **generated**, not hand-maintained — the source of truth is the typed data behind `explain` (`src/cli/explain-code.ts` + `src/constants.ts`), and a drift test (`src/__tests__/error-registry.test.ts`) fails if the committed JSON ever diverges from it. Regenerate after changing any explain data:
 
 ```bash
 npm run gen:error-registry
@@ -455,7 +457,7 @@ Fields:
 | `title` | Short human-readable meaning |
 | `hint` | Branch/recovery advice (what to check next) |
 | `sandboxVerified` | `true` when the meaning was reproduced against the live sandbox; absent means spec-derived or inferred |
-| `evidence` | For live-verified codes: pointer into [`SANDBOX-FINDINGS.md`](./SANDBOX-FINDINGS.md) (e.g. `SANDBOX-FINDINGS §8/§9`) |
+| `evidence` | For live-verified codes: pointer into [`SANDBOX-FINDINGS.md`](../internal/SANDBOX-FINDINGS.md) (e.g. `SANDBOX-FINDINGS §8/§9`) |
 
 The CLI surfaces the same provenance: `payway-sdk explain PTL36` prints a `✓ sandbox-verified` line in text mode, and `payway-sdk explain PTL36 --json` emits the exact registry entry as one JSON document (`explain --json` with no code lists all of them).
 
@@ -922,8 +924,8 @@ curl -I https://your-domain.com/api/payway-webhook
 
 ## Next Steps
 
-- **For deployment** → [Chapter 13 — Deployment Checklist](./13-deployment-checklist.md)
-- **For the webhook handler** → [Chapter 11 — Callbacks & Webhooks](./11-callbacks-and-webhooks.md)
-- **For reference** → [Chapter 14 — Appendix: Code Snippets](./14-appendix-code-snippets.md)
+- **For deployment** → [Chapter 13 — Deployment Checklist](13-deployment-checklist.md)
+- **For the webhook handler** → [Chapter 11 — Callbacks & Webhooks](11-callbacks-and-webhooks.md)
+- **For reference** → [Chapter 14 — Appendix: Code Snippets](14-appendix-code-snippets.md)
 
-> ← [Previous: Callbacks & Webhooks](./11-callbacks-and-webhooks.md) | [Next: Deployment Checklist →](./13-deployment-checklist.md)
+> ← [Previous: Callbacks & Webhooks](11-callbacks-and-webhooks.md) | [Next: Deployment Checklist →](13-deployment-checklist.md)

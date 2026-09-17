@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/07-qr-code-handling.md for compatibility. Do not edit here. -->
+
 # Chapter 7 — QR Code Handling
 
 > **Estimated reading time:** 15 minutes  
@@ -323,19 +325,19 @@ export default router;
 
 ## QR Image Template Gallery
 
-The `qrImageTemplate` parameter (CLI `--template`) asks the **gateway** to render `qrImage` in one of seven styles. All seven are verified in sandbox (2026-08-30; per-template latency and acceptance notes in [SANDBOX-FINDINGS](./SANDBOX-FINDINGS.md)). `template2` is the API default. Templates are online-only — the [offline ABA KHQR](#official-aba-khqr-offline-generation-no-api-call-required) pipeline produces plain unbranded EMVCo payloads and cannot carry a template.
+The `qrImageTemplate` parameter (CLI `--template`) asks the **gateway** to render `qrImage` in one of seven styles. All seven are verified in sandbox (2026-08-30; per-template latency and acceptance notes in [SANDBOX-FINDINGS](../internal/SANDBOX-FINDINGS.md)). `template2` is the API default. Templates are online-only — the [offline ABA KHQR](#official-aba-khqr-offline-generation-no-api-call-required) pipeline produces plain unbranded EMVCo payloads and cannot carry a template.
 
 Rendered samples (captured from the sandbox by `scripts/capture-qr-template-gallery.ts`):
 
 | Template | Sample | Style | Use it for |
 |---|---|---|---|
-| `template1` | ![template1](./images/qr-templates/template1.png) | Classic black & white card, no branding | Minimal digital displays, embedded devices, custom-branding hosts |
-| `template1_color` | ![template1_color](./images/qr-templates/template1_color.png) | Classic layout with ABA brand color | Same as template1 with recognizable ABA mark |
-| `template2` *(default)* | ![template2](./images/qr-templates/template2.png) | White card with ABA logo header | General checkout pages |
-| `template2_color` | ![template2_color](./images/qr-templates/template2_color.png) | Default layout with brand color | Checkout pages that match an ABA-branded theme |
-| `template3_color` | ![template3_color](./images/qr-templates/template3_color.png) | Compact color design | Customer-facing screens where vertical space is tight |
-| `template4` | ![template4](./images/qr-templates/template4.png) | Tall receipt style, black & white | Receipts and printed invoices (thermal printers) |
-| `template4_color` | ![template4_color](./images/qr-templates/template4_color.png) | Tall receipt style with brand color | Branded receipts and printed invoices |
+| `template1` | ![template1](../images/qr-templates/template1.png) | Classic black & white card, no branding | Minimal digital displays, embedded devices, custom-branding hosts |
+| `template1_color` | ![template1_color](../images/qr-templates/template1_color.png) | Classic layout with ABA brand color | Same as template1 with recognizable ABA mark |
+| `template2` *(default)* | ![template2](../images/qr-templates/template2.png) | White card with ABA logo header | General checkout pages |
+| `template2_color` | ![template2_color](../images/qr-templates/template2_color.png) | Default layout with brand color | Checkout pages that match an ABA-branded theme |
+| `template3_color` | ![template3_color](../images/qr-templates/template3_color.png) | Compact color design | Customer-facing screens where vertical space is tight |
+| `template4` | ![template4](../images/qr-templates/template4.png) | Tall receipt style, black & white | Receipts and printed invoices (thermal printers) |
+| `template4_color` | ![template4_color](../images/qr-templates/template4_color.png) | Tall receipt style with brand color | Branded receipts and printed invoices |
 
 > 💡 Pick by placement, not preference: screens get `template2`/`template3_color`; print gets `template4`/`template4_color`; unbranded or self-branded hosts get `template1`. The samples above are 5.00 USD sandbox renders — amounts and merchant names render dynamically per transaction.
 
@@ -430,13 +432,13 @@ QR codes generated via the API have a limited lifetime:
 
 ### Sandbox-verified lifecycle facts (2026-08-25)
 
-- **Duplicate `tran_id` is silently accepted** on purchase in sandbox (HTTP 200, `code 0`). Generate unique transaction IDs (the CLI does: `qr<timestamp><random>`); do not rely on PayWay for idempotency. Production behavior is an open question — see [SANDBOX-FINDINGS §8c](./SANDBOX-FINDINGS.md).
-- **Closing an unpaid transaction keeps it reporting `PENDING`** via check/list APIs (not `CANCELLED`). Treat "closed" as a local state you track yourself; the close call returns `code 0 Success!` when accepted. **Customer-side, the close DOES kill the QR**: closed-unpaid KHQRs are refused by the ABA app at scan time with a generic "transaction expired" message (3 live observations, 2026-08-25 + 2026-09-05 ×2 — indistinguishable from natural expiry at scan time). Enforcement is channel-dependent: two hosted-card sessions accepted payment after a code-00 close — see [CLOSE-TRANSACTION-FINDINGS.md](./CLOSE-TRANSACTION-FINDINGS.md).
+- **Duplicate `tran_id` is silently accepted** on purchase in sandbox (HTTP 200, `code 0`). Generate unique transaction IDs (the CLI does: `qr<timestamp><random>`); do not rely on PayWay for idempotency. Production behavior is an open question — see [SANDBOX-FINDINGS §8c](../internal/SANDBOX-FINDINGS.md).
+- **Closing an unpaid transaction keeps it reporting `PENDING`** via check/list APIs (not `CANCELLED`). Treat "closed" as a local state you track yourself; the close call returns `code 0 Success!` when accepted. **Customer-side, the close DOES kill the QR**: closed-unpaid KHQRs are refused by the ABA app at scan time with a generic "transaction expired" message (3 live observations, 2026-08-25 + 2026-09-05 ×2 — indistinguishable from natural expiry at scan time). Enforcement is channel-dependent: two hosted-card sessions accepted payment after a code-00 close — see [CLOSE-TRANSACTION-FINDINGS.md](../internal/CLOSE-TRANSACTION-FINDINGS.md).
 - **transaction-list visibility is unpaid-QR-only asymmetric** (SANDBOX-FINDINGS §14/§20): paid transactions ARE list-visible; unpaid QR-only ones never appear (check-transaction/detail see them instantly); unpaid checkout-path transactions DO appear. Timestamps shown are the **gateway clock, UTC+7** — a UTC/local-derived date window silently returns 0 rows, so omit `--from/--to` (full gateway day) or convert.
 - **`closeTransaction()` on a nonexistent ID** → HTTP 403, internal code `5` ("Transaction not found"), while `checkTransaction()` on a nonexistent ID → HTTP 200 with `status.code 6` ("tran_id not found"). Handle both shapes.
 - **Creation grace period:** the first check right after creating a transaction can return `status.code 6` for a few seconds before it becomes visible. `pollTransactionStatus()` yields `NOT_FOUND` for these and does **not** count them toward `maxConsecutiveErrors`. Verified live 2026-08-25: checkout-link flow saw 1× NOT_FOUND, then PENDING ×4 → APPROVED (~32s).
 - **Visibility is asymmetric across endpoints (measured 2026-08-25):** check-transaction sees a fresh transaction in <1s, but get-transaction-detail needs ~5s and is capped at 10/min. Poll status with `checkTransaction` / `pollTransactionStatus`; use detail only for reconciliation (`apv`, `bank_ref`, operation history) after the fact.
-- **Strict-cap responses look like permission errors:** exceeding a documented cap (detail 10/min, list 50/min) returns HTTP **403** with NUMERIC body `status.code` 429 ("Rate limit exceeded...") and no rate-limit headers. The SDK maps this to typed retryable `PayWayRateLimitError` and paces retries from its own observed window — see [Error Handling §Endpoint HTTP Behavior](./12-error-handling-and-debugging.md#endpoint-http-behavior).
+- **Strict-cap responses look like permission errors:** exceeding a documented cap (detail 10/min, list 50/min) returns HTTP **403** with NUMERIC body `status.code` 429 ("Rate limit exceeded...") and no rate-limit headers. The SDK maps this to typed retryable `PayWayRateLimitError` and paces retries from its own observed window — see [Error Handling §Endpoint HTTP Behavior](12-error-handling-and-debugging.md#endpoint-http-behavior).
 - **Hosted checkout link requires `payment_gate=0`:** via the JSON Create Transaction API (`checkout.purchase()`), the response includes `checkout_qr_url` only when you send `viewType: 'hosted_view'` + `paymentGate: 0` alongside `paymentOption: 'abapay_khqr_deeplink'`. Without gate 0 you get only `qrString` / `qrImage` / `abapay_deeplink`.
 - **Transaction-list date filters must be `"YYYY-MM-DD HH:mm:ss"`** (e.g. `"2026-08-25 00:00:00"`). Compact (`20260825`), ISO-date (`2026-08-25`), and epoch formats all fail with HTTP 403 / code `49` "Invalid Start Date."
 - **QR `lifetime` minimum is 3 minutes — sandbox-pinned 2026-08-30, now enforced by the SDK.** `lifetime: 179` → HTTP 400 code `"04"` ("The given data was invalid"); `lifetime: 180` → success. The API takes **minutes**; the SDK accepts seconds, floors to whole minutes (a live QR never outlives the merchant's displayed countdown), and **rejects sub-180s values locally** with `PayWayConfigError` before any network call (exported constant: `QR_LIFETIME_MIN_SECONDS`). `checkout.purchase` is different: its `lifetime` is **minutes** (spec min 3, max 43200 = 30 days); sub-3-minute values are rejected locally with `PayWayConfigError` (gateway error-69 parity). QR maximum per the spec is 120 days (not locally enforced; ~27h confirmed accepted live).
@@ -447,7 +449,7 @@ QR codes generated via the API have a limited lifetime:
 - **Two clocks govern a QR**: the *scan/session window* the customer experiences, and the *transaction lifetime* (`lifetime`) the gateway keeps the record alive. They are independent — a QR image can stop scanning while the transaction record is still open (matches the sandbox observation of a 1440-min-lifetime KHQR refused at scan after ~2h). For long-lived invoices use the offline-KHQR/invoice pattern with its own validity, not a checkout QR.
 - **Hosted-checkout session timeouts per method** (front-end session, not transaction TTL): `abapay_khqr` 5 minutes; `abapay_khqr_deeplink`, cards, Alipay, and WeChat 3 minutes. The QR image itself may expire in as little as ~2 minutes while the transaction is open — after the window the customer must re-initiate (a fresh transaction/QR), not reuse the old `checkout_qr_url`.
 - **Default KHQR checkout expiry is 5 minutes after generation** (global setting, not per-merchant configurable). Some QR APIs default to a long validity (~30 days) when `lifetime` is omitted; KHQR is described as one-time-use with a 24-hour lifetime in other PayWay contexts. Keep the visible window short (3–5 min) and align `lifetime` + polling/expiry logic with it.
-- **Offline KHQR repeat payment and validity** (closes the open policy question in [SANDBOX-FINDINGS](./SANDBOX-FINDINGS.md)): a QR **may support multiple payment transactions during its applicable validity** (the UNPAID/PARTIALLY_PAID/PAID/OVERPAID model; dedupe on `transaction_id`, reconcile on `merchant_ref`) — but "payable multiple times" explicitly does **not** mean payable forever. Creation/expiry follow the current ABA KHQR (Bakong) spec timestamps.
+- **Offline KHQR repeat payment and validity** (closes the open policy question in [SANDBOX-FINDINGS](../internal/SANDBOX-FINDINGS.md)): a QR **may support multiple payment transactions during its applicable validity** (the UNPAID/PARTIALLY_PAID/PAID/OVERPAID model; dedupe on `transaction_id`, reconcile on `merchant_ref`) — but "payable multiple times" explicitly does **not** mean payable forever. Creation/expiry follow the current ABA KHQR (Bakong) spec timestamps.
 - **No signature on the offline-KHQR notification — by design.** ABA confirmed no separate HMAC/signature scheme exists for that callback; integrity comes from HTTPS, dedupe on `transaction_id`, `merchant_ref` reconciliation, and treating transaction inquiry (Check Transaction / `get-transactions-by-mc-ref`) as the source of truth. ABA configures/whitelists the merchant callback URL on the profile.
 - **Status enum confirmed**: `payment_status_code` 0 APPROVED, 2 PENDING (may persist up to ~24 h), 3 DECLINED, 4 REFUNDED, 7 CANCELLED (pre-auth). There is **no EXPIRED/CLOSED code** — long-PENDING is the gateway's terminal representation; expiry is merchant-side. (`DECLINDED` spellings in list output are the gateway's own typo — handle it.)
 
@@ -762,8 +764,8 @@ console.log(info);
 
 ## Next Steps
 
-- **For web checkout flows** → [Chapter 3 — Web Implementation](./03-web-implementation.md)
-- **For mobile apps** → [Chapter 4 — Native App Implementation](./04-native-app-implementation.md)
-- **For production deployment** → [Chapter 13 — Deployment Checklist](./13-deployment-checklist.md)
+- **For web checkout flows** → [Chapter 3 — Web Implementation](03-web-implementation.md)
+- **For mobile apps** → [Chapter 4 — Native App Implementation](04-native-app-implementation.md)
+- **For production deployment** → [Chapter 13 — Deployment Checklist](13-deployment-checklist.md)
 
-> ← [Previous: Web Implementation](./03-web-implementation.md) | [Next: Link / Unlink / Renew Lifecycle →](./09-link-unlink-renew-lifecycle.md)
+> ← [Previous: Web Implementation](03-web-implementation.md) | [Next: Link / Unlink / Renew Lifecycle →](09-link-unlink-renew-lifecycle.md)

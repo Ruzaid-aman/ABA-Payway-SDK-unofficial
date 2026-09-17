@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/15-merchant-scenario-requirements.md for compatibility. Do not edit here. -->
+
 # Chapter 15 — Merchant Scenario Requirements
 
 This chapter maps the reviewed merchant scenarios to SDK and integrator responsibilities. “Guidance observed during integration” is not a universal PayWay guarantee; profile and commercial settings must be confirmed with ABA.
@@ -188,7 +190,7 @@ joining them to the bank settlement report for the expected settlement date S
 has been observed but is not universal). Fees appear as separate debits — reconcile
 net vs gross per the agreement. Mismatches: send `tran_id` + date/time + amount +
 bank evidence to the Integration/Settlement team. Full pattern:
-[Chapter 20](./20-settlement-and-disputes.md).
+[Chapter 20](20-settlement-and-disputes.md).
 
 ## TC-036 — Chargebacks and disputes
 
@@ -198,7 +200,7 @@ final/irrevocable once successful. ABA notifies the merchant's registered email
 with reason code, amount, PAN partial, approval code, purchase ID, and a response
 deadline; silence past the deadline is treated as acceptance. Merchants accept
 (refund) or dispute with evidence; ABA represents the case to the scheme. Monitor
-the registered email. Full flow: [Chapter 20](./20-settlement-and-disputes.md).
+the registered email. Full flow: [Chapter 20](20-settlement-and-disputes.md).
 
 ## TC-037 — Payout and split timing
 
@@ -210,4 +212,4 @@ same operation, subject to liquidity and daily payout limits. Production require
 beneficiary whitelisting and the payout service enabled on the MID. **Once a
 transaction is processed via payout/split, the standard refund API is not
 available** — refunds are manual, or a pre-auth refund before the split. See
-[Chapter 20](./20-settlement-and-disputes.md).
+[Chapter 20](20-settlement-and-disputes.md).

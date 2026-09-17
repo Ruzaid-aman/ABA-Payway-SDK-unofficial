@@ -21,7 +21,7 @@ Stripe's CLI is organized around making webhook receivers testable without real 
 - `stripe events resend <event_id> --webhook-endpoint=...` — replays a past real event (last 30 days) to a live endpoint.
 - `stripe logs tail` — real-time API request log tailing with filters (method, status-code class, path, IP, source).
 
-Our `setup-webhook` ([src/webhook/server.ts](../src/webhook/server.ts), registered at [src/cli.ts](../src/cli.ts) `setup-webhook` group) is a **capture** tool: three receiver routes (online callback, KHQR notification, payment-link pushback), optional HMAC verification, JSON/SQLite storage, optional Cloudflare Tunnel, journal integration. It does **not forward** captured callbacks to the merchant's application, **cannot synthesize** an event, and **cannot replay** a stored one (the journal renders replay *markers* — [src/cli/commands/journal.ts](../src/cli/commands/journal.ts) `replay` — but nothing re-sends). And there is **no standalone `verify` command**: `verifyCallbackDetailed` exists in [src/auth.ts](../src/auth.ts) (timing-safe HMAC, failure reasons) but is only reachable programmatically or through the webhook server; the `aba-payway-hash` skill has to describe it as a library call.
+Our `setup-webhook` ([src/webhook/server.ts](../../src/webhook/server.ts), registered at [src/cli.ts](../../src/cli.ts) `setup-webhook` group) is a **capture** tool: three receiver routes (online callback, KHQR notification, payment-link pushback), optional HMAC verification, JSON/SQLite storage, optional Cloudflare Tunnel, journal integration. It does **not forward** captured callbacks to the merchant's application, **cannot synthesize** an event, and **cannot replay** a stored one (the journal renders replay *markers* — [src/cli/commands/journal.ts](../../src/cli/commands/journal.ts) `replay` — but nothing re-sends). And there is **no standalone `verify` command**: `verifyCallbackDetailed` exists in [src/auth.ts](../../src/auth.ts) (timing-safe HMAC, failure reasons) but is only reachable programmatically or through the webhook server; the `aba-payway-hash` skill has to describe it as a library call.
 
 Consequence: today the only way to test a receiver end-to-end is a real sandbox payment through the ABA Simulator (60–90 s latency per approval, per §18 of SANDBOX-FINDINGS). Stripe's loop is seconds and offline.
 
@@ -29,7 +29,7 @@ Consequence: today the only way to test a receiver end-to-end is a real sandbox 
 
 `stripe login --non-interactive` prints `{ browser_url, verification_code, next_step }` as JSON and exits; the agent (or CI) runs the returned `next_step` command with `--complete=<poll-url>` after the human approves in the browser. `stripe sandbox create --non-interactive` and `agent setup --json` (dry-run of planned actions) follow the same pattern. Stripe treats "an AI coding agent is driving" as a first-class runtime, and even detects which agent it is for telemetry.
 
-We have the inverse strength (the `ask`/`agent` REPL is itself an agent) and our `--output json|ndjson` schema with `nextAction` ([src/cli/output.ts](../src/cli/output.ts), schema v1.0) plus stderr-separated diagnostics is already agent-shaped. But the pattern is not uniform: some commands still couple their "what should I do next" guidance to human output only.
+We have the inverse strength (the `ask`/`agent` REPL is itself an agent) and our `--output json|ndjson` schema with `nextAction` ([src/cli/output.ts](../../src/cli/output.ts), schema v1.0) plus stderr-separated diagnostics is already agent-shaped. But the pattern is not uniform: some commands still couple their "what should I do next" guidance to human output only.
 
 ### 3. `agent setup` ships an MCP server, and Razorpay has an MCP product
 
@@ -37,12 +37,12 @@ We have the inverse strength (the `ask`/`agent` REPL is itself an agent) and our
 
 ### 4. Distribution, discovery, and upgrade polish
 
-- **Install:** Stripe moved to npm as the primary channel; Razorpay ships per-arch binaries through brew, scoop, deb, rpm, and a `curl … | bash` script. We are **unpublished** (a release-gated decision, [docs/RELEASE-READINESS.md](RELEASE-READINESS.md)) and the README already warns that bare `npx payway-sdk` resolves to an **unrelated squatted package** — the bin name `payway-sdk` is a live trap until we publish.
+- **Install:** Stripe moved to npm as the primary channel; Razorpay ships per-arch binaries through brew, scoop, deb, rpm, and a `curl … | bash` script. We are **unpublished** (a release-gated decision, [docs/RELEASE-READINESS.md](../project/RELEASE-READINESS.md)) and the README already warns that bare `npx payway-sdk` resolves to an **unrelated squatted package** — the bin name `payway-sdk` is a live trap until we publish.
 - **Upgrade:** `stripe version` reports "A newer version of the Stripe CLI is available." We have no update check at all.
 - **Completion:** `stripe completion` emits bash/zsh scripts. We have none.
 - **Docs in terminal:** `stripe docs <path>`, `docs api <resource>`, `docs search <query>`. Razorpay publishes an `/llms.txt` index "to discover all available pages" for AI agents. We have 18 chapters plus deep guides — all markdown, none reachable from the CLI, no `llms.txt`.
 - **`open` shortcuts:** `stripe open dashboard/webhooks` etc. We have no command that opens the ABA merchant portal or our own docs.
-- **`config --set/--unset/--list/--edit` + `--project-name`:** Stripe persists preferences (color, device name, API keys) in a config file with multi-account project profiles. Our [src/config/profiles.ts](../src/config/profiles.ts) (8 named credential profiles, atomic 0o600 writes, precedence rules) is actually **stronger for credentials**; what we lack is a persisted preferences layer for UI/journal/output mode (those are env-only).
+- **`config --set/--unset/--list/--edit` + `--project-name`:** Stripe persists preferences (color, device name, API keys) in a config file with multi-account project profiles. Our [src/config/profiles.ts](../../src/config/profiles.ts) (8 named credential profiles, atomic 0o600 writes, precedence rules) is actually **stronger for credentials**; what we lack is a persisted preferences layer for UI/journal/output mode (those are env-only).
 - **Global `--live` duality:** every Stripe command defaults to test mode; `--live` is an explicit per-command opt-in. We carry sandbox/production in `PAYWAY_ENV`/profiles and print `Using profile:` — the mode is visible, but there is no per-command live-mode confirmation on money-movement operations outside the agentic risk gates.
 
 ## What Razorpay does better
@@ -57,9 +57,9 @@ Razorpay's CLI is far simpler than ours — resource commands over their REST AP
 | Capability | Us | Stripe | Razorpay |
 |---|---|---|---|
 | Full domain coverage incl. COF, pre-auth, payouts, beneficiaries, payment links | 24-op matrix, all CLI-exposed | Resources/HTTP escape hatch | 15 API families |
-| Natural-language agentic CLI with risk gates, execution ledger, privacy ack | `ask`/`agent` REPL ([src/agent/](../src/agent/)) | — | — |
-| Local transaction journal + RCA + anomaly detection | `journal stats/reconcile/explain/anomalies` ([src/journal/](../src/journal/)) | `logs tail` (server-side, test-mode only) | — |
-| Offline/capability-free test environment | mock gateway ([src/test/index.ts](../src/test/index.ts)) + credential-free `demo` | `sandbox create` (no-account sandbox, 7-day) | — |
+| Natural-language agentic CLI with risk gates, execution ledger, privacy ack | `ask`/`agent` REPL ([src/agent/](../../src/agent)) | — | — |
+| Local transaction journal + RCA + anomaly detection | `journal stats/reconcile/explain/anomalies` ([src/journal/](../../src/journal)) | `logs tail` (server-side, test-mode only) | — |
+| Offline/capability-free test environment | mock gateway ([src/test/index.ts](../../src/test/index.ts)) + credential-free `demo` | `sandbox create` (no-account sandbox, 7-day) | — |
 | Installable agent skills with hash manifest, target-aware installer, user-edit preservation | 32 skills, `skills add/doctor` | `agent setup` skills | — |
 | Bulk operations | `tx-batch close/check/detail` with pacing + evidence reports | — | — |
 | Error-code decoding | `explain <code>`, `status` | — | — |
@@ -75,9 +75,9 @@ Ordered by leverage. Items W-1..W-4 form one coherent "webhook workbench" wave; 
 
 ### P0 — close the local webhook test loop
 
-**W-1. `setup-webhook --forward-to <url>` (Stripe `listen --forward-to`).** After capture/verification, re-POST the raw callback (original headers where meaningful) to the merchant's local app URL; keep storage and journal events; add `--forward-headers` for custom injection. Small, surgical change to [src/webhook/server.ts](../src/webhook/server.ts) + the command options. This single flag converts our capture tool into a forwarder and makes the local dev loop real: `payway-sdk setup-webhook --tunnel --forward-to http://localhost:3000/webhooks/aba`.
+**W-1. `setup-webhook --forward-to <url>` (Stripe `listen --forward-to`).** After capture/verification, re-POST the raw callback (original headers where meaningful) to the merchant's local app URL; keep storage and journal events; add `--forward-headers` for custom injection. Small, surgical change to [src/webhook/server.ts](../../src/webhook/server.ts) + the command options. This single flag converts our capture tool into a forwarder and makes the local dev loop real: `payway-sdk setup-webhook --tunnel --forward-to http://localhost:3000/webhooks/aba`.
 
-**W-2. `webhook trigger <event>` (Stripe `trigger`).** Synthesize a signed callback event from fixtures — `payment.approved`, `payment.declined`, `payment-link.pushback`, `khqr.notification` — signed with the merchant's sandbox API key so the receiver's `verifyCallback` passes; seed realistic bodies from a real transaction via `-t <tran-id>` or template values; honor both contract shapes (payment-link pushbacks carry **no hash**, `status` is numeric `0` — SANDBOX-FINDINGS §22 V-1). Reuses mock-harness payload shapes ([src/test/index.ts](../src/test/index.ts)). Medium effort; the payoff is testing receiver logic in seconds without the ABA Simulator. Feed it through the webhook server so `--forward-to` + `trigger` compose.
+**W-2. `webhook trigger <event>` (Stripe `trigger`).** Synthesize a signed callback event from fixtures — `payment.approved`, `payment.declined`, `payment-link.pushback`, `khqr.notification` — signed with the merchant's sandbox API key so the receiver's `verifyCallback` passes; seed realistic bodies from a real transaction via `-t <tran-id>` or template values; honor both contract shapes (payment-link pushbacks carry **no hash**, `status` is numeric `0` — SANDBOX-FINDINGS §22 V-1). Reuses mock-harness payload shapes ([src/test/index.ts](../../src/test/index.ts)). Medium effort; the payoff is testing receiver logic in seconds without the ABA Simulator. Feed it through the webhook server so `--forward-to` + `trigger` compose.
 
 **W-3. `webhook resend <record-id> --to <url>` (Stripe `events resend`).** Replay a stored record from webhook storage (JSON or SQLite) to a URL — receiver regression testing against real captured payloads. Small; the storage layer already preserves everything needed, and the journal already tracks replay markers.
 
@@ -85,9 +85,9 @@ Ordered by leverage. Items W-1..W-4 form one coherent "webhook workbench" wave; 
 
 ### P1 — agent-surface parity
 
-**A-1. Ship an MCP server.** `payway-sdk mcp` (stdio) exposing the existing 13-tool agent catalog (or its read-only subset plus gated mutations, reusing the same risk gates and privacy ack from the agentic path), plus `query_journal`. Both benchmarks treat MCP as product surface (Stripe installs one via `agent setup`; Razorpay lists it in the docs nav). We are already an agent-first toolkit; MCP is the standard door and we have no door. Medium-large; anchors: [src/agent/](../src/agent/) tool catalog, [src/cli/commands/agent.ts](../src/cli/commands/agent.ts).
+**A-1. Ship an MCP server.** `payway-sdk mcp` (stdio) exposing the existing 13-tool agent catalog (or its read-only subset plus gated mutations, reusing the same risk gates and privacy ack from the agentic path), plus `query_journal`. Both benchmarks treat MCP as product surface (Stripe installs one via `agent setup`; Razorpay lists it in the docs nav). We are already an agent-first toolkit; MCP is the standard door and we have no door. Medium-large; anchors: [src/agent/](../../src/agent) tool catalog, [src/cli/commands/agent.ts](../../src/cli/commands/agent.ts).
 
-**A-2. `docs/llms.txt` + `payway-sdk docs <topic>`.** Generate an `llms.txt` index from [docs/README.md](README.md) (Razorpay does this for AI agents; it costs an afternoon); add `payway-sdk docs <topic>` to print/page the right chapter offline and `docs search <query>` over the local corpus. Our 18-chapter corpus is a strength that is invisible to agents that don't read repos. Small.
+**A-2. `docs/llms.txt` + `payway-sdk docs <topic>`.** Generate an `llms.txt` index from [docs/README.md](../README.md) (Razorpay does this for AI agents; it costs an afternoon); add `payway-sdk docs <topic>` to print/page the right chapter offline and `docs search <query>` over the local corpus. Our 18-chapter corpus is a strength that is invisible to agents that don't read repos. Small.
 
 **A-3. Uniform non-interactive pattern.** Extend the `nextAction` field and JSON envelopes so every journey command's "what to do next" is machine-visible, matching Stripe's `next_step` convention. Audit the commands where guidance is currently human-output-only.
 
@@ -99,7 +99,7 @@ Ordered by leverage. Items W-1..W-4 form one coherent "webhook workbench" wave; 
 
 ### P2 — distribution and polish
 
-**D-1. Publish, and fix the bin name first.** The npm release is already gated elsewhere ([docs/RELEASE-READINESS.md](RELEASE-READINESS.md)); this audit adds one strategic input: **the bin name `payway-sdk` is currently squatted on npm by an unrelated package**. Renaming the bin (e.g. `aba-payway`) or publishing scoped is a one-way door that must be decided **before** first publish. After npm, brew/scoop/curl-script distribution (Razorpay model) and a Docker image are derivable low-effort follow-ons; single-binary distribution is unnecessary for a Node CLI.
+**D-1. Publish, and fix the bin name first.** The npm release is already gated elsewhere ([docs/RELEASE-READINESS.md](../project/RELEASE-READINESS.md)); this audit adds one strategic input: **the bin name `payway-sdk` is currently squatted on npm by an unrelated package**. Renaming the bin (e.g. `aba-payway`) or publishing scoped is a one-way door that must be decided **before** first publish. After npm, brew/scoop/curl-script distribution (Razorpay model) and a Docker image are derivable low-effort follow-ons; single-binary distribution is unnecessary for a Node CLI.
 
 **D-2. Update check.** On `-V`/idle, compare `package.json` against the npm registry `latest` with a cached, non-blocking check and an opt-out env var (Stripe: "A newer version of the Stripe CLI is available."). Post-publish only. Telemetry: recommend **not** collecting usage telemetry and documenting that position — it fits our local-journal, privacy-first architecture (Stripe's opt-out exists; ours can simply be "we don't").
 
@@ -113,7 +113,7 @@ Ordered by leverage. Items W-1..W-4 form one coherent "webhook workbench" wave; 
 
 ### Explicitly not recommended
 
-- **Browser pairing login / `sandbox create`-style provisioning** — requires PayWay-side OAuth and no-account sandbox APIs we don't have (related open asks to ABA in [audit-results/four-pillars/ABA-OPEN-QUESTIONS.md](../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md)); not implementable locally.
+- **Browser pairing login / `sandbox create`-style provisioning** — requires PayWay-side OAuth and no-account sandbox APIs we don't have (related open asks to ABA in [audit-results/four-pillars/ABA-OPEN-QUESTIONS.md](../../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md)); not implementable locally.
 - **Generic resource-verb CRUD (`stripe customers create`)** — PayWay's 24 operations are already fully exposed with richer, validated flag sets; generic CRUD would be a regression in ergonomics, not parity.
 - **Stripe Projects/plugins** — out of scope for a payments SDK.
 - **Usage telemetry** — see D-2.
@@ -128,7 +128,7 @@ Ordered by leverage. Items W-1..W-4 form one coherent "webhook workbench" wave; 
 
 - [Stripe CLI reference](https://docs.stripe.com/cli) — fetched and read in full this session (login/context/sandbox/agent setup/config/completion/docs/logs tail/open/listen/trigger/events resend/resources/get/post/delete/fixtures/projects/tools/plugins/telemetry/global flags).
 - [Razorpay CLI — About](https://razorpay.com/docs/cli) and [Install](https://razorpay.com/docs/cli/install-cli) — fetched via curl and read this session (resource commands, supported API families, platforms, brew/scoop/deb/rpm/curl install, `configure`, `/llms.txt`, MCP server in docs nav).
-- Current repository: `src/cli.ts` command tree, [src/cli/commands/](../src/cli/commands/), [src/webhook/](../src/webhook/), [src/agent/](../src/agent/), [src/journal/](../src/journal/), [src/test/index.ts](../src/test/index.ts), [src/config/profiles.ts](../src/config/profiles.ts), [src/cli/output.ts](../src/cli/output.ts), [docs/17-payment-link.md](17-payment-link.md) §17.7, [docs/SANDBOX-FINDINGS.md](SANDBOX-FINDINGS.md) §21/§22.
+- Current repository: `src/cli.ts` command tree, [src/cli/commands/](../../src/cli/commands), [src/webhook/](../../src/webhook), [src/agent/](../../src/agent), [src/journal/](../../src/journal), [src/test/index.ts](../../src/test/index.ts), [src/config/profiles.ts](../../src/config/profiles.ts), [src/cli/output.ts](../../src/cli/output.ts), [docs/17-payment-link.md](../guides/17-payment-link.md) §17.7, [docs/SANDBOX-FINDINGS.md](../internal/SANDBOX-FINDINGS.md) §21/§22.
 - Prior related analysis: [competitive-analysis-cutluy.md](competitive-analysis-cutluy.md) (first-payment path, `webhooks test/replay/inspect` proposal), [competitive-analysis-canadia.md](competitive-analysis-canadia.md) (2026-09-11 bank-portal audit: per-endpoint sequence diagrams, semantic error-code table, Flutter coverage as the adoptable patterns; their samples don't run), [STRIPE-STANDARD-DX-AUDIT.md](STRIPE-STANDARD-DX-AUDIT.md) (SDK-level audit, mostly shipped).
 
 ---
@@ -190,7 +190,7 @@ Published, zero-dependency, MIT, Node ≥18, ESM+CJS, claims Node/Bun/Deno/Cloud
 2. **Counter-position explicitly against the "Official" claim.** Our README already states "community-maintained… no endorsement is claimed" — keep that honesty, and consider raising the `aba-payway-sdk` misrepresentation with ABA: an unofficial package claiming official status is a merchant-trust risk for the gateway itself, and ABA engagement could either legitimize our positioning or prompt a genuine official SDK.
 3. **The zero-dependency pitch is worth partially matching.** We can't drop `commander`/`@clack` from the CLI experience, but we can (a) keep the **library** entry free of CLI-only deps — move them to `optionalDependencies` or split a future `aba-payway-cli` package — and (b) document runtime support honestly (Node ≥22.12; Bun/Deno/Workers unverified). This shrinks the install for library-only consumers and answers their sharpest marketing point without sacrificing the CLI.
 4. **Their bugs are our content-marketing.** Their QR-lifetime-units and close→CANCELLED errors are exactly the gateway-contract mistakes our sandbox campaigns exist to prevent. A short "Why gateway-verified contracts matter" section in README/docs — naming the failure modes, not the competitor — turns our verification depth into a visible differentiator.
-5. **Publication cadence beats perfection once unblocked.** Both competitors shipped fast with real errors; we are far more correct but invisible. Once the release blockers in [docs/RELEASE-READINESS.md](RELEASE-READINESS.md) clear, publishing early-and-often matters more than holding for completeness — namespace and search positioning accrue to the published.
+5. **Publication cadence beats perfection once unblocked.** Both competitors shipped fast with real errors; we are far more correct but invisible. Once the release blockers in [docs/RELEASE-READINESS.md](../project/RELEASE-READINESS.md) clear, publishing early-and-often matters more than holding for completeness — namespace and search positioning accrue to the published.
 
 ### Ecosystem-section sources
 
@@ -199,8 +199,8 @@ Published, zero-dependency, MIT, Node ≥18, ESM+CJS, claims Node/Bun/Deno/Cloud
 - `github.com/Joselay/aba-payway` source: `src/client.ts`, `src/hash.ts`, `src/constants.ts`, `tests/e2e.test.ts` — fetched 2026-09-08
 - `registry.npmjs.org/aba-payway-sdk` (package.json incl. maintainers, README) and downloads API — fetched 2026-09-08
 - `registry.npmjs.org/payway-sdk`, `payway`, `aba-payway-ts`, `aba-payway-cli` — availability checks, 2026-09-08
-- Our sandbox-verified contracts: [docs/SANDBOX-FINDINGS.md](SANDBOX-FINDINGS.md) (QR lifetime 180 s, close-transaction behavior), [docs/CLOSE-TRANSACTION-FINDINGS.md](CLOSE-TRANSACTION-FINDINGS.md), HANDOFF.md §3/§7
-- Our [package.json](../package.json) dependencies; [README.md](../README.md) positioning lines
+- Our sandbox-verified contracts: [docs/SANDBOX-FINDINGS.md](../internal/SANDBOX-FINDINGS.md) (QR lifetime 180 s, close-transaction behavior), [docs/CLOSE-TRANSACTION-FINDINGS.md](../internal/CLOSE-TRANSACTION-FINDINGS.md), HANDOFF.md §3/§7
+- Our [package.json](../../package.json) dependencies; [README.md](../../README.md) positioning lines
 
 ---
 

@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/06-telegram-mini-app.md for compatibility. Do not edit here. -->
+
 # Chapter 6 — Telegram Mini App Integration
 
 > **Estimated reading time:** 10 minutes  
@@ -626,8 +628,8 @@ bot.launch();
 
 ## Next Steps
 
-- **For standard web integration** → [Chapter 3 — Web Implementation](./03-web-implementation.md)
-- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](./11-callbacks-and-webhooks.md)
-- **For production deployment** → [Chapter 13 — Deployment Checklist](./13-deployment-checklist.md)
+- **For standard web integration** → [Chapter 3 — Web Implementation](03-web-implementation.md)
+- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](11-callbacks-and-webhooks.md)
+- **For production deployment** → [Chapter 13 — Deployment Checklist](13-deployment-checklist.md)
 
-> ← [Previous: WebView Implementation](./05-webview-implementation.md) | [Next: Deep Linking →](./08-deep-linking.md)
+> ← [Previous: WebView Implementation](05-webview-implementation.md) | [Next: Deep Linking →](08-deep-linking.md)

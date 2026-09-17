@@ -19,7 +19,7 @@ export interface CodeExplanation {
   readonly hint: string;
   /** True when the code's meaning was reproduced against the live sandbox. */
   readonly sandboxVerified?: boolean;
-  /** Evidence pointer into docs/SANDBOX-FINDINGS.md for live-verified codes. */
+  /** Evidence pointer into docs/internal/SANDBOX-FINDINGS.md for live-verified codes. */
   readonly evidence?: string;
   /** Gateway APIs (short labels, see docs/12 telemetry section) where ABA production telemetry observed this code, 2026-09-15 CSV. */
   readonly observedOn?: string[];
@@ -29,7 +29,7 @@ export interface CodeExplanation {
 
 /**
  * Codes whose meaning was live-verified against the sandbox (see
- * docs/SANDBOX-FINDINGS.md). Everything else in the explain maps is
+ * docs/internal/SANDBOX-FINDINGS.md). Everything else in the explain maps is
  * spec-derived or inferred. Drives `sandboxVerified`/`evidence` on
  * CodeExplanation and the generated docs/error-codes.json registry.
  */

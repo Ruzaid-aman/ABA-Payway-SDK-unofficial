@@ -1,6 +1,6 @@
 /**
  * Signed callback fixtures for local webhook testing (P0 W-2 of
- * docs/competitive-analysis-cli-stripe-razorpay.md — Stripe `trigger` analog).
+ * docs/strategy/competitive-analysis-cli-stripe-razorpay.md — Stripe `trigger` analog).
  *
  * Four fixture families mirror the webhook-server routes:
  *  - `payment.approved` / `payment.declined` … — online checkout callbacks:

@@ -30,7 +30,7 @@ Every artifact in demo mode carries a `simulated: true` flag and the UI shows a 
 
 ## Sandbox mode
 
-For a guided local exercise, see the [first-payment walkthrough](../../docs/FIRST-PAYMENT-WALKTHROUGH.md).
+For a guided local exercise, see the [first-payment walkthrough](../../docs/guides/FIRST-PAYMENT-WALKTHROUGH.md).
 
 1. Copy `.env.example` to `.env`, fill in your sandbox merchant ID and API key, and export the variables (`PAYWAY_ENV=sandbox` optional — sandbox is the default).
 2. Set `PUBLIC_BASE_URL` to a host PayWay can reach (public HTTPS; for local tunnels set `ALLOW_PRIVATE_CALLBACK_HOSTS=1` — the SDK refuses loopback callback URLs by default, for good reason).

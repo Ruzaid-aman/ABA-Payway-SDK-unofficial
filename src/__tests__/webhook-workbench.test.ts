@@ -1,6 +1,6 @@
 /**
  * W-1 forwarder + W-2 fixture library coverage (P0 webhook workbench,
- * docs/competitive-analysis-cli-stripe-razorpay.md Wave 1).
+ * docs/strategy/competitive-analysis-cli-stripe-razorpay.md Wave 1).
  *
  * Pins the load-bearing contracts:
  * - fixture signatures round-trip through the SDK's own verifyCallbackDetailed

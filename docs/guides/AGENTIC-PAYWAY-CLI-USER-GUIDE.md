@@ -108,7 +108,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 > **`.env` credentials alone are not enough for the agent.** The context resolver does fall
 > back to environment variables, but agent readiness requires a **saved profile**
 > (`agent doctor` shows "PayWay context: missing" otherwise). See
-> [AGENT-SETUP-PLAYBOOK.md](./AGENT-SETUP-PLAYBOOK.md) for a field-tested setup path,
+> [AGENT-SETUP-PLAYBOOK.md](AGENT-SETUP-PLAYBOOK.md) for a field-tested setup path,
 > troubleshooting, and known pitfalls (including `profiles add` being interactive-only). The
 > guided `payway-sdk onboard` command automates every step above in one interactive flow.
 
@@ -435,7 +435,7 @@ payway-sdk webhook list --json
 payway-sdk webhook resend --record wh_xxx --to http://localhost:3000/webhooks/aba --json
 ```
 
-Combine with `setup-webhook --forward-to http://localhost:3000/webhooks/aba` to exercise the app end-to-end while capturing every delivery for the journal. Fixture events: the five online-checkout statuses (HMAC-signed), `khqr.notification` and `payment-link.pushback` (both unsigned by design — verify those via check-transaction). Fixtures are synthetic: the gateway never saw the `tran_id`; never fulfill on them. Full contract: [Local Webhook Workbench](./16-webhook-setup-guide.md#local-webhook-workbench).
+Combine with `setup-webhook --forward-to http://localhost:3000/webhooks/aba` to exercise the app end-to-end while capturing every delivery for the journal. Fixture events: the five online-checkout statuses (HMAC-signed), `khqr.notification` and `payment-link.pushback` (both unsigned by design — verify those via check-transaction). Fixtures are synthetic: the gateway never saw the `tran_id`; never fulfill on them. Full contract: [Local Webhook Workbench](16-webhook-setup-guide.md#local-webhook-workbench).
 
 ---
 

@@ -206,4 +206,4 @@ payway-sdk skills add claude opencode       # install agent skill guides
 Sandbox facts baked into these defaults: duplicate `tran_id` is accepted
 (generate unique IDs), closed-but-unpaid stays `PENDING`, list dates must be
 `YYYY-MM-DD HH:mm:ss`, refunds need ≥ $0.01 USD / ≥ 1 KHR. Evidence:
-[SANDBOX-FINDINGS §8–9](./SANDBOX-FINDINGS.md).
+[SANDBOX-FINDINGS §8–9](../internal/SANDBOX-FINDINGS.md).

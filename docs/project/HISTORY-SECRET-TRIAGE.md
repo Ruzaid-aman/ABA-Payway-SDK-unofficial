@@ -4,7 +4,7 @@ Publication remains blocked. Static triage is complete; provider revocation and
 history disposition are not complete. No credential was tested against a provider.
 
 Gitleaks 8.30.1 scanned all 217 local commits at baseline `6ecca2b`:
-56 occurrences, 24 distinct exact values. The [occurrence register](HISTORY-SECRET-TRIAGE.csv)
+56 occurrences, 24 distinct exact values. The [occurrence register](../HISTORY-SECRET-TRIAGE.csv)
 records every rule, commit, path, line and a SHA-256-derived value ID without
 including secret values or matched text. Counts describe this scanner's coverage,
 not proof that no other sensitive material exists.

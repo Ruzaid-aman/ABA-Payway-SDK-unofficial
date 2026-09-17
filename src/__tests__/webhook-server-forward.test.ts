@@ -2,7 +2,7 @@
  * W-1 server wiring: `forwardTo` on the webhook server re-POSTs captured
  * deliveries to the developer's receiver — after capture, before the 200 —
  * and capture ALWAYS survives forward failure (P0 Wave 1,
- * docs/competitive-analysis-cli-stripe-razorpay.md).
+ * docs/strategy/competitive-analysis-cli-stripe-razorpay.md).
  *
  * Uses real HTTP for both sides (webhook server + a receiver stub) so the
  * full request path is exercised, including the re-attached signature header.

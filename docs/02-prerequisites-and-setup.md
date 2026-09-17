@@ -1,7 +1,9 @@
+<!-- GENERATED STUB: copy of docs/guides/02-prerequisites-and-setup.md for compatibility. Do not edit here. -->
+
 # Chapter 2 — Prerequisites & Setup
 
 > **Estimated reading time:** 15 minutes  
-> **Goal:** Get your environment ready and verify everything works before building your integration. New here? Follow the [quickstart](../QUICKSTART.md) in order; use this chapter for credential and configuration details.
+> **Goal:** Get your environment ready and verify everything works before building your integration. New here? Follow the [quickstart](../../QUICKSTART.md) in order; use this chapter for credential and configuration details.
 
 ---
 
@@ -22,7 +24,7 @@ The simulated demo needs no credentials. For gateway calls, obtain credentials f
 1. Open the official [ABA PayWay sandbox registration page](https://sandbox.payway.com.kh/register-sandbox/), linked from the [Developer Suite](https://developer.payway.com.kh/).
 2. Complete registration using an email address you can access.
 3. Retrieve the sandbox Merchant ID and API Key from the email sent to that address. Keep the API Key private; the SDK cannot issue these credentials.
-4. Set `PAYWAY_ENV=sandbox`, `PAYWAY_MERCHANT_ID`, and `PAYWAY_API_KEY` as shown in the [quickstart](../QUICKSTART.md#3-get-and-configure-sandbox-credentials).
+4. Set `PAYWAY_ENV=sandbox`, `PAYWAY_MERCHANT_ID`, and `PAYWAY_API_KEY` as shown in the [quickstart](../../QUICKSTART.md#3-get-and-configure-sandbox-credentials).
 5. If your route requires RSA encryption, ask your ABA integration contact for the sandbox RSA public key and any required feature activation.
 
 If the email does not arrive, check spam/junk and follow up through your ABA contact or the official portal. No delivery time or approval guarantee is assumed here.
@@ -44,7 +46,7 @@ ABA PAY / KHQR / deeplink testing uses the **ABA Mobile Simulator app** (the pro
 
 No real money moves. For live merchants there is a separate [ABA Merchant app](https://play.google.com/store/apps/details?id=com.ababank.payway) (not a simulator).
 
-Return to [quickstart callback setup](../QUICKSTART.md#4-prepare-a-callback-and-check-your-route), then create and verify one payment.
+Return to [quickstart callback setup](../../QUICKSTART.md#4-prepare-a-callback-and-check-your-route), then create and verify one payment.
 
 ### Onboarding lifecycle: sandbox → production
 
@@ -60,7 +62,7 @@ The end-to-end path, as described by the ABA integration team (2026-09-12):
 8. **Live verification** — run at least one low-value live transaction (per enabled method), capture transaction IDs + screenshots, and share them for sign-off.
 9. **Go-live** — ABA verifies the transactions in bank/portal logs, confirms the settlement account, removes the temporary key expirations, and marks the merchant live. A short **VIP support window** follows; afterwards, issues go through standard Digital Support channels.
 
-No lead times are guaranteed anywhere in this path; every approval step is an ABA-side action (see [Chapter 15](./15-merchant-scenario-requirements.md) for the review gates).
+No lead times are guaranteed anywhere in this path; every approval step is an ABA-side action (see [Chapter 15](15-merchant-scenario-requirements.md) for the review gates).
 
 ---
 
@@ -146,7 +148,7 @@ For API-calling commands, the CLI resolves credentials in this order: explicit `
 
 The profile file is plaintext at `%APPDATA%\aba-payway-sdk\profiles.json` on Windows, or `~/.config/aba-payway-sdk/profiles.json` when `APPDATA` is unavailable. Do not commit it, do not share it, and restrict local filesystem access. Plaintext profiles are a CLI convenience only: deployed SDK applications should load keys from an OS secret manager, a cloud secret manager, or CI/CD secret storage. Never put PayWay credentials in browser or mobile application code.
 
-> 🤖 **Agentic CLI:** The agentic CLI keeps its provider API key **only** in the `PAYWAY_AGENT_API_KEY` environment variable — it is never stored in agent config or session files (which are also plaintext; restrict access). Note that agent readiness requires a **saved credential profile** (`.env` fallback alone marks "PayWay context" as missing in `agent doctor`) plus a **public HTTPS** `PAYWAY_CALLBACK_URL` for online QR. See the [Agentic PayWay CLI guide](./QUICK-START-1-PAGER.md#agentic-payway-cli), the [aba-payway-agent](../skills/aba-payway-agent/SKILL.md) skill, and the field-tested [Agent Setup Playbook](./AGENT-SETUP-PLAYBOOK.md).
+> 🤖 **Agentic CLI:** The agentic CLI keeps its provider API key **only** in the `PAYWAY_AGENT_API_KEY` environment variable — it is never stored in agent config or session files (which are also plaintext; restrict access). Note that agent readiness requires a **saved credential profile** (`.env` fallback alone marks "PayWay context" as missing in `agent doctor`) plus a **public HTTPS** `PAYWAY_CALLBACK_URL` for online QR. See the [Agentic PayWay CLI guide](QUICK-START-1-PAGER.md#agentic-payway-cli), the [aba-payway-agent](../../skills/aba-payway-agent/SKILL.md) skill, and the field-tested [Agent Setup Playbook](AGENT-SETUP-PLAYBOOK.md).
 
 ---
 
@@ -476,8 +478,8 @@ When the SDK is initialized from environment variables without an explicit `envi
 
 Your environment is ready! Now you can build your first integration:
 
-- **For web checkout flows** → [Chapter 3 — Web Implementation](./03-web-implementation.md)
-- **For QR code payments** → [Chapter 7 — QR Code Handling](./07-qr-code-handling.md)
-- **For mobile apps** → [Chapter 4 — Native App Implementation](./04-native-app-implementation.md)
+- **For web checkout flows** → [Chapter 3 — Web Implementation](03-web-implementation.md)
+- **For QR code payments** → [Chapter 7 — QR Code Handling](07-qr-code-handling.md)
+- **For mobile apps** → [Chapter 4 — Native App Implementation](04-native-app-implementation.md)
 
-> ← [Previous: Overview & Concepts](./01-overview-and-concepts.md) | [Next: Web Implementation →](./03-web-implementation.md)
+> ← [Previous: Overview & Concepts](01-overview-and-concepts.md) | [Next: Web Implementation →](03-web-implementation.md)

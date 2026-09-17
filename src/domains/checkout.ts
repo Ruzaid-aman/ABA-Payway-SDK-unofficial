@@ -175,7 +175,7 @@ export interface CheckoutDomain {
   ) => Promise<components['schemas']['CheckTransactionResponse']>;
   /**
    * Close an open transaction before payment. Sandbox-verified (2026-09-05,
-   * docs/CLOSE-TRANSACTION-FINDINGS.md §2b/§9): enforcement is CHANNEL-dependent —
+   * docs/internal/CLOSE-TRANSACTION-FINDINGS.md §2b/§9): enforcement is CHANNEL-dependent —
    * the KHQR/QR channel refuses closed transactions at scan time ("transaction
    * expired"), while two hosted-card sessions accepted payment AFTER a code-00
    * close. No read API ever exposes a CLOSED status (closed-unpaid keeps

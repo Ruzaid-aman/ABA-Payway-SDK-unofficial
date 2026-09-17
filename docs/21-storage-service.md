@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/21-storage-service.md for compatibility. Do not edit here. -->
+
 # 21 — Storage Service (`createStorageService`)
 
 One programmatic facade over the three PayWay local stores, introduced in storage wave 3

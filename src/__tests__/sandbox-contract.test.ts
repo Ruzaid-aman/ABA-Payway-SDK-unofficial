@@ -2,7 +2,7 @@
  * Sandbox contract suite — opt-in, live-network integration tests.
  *
  * Purpose: pin the sandbox-verified gateway facts from
- * `docs/SANDBOX-FINDINGS.md` §1–§13 (summarized in HANDOFF.md §7) as
+ * `docs/internal/SANDBOX-FINDINGS.md` §1–§13 (summarized in HANDOFF.md §7) as
  * executable tests, so gateway behavior drift surfaces here instead of
  * in a merchant's production integration.
  *

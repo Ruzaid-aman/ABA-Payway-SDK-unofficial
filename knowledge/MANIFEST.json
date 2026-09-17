@@ -8,19 +8,19 @@
       "description": "First sandbox payment end to end: credentials, .env, generate-qr, check-transaction, polling.",
       "source": "QUICKSTART.md",
       "file": "quickstart.md",
-      "bytes": 12677,
-      "sha256": "1d23a589d3858dc3",
-      "sourceSha256": "1d23a589d3858dc3"
+      "bytes": 12088,
+      "sha256": "38205bb717c9405b",
+      "sourceSha256": "50ca507897328598"
     },
     {
       "topic": "quickstart-1-page",
       "title": "One-page quickstart",
       "description": "Condensed create→verify→fulfill reference for the impatient.",
-      "source": "docs/QUICK-START-1-PAGER.md",
+      "source": "docs/guides/QUICK-START-1-PAGER.md",
       "file": "quickstart-1-page.md",
       "bytes": 1359,
       "sha256": "7d8e20268ca95b7e",
-      "sourceSha256": "36690f97ca2e3c69"
+      "sourceSha256": "e69127c8176b0be9"
     },
     {
       "topic": "docs-index",
@@ -28,185 +28,185 @@
       "description": "The full documentation map: start-here routes, per-domain guides, troubleshooting.",
       "source": "docs/README.md",
       "file": "docs-index.md",
-      "bytes": 7700,
-      "sha256": "7c609355e4438643",
-      "sourceSha256": "f0b11d2c1b10aad4"
+      "bytes": 7715,
+      "sha256": "be6bab8bcd9979cc",
+      "sourceSha256": "6dabeec0136a67ab"
     },
     {
       "topic": "overview",
       "title": "Overview & concepts",
       "description": "PayWay model: merchant credentials, hash signing, sandbox vs production, payment options.",
-      "source": "docs/01-overview-and-concepts.md",
+      "source": "docs/guides/01-overview-and-concepts.md",
       "file": "overview.md",
       "bytes": 10775,
       "sha256": "914e941a9fd5caf3",
-      "sourceSha256": "1ad162d404316f4d"
+      "sourceSha256": "fa00fe5fa5e375c3"
     },
     {
       "topic": "setup",
       "title": "Prerequisites & setup",
       "description": "Merchant portal, sandbox credentials, ABA Mobile simulator, environment variables.",
-      "source": "docs/02-prerequisites-and-setup.md",
+      "source": "docs/guides/02-prerequisites-and-setup.md",
       "file": "setup.md",
       "bytes": 23095,
       "sha256": "342c5289b641da71",
-      "sourceSha256": "ea7cbdbce23f1dc8"
+      "sourceSha256": "f88f6e18b519fd27"
     },
     {
       "topic": "web-implementation",
       "title": "Web implementation",
       "description": "Hosted checkout + server-side purchase flow for web apps, with callback verification.",
-      "source": "docs/03-web-implementation.md",
+      "source": "docs/guides/03-web-implementation.md",
       "file": "web-implementation.md",
       "bytes": 30251,
       "sha256": "b2578b5fadad6f24",
-      "sourceSha256": "3b87d60e0411bec3"
+      "sourceSha256": "3396dc791cfe5e88"
     },
     {
       "topic": "native-apps",
       "title": "Native app implementation",
       "description": "Android/iOS integration: deeplinks, webviews, return handling.",
-      "source": "docs/04-native-app-implementation.md",
+      "source": "docs/guides/04-native-app-implementation.md",
       "file": "native-apps.md",
       "bytes": 23742,
       "sha256": "4e028c7a24e03515",
-      "sourceSha256": "f353724d335887cb"
+      "sourceSha256": "03fcaa491fa0c50c"
     },
     {
       "topic": "webviews",
       "title": "Webview implementation",
       "description": "Mobile webview checkout patterns and deeplink return legs.",
-      "source": "docs/05-webview-implementation.md",
+      "source": "docs/guides/05-webview-implementation.md",
       "file": "webviews.md",
       "bytes": 11870,
       "sha256": "e1c7f60db90b397e",
-      "sourceSha256": "9d0ece241caae261"
+      "sourceSha256": "312889c0822b211f"
     },
     {
       "topic": "telegram-mini-app",
       "title": "Telegram mini-app",
       "description": "PayWay checkout inside a Telegram mini-app.",
-      "source": "docs/06-telegram-mini-app.md",
+      "source": "docs/guides/06-telegram-mini-app.md",
       "file": "telegram-mini-app.md",
       "bytes": 21581,
       "sha256": "6e500f9fc08c2968",
-      "sourceSha256": "91c51f4c7ce1723c"
+      "sourceSha256": "83eaf8a2f2c7e5a6"
     },
     {
       "topic": "qr-handling",
       "title": "QR code handling",
       "description": "Online vs offline KHQR, scan-time validity windows, rendering and expiry semantics.",
-      "source": "docs/07-qr-code-handling.md",
+      "source": "docs/guides/07-qr-code-handling.md",
       "file": "qr-handling.md",
       "bytes": 39715,
       "sha256": "5e3588fa2d9e6679",
-      "sourceSha256": "27f4a94b44b443b4"
+      "sourceSha256": "f1c69b7fc936117a"
     },
     {
       "topic": "deep-linking",
       "title": "Deep linking",
       "description": "abamobilebank:// deeplink scheme and return-leg handling.",
-      "source": "docs/08-deep-linking.md",
+      "source": "docs/guides/08-deep-linking.md",
       "file": "deep-linking.md",
       "bytes": 13698,
       "sha256": "20af8160792c673d",
-      "sourceSha256": "3e084a07fdef2823"
+      "sourceSha256": "c896191707f2874d"
     },
     {
       "topic": "link-lifecycle",
       "title": "COF link/unlink/renew lifecycle",
       "description": "Credentials-on-file account/card lifecycle and token renewal.",
-      "source": "docs/09-link-unlink-renew-lifecycle.md",
+      "source": "docs/guides/09-link-unlink-renew-lifecycle.md",
       "file": "link-lifecycle.md",
       "bytes": 29004,
       "sha256": "0d69d3a056799657",
-      "sourceSha256": "8b045833c9db249c"
+      "sourceSha256": "a46ff4f5820ba168"
     },
     {
       "topic": "ui-customization",
       "title": "UI customization",
       "description": "Hosted checkout branding and view customization options.",
-      "source": "docs/10-ui-customization.md",
+      "source": "docs/guides/10-ui-customization.md",
       "file": "ui-customization.md",
       "bytes": 7819,
       "sha256": "4d0379db56a90258",
-      "sourceSha256": "8bbde17258615ee7"
+      "sourceSha256": "fe317726abd52460"
     },
     {
       "topic": "callbacks-webhooks",
       "title": "Callbacks & webhooks",
       "description": "Single best-effort callback delivery, HMAC verification, webhook workbench.",
-      "source": "docs/11-callbacks-and-webhooks.md",
+      "source": "docs/guides/11-callbacks-and-webhooks.md",
       "file": "callbacks-webhooks.md",
       "bytes": 23626,
       "sha256": "85a9325c8a0533a9",
-      "sourceSha256": "61891b1a3c92ed74"
+      "sourceSha256": "c7143830a55974c2"
     },
     {
       "topic": "errors-and-debugging",
       "title": "Errors & debugging",
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
-      "source": "docs/12-error-handling-and-debugging.md",
+      "source": "docs/guides/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
       "bytes": 53046,
       "sha256": "6273362b2a54033f",
-      "sourceSha256": "b59a2d57c37b0ae0"
+      "sourceSha256": "5bb73dc7a98119ee"
     },
     {
       "topic": "deployment-checklist",
       "title": "Deployment checklist",
       "description": "Production go-live gates: credentials, RSA, callback URLs, base URL.",
-      "source": "docs/13-deployment-checklist.md",
+      "source": "docs/guides/13-deployment-checklist.md",
       "file": "deployment-checklist.md",
       "bytes": 11330,
       "sha256": "fdf10d6105c240d8",
-      "sourceSha256": "a26eb4e2aba77220"
+      "sourceSha256": "d7db06798d026e79"
     },
     {
       "topic": "code-snippets",
       "title": "Appendix: code snippets",
       "description": "Copy-paste hash signing, callback verification, and polling snippets.",
-      "source": "docs/14-appendix-code-snippets.md",
+      "source": "docs/guides/14-appendix-code-snippets.md",
       "file": "code-snippets.md",
       "bytes": 22567,
       "sha256": "0345aaa9b0462927",
-      "sourceSha256": "e96ae3ae7def4d99"
+      "sourceSha256": "445272b058d970ae"
     },
     {
       "topic": "merchant-scenarios",
       "title": "Merchant scenario requirements",
       "description": "POS/billing/scenario requirements observed in real integrations.",
-      "source": "docs/15-merchant-scenario-requirements.md",
+      "source": "docs/guides/15-merchant-scenario-requirements.md",
       "file": "merchant-scenarios.md",
       "bytes": 12479,
       "sha256": "9e9932fc16e868e3",
-      "sourceSha256": "5d335f558c381bf8"
+      "sourceSha256": "7617659e836622d2"
     },
     {
       "topic": "webhook-setup",
       "title": "Webhook setup guide",
       "description": "Local listener, tunnels, forwarding, and production webhook configuration.",
-      "source": "docs/16-webhook-setup-guide.md",
+      "source": "docs/guides/16-webhook-setup-guide.md",
       "file": "webhook-setup.md",
       "bytes": 21421,
       "sha256": "349c629aaee4aa53",
-      "sourceSha256": "9db897ad6964f656"
+      "sourceSha256": "2c636852789d50b5"
     },
     {
       "topic": "payment-link",
       "title": "Payment link",
       "description": "Payment-link create/detail/void contract incl. pushbacks and VOIDED semantics.",
-      "source": "docs/17-payment-link.md",
+      "source": "docs/guides/17-payment-link.md",
       "file": "payment-link.md",
       "bytes": 20590,
       "sha256": "0a563ad97da49c00",
-      "sourceSha256": "968c0a9d334c8777"
+      "sourceSha256": "5d168d17a35c80d9"
     },
     {
       "topic": "transaction-journal",
       "title": "Transaction journal",
       "description": "Opt-in JSONL journal: correlation ids, timeline/stats/reconcile/anomalies.",
-      "source": "docs/18-transaction-journal.md",
+      "source": "docs/guides/18-transaction-journal.md",
       "file": "transaction-journal.md",
       "bytes": 13644,
       "sha256": "cce144da57231c0e",
@@ -216,27 +216,27 @@
       "topic": "customer-module-qr",
       "title": "Customer module QR",
       "description": "Portal Customer-ID keyed QR generation and merchant-reference reconciliation.",
-      "source": "docs/19-customer-module-qr.md",
+      "source": "docs/guides/19-customer-module-qr.md",
       "file": "customer-module-qr.md",
       "bytes": 11482,
       "sha256": "c57515cef7e19ebd",
-      "sourceSha256": "c57515cef7e19ebd"
+      "sourceSha256": "e55ca235192d367f"
     },
     {
       "topic": "settlement-disputes",
       "title": "Settlement & disputes",
       "description": "Settlement timing, chargebacks, and refund boundaries per payment method.",
-      "source": "docs/20-settlement-and-disputes.md",
+      "source": "docs/guides/20-settlement-and-disputes.md",
       "file": "settlement-disputes.md",
       "bytes": 8212,
       "sha256": "ba8ae8dc7a3dcab1",
-      "sourceSha256": "7d21aed9410b9363"
+      "sourceSha256": "a48bb5b9c551178c"
     },
     {
       "topic": "api-datetime-timezones",
       "title": "API datetime & timezones",
       "description": "Endpoint-specific UTC, UTC+7, epoch, naive datetime, callback, and parsing rules.",
-      "source": "docs/22-api-datetime-and-timezones.md",
+      "source": "docs/guides/22-api-datetime-and-timezones.md",
       "file": "api-datetime-timezones.md",
       "bytes": 8332,
       "sha256": "cbd2ed3a8eaf4404",
@@ -246,7 +246,7 @@
       "topic": "cloudflare-webhook",
       "title": "Cloudflare webhook (free tier)",
       "description": "Free-tier Cloudflare Worker webhook receiver setup.",
-      "source": "docs/cloudflare-free-webhook.md",
+      "source": "docs/recipes/cloudflare-free-webhook.md",
       "file": "cloudflare-webhook.md",
       "bytes": 25625,
       "sha256": "267c3c4f15be79b8",
@@ -256,7 +256,7 @@
       "topic": "agent-setup-playbook",
       "title": "Agent setup playbook",
       "description": "Configuring the agentic CLI: providers, capability modes, privacy ack.",
-      "source": "docs/AGENT-SETUP-PLAYBOOK.md",
+      "source": "docs/guides/AGENT-SETUP-PLAYBOOK.md",
       "file": "agent-setup-playbook.md",
       "bytes": 13487,
       "sha256": "b800a536e15adfd5",
@@ -266,41 +266,41 @@
       "topic": "agentic-cli-guide",
       "title": "Agentic CLI user guide",
       "description": "ask / agent REPL / sessions / ledger — the full agent surface.",
-      "source": "docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md",
+      "source": "docs/guides/AGENTIC-PAYWAY-CLI-USER-GUIDE.md",
       "file": "agentic-cli-guide.md",
       "bytes": 25086,
       "sha256": "17093c95c50c7a6d",
-      "sourceSha256": "1a2e31863470c4f8"
+      "sourceSha256": "2cdb235795a0b8b0"
     },
     {
       "topic": "first-payment-walkthrough",
       "title": "First payment walkthrough",
       "description": "Guided first sandbox payment with verification at each step.",
-      "source": "docs/FIRST-PAYMENT-WALKTHROUGH.md",
+      "source": "docs/guides/FIRST-PAYMENT-WALKTHROUGH.md",
       "file": "first-payment-walkthrough.md",
       "bytes": 3632,
       "sha256": "326001e50ffecaef",
-      "sourceSha256": "3d0b79a28c9c74b7"
+      "sourceSha256": "0b7a0e1a47964a80"
     },
     {
       "topic": "close-transaction-findings",
       "title": "Close-transaction findings",
       "description": "What close-transaction really does remotely (QR kill vs hosted-card sessions).",
-      "source": "docs/CLOSE-TRANSACTION-FINDINGS.md",
+      "source": "docs/internal/CLOSE-TRANSACTION-FINDINGS.md",
       "file": "close-transaction-findings.md",
       "bytes": 10821,
       "sha256": "8eefc8f138cdeddd",
-      "sourceSha256": "87b0108acd052cf7"
+      "sourceSha256": "9722e648e6c0aa5a"
     },
     {
       "topic": "sdk-cli-reference",
       "title": "SDK & CLI reference",
       "description": "Every SDK domain method and CLI command with flags and contracts.",
-      "source": "docs/SDK-AND-CLI-REFERENCE.md",
+      "source": "docs/reference/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
-      "bytes": 47287,
-      "sha256": "21117c9343eaeeba",
-      "sourceSha256": "521b45bd2611595c"
+      "bytes": 47018,
+      "sha256": "69fe1f595cc34666",
+      "sourceSha256": "b2a864442342184d"
     },
     {
       "topic": "error-codes",

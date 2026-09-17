@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/08-deep-linking.md for compatibility. Do not edit here. -->
+
 # Chapter 8 — Deep Linking
 
 > **Estimated reading time:** 10 minutes  
@@ -177,7 +179,7 @@ const signedPayload = payway.checkout.createTransaction({
 
 > 💡 The `returnDeeplink` parameter is encoded as a Base64 JSON string by the SDK. The SDK automatically handles this when you pass an object.
 
-> **Flutter:** launching the ABA Pay deeplink (with the not-installed fallback above) maps to `url_launcher` — see [`launchAbapayDeeplink` in the Flutter example](./examples/flutter/payment_screen.dart).
+> **Flutter:** launching the ABA Pay deeplink (with the not-installed fallback above) maps to `url_launcher` — see [`launchAbapayDeeplink` in the Flutter example](../examples/flutter/payment_screen.dart).
 
 ---
 
@@ -411,8 +413,8 @@ func handleDeepLink(url: URL) {
 
 ## Next Steps
 
-- **For native app integration** → [Chapter 4 — Native App Implementation](./04-native-app-implementation.md)
-- **For WebView implementation** → [Chapter 5 — WebView Implementation](./05-webview-implementation.md)
-- **For QR code payments (alternative to deep links)** → [Chapter 7 — QR Code Handling](./07-qr-code-handling.md)
+- **For native app integration** → [Chapter 4 — Native App Implementation](04-native-app-implementation.md)
+- **For WebView implementation** → [Chapter 5 — WebView Implementation](05-webview-implementation.md)
+- **For QR code payments (alternative to deep links)** → [Chapter 7 — QR Code Handling](07-qr-code-handling.md)
 
-> ← [Previous: Telegram Mini App](./06-telegram-mini-app.md) | [Next: Callbacks & Webhooks →](./11-callbacks-and-webhooks.md)
+> ← [Previous: Telegram Mini App](06-telegram-mini-app.md) | [Next: Callbacks & Webhooks →](11-callbacks-and-webhooks.md)

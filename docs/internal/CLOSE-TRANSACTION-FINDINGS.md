@@ -6,7 +6,7 @@
 > Purpose: complete, reproducible evidence that the sandbox Close Transaction API does
 > not enforce the documented contract, plus everything a future agent needs to (a) brief
 > ABA, (b) re-validate after a fix, and (c) keep merchant integrations safe meanwhile.
-> Companion knowledge: [SANDBOX-FINDINGS §10–§12](./SANDBOX-FINDINGS.md).
+> Companion knowledge: [SANDBOX-FINDINGS §10–§12](SANDBOX-FINDINGS.md).
 
 ---
 
@@ -147,7 +147,7 @@ and probe dossier `test-output/txn-detail-probe.json`.
 
 ## 8. Other session learnings (context, 2026-08-25)
 
-These are fully documented in [SANDBOX-FINDINGS §10–§11](./SANDBOX-FINDINGS.md)
+These are fully documented in [SANDBOX-FINDINGS §10–§11](SANDBOX-FINDINGS.md)
 and the skills; summarized so a future agent has one place to start:
 
 - **Online QR** (`qr.generateQr`): lifetime is seconds (SDK converts to minutes, min 3);

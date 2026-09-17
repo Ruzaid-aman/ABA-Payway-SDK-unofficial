@@ -18,7 +18,7 @@ Our project is stronger as a PayWay platform toolkit: it exposes multiple PayWay
 
 CutLuy says the API is organized around one resource: `payment`. The user learns create, retrieve, list, statuses, checkout, and webhooks as parts of one lifecycle. A create response immediately contains `id`, `status`, `qr_string`, `checkout_url`, timestamps, and expiry.
 
-Our SDK exposes separate domains such as `checkout`, `qr`, `paymentLink`, `credentialsOnFile`, `preAuth`, `payout`, and `khqr`. That is appropriate for PayWay's actual surface area, but it makes the first decision harder: a new merchant must choose between checkout, QR API, payment link, offline KHQR, or another domain before seeing a working result. See [the domain overview](./01-overview-and-concepts.md) and the `PayWay` façade in [src/client.ts](../src/client.ts).
+Our SDK exposes separate domains such as `checkout`, `qr`, `paymentLink`, `credentialsOnFile`, `preAuth`, `payout`, and `khqr`. That is appropriate for PayWay's actual surface area, but it makes the first decision harder: a new merchant must choose between checkout, QR API, payment link, offline KHQR, or another domain before seeing a working result. See [the domain overview](../guides/01-overview-and-concepts.md) and the `PayWay` façade in [src/client.ts](../../src/client.ts).
 
 **Learning:** create a task-level abstraction, not another competing low-level domain: `payway.payments.create()` should be able to return a normalized “pay now” object while preserving access to the underlying PayWay response.
 
@@ -26,7 +26,7 @@ Our SDK exposes separate domains such as `checkout`, `qr`, `paymentLink`, `crede
 
 CutLuy's quickstart is a small cURL request, followed by an explicit choice: redirect to `checkout_url` or render `qr_string`. It tells the user what happens after payment and where the webhook fits.
 
-Our README has a strong security architecture and many runnable examples, but the path is longer and immediately introduces environment configuration, server-only constraints, rate limits, retries, multiple API domains, and PayWay-specific terminology. The material is useful for production readiness but not optimized for the first five minutes. See [README.md](../README.md#quick-start) and [docs/README.md](./README.md).
+Our README has a strong security architecture and many runnable examples, but the path is longer and immediately introduces environment configuration, server-only constraints, rate limits, retries, multiple API domains, and PayWay-specific terminology. The material is useful for production readiness but not optimized for the first five minutes. See [README.md](../../README.md#quick-start) and [docs/README.md](../README.md).
 
 **Learning:** lead with one copy-paste scenario, then progressively disclose security, configuration, provider quirks, and advanced domains.
 
@@ -34,7 +34,7 @@ Our README has a strong security architecture and many runnable examples, but th
 
 Every CutLuy payment has a hosted, branded, mobile-friendly checkout page with QR, countdown, live status, deep links, success/failure redirects, and a documented status-state UX. It also provides a standalone SVG renderer for any valid KHQR payload, with immutable caching and validation.
 
-Our project supports hosted checkout, QR generation, offline KHQR, examples, and a webhook setup server, but the user must assemble the UI behavior across SDK calls, examples, and documentation. The deployment checklist even identifies expiry countdowns as something the integrator must remember. See [docs/13-deployment-checklist.md](./13-deployment-checklist.md) and [docs/07-qr-code-handling.md](./07-qr-code-handling.md).
+Our project supports hosted checkout, QR generation, offline KHQR, examples, and a webhook setup server, but the user must assemble the UI behavior across SDK calls, examples, and documentation. The deployment checklist even identifies expiry countdowns as something the integrator must remember. See [docs/13-deployment-checklist.md](../guides/13-deployment-checklist.md) and [docs/07-qr-code-handling.md](../guides/07-qr-code-handling.md).
 
 **Learning:** ship a canonical QR/payment presentation component or framework-neutral renderer contract with status panels, expiry, amount, currency, and accessibility guidance. Make it available through the SDK and CLI, not only as prose.
 
@@ -42,7 +42,7 @@ Our project supports hosted checkout, QR generation, offline KHQR, examples, and
 
 CutLuy documents five statuses (`pending`, `scanned`, `paid`, `expired`, `failed`), terminality, webhook event mapping, and the rule to stop polling on terminal status. Its UI guidance explicitly warns against leaving a paid or expired QR visible.
 
-Our docs correctly treat webhooks as the trusted source of truth and expose polling helpers, but the state model is spread across provider-specific concepts and callback guidance. See [docs/11-callbacks-and-webhooks.md](./11-callbacks-and-webhooks.md) and the polling implementation in [src/cli.ts](../src/cli.ts).
+Our docs correctly treat webhooks as the trusted source of truth and expose polling helpers, but the state model is spread across provider-specific concepts and callback guidance. See [docs/11-callbacks-and-webhooks.md](../guides/11-callbacks-and-webhooks.md) and the polling implementation in [src/cli.ts](../../src/cli.ts).
 
 **Learning:** publish a single lifecycle diagram and a normalized status contract that is shared by SDK return types, CLI output, examples, tests, and Agent Skills.
 
@@ -50,7 +50,7 @@ Our docs correctly treat webhooks as the trusted source of truth and expose poll
 
 The CutLuy docs include idempotent replay behavior, webhook retry policy, resend/test-event controls, raw-body signature verification, timestamp freshness, error codes, rate-limit headers, payload caps, and concrete UI decisions. The “Copy prompt for AI” control is also a useful bridge from documentation to agent-assisted implementation.
 
-Our project has deeper operational material—retry configuration, rate-limit throttling, sanitized diagnostics, sandbox probes, release checks, webhook storage, and a full webhook setup guide—but those features are not presented as one integrated happy path. See [README.md](../README.md#rate-limiting-configuration), [docs/16-webhook-setup-guide.md](./16-webhook-setup-guide.md), and [SECURITY.md](../SECURITY.md).
+Our project has deeper operational material—retry configuration, rate-limit throttling, sanitized diagnostics, sandbox probes, release checks, webhook storage, and a full webhook setup guide—but those features are not presented as one integrated happy path. See [README.md](../../README.md#rate-limiting-configuration), [docs/16-webhook-setup-guide.md](../guides/16-webhook-setup-guide.md), and [SECURITY.md](../../SECURITY.md).
 
 **Learning:** add a “production behavior” panel to every major workflow: retries, idempotency, webhook source of truth, replay handling, rate limits, and failure recovery.
 
@@ -58,20 +58,20 @@ Our project has deeper operational material—retry configuration, rate-limit th
 
 CutLuy supplies language tabs for cURL, Node.js, PHP/Laravel, and Python, and gives users a directly usable QR image URL. This reduces the amount of setup needed before a developer can see a result.
 
-Our package is TypeScript-first, with backend and frontend examples plus native SDK folders, but the CLI is primarily an operational/development tool rather than a “generate an integration artifact” tool. It has strong commands such as `init`, `doctor`, profiles, QR generation, test/demo, and webhook setup; the opportunity is to connect those commands into a single guided flow. See [README.md](../README.md#cli-commands) and [src/cli.ts](../src/cli.ts).
+Our package is TypeScript-first, with backend and frontend examples plus native SDK folders, but the CLI is primarily an operational/development tool rather than a “generate an integration artifact” tool. It has strong commands such as `init`, `doctor`, profiles, QR generation, test/demo, and webhook setup; the opportunity is to connect those commands into a single guided flow. See [README.md](../../README.md#cli-commands) and [src/cli.ts](../../src/cli.ts).
 
 ## Where our project is stronger
 
 | Dimension | Our current advantage | Evidence |
 |---|---|---|
-| Provider coverage | Multiple PayWay domains: checkout, QR, KHQR, payment links, payouts, pre-auth, credentials-on-file, refunds, and transaction operations | [src/client.ts](../src/client.ts), [docs/01-overview-and-concepts.md](./01-overview-and-concepts.md) |
-| Type safety | Published TypeScript SDK and generated API types | [package.json](../package.json), [src/types.ts](../src/types.ts) |
-| Reliability controls | Exponential retries, endpoint-aware throttling, rate-limit parsing, response hooks, and typed error categories | [src/client.ts](../src/client.ts), [README.md](../README.md#retry-configuration) |
-| Local/offline capability | Offline EMVCo KHQR generation without a PayWay call | [src/khqr-offline.ts](../src/khqr-offline.ts), [skills/aba-payway-offline-qr/SKILL.md](../skills/aba-payway-offline-qr/SKILL.md) |
-| CLI operations | Init, doctor, config, profiles, QR/checkout flows, validation, status references, webhook setup, and skill management | [src/cli.ts](../src/cli.ts) |
-| Agent assistance | A broad set of task-focused skills with quick starts, error handling, constraints, and related skills | [skills/README.md](../skills/README.md), [skills/](../skills/) |
-| Mobile/platform reach | iOS and Android SDK material plus web, WebView, and Telegram guidance | [sdk/ios/](../sdk/ios/), [sdk/android/](../sdk/android/), [docs/README.md](./README.md) |
-| Verification depth | Sandbox probes, contract tests, webhook tests, coverage artifacts, and release checklists | [scripts/](../scripts/), [src/__tests__/](../src/__tests__/), [docs/RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) |
+| Provider coverage | Multiple PayWay domains: checkout, QR, KHQR, payment links, payouts, pre-auth, credentials-on-file, refunds, and transaction operations | [src/client.ts](../../src/client.ts), [docs/01-overview-and-concepts.md](../guides/01-overview-and-concepts.md) |
+| Type safety | Published TypeScript SDK and generated API types | [package.json](../../package.json), [src/types.ts](../../src/types.ts) |
+| Reliability controls | Exponential retries, endpoint-aware throttling, rate-limit parsing, response hooks, and typed error categories | [src/client.ts](../../src/client.ts), [README.md](../../README.md#retry-configuration) |
+| Local/offline capability | Offline EMVCo KHQR generation without a PayWay call | [src/khqr-offline.ts](../../src/khqr-offline.ts), [skills/aba-payway-offline-qr/SKILL.md](../../skills/aba-payway-offline-qr/SKILL.md) |
+| CLI operations | Init, doctor, config, profiles, QR/checkout flows, validation, status references, webhook setup, and skill management | [src/cli.ts](../../src/cli.ts) |
+| Agent assistance | A broad set of task-focused skills with quick starts, error handling, constraints, and related skills | [skills/README.md](../../skills/README.md), [skills/](../../skills) |
+| Mobile/platform reach | iOS and Android SDK material plus web, WebView, and Telegram guidance | [sdk/ios/](../../sdk/ios), [sdk/android/](../../sdk/android), [docs/README.md](../README.md) |
+| Verification depth | Sandbox probes, contract tests, webhook tests, coverage artifacts, and release checklists | [scripts/](../../scripts), [src/__tests__/](../../src/__tests__), [docs/RELEASE_CHECKLIST.md](../project/RELEASE_CHECKLIST.md) |
 
 CutLuy's simplicity is partly enabled by a narrower product: USD-only documented amounts, one store/payment-link model, one primary payment resource, and a smaller set of documented operations. We should copy the packaging and defaults, not assume that reducing PayWay's real breadth is acceptable.
 
@@ -189,13 +189,13 @@ Success should be measured by time-to-first-valid-payment, time-to-correct-webho
 ## Sources and evidence
 
 - [CutLuy API documentation](https://cutluy.com/docs#introduction) — directly inspected 2026-08-21.
-- [Current SDK README](../README.md).
-- [Current SDK/domain overview](./01-overview-and-concepts.md).
-- [Current long-form documentation index](./README.md).
-- [Current CLI](../src/cli.ts).
-- [Current TypeScript client](../src/client.ts).
-- [Current Agent Skills](../skills/README.md).
-- [Current webhook setup guide](./16-webhook-setup-guide.md).
+- [Current SDK README](../../README.md).
+- [Current SDK/domain overview](../guides/01-overview-and-concepts.md).
+- [Current long-form documentation index](../README.md).
+- [Current CLI](../../src/cli.ts).
+- [Current TypeScript client](../../src/client.ts).
+- [Current Agent Skills](../../skills/README.md).
+- [Current webhook setup guide](../guides/16-webhook-setup-guide.md).
 
 ## Caveat about repository state
 
