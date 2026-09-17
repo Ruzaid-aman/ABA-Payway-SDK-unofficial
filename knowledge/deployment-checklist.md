@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/13-deployment-checklist.md for compatibility. Do not edit here. -->
+
 # Chapter 13 — Deployment Checklist
 
 > **Estimated reading time:** 10 minutes  
@@ -282,6 +284,6 @@ Print this and keep it handy during launch:
 You've completed the implementation guide! Here's what to do next:
 
 - **[Chapter 14 — Appendix: Code Snippets](payway-sdk docs code-snippets)** — Full copy-paste-ready examples
-- **[README](payway-sdk docs docs-index)** — Documentation index with all chapters
+- **README** — Documentation index with all chapters
 
 > ← [Previous: Error Handling & Debugging](payway-sdk docs errors-and-debugging) | [Next: Appendix →](payway-sdk docs code-snippets)

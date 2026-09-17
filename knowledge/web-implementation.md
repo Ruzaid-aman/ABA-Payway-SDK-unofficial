@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/03-web-implementation.md for compatibility. Do not edit here. -->
+
 # Chapter 3 — Web Implementation
 
 > **Estimated reading time:** 20 minutes  

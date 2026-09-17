@@ -32,7 +32,7 @@ sequenceDiagram
     Note over Backend,PayWay: The callback is the only trusted source of truth — the redirect is not.
 ```
 
-Full diagram: [Payment Lifecycle](../../diagrams/payment-lifecycle.md) · Callback details: [Chapter 11](11-callbacks-and-webhooks.md).
+Full diagram: [Payment Lifecycle](../diagrams/payment-lifecycle.md) · Callback details: [Chapter 11](11-callbacks-and-webhooks.md).
 
 ---
 
@@ -554,7 +554,7 @@ For a more "in-app" feel on desktop, use PayWay's `checkout2-0.js` library to op
 </html>
 ```
 
-> 📎 **Full runnable example:** See [`docs/examples/web/checkout-popup.html`](../../examples/web/checkout-popup.html) for the complete implementation with payment method selection and error handling.
+> 📎 **Full runnable example:** See [`docs/examples/web/checkout-popup.html`](../examples/web/checkout-popup.html) for the complete implementation with payment method selection and error handling.
 
 ---
 

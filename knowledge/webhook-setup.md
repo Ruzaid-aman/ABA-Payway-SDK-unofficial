@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/16-webhook-setup-guide.md for compatibility. Do not edit here. -->
+
 # Chapter 16 — Webhook Setup with the CLI
 
 This chapter explains how to receive ABA PayWay online checkout callbacks and offline ABA KHQR notifications using the built-in `setup-webhook` CLI command. It starts a local HTTP server that logs and persists every incoming delivery, with optional Cloudflare Tunnel integration for exposing the server to the public internet during development.

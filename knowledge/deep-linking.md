@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/08-deep-linking.md for compatibility. Do not edit here. -->
+
 # Chapter 8 — Deep Linking
 
 > **Estimated reading time:** 10 minutes  

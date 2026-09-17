@@ -30,7 +30,7 @@ sequenceDiagram
     Endpoint->>DB: reconcile (Missing callback ≠ non-payment; PayWay never retries)
 ```
 
-Full diagram: [Callback Flow](../../diagrams/callback-flow.md).
+Full diagram: [Callback Flow](../diagrams/callback-flow.md).
 
 ---
 

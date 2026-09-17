@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/11-callbacks-and-webhooks.md for compatibility. Do not edit here. -->
+
 # Chapter 11 — Callbacks & Webhooks
 
 > **Estimated reading time:** 15 minutes  

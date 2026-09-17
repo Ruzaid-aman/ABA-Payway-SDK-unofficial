@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/04-native-app-implementation.md for compatibility. Do not edit here. -->
+
 # Chapter 4 — Native App Implementation (iOS & Android)
 
 > **Estimated reading time:** 15 minutes  
