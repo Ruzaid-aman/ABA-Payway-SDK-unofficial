@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/11-callbacks-and-webhooks.md for compatibility. Do not edit here. -->
+
 # Chapter 11 — Callbacks & Webhooks
 
 > **Estimated reading time:** 15 minutes  
@@ -28,7 +30,7 @@ sequenceDiagram
     Endpoint->>DB: reconcile (Missing callback ≠ non-payment; PayWay never retries)
 ```
 
-Full diagram: [Callback Flow](../diagrams/callback-flow.md).
+Full diagram: [Callback Flow](../../diagrams/callback-flow.md).
 
 ---
 

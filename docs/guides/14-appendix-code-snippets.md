@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/14-appendix-code-snippets.md for compatibility. Do not edit here. -->
+
 # Chapter 14 — Appendix: Complete Code Snippets
 
 > **Estimated reading time:** Reference  
@@ -667,9 +669,9 @@ async function monitorMultiplePayments(transactionIds: string[]) {
 
 ## See Also
 
-- **Full Chapter List:** [README.md](../README.md)
+- **Full Chapter List:** [README.md](../../README.md)
 - **SDK Source:** `../src/client.ts`
 - **Sandbox Findings:** `../SANDBOX-FINDINGS.md`
 - **OpenAPI Spec:** `../payway-openapi.yaml`
 
-> ← [Previous: Deployment Checklist](13-deployment-checklist.md) | [Back to Documentation Home →](../README.md)
+> ← [Previous: Deployment Checklist](13-deployment-checklist.md) | [Back to Documentation Home →](../../README.md)

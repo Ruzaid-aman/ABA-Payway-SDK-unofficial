@@ -1055,7 +1055,7 @@ class PaymentActivity : AppCompatActivity() {
 ## See Also
 
 - [iOS SDK Documentation](../ios/README.md)
-- [Web Implementation Guide](../../docs/guides/03-web-implementation.md)
-- [Deep Linking Guide](../../docs/guides/08-deep-linking.md)
-- [API Reference](../../docs/guides/11-callbacks-and-webhooks.md)
-- [Error Handling Guide](../../docs/guides/12-error-handling-and-debugging.md)
+- [Web Implementation Guide](../../../../docs/guides/03-web-implementation.md)
+- [Deep Linking Guide](../../../../docs/guides/08-deep-linking.md)
+- [API Reference](../../../../docs/guides/11-callbacks-and-webhooks.md)
+- [Error Handling Guide](../../../../docs/guides/12-error-handling-and-debugging.md)

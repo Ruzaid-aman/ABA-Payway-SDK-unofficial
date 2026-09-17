@@ -1,12 +1,14 @@
+<!-- GENERATED STUB: copy of docs/guides/01-overview-and-concepts.md for compatibility. Do not edit here. -->
+
 # Chapter 1 — Overview & Core Concepts
 
 > **Estimated reading time:** 15 minutes
 
-Not sure which integration route fits your app? Start with the [platform decision tree](../diagrams/platform-decision-tree.md) — it routes web, native, WebView, Telegram, QR, and deep-linking scenarios to the right chapter.
+Not sure which integration route fits your app? Start with the [platform decision tree](../../diagrams/platform-decision-tree.md) — it routes web, native, WebView, Telegram, QR, and deep-linking scenarios to the right chapter.
 
 ---
 
-This is a community-maintained server-side SDK, not an official ABA Bank SDK. It requires Node.js 22.12 or later. See [support and compatibility](../../SUPPORT.md) for verification limits.
+This is a community-maintained server-side SDK, not an official ABA Bank SDK. It requires Node.js 22.12 or later. See [support and compatibility](../../../SUPPORT.md) for verification limits.
 
 ## What Is ABA PayWay?
 
@@ -192,6 +194,6 @@ Endpoints like **Pre-Auth**, **Payout**, and **Payment Link** require RSA-encryp
 
 Now that you understand the concepts, proceed to **[Chapter 2 — Prerequisites & Setup](02-prerequisites-and-setup.md)** to get your credentials and environment configured.
 
-> 🤖 **Agentic CLI:** You can also let a supported provider drive these payments through the risk-gated agentic CLI. See the [Agentic PayWay CLI guide](QUICK-START-1-PAGER.md#agentic-payway-cli) and the [aba-payway-agent](../../skills/aba-payway-agent/SKILL.md) / [aba-payway-first-payment](../../skills/aba-payway-first-payment/SKILL.md) skill guides.
+> 🤖 **Agentic CLI:** You can also let a supported provider drive these payments through the risk-gated agentic CLI. See the [Agentic PayWay CLI guide](QUICK-START-1-PAGER.md#agentic-payway-cli) and the [aba-payway-agent](../../../skills/aba-payway-agent/SKILL.md) / [aba-payway-first-payment](../../../skills/aba-payway-first-payment/SKILL.md) skill guides.
 
-> ← [Back to Documentation Home](../README.md) | [Next: Prerequisites & Setup →](02-prerequisites-and-setup.md)
+> ← [Back to Documentation Home](../../README.md) | [Next: Prerequisites & Setup →](02-prerequisites-and-setup.md)

@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/13-deployment-checklist.md for compatibility. Do not edit here. -->
+
 # Chapter 13 — Deployment Checklist
 
 > **Estimated reading time:** 10 minutes  
@@ -282,6 +284,6 @@ Print this and keep it handy during launch:
 You've completed the implementation guide! Here's what to do next:
 
 - **[Chapter 14 — Appendix: Code Snippets](14-appendix-code-snippets.md)** — Full copy-paste-ready examples
-- **[README](../README.md)** — Documentation index with all chapters
+- **[README](../../README.md)** — Documentation index with all chapters
 
 > ← [Previous: Error Handling & Debugging](12-error-handling-and-debugging.md) | [Next: Appendix →](14-appendix-code-snippets.md)

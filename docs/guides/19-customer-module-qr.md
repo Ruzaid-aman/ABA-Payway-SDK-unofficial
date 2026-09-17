@@ -1,3 +1,5 @@
+<!-- GENERATED STUB: copy of docs/guides/19-customer-module-qr.md for compatibility. Do not edit here. -->
+
 # Chapter 19 — Customer Module QRs (Merchant Portal "Printed QR")
 
 > The Customer Module lets a merchant create **static, reusable, customer-specific KHQR codes** in the PayWay Merchant Portal — one QR per entity (a student, a vending machine, a distributor, a donation point). Customers pay any amount, any time, from any KHQR-compatible banking app. There is **no QR-generation API**: integration effort concentrates entirely on the **callback handler** and the **`get-transactions-by-mc-ref` reconciliation fallback**, both of which this SDK ships first-class support for.
@@ -96,7 +98,7 @@ parsed.notification.customer;             // portal profile snapshot
 parsed.unknownFields;                     // forward-compatible catch-all
 ```
 
-The parser never authenticates anything — parse, then **verify the signature**, then check state + money + dedupe before fulfilling (see the [Customer Module QR skill](../../skills/aba-payway-customer-qr/SKILL.md) for the full outbox/idempotency handler).
+The parser never authenticates anything — parse, then **verify the signature**, then check state + money + dedupe before fulfilling (see the [Customer Module QR skill](../../../skills/aba-payway-customer-qr/SKILL.md) for the full outbox/idempotency handler).
 
 ### 2.2 Receiving with the SDK webhook server
 

@@ -1,9 +1,11 @@
+<!-- GENERATED STUB: copy of docs/guides/09-link-unlink-renew-lifecycle.md for compatibility. Do not edit here. -->
+
 # Chapter 9 — Link / Unlink / Renew Lifecycle
 
 > **Estimated reading time:** 15 minutes  
 > **Goal:** Understand how to save, manage, and charge customer payment methods using Credentials-on-File (CoF).
 
-Token state machine at a glance: [Link / Unlink State Machine](../diagrams/link-unlink-state-machine.md) — every transition keyed to the SDK method that performs it.
+Token state machine at a glance: [Link / Unlink State Machine](../../diagrams/link-unlink-state-machine.md) — every transition keyed to the SDK method that performs it.
 
 ---
 
@@ -361,7 +363,7 @@ if (daysLeft <= 7 && daysLeft > 0) {
 > Note: until ABA confirms whether the exact window is 89 vs 90 vs 91 days
 > (`daysUntilTokenExpiry` granularity across time zones), treat day ≤7 as the
 > renewal trigger and never assume charges work on the boundary day.
-> See [ABA-OPEN-QUESTIONS.md](../../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md).
+> See [ABA-OPEN-QUESTIONS.md](../../../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md).
 
 **The CLI tracks this for you (storage wave 4).** When tokens are captured by the webhook receiver
 they land in the local token store with their capture timestamp, and the CLI applies the window
