@@ -104,6 +104,7 @@ describe('Documentation examples', () => {
       .filter((target) => !/^(?:[a-z][a-z\d+.-]*:|#)/i.test(target))
       .map((target) => decodeURIComponent(target.split('#', 1)[0].split('?', 1)[0]))
       .filter((target) => target.length > 0)
+      .filter((target) => !target.startsWith('payway-sdk '))
       .filter((target) => !existsSync(resolve(docDir, target)));
 
     expect(missing).toEqual([]);

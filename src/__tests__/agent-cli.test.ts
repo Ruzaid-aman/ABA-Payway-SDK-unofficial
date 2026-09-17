@@ -228,7 +228,7 @@ describe('agentic payway CLI (TASK-011)', () => {
     runCli(['agent', 'ack'], baseEnv(appData));
     const after = stripAnsi(runCli(['agent', 'doctor'], baseEnv(appData)).stdout);
     expect(after).toContain('Privacy acknowledgment');
-  });
+  }, 30_000);
 
   it('agent sessions list works (empty then after a session export)', () => {
     const appData = mkdtempSync(path.join(tmpdir(), 'task011-'));

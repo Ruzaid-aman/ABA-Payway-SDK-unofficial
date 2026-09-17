@@ -25,6 +25,8 @@
   - Formatting: Plaintext is JSON-stringified, encrypted in chunks, and then concatenated as raw buffers before base64-encoding the entire concatenated buffer.
   - *Warning*: Do not base64-encode individual chunks inside the loop (as done in some boilerplate JS files); this is a known boilerplate quirk. The PayWay production system expects standard PHP-equivalent chunk concatenation before base64 encoding.
 
+  Note: The canonical internal dossier hub is `docs/internal/README.md`. Use `docs/internal/` for internal findings and `docs/guides/` for public-facing guides.
+
 ## Request Formatting
 - **Form Content-Types**:
   - Some APIs (such as Payment Link Create/Detail, Refund, Pre-auth) expect forms (`multipart/form-data` or `application/x-www-form-urlencoded`) rather than JSON.
