@@ -131,7 +131,8 @@
                   "C.set('return_params', rparams);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -171,7 +172,8 @@
                   "  if (j.status) console.log('status.code:', j.status.code, '-', j.status.message);",
                   "  assertJsonSchema({\"type\":\"object\",\"required\":[\"status\"],\"properties\":{\"status\":{\"type\":\"object\",\"required\":[\"code\"],\"properties\":{\"code\":{\"type\":[\"number\",\"string\"]},\"message\":{\"type\":\"string\"}}}}});",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -357,7 +359,8 @@
                   "C.set('tran_id', tranId);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -377,7 +380,8 @@
                   "    console.log('Business error', sc, '-', j.status.message);",
                   "  }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -437,7 +441,8 @@
                   "C.set('tran_id', tranId);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -465,7 +470,8 @@
                   "else if (pay === '3') console.log('NEXT: DECLINED - re-run Purchase and pay with a success test card (folder 01).');",
                   "else if (!pay && sc === '5') console.log('NEXT: code 5 - check-transaction-2 only sees the last 7 days and not KHQR; use 2. Get Transaction Details.');",
                   "assertJsonSchema({\"type\":\"object\",\"required\":[\"status\"],\"properties\":{\"status\":{\"type\":\"object\",\"required\":[\"code\"],\"properties\":{\"code\":{\"type\":[\"number\",\"string\"]},\"message\":{\"type\":\"string\"}}}}});"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -524,7 +530,8 @@
                   "C.set('tran_id', tranId);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -541,7 +548,8 @@
                   "var sc = respCode(j);",
                   "if (sc) pm.test('Close responded (status.code ' + sc + ')', function () { pm.expect(sc).to.not.be.empty; });",
                   "console.log('status.code:', sc, '-', j.status && j.status.message);"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -603,7 +611,10 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('RSA payload:', JSON.stringify({mc_id: C.get('merchant_id'), tran_id: tranId, refund_amount: amount}));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -626,7 +637,8 @@
                   "  if (String(code) === '0' || String(code) === '00') { console.log('Refund accepted for', pm.collectionVariables.get('last_tran_id')); }",
                   "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -673,7 +685,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "// Restore the shared PayWay helper library (Postman runs every script in its own scope):\nvar __h = pm.collectionVariables.get('__helpers');\nif (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');\neval(__h);\n// Transaction List - hash: req_time+merchant_id+from_date+to_date+from_amount+to_amount+status+page+pagination\nvar C = pm.collectionVariables;\nvar d = new Date();\n// Sandbox-verified: dates must be 'yyyy-mm-dd hh:mm:ss' (plain yyyy-mm-dd -> code 49 'Invalid Start Date')\nvar day = d.getUTCFullYear() + '-' + _pad(d.getUTCMonth() + 1) + '-' + _pad(d.getUTCDate());\nvar fromD = C.get('from_date') || day + ' 00:00:00';\nvar toD = C.get('to_date') || day + ' 23:59:59';\nif (fromD.length === 10) fromD += ' 00:00:00';\nif (toD.length === 10) toD += ' 23:59:59';\nC.set('from_date', fromD); C.set('to_date', toD);\nvar reqTime = utcNow();\nvar msg = reqTime + C.get('merchant_id') + C.get('from_date') + C.get('to_date')\n  + '' + '' + (C.get('tran_status_filter')||'') + '1' + '20';\nC.set('req_time', reqTime);\nC.set('computed_hash', hmac512(msg, C.get('secret_key')));\nconsole.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -682,7 +695,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"List responded (status.code 00)\", function () {\n    var jsonData = pm.response.json();\n    pm.expect(jsonData.status.code).to.eql(\"00\");\n});\n\npm.test(\"Status code is 200 OK\", function () {\n    pm.response.to.have.status(200);\n});\n\npm.test(\"Response has pagination and data fields\", function () {\n    var jsonData = pm.response.json();\n    pm.expect(jsonData).to.have.property(\"data\");\n    pm.expect(jsonData).to.have.property(\"page\");\n    pm.expect(jsonData).to.have.property(\"pagination\");\n    pm.expect(jsonData.data).to.be.an(\"array\");\n});\n\npm.test(\"Transaction item has required fields\", function () {\n    var jsonData = pm.response.json();\n    if (jsonData.data && jsonData.data.length > 0) {\n        var tx = jsonData.data[0];\n        pm.expect(tx).to.have.property(\"transaction_id\");\n        pm.expect(tx).to.have.property(\"payment_status\");\n        pm.expect(tx).to.have.property(\"original_amount\");\n    }\n});\n"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -729,7 +743,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "// Restore the shared PayWay helper library (Postman runs every script in its own scope):\nvar __h = pm.collectionVariables.get('__helpers');\nif (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');\neval(__h);\n// Exchange Rate - hash: req_time+merchant_id\nvar C = pm.collectionVariables;\nvar reqTime = utcNow();\nvar msg = reqTime + C.get('merchant_id');\nC.set('req_time', reqTime);\nC.set('computed_hash', hmac512(msg, C.get('secret_key')));\nconsole.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -738,7 +753,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "// Restore the shared PayWay helper library (Postman runs every script in its own scope):\nvar __h = pm.collectionVariables.get('__helpers');\nif (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');\neval(__h);\nvar j = {};\ntry { j = pm.response.json(); } catch (e) { }\nvar sc = respCode(j);\npm.test('Exchange rate responded (status.code ' + sc + ')', function () { pm.expect(sc).to.not.be.empty; });\npm.test('Exchange rate success (0/00)', function () { pm.expect(okStatus(j)).to.eql(true); });\nif (j.exchange_rates) console.log('rates:', JSON.stringify(j.exchange_rates).slice(0, 200));"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -820,7 +836,8 @@
                   "C.set('return_params', rparams);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -847,7 +864,8 @@
                   "assertJsonSchema({\"type\":\"object\",\"properties\":{\"status\":{\"type\":\"object\",\"properties\":{\"code\":{\"type\":[\"number\",\"string\"]},\"message\":{\"type\":\"string\"}}},\"qrString\":{\"type\":\"string\"},\"qrImage\":{\"type\":\"string\"}}});",
                   "var vj = {}; try { vj = pm.response.json(); } catch (e) {}",
                   "if (vj.qrImage || vj.qrString) visualizeQr(vj.qrImage, vj.qrString, 'Scan with the ABA Mobile app (sandbox). tran_id: ' + pm.collectionVariables.get('tran_id'));"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -900,7 +918,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "// Restore the shared PayWay helper library (Postman runs every script in its own scope):\nvar __h = pm.collectionVariables.get('__helpers');\nif (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');\neval(__h);\n// Create Payment Link - RSA payload per description; hash: request_time+merchant_id+merchant_auth\nvar C = pm.collectionVariables;\nvar reqTime = utcNow();\nvar payload = {\n  mc_id: C.get('merchant_id'),\n  title: 'Test Payment Link',\n  amount: fmtAmt(C.get('amount')),\n  currency: C.get('currency'),\n  description: 'Created from Postman',\n  payment_limit: '50',\n  expired_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0,19).replace('T', ' '),\n  return_url: b64(C.get('return_url')),\n  merchant_ref_no: C.get('merchant_ref')\n};\nvar auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'pl_merchant_auth');\nvar msg = reqTime + C.get('merchant_id') + auth;\nC.set('request_time', reqTime);\nC.set('computed_merchant_auth', auth);\nC.set('computed_hash', hmac512(msg, C.get('secret_key')));\nconsole.log('RSA payload:', JSON.stringify(payload));\nconsole.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -909,7 +930,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Status code is 400 or successful\", function () {\n    pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]);\n});\n\npm.test(\"Response content-type is application/problem+json\", function () {\n    pm.response.to.have.header(\"Content-Type\");\n    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");\n});\n\npm.test(\"Response has status object\", function () {\n    var jsonData = pm.response.json();\n    pm.expect(jsonData).to.have.property(\"status\");\n    pm.expect(jsonData.status).to.have.property(\"code\");\n    pm.expect(jsonData.status).to.have.property(\"message\");\n});\n\n// Chain: save the created link id for Details/Void (payment_link_id = create response data.id)\ntry {\n  var __cj = pm.response.json();\n  if (__cj && __cj.data && __cj.data.id) {\n    pm.collectionVariables.set('payment_link_id', String(__cj.data.id));\n    console.log('payment_link_id saved:', String(__cj.data.id), '- NEXT: \"Get Payment Link Details\", or \"Void Payment Link\" (irreversible).');\n  }\n} catch (e) {}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -981,7 +1003,10 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('RSA payload:', JSON.stringify(payload));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -1004,7 +1029,8 @@
                   "  if (String(code) === '0' || String(code) === '00') { if (j.data) console.log('link detail:', JSON.stringify(j.data).slice(0, 300)); }",
                   "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1073,7 +1099,9 @@
                   "console.log('b4hash:', msg);"
                 ],
                 "type": "text/javascript",
-                "packages": {}
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -1186,7 +1214,10 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('RSA payload:', JSON.stringify(payload));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -1209,7 +1240,8 @@
                   "  if (String(code) === '0' || String(code) === '00') { console.log('Pre-auth captured.'); }",
                   "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1275,7 +1307,10 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('RSA payload:', JSON.stringify(payload));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -1298,7 +1333,8 @@
                   "  if (String(code) === '0' || String(code) === '00') { console.log('Pre-auth captured with payout split.'); }",
                   "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1359,7 +1395,10 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('RSA payload:', JSON.stringify(payload));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -1382,7 +1421,8 @@
                   "  if (String(code) === '0' || String(code) === '00') { console.log('Pre-auth released.'); }",
                   "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1456,7 +1496,10 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('RSA beneficiaries:', JSON.stringify(benef));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -1479,7 +1522,8 @@
                   "  if (String(code) === '0' || String(code) === '00') { console.log('Payout accepted:', JSON.stringify(j.data || {}).slice(0, 200)); }",
                   "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1541,7 +1585,10 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('RSA payload:', JSON.stringify(payload));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -1564,7 +1611,8 @@
                   "  if (String(code) === '0' || String(code) === '00') { console.log('Payee whitelisted.'); }",
                   "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1625,7 +1673,10 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('RSA payload:', JSON.stringify(payload));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -1648,7 +1699,8 @@
                   "  if (String(code) === '0' || String(code) === '00') { console.log('Whitelist status updated.'); }",
                   "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1718,7 +1770,8 @@
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);",
                   "console.log('request_id:', requestId, '- use it with Get Token Details after the callback fires.')"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -1745,7 +1798,8 @@
                   "} catch (e) { console.log('Response is not JSON; likely a redirect page.'); }",
                   "var vj = {}; try { vj = pm.response.json(); } catch (e) {}",
                   "if (vj.data && (vj.data.qr_string || vj.data.qrString)) visualizeQr('', vj.data.qr_string || vj.data.qrString, 'Link Account - scan in ABA Mobile, approve, then run Get Token Details with request_id ' + pm.collectionVariables.get('request_id'));"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1808,7 +1862,8 @@
                   "C.set('cof_continue_b64', cuB64);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -1834,7 +1889,8 @@
                   "  }",
                   "  visualizeFormPost(pm.variables.replaceIn(pm.request.url.toString()), fields, 'PayWay card linking',",
                   "    'How real integrations open PayWay: a form POST with these signed fields. Click the button - the checkout page is served by PayWay itself (no CORS issues). Pay with the sandbox test cards, then re-send Check Transaction here to see APPROVED.');"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -1933,7 +1989,8 @@
                   "C.set('request_time', reqTime);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -1960,7 +2017,8 @@
                   "  console.log('status.code:', sc, '-', j.status.message);",
                   "}",
                   "if (pm.response.code === 200) assertJsonSchema({\"type\":\"object\",\"required\":[\"status\"],\"properties\":{\"status\":{\"type\":\"object\",\"properties\":{\"code\":{\"type\":[\"number\",\"string\"]},\"message\":{\"type\":\"string\"}}},\"data\":{\"type\":\"object\"}}});"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2027,7 +2085,8 @@
                   "C.set('cof_pay_token_flag', tokenFlag);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2045,7 +2104,8 @@
                   "    if (j.data) console.log('approved:', JSON.stringify(j.data).slice(0, 400));",
                   "  }",
                   "} catch (e) { console.log('Response was not JSON.'); }"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2105,7 +2165,8 @@
                   "C.set('request_id', requestId);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2122,7 +2183,8 @@
                   "    if (String(j.status.code) === '00') console.log('Token renewed (+90 days) - new request_id =', pm.collectionVariables.get('request_id'));",
                   "  }",
                   "} catch (e) { console.log('Response was not JSON.'); }"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2180,7 +2242,8 @@
                   "C.set('request_time', reqTime);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2200,7 +2263,8 @@
                   "    }",
                   "  }",
                   "} catch (e) { console.log('Response was not JSON.'); }"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2276,7 +2340,8 @@
                   "C.set('sub_con_b64', su);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2299,7 +2364,8 @@
                   "}",
                   "var vj = {}; try { vj = pm.response.json(); } catch (e) {}",
                   "if (vj.qrImage || vj.qrString) visualizeQr(vj.qrImage, vj.qrString, 'Subscription first payment - scan with the ABA Mobile app (sandbox). tran_id: ' + pm.collectionVariables.get('tran_id'));"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2483,7 +2549,8 @@
                   "C.set('req_time', reqTime);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2505,7 +2572,8 @@
                   "  pm.test('KHQR lookup responded (status.code ' + sc + ')', function () { pm.expect(sc).to.not.be.empty; });",
                   "  console.log('status.code:', sc, '-', j.status && j.status.message);",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2580,7 +2648,8 @@
                   "C.set('computed_header', hmac512(msg, C.get('secret_key')));",
                   "console.log('callback concat:', msg);",
                   "console.log('X-PayWay-Hmac-Sha512:', pm.collectionVariables.get('computed_header'));"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2589,7 +2658,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Sent to listener (HTTP 2xx/4xx)', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 400, 404]); });"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2650,7 +2720,8 @@
                   "}).join('');",
                   "C.set('computed_header', hmac512(msg, C.get('secret_key')));",
                   "console.log('callback concat:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2659,7 +2730,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Sent to listener (HTTP 2xx/4xx)', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 400, 404]); });"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2710,7 +2782,8 @@
                   "C.set('webhook_token', m ? m[1] : '');",
                   "if (!m) console.log('No webhook.site UUID found in {{callback_listener}}. Set it to https://webhook.site/<uuid> first.');",
                   "else console.log('webhook_token:', m[1]);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2745,7 +2818,8 @@
                   "});",
                   "pm.test('At least one recognizable callback was imported', function () { pm.expect(synced).to.eql(true, 'No callback payload with tran_id/payment_credential found yet - send one first.'); });",
                   "console.log(synced ? 'SYNC OK: variables updated from webhook.site' : 'No recognizable payloads yet - send a callback, then re-run.');"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2829,7 +2903,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "// Restore the shared PayWay helper library (Postman runs every script in its own scope):\nvar __h = pm.collectionVariables.get('__helpers');\nif (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');\neval(__h);\nvar C = pm.collectionVariables;\nC.set('poll_count', '0');\nC.set('poll_status', '');\nvar reqTime = utcNow();\nvar tranId = genTranId();\nvar amount = fmtAmt(C.get('amount'));\nvar itemsB64 = b64json((C.get('items_json') || '').trim() || '[{\"name\":\"QR Poll\",\"quantity\":1,\"price\":0.10}]');\nvar cbB64 = ensureB64(C.get('callback_url'));\nvar rdl = b64json((C.get('return_deeplink_raw')||'').trim());\nvar customB64 = b64json((C.get('custom_fields_json')||'').trim());\nvar payoutB64 = b64json((C.get('payout_json')||'').trim());\nvar rparams = (C.get('return_params_raw')||'').trim();\nvar msg = reqTime + C.get('merchant_id') + tranId + amount + itemsB64\n  + C.get('buyer_first_name') + C.get('buyer_last_name') + C.get('buyer_email') + C.get('buyer_phone')\n  + C.get('purchase_type') + C.get('payment_option') + cbB64 + rdl + C.get('currency')\n  + customB64 + rparams + payoutB64 + C.get('lifetime') + C.get('qr_image_template');\nC.set('req_time', reqTime);\nC.set('tran_id', tranId);\nC.set('last_tran_id', tranId);\nC.set('amount', amount);\nC.set('items_b64', itemsB64);\nC.set('callback_url_b64', cbB64);\nC.set('return_deeplink_b64', rdl);\nC.set('custom_fields_b64', customB64);\nC.set('payout_b64', payoutB64);\nC.set('return_params', rparams);\nC.set('computed_hash', hmac512(msg, C.get('secret_key')));\nconsole.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2838,7 +2913,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"QR created (status.code 0)\", function () {\n    pm.response.to.have.status(200);\n});\n\npm.test(\"Response has valid JSON body with qrString and qrImage\", function () {\n    const responseJson = pm.response.json();\n    pm.expect(responseJson).to.be.an('object');\n    pm.expect(responseJson).to.have.property('qrString').that.is.a('string');\n    pm.expect(responseJson).to.have.property('qrImage').that.is.a('string');\n});\n\npm.test(\"qrImage is a valid base64 PNG data URL\", function () {\n    const responseJson = pm.response.json();\n    pm.expect(responseJson.qrImage).to.match(/^data:image\\/png;base64,/);\n});\n"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2885,7 +2961,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "// Restore the shared PayWay helper library (Postman runs every script in its own scope):\nvar __h = pm.collectionVariables.get('__helpers');\nif (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');\neval(__h);\nvar C = pm.collectionVariables;\nvar reqTime = utcNow();\nvar tranId = C.get('last_tran_id') || C.get('tran_id');\nif (!tranId) throw new Error('No tran_id to poll - run A1 first (sets {{last_tran_id}}).');\nvar msg = reqTime + C.get('merchant_id') + tranId;\nC.set('req_time', reqTime);\nC.set('tran_id', tranId);\nC.set('computed_hash', hmac512(msg, C.get('secret_key')));\nconsole.log('poll b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2894,7 +2971,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Poll 2/10 - status 2\", function () {\n    var jsonData = pm.response.json();\n    pm.expect(jsonData.data.payment_status_code).to.eql(2);\n});\n\npm.test(\"Status code is 200\", function () {\n    pm.response.to.have.status(200);\n});\n\npm.test(\"Response time is less than 1000ms\", function () {\n    pm.expect(pm.response.responseTime).to.be.below(1000);\n});\n\npm.test(\"Content-Type is application/json\", function () {\n    pm.response.to.have.header(\"Content-Type\");\n    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\n});\n\npm.test(\"Response has valid transaction structure\", function () {\n    var jsonData = pm.response.json();\n    pm.expect(jsonData).to.have.property('data');\n    pm.expect(jsonData).to.have.property('status');\n    pm.expect(jsonData.data).to.have.property('transaction_id');\n    pm.expect(jsonData.data).to.have.property('payment_status');\n    pm.expect(jsonData.status).to.have.property('code', '00');\n});\n"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -2951,7 +3029,8 @@
                   "C.set('req_time', reqTime);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -2972,7 +3051,8 @@
                   "} else {",
                   "  console.log('Business error', sc, '-', j.status && j.status.message);",
                   "}"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -3031,7 +3111,10 @@
                   "C.set('computed_merchant_auth', auth);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {
+                  "node-forge": "1.3.1"
+                }
               }
             },
             {
@@ -3042,7 +3125,8 @@
                   "var j = pm.response.json();",
                   "var code = j.statusCode || (j.status && j.status.code);",
                   "pm.test('Refund responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });\npostman.setNextRequest(null); // end of Flow A - do not bleed into Flow B"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -3104,7 +3188,8 @@
                   "C.set('cof_callback_b64', cbB64);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -3131,7 +3216,8 @@
                   "} catch (e) { console.log('Response is not JSON; likely a redirect page.'); }",
                   "var vj = {}; try { vj = pm.response.json(); } catch (e) {}",
                   "if (vj.data && (vj.data.qr_string || vj.data.qrString)) visualizeQr('', vj.data.qr_string || vj.data.qrString, 'Flow B - scan in ABA Mobile, approve, then B2 with request_id ' + pm.collectionVariables.get('request_id'));"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -3188,7 +3274,8 @@
                   "C.set('request_time', reqTime);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -3215,7 +3302,8 @@
                   "  console.log('status.code:', sc, '-', j.status.message);",
                   "}",
                   "if (pm.response.code === 200) assertJsonSchema({\"type\":\"object\",\"required\":[\"status\"],\"properties\":{\"status\":{\"type\":\"object\",\"properties\":{\"code\":{\"type\":[\"number\",\"string\"]},\"message\":{\"type\":\"string\"}}},\"data\":{\"type\":\"object\"}}});"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -3281,7 +3369,8 @@
                   "C.set('cof_pay_token_flag', tokenFlag);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -3299,7 +3388,8 @@
                   "    if (j.data) console.log('approved:', JSON.stringify(j.data).slice(0, 400));",
                   "  }",
                   "} catch (e) { console.log('Response was not JSON.'); }"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -3358,7 +3448,8 @@
                   "C.set('request_id', requestId);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -3375,7 +3466,8 @@
                   "    if (String(j.status.code) === '00') console.log('Token renewed (+90 days) - new request_id =', pm.collectionVariables.get('request_id'));",
                   "  }",
                   "} catch (e) { console.log('Response was not JSON.'); }"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -3432,7 +3524,8 @@
                   "C.set('request_time', reqTime);",
                   "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
                   "console.log('b4hash:', msg);"
-                ]
+                ],
+                "packages": {}
               }
             },
             {
@@ -3452,7 +3545,8 @@
                   "    }",
                   "  }",
                   "} catch (e) { console.log('Response was not JSON.'); }\npostman.setNextRequest(null); // end of Flow B"
-                ]
+                ],
+                "packages": {}
               }
             }
           ],
@@ -3508,7 +3602,8 @@
           "var __h = pm.collectionVariables.get('__helpers');",
           "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
           "eval(__h);"
-        ]
+        ],
+        "packages": {}
       }
     },
     {
@@ -3523,7 +3618,8 @@
           "    if (j.status) console.log('Response status.code:', j.status.code, '-', j.status.message);",
           "  } catch (e) {}",
           "}"
-        ]
+        ],
+        "packages": {}
       }
     }
   ],

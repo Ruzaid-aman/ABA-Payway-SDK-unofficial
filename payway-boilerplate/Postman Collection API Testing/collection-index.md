@@ -38,7 +38,7 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 
 1. Import `exp-PayWay API — Complete Collection.postman_collection.json` into Postman.
 2. Nothing to configure for a first test — **this repo's sandbox merchant is pre-filled** (merchant `ec476910`, `secret_key` Postman *Secret*, full `rsa_public_key` PEM, seeded beneficiary `500000001`, `ctid customer123`) — all as collection variables, no environment needed. For another merchant replace `merchant_id`/`secret_key`/`rsa_public_key`; switch `baseUrl` sandbox/production.
-3. Recommended: install **node-forge** under *Edit collection → Libraries* so RSA endpoints (`Refund`, Payment Link, Pre-auth, Payout, Whitelist) compute `merchant_auth`/`beneficiaries` for you. Without it, paste pre-encrypted values into the `*_merchant_auth` variables.
+3. The 11 RSA pre-requests (`Refund`, Payment Link, Pre-auth, Payout, Whitelist) declare **`node-forge@1.3.1`** in their script `packages`, so current Postman loads it automatically via script package-import — no manual setup. Fallback if your Postman build ignores `packages`: install node-forge under *Edit collection → Libraries*, or paste pre-encrypted values into the `*_merchant_auth` variables.
 4. Start at **03 - Ecommerce Checkout → 1. Purchase**, pay on the hosted page (Visualize tab launcher), then **Check Transaction**. Every request's description starts with a **⚡ Quick test** block: what to set, what to expect, what to send next — and the Console prints `NEXT:` hints after key responses.
 5. For callbacks, paste a `https://webhook.site/<uuid>` URL into `callback_url` / `callback_listener` (see folder 10).
 
