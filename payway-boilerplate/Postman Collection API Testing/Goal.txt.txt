@@ -1,0 +1,29 @@
+Create a Postman Collection for the PayWay APIs documented at https://developer.payway.com.kh/, following current Postman standards and API testing best practices for all APIs and callback webhooks. The collection should be usable as a playground where merchant developers can test the complete API suite.
+
+The collection should include clear error-code explanations, pre-request and post-response/test script handling for different testing scenarios, transaction pooling flows, and coverage of all callback and request scenarios. It is being built to help merchant developers easily test every available service.
+
+---
+
+**Structured version:**
+
+**Title:** PayWay API Postman Collection
+
+**Objective:**  
+Build a comprehensive, up-to-date Postman Collection for all APIs and callback webhooks documented at https://developer.payway.com.kh/.
+
+**Purpose:**  
+Provide merchant developers with a ready-to-use playground for testing the full PayWay API suite.
+
+**Scope:**  
+- Cover all PayWay APIs and callback/webhook events.
+- Follow current Postman and API testing best practices.
+- Include clear error-code explanations.
+- Add pre-request and test/post-response scripts for multiple testing scenarios.
+- Support transaction pooling flows.
+- Cover all callback and request scenarios.
+
+**Audience:**  
+Merchant developers integrating with PayWay.
+
+**Expected Outcome:**  
+A practical Postman Collection that enables merchant developers to test all PayWay services end-to-end.

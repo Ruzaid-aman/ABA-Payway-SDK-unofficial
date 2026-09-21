@@ -1,0 +1,452 @@
+{
+  "info": {
+    "_postman_id": "a2f6a97a-1a67-4a2e-9c66-5bd5c9f1f7e2",
+    "name": "PayWay API — Complete Collection",
+    "version": "1.2.1",
+    "description": "# 🚀 PayWay API — Get Started\n\n**Welcome!** This collection is a complete playground for the [PayWay merchant APIs](https://developer.payway.com.kh/). It ships **pre-configured with the public sandbox demo merchant**, so your first request works immediately — no signup, no keys.\n\n> **While testing:** open the Postman **Console** (bottom-left). Every request logs its `b4hash:` signing string there so you can verify it against the docs.\n\n---\n\n## 1 · Your first transaction (60 seconds, zero setup)\n\n1. Open **03 - Ecommerce Checkout → 1. Purchase (Hosted Checkout)** → hit **Send**.\n2. Open the **Visualize** tab of the response → click **Open payment page →**.\n   The button form-POSTs your signed fields and the checkout page is served by PayWay itself — no CORS problems.\n3. Pay with the sandbox test card:\n\n   | Card | Number | Expiry | CVV | 3-D Secure |\n   |---|---|---|---|---|\n   | ✅ Success | `4286 0900 0000 0206` | 04/30 | 777 | Yes (any code) |\n   | ✅ Success (no 3DS) | `5156 8399 3770 6777` | 01/30 | 993 | No |\n   | ❌ Declined | `5156 8302 7256 1029` | 04/30 | 777 | Yes |\n\n4. Back in Postman, send **3. Check Transaction** → `payment_status_code: 0 (APPROVED)` 🎉\n\nThat is the whole merchant lifecycle you are learning: **create → host the page → verify**.\n\n> 💡 **Helper text everywhere:** every request's description starts with a **⚡ Quick test** block — what to set (usually nothing), what you'll see, and what to send next. After key responses the **Console** also prints a `NEXT:` hint.\n\n## 2 · What happens automatically\n\n- **Chaining** — every response saves what the next request needs: `{{last_tran_id}}`, `{{pwt}}`, `{{ctid}}`, `{{request_id}}`, `{{payment_link_id}}`. Just send requests in the documented order.\n- **Signing** — every pre-request builds `hash = base64(HMAC-SHA512(field values in documented order, secret_key))` and logs the exact input as `b4hash:`. Amounts are formatted per `{{currency}}`: USD 2 decimals, KHR integer.\n- **Polling** — **11 - Polling & Lifecycle Flows → Flow A** loops on `data.payment_status_code` while it is `2 (PENDING)`, budgeted by `{{max_polls}}`. Run the folder in the **Collection Runner** (delay ≥ 1000 ms).\n- **Callbacks** — folder **10** documents payment/token payloads + `X-PayWay-Hmac-Sha512` verification, can replay samples to `{{callback_listener}}`, and can **pull** callbacks back from webhook.site into your variables.\n- **RSA endpoints** (Refund, Payment Link, Pre-auth, Payout, Whitelist) encrypt `merchant_auth`/`beneficiaries` automatically once the **node-forge** library is installed (collection → **Libraries**); without it they **skip with setup instructions** instead of failing.\n- **Prerequisite guards** — requests that need earlier state (`{{pwt}}`, `{{request_id}}`, `{{last_tran_id}}`) stop with a clear message telling you exactly which request to run first.\n\n## 3 · Pick your journey\n\n| You want to… | Go to |\n|---|---|\n| Take a card / ABA Pay / wallet payment | **03 - Ecommerce Checkout** |\n| Show a QR to scan (ABA app) | **04 - ABA QR API**, then poll with **Flow A** in **11** |\n| Link a card/account, charge later | **08 - Credentials on File (CoF)** |\n| Sell via a shareable link | **05 - Payment Link** |\n| Hold funds, capture or release later | **06 - Pre-auth** |\n| Split payments to beneficiaries | **07 - Payout** |\n| Look up KHQR payments by merchant ref | **09 - KHQR Guideline** |\n| Test your webhook handling | **10 - Callbacks & Webhooks** |\n\n## 4 · Switching to your own merchant (before real integration)\n\n| Variable | Replace with | Notes |\n|---|---|---|\n| `{{merchant_id}}` | Your sandbox merchant ID | From PayWay onboarding |\n| `{{secret_key}}` | Your sandbox secret | Stored as a **Postman secret** type — masked in UI/exports |\n| `{{rsa_public_key}}` | Your RSA public key (PEM) | Needed by the RSA endpoints above |\n| `{{ctid}}` | Your consumer ID | CoF folders |\n| `{{baseUrl}}` | `https://checkout.payway.com.kh` | Production only |\n\n> ⚠️ The pre-filled demo credentials are **public** — use them only to explore. Replace them before touching anything real, and never commit your secret into source control.\n\n## 5 · Transaction statuses\n\n`data.payment_status_code`: **0** APPROVED / PRE-AUTH · **2** PENDING · **3** DECLINED · **4** REFUNDED · **7** CANCELLED\n\nGateway `status.code` is `\"00\"`/`0` on success and otherwise an error code (string *or* number) — test scripts normalize both. Most common errors:\n\n| Code | Meaning | | Code | Meaning |\n|---|---|---|---|---|\n| 1 | Wrong hash | | 5 | Transaction not found |\n| 4 | Given data was invalid | | 6 | Domain not whitelisted |\n| 2 | Invalid transaction ID | | 12 | Currency not allowed |\n| 4 | Duplicated transaction ID | | 47 | KHR must be ≥ 100 |\n| 23 | Payment option not enabled | | 429 | Rate limit exceeded |\n| PTL02 | Wrong hash (portal APIs) | | 503 | Under maintenance |\n\nFull table: [developer.payway.com.kh](https://developer.payway.com.kh/) · `b4hash:` in the Console is your first stop for any `Wrong hash`.\n\n## 6 · 60-second fixes\n\nThe five snags that cost developers the most time, with the one-line fix:\n\n| Symptom | Fix |\n|---|---|\n| `Wrong hash` (code 1) | Open the **Console** → compare the `b4hash:` line with the docs' field order (each request's description lists it too). USD amounts need 2 decimals, KHR none — the scripts handle this via `fmtAmt`. |\n| RSA endpoints answer `SKIPPED` | Install **node-forge** under collection → **Libraries**, or paste a pre-encrypted value into the `{{…_merchant_auth}}` variable named in the description. |\n| Code 5 / transaction not found | `check-transaction-2` only sees the **last 7 days** and **no KHQR** transactions — use **2. Get Transaction Details** instead. |\n| Code 49 Invalid Start Date | Transaction List dates must be `yyyy-mm-dd hh:mm:ss` (auto-filled for you — don't shorten them). |\n| Code 23 payment option not enabled | The demo profile doesn't allow that wallet — switch `{{payment_option}}` (try `cards` or `abapay_khqr`). |\n\n## 7 · Environments\n\n- **Sandbox (default):** `https://checkout-sandbox.payway.com.kh`\n- **Production:** `https://checkout.payway.com.kh` — only after replacing the demo credentials\n- **Docs:** [developer.payway.com.kh](https://developer.payway.com.kh/)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://checkout-sandbox.payway.com.kh",
+      "type": "string"
+    },
+    {
+      "key": "merchant_id",
+      "value": "sonitatest",
+      "type": "string"
+    },
+    {
+      "key": "secret_key",
+      "value": "9dc49bb1-04db-4ac0-a262-e7bef22cff6a",
+      "type": "secret",
+      "description": "HMAC-SHA512 signing secret (the \"API key\" PayWay issues). Pre-filled with the PUBLIC sandbox demo merchant (sonitatest) so the collection works out of the box - REPLACE with your own secret and never use it in production. Only ever used to compute HMAC signatures, never sent in a request body."
+    },
+    {
+      "key": "buyer_first_name",
+      "value": "Test",
+      "type": "string"
+    },
+    {
+      "key": "buyer_last_name",
+      "value": "User",
+      "type": "string"
+    },
+    {
+      "key": "buyer_email",
+      "value": "test@example.com",
+      "type": "string"
+    },
+    {
+      "key": "buyer_phone",
+      "value": "0123456789",
+      "type": "string"
+    },
+    {
+      "key": "return_params_raw",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rsa_public_key",
+      "value": "-----BEGIN PUBLIC KEY-----\nYOUR_RSA_KEY_HERE\n-----END PUBLIC KEY-----",
+      "type": "string",
+      "description": "RSA public key (PEM) from ABA Bank for portal APIs."
+    },
+    {
+      "key": "currency",
+      "value": "USD",
+      "type": "string",
+      "description": "KHR or USD"
+    },
+    {
+      "key": "amount",
+      "value": "0.10",
+      "type": "string",
+      "description": "USD min 0.01; KHR min 100"
+    },
+    {
+      "key": "ctid",
+      "value": "TESTCONSUMER01",
+      "type": "string",
+      "description": "Consumer ID (5-24 alphanumeric)."
+    },
+    {
+      "key": "pwt",
+      "value": "",
+      "type": "string",
+      "description": "PayWay Token; auto-saved by token endpoints."
+    },
+    {
+      "key": "request_time",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "request_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tran_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "computed_hash",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "last_tran_id",
+      "value": "",
+      "type": "string",
+      "description": "Set by QR purchase; consumed by polling/refund flows."
+    },
+    {
+      "key": "payment_option",
+      "value": "abapay_khqr",
+      "type": "string",
+      "description": "cards | abapay_khqr | abapay_khqr_deeplink | abapay | abapay_deeplink | alipay | wechat | google_pay"
+    },
+    {
+      "key": "qr_image_template",
+      "value": "template3_color",
+      "type": "string"
+    },
+    {
+      "key": "return_url",
+      "value": "https://example.com/return",
+      "type": "string"
+    },
+    {
+      "key": "cancel_url",
+      "value": "https://example.com/cancel",
+      "type": "string"
+    },
+    {
+      "key": "continue_success_url",
+      "value": "https://example.com/success",
+      "type": "string"
+    },
+    {
+      "key": "return_deeplink_raw",
+      "value": "",
+      "type": "string",
+      "description": "Optional raw JSON: {\"ios_scheme\":\"...\",\"android_scheme\":\"...\"}. Auto base64-encoded."
+    },
+    {
+      "key": "callback_url",
+      "value": "https://example.com/callback",
+      "type": "string"
+    },
+    {
+      "key": "items_json",
+      "value": "[{\"name\":\"Test Item\",\"quantity\":1,\"price\":0.10}]",
+      "type": "string"
+    },
+    {
+      "key": "custom_fields_json",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "payout_json",
+      "value": "",
+      "type": "string",
+      "description": "e.g. [{\"acc\":\"000133879\",\"amt\":0.05},{\"acc\":\"000133880\",\"amt\":0.05}]"
+    },
+    {
+      "key": "additional_params_json",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "google_pay_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "skip_success_page",
+      "value": "0",
+      "type": "string"
+    },
+    {
+      "key": "view_type",
+      "value": "hosted_view",
+      "type": "string"
+    },
+    {
+      "key": "payment_gate",
+      "value": "0",
+      "type": "string"
+    },
+    {
+      "key": "lifetime",
+      "value": "3",
+      "type": "string",
+      "description": "Minutes; min 3"
+    },
+    {
+      "key": "shipping_fee",
+      "value": "0.00",
+      "type": "string"
+    },
+    {
+      "key": "token_flag",
+      "value": "CITI_FLEX",
+      "type": "string",
+      "description": "CITI_FLEX | CITO_FLEX | CITR_FIX (link); CITU_FLEX | MITU_FLEX | MITR_FIX (payment);"
+    },
+    {
+      "key": "sub_frequency",
+      "value": "1W",
+      "type": "string",
+      "description": "1W | 1M | 2M"
+    },
+    {
+      "key": "sub_lifetime",
+      "value": "30",
+      "type": "string"
+    },
+    {
+      "key": "callback_listener",
+      "value": "",
+      "type": "string",
+      "description": "webhook.site URL / test endpoint for folder 10."
+    },
+    {
+      "key": "webhook_token",
+      "value": "",
+      "type": "string",
+      "description": "Extracted UUID from {{callback_listener}} (https://webhook.site/<uuid>); used by folder 10 sync request."
+    },
+    {
+      "key": "poll_count",
+      "value": "0",
+      "type": "string"
+    },
+    {
+      "key": "max_polls",
+      "value": "10",
+      "type": "string",
+      "description": "Polling loop budget for Flow A2 (Collection Runner)"
+    },
+    {
+      "key": "poll_status",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refund_amount",
+      "value": "0.10",
+      "type": "string"
+    },
+    {
+      "key": "refund_merchant_auth",
+      "value": "",
+      "type": "string",
+      "description": "Paste RSA-encrypted {mc_id,tran_id,refund_amount} if no node-forge."
+    },
+    {
+      "key": "pl_merchant_auth",
+      "value": "",
+      "type": "string",
+      "description": "Payment Link: paste RSA-encrypted payload if no node-forge."
+    },
+    {
+      "key": "payment_link_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "preauth_merchant_auth",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "preauth_payout_merchant_auth",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cancel_preauth_merchant_auth",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "payout_beneficiaries",
+      "value": "",
+      "type": "string",
+      "description": "Paste RSA-encrypted [{account,amount}] if no node-forge."
+    },
+    {
+      "key": "add_whitelist_merchant_auth",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "update_whitelist_merchant_auth",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "whitelist_payee",
+      "value": "318111358120004",
+      "type": "string"
+    },
+    {
+      "key": "merchant_ref",
+      "value": "MREF-0001",
+      "type": "string"
+    },
+    {
+      "key": "test_mc_success",
+      "value": "5156 8399 3770 6777",
+      "type": "string"
+    },
+    {
+      "key": "test_visa_success",
+      "value": "4286 0900 0000 0206",
+      "type": "string"
+    },
+    {
+      "key": "test_mc_declined",
+      "value": "5156 8302 7256 1029",
+      "type": "string"
+    },
+    {
+      "key": "test_visa_declined",
+      "value": "4156 8399 3770 6777",
+      "type": "string"
+    },
+    {
+      "key": "test_expiry",
+      "value": "01/30",
+      "type": "string"
+    },
+    {
+      "key": "from_date",
+      "value": "",
+      "type": "string",
+      "description": "yyyy-mm-dd (auto-filled as today, or paste when using Transaction List)"
+    },
+    {
+      "key": "to_date",
+      "value": "",
+      "type": "string",
+      "description": "yyyy-mm-dd (auto-filled as today, or paste when using Transaction List)"
+    },
+    {
+      "key": "tran_status_filter",
+      "value": "",
+      "type": "string",
+      "description": "Optional status filter for Transaction List (0 approved, 2 pending, 3 declined, 4 refunded, 7 cancelled)"
+    },
+    {
+      "key": "test_cvv",
+      "value": "123",
+      "type": "string"
+    },
+    {
+      "key": "sub_payment_option",
+      "value": "abapay",
+      "type": "string",
+      "description": "Sub only: abapay | abapay_deeplink | cards"
+    },
+    {
+      "key": "sub_firstname",
+      "value": "Test",
+      "type": "string"
+    },
+    {
+      "key": "sub_lastname",
+      "value": "User",
+      "type": "string"
+    },
+    {
+      "key": "sub_email",
+      "value": "test@example.com",
+      "type": "string"
+    },
+    {
+      "key": "sub_phone",
+      "value": "0123456789",
+      "type": "string"
+    },
+    {
+      "key": "cof_return_deeplink",
+      "value": "",
+      "type": "string",
+      "description": "CoF Link Account: https URL or base64"
+    },
+    {
+      "key": "cof_callback_url",
+      "value": "",
+      "type": "string",
+      "description": "CoF Link Account/Card: https URL or base64"
+    },
+    {
+      "key": "cof_continue_success_url",
+      "value": "",
+      "type": "string",
+      "description": "CoF Link Card: https URL or base64"
+    },
+    {
+      "key": "cof_amount",
+      "value": "0.10",
+      "type": "string"
+    },
+    {
+      "key": "purchase_type",
+      "value": "purchase",
+      "type": "string",
+      "description": "purchase | pre-auth (purchase \"type\" field and generate-qr purchase_type)"
+    },
+    {
+      "key": "return_params",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "__helpers",
+      "value": "var CryptoJS = require('crypto-js');\n\nfunction _pad(n) { return n < 10 ? '0' + n : '' + n; }\n\nfunction utcNow() {\n  var d = new Date();\n  return '' + d.getUTCFullYear() + _pad(d.getUTCMonth()+1) + _pad(d.getUTCDate()) +\n         _pad(d.getUTCHours()) + _pad(d.getUTCMinutes()) + _pad(d.getUTCSeconds());\n}\n\nfunction hmac512(msg, secret) {\n  return CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA512(msg, secret));\n}\n\nfunction b64(str) {\n  return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(str));\n}\n\nfunction b64json(obj) {\n  if (typeof obj === 'string') return b64(obj);\n  return b64(JSON.stringify(obj));\n}\n\nfunction ensureB64(url) {\n  url = (url || '').trim();\n  if (!url) return '';\n  if (/^https?:\\/\\//i.test(url)) return b64(url);\n  return url;\n}\n\nfunction fmtAmt(a, cur) { var n = parseFloat(a) || 0; if (String(cur || '').toUpperCase() === 'KHR') return String(Math.round(n)); return n.toFixed(2); }\nfunction genTranId() { return 'T' + Date.now().toString(); }\nfunction genRequestId(p) { return (p || 'REQ') + Date.now().toString().slice(-12); }\nfunction okStatus(j) { return !!(j && j.status && (String(j.status.code) === '0' || String(j.status.code) === '00')); }\nfunction respCode(j) { return j && j.status ? String(j.status.code) : ''; }\nfunction rsaMissing(j) {\n  // true when the gateway rejected the call only because the RSA payload (merchant_auth / beneficiaries) was empty\n  var errs = (j && j.errors) || (j && j.status && j.status.errors) || null;\n  var code = String((j && j.statusCode) || (j && j.status && j.status.code) || '');\n  if (code !== '04') return false;\n  return !!errs && /merchant_auth|beneficiaries/i.test(Object.keys(errs).join(' '));\n}\n\nfunction openSslEncrypt(jsonStr, pem) {\n  var forge = null;\n  try { forge = require('node-forge'); } catch (e) {}\n  if (!forge) return null;\n  var key = forge.pki.publicKeyFromPem(pem);\n  var keyByteLen = Math.ceil(key.n.bitLength() / 8);\n  var chunkLen = keyByteLen - 11;\n  var bin = forge.util.createBuffer(jsonStr, 'utf8').getBytes();\n  var out = '';\n  for (var i = 0; i < bin.length; i += chunkLen) {\n    out += key.encrypt(bin.substring(i, i + chunkLen), 'RSAES-PKCS1-V1_5');\n  }\n  return forge.util.encode64(out);\n}\n\nfunction rsaFallback(jsonStr, pem, fallbackVar) {\n  var enc = openSslEncrypt(jsonStr, pem);\n  if (enc) return enc;\n  var fb = pm.collectionVariables.get(fallbackVar) || '';\n  if (!fb) {\n    console.log('WARN: node-forge unavailable and {{' + fallbackVar + '}} is empty. Install the node-forge library or paste a pre-computed value.');\n  }\n  return fb;\n}\n\n// ---- JSON Schema assertions (draft-04 subset) ----\n// Usage: assertJsonSchema({ required: ['status', 'data'], properties: { status: { type: 'object' } } })\nfunction assertJsonSchema(schema, expected) {\n  if (typeof expected === 'undefined') expected = 200;\n  pm.test('HTTP ' + expected, function () { pm.response.to.have.status(expected); });\n  if (!schema) { pm.test('JSON Schema defined', function () { pm.expect(schema).to.not.be.empty; }); return; }\n  pm.test('Response matches JSON Schema', function () {\n    pm.response.to.have.jsonSchema(schema);\n  });\n}\nfunction escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/\"/g, '&quot;').replace(/</g, '&lt;'); }\n// ---- Postman Visualizer helpers (no-ops in newman/CI) ----\nfunction visualizeFormPost(action, fields, title, note) {\n  if (typeof pm.visualizer === 'undefined' || !pm.visualizer.set) return;\n  var inputs = '';\n  for (var k in fields) {\n    inputs += '<input type=\"hidden\" name=\"' + escHtml(k) + '\" value=\"' + escHtml(fields[k]) + '\">';\n  }\n  var tpl = '<html><head><meta charset=\"utf-8\"><style>body{font:14px/1.5 sans-serif;margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#fafafa;color:#222}.card{max-width:560px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06)}h4{margin:0 0 8px}p{margin:0 0 16px;color:#555;font-size:13px}button{font:600 14px sans-serif;padding:10px 18px;border:0;border-radius:8px;background:#0a7d38;color:#fff;cursor:pointer}</style></head><body><div class=\"card\"><h4>{{title}}</h4><p>{{note}}</p><p style=\"margin:-6px 0 16px;color:#8a8f98;font-size:12px\">The checkout opens in a new browser tab. If nothing opens, allow pop-ups for Postman and click again.</p><form method=\"POST\" action=\"{{action}}\" target=\"_blank\">{{{inputs}}}<button type=\"submit\">Open payment page in a new tab &rarr;</button></form></div></body></html>';\n  pm.visualizer.set(tpl, { title: String(title || ''), note: String(note || ''), action: String(action || ''), inputs: inputs });\n}\nfunction visualizeQr(dataUrl, qrText, title) {\n  if (typeof pm.visualizer === 'undefined' || !pm.visualizer.set) return;\n  var img = dataUrl\n    ? '<img alt=\"QR code\" style=\"width:300px;height:300px\" src=\"' + dataUrl + '\">'\n    : '<div id=\"qrbox\">Rendering QR...</div>' +\n      '<script src=\"https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js\"><\\/script>' +\n      '<script>try { new QRCode(document.getElementById(\"qrbox\"), { text: ' + JSON.stringify(String(qrText || '')).replace(/</g, '\\\\u003c') + ', width: 300, height: 300 }); } catch (e) { document.getElementById(\"qrbox\").textContent = \"QR render failed - copy the string below into any QR tool.\"; }<\\/script>';\n  var tpl = '<html><head><meta charset=\"utf-8\"><style>body{font:14px sans-serif;margin:16px;color:#222}code{display:block;white-space:pre-wrap;word-break:break-all;background:#f4f4f5;padding:10px;border-radius:6px;margin-top:14px;font-size:11px}h4{margin:0 0 12px}</style></head><body><h4>{{title}}</h4>{{{img}}}{{#if qrText}}<code>{{qrText}}</code>{{/if}}</body></html>';\n  pm.visualizer.set(tpl, { title: String(title || 'Scan with the ABA Mobile app'), img: img, qrText: String(qrText || '') });\n}",
+      "type": "string",
+      "description": "Shared helper library (JavaScript source, single source of truth). Postman runs every script in its own scope, so request/test scripts eval() this variable to restore the helpers (_pad, utcNow, hmac512, b64, b64json, ensureB64, fmtAmt, genTranId, genRequestId, okStatus, respCode, rsaMissing, openSslEncrypt, rsaFallback, escHtml, visualizeFormPost, visualizeQr, assertJsonSchema). Edit with care — then keep the loader lines in the scripts untouched."
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// ---- PayWay helper library (restored into this script's own scope) ----",
+          "// Postman executes every script (collection / folder / request-level, pre-request",
+          "// and test) in its OWN scope: functions declared in one script are NOT visible in",
+          "// another. The library therefore ships as the `__helpers` collection variable and",
+          "// every script that needs the helpers starts by evaluating it.",
+          "var __h = pm.collectionVariables.get('__helpers');",
+          "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+          "eval(__h);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test: log status.code if the response is JSON",
+          "if (pm.response && pm.response.headers && pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').toLowerCase().indexOf('json') >= 0) {",
+          "  try {",
+          "    var j = pm.response.json();",
+          "    if (j.status) console.log('Response status.code:', j.status.code, '-', j.status.message);",
+          "  } catch (e) {}",
+          "}"
+        ]
+      }
+    }
+  ]
+}

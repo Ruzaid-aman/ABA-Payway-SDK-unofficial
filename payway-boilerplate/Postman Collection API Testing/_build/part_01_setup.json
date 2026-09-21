@@ -1,0 +1,69 @@
+{
+  "folder": "01 - Get Started & Test Cards",
+  "description": "## Get started here\n\n**60-second tour:** open **03 - Ecommerce Checkout → 1. Purchase** → **Send** → **Visualize tab** → click **Open payment page →** → pay with a test card below → back here, send **Check Transaction** → APPROVED.\n\nThe full guide lives on the collection **Overview** tab (click the collection name). Nothing needs configuring — the public sandbox demo merchant is pre-filled.\n\nThis folder: test cards, endpoints reference, and the docs links.",
+  "item": [
+    {
+      "name": "0. Get Started (60-second walkthrough)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://developer.payway.com.kh/overview-865678m0",
+          "protocol": "https",
+          "host": [
+            "developer",
+            "payway",
+            "com",
+            "kh"
+          ],
+          "path": [
+            "overview-865678m0"
+          ]
+        },
+        "description": "## 60-second walkthrough (zero setup)\n\n1. **03 - Ecommerce Checkout → 1. Purchase (Hosted Checkout)** → **Send**.\n2. Open the **Visualize** tab → click **Open payment page →** (form-POSTs the signed fields; the page is served by PayWay itself).\n3. Pay with a sandbox test card:\n\n   | Card | Number | Expiry | CVV |\n   |---|---|---|---|\n   | ✅ Success | `4286 0900 0000 0206` | 04/30 | 777 |\n   | ❌ Declined | `5156 8302 7256 1029` | 04/30 | 777 |\n\n4. Back in Postman: **3. Check Transaction** → `payment_status_code: 0 (APPROVED)`.\n\n**What happened automatically:** the hash was signed (`b4hash:` in the Console), the response saved `{{last_tran_id}}`, and the Visualizer rendered the merchant-style launcher.\n\nNext stops: **Flow A** (folder 11) for KHQR + polling, **08** for saved tokens, **10** for callbacks. Full guide: collection **Overview** tab."
+      }
+    },
+    {
+      "name": "Sandbox Test Cards",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://developer.payway.com.kh/resources-3305682f0",
+          "protocol": "https",
+          "host": [
+            "developer",
+            "payway",
+            "com",
+            "kh"
+          ],
+          "path": [
+            "resources-3305682f0"
+          ]
+        },
+        "description": "### Sandbox cards (values are pre-set as collection variables)\n\n| Result | Type | Card number | Expiry | CVV | 3-D Secure |\n|---|---|---|---|---|---|\n| Success | Mastercard | `{{test_mc_success}}` (5156 8399 3770 6777) | 01/30 | 993 | No |\n| Success | Visa | `{{test_visa_success}}` (4286 0900 0000 0206) | 04/30 | 777 | Yes |\n| Declined | Mastercard | `{{test_mc_declined}}` (5156 8302 7256 1029) | 04/30 | 777 | Yes |\n| Declined | Visa | `{{test_visa_declined}}` (4156 8399 3770 6777) | 01/30 | 993 | No |\n\nUse these in the hosted checkout page that PayWay opens for the **purchase** flow (folder 03).\n\n### 3-D Secure\nVisa cards above trigger a simulated 3DS challenge — enter any code to continue. Mastercard success card has no 3DS."
+      }
+    },
+    {
+      "name": "Reference - API Endpoints List (doc)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://developer.payway.com.kh/api-endpoints-984508m0",
+          "protocol": "https",
+          "host": [
+            "developer",
+            "payway",
+            "com",
+            "kh"
+          ],
+          "path": [
+            "api-endpoints-984508m0"
+          ]
+        },
+        "description": "## What this collection covers\n- **Ecommerce Checkout** (folder 03): Purchase, Get TXN Details, Check TXN, Close TXN, Refund, TXN List, Exchange Rate\n- **ABA QR API** (folder 04): Generate QR\n- **Payment Link** (folder 05): Create, Get Details\n- **Pre-auth** (folder 06): Complete, Complete+payout, Cancel\n- **Payout** (folder 07): Payout, Add-to-whitelist, Update whitelist status\n- **Credentials on File (CoF)** (folder 08): Link-account, Link-card, Get-token-details, Payment, Renew, Remove\n- **KHQR Guideline** (folder 09): Get transactions by merchant ref\n- **Callbacks & Webhooks** (folder 10): payment/token payloads + verification + senders\n- **Polling & Lifecycle Flows** (folder 11): Collection-Runner flows (setNextRequest)"
+      }
+    }
+  ]
+}

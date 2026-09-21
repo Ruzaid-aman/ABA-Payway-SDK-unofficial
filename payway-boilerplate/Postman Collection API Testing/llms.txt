@@ -1,0 +1,46 @@
+# Developer Suite
+
+## Docs
+- [Overview](https://developer.payway.com.kh/overview-865678m0.md): 
+- [API Endpoints](https://developer.payway.com.kh/api-endpoints-984508m0.md): 
+- [Ecommerce Checkout](https://developer.payway.com.kh/ecommerce-checkout-3158159f0.md): 
+- [Plugins](https://developer.payway.com.kh/plugins-3186291f0.md): 
+- Plugins [ABA PayWay Shopify Payment App](https://developer.payway.com.kh/-902970m0.md): The ABA PayWay Shopify plugin simplifies payment acceptance, offering a quick, secure checkout experience for both local Cambodian and international customers.
+- Plugins [ ](https://developer.payway.com.kh/-871485m0.md): 
+- Plugins [ABA PayWay Woocommerce Plugin](https://developer.payway.com.kh/-873826m0.md): 
+- Plugins [ ](https://developer.payway.com.kh/-2113617m0.md): 
+- [Credentials on File](https://developer.payway.com.kh/credentials-on-file-4395178f0.md): 
+- Credentials on File [Unschedule Payment](https://developer.payway.com.kh/unschedule-payment-2038908m0.md): 
+- Credentials on File [Schedule Payment](https://developer.payway.com.kh/schedule-payment-2038907m0.md): 
+- [ABA QR API](https://developer.payway.com.kh/aba-qr-api-3158158f0.md): 
+- [Payment Link](https://developer.payway.com.kh/payment-link-3158157f0.md): 
+- [Pre-auth](https://developer.payway.com.kh/pre-auth-3158156f0.md): 
+- [Payout](https://developer.payway.com.kh/payout-3158153f0.md): 
+- [KHQR Guideline](https://developer.payway.com.kh/khqr-guideline-3192101f0.md): 
+- [Resources](https://developer.payway.com.kh/resources-3305682f0.md): 
+
+## API Docs
+- Ecommerce Checkout [Purchase](https://developer.payway.com.kh/purchase-14530820e0.md): The Purchase API is used to initiate a payment transaction between a customer and a merchant through PayWay. It allows merchants to request a payment by providing transaction details such as the amount, currency, item list, and other relevant data.
+- Ecommerce Checkout [Get a transaction details](https://developer.payway.com.kh/get-a-transaction-details-14530824e0.md): This API allows you to retrieve details of a purchase transaction, including its history and related operations, for both online and in-store payments.
+- Ecommerce Checkout [Close transaction](https://developer.payway.com.kh/close-transaction-14530822e0.md): If your business handles transactions that may require cancellation—such as flash sales, hotel bookings, or ticket sales—you can use the Close Transaction API to cancel a transaction before payment completes. Once a transaction is closed, it will no longer accept payment: any incoming payment will be rejected or reversed, and no payment notification (callback) will be sent to the merchant.
+- Ecommerce Checkout [Check transaction](https://developer.payway.com.kh/check-transaction-14530826e0.md): This API allow you to get the transaction status of a transaction, you can only check the transaction that created within 7 days only. To get a details of a transaction which is older than 7 days please use [Get a transaction details](apidog://link/endpoint/14530824) API.
+- Ecommerce Checkout [Refund API](https://developer.payway.com.kh/refund-api-14530821e0.md): You can use the Refund API to issue full or partial refunds within 30 days after the transaction was created. ABA PAY and KHQR refunds is immediate, while Card, WeChat, and Alipay refunds follow your agreement with PayWay. This API works both for instore transaction and online transaction.
+- Ecommerce Checkout [Get transaction list](https://developer.payway.com.kh/get-transaction-list-14530825e0.md): This API allows merchants to retrieve a list of transactions filtered by specific criteria, such as transaction date, amount, payment type, and more. It supports pagination and is designed for both in-store and online profiles, providing secure and efficient access to recent transaction records.
+- Ecommerce Checkout [Exchange rate](https://developer.payway.com.kh/exchange-rate-14530823e0.md): With the Exchange rate API you can fetch the latest exchange rate from ABA bank, the exchange rates are exactly like the prices you will find on https://www.ababank.com/en/forex-exchange
+- Credentials on File [Link Account](https://developer.payway.com.kh/link-account-19336820e0.md): The API returns a QR code or an ABA Mobile deeplink, enabling users to either scan the QR code or use the deeplink to  automatically launches the ABA Mobile app and prompts the customer to select an ABA account to link to your platform. Once the user finished linking, PayWay will send pushback account details and token to the merchant through the `callback_url`.
+- Credentials on File [Link Card](https://developer.payway.com.kh/link-card-19336819e0.md): The API returns **HTML**, allowing users to enter their credit/debit card details (**Visa, Mastercard, JCB, and UPI**) to link their card to your platform. Once the user has completed the linking process, **PayWay** will send the account details and token to the merchant via the **`callback_url`**.
+- Credentials on File [Payment](https://developer.payway.com.kh/payment-19336821e0.md): This Payment API allows you to initiate transactions using a token. It supports the following token types: `CITI_FLEX`, `CITO_FLEX`, and `CITR_FIX`.
+- Credentials on File [Renew Token](https://developer.payway.com.kh/renew-token-19336823e0.md): Account tokens linked with the `CITI_FLEX` or `CITO_FLEX` flags will expire 90 days after their initial linking, renewal, or the last successful transaction—whichever is most recent. There are several ways for customers to renew the token:
+- Credentials on File [Get token details](https://developer.payway.com.kh/get-token-details-19336824e0.md): If you encounter issues with the callback and do not receive the details during **link account**, **link card**, or **token renewal**, you can manually retrieve the linked account or card information.
+- Credentials on File [Remove token](https://developer.payway.com.kh/remove-token-19336822e0.md): This API allows you to remove a customer’s linked account or card token from your merchant profile. Once removed, the action is irreversible, and the token will no longer be valid for any future transactions.
+- Credentials on File [Subscription](https://developer.payway.com.kh/subscription-21402227e0.md): This API allows a merchant to make a purchase transaction while at the same time linking the customer’s card and ABA account to the merchant’s system. Once the purchase is successfully completed, the API will push a token back to the merchant, which can be used for future payments or account verification.
+- ABA QR API [QR API](https://developer.payway.com.kh/qr-api-14530840e0.md): - Support both online/instore merchant
+- Payment Link [Create payment link](https://developer.payway.com.kh/create-payment-link-14530837e0.md): This API allows you to create a payment link from your application.
+- Payment Link [Get payment link details](https://developer.payway.com.kh/get-payment-link-details-14530838e0.md): This API allows you to retrieve the details of a payment link that has already been created.
+- Pre-auth [Complete pre-auth transactions](https://developer.payway.com.kh/complete-pre-auth-transactions-14530835e0.md): A complete pre-auth refers to the action where the merchant proceeds with capturing the funds after the initial authorization, typically at the time the product or service is provided.
+- Pre-auth [Complete pre-auh transaction with payout](https://developer.payway.com.kh/complete-pre-auh-transaction-with-payout-14666701e0.md): A complete pre-auth refers to the action where the merchant proceeds with capturing the funds after the initial authorization, typically at the time the product or service is provided.
+- Pre-auth [Cancel pre-purchase transaction](https://developer.payway.com.kh/cancel-pre-purchase-transaction-14530836e0.md): Cancel pre-auth (or cancel pre-authorization) is the process of releasing a temporary hold on funds placed on a customer's payment method before the final transaction is completed.
+- Payout [Payout](https://developer.payway.com.kh/payout-14530816e0.md): The ABA PayWay Funds Route API provides a seamless solution for splitting and distributing payments to third parties, sellers, service providers, or your ABA bank accounts.
+- Payout [Update a beneficiary status](https://developer.payway.com.kh/update-a-beneficiary-status-14530817e0.md): This API allows you to update the status of a beneficiary, toggling between active and inactive status.
+- Payout [Add a beneficiary to whitelist](https://developer.payway.com.kh/add-a-beneficiary-to-whitelist-14530818e0.md): Use this API to whitelist accounts that you intend to split payment and payout. You'll first have to whitelist the accounts before you can use those accounts to request on payout request.
+- KHQR Guideline [Get transactions](https://developer.payway.com.kh/get-transactions-22366268e0.md): This API allows you to retrieve  purchase transactions using `merchant_ref` number, for both online and in-store payments.

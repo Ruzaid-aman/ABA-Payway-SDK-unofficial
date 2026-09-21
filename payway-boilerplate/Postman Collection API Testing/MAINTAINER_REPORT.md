@@ -1,0 +1,168 @@
+# PayWay API Postman Collection — Maintainer Report
+
+Updated: 19 Sep 2026 (v1.2.1 — **visualizer launcher fix**: "Open payment page" now opens the PayWay checkout in a new browser tab (`target="_blank"`) instead of navigating inside Postman's sandboxed Visualize iframe; v1.2.0 — **script-scope fix**: Postman runs every script in its own scope, so the collection-level helper library was invisible to all 60 request scripts; library moved to the `__helpers` collection variable + `eval` loaders, live-verified with Newman; v1.1.1 — helper-text pass: ⚡ Quick-test description blocks, `NEXT:` console hints, 60-second-fixes guide section; v1.1.0 — first live-tested release, Postman-Visualizer response rendering, SDK-verified importability)
+
+## 1. Executive summary
+
+A single, self-contained Postman Collection (`PayWay_API_Postman_Collection.postman_collection.json`, schema v2.1.0, **v1.1.1**) covering the full PayWay merchant API surface: checkout/REST, QR, Payment Link, pre-auth, payout, CoF/subscriptions, KHQR, callbacks/webhooks, plus Collection-Runner polling flows. Built from per-folder JSON parts in `_build/` and merged by `_build/merge.js` (Node).
+
+**This release is the first one executed against the live sandbox** (`https://checkout-sandbox.payway.com.kh`) with a Postman-faithful script runtime. Result: **17 live requests, 0 failures**, every reachable endpoint verified, and a series of real bugs found and fixed (see §4).
+
+### 1.2 v1.2.0 — script-scope fix (Postman "utcNow is not defined")
+
+**Symptom (first observed in the Postman app, 19 Sep 2026):** sending **03 → 1. Purchase (Hosted Checkout) - multipart** (and in fact every request with scripts) failed with `ReferenceError: utcNow is not defined` in the pre-request script and `ReferenceError: okStatus is not defined` in the test script; the request went out **unsigned** and the sandbox answered 400/`04`.
+
+**Root cause:** Postman executes *every* script — collection-level, folder-level, request-level, pre-request **and** test — in its **own scope**. Top-level functions declared in the collection pre-request (the 18-helper library) are therefore **not visible** to request scripts. The v1.0–v1.1 QA missed this because `smoketest.js` ran all scripts of a request in one shared `vm` context (an incorrect model of Postman). `_build/scope_audit.js` mapped the blast radius: **60 of 72 scripts** (35 pre-request + 25 test) referenced the helpers.
+
+**Rejected alternative:** Postman AI's suggestion to move each request's logic into the collection script behind `if (pm.info.requestName === '…')` guards. It only patches one request, still leaves the 25 test scripts broken, couples logic to exact request names, and would grow two collection-level monoliths with ~60 guarded blocks. The eval-library pattern is the standard Postman solution and also works in Newman/Postman CLI.
+
+**Fix (via idempotent `_build/fix_scope.js`, no request logic moved):**
+- The helper library now ships **once** as the `__helpers` collection variable (source of truth, editable in the Variables tab, travels with the JSON).
+- The collection pre-request is an 8-line loader that evals it (guarded with a clear error if the variable is missing).
+- All **60** helper-consuming scripts (pre-request *and* test) start with the same 4-line loader: `eval(pm.collectionVariables.get('__helpers'))`.
+- `smoketest.js` rewritten to run **each script in its own `vm` context** (variables shared, declarations not) — the faithful Postman model, so this bug class can never pass QA again.
+- Collection version → 1.2.0; variables 75 → 76.
+
+**QA (all green):** `merge.js`, `syntaxcheck.js` (72 scripts, 0 errors), `validate.js`, `verify_postman_import.js` (importable; 76 variables), `smoketest.js` sim (41/41 execute under isolated scopes; the 16 stops are the intentional prerequisite guards), `standards.js`, `verify_index.js`. Newman live re-run (same `postman-runtime` engine as the app and Postman CLI): Purchase **HTTP 200** checkout page + all assertions passing (was ReferenceError + 400); a 15-request live pass over folders 03/04/08 executed **60/60 scripts with zero ReferenceErrors** — success endpoints (Purchase, Transaction List, Exchange Rate, Generate QR, Link Account, Link Card, Subscription, Close) all 2xx, RSA Refund showing its designed friendly `SKIPPED` branch, CoF token ops stopping on their intentional `{{pwt}}` guards.
+
+### 1.3 v1.2.1 — visualizer launcher opens the checkout in a new tab
+
+**Symptom (19 Sep 2026):** clicking **"Open payment page →"** in the Purchase (and CoF Link Card) Visualize tab navigated **inside Postman's sandboxed visualizer iframe** — the hosted-checkout page half-loaded in the pane (its own JS fetched the QR session, e.g. `GET checkout-sandbox.payway.com.kh/<base64 session json>`, `step: abapay_khqr_request_qr`) but could not be used to pay.
+
+**Fix (idempotent `_build/fix_visualizer_tab.js`):** the shared `visualizeFormPost` launcher form now posts with `target="_blank"`, the button reads "Open payment page in a new tab →", and the card carries a hint ("The checkout opens in a new browser tab. If nothing opens, allow pop-ups for Postman and click again."). Same helper serves folder 08's Link Card launcher, so both benefit. QA: merge, syntaxcheck (72/0), SDK import check, live Purchase re-run HTTP 200. Version → 1.2.1.
+
+### 1.4 v1.1.1 — helper-text pass (documentation only, no script logic changed)
+
+Review outcome: the pre/post scripts already carried strong inline guidance (`b4hash:` logging, prerequisite guards, error-code logging), but request-level helper text was missing exactly where developers start. Changes, all via the new idempotent `_build/inject_quickstart.js` (edit parts → `merge.js`):
+
+- **Request descriptions** — 24 requests now start with a **⚡ Quick test** block (what to set → what to expect → what to send next), kept above the existing hash/RSA notes. Five folder-03 requests (Purchase, Get Transaction Details, Check Transaction, Close Transaction, Exchange Rate) had **no description at all** — full helper descriptions written; thin stubs elsewhere (pre-auth, whitelist, CoF token ops, runner steps A3–B5) expanded. Coverage is now 41/41 requests, 10/10 folders.
+- **`NEXT:` console hints** — status-aware hints added to the test scripts on the critical first path: Purchase (both success branches), Check Transaction (APPROVED / PENDING / DECLINED / code-5), Generate QR. Pure `console.log` additions; no assertions or chaining logic touched.
+- **Get Started guide** (`_build/get_started.md`, auto-synced into the Overview tab) — added a "helper text everywhere" callout in §1 and a new **§6 · 60-second fixes** troubleshooting table (Wrong hash, RSA SKIPPED, code 5, code 49, code 23); Environments renumbered to §7.
+- **`collection-index.md`** — brought up to date with the collection (folder 01 name, request names/URLs, `purchase_type` variable, version, sizes) so `verify_index.js` passes again; documents the helper-text architecture and all `_build` tooling files.
+
+QA after the pass: `merge.js`, `syntaxcheck.js` (72 scripts, 0 errors), `validate.js`, `verify_postman_import.js` (SDK verdict: importable), `smoketest.js` sim (41/41 execute; the 16 reported guard-throws are the intentional prerequisite stops), `standards.js` (41/41 descriptions), `verify_index.js` (all checks passed). The legacy `PayWay_CoF_Postman_Collection_v4.json` (regression baseline) and the three `Create Transaction *.postman_collection.json` scratch exports were deliberately left untouched.
+
+## 2. Live verification matrix (sandbox, demo merchant `sonitatest` / `sonitatestinstore`)
+
+| Endpoint | Live result | Notes |
+|---|---|---|
+| Purchase (hosted checkout) | ✅ HTTP 200 | Returns the HTML checkout page; `last_tran_id` auto-saved |
+| Get Transaction Details | ✅ HTTP 200 | Query `status.code "00"`; full record in `data` |
+| Check Transaction (fast) | ✅ HTTP 200 | `status.code` is the **query** status; transaction status is `data.payment_status_code` |
+| Close Transaction | ✅ | Correct business error (5 "Transaction not found") on a fresh ID |
+| Refund (RSA) | ⚠️ SKIP | Requires RSA `merchant_auth`; friendly skip + WARN without node-forge (see §5) |
+| Transaction List | ✅ HTTP 200 | Date format fix (below); lists live transactions |
+| Exchange Rate | ✅ HTTP 200 | `code "00"`, `exchange_rates` |
+| Generate QR (folder 04) | ✅ HTTP 200 | `qrString` + `qrImage` (data-URL) |
+| CoF Link Account | ✅ HTTP 200 | `code "00"`, returns `data.deeplink` + `data.qr_string` |
+| CoF Link Card | ✅ HTTP 200 | Returns the card-entry HTML page |
+| CoF Get Token Details | ✅ (business) | `code 09 "Data not found"` until the ABA-app link is completed — expected; test is informational |
+| CoF Subscription | ✅ HTTP 200 | Full v1 purchase hash accepted; `qrString` returned, success code `"00"` |
+| Flow A polling loop | ✅ | A1 → A2 polls `transaction-detail`, sees PENDING, loops, exits to A3 at `max_polls` |
+| KHQR get-transactions-by-mc-ref | ⚠️ 404/empty | Path + hash are docs-verified; sandbox demo profiles return 404/empty (needs dedicated KHQR profile). Guarded, informational |
+| Payout / Whitelist / Pre-auth / Payment Link (RSA) | ⚠️ SKIP | Same RSA skip handling as Refund |
+
+Not live-verifiable without a human: paying the checkout page / scanning KHQR / completing the CoF link in the ABA app (sandbox auto-approval was not observed), and RSA endpoints without a merchant RSA key.
+
+## 3. Response handling (post-response automation)
+
+**Every API request has a test script** that: normalizes the mixed string/number `status.code` (`okStatus`/`respCode`), chains state for the next request (`last_tran_id`, `pwt`, `ctid`, `request_id`, `payment_link_id`, `poll_status`, `last_pay_status`), logs human-readable error codes, and asserts a JSON schema where the shape is stable.
+
+**Postman Visualizer** (`pm.visualizer.set`, no-ops under newman/CI) renders interactive responses in the **Visualize tab**:
+
+| Request | What renders |
+|---|---|
+| 1. Purchase (hosted checkout) | **Merchant-style launcher**: a button that form-POSTs the already-signed fields (incl. `hash`) to the purchase endpoint — the browser then navigates to the checkout page **served by PayWay itself**, and payment happens with the sandbox test cards |
+| CoF Link Card | Same form-POST launcher for the card-linking page |
+| Generate QR / Flow A1 / Subscription | The KHQR as a scannable image (`qrImage` data-URL) + the raw `qrString` |
+| CoF Link Account (folder 08 + Flow B1) | `qr_string` rendered as a QR (CDN QR lib, computed locally — no data leaves Postman) + request_id guidance |
+
+**Why a form-POST launcher instead of showing/saving the returned HTML:** the checkout page's own JavaScript calls back to PayWay from the page origin — opened from `file://` (Save Response → open in browser) those calls CORS-fail and the page never loads (observed). The form POST is the actual merchant integration pattern: the browser navigates to the checkout URL, PayWay serves the page on its own origin, everything is same-origin and works. After paying, re-sending **Check Transaction** in Postman shows APPROVED. Sandbox-verified: a plain urlencoded form POST with the collection's field set (`view_type=hosted_view`, `payment_gate=0`) returns the full checkout HTML page (probe: `_build/probe_purchase_urlencoded.js`).
+
+**Other automation already in place:** Flow A2 `postman.setNextRequest` polling loop on `data.payment_status_code`; webhook.site "pull callbacks" sync that imports `tran_id`/`pwt`/`ctid` into collection variables; RSA endpoints auto-skip with setup guidance when `merchant_auth` cannot be computed.
+
+## 4. Importability (verified with the official Postman SDK)
+
+`_build/verify_postman_import.js` loads the collection with **`postman-collection`** — the same parser the Postman app uses on import. Current verdict:
+
+```
+JSON.parse: OK (212 KB) — sdk.Collection instantiated
+10 folders, 41 requests, 76 collection variables
+request prerequest=36, request test=36, collection prerequest=1, collection test=1
+URL issues: none — secret-typed variables: secret_key
+VERDICT: importable in Postman
+```
+
+Import path: Postman → **Import** → select `PayWay_API_Postman_Collection.postman_collection.json`. The SDK check also caught and fixed three doc requests whose URL objects had malformed host arrays (`https.` baked into host).
+
+## 5. Sandbox behaviours discovered (documented in the collection)
+
+1. **`status.code` types are mixed.** Success comes back as `"00"` (string), business errors as `"5"`, `"1"`, `6` (string *or* number). All test scripts now normalize via `okStatus(j)` / `respCode(j)` (accept `0`/`"0"`/`"00"`).
+2. **check-transaction-2 has a 7-day window and does not see KHQR transactions** (docs confirm the 7-day limit; sandbox confirmed QR-created trans return `code 6` while transaction-detail finds them). Polling therefore uses **transaction-detail**, which works for both.
+3. **The transaction status lives in `data.payment_status_code` / `data.payment_status`**, not in `status.code` (`2`/`PENDING`, `0`/`APPROVED`, `3`/`DECLINED`, `4`/`REFUNDED`, `7`/`CANCELLED`).
+4. **Transaction List dates must be `yyyy-mm-dd hh:mm:ss`** — plain `yyyy-mm-dd` is rejected with code 49 "Invalid Start Date". Auto-filled today 00:00:00 → 23:59:59.
+5. **generate-qr `purchase_type` only allows `purchase` | `pre-auth`** (the wallet selector is `payment_option`).
+6. **Purchase success = the HTML checkout page** (HTTP 200, `text/html`) — the test detects this and saves `last_tran_id`; JSON paths still handled.
+7. **CoF Link Account works with the public demo merchant** and returns deeplink + QR immediately; the token (`pwt`) only exists after the customer completes the link (Get Token Details then returns code 09).
+
+## 6. Bugs found by live testing and fixed (v1.0.0 → v1.1.0)
+
+| # | Bug | Fix |
+|---|---|---|
+| 1 | Numeric `status.code` assertions everywhere (`eql(0)`, `typeof === 'number'`) failed against string codes | `okStatus()`/`respCode()` normalization in all test scripts |
+| 2 | Polling loop compared numeric `status.code === 2` and polled the *query* status, not the payment status | Flow A2 rewritten: polls `transaction-detail`, loops on `data.payment_status_code === 2`, budgeted by `{{max_polls}}` |
+| 3 | `purchase_type` on generate-qr carried the payment option → sandbox rejected (`04`) | New `{{purchase_type}}` variable (`purchase`), hash + body + docs updated |
+| 4 | Transaction List sent `yyyy-mm-dd` → code 49 | `yyyy-mm-dd hh:mm:ss` auto-fill + description |
+| 5 | Purchase test assumed a JSON response; success is HTML | HTML-200 success path saving `last_tran_id` |
+| 6 | QR response keys logged as `qr_data`/`qr_image`; real keys are `qrString`/`qrImage` | Tests + docs updated |
+| 7 | Subscription success code is `"00"` but the test expected `'0'` | `okStatus` |
+| 8 | RSA endpoints failed loudly without node-forge | `rsaMissing(j)` helper + friendly `SKIPPED` tests (8 requests) |
+| 9 | KHQR lookup crashed on the sandbox 404/empty body | Guarded, informational, sandbox note added |
+| 10 | Callback senders crashed with `Failed to parse URL from ''` when `{{callback_listener}}` empty | Pre-request guards with setup instructions |
+| 11 | Doc-only "README" request in folder 11 actually fired a hashless API call | Now points to the docs site |
+| 12 | Sandbox Test Cards doc link 404 | Points to `resources-3305682f0` |
+| 13 | Collection README referenced wrong folder numbers (08/09) | Corrected (10 callbacks, 11 polling) |
+| 14 | Runner flows bled into each other (A4 → B1) | `postman.setNextRequest(null)` at end of Flow A / Flow B |
+| 15 | `fmtAmt` forced 2 decimals (breaks KHR integer amounts) | `fmtAmt(a, cur)` — KHR rounds to integer; wired into purchase/QR/CoF money fields |
+| 16 | Missing `{{return_params}}` seed broke the callback sample sender | Seeded in collection variables |
+
+DX/security changes: `merchant_id`/`secret_key` pre-filled with the **public sandbox demo merchant** (`sonitatest`) so the collection works on first Send; `secret_key` is a Postman **secret**-type variable with a replace-me description; every prerequisite throws a clear, actionable message instead of a cryptic failure.
+
+## 7. Build architecture & QA tooling
+
+- `part_00_info.json` — info + **Get Started guide** (source: `_build/get_started.md`, rendered in Postman's Overview tab), 76 collection variables (incl. the `__helpers` library), and the collection pre-request loader that evals the library into its own scope. Helper set (v1.2.0): `_pad, utcNow, hmac512, b64, b64json, ensureB64, fmtAmt(a,cur), genTranId, genRequestId, okStatus, respCode, rsaMissing, openSslEncrypt, rsaFallback, escHtml, visualizeFormPost, visualizeQr, assertJsonSchema`. **Postman runs every script in its own scope** — scripts that need the helpers must start with `eval(pm.collectionVariables.get('__helpers'))` (see §1.2).
+- `part_01…part_11` — one part per folder (`{ folder, description, item }`).
+- `merge.js` — merges parts, preserves collection-level `event`, checks the global pre-request survives.
+- Validators: `syntaxcheck.js` (parses every script), `validate.js` (folders, setNextRequest targets, undefined vars, helpers), `audit.js`, `standards.js`.
+- **`smoketest.js`** — Postman-faithful simulator + live smoke test. Runs the collection's actual scripts in `node:vm` sandboxes with **one fresh scope per script** (collection pre / request pre / collection test / request test), matching Postman's scoping rules — only `pm` variables are shared — then optionally fires real HTTP calls. `node smoketest.js` = sim-only (no HTTP); `node smoketest.js live` = full live pass against the sandbox using the demo merchant. (`scope_audit.js` maps helper definition/usage across all scripts; `fix_scope.js` is the idempotent v1.2.0 patcher.)
+- Fix scripts (`fix_round1-4.js`, `probe_*.js`, `inspect_parts.js`) — deterministic, asserted patches applied during live-test debugging; kept as history of *why* each change exists.
+
+## 8. Rebuild & validate
+
+```powershell
+node _build\merge.js                     # parts -> PayWay_API_Postman_Collection.postman_collection.json
+node _build\syntaxcheck.js               # every script parses
+node _build\validate.js                  # structure, vars, setNextRequest targets
+node _build\verify_postman_import.js     # official postman-collection SDK import check
+node _build\smoketest.js                 # sim pass: all 41 scripts execute, all body vars set
+node _build\smoketest.js live            # LIVE pass against sandbox (demo merchant, safe endpoints only)
+```
+
+Deliverable: `D:\PayWay_Postman\PayWay_API_Postman_Collection.postman_collection.json` (~212 KB, 10 folders, 41 requests, 72 scripts — every request and folder documented, 24 ⚡ Quick-test blocks; helper library in the `__helpers` variable since v1.2.0).
+
+## 9. Remaining known gaps (not bugs)
+
+1. **RSA endpoints cannot be fully verified** without a merchant RSA key — hash *orders* are implemented per docs and validated up to the RSA-payload check; with node-forge installed the scripts compute `merchant_auth`/`beneficiaries` automatically.
+2. **Payment completion** (paying the hosted page, scanning KHQR, completing the CoF link in the ABA app) needs a human; polling and callback paths are wired and sandbox-verified up to that point.
+3. **KHQR retrieval** returns 404/empty for demo profiles — keep the informational note; retest with a real KHQR profile.
+4. OpenAPI spec generation remains a manual Postman UI step (Spec Hub).
+5. Optional hardening: move `secret_key`/`merchant_id` into a Postman environment (Sandbox/Prod) instead of collection defaults; add `newman run` in CI with `smoketest.js` sim pass as pre-commit.
+
+## 10. Command/URL reference
+
+- PayWay sandbox: `https://checkout-sandbox.payway.com.kh` (live-tested 2026-09-18)
+- PayWay prod: `https://checkout.payway.com.kh`
+- Docs index: `D:\PayWay_Postman\llms.txt` (each `*.md` doc is fetchable — used to verify the KHQR endpoint)
+- Sandbox demo merchants: `sonitatest` (ecommerce), `sonitatestinstore` (QR/in-store), ctid `TESTCONSUMER01` for CoF
+- Transaction status codes: `0` APPROVED/PRE-AUTH, `2` PENDING, `3` DECLINED, `4` REFUNDED, `7` CANCELLED
+- Postman collection schema: `https://schema.getpostman.com/json/collection/v2.1.0/collection.json`

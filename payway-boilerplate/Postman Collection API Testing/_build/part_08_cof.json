@@ -1,0 +1,765 @@
+{
+  "folder": "08 - Credentials on File (CoF)",
+  "description": "## Credentials on File (CoF) / Subscriptions\nTokenize a card or ABA account, then charge it later without re-entering credentials.\n\n**Typical flow:** `1. Link Account` (or `2. Link Card`) -> wait for callback -> `3. Get Token Details` (auto-saves `{{pwt}}`/`{{ctid}}`) -> `4. Payment` -> `6. Remove` at the end.\n\n`callback_url` must be base64-encoded in the hash/body - the scripts do that automatically for https URLs. Run `7. Subscription` to test recurring CITR_FIX payments.",
+  "item": [
+    {
+      "name": "1. Link Account (ABA Account)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          },
+          "raw": "{\n  \"request_id\":     \"{{request_id}}\",\n  \"request_time\":   \"{{request_time}}\",\n  \"merchant_id\":    \"{{merchant_id}}\",\n  \"ctid\":           \"{{ctid}}\",\n  \"return_deeplink\": \"{{cof_return_deeplink_b64}}\",\n  \"token_flag\":     \"{{token_flag}}\",\n  \"currency\":       \"{{currency}}\",\n  \"callback_url\":   \"{{cof_callback_b64}}\",\n  \"hash\":           \"{{computed_hash}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payment-credential/v3/aof/link-account",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "payment-credential",
+            "v3",
+            "aof",
+            "link-account"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. Just hit **Send** — it generates `{{request_id}}` and returns a deeplink + QR (Visualize tab) to approve in the ABA Mobile app.\n2. After approving, run **3. Get Token Details** (code 09 until the link is completed) or watch for the callback.\n\nHash: merchant_id + request_time + ctid + return_deeplink + callback_url + request_id + token_flag + **frequency** + **purchase_amount** + currency (last two often empty strings).\n\nBody must use the **same** return_deeplink/callback_url strings as in the hash (plain https -> base64). Set {{cof_return_deeplink}} / {{cof_callback_url}} as plain https (auto-encoded).\n\npwt arrives at callback; use Get Token Details with the logged {{request_id}}."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Link Account - hash: merchant_id+request_time+ctid+return_deeplink+callback_url+request_id+token_flag+frequency+purchase_amount+currency",
+              "var C = pm.collectionVariables;",
+              "var reqTime = utcNow();",
+              "var requestId = genRequestId('REQ');",
+              "var rdB64 = ensureB64(C.get('cof_return_deeplink'));",
+              "var cbB64 = ensureB64(C.get('cof_callback_url'));",
+              "var msg = C.get('merchant_id') + reqTime + C.get('ctid') + rdB64 + cbB64 + requestId + (C.get('token_flag')||'CITI_FLEX') + '' + '' + (C.get('currency')||'USD');",
+              "C.set('request_id', requestId);",
+              "C.set('request_time', reqTime);",
+              "C.set('cof_return_deeplink_b64', rdB64);",
+              "C.set('cof_callback_b64', cbB64);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('b4hash:', msg);",
+              "console.log('request_id:', requestId, '- use it with Get Token Details after the callback fires.')"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "try {",
+              "  var j = pm.response.json();",
+              "  if (j.status) {",
+              "    pm.test('status.code present', function () { pm.expect(j.status.code).to.not.be.empty; });",
+              "    console.log('status.code:', j.status.code, '-', j.status.message || '');",
+              "    if (String(j.status.code) === '00') {",
+              "      console.log('Link approved. request_id =', pm.collectionVariables.get('request_id'), '(watch the callback for pwt)');",
+              "    } else {",
+              "      console.log('Non-success code. See error-code table in description. request_id =', pm.collectionVariables.get('request_id'));",
+              "    }",
+              "  }",
+              "} catch (e) { console.log('Response is not JSON; likely a redirect page.'); }",
+              "var vj = {}; try { vj = pm.response.json(); } catch (e) {}",
+              "if (vj.data && (vj.data.qr_string || vj.data.qrString)) visualizeQr('', vj.data.qr_string || vj.data.qrString, 'Link Account - scan in ABA Mobile, approve, then run Get Token Details with request_id ' + pm.collectionVariables.get('request_id'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Link Card (Credit/Debit)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "multipart/form-data"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "request_id",
+              "value": "{{request_id}}",
+              "type": "text"
+            },
+            {
+              "key": "request_time",
+              "value": "{{request_time}}",
+              "type": "text"
+            },
+            {
+              "key": "merchant_id",
+              "value": "{{merchant_id}}",
+              "type": "text"
+            },
+            {
+              "key": "ctid",
+              "value": "{{ctid}}",
+              "type": "text"
+            },
+            {
+              "key": "token_flag",
+              "value": "{{token_flag}}",
+              "type": "text"
+            },
+            {
+              "key": "currency",
+              "value": "{{currency}}",
+              "type": "text"
+            },
+            {
+              "key": "callback_url",
+              "value": "{{cof_callback_b64}}",
+              "type": "text"
+            },
+            {
+              "key": "continue_success_url",
+              "value": "{{cof_continue_b64}}",
+              "type": "text"
+            },
+            {
+              "key": "hash",
+              "value": "{{computed_hash}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payment-credential/v3/cof/link-card",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "payment-credential",
+            "v3",
+            "cof",
+            "link-card"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. Just hit **Send** — the **Visualize** tab shows a launcher for the card-entry page; complete it with a sandbox test card.\n2. The card token arrives via callback; meanwhile poll **3. Get Token Details** with the logged `{{request_id}}`.\n\nHash: merchant_id + request_time + ctid + callback_url + request_id + token_flag + **frequency** + **amount** + currency + continue_success_url (frequency & amount empty strings; callback_url / continue_success_url decoded via base64 when https).\n\nBody must use the same encoded strings as the hash. Returns HTML - open the returned page in a full browser window to perform card linking."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Link Card - hash: merchant_id+request_time+ctid+callback_url+request_id+token_flag+frequency+amount+currency+continue_success_url",
+              "var C = pm.collectionVariables;",
+              "var reqTime = utcNow();",
+              "var requestId = genRequestId('CARD');",
+              "var cbB64 = ensureB64(C.get('cof_callback_url'));",
+              "var cuB64 = ensureB64(C.get('cof_continue_success_url'));",
+              "var msg = C.get('merchant_id') + reqTime + C.get('ctid') + cbB64 + requestId + (C.get('token_flag')||'CITI_FLEX') + '' + '' + (C.get('currency')||'USD') + cuB64;",
+              "C.set('request_id', requestId);",
+              "C.set('request_time', reqTime);",
+              "C.set('cof_callback_b64', cbB64);",
+              "C.set('cof_continue_b64', cuB64);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "var ct = (pm.response.headers.get('Content-Type') || '').toLowerCase();",
+              "pm.test('Link Card returned the card-entry page (HTML)', function () {",
+              "  pm.expect(pm.response.code).to.eql(200);",
+              "  pm.expect(ct).to.include('html');",
+              "});",
+              "console.log('Card-entry page received. Complete the card form (sandbox test cards); the token arrives via {{callback_url}} or Get Token Details with {{request_id}}.');",
+              "  // Merchant-style launcher: form-POST the signed fields so the checkout page is",
+              "  // SERVED BY PayWay (its own origin) - saved .html opened from disk CORS-fails.",
+              "  var fields = {};",
+              "  if (pm.request.body && pm.request.body.formdata) {",
+              "    pm.request.body.formdata.each(function (p) { if (!p.disabled) fields[p.key] = pm.variables.replaceIn(String(p.value)); });",
+              "  }",
+              "  visualizeFormPost(pm.variables.replaceIn(pm.request.url.toString()), fields, 'PayWay card linking',",
+              "    'How real integrations open PayWay: a form POST with these signed fields. Click the button - the checkout page is served by PayWay itself (no CORS issues). Pay with the sandbox test cards, then re-send Check Transaction here to see APPROVED.');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Get Token Details",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          },
+          "raw": "{\n  \"request_time\": \"{{request_time}}\",\n  \"request_id\":   \"{{request_id}}\",\n  \"merchant_id\":  \"{{merchant_id}}\",\n  \"hash\":         \"{{computed_hash}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payment-credential/v3/token-management/get-token-details",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "payment-credential",
+            "v3",
+            "token-management",
+            "get-token-details"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. **Send** after Link Account/Card — uses the auto-saved `{{request_id}}`; on success saves `{{pwt}}`/`{{ctid}}` for Payment/Renew/Remove.\n2. `code 09 Data not found` = the customer hasn't completed the link yet — expected; approve the deeplink/QR first, then re-send.\n\nHash formula: merchant_id + request_time + request_id\n\nUse the {{request_id}} logged by Link Account/Card. On success the test saves {{pwt}} + {{ctid}} for Payment / Renew / Remove."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Get Token Details - hash: merchant_id+request_time+request_id",
+              "var C = pm.collectionVariables;",
+              "var reqTime = utcNow();",
+              "if (!C.get('request_id')) throw new Error('Set {{request_id}} (log from Link Account/Card, or after callback).');",
+              "var msg = C.get('merchant_id') + reqTime + C.get('request_id');",
+              "C.set('request_time', reqTime);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "var j = {};",
+              "try { j = pm.response.json(); } catch (e) {}",
+              "var sc = respCode(j);",
+              "pm.test('Get Token Details responded (status.code ' + (sc || 'HTTP ' + pm.response.code) + ')', function () { pm.expect(sc || pm.response.code).to.not.be.undefined; });",
+              "if (sc === '09' || pm.response.code === 403) {",
+              "  // sandbox-verified: code 09 'Data not found' = token not issued yet (link not completed)",
+              "  console.log('Token not issued yet (code 09). Complete the ABA-app link flow from Link Account/Card (deeplink or QR), or wait for the callback, then re-send with the SAME {{request_id}}.');",
+              "} else if (okStatus(j)) {",
+              "  if (j.data && j.data.pwt) { pm.collectionVariables.set('pwt', j.data.pwt); console.log('pwt saved to collection variables.'); }",
+              "  if (j.data && j.data.ctid) { pm.collectionVariables.set('ctid', j.data.ctid); console.log('ctid saved:', j.data.ctid); }",
+              "  pm.test('pwt available for Payment/Renew/Remove', function () { pm.expect(pm.collectionVariables.get('pwt')).to.not.be.empty; });",
+              "} else if (j.status) {",
+              "  console.log('status.code:', sc, '-', j.status.message);",
+              "}",
+              "if (pm.response.code === 200) assertJsonSchema({\"type\":\"object\",\"required\":[\"status\"],\"properties\":{\"status\":{\"type\":\"object\",\"properties\":{\"code\":{\"type\":[\"number\",\"string\"]},\"message\":{\"type\":\"string\"}}},\"data\":{\"type\":\"object\"}}});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Payment (Using Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          },
+          "raw": "{\n  \"request_time\":  \"{{request_time}}\",\n  \"merchant_id\":   \"{{merchant_id}}\",\n  \"tran_id\":       \"{{tran_id}}\",\n  \"ctid\":          \"{{ctid}}\",\n  \"pwt\":           \"{{pwt}}\",\n  \"first_name\":    \"{{buyer_first_name}}\",\n  \"last_name\":     \"{{buyer_last_name}}\",\n  \"email\":         \"{{buyer_email}}\",\n  \"phone\":         \"{{buyer_phone}}\",\n  \"amount\":        \"{{cof_amount_fmt}}\",\n  \"shipping_fee\":  \"{{cof_shipping_fee}}\",\n  \"currency\":      \"{{currency}}\",\n  \"token_flag\":    \"{{cof_pay_token_flag}}\",\n  \"purchase_type\": \"purchase\",\n  \"callback_url\":  null,\n  \"items\":         null,\n  \"return_params\": null,\n  \"payout\":        null,\n  \"custom_fields\": null,\n  \"hash\":          \"{{computed_hash}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payment-gateway/v3/purchase/payment-credential",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "payment-gateway",
+            "v3",
+            "purchase",
+            "payment-credential"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. Needs `{{pwt}}` + `{{ctid}}` (saved by Get Token Details) — then just **Send**; it charges `{{amount}}` to the stored credential.\n\nPrerequisite: {{pwt}} + {{ctid}} (run Get Token Details first).\n\nHash formula:\nrequest_time + merchant_id + tran_id + amount + currency + items + ctid + pwt + first_name + last_name + email + phone + purchase_type + callback_url + custom_fields + return_params + payout + token_flag + shipping_fee"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Payment with token - hash: request_time+merchant_id+tran_id+amount+currency+items+ctid+pwt+first_name+last_name+email+phone+purchase_type+callback_url+custom_fields+return_params+payout+token_flag+shipping_fee",
+              "var C = pm.collectionVariables;",
+              "if (!C.get('pwt')) throw new Error('Set {{pwt}} first (run Get Token Details).');",
+              "var reqTime = utcNow();",
+              "var tranId = genTranId();",
+              "var amount = fmtAmt(C.get('cof_amount'), C.get('currency'));",
+              "var tokenFlag = 'CITU_FLEX';",
+              "var msg = reqTime + C.get('merchant_id') + tranId + amount + (C.get('currency')||'USD') + '' + C.get('ctid') + C.get('pwt')",
+              "  + C.get('buyer_first_name') + C.get('buyer_last_name') + C.get('buyer_email') + C.get('buyer_phone')",
+              "  + 'purchase' + '' + '' + '' + '' + tokenFlag + '0.00';",
+              "C.set('request_time', reqTime);",
+              "C.set('tran_id', tranId);",
+              "C.set('cof_amount_fmt', amount);",
+              "C.set('cof_shipping_fee', '0.00');",
+              "C.set('cof_pay_token_flag', tokenFlag);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "try {",
+              "  var j = pm.response.json();",
+              "  if (j.status) {",
+              "    pm.test('status.code = 0 (approved)', function () { pm.expect(String(j.status.code)).to.eql('0'); });",
+              "    console.log('status.code:', j.status.code, '-', j.status.message || '');",
+              "    pm.collectionVariables.set('last_tran_id', pm.collectionVariables.get('tran_id'));",
+              "    if (j.data) console.log('approved:', JSON.stringify(j.data).slice(0, 400));",
+              "  }",
+              "} catch (e) { console.log('Response was not JSON.'); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Renew Token (ABA account)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          },
+          "raw": "{\n  \"request_time\": \"{{request_time}}\",\n  \"merchant_id\":  \"{{merchant_id}}\",\n  \"request_id\":   \"{{request_id}}\",\n  \"ctid\":         \"{{ctid}}\",\n  \"pwt\":          \"{{pwt}}\",\n  \"hash\":         \"{{computed_hash}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payment-credential/v3/token-management/renew-expired-account-token",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "payment-credential",
+            "v3",
+            "token-management",
+            "renew-expired-account-token"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. ABA **account** tokens only — needs `{{pwt}}`; extends validity by 90 days from today.\n\nABA Account tokens only. Extends validity by 90 days.\n\nHash formula: ctid + request_time + pwt + merchant_id + request_id"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Renew - hash: ctid+request_time+pwt+merchant_id+request_id",
+              "var C = pm.collectionVariables;",
+              "if (!C.get('pwt')) throw new Error('Set {{pwt}} first.');",
+              "var reqTime = utcNow();",
+              "var requestId = genRequestId('RNW');",
+              "var msg = C.get('ctid') + reqTime + C.get('pwt') + C.get('merchant_id') + requestId;",
+              "C.set('request_time', reqTime);",
+              "C.set('request_id', requestId);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "try {",
+              "  var j = pm.response.json();",
+              "  if (j.status) {",
+              "    pm.test('status.code present', function () { pm.expect(j.status.code).to.not.be.empty; });",
+              "    console.log('status.code:', j.status.code, '-', j.status.message || '');",
+              "    if (String(j.status.code) === '00') console.log('Token renewed (+90 days) - new request_id =', pm.collectionVariables.get('request_id'));",
+              "  }",
+              "} catch (e) { console.log('Response was not JSON.'); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Remove Token (irreversible)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          },
+          "raw": "{\n  \"request_time\": \"{{request_time}}\",\n  \"merchant_id\":  \"{{merchant_id}}\",\n  \"ctid\":         \"{{ctid}}\",\n  \"pwt\":          \"{{pwt}}\",\n  \"hash\":         \"{{computed_hash}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payment-credential/v3/token-management/remove-token",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "payment-credential",
+            "v3",
+            "token-management",
+            "remove-token"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. ⚠️ **Irreversible** — deletes the token in `{{pwt}}` (and clears the variable). Test this last.\n\nPermanently removes the token (irreversible).\n\nHash formula: merchant_id + ctid + request_time + pwt"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Remove token - hash: merchant_id+ctid+request_time+pwt",
+              "var C = pm.collectionVariables;",
+              "if (!C.get('pwt')) throw new Error('Set {{pwt}} first.');",
+              "var reqTime = utcNow();",
+              "var msg = C.get('merchant_id') + C.get('ctid') + reqTime + C.get('pwt');",
+              "C.set('request_time', reqTime);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "try {",
+              "  var j = pm.response.json();",
+              "  if (j.status) {",
+              "    pm.test('status.code present', function () { pm.expect(j.status.code).to.not.be.empty; });",
+              "    console.log('status.code:', j.status.code, '-', j.status.message || '');",
+              "    if (String(j.status.code) === '00') {",
+              "      console.log('Token removed. Clear {{pwt}} to avoid reusing a dead token.');",
+              "      pm.collectionVariables.set('pwt', '');",
+              "    }",
+              "  }",
+              "} catch (e) { console.log('Response was not JSON.'); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Subscription (Scheduled Payment)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/payment-gateway/v1/payments/purchase",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "payment-gateway",
+            "v1",
+            "payments",
+            "purchase"
+          ]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "req_time",
+              "value": "{{request_time}}",
+              "type": "text"
+            },
+            {
+              "key": "merchant_id",
+              "value": "{{merchant_id}}",
+              "type": "text"
+            },
+            {
+              "key": "tran_id",
+              "value": "{{tran_id}}",
+              "type": "text"
+            },
+            {
+              "key": "firstname",
+              "value": "{{sub_firstname}}",
+              "type": "text"
+            },
+            {
+              "key": "lastname",
+              "value": "{{sub_lastname}}",
+              "type": "text"
+            },
+            {
+              "key": "email",
+              "value": "{{sub_email}}",
+              "type": "text"
+            },
+            {
+              "key": "phone",
+              "value": "{{sub_phone}}",
+              "type": "text"
+            },
+            {
+              "key": "type",
+              "value": "purchase",
+              "type": "text"
+            },
+            {
+              "key": "payment_option",
+              "value": "{{sub_payment_option}}",
+              "type": "text"
+            },
+            {
+              "key": "items",
+              "value": "{{sub_items_b64}}",
+              "type": "text"
+            },
+            {
+              "key": "shipping",
+              "value": "0",
+              "type": "text"
+            },
+            {
+              "key": "amount",
+              "value": "{{sub_amount_fmt}}",
+              "type": "text"
+            },
+            {
+              "key": "return_url",
+              "value": "{{sub_ret_b64}}",
+              "type": "text"
+            },
+            {
+              "key": "cancel_url",
+              "value": "{{sub_can_b64}}",
+              "type": "text"
+            },
+            {
+              "key": "continue_success_url",
+              "value": "{{sub_con_b64}}",
+              "type": "text"
+            },
+            {
+              "key": "return_deeplink",
+              "value": "",
+              "type": "text"
+            },
+            {
+              "key": "currency",
+              "value": "{{currency}}",
+              "type": "text"
+            },
+            {
+              "key": "custom_fields",
+              "value": "",
+              "type": "text"
+            },
+            {
+              "key": "return_params",
+              "value": "",
+              "type": "text"
+            },
+            {
+              "key": "payout",
+              "value": "",
+              "type": "text"
+            },
+            {
+              "key": "lifetime",
+              "value": "{{sub_lifetime}}",
+              "type": "text"
+            },
+            {
+              "key": "skip_success_page",
+              "value": "",
+              "type": "text"
+            },
+            {
+              "key": "ctid",
+              "value": "{{ctid}}",
+              "type": "text"
+            },
+            {
+              "key": "token_flag",
+              "value": "CITR_FIX",
+              "type": "text"
+            },
+            {
+              "key": "frequency",
+              "value": "{{sub_frequency}}",
+              "type": "text"
+            },
+            {
+              "key": "hash",
+              "value": "{{computed_hash}}",
+              "type": "text"
+            }
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. Just hit **Send** — creates a recurring `CITR_FIX` subscription and returns the first-payment QR (Visualize tab); pay it to activate the token via callback.\n2. Tune with `{{sub_frequency}}` (1W/1M/2M), `{{sub_lifetime}}`, `{{sub_payment_option}}`.\n\nCITR_FIX subscription - uses the **v1 payments/purchase** hash (PayWay demo order):\nreq_time+merchant_id+tran_id+amount+**items_b64**+''+shipping+**ctid**+''+firstname+lastname+email+phone+**type**+**payment_option**+return_url_b64+cancel_url_b64+continue_success_url_b64+return_deeplink_b64+currency+**custom_fields**+return_params+payout+lifetime+skip_success+token_flag+frequency\n\nFrequency: 1W | 1M | 2M. Set {{sub_lifetime}}, {{sub_payment_option}}, {{items_b64}} etc.\nResponse opens a hosted page to approve the subscription."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Subscription - v1 purchase hash order (see description)",
+              "var C = pm.collectionVariables;",
+              "var itemRaw = (C.get('items_json') || '').trim() || '[{\"name\":\"Subscription\",\"quantity\":1,\"price\":0.10}]';",
+              "var itemsB64 = b64json(itemRaw);",
+              "var ru = ensureB64(C.get('return_url') || 'https://example.com/return');",
+              "var cu = ensureB64(C.get('cancel_url') || 'https://example.com/cancel');",
+              "var su = ensureB64(C.get('continue_success_url') || 'https://example.com/success');",
+              "var reqTime = utcNow();",
+              "var tranId = genTranId();",
+              "var amount = fmtAmt(C.get('amount'), C.get('currency'));",
+              "var tokenFlag = 'CITR_FIX';",
+              "var frequency = C.get('sub_frequency') || '1W';",
+              "var lifetime = C.get('sub_lifetime') || '30';",
+              "var msg = reqTime + C.get('merchant_id') + tranId + amount + itemsB64 + '' + '0'",
+              "  + C.get('ctid') + '' + C.get('sub_firstname') + C.get('sub_lastname') + C.get('sub_email') + C.get('sub_phone')",
+              "  + 'purchase' + (C.get('sub_payment_option') || 'abapay') + ru + cu + su + ''",
+              "  + (C.get('currency') || 'USD') + '' + '' + '' + lifetime + '' + tokenFlag + frequency;",
+              "C.set('request_time', reqTime);",
+              "C.set('tran_id', tranId);",
+              "C.set('sub_amount_fmt', amount);",
+              "C.set('sub_items_b64', itemsB64);",
+              "C.set('sub_ret_b64', ru);",
+              "C.set('sub_can_b64', cu);",
+              "C.set('sub_con_b64', su);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "var j = {};",
+              "try { j = pm.response.json(); } catch (e) {}",
+              "if (okStatus(j)) {",
+              "  pm.collectionVariables.set('last_tran_id', pm.collectionVariables.get('tran_id'));",
+              "  pm.test('Subscription purchase accepted (status.code 0/00)', function () { pm.expect(okStatus(j)).to.eql(true); });",
+              "  if (j.qrString) console.log('qrString:', String(j.qrString).slice(0, 48) + '... (first subscription payment QR - pay it to receive the token via callback)');",
+              "} else if (j.status) {",
+              "  console.log('Subscription business error', j.status.code, '-', j.status.message);",
+              "}",
+              "var vj = {}; try { vj = pm.response.json(); } catch (e) {}",
+              "if (vj.qrImage || vj.qrString) visualizeQr(vj.qrImage, vj.qrString, 'Subscription first payment - scan with the ABA Mobile app (sandbox). tran_id: ' + pm.collectionVariables.get('tran_id'));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

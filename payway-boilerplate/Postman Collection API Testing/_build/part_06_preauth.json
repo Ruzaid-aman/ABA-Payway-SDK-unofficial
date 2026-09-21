@@ -1,0 +1,261 @@
+{
+  "folder": "06 - Pre-auth",
+  "description": "## Pre-auth (Card holds)\nPre-authorisation flow: after a `purchase`, complete (capture) or cancel the hold. Use `pre-auth-completion` optionally with a **payout** split.\n\nOrder of fields in the hash differs per request - read the description before editing values.",
+  "item": [
+    {
+      "name": "1. Complete Pre-auth",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"request_time\": \"{{request_time}}\",\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_auth\": \"{{computed_merchant_auth}}\",\n  \"hash\": \"{{computed_hash}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "merchant-portal",
+            "merchant-access",
+            "online-transaction",
+            "pre-auth-completion"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. Create the hold first: set `{{purchase_type}}` = `pre-auth` → run **03 → 1. Purchase** → then send this (it reads `{{last_tran_id}}` and captures `{{amount}}`).\n2. RSA needed (node-forge or `{{preauth_merchant_auth}}`). Prefer releasing the funds? Use **3. Cancel Pre-auth** instead.\n\n## Complete Pre-auth\nRSA payload: `{ \"mc_id\": \"...\", \"tran_id\": \"...\", \"complete_amount\": \"...\" }`\nHash: `merchant_auth + request_time + merchant_id` (note: merchant_auth FIRST).\nWithout node-forge, set `{{preauth_merchant_auth}}`."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Complete Pre-auth - RSA({mc_id,tran_id,complete_amount}); hash: merchant_auth+request_time+merchant_id",
+              "var C = pm.collectionVariables;",
+              "var reqTime = utcNow();",
+              "var tranId = C.get('last_tran_id') || C.get('tran_id') || genTranId();",
+              "var payload = { mc_id: C.get('merchant_id'), tran_id: tranId, complete_amount: fmtAmt(C.get('amount')) };",
+              "var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'preauth_merchant_auth');",
+              "var msg = auth + reqTime + C.get('merchant_id');",
+              "C.set('request_time', reqTime);",
+              "C.set('computed_merchant_auth', auth);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('RSA payload:', JSON.stringify(payload));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "var j = {};",
+              "try { j = pm.response.json(); } catch (e) {}",
+              "if (rsaMissing(j)) {",
+              "  pm.test('SKIPPED - RSA payload not configured', function () { pm.expect(true).to.eql(true); });",
+              "  console.log('SKIPPED: the gateway needs an RSA-encrypted merchant_auth. Install the node-forge library (collection > Libraries) or paste a pre-computed value into the fallback variable - see the request description.');",
+              "} else {",
+              "  var code = j.statusCode || (j.status && j.status.code);",
+              "  pm.test('Complete Pre-auth responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });",
+              "  if (String(code) === '0' || String(code) === '00') { console.log('Pre-auth captured.'); }",
+              "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Complete Pre-auth with Payout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"request_time\": \"{{request_time}}\",\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_auth\": \"{{computed_merchant_auth}}\",\n  \"hash\": \"{{computed_hash}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "merchant-portal",
+            "merchant-access",
+            "online-transaction",
+            "pre-auth-completion"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. Same setup as request 1, but the captured amount is split to beneficiaries — set `{{payout_json}}` (`[{\"acc\":\"...\",\"amt\":0.05}]`) first.\n2. RSA needed (node-forge or `{{preauth_payout_merchant_auth}}`).\n\n## Complete Pre-auth with Payout\nSame endpoint/order as the plain completion, but the RSA payload also carries a `payout` array:\n`{ \"mc_id\": \"...\", \"tran_id\": \"...\", \"complete_amount\": \"...\", \"payout\": [{ \"acc\": \"...\", \"amt\": \"...\", \"reason\": \"...\" } | ...] }`\nHash: `merchant_auth + request_time + merchant_id`.\nWithout node-forge, set `{{preauth_payout_merchant_auth}}`."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Complete Pre-auth + payout - RSA payload with payout array; hash: merchant_auth+request_time+merchant_id",
+              "var C = pm.collectionVariables;",
+              "var reqTime = utcNow();",
+              "var amount = fmtAmt(C.get('amount'));",
+              "var payouts = [];",
+              "var payoutRaw = (C.get('payout_json') || '').trim();",
+              "if (payoutRaw) { try { payouts = JSON.parse(payoutRaw); } catch (e) {} }",
+              "else { payouts = [{ acc: '000133879', amt: amount, reason: 'test' }]; }",
+              "var payload = { mc_id: C.get('merchant_id'), tran_id: C.get('last_tran_id') || genTranId(), complete_amount: amount, payout: payouts };",
+              "var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'preauth_payout_merchant_auth');",
+              "var msg = auth + reqTime + C.get('merchant_id');",
+              "C.set('request_time', reqTime);",
+              "C.set('computed_merchant_auth', auth);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('RSA payload:', JSON.stringify(payload));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "var j = {};",
+              "try { j = pm.response.json(); } catch (e) {}",
+              "if (rsaMissing(j)) {",
+              "  pm.test('SKIPPED - RSA payload not configured', function () { pm.expect(true).to.eql(true); });",
+              "  console.log('SKIPPED: the gateway needs an RSA-encrypted merchant_auth. Install the node-forge library (collection > Libraries) or paste a pre-computed value into the fallback variable - see the request description.');",
+              "} else {",
+              "  var code = j.statusCode || (j.status && j.status.code);",
+              "  pm.test('Complete Pre-auth with Payout responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });",
+              "  if (String(code) === '0' || String(code) === '00') { console.log('Pre-auth captured with payout split.'); }",
+              "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Cancel Pre-auth",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"request_time\": \"{{request_time}}\",\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_auth\": \"{{computed_merchant_auth}}\",\n  \"hash\": \"{{computed_hash}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "merchant-portal",
+            "merchant-access",
+            "online-transaction",
+            "pre-auth-cancellation"
+          ]
+        },
+        "description": "## ⚡ Quick test\n1. Releases the hold from a `pre-auth` purchase (reads `{{last_tran_id}}`) — funds return to the cardholder.\n2. RSA needed (node-forge or `{{cancel_preauth_merchant_auth}}`).\n\n## Cancel Pre-auth\nRSA payload: `{ \"mc_id\": \"...\", \"tran_id\": \"...\" }`\nHash: `merchant_id + merchant_auth + request_time` (merchant_id FIRST).\nWithout node-forge, set `{{cancel_preauth_merchant_auth}}`."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "// Cancel Pre-auth - RSA({mc_id,tran_id}); hash: merchant_id+merchant_auth+request_time",
+              "var C = pm.collectionVariables;",
+              "var reqTime = utcNow();",
+              "var payload = { mc_id: C.get('merchant_id'), tran_id: C.get('last_tran_id') || C.get('tran_id') || genTranId() };",
+              "var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'cancel_preauth_merchant_auth');",
+              "var msg = C.get('merchant_id') + auth + reqTime;",
+              "C.set('request_time', reqTime);",
+              "C.set('computed_merchant_auth', auth);",
+              "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
+              "console.log('RSA payload:', JSON.stringify(payload));",
+              "console.log('b4hash:', msg);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Restore the shared PayWay helper library (Postman runs every script in its own scope):",
+              "var __h = pm.collectionVariables.get('__helpers');",
+              "if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');",
+              "eval(__h);",
+              "var j = {};",
+              "try { j = pm.response.json(); } catch (e) {}",
+              "if (rsaMissing(j)) {",
+              "  pm.test('SKIPPED - RSA payload not configured', function () { pm.expect(true).to.eql(true); });",
+              "  console.log('SKIPPED: the gateway needs an RSA-encrypted merchant_auth. Install the node-forge library (collection > Libraries) or paste a pre-computed value into the fallback variable - see the request description.');",
+              "} else {",
+              "  var code = j.statusCode || (j.status && j.status.code);",
+              "  pm.test('Cancel Pre-auth responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });",
+              "  if (String(code) === '0' || String(code) === '00') { console.log('Pre-auth released.'); }",
+              "  else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

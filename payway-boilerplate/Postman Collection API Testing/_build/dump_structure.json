@@ -1,0 +1,894 @@
+{
+  "name": "PayWay API — Complete Collection",
+  "version": "1.1.0",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+  "collEvents": [
+    "prerequest",
+    "test"
+  ],
+  "varCount": 75,
+  "variables": [
+    {
+      "key": "baseUrl",
+      "value": "https://checkout-sandbox.payway.com.kh",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "merchant_id",
+      "value": "sonitatest",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "secret_key",
+      "value": "9dc49bb1-04db-4ac0-a262-e7bef22cff6a",
+      "type": "secret",
+      "desc": "HMAC-SHA512 signing secret (the \"API key\" PayWay issues). Pre-filled with the PUBLIC sandbox demo merchant (sonitatest) so the collection works out of the box - REPLACE with your own secret and never use it in production. Only ever used to compute HMAC signatures, never sent in a request body."
+    },
+    {
+      "key": "buyer_first_name",
+      "value": "Test",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "buyer_last_name",
+      "value": "User",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "buyer_email",
+      "value": "test@example.com",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "buyer_phone",
+      "value": "0123456789",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "return_params_raw",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "rsa_public_key",
+      "value": "-----BEGIN PUBLIC KEY-----\nYOUR_RSA_KEY_HERE\n-----END PUBLIC KEY-----",
+      "type": "string",
+      "desc": "RSA public key (PEM) from ABA Bank for portal APIs."
+    },
+    {
+      "key": "currency",
+      "value": "USD",
+      "type": "string",
+      "desc": "KHR or USD"
+    },
+    {
+      "key": "amount",
+      "value": "0.10",
+      "type": "string",
+      "desc": "USD min 0.01; KHR min 100"
+    },
+    {
+      "key": "ctid",
+      "value": "TESTCONSUMER01",
+      "type": "string",
+      "desc": "Consumer ID (5-24 alphanumeric)."
+    },
+    {
+      "key": "pwt",
+      "value": "",
+      "type": "string",
+      "desc": "PayWay Token; auto-saved by token endpoints."
+    },
+    {
+      "key": "request_time",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "request_id",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "tran_id",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "computed_hash",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "last_tran_id",
+      "value": "",
+      "type": "string",
+      "desc": "Set by QR purchase; consumed by polling/refund flows."
+    },
+    {
+      "key": "payment_option",
+      "value": "abapay_khqr",
+      "type": "string",
+      "desc": "cards | abapay_khqr | abapay_khqr_deeplink | abapay | abapay_deeplink | alipay | wechat | google_pay"
+    },
+    {
+      "key": "qr_image_template",
+      "value": "template3_color",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "return_url",
+      "value": "https://example.com/return",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "cancel_url",
+      "value": "https://example.com/cancel",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "continue_success_url",
+      "value": "https://example.com/success",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "return_deeplink_raw",
+      "value": "",
+      "type": "string",
+      "desc": "Optional raw JSON: {\"ios_scheme\":\"...\",\"android_scheme\":\"...\"}. Auto base64-encoded."
+    },
+    {
+      "key": "callback_url",
+      "value": "https://example.com/callback",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "items_json",
+      "value": "[{\"name\":\"Test Item\",\"quantity\":1,\"price\":0.10}]",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "custom_fields_json",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "payout_json",
+      "value": "",
+      "type": "string",
+      "desc": "e.g. [{\"acc\":\"000133879\",\"amt\":0.05},{\"acc\":\"000133880\",\"amt\":0.05}]"
+    },
+    {
+      "key": "additional_params_json",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "google_pay_token",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "skip_success_page",
+      "value": "0",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "view_type",
+      "value": "hosted_view",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "payment_gate",
+      "value": "0",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "lifetime",
+      "value": "3",
+      "type": "string",
+      "desc": "Minutes; min 3"
+    },
+    {
+      "key": "shipping_fee",
+      "value": "0.00",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "token_flag",
+      "value": "CITI_FLEX",
+      "type": "string",
+      "desc": "CITI_FLEX | CITO_FLEX | CITR_FIX (link); CITU_FLEX | MITU_FLEX | MITR_FIX (payment);"
+    },
+    {
+      "key": "sub_frequency",
+      "value": "1W",
+      "type": "string",
+      "desc": "1W | 1M | 2M"
+    },
+    {
+      "key": "sub_lifetime",
+      "value": "30",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "callback_listener",
+      "value": "",
+      "type": "string",
+      "desc": "webhook.site URL / test endpoint for folder 10."
+    },
+    {
+      "key": "webhook_token",
+      "value": "",
+      "type": "string",
+      "desc": "Extracted UUID from {{callback_listener}} (https://webhook.site/<uuid>); used by folder 10 sync request."
+    },
+    {
+      "key": "poll_count",
+      "value": "0",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "max_polls",
+      "value": "10",
+      "type": "string",
+      "desc": "Polling loop budget for Flow A2 (Collection Runner)"
+    },
+    {
+      "key": "poll_status",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "refund_amount",
+      "value": "0.10",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "refund_merchant_auth",
+      "value": "",
+      "type": "string",
+      "desc": "Paste RSA-encrypted {mc_id,tran_id,refund_amount} if no node-forge."
+    },
+    {
+      "key": "pl_merchant_auth",
+      "value": "",
+      "type": "string",
+      "desc": "Payment Link: paste RSA-encrypted payload if no node-forge."
+    },
+    {
+      "key": "payment_link_id",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "preauth_merchant_auth",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "preauth_payout_merchant_auth",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "cancel_preauth_merchant_auth",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "payout_beneficiaries",
+      "value": "",
+      "type": "string",
+      "desc": "Paste RSA-encrypted [{account,amount}] if no node-forge."
+    },
+    {
+      "key": "add_whitelist_merchant_auth",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "update_whitelist_merchant_auth",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "whitelist_payee",
+      "value": "318111358120004",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "merchant_ref",
+      "value": "MREF-0001",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "test_mc_success",
+      "value": "5156 8399 3770 6777",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "test_visa_success",
+      "value": "4286 0900 0000 0206",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "test_mc_declined",
+      "value": "5156 8302 7256 1029",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "test_visa_declined",
+      "value": "4156 8399 3770 6777",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "test_expiry",
+      "value": "01/30",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "from_date",
+      "value": "",
+      "type": "string",
+      "desc": "yyyy-mm-dd (auto-filled as today, or paste when using Transaction List)"
+    },
+    {
+      "key": "to_date",
+      "value": "",
+      "type": "string",
+      "desc": "yyyy-mm-dd (auto-filled as today, or paste when using Transaction List)"
+    },
+    {
+      "key": "tran_status_filter",
+      "value": "",
+      "type": "string",
+      "desc": "Optional status filter for Transaction List (0 approved, 2 pending, 3 declined, 4 refunded, 7 cancelled)"
+    },
+    {
+      "key": "test_cvv",
+      "value": "123",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "sub_payment_option",
+      "value": "abapay",
+      "type": "string",
+      "desc": "Sub only: abapay | abapay_deeplink | cards"
+    },
+    {
+      "key": "sub_firstname",
+      "value": "Test",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "sub_lastname",
+      "value": "User",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "sub_email",
+      "value": "test@example.com",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "sub_phone",
+      "value": "0123456789",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "cof_return_deeplink",
+      "value": "",
+      "type": "string",
+      "desc": "CoF Link Account: https URL or base64"
+    },
+    {
+      "key": "cof_callback_url",
+      "value": "",
+      "type": "string",
+      "desc": "CoF Link Account/Card: https URL or base64"
+    },
+    {
+      "key": "cof_continue_success_url",
+      "value": "",
+      "type": "string",
+      "desc": "CoF Link Card: https URL or base64"
+    },
+    {
+      "key": "cof_amount",
+      "value": "0.10",
+      "type": "string",
+      "desc": ""
+    },
+    {
+      "key": "purchase_type",
+      "value": "purchase",
+      "type": "string",
+      "desc": "purchase | pre-auth (purchase \"type\" field and generate-qr purchase_type)"
+    },
+    {
+      "key": "return_params",
+      "value": "",
+      "type": "string",
+      "desc": ""
+    }
+  ],
+  "folders": [
+    {
+      "name": "01 - Get Started & Test Cards",
+      "desc": "## Get started here\n\n**60-second tour:** open **03 - Ecommerce Checkout → 1. Purchase** → **Send** → **Visualize tab** → click **Open payment page →** → pay with a test card below → back here, send **Check Transaction** → APPROVED.\n\nThe full guide lives on the collection **Overview** tab (click the collection name). Nothing needs configuring — the public sandbox demo merchant is pre-filled.\n\nThis folder: test cards, endpoints reference, and the docs links.",
+      "requests": [
+        {
+          "name": "0. Get Started (60-second walkthrough)",
+          "method": "GET",
+          "url": "https://developer.payway.com.kh/overview-865678m0",
+          "hasPre": false,
+          "hasTest": false,
+          "snr": []
+        },
+        {
+          "name": "Sandbox Test Cards",
+          "method": "GET",
+          "url": "https://developer.payway.com.kh/resources-3305682f0",
+          "hasPre": false,
+          "hasTest": false,
+          "snr": []
+        },
+        {
+          "name": "Reference - API Endpoints List (doc)",
+          "method": "GET",
+          "url": "https://developer.payway.com.kh/api-endpoints-984508m0",
+          "hasPre": false,
+          "hasTest": false,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Ecommerce Checkout",
+      "desc": "## Ecommerce Checkout\nREST endpoints for the standard hosted-checkout flow (cards, ABA KHQR, wallets).\n\n**Suggested order:**\n1. **Purchase** - creates a transaction and returns a hosted page; save the `tran_id` (auto-stored in `{{last_tran_id}}`).\n2. **Check Transaction** - fast status check while a customer pays (great for polling).\n3. **Get Transaction Details** - full record.\n4. **Close Transaction** / **Refund** - close or money-back (Refund needs RSA).\n5. **Transaction List** / **Exchange Rate** - admin views.\n\nAll hashes follow `req_time + merchant_id + tran_id + ...` per endpoint (see each description).",
+      "requests": [
+        {
+          "name": "1. Purchase (Hosted Checkout) - multipart",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/purchase",
+          "bodyMode": "formdata",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "2. Get Transaction Details",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-detail",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "3. Check Transaction (fast, recent)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/check-transaction-2",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "4. Close Transaction",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/close-transaction",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "5. Refund - RSA merchant_auth",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/refund",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "6. Transaction List (filter)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-list-2",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "7. Exchange Rate",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/exchange-rate",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "04 - ABA QR API",
+      "desc": "## ABA QR API\n`POST /generate-qr` creates an ABA KHQR for static/dynamic payment. Render `qr_data` as a QR image, or show `qr_image`. The payer scans with the ABA app.\n\nAfter payment, verify via **Check Transaction** or the callback. The purchase_type/payment_option both default to `{{payment_option}}`.",
+      "requests": [
+        {
+          "name": "Generate QR",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/generate-qr",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Payment Link",
+      "desc": "## Payment Link\nCreate a shareable payment link (sent via WhatsApp/email/SMS) and query its stats.\n\n> These are **portal APIs**: instead of a plain hash they require `merchant_auth` = base64 of the RSA-encrypted payload. Install node-forge or paste a pre-encrypted value into `{{pl_merchant_auth}}`.",
+      "requests": [
+        {
+          "name": "Create Payment Link",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/payment-link/create",
+          "bodyMode": "formdata",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "Get Payment Link Details",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/payment-link/detail",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Pre-auth",
+      "desc": "## Pre-auth (Card holds)\nPre-authorisation flow: after a `purchase`, complete (capture) or cancel the hold. Use `pre-auth-completion` optionally with a **payout** split.\n\nOrder of fields in the hash differs per request - read the description before editing values.",
+      "requests": [
+        {
+          "name": "1. Complete Pre-auth",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "2. Complete Pre-auth with Payout",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "3. Cancel Pre-auth",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "07 - Payout",
+      "desc": "## Payout\nMass payouts (up to 250 beneficiaries) plus the whitelist that authorities them.\n\n**Sequence:** whitelist the payee account first, then send a payout. Both need RSA (folder 06 variables). Payout hashes use the **body beneficiaries ciphertext** as a hash input, so the hash must be computed AFTER encryption.",
+      "requests": [
+        {
+          "name": "1. Payout (to beneficiaries)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v2/direct-payment/merchant/payout",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "2. Add Account to Payout Whitelist - RSA",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "3. Update Payser Status - RSA",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "08 - Credentials on File (CoF)",
+      "desc": "## Credentials on File (CoF) / Subscriptions\nTokenize a card or ABA account, then charge it later without re-entering credentials.\n\n**Typical flow:** `1. Link Account` (or `2. Link Card`) -> wait for callback -> `3. Get Token Details` (auto-saves `{{pwt}}`/`{{ctid}}`) -> `4. Payment` -> `6. Remove` at the end.\n\n`callback_url` must be base64-encoded in the hash/body - the scripts do that automatically for https URLs. Run `7. Subscription` to test recurring CITR_FIX payments.",
+      "requests": [
+        {
+          "name": "1. Link Account (ABA Account)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/aof/link-account",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "2. Link Card (Credit/Debit)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/cof/link-card",
+          "bodyMode": "formdata",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "3. Get Token Details",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/token-management/get-token-details",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "4. Payment (Using Token)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v3/purchase/payment-credential",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "5. Renew Token (ABA account)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/token-management/renew-expired-account-token",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "6. Remove Token (irreversible)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/token-management/remove-token",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "7. Subscription (Scheduled Payment)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/purchase",
+          "bodyMode": "formdata",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "09 - KHQR Guideline",
+      "desc": "## KHQR guideline\nUse a dedicated `instore` QR merchant account. Generate a QR (folder 04), have the payer scan it, and look up the matched inbound transaction with the merchant reference you set.",
+      "requests": [
+        {
+          "name": "Get Transactions by Merchant Ref",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/get-transactions-by-mc-ref",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "10 - Callbacks & Webhooks",
+      "desc": "## Callbacks & Webhooks\nEverything PayWay POSTs back to **your** server, plus how to verify it.\n\n- Set `{{callback_listener}}` (e.g. webhook.site) and these sample senders will POST real-looking payloads to it.\n- The `X-PayWay-Hmac-Sha512` header is computed with the same ksort+concat rule PayWay uses, so you can test your verifier end-to-end.\n- 'Webhook Design Notes' summarises idempotency / retry / response guidance.\n\n## How to get a callback URL\nPostman has no built-in inbound URL; you provide one.\n\n1. **Free webhook catcher (easiest)** - open **webhook.site** (or webhookbin.com), copy its `https://webhook.site/<uuid>` URL, and paste it into `{{callback_url}}`, `{{cof_callback_url}}` and `{{callback_listener}}`. PayWay/sample senders will POST results there and you watch payloads arrive in the browser.\n   - While PayWay does not push straight into Postman, you **can sync webhook.site -> Postman**: webhook.site exposes a REST API. `GET https://api.webhook.site/token/<uuid>/requests` returns every received payload as JSON. A dedicated Postman request can call that endpoint and, in its test script, save `pwt`/`ctid`/`tran_id` from the latest callback into collection variables - effectively importing the callback. (webhookbin has no such API; use webhook.site for the sync trick.)\n2. **Postman Mock Server (closest Postman-native)** - create a mock server for this collection in the Postman web UI; it issues a public `https://<mock-id>.mock.pstmn.io` URL that accepts any POST and returns your mock response. The **Call Logs** tab shows every received callback (headers + body) so you can read `pwt`/`tran_id` there.\n3. **ngrok + local listener** - `ngrok http 8080` pointed at a local web server; set `{{callback_url}}` to the ngrok URL. Best when you want to script saving variables or run a verifier locally.\n\n> Tip: for the CoF workflows (folders 08 / 11) the callback is optional - request `3. Get Token Details` already fetches and saves `pwt`/`ctid` from the API using `{{request_id}}`.",
+      "requests": [
+        {
+          "name": "Payment Result Callback - Sample Sender",
+          "method": "POST",
+          "url": "{{callback_listener}}",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "Token Result Callback (CoF) - Sample Sender",
+          "method": "POST",
+          "url": "{{callback_listener}}",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "Sync webhook.site -> Postman (pull callbacks)",
+          "method": "GET",
+          "url": "https://api.webhook.site/token/{{webhook_token}}/requests",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "Webhook Design Notes",
+          "method": "GET",
+          "url": "https://developer.payway.com.kh/overview-865678m0",
+          "hasPre": false,
+          "hasTest": false,
+          "snr": []
+        }
+      ]
+    },
+    {
+      "name": "11 - Polling & Lifecycle Flows (Runner)",
+      "desc": "## Polling & Lifecycle Flows (Collection Runner)\nComposable flows via `postman.setNextRequest` - run these from the **Collection Runner** (set delay 1000 ms).\n\n- **Flow A:** Generate QR -> poll until settled -> get details -> refund.\n- **Flow B:** Link account -> get token -> charge -> renew -> remove.\n\nFallback: when run as single requests, each step still saves the variables the next step needs (`{{last_tran_id}}`, `{{pwt}}`, `{{request_id}}`).",
+      "requests": [
+        {
+          "name": "Flow B - README: run the flows",
+          "method": "GET",
+          "url": "https://developer.payway.com.kh/",
+          "hasPre": false,
+          "hasTest": false,
+          "snr": []
+        },
+        {
+          "name": "A1 - Create QR",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/generate-qr",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "A2 - Poll Transaction Status (loops)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-detail",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": [
+            "  postman.setNextRequest('A2 - Poll Transaction Status (loops)');",
+            "  postman.setNextRequest('A3 - Get Transaction Details');"
+          ]
+        },
+        {
+          "name": "A3 - Get Transaction Details",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-detail",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "A4 - Refund",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/refund",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": [
+            "pm.test('Refund responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });\npostman.setNextRequest(null); // end of Flow A - do not bleed into Flow B"
+          ]
+        },
+        {
+          "name": "B1 - Link Account (Flow B)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/aof/link-account",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "B2 - Get Token Details (Flow B)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/token-management/get-token-details",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "B3 - Payment using Token (Flow B)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-gateway/v3/purchase/payment-credential",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "B4 - Renew Token (Flow B)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/token-management/renew-expired-account-token",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": []
+        },
+        {
+          "name": "B5 - Remove Token (Flow B)",
+          "method": "POST",
+          "url": "{{baseUrl}}/api/payment-credential/v3/token-management/remove-token",
+          "bodyMode": "raw",
+          "hasPre": true,
+          "hasTest": true,
+          "snr": [
+            "} catch (e) { console.log('Response was not JSON.'); }\npostman.setNextRequest(null); // end of Flow B"
+          ]
+        }
+      ]
+    }
+  ]
+}

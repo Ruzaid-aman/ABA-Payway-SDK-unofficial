@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "newman": "^6.2.2",
+    "postman-collection": "^5.3.1"
+  }
+}
