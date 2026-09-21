@@ -4,36 +4,6 @@
   "item": [
     {
       "name": "Payment Result Callback - Sample Sender",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "X-PayWay-Hmac-Sha512",
-            "value": "{{computed_header}}",
-            "description": "base64(HMAC-SHA512(ksorted concat values, secret_key))"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          },
-          "raw": "{\n  \"tran_id\": \"{{tran_id}}\",\n  \"apv\": 1,\n  \"status\": \"0\",\n  \"return_params\": \"{{return_params}}\"\n}"
-        },
-        "url": {
-          "raw": "{{callback_listener}}",
-          "host": [
-            "{{callback_listener}}"
-          ]
-        },
-        "description": "## Payment callback\nPayWay POSTs this JSON to your `callback_url` (or profile pushback URL) and signs it:\n```\nX-PayWay-Hmac-Sha512: base64(HMAC-SHA512(<concat>, {{secret_key}}))\n```\n- Sort the payload keys ascending (`apv, return_params, status, tran_id`) as they arrived, **concat values** (arrays/objects are json_encoded), HMAC-SHA512, Base64, then compare with `hash_equals` against the header.\n- `apv` auto-generated approval code; `status` 0/2/3/4/7; `return_params` echoes what you sent.\n\nThis request posts a **sample** to `{{callback_listener}}` (set it to webhook.site) so you can inspect the raw wire format."
-      },
       "event": [
         {
           "listen": "prerequest",
@@ -63,7 +33,8 @@
               "C.set('computed_header', hmac512(msg, C.get('secret_key')));",
               "console.log('callback concat:', msg);",
               "console.log('X-PayWay-Hmac-Sha512:', pm.collectionVariables.get('computed_header'));"
-            ]
+            ],
+            "packages": {}
           }
         },
         {
@@ -72,13 +43,11 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('Sent to listener (HTTP 2xx/4xx)', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 400, 404]); });"
-            ]
+            ],
+            "packages": {}
           }
         }
-      ]
-    },
-    {
-      "name": "Token Result Callback (CoF) - Sample Sender",
+      ],
       "request": {
         "method": "POST",
         "header": [
@@ -94,12 +63,12 @@
         ],
         "body": {
           "mode": "raw",
+          "raw": "{\n  \"tran_id\": \"{{tran_id}}\",\n  \"apv\": 1,\n  \"status\": \"0\",\n  \"return_params\": \"{{return_params}}\"\n}",
           "options": {
             "raw": {
               "language": "json"
             }
-          },
-          "raw": "{\n  \"request_id\": \"{{request_id}}\",\n  \"payment_credential\": {\n    \"ctid\": \"{{ctid}}\",\n    \"pwt\": \"{{pwt}}\",\n    \"source_of_fund\": \"\",\n    \"type\": \"CARD\",\n    \"status\": \"ACTIVE\",\n    \"expired_at\": \"2026-12-31 00:00:00\",\n    \"token_flag\": \"{{token_flag}}\",\n    \"frequency\": \"\",\n    \"subscribed_amount\": \"\",\n    \"amount_limit_per_tran\": \"\",\n    \"currency\": \"{{currency}}\"\n  }\n}"
+          }
         },
         "url": {
           "raw": "{{callback_listener}}",
@@ -107,8 +76,12 @@
             "{{callback_listener}}"
           ]
         },
-        "description": "## CoF token callback\nAfter Link Account / Link Card completes, PayWay POSTs the credential JSON to your `callback_url` and signs it with the same `X-PayWay-Hmac-Sha512` rule.\n\nFields: `request_id` (the one you sent), `payment_credential` with `ctid`, `pwt`, `token_flag`, `status` (ACTIVE/CONSUMED), `expired_at`, etc.\n\n**Save `{{ctid}}` + `{{pwt}}` from this payload** (or from Get Token Details). This request posts a sample to `{{callback_listener}}`."
+        "description": "## Payment callback\nPayWay POSTs this JSON to your `callback_url` (or profile pushback URL) and signs it:\n```\nX-PayWay-Hmac-Sha512: base64(HMAC-SHA512(<concat>, {{secret_key}}))\n```\n- Sort the payload keys ascending (`apv, return_params, status, tran_id`) as they arrived, **concat values** (arrays/objects are json_encoded), HMAC-SHA512, Base64, then compare with `hash_equals` against the header.\n- `apv` auto-generated approval code; `status` 0/2/3/4/7; `return_params` echoes what you sent.\n\nThis request posts a **sample** to `{{callback_listener}}` (set it to webhook.site) so you can inspect the raw wire format."
       },
+      "response": []
+    },
+    {
+      "name": "Token Result Callback (CoF) - Sample Sender",
       "event": [
         {
           "listen": "prerequest",
@@ -132,7 +105,8 @@
               "}).join('');",
               "C.set('computed_header', hmac512(msg, C.get('secret_key')));",
               "console.log('callback concat:', msg);"
-            ]
+            ],
+            "packages": {}
           }
         },
         {
@@ -141,32 +115,45 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('Sent to listener (HTTP 2xx/4xx)', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 400, 404]); });"
-            ]
+            ],
+            "packages": {}
           }
         }
-      ]
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-PayWay-Hmac-Sha512",
+            "value": "{{computed_header}}",
+            "description": "base64(HMAC-SHA512(ksorted concat values, secret_key))"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"request_id\": \"{{request_id}}\",\n  \"payment_credential\": {\n    \"ctid\": \"{{ctid}}\",\n    \"pwt\": \"{{pwt}}\",\n    \"source_of_fund\": \"\",\n    \"type\": \"CARD\",\n    \"status\": \"ACTIVE\",\n    \"expired_at\": \"2026-12-31 00:00:00\",\n    \"token_flag\": \"{{token_flag}}\",\n    \"frequency\": \"\",\n    \"subscribed_amount\": \"\",\n    \"amount_limit_per_tran\": \"\",\n    \"currency\": \"{{currency}}\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{callback_listener}}",
+          "host": [
+            "{{callback_listener}}"
+          ]
+        },
+        "description": "## CoF token callback\nAfter Link Account / Link Card completes, PayWay POSTs the credential JSON to your `callback_url` and signs it with the same `X-PayWay-Hmac-Sha512` rule.\n\nFields: `request_id` (the one you sent), `payment_credential` with `ctid`, `pwt`, `token_flag`, `status` (ACTIVE/CONSUMED), `expired_at`, etc.\n\n**Save `{{ctid}}` + `{{pwt}}` from this payload** (or from Get Token Details). This request posts a sample to `{{callback_listener}}`."
+      },
+      "response": []
     },
     {
       "name": "Sync webhook.site -> Postman (pull callbacks)",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "https://api.webhook.site/token/{{webhook_token}}/requests",
-          "protocol": "https",
-          "host": [
-            "api",
-            "webhook",
-            "site"
-          ],
-          "path": [
-            "token",
-            "{{webhook_token}}",
-            "requests"
-          ]
-        },
-        "description": "## Pull callbacks from webhook.site into Postman\nwebhook.site stores every request it receives and exposes them via a REST API:\n`GET https://api.webhook.site/token/<uuid>/requests`\n\nThe `<uuid>` is taken automatically from `{{callback_listener}}` (e.g. `https://webhook.site/abc-123` -> token `abc-123`) by the pre-request script, so set `{{callback_listener}}` first.\n\nThis request fetches all received payloads (newest first) and the test script imports them into collection variables:\n- `tran_id` / `last_tran_id` (payment pushback)\n- `ctid`, `pwt`, `token_flag` (CoF token callback)\n- `last_callback_status`\n\nAfter clicking Send, later requests in folders 08 / 11 can immediately use `{{pwt}}` / `{{ctid}}` without manual copy-paste. (webhookbin.com has no such API; use webhook.site for this.)"
-      },
       "event": [
         {
           "listen": "prerequest",
@@ -180,7 +167,8 @@
               "C.set('webhook_token', m ? m[1] : '');",
               "if (!m) console.log('No webhook.site UUID found in {{callback_listener}}. Set it to https://webhook.site/<uuid> first.');",
               "else console.log('webhook_token:', m[1]);"
-            ]
+            ],
+            "packages": {}
           }
         },
         {
@@ -190,9 +178,11 @@
             "exec": [
               "pm.test('webhook.site API responded', function () { pm.response.to.have.status(200); });",
               "var C = pm.collectionVariables;",
-              "var list = pm.response.json();",
+              "// webhook.site returns either a legacy top-level array or a paginated {data: [...]}.",
+              "var pj = pm.response.json();",
+              "var list = Array.isArray(pj) ? pj : (pj && pj.data) || [];",
               "var synced = false;",
-              "[].concat(list || []).forEach(function (req) {",
+              "list.forEach(function (req) {",
               "  if (!req || typeof req.content !== 'string') return;",
               "  var body;",
               "  try { body = JSON.parse(req.content); } catch (e) { return; }",
@@ -215,10 +205,30 @@
               "});",
               "pm.test('At least one recognizable callback was imported', function () { pm.expect(synced).to.eql(true, 'No callback payload with tran_id/payment_credential found yet - send one first.'); });",
               "console.log(synced ? 'SYNC OK: variables updated from webhook.site' : 'No recognizable payloads yet - send a callback, then re-run.');"
-            ]
+            ],
+            "packages": {}
           }
         }
-      ]
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://webhook.site/token/{{webhook_token}}/requests",
+          "protocol": "https",
+          "host": [
+            "webhook",
+            "site"
+          ],
+          "path": [
+            "token",
+            "{{webhook_token}}",
+            "requests"
+          ]
+        },
+        "description": "## Pull callbacks from webhook.site into Postman\nwebhook.site stores every request it receives and exposes them via a REST API:\n`GET https://api.webhook.site/token/<uuid>/requests`\n\nThe `<uuid>` is taken automatically from `{{callback_listener}}` (e.g. `https://webhook.site/abc-123` -> token `abc-123`) by the pre-request script, so set `{{callback_listener}}` first.\n\nThis request fetches all received payloads (newest first) and the test script imports them into collection variables:\n- `tran_id` / `last_tran_id` (payment pushback)\n- `ctid`, `pwt`, `token_flag` (CoF token callback)\n- `last_callback_status`\n\nAfter clicking Send, later requests in folders 08 / 11 can immediately use `{{pwt}}` / `{{ctid}}` without manual copy-paste. (webhookbin.com has no such API; use webhook.site for this.)"
+      },
+      "response": []
     },
     {
       "name": "Webhook Design Notes",
@@ -239,7 +249,8 @@
           ]
         },
         "description": "## Webhook checklist\n1. **Verify every callback** with `X-PayWay-Hmac-Sha512` (see folder 09 for the exact algorithm).\n2. **Idempotency**: use `tran_id` / `request_id` as the unique key in your database; you may receive a callback more than once.\n3. **Fast 200**: respond 200 immediately; do heavy processing asynchronously.\n4. Return 200 with empty body so PayWay does not retry.\n5. PayWay retries failed deliveries (see your profile/incident settings)."
-      }
+      },
+      "response": []
     }
   ]
 }
