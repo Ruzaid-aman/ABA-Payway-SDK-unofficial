@@ -1,0 +1,5 @@
+$kind: collection
+description: |-
+  ## KHQR guideline
+  Use a dedicated `instore` QR merchant account. Generate a QR (folder 04), have the payer scan it, and look up the matched inbound transaction with the merchant reference you set.
+order: 8000

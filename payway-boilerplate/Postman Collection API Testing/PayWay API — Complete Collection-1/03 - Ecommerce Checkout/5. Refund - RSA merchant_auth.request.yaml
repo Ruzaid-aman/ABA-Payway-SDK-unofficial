@@ -1,0 +1,78 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Refunds `{{last_tran_id}}` by `{{refund_amount}}`. Needs RSA — install **node-forge** (collection → Libraries) or paste `{{refund_merchant_auth}}`; without it the test reports a friendly **SKIPPED**.
+  2. After a successful refund, re-send **3. Check Transaction** — status becomes `4 (REFUNDED)`.
+
+  ## Refund
+  RSA payload: `{ "mc_id": "...", "tran_id": "...", "refund_amount": "..." }`
+  Hash: `request_time + merchant_id + merchant_auth` (merchant_auth is the **base64 of the RSA-encrypted** payload).
+
+  **No node-forge?** Pre-encrypt and paste into `{{refund_merchant_auth}}` (old-style `openssl_public_encrypt`), the script will use it automatically.
+
+  ```php
+  $data = json_encode(['mc_id'=>$mcId,'tran_id'=>$tranId,'refund_amount'=>number_format($amount,2,'.','')]);
+  openssl_public_encrypt($data, $encrypted, $pubKey, OPENSSL_PKCS1_PADDING);
+  $merchant_auth = base64_encode($encrypted);
+  $hash = base64_encode(hash_hmac('sha512', $requestTime.$mcId.$merchant_auth, $secretKey, true));
+  ```
+url: "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/refund"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "merchant_auth": "{{computed_merchant_auth}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Refund - RSA({mc_id,tran_id,refund_amount}); hash: request_time+merchant_id+merchant_auth
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var tranId = C.get('last_tran_id') || C.get('tran_id');
+      var amount = fmtAmt(C.get('refund_amount'));
+      var auth = rsaFallback(JSON.stringify({mc_id: C.get('merchant_id'), tran_id: tranId, refund_amount: amount}), C.get('rsa_public_key'), 'refund_merchant_auth');
+      if (!auth) {
+        console.log('SKIP: merchant_auth could not be computed — node-forge is unavailable and {{refund_merchant_auth}} is empty. Install node-forge (Edit collection > Libraries) or paste a pre-encrypted value into {{refund_merchant_auth}}.');
+        pm.execution.skipRequest();
+      }
+      var msg = reqTime + C.get('merchant_id') + auth;
+      C.set('request_time', reqTime);
+      C.set('computed_merchant_auth', auth);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('RSA payload:', JSON.stringify({mc_id: C.get('merchant_id'), tran_id: tranId, refund_amount: amount}));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      var code = String(j.statusCode || (j.status && j.status.code) || '');
+      var msgTxt = (j.status && j.status.message) || j.message || '';
+      pm.test('HTTP 200', function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test('Refund accepted (API status 0 or 00)', function () {
+        pm.expect(code).to.be.oneOf(['0', '00'], 'Expected success code 0/00 but got ' + code + ' — ' + msgTxt);
+      });
+      if (code === '0' || code === '00') {
+        console.log('Refund accepted for', pm.collectionVariables.get('last_tran_id'));
+      } else {
+        console.log('Refund failed — status:', code, '-', msgTxt);
+      }
+    language: text/javascript
+order: 5000

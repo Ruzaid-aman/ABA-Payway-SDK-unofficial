@@ -7,9 +7,27 @@ const vm = require('vm');
 const path = require('path');
 const assert = require('assert');
 
-const file = path.join(__dirname, '..', 'exp-PayWay API — Complete Collection.postman_collection.json');
-const c = JSON.parse(fs.readFileSync(file, 'utf8'));
-const f09 = c.item.find((f) => f.name.startsWith('09'));
+const { loadYamlCollection } = require('./yaml_collection');
+const collectionDir = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.join(__dirname, '..', 'postman', 'collections', 'PayWay API — Complete Collection');
+const yamlCollection = loadYamlCollection(collectionDir);
+const c = {
+  variable: [...yamlCollection.variables].map(([key, value]) => ({ key, value })),
+  item: [{
+    name: '09 - KHQR Guideline',
+    item: yamlCollection.requests
+      .filter((request) => request.relativePath.startsWith('09 - KHQR Guideline'))
+      .map((request) => ({
+        name: path.basename(request.relativePath, '.request.yaml'),
+        event: (request.scripts || []).map((script) => ({
+          listen: script.type === 'beforeRequest' ? 'prerequest' : 'test',
+          script: { exec: String(script.code || '').split('\n') },
+        })),
+      })),
+  }],
+};
+const f09 = c.item[0];
 
 function freshVars() { return new Map(c.variable.map((v) => [v.key, v.value])); }
 

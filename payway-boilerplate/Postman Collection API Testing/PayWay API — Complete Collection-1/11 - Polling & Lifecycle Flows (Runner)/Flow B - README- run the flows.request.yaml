@@ -1,0 +1,18 @@
+$kind: http-request
+name: "Flow B - README: run the flows"
+description: |-
+  ## Collection Runner flows
+  Open the **Collection Runner**: select folder **11 - Polling & Lifecycle Flows (Runner)** and keep iteration order. The arrows below are wired with `postman.setNextRequest` so they work even when each request is sent individually.
+
+  ### Flow A - QR purchase -> poll -> details -> refund
+  `A1 Create QR` -> `A2 Poll Transaction Status` (loops while `data.payment_status_code` = 2 PENDING, max `{{max_polls}}`) -> `A3 Get Details` -> `A4 Refund`
+
+  ### Flow B - CoF lifecycle
+  `B1 Link Account` -> `B2 Get Token Details` (saves {{pwt}}/{{ctid}}) -> `B3 Payment using Token` -> `B4 Renew` -> `B5 Remove`
+
+  In the Runner, set **delay = 1000 ms** so callbacks/polling have time.
+
+  > Poll loop: `{{poll_count}}` increments each poll; `{{max_polls}}` = 10. Payment status `2` (PENDING) or "not visible yet" loops; any settled status moves on.
+url: https://developer.payway.com.kh/
+method: GET
+order: 1000

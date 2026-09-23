@@ -1,0 +1,19 @@
+$kind: collection
+description: |-
+  ## Callbacks & Webhooks
+  Everything PayWay POSTs back to **your** server, plus how to verify it.
+
+  - Set `{{callback_listener}}` (e.g. webhook.site) and these sample senders will POST real-looking payloads to it.
+  - The `X-PayWay-Hmac-Sha512` header is computed with the same ksort+concat rule PayWay uses, so you can test your verifier end-to-end.
+  - 'Webhook Design Notes' summarises idempotency / retry / response guidance.
+
+  ## How to get a callback URL
+  Postman has no built-in inbound URL; you provide one.
+
+  1. **Free webhook catcher (easiest)** - open **webhook.site** (or webhookbin.com), copy its `https://webhook.site/<uuid>` URL, and paste it into `{{callback_url}}`, `{{cof_callback_url}}` and `{{callback_listener}}`. PayWay/sample senders will POST results there and you watch payloads arrive in the browser.
+     - While PayWay does not push straight into Postman, you **can sync webhook.site -> Postman**: webhook.site exposes a REST API. `GET https://api.webhook.site/token/<uuid>/requests` returns every received payload as JSON. A dedicated Postman request can call that endpoint and, in its test script, save `pwt`/`ctid`/`tran_id` from the latest callback into collection variables - effectively importing the callback. (webhookbin has no such API; use webhook.site for the sync trick.)
+  2. **Postman Mock Server (closest Postman-native)** - create a mock server for this collection in the Postman web UI; it issues a public `https://<mock-id>.mock.pstmn.io` URL that accepts any POST and returns your mock response. The **Call Logs** tab shows every received callback (headers + body) so you can read `pwt`/`tran_id` there.
+  3. **ngrok + local listener** - `ngrok http 8080` pointed at a local web server; set `{{callback_url}}` to the ngrok URL. Best when you want to script saving variables or run a verifier locally.
+
+  > Tip: for the CoF workflows (folders 08 / 11) the callback is optional - request `3. Get Token Details` already fetches and saves `pwt`/`ctid` from the API using `{{request_id}}`.
+order: 9000

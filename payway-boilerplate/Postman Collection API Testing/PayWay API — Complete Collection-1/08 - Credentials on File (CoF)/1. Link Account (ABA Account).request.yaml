@@ -1,0 +1,74 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Just hit **Send** — it generates `{{request_id}}` and returns a deeplink + QR (Visualize tab) to approve in the ABA Mobile app.
+  2. After approving, run **3. Get Token Details** (code 09 until the link is completed) or watch for the callback.
+
+  Hash: merchant_id + request_time + ctid + return_deeplink + callback_url + request_id + token_flag + **frequency** + **purchase_amount** + currency (last two often empty strings).
+
+  Body must use the **same** return_deeplink/callback_url strings as in the hash (plain https -> base64). Set {{cof_return_deeplink}} / {{cof_callback_url}} as plain https (auto-encoded).
+
+  pwt arrives at callback; use Get Token Details with the logged {{request_id}}.
+url: "{{baseUrl}}/api/payment-credential/v3/aof/link-account"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_id":     "{{request_id}}",
+      "request_time":   "{{request_time}}",
+      "merchant_id":    "{{merchant_id}}",
+      "ctid":           "{{ctid}}",
+      "return_deeplink": "{{cof_return_deeplink_b64}}",
+      "token_flag":     "{{token_flag}}",
+      "currency":       "{{currency}}",
+      "callback_url":   "{{cof_callback_b64}}",
+      "hash":           "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Link Account - hash: merchant_id+request_time+ctid+return_deeplink+callback_url+request_id+token_flag+frequency+purchase_amount+currency
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var requestId = genRequestId('REQ');
+      var rdB64 = ensureB64(C.get('cof_return_deeplink'));
+      var cbB64 = ensureB64(C.get('cof_callback_url'));
+      var msg = C.get('merchant_id') + reqTime + C.get('ctid') + rdB64 + cbB64 + requestId + (C.get('token_flag')||'CITI_FLEX') + '' + '' + (C.get('currency')||'USD');
+      C.set('request_id', requestId);
+      C.set('request_time', reqTime);
+      C.set('cof_return_deeplink_b64', rdB64);
+      C.set('cof_callback_b64', cbB64);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+      console.log('request_id:', requestId, '- use it with Get Token Details after the callback fires.')
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      pm.test('HTTP 200', function () { pm.response.to.have.status(200); });
+      try {
+        var j = pm.response.json();
+        if (j.status) {
+          pm.test('status.code present', function () { pm.expect(j.status.code).to.not.be.empty; });
+          console.log('status.code:', j.status.code, '-', j.status.message || '');
+          if (String(j.status.code) === '00') {
+            console.log('Link approved. request_id =', pm.collectionVariables.get('request_id'), '(watch the callback for pwt)');
+          } else {
+            console.log('Non-success code. See error-code table in description. request_id =', pm.collectionVariables.get('request_id'));
+          }
+        }
+      } catch (e) { console.log('Response is not JSON; likely a redirect page.'); }
+      var vj = {}; try { vj = pm.response.json(); } catch (e) {}
+      if (vj.data && (vj.data.qr_string || vj.data.qrString)) visualizeQr('', vj.data.qr_string || vj.data.qrString, 'Link Account - scan in ABA Mobile, approve, then run Get Token Details with request_id ' + pm.collectionVariables.get('request_id'));
+    language: text/javascript
+order: 1000

@@ -1,0 +1,105 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/payment-gateway/v1/exchange-rate"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "req_time": "{{req_time}}",
+        "merchant_id": "{{merchant_id}}",
+        "hash": "{{computed_hash}}"
+      }
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    date: Mon, 21 Sep 2026 17:57:19 GMT
+    content-type: application/json
+    transfer-encoding: chunked
+    connection: keep-alive
+    server: cloudflare
+    strict-transport-security: max-age=31536000; includeSubDomains; preload, max-age=31536000; includeSubDomains; preload
+    x-xss-protection: 1; mode=block
+    x-content-type-options: nosniff
+    content-security-policy: upgrade-insecure-requests
+    referrer-policy: same-origin
+    permissions-policy: geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+    cf-cache-status: DYNAMIC
+    content-encoding: gzip
+    cf-ray: a3eaf399dcde28ee-HKG
+  body:
+    type: json
+    content: |-
+      {
+        "status": {
+          "code": "00",
+          "message": "Success!"
+        },
+        "date": "",
+        "exchange_rates": {
+          "usd": {
+            "sell": "4012",
+            "buy": "3990"
+          },
+          "eur": {
+            "sell": "4667.55",
+            "buy": "4466.96"
+          },
+          "vnd": {
+            "sell": "0.15",
+            "buy": "0.14"
+          },
+          "jpy": {
+            "sell": "25.38",
+            "buy": "23.6"
+          },
+          "sgd": {
+            "sell": "3144.05",
+            "buy": "2957.07"
+          },
+          "hkd": {
+            "sell": "517.06",
+            "buy": "462.81"
+          },
+          "myr": {
+            "sell": "1005.09",
+            "buy": "899.62"
+          },
+          "gbp": {
+            "sell": "5345.98",
+            "buy": "5094.92"
+          },
+          "aud": {
+            "sell": "2815.59",
+            "buy": "2634.62"
+          },
+          "cad": {
+            "sell": "2911.53",
+            "buy": "2629.91"
+          },
+          "chf": {
+            "sell": "4287.21",
+            "buy": "4165.67"
+          },
+          "krw": {
+            "sell": "2.7",
+            "buy": "2.4"
+          },
+          "thb": {
+            "sell": "124.36",
+            "buy": "118.3"
+          },
+          "php": {
+            "sell": "91.35",
+            "buy": "85.13"
+          },
+          "cny": {
+            "sell": "586.18",
+            "buy": "531.62"
+          }
+        }
+      }
+order: 1000

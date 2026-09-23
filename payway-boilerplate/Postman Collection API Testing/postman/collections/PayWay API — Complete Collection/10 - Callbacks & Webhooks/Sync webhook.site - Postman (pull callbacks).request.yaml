@@ -1,0 +1,61 @@
+$kind: http-request
+name: Sync webhook.site -> Postman (pull callbacks)
+description: |-
+  ## Pull callbacks from webhook.site into Postman
+  webhook.site stores every request it receives and exposes them via a REST API:
+  `GET https://api.webhook.site/token/<uuid>/requests`
+
+  The `<uuid>` is taken automatically from `{{callback_listener}}` (e.g. `https://webhook.site/abc-123` -> token `abc-123`) by the pre-request script, so set `{{callback_listener}}` first.
+
+  This request fetches all received payloads (newest first) and the test script imports them into collection variables:
+  - `tran_id` / `last_tran_id` (payment pushback)
+  - `ctid`, `pwt`, `token_flag` (CoF token callback)
+  - `last_callback_status`
+
+  After clicking Send, later requests in folders 08 / 11 can immediately use `{{pwt}}` / `{{ctid}}` without manual copy-paste. (webhookbin.com has no such API; use webhook.site for this.)
+url: https://webhook.site/token/{{webhook_token}}/requests
+method: GET
+scripts:
+  - type: beforeRequest
+    code: |-
+      if (!pm.collectionVariables.get('webhook_token')) throw new Error('Set {{webhook_token}} first (the UUID part of your webhook.site bin URL).'); // listener guard
+      var C = pm.collectionVariables;
+      var listener = C.get('callback_listener') || '';
+      var m = listener.match(/webhook\.site\/([0-9a-fA-F-]{8,})/);
+      C.set('webhook_token', m ? m[1] : '');
+      if (!m) console.log('No webhook.site UUID found in {{callback_listener}}. Set it to https://webhook.site/<uuid> first.');
+      else console.log('webhook_token:', m[1]);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('webhook.site API responded', function () { pm.response.to.have.status(200); });
+      var C = pm.collectionVariables;
+      // webhook.site returns either a legacy top-level array or a paginated {data: [...]}.
+      var pj = pm.response.json();
+      var list = Array.isArray(pj) ? pj : (pj && pj.data) || [];
+      var synced = false;
+      list.forEach(function (req) {
+        if (!req || typeof req.content !== 'string') return;
+        var body;
+        try { body = JSON.parse(req.content); } catch (e) { return; }
+        if (body && body.tran_id) {
+          C.set('tran_id', body.tran_id);
+          C.set('last_tran_id', body.tran_id);
+          synced = true;
+          console.log('tran_id synced:', body.tran_id);
+        }
+        if (body && body.payment_credential && typeof body.payment_credential === 'object') {
+          var pc = body.payment_credential;
+          if (pc.ctid) { C.set('ctid', pc.ctid); synced = true; console.log('ctid synced:', pc.ctid); }
+          if (pc.pwt)  { C.set('pwt', pc.pwt);   synced = true; console.log('pwt synced:',  pc.pwt);  }
+          if (pc.token_flag) C.set('token_flag', pc.token_flag);
+        }
+        if (body && body.apv !== undefined && body.status !== undefined) {
+          C.set('last_callback_status', body.status);
+          console.log('last_callback_status synced:', body.status);
+        }
+      });
+      pm.test('At least one recognizable callback was imported', function () { pm.expect(synced).to.eql(true, 'No callback payload with tran_id/payment_credential found yet - send one first.'); });
+      console.log(synced ? 'SYNC OK: variables updated from webhook.site' : 'No recognizable payloads yet - send a callback, then re-run.');
+    language: text/javascript
+order: 3000

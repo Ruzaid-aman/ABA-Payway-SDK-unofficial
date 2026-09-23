@@ -1,0 +1,15 @@
+$kind: http-request
+description: |-
+  ## What this collection covers
+  - **Ecommerce Checkout** (folder 03): Purchase, Get TXN Details, Check TXN, Close TXN, Refund, TXN List, Exchange Rate
+  - **ABA QR API** (folder 04): Generate QR
+  - **Payment Link** (folder 05): Create, Get Details
+  - **Pre-auth** (folder 06): Complete, Complete+payout, Cancel
+  - **Payout** (folder 07): Payout, Add-to-whitelist, Update whitelist status
+  - **Credentials on File (CoF)** (folder 08): Link-account, Link-card, Get-token-details, Payment, Renew, Remove
+  - **KHQR Guideline** (folder 09): Get transactions by merchant ref
+  - **Callbacks & Webhooks** (folder 10): payment/token payloads + verification + senders
+  - **Polling & Lifecycle Flows** (folder 11): Collection-Runner flows (setNextRequest)
+url: https://developer.payway.com.kh/api-endpoints-984508m0
+method: GET
+order: 3000

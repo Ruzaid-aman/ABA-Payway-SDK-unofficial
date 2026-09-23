@@ -1,0 +1,54 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. ⚠️ **Irreversible** — deletes the token in `{{pwt}}` (and clears the variable). Test this last.
+
+  Permanently removes the token (irreversible).
+
+  Hash formula: merchant_id + ctid + request_time + pwt
+url: "{{baseUrl}}/api/payment-credential/v3/token-management/remove-token"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "merchant_id":  "{{merchant_id}}",
+      "ctid":         "{{ctid}}",
+      "pwt":          "{{pwt}}",
+      "hash":         "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // Remove token - hash: merchant_id+ctid+request_time+pwt
+      var C = pm.collectionVariables;
+      if (!C.get('pwt')) throw new Error('Set {{pwt}} first.');
+      var reqTime = utcNow();
+      var msg = C.get('merchant_id') + C.get('ctid') + reqTime + C.get('pwt');
+      C.set('request_time', reqTime);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 200', function () { pm.response.to.have.status(200); });
+      try {
+        var j = pm.response.json();
+        if (j.status) {
+          pm.test('status.code present', function () { pm.expect(j.status.code).to.not.be.empty; });
+          console.log('status.code:', j.status.code, '-', j.status.message || '');
+          if (String(j.status.code) === '00') {
+            console.log('Token removed. Clear {{pwt}} to avoid reusing a dead token.');
+            pm.collectionVariables.set('pwt', '');
+          }
+        }
+      } catch (e) { console.log('Response was not JSON.'); }
+    language: text/javascript
+order: 6000

@@ -1,0 +1,54 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-list-2"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "req_time": "{{req_time}}",
+        "merchant_id": "{{merchant_id}}",
+        "from_date": "{{from_date}}",
+        "to_date": "{{to_date}}",
+        "from_amount": "",
+        "to_amount": "",
+        "status": "{{tran_status_filter}}",
+        "page": "1",
+        "pagination": "20",
+        "hash": "{{computed_hash}}"
+      }
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    date: Mon, 21 Sep 2026 17:53:21 GMT
+    content-type: application/json
+    transfer-encoding: chunked
+    connection: keep-alive
+    server: cloudflare
+    strict-transport-security: max-age=31536000; includeSubDomains; preload, max-age=31536000; includeSubDomains; preload
+    x-xss-protection: 1; mode=block
+    x-content-type-options: nosniff
+    content-security-policy: upgrade-insecure-requests
+    referrer-policy: same-origin
+    permissions-policy: geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+    cf-cache-status: DYNAMIC
+    set-cookie: __cf_bm=aePr2kyvB1mRuzrkmnOLZighcU9wB4FZCAsyvYUNXig-1790013201.8137937-1.0.1.1-RFlkJ.B1Lm_g9jMTCjFuNy9kJeUL99wo2VhB_Jd9ZmgrKq_PjcG42QIcq7E1k2oeNOSDbOfMhyVUpILgOYKCU_Pruwj9IlNTVl14wqMSGNNOln8TG8y1Hn9m.BRxsWvo; HttpOnly; SameSite=None; Secure; Path=/; Domain=payway.com.kh; Expires=Mon, 21 Sep 2026 18:23:21 GMT
+    content-encoding: gzip
+    cf-ray: a3eaedcf5ebd3201-HKG
+  body:
+    type: json
+    content: |-
+      {
+        "data": [],
+        "page": "1",
+        "pagination": "20",
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "1790013201"
+        }
+      }
+order: 2000

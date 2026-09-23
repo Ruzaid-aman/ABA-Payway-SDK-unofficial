@@ -1,0 +1,74 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Run **Create Payment Link** first — its `payment_link_id` is auto-saved and consumed here.
+  2. RSA needed (node-forge or `{{pl_merchant_auth}}`); without it the test reports **SKIPPED**.
+
+  ## Get Payment Link Details
+  RSA payload: `{ "mc_id": "...", "id": "..." }` (id = link id from Create).
+  Hash: `request_time + merchant_id + merchant_auth`.
+  Without node-forge, set `{{pl_merchant_auth}}`.
+url: "{{baseUrl}}/api/merchant-portal/merchant-access/payment-link/detail"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "merchant_auth": "{{computed_merchant_auth}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Payment Link Detail - RSA({mc_id,id}); hash: request_time+merchant_id+merchant_auth
+      var C = pm.collectionVariables;
+      var linkId = (C.get('payment_link_id') || '').trim();
+      if (!linkId) {
+        console.log('SKIP: {{payment_link_id}} is empty. Run "Create Payment Link" first — its test saves data.id automatically.');
+        pm.execution.skipRequest();
+      }
+      var reqTime = utcNow();
+      var payload = { mc_id: C.get('merchant_id'), id: linkId };
+      var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'pl_merchant_auth');
+      if (!auth) {
+        console.log('SKIP: merchant_auth could not be computed — node-forge is unavailable and {{pl_merchant_auth}} is empty. Install node-forge (Edit collection > Libraries) or paste a pre-encrypted value into {{pl_merchant_auth}}.');
+        pm.execution.skipRequest();
+      }
+      var msg = reqTime + C.get('merchant_id') + auth;
+      C.set('request_time', reqTime);
+      C.set('computed_merchant_auth', auth);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('RSA payload:', JSON.stringify(payload));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      var code = String(j.statusCode || (j.status && j.status.code) || '');
+      var msgTxt = (j.status && j.status.message) || j.message || '';
+      pm.test('HTTP 200', function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test('Get Payment Link Details accepted (API status 0 or 00)', function () {
+        pm.expect(code).to.be.oneOf(['0', '00'], 'Expected success code 0/00 but got ' + code + ' — ' + msgTxt);
+      });
+      if (code === '0' || code === '00') {
+        if (j.data) console.log('link detail:', JSON.stringify(j.data).slice(0, 300));
+      } else {
+        console.log('Get Payment Link Details failed — status:', code, '-', msgTxt);
+      }
+    language: text/javascript
+order: 2000

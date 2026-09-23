@@ -1,0 +1,10 @@
+$kind: collection
+description: |-
+  ## Polling & Lifecycle Flows (Collection Runner)
+  Composable flows via `postman.setNextRequest` - run these from the **Collection Runner** (set delay 1000 ms).
+
+  - **Flow A:** Generate QR -> poll until settled -> get details -> refund.
+  - **Flow B:** Link account -> get token -> charge -> renew -> remove.
+
+  Fallback: when run as single requests, each step still saves the variables the next step needs (`{{last_tran_id}}`, `{{pwt}}`, `{{request_id}}`).
+order: 10000

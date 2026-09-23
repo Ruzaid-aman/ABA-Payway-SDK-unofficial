@@ -1,0 +1,11 @@
+$kind: http-request
+description: |-
+  ## Webhook checklist
+  1. **Verify every callback** with `X-PayWay-Hmac-Sha512` (see folder 09 for the exact algorithm).
+  2. **Idempotency**: use `tran_id` / `request_id` as the unique key in your database; you may receive a callback more than once.
+  3. **Fast 200**: respond 200 immediately; do heavy processing asynchronously.
+  4. Return 200 with empty body so PayWay does not retry.
+  5. PayWay retries failed deliveries (see your profile/incident settings).
+url: https://developer.payway.com.kh/overview-865678m0
+method: GET
+order: 4000

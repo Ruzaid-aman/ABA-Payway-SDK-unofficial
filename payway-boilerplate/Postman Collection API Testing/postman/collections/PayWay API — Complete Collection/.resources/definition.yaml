@@ -1,0 +1,421 @@
+$kind: collection
+description: |-
+  # 🚀 PayWay API — Get Started
+
+  **Welcome!** This collection is a complete playground for the [PayWay merchant APIs](https://developer.payway.com.kh/). It ships **pre-configured with this project's sandbox merchant credentials** (merchant `ec476910`), so your first request works immediately — no extra setup.
+
+  > **While testing:** open the Postman **Console** (bottom-left). Every request logs its `b4hash:` signing string there so you can verify it against the docs.
+
+  ---
+
+  ## 1 · Your first transaction (60 seconds, zero setup)
+
+  1. Open **03 - Ecommerce Checkout → 1. Purchase (Hosted Checkout)** → hit **Send**.
+  2. Open the **Visualize** tab of the response → click **Open payment page →**.
+     The button form-POSTs your signed fields and the checkout page is served by PayWay itself — no CORS problems.
+  3. Pay with the sandbox test card:
+
+     | Card | Number | Expiry | CVV | 3-D Secure |
+     |---|---|---|---|---|
+     | ✅ Success | `4286 0900 0000 0206` | 04/30 | 777 | Yes (any code) |
+     | ✅ Success (no 3DS) | `5156 8399 3770 6777` | 01/30 | 993 | No |
+     | ❌ Declined | `5156 8302 7256 1029` | 04/30 | 777 | Yes |
+
+  4. Back in Postman, send **3. Check Transaction** → `payment_status_code: 0 (APPROVED)` 🎉
+
+  That is the whole merchant lifecycle you are learning: **create → host the page → verify**.
+
+  > 💡 **Helper text everywhere:** every request's description starts with a **⚡ Quick test** block — what to set (usually nothing), what you'll see, and what to send next. After key responses the **Console** also prints a `NEXT:` hint.
+
+  ## 2 · What happens automatically
+
+  - **Chaining** — every response saves what the next request needs: `{{last_tran_id}}`, `{{pwt}}`, `{{ctid}}`, `{{request_id}}`, `{{payment_link_id}}`. Just send requests in the documented order.
+  - **Signing** — every pre-request builds `hash = base64(HMAC-SHA512(field values in documented order, secret_key))` and logs the exact input as `b4hash:`. Amounts are formatted per `{{currency}}`: USD 2 decimals, KHR integer.
+  - **Polling** — **11 - Polling & Lifecycle Flows → Flow A** loops on `data.payment_status_code` while it is `2 (PENDING)`, budgeted by `{{max_polls}}`. Run the folder in the **Collection Runner** (delay ≥ 1000 ms).
+  - **Callbacks** — folder **10** documents payment/token payloads + `X-PayWay-Hmac-Sha512` verification, can replay samples to `{{callback_listener}}`, and can **pull** callbacks back from webhook.site into your variables.
+  - **RSA endpoints** (Refund, Payment Link, Pre-auth, Payout, Whitelist) encrypt `merchant_auth`/`beneficiaries` with the self-contained PKCS#1 v1.5 helper and Postman's secure random source. No library installation or package download is needed.
+  - **Prerequisite guards** — requests that need earlier state (`{{pwt}}`, `{{request_id}}`, `{{last_tran_id}}`) stop with a clear message telling you exactly which request to run first.
+
+  ## 3 · Pick your journey
+
+  | You want to… | Go to |
+  |---|---|
+  | Take a card / ABA Pay / wallet payment | **03 - Ecommerce Checkout** |
+  | Show a QR to scan (ABA app) | **04 - ABA QR API**, then poll with **Flow A** in **11** |
+  | Link a card/account, charge later | **08 - Credentials on File (CoF)** |
+  | Sell via a shareable link | **05 - Payment Link** |
+  | Hold funds, capture or release later | **06 - Pre-auth** |
+  | Split payments to beneficiaries | **07 - Payout** |
+  | Look up KHQR payments by merchant ref | **09 - KHQR Guideline** |
+  | Test your webhook handling | **10 - Callbacks & Webhooks** |
+
+  ## 4 · Switching to your own merchant (before real integration)
+
+  | Variable | Replace with | Notes |
+  |---|---|---|
+  | `{{merchant_id}}` | Your sandbox merchant ID | From PayWay onboarding |
+  | `{{secret_key}}` | Your sandbox secret | Stored as a **Postman secret** type — masked in UI/exports |
+  | `{{rsa_public_key}}` | Your RSA public key (PEM) | Needed by the RSA endpoints above |
+  | `{{ctid}}` | Your consumer ID | CoF folders |
+  | `{{baseUrl}}` | `https://checkout.payway.com.kh` | Production only |
+
+  > ⚠️ The pre-filled demo credentials are **public** — use them only to explore. Replace them before touching anything real, and never commit your secret into source control.
+
+  ## 5 · Transaction statuses
+
+  `data.payment_status_code`: **0** APPROVED / PRE-AUTH · **2** PENDING · **3** DECLINED · **4** REFUNDED · **7** CANCELLED
+
+  Gateway `status.code` is `"00"`/`0` on success and otherwise an error code (string *or* number) — test scripts normalize both. Most common errors:
+
+  | Code | Meaning | | Code | Meaning |
+  |---|---|---|---|---|
+  | 1 | Wrong hash | | 5 | Transaction not found |
+  | 4 | Given data was invalid | | 6 | Domain not whitelisted |
+  | 2 | Invalid transaction ID | | 12 | Currency not allowed |
+  | 4 | Duplicated transaction ID | | 47 | KHR must be ≥ 100 |
+  | 23 | Payment option not enabled | | 429 | Rate limit exceeded |
+  | PTL02 | Wrong hash (portal APIs) | | 503 | Under maintenance |
+
+  Full table: [developer.payway.com.kh](https://developer.payway.com.kh/) · `b4hash:` in the Console is your first stop for any `Wrong hash`.
+
+  ## 6 · 60-second fixes
+
+  The five snags that cost developers the most time, with the one-line fix:
+
+  | Symptom | Fix |
+  |---|---|
+  | `Wrong hash` (code 1) | Open the **Console** → compare the `b4hash:` line with the docs' field order (each request's description lists it too). USD amounts need 2 decimals, KHR none — the scripts handle this via `fmtAmt`. |
+  | RSA endpoints answer `SKIPPED` | Ensure the Postman runtime supports `crypto.getRandomValues`; or paste a fresh pre-encrypted value into the fallback variable named in the request. |
+  | Code 5 / transaction not found | `check-transaction-2` only sees the **last 7 days** and **no KHQR** transactions — use **2. Get Transaction Details** instead. |
+  | Code 49 Invalid Start Date | Transaction List dates must be `yyyy-mm-dd hh:mm:ss` (auto-filled for you — don't shorten them). |
+  | Code 23 payment option not enabled | The demo profile doesn't allow that wallet — switch `{{payment_option}}` (try `cards` or `abapay_khqr`). |
+
+  ## 7 · Environments
+
+  - **Sandbox (default):** `https://checkout-sandbox.payway.com.kh`
+  - **Production:** `https://checkout.payway.com.kh` — only after replacing the demo credentials
+  - **Docs:** [developer.payway.com.kh](https://developer.payway.com.kh/)
+variables:
+  baseUrl: https://checkout-sandbox.payway.com.kh
+  merchant_id: ec476910
+  secret_key: 05082504b76df71e468f8c0ff36f863e19e4cd29
+  buyer_first_name: Test
+  buyer_last_name: User
+  buyer_email: test@example.com
+  buyer_phone: "0123456789"
+  return_params_raw: ""
+  rsa_public_key: |-
+    -----BEGIN PUBLIC KEY-----
+    MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCOzQHS55DWKJADrAuuwu5pNHuT
+    SFQiCQHBt8bcROwQYxTrlZgPmJznvocVgIoawSLcldBZ6VWH1QFdYEGWo3VH9iC/
+    cm94em0lfzSti6P9C8N78yeXBjPYA7Wu954jzH5ClN+tB2tmNjFRF+iAiqO4b01H
+    lH5i2pyTppIfiX6oYQIDAQAB
+    -----END PUBLIC KEY-----
+  currency: USD
+  amount: "0.10"
+  ctid: customer123
+  pwt: ""
+  request_time: ""
+  request_id: ""
+  tran_id: ""
+  computed_hash: ""
+  last_tran_id: ""
+  payment_option: abapay_khqr
+  qr_image_template: template3_color
+  return_url: aHR0cHM6Ly93ZWJob29rLnNpdGUvNmFkYzZlNDktNTJmMy00ODQyLTk4YjAtNTI4YTFlMzdjZGEy
+  cancel_url: https://example.com/cancel
+  continue_success_url: https://example.com/success
+  return_deeplink_raw: ""
+  callback_url: aHR0cHM6Ly93ZWJob29rLnNpdGUvNmFkYzZlNDktNTJmMy00ODQyLTk4YjAtNTI4YTFlMzdjZGEy
+  items_json: '[{"name":"Test Item","quantity":1,"price":0.10}]'
+  custom_fields_json: ""
+  payout_json: ""
+  additional_params_json: ""
+  google_pay_token: ""
+  skip_success_page: "0"
+  view_type: hosted_view
+  payment_gate: "0"
+  lifetime: "3"
+  shipping_fee: "0.00"
+  token_flag: CITI_FLEX
+  sub_frequency: 1W
+  sub_lifetime: "30"
+  callback_listener: ""
+  webhook_token: ""
+  poll_count: "0"
+  max_polls: "10"
+  poll_status: ""
+  refund_amount: "0.10"
+  refund_merchant_auth: ""
+  pl_merchant_auth: ""
+  payment_link_id: ""
+  preauth_merchant_auth: ""
+  preauth_payout_merchant_auth: ""
+  cancel_preauth_merchant_auth: ""
+  payout_beneficiaries: ""
+  add_whitelist_merchant_auth: ""
+  update_whitelist_merchant_auth: ""
+  whitelist_payee: "500000001"
+  merchant_ref: MREF-0001
+  khqr_bakong_id: abaakhppxxx@abaa
+  khqr_mid: "323080411495479"
+  khqr_bank_name: ABA Bank
+  khqr_mcc: "5544"
+  khqr_merchant_name: LUCKY SUPER MARKET 102
+  khqr_merchant_city: PHNOM PENH
+  khqr_payway_data: 0010PAYWAY@ABA020610259006049E4C
+  khqr_mode: dynamic
+  khqr_expiry_minutes: "30"
+  khqr_merchant_ref: ""
+  khqr_payload: ""
+  khqr_selftest: ""
+  khqr_amount_used: ""
+  khqr_currency_used: ""
+  khqr_transaction_id: ""
+  khqr_payment_status: ""
+  khqr_payment_status_code: ""
+  khqr_payment_amount: ""
+  khqr_payment_currency: ""
+  khqr_callback_count: ""
+  khqr_final_status: ""
+  test_mc_success: 5156 8399 3770 6777
+  test_visa_success: 4286 0900 0000 0206
+  test_mc_declined: 5156 8302 7256 1029
+  test_visa_declined: 4156 8399 3770 6777
+  test_expiry: 01/30
+  from_date: ""
+  to_date: ""
+  tran_status_filter: ""
+  test_cvv: "123"
+  sub_payment_option: abapay
+  sub_firstname: Test
+  sub_lastname: User
+  sub_email: test@example.com
+  sub_phone: "0123456789"
+  cof_return_deeplink: ""
+  cof_callback_url: ""
+  cof_continue_success_url: ""
+  cof_amount: "0.10"
+  purchase_type: purchase
+  return_params: ""
+  req_time: ""
+  items_b64: ""
+  shipping: ""
+  return_url_b64: ""
+  cancel_url_b64: ""
+  continue_success_url_b64: ""
+  return_deeplink_b64: ""
+  custom_fields_b64: ""
+  payout_b64: ""
+  additional_params_b64: ""
+  computed_merchant_auth: ""
+  callback_url_b64: ""
+  computed_beneficiaries: ""
+  cof_return_deeplink_b64: ""
+  cof_callback_b64: ""
+  cof_continue_b64: ""
+  last_pay_status: ""
+  sub_amount_fmt: ""
+  sub_items_b64: ""
+  sub_ret_b64: ""
+  sub_can_b64: ""
+  sub_con_b64: ""
+  computed_header: ""
+  last_callback_status: ""
+  __helpers_v20260923_portable_v2: |-
+    var CryptoJS = require('crypto-js');
+
+    function _pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+    function utcNow() {
+      var d = new Date();
+      return '' + d.getUTCFullYear() + _pad(d.getUTCMonth()+1) + _pad(d.getUTCDate()) +
+             _pad(d.getUTCHours()) + _pad(d.getUTCMinutes()) + _pad(d.getUTCSeconds());
+    }
+
+    function hmac512(msg, secret) {
+      return CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA512(msg, secret));
+    }
+
+    function b64(str) {
+      return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(str));
+    }
+
+    function b64json(obj) {
+      if (typeof obj === 'string') return b64(obj);
+      return b64(JSON.stringify(obj));
+    }
+
+    function ensureB64(url) {
+      url = (url || '').trim();
+      if (!url) return '';
+      if (/^https?:\/\//i.test(url)) return b64(url);
+      return url;
+    }
+
+    function fmtAmt(a, cur) { var n = parseFloat(a) || 0; if (String(cur || '').toUpperCase() === 'KHR') return String(Math.round(n)); return n.toFixed(2); }
+    function genTranId() { return 'T' + Date.now().toString(); }
+    function genRequestId(p) { return (p || 'REQ') + Date.now().toString().slice(-12); }
+    function okStatus(j) { return !!(j && j.status && (String(j.status.code) === '0' || String(j.status.code) === '00')); }
+    function respCode(j) { return j && j.status ? String(j.status.code) : ''; }
+    function rsaMissing(j) {
+      // true when the gateway rejected the call only because the RSA payload (merchant_auth / beneficiaries) was empty
+      var errs = (j && j.errors) || (j && j.status && j.status.errors) || null;
+      var code = String((j && j.statusCode) || (j && j.status && j.status.code) || '');
+      if (code !== '04') return false;
+      return !!errs && /merchant_auth|beneficiaries/i.test(Object.keys(errs).join(' '));
+    }
+
+
+    function rsaFallback(jsonStr, pem, fallbackVar) {
+      var enc = openSslEncrypt(jsonStr, pem);
+      if (enc) return enc;
+      var fb = pm.collectionVariables.get(fallbackVar) || '';
+      if (!fb) {
+        console.log('WARN: secure randomness unavailable and {{' + fallbackVar + '}} is empty. Paste a fresh pre-computed value.');
+      }
+      return fb;
+    }
+
+    // ---- JSON Schema assertions (draft-04 subset) ----
+    // Usage: assertJsonSchema({ required: ['status', 'data'], properties: { status: { type: 'object' } } })
+    function assertJsonSchema(schema, expected) {
+      if (typeof expected === 'undefined') expected = 200;
+      pm.test('HTTP ' + expected, function () { pm.response.to.have.status(expected); });
+      if (!schema) { pm.test('JSON Schema defined', function () { pm.expect(schema).to.not.be.empty; }); return; }
+      pm.test('Response matches JSON Schema', function () {
+        pm.response.to.have.jsonSchema(schema);
+      });
+    }
+    function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+    // ---- Postman Visualizer helpers (no-ops in newman/CI) ----
+    function visualizeFormPost(action, fields, title, note) {
+      if (typeof pm.visualizer === 'undefined' || !pm.visualizer.set) return;
+      var inputs = '';
+      for (var k in fields) {
+        inputs += '<input type="hidden" name="' + escHtml(k) + '" value="' + escHtml(fields[k]) + '">';
+      }
+      var tpl = '<html><head><meta charset="utf-8"><style>body{font:14px/1.5 sans-serif;margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#fafafa;color:#222}.card{max-width:560px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06)}h4{margin:0 0 8px}p{margin:0 0 16px;color:#555;font-size:13px}button{font:600 14px sans-serif;padding:10px 18px;border:0;border-radius:8px;background:#0a7d38;color:#fff;cursor:pointer}</style></head><body><div class="card"><h4>{{title}}</h4><p>{{note}}</p><p style="margin:-6px 0 16px;color:#8a8f98;font-size:12px">The checkout opens in a new browser tab. If nothing opens, allow pop-ups for Postman and click again.</p><form method="POST" action="{{action}}" target="_blank">{{{inputs}}}<button type="submit">Open payment page in a new tab &rarr;</button></form></div></body></html>';
+      pm.visualizer.set(tpl, { title: String(title || ''), note: String(note || ''), action: String(action || ''), inputs: inputs });
+    }
+    function visualizeQr(dataUrl, qrText, title) {
+      if (typeof pm.visualizer === 'undefined' || !pm.visualizer.set) return;
+      var img = dataUrl
+        ? '<img alt="QR code" style="width:300px;height:300px" src="' + dataUrl + '">'
+        : '<div id="qrbox">Rendering QR...</div>' +
+          '<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"><\/script>' +
+          '<script>try { new QRCode(document.getElementById("qrbox"), { text: ' + JSON.stringify(String(qrText || '')).replace(/</g, '\\u003c') + ', width: 300, height: 300 }); } catch (e) { document.getElementById("qrbox").textContent = "QR render failed - copy the string below into any QR tool."; }<\/script>';
+      var tpl = '<html><head><meta charset="utf-8"><style>body{font:14px sans-serif;margin:16px;color:#222}code{display:block;white-space:pre-wrap;word-break:break-all;background:#f4f4f5;padding:10px;border-radius:6px;margin-top:14px;font-size:11px}h4{margin:0 0 12px}</style></head><body><h4>{{title}}</h4>{{{img}}}{{#if qrText}}<code>{{qrText}}</code>{{/if}}</body></html>';
+      pm.visualizer.set(tpl, { title: String(title || 'Scan with the ABA Mobile app'), img: img, qrText: String(qrText || '') });
+    }
+
+    function openSslEncrypt(jsonStr, pem) {
+      if (typeof BigInt !== 'function' || typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') return null;
+      var CryptoJS = require('crypto-js');
+      function bytes(wordArray) {
+        var result = [];
+        for (var i = 0; i < wordArray.sigBytes; i++) result.push((wordArray.words[i >>> 2] >>> (24 - 8 * (i % 4))) & 255);
+        return result;
+      }
+      function wordArray(values) {
+        var words = [];
+        for (var i = 0; i < values.length; i++) words[i >>> 2] = (words[i >>> 2] || 0) | (values[i] << (24 - 8 * (i % 4)));
+        return CryptoJS.lib.WordArray.create(words, values.length);
+      }
+      function readTlv(data, position) {
+        var tag = data[position++];
+        var length = data[position++];
+        if (length & 128) {
+          var count = length & 127;
+          if (!count || count > 4) throw new Error('Invalid RSA public key DER length');
+          length = 0;
+          while (count--) length = length * 256 + data[position++];
+        }
+        var end = position + length;
+        if (end > data.length) throw new Error('Truncated RSA public key DER');
+        return { tag: tag, start: position, end: end };
+      }
+      function integer(data, part) {
+        if (part.tag !== 2) throw new Error('Invalid RSA public key integer');
+        var value = BigInt(0);
+        for (var i = part.start; i < part.end; i++) value = value * BigInt(256) + BigInt(data[i]);
+        return value;
+      }
+      function modPow(base, exponent, modulus) {
+        var result = BigInt(1);
+        while (exponent > 0) {
+          if (exponent & BigInt(1)) result = result * base % modulus;
+          base = base * base % modulus;
+          exponent >>= BigInt(1);
+        }
+        return result;
+      }
+      var encoded = String(pem || '').replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+      var der = bytes(CryptoJS.enc.Base64.parse(encoded));
+      var outer = readTlv(der, 0);
+      if (outer.tag !== 48 || outer.end !== der.length) throw new Error('Expected SPKI RSA public key');
+      var algorithm = readTlv(der, outer.start);
+      var bitString = readTlv(der, algorithm.end);
+      if (algorithm.tag !== 48 || bitString.tag !== 3 || der[bitString.start] !== 0) throw new Error('Expected SPKI RSA public key');
+      var key = readTlv(der, bitString.start + 1);
+      var modulusPart = readTlv(der, key.start);
+      var exponentPart = readTlv(der, modulusPart.end);
+      if (key.tag !== 48 || exponentPart.end !== key.end) throw new Error('Invalid RSA public key');
+      var modulus = integer(der, modulusPart);
+      var exponent = integer(der, exponentPart);
+      var keyBytes = Math.ceil((modulus.toString(2).length) / 8);
+      var chunkSize = keyBytes - 11;
+      if (chunkSize < 1 || exponent < 3) throw new Error('Invalid RSA public key size or exponent');
+      var input = bytes(CryptoJS.enc.Utf8.parse(jsonStr));
+      var output = [];
+      for (var offset = 0; offset < input.length; offset += chunkSize) {
+        var chunk = input.slice(offset, offset + chunkSize);
+        var padLength = keyBytes - chunk.length - 3;
+        var block = [0, 2];
+        var random = new Uint8Array(padLength);
+        crypto.getRandomValues(random);
+        for (var j = 0; j < padLength; j++) {
+          while (random[j] === 0) crypto.getRandomValues(random.subarray(j, j + 1));
+          block.push(random[j]);
+        }
+        block.push(0);
+        block.push.apply(block, chunk);
+        var number = BigInt(0);
+        for (var k = 0; k < block.length; k++) number = number * BigInt(256) + BigInt(block[k]);
+        var encrypted = modPow(number, exponent, modulus);
+        var result = new Array(keyBytes);
+        for (var p = keyBytes - 1; p >= 0; p--) {
+          result[p] = Number(encrypted % BigInt(256));
+          encrypted /= BigInt(256);
+        }
+        output.push.apply(output, result);
+      }
+      return CryptoJS.enc.Base64.stringify(wordArray(output));
+    }
+  __helpers: ""
+scripts:
+  - type: http:beforeRequest
+    code: |-
+      // ---- PayWay helper library (restored into this script's own scope) ----
+      // Postman executes every script (collection / folder / request-level, pre-request
+      // and test) in its OWN scope: functions declared in one script are NOT visible in
+      // another. The library therefore ships as the versioned `__helpers_v20260923_portable_v2` collection variable and
+      // every script that needs the helpers starts by evaluating it.
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (__h && !pm.collectionVariables.get('__helpers_v20260923_portable_v2')) {
+        __h += '\n\n' + "function openSslEncrypt(jsonStr, pem) {\n  if (typeof BigInt !== 'function' || typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') return null;\n  var CryptoJS = require('crypto-js');\n  function bytes(wordArray) {\n    var result = [];\n    for (var i = 0; i < wordArray.sigBytes; i++) result.push((wordArray.words[i >>> 2] >>> (24 - 8 * (i % 4))) & 255);\n    return result;\n  }\n  function wordArray(values) {\n    var words = [];\n    for (var i = 0; i < values.length; i++) words[i >>> 2] = (words[i >>> 2] || 0) | (values[i] << (24 - 8 * (i % 4)));\n    return CryptoJS.lib.WordArray.create(words, values.length);\n  }\n  function readTlv(data, position) {\n    var tag = data[position++];\n    var length = data[position++];\n    if (length & 128) {\n      var count = length & 127;\n      if (!count || count > 4) throw new Error('Invalid RSA public key DER length');\n      length = 0;\n      while (count--) length = length * 256 + data[position++];\n    }\n    var end = position + length;\n    if (end > data.length) throw new Error('Truncated RSA public key DER');\n    return { tag: tag, start: position, end: end };\n  }\n  function integer(data, part) {\n    if (part.tag !== 2) throw new Error('Invalid RSA public key integer');\n    var value = BigInt(0);\n    for (var i = part.start; i < part.end; i++) value = value * BigInt(256) + BigInt(data[i]);\n    return value;\n  }\n  function modPow(base, exponent, modulus) {\n    var result = BigInt(1);\n    while (exponent > 0) {\n      if (exponent & BigInt(1)) result = result * base % modulus;\n      base = base * base % modulus;\n      exponent >>= BigInt(1);\n    }\n    return result;\n  }\n  var encoded = String(pem || '').replace(/-----[^-]+-----/g, '').replace(/\\s/g, '');\n  var der = bytes(CryptoJS.enc.Base64.parse(encoded));\n  var outer = readTlv(der, 0);\n  if (outer.tag !== 48 || outer.end !== der.length) throw new Error('Expected SPKI RSA public key');\n  var algorithm = readTlv(der, outer.start);\n  var bitString = readTlv(der, algorithm.end);\n  if (algorithm.tag !== 48 || bitString.tag !== 3 || der[bitString.start] !== 0) throw new Error('Expected SPKI RSA public key');\n  var key = readTlv(der, bitString.start + 1);\n  var modulusPart = readTlv(der, key.start);\n  var exponentPart = readTlv(der, modulusPart.end);\n  if (key.tag !== 48 || exponentPart.end !== key.end) throw new Error('Invalid RSA public key');\n  var modulus = integer(der, modulusPart);\n  var exponent = integer(der, exponentPart);\n  var keyBytes = Math.ceil((modulus.toString(2).length) / 8);\n  var chunkSize = keyBytes - 11;\n  if (chunkSize < 1 || exponent < 3) throw new Error('Invalid RSA public key size or exponent');\n  var input = bytes(CryptoJS.enc.Utf8.parse(jsonStr));\n  var output = [];\n  for (var offset = 0; offset < input.length; offset += chunkSize) {\n    var chunk = input.slice(offset, offset + chunkSize);\n    var padLength = keyBytes - chunk.length - 3;\n    var block = [0, 2];\n    var random = new Uint8Array(padLength);\n    crypto.getRandomValues(random);\n    for (var j = 0; j < padLength; j++) {\n      while (random[j] === 0) crypto.getRandomValues(random.subarray(j, j + 1));\n      block.push(random[j]);\n    }\n    block.push(0);\n    block.push.apply(block, chunk);\n    var number = BigInt(0);\n    for (var k = 0; k < block.length; k++) number = number * BigInt(256) + BigInt(block[k]);\n    var encrypted = modPow(number, exponent, modulus);\n    var result = new Array(keyBytes);\n    for (var p = keyBytes - 1; p >= 0; p--) {\n      result[p] = Number(encrypted % BigInt(256));\n      encrypted /= BigInt(256);\n    }\n    output.push.apply(output, result);\n  }\n  return CryptoJS.enc.Base64.stringify(wordArray(output));\n}";
+        pm.collectionVariables.set('__helpers_v20260923_portable_v2', __h);
+      }
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+    language: text/javascript
+  - type: http:afterResponse
+    code: |-
+      // Global test: log status.code if the response is JSON
+      if (pm.response && pm.response.headers && pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').toLowerCase().indexOf('json') >= 0) {
+        try {
+          var j = pm.response.json();
+          if (j.status) console.log('Response status.code:', j.status.code, '-', j.status.message);
+        } catch (e) {}
+      }
+    language: text/javascript

@@ -1,0 +1,50 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  Send it. The response `uuid` becomes a fresh webhook.site bin: the test script saves `https://webhook.site/<uuid>` into `{{callback_listener}}` and the UUID into `{{webhook_token}}` (the same variables folder 10 uses).
+
+  **Why this exists:** an offline KHQR has **no per-QR callback field** - PayWay POSTs the payment notification to the webhook URL provisioned on your merchant account. Create the bin here, point that provisioning at it (ABA), and steps 3-4 of this folder can verify payments end-to-end. Re-running creates a NEW bin and repoints the variables.
+url: https://webhook.site/token
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: "{}"
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // Creates a throwaway webhook.site bin to catch the offline-KHQR payment pushback.
+      // Offline KHQR has NO per-QR callback field: PayWay POSTs the payment notification to
+      // the webhook URL provisioned on your merchant account - point that provisioning at
+      // the https://webhook.site/<uuid> URL this response produces.
+      var C = pm.collectionVariables;
+      console.log('Creating a fresh webhook.site receiver - re-running creates a NEW bin and repoints the callback_listener / webhook_token variables.');
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      var C = pm.collectionVariables;
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      if (pm.response.code === 200 || pm.response.code === 201) {
+        pm.test('webhook.site receiver created', function () {
+          pm.expect(j.uuid).to.be.a('string');
+        });
+        C.set('webhook_token', j.uuid);
+        C.set('callback_listener', 'https://webhook.site/' + j.uuid);
+        console.log('Receiver ready: https://webhook.site/' + j.uuid, '(saved into callback_listener + webhook_token - the same variables folder 10 uses).');
+        console.log('NEXT: point your PayWay merchant-account KHQR webhook at this URL (ABA provisioning), then run "2. Build Offline KHQR (TLV + CRC + QR)".');
+      } else {
+        pm.test('webhook.site responded (2xx)', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });
+        console.log('webhook.site could not create a bin (HTTP ' + pm.response.code + '). Create one manually at https://webhook.site and paste its URL into the callback_listener collection variable, then continue with request 2.');
+      }
+    language: text/javascript
+order: 1000

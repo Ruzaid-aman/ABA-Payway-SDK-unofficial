@@ -1,0 +1,18 @@
+$kind: http-request
+description: |-
+  ### Sandbox cards (values are pre-set as collection variables)
+
+  | Result | Type | Card number | Expiry | CVV | 3-D Secure |
+  |---|---|---|---|---|---|
+  | Success | Mastercard | `{{test_mc_success}}` (5156 8399 3770 6777) | 01/30 | 993 | No |
+  | Success | Visa | `{{test_visa_success}}` (4286 0900 0000 0206) | 04/30 | 777 | Yes |
+  | Declined | Mastercard | `{{test_mc_declined}}` (5156 8302 7256 1029) | 04/30 | 777 | Yes |
+  | Declined | Visa | `{{test_visa_declined}}` (4156 8399 3770 6777) | 01/30 | 993 | No |
+
+  Use these in the hosted checkout page that PayWay opens for the **purchase** flow (folder 03).
+
+  ### 3-D Secure
+  Visa cards above trigger a simulated 3DS challenge — enter any code to continue. Mastercard success card has no 3DS.
+url: https://developer.payway.com.kh/resources-3305682f0
+method: GET
+order: 2000

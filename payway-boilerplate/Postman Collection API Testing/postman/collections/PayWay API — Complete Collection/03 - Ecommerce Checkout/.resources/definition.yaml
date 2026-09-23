@@ -1,0 +1,14 @@
+$kind: collection
+description: |-
+  ## Ecommerce Checkout
+  REST endpoints for the standard hosted-checkout flow (cards, ABA KHQR, wallets).
+
+  **Suggested order:**
+  1. **Purchase** - creates a transaction and returns a hosted page; save the `tran_id` (auto-stored in `{{last_tran_id}}`).
+  2. **Check Transaction** - fast status check while a customer pays (great for polling).
+  3. **Get Transaction Details** - full record.
+  4. **Close Transaction** / **Refund** - close or money-back (Refund needs RSA).
+  5. **Transaction List** / **Exchange Rate** - admin views.
+
+  All hashes follow `req_time + merchant_id + tran_id + ...` per endpoint (see each description).
+order: 2000

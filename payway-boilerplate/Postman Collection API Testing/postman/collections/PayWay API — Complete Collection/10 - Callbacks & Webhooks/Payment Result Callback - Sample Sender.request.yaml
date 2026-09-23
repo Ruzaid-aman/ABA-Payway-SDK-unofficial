@@ -1,0 +1,59 @@
+$kind: http-request
+description: |-
+  ## Payment callback
+  PayWay POSTs this JSON to your `callback_url` (or profile pushback URL) and signs it:
+  ```
+  X-PayWay-Hmac-Sha512: base64(HMAC-SHA512(<concat>, {{secret_key}}))
+  ```
+  - Sort the payload keys ascending (`apv, return_params, status, tran_id`) as they arrived, **concat values** (arrays/objects are json_encoded), HMAC-SHA512, Base64, then compare with `hash_equals` against the header.
+  - `apv` auto-generated approval code; `status` 0/2/3/4/7; `return_params` echoes what you sent.
+
+  This request posts a **sample** to `{{callback_listener}}` (set it to webhook.site) so you can inspect the raw wire format.
+url: "{{callback_listener}}"
+method: POST
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-PayWay-Hmac-Sha512
+    value: "{{computed_header}}"
+    description: base64(HMAC-SHA512(ksorted concat values, secret_key))
+body:
+  type: json
+  content: |-
+    {
+      "tran_id": "{{tran_id}}",
+      "apv": 1,
+      "status": "0",
+      "return_params": "{{return_params}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      if (!pm.collectionVariables.get('callback_listener')) throw new Error('Set {{callback_listener}} first (e.g. create a bin at webhook.site and paste its URL) - in production PayWay POSTs callbacks to your callback_url.'); // listener guard
+      // Compute X-PayWay-Hmac-Sha512 exactly as PayWay does: sorted keys, concat values, HMAC-SHA512, base64.
+      var C = pm.collectionVariables;
+      var obj = {
+        tran_id: C.get('tran_id') || C.get('last_tran_id') || genTranId(),
+        apv: 1,
+        status: '0',
+        return_params: (C.get('return_params') || '').toString()
+      };
+      var keys = Object.keys(obj).sort();
+      var msg = keys.map(function (k) {
+        var v = obj[k];
+        if (typeof v === 'string' || typeof v === 'number') return String(v);
+        return JSON.stringify(v);
+      }).join('');
+      C.set('tran_id', obj.tran_id);
+      C.set('computed_header', hmac512(msg, C.get('secret_key')));
+      console.log('callback concat:', msg);
+      console.log('X-PayWay-Hmac-Sha512:', pm.collectionVariables.get('computed_header'));
+    language: text/javascript
+  - type: afterResponse
+    code: pm.test('Sent to listener (HTTP 2xx/4xx)', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 400, 404]); });
+    language: text/javascript
+order: 1000

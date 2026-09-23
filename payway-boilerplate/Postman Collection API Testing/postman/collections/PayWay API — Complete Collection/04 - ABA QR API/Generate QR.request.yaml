@@ -1,0 +1,100 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Just hit **Send** → the **Visualize** tab renders the scannable KHQR + raw `qrString`.
+  2. Scan with the ABA Mobile app, then poll **Flow A (folder 11)** or use **2. Get Transaction Details** — *Check Transaction cannot see QR transactions*.
+
+  ## Generate QR
+  Hash order: `req_time, merchant_id, tran_id, amount, items, first_name, last_name, email, phone, purchase_type, payment_option, callback_url, return_deeplink, currency, custom_fields, return_params, payout, lifetime, qr_image_template`.
+
+  - `purchase_type` allows only `purchase` or `pre-auth` (sandbox-verified 2026-09). The wallet selector is `payment_option`: `abapay_khqr` (QR static), `abapay_khqr_deeplink`, `abapay`, `abapay_deeplink`, `cards`, `alipay`, `wechat`.
+  - `callback_url` is base64-encoded (auto).
+  - Field `account_information` may be passed to override the default QR account.
+  - Response (sandbox-verified): `qrString` = KHQR string to render as a QR image; `qrImage` = base64 PNG data-URL of the templated QR.
+url: "{{baseUrl}}/api/payment-gateway/v1/payments/generate-qr"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "req_time": "{{req_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "tran_id": "{{tran_id}}",
+      "amount": "{{amount}}",
+      "items": "{{items_b64}}",
+      "first_name": "{{buyer_first_name}}",
+      "last_name": "{{buyer_last_name}}",
+      "email": "{{buyer_email}}",
+      "phone": "{{buyer_phone}}",
+      "purchase_type": "{{purchase_type}}",
+      "payment_option": "{{payment_option}}",
+      "callback_url": "{{callback_url_b64}}",
+      "return_deeplink": "{{return_deeplink_b64}}",
+      "currency": "{{currency}}",
+      "custom_fields": "{{custom_fields_b64}}",
+      "return_params": "{{return_params}}",
+      "payout": "{{payout_b64}}",
+      "lifetime": "{{lifetime}}",
+      "qr_image_template": "{{qr_image_template}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // Generate QR - hash order listed above
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var tranId = genTranId();
+      var amount = fmtAmt(C.get('amount'));
+      var itemRaw = (C.get('items_json') || '').trim() || '[{"name":"Test Item","quantity":1,"price":0.10}]';
+      var itemsB64 = b64json(itemRaw);
+      var cbB64 = ensureB64(C.get('callback_url'));
+      var rdl = b64json((C.get('return_deeplink_raw')||'').trim());
+      var customB64 = b64json((C.get('custom_fields_json')||'').trim());
+      var payoutB64 = b64json((C.get('payout_json')||'').trim());
+      var rparams = (C.get('return_params_raw')||'').trim();
+      var msg = reqTime + C.get('merchant_id') + tranId + amount + itemsB64
+        + C.get('buyer_first_name') + C.get('buyer_last_name') + C.get('buyer_email') + C.get('buyer_phone')
+        + C.get('purchase_type') + C.get('payment_option') + cbB64 + rdl + C.get('currency')
+        + customB64 + rparams + payoutB64 + C.get('lifetime') + C.get('qr_image_template');
+      C.set('req_time', reqTime);
+      C.set('tran_id', tranId);
+      C.set('amount', amount);
+      C.set('items_b64', itemsB64);
+      C.set('callback_url_b64', cbB64);
+      C.set('return_deeplink_b64', rdl);
+      C.set('custom_fields_b64', customB64);
+      C.set('payout_b64', payoutB64);
+      C.set('return_params', rparams);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      if (okStatus(j)) {
+        pm.collectionVariables.set('last_tran_id', pm.collectionVariables.get('tran_id'));
+        pm.test('QR generated (status.code 0)', function () { pm.expect(okStatus(j)).to.eql(true); });
+        // Sandbox-verified response keys: qrString (render as QR) + qrImage (base64 data-URL)
+        if (j.qrString) console.log('qrString:', String(j.qrString).slice(0, 48) + '...');
+        if (j.qrImage) console.log('qrImage: data-URL received (' + String(j.qrImage).length + ' chars) - paste into a browser to view');
+      console.log('NEXT: scan the QR (Visualize tab) with the ABA Mobile app, then poll Flow A (folder 11) or use 2. Get Transaction Details.');
+      } else if (j.status) {
+        console.log('QR business error', j.status.code, '-', j.status.message);
+      }
+      assertJsonSchema({"type":"object","properties":{"status":{"type":"object","properties":{"code":{"type":["number","string"]},"message":{"type":"string"}}},"qrString":{"type":"string"},"qrImage":{"type":"string"}}});
+      var vj = {}; try { vj = pm.response.json(); } catch (e) {}
+      if (vj.qrImage || vj.qrString) visualizeQr(vj.qrImage, vj.qrString, 'Scan with the ABA Mobile app (sandbox). tran_id: ' + pm.collectionVariables.get('tran_id'));
+    language: text/javascript
+order: 1000

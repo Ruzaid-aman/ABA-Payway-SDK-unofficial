@@ -1,0 +1,81 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Whitelist each payee first (request 2), then set `{{payout_json}}` = `[{"acc":"...","amt":0.05}]` and **Send**.
+  2. RSA needed (node-forge or `{{payout_beneficiaries}}`); per-beneficiary minimum USD 0.01 / KHR 100.
+
+  ## Payout
+  `beneficiaries` is the **base64 of the RSA-encrypted** array `[{"account":"...","amount":"..."}, ...]` (max 250).
+  Hash order: `merchant_id, tran_id, beneficiaries, amount, custom_fields, currency`.
+
+  - `amount` here is the merchant's payout total string.
+  - Every account must already be whitelisted (folder 07 requests 2/3).
+  - Min per beneficiary: USD 0.01 / KHR 100.
+  Without node-forge, set `{{payout_beneficiaries}}` (paste base64).
+
+  ```php
+  $data = json_encode([['account'=>'...','amount'=>'...'],['account'=>'...','amount'=>'...']]);
+  openssl_public_encrypt($data, $enc, $key, OPENSSL_PKCS1_PADDING);
+  $beneficiaries = base64_encode($enc);
+  ```
+url: "{{baseUrl}}/api/payment-gateway/v2/direct-payment/merchant/payout"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "merchant_id": "{{merchant_id}}",
+      "tran_id": "{{tran_id}}",
+      "beneficiaries": "{{computed_beneficiaries}}",
+      "amount": "{{amount}}",
+      "custom_fields": "{{custom_fields_b64}}",
+      "currency": "{{currency}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Payout - RSA([{account,amount}]); hash: merchant_id+tran_id+beneficiaries+amount+custom_fields+currency
+      var C = pm.collectionVariables;
+      var tranId = genTranId();
+      var amount = fmtAmt(C.get('amount'));
+      var benef = [];
+      var raw = (C.get('payout_json') || '').trim();
+      if (raw) { try { benef = JSON.parse(raw); } catch (e) {} }
+      else { benef = [{ account: '500000001', amount: amount }]; }
+      var auth = rsaFallback(JSON.stringify(benef), C.get('rsa_public_key'), 'payout_beneficiaries');
+      var customB64 = b64json((C.get('custom_fields_json')||'').trim());
+      var msg = C.get('merchant_id') + tranId + auth + amount + customB64 + C.get('currency');
+      C.set('tran_id', tranId);
+      C.set('amount', amount);
+      C.set('computed_beneficiaries', auth);
+      C.set('custom_fields_b64', customB64);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('RSA beneficiaries:', JSON.stringify(benef));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      if (rsaMissing(j)) {
+        pm.test('SKIPPED - RSA payload not configured', function () { pm.expect(true).to.eql(true); });
+        console.log('SKIPPED: the gateway needs an RSA-encrypted merchant_auth. Install the node-forge library (collection > Libraries) or paste a pre-computed value into the fallback variable - see the request description.');
+      } else {
+        var code = j.statusCode || (j.status && j.status.code);
+        pm.test('Payout responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });
+        if (String(code) === '0' || String(code) === '00') { console.log('Payout accepted:', JSON.stringify(j.data || {}).slice(0, 200)); }
+        else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }
+      }
+    language: text/javascript
+order: 1000

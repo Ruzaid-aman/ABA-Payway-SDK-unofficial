@@ -1,0 +1,60 @@
+$kind: http-request
+description: |-
+  ## CoF token callback
+  After Link Account / Link Card completes, PayWay POSTs the credential JSON to your `callback_url` and signs it with the same `X-PayWay-Hmac-Sha512` rule.
+
+  Fields: `request_id` (the one you sent), `payment_credential` with `ctid`, `pwt`, `token_flag`, `status` (ACTIVE/CONSUMED), `expired_at`, etc.
+
+  **Save `{{ctid}}` + `{{pwt}}` from this payload** (or from Get Token Details). This request posts a sample to `{{callback_listener}}`.
+url: "{{callback_listener}}"
+method: POST
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-PayWay-Hmac-Sha512
+    value: "{{computed_header}}"
+    description: base64(HMAC-SHA512(ksorted concat values, secret_key))
+body:
+  type: json
+  content: |-
+    {
+      "request_id": "{{request_id}}",
+      "payment_credential": {
+        "ctid": "{{ctid}}",
+        "pwt": "{{pwt}}",
+        "source_of_fund": "",
+        "type": "CARD",
+        "status": "ACTIVE",
+        "expired_at": "2026-12-31 00:00:00",
+        "token_flag": "{{token_flag}}",
+        "frequency": "",
+        "subscribed_amount": "",
+        "amount_limit_per_tran": "",
+        "currency": "{{currency}}"
+      }
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      if (!pm.collectionVariables.get('callback_listener')) throw new Error('Set {{callback_listener}} first (e.g. create a bin at webhook.site and paste its URL) - in production PayWay POSTs callbacks to your callback_url.'); // listener guard
+      // Signature for the token callback (same ksort+concat rule; nested object json_encoded).
+      var C = pm.collectionVariables;
+      var obj = {
+        request_id: C.get('request_id') || genRequestId('REQ'),
+        payment_credential: { ctid: C.get('ctid'), pwt: C.get('pwt'), source_of_fund: '', type: 'CARD', status: 'ACTIVE', expired_at: '2026-12-31 00:00:00', token_flag: C.get('token_flag'), frequency: '', subscribed_amount: '', amount_limit_per_tran: '', currency: C.get('currency') }
+      };
+      var msg = Object.keys(obj).sort().map(function (k) {
+        var v = obj[k];
+        return typeof v === 'object' ? JSON.stringify(v) : String(v);
+      }).join('');
+      C.set('computed_header', hmac512(msg, C.get('secret_key')));
+      console.log('callback concat:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: pm.test('Sent to listener (HTTP 2xx/4xx)', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 400, 404]); });
+    language: text/javascript
+order: 2000

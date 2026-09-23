@@ -1,0 +1,82 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Pay the QR from request 2 (scan it on the Visualize tab).
+  2. Send this request a few seconds later. A matching pushback (same `merchant_ref`) is imported into `khqr_transaction_id` / `khqr_payment_status` / `khqr_payment_status_code` / amount variables.
+  3. Re-run as needed - webhook.site keeps every captured request. In the Collection Runner add a delay and send this again if the pushback lags (PayWay callbacks are single best-effort deliveries).
+
+  Pulls `GET /token/{uuid}/requests` (both the legacy top-level-array and the paginated `{data: [...]}` response shapes are supported) and matches JSON bodies carrying `transaction_id` plus your `merchant_ref`. KHQR pushback fields per the guideline: `transaction_id`, `merchant_ref`, `payment_status_code` (**0 = approved**), `payment_status`, `payment_amount`, `payment_currency`, `apv`, `bank_ref`, `payment_type`, `payer_account`, `bank_name`.
+
+  > If nothing matches: pay first, then check that the merchant-account KHQR webhook is provisioned to THIS bin.
+url: https://webhook.site/token/{{webhook_token}}/requests
+method: GET
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // Pulls captured requests from the webhook.site receiver and looks for the PayWay
+      // offline-KHQR payment pushback for the last generated merchant reference.
+      var C = pm.collectionVariables;
+      if (!C.get('webhook_token')) {
+        var m = (C.get('callback_listener') || '').match(/webhook\.site\/([0-9a-fA-F-]{8,})/);
+        if (m) C.set('webhook_token', m[1]);
+      }
+      if (!C.get('webhook_token')) {
+        throw new Error('No webhook.site receiver: run "1. Create webhook.site Receiver" first (or paste your bin URL into the callback_listener collection variable). Remember PayWay must ALSO be provisioned to POST KHQR notifications there.');
+      }
+      console.log('Polling webhook.site for KHQR pushbacks; matching merchant_ref:', C.get('khqr_merchant_ref') || C.get('merchant_ref'));
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      var C = pm.collectionVariables;
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      pm.test('webhook.site API responded (JSON)', function () {
+        pm.response.to.have.status(200);
+        pm.expect(j).to.be.an('object');
+      });
+      // webhook.site returns a legacy top-level array or a paginated object with .data.
+      var list = Array.isArray(j) ? j : (j && j.data) || [];
+      var ref = C.get('khqr_merchant_ref') || C.get('merchant_ref') || '';
+      var matches = [];
+      list.forEach(function (r) {
+        var body = null;
+        try { body = JSON.parse(r.content); } catch (e) { return; }
+        if (!body || typeof body !== 'object') return;
+        var tid = String(body.transaction_id || body.tran_id || '');
+        if (!tid) return; // not a payment pushback
+        var bref = String(body.merchant_ref || '');
+        if (!ref || !bref || bref === ref) matches.push({ at: String(r.created_at || ''), body: body });
+      });
+      // newest first (webhook.site returns latest-first, but do not rely on it)
+      matches.sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); });
+      C.set('khqr_callback_count', String(matches.length));
+      if (matches.length) {
+        var latest = matches[0].body;
+        var sc = String(latest.payment_status_code !== undefined ? latest.payment_status_code : '');
+        C.set('khqr_transaction_id', String(latest.transaction_id || latest.tran_id || ''));
+        C.set('khqr_payment_status', String(latest.payment_status || ''));
+        C.set('khqr_payment_status_code', sc);
+        C.set('khqr_payment_amount', String(latest.payment_amount !== undefined ? latest.payment_amount : ''));
+        C.set('khqr_payment_currency', String(latest.payment_currency || ''));
+        pm.test('KHQR callback received for merchant_ref ' + ref + ' (payment status: ' + (C.get('khqr_payment_status') || sc || 'unknown') + ')', function () {
+          pm.expect(matches.length).to.be.above(0);
+        });
+        console.log('Pushback captured:', JSON.stringify(latest).slice(0, 500));
+        console.log('NEXT: run "4. Get Transactions by Merchant Ref" to confirm via the inquiry API.');
+        if (matches.length > 1) console.log('NOTE: ' + matches.length + ' payments matched this reference - a KHQR can be PAID MULTIPLE TIMES (guideline). Store every transaction_id; deduplicate by transaction id, never by merchant_ref.');
+      } else {
+        pm.test('KHQR callback captured for merchant_ref ' + ref, function () {
+          pm.expect(matches.length).to.be.above(0, 'No payment pushback yet. Pay the QR, wait a few seconds, re-run this request. Also check that your merchant-account KHQR webhook is provisioned to THIS webhook.site bin (ABA provisioning).');
+        });
+        console.log('No recognizable KHQR pushback yet (looked for JSON bodies with transaction_id + matching merchant_ref). Captured entries in bin:', list.length, '| response shape keys:', Object.keys(j).join(', '));
+      }
+    language: text/javascript
+order: 3000

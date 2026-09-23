@@ -1,0 +1,10 @@
+$kind: collection
+description: |-
+  ## Get started here
+
+  **60-second tour:** open **03 - Ecommerce Checkout → 1. Purchase** → **Send** → **Visualize tab** → click **Open payment page →** → pay with a test card below → back here, send **Check Transaction** → APPROVED.
+
+  The full guide lives on the collection **Overview** tab (click the collection name). Nothing needs configuring — this project's sandbox merchant credentials are pre-filled.
+
+  This folder: test cards, endpoints reference, and the docs links.
+order: 1000

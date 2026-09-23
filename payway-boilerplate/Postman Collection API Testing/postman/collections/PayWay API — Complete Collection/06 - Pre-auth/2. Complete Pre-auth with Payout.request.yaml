@@ -1,0 +1,75 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Same setup as request 1, but the captured amount is split to beneficiaries — set `{{payout_json}}` (`[{"acc":"...","amt":0.05}]`) first.
+  2. RSA encryption runs inside this collection with no package download; `{{preauth_payout_merchant_auth}}` is the manual fallback.
+
+  ## Complete Pre-auth with Payout
+  Same endpoint/order as the plain completion, but the RSA payload also carries a `payout` array:
+  `{ "mc_id": "...", "tran_id": "...", "complete_amount": "...", "payout": [{ "acc": "...", "amt": "...", "reason": "..." } | ...] }`
+  Hash: `merchant_auth + request_time + merchant_id`.
+  If secure randomness is unavailable, set `{{preauth_payout_merchant_auth}}`.
+url: "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "merchant_auth": "{{computed_merchant_auth}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (__h && !pm.collectionVariables.get('__helpers_v20260923_portable_v2')) {
+        __h += '\n\n' + "function openSslEncrypt(jsonStr, pem) {\n  if (typeof BigInt !== 'function' || typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') return null;\n  var CryptoJS = require('crypto-js');\n  function bytes(wordArray) {\n    var result = [];\n    for (var i = 0; i < wordArray.sigBytes; i++) result.push((wordArray.words[i >>> 2] >>> (24 - 8 * (i % 4))) & 255);\n    return result;\n  }\n  function wordArray(values) {\n    var words = [];\n    for (var i = 0; i < values.length; i++) words[i >>> 2] = (words[i >>> 2] || 0) | (values[i] << (24 - 8 * (i % 4)));\n    return CryptoJS.lib.WordArray.create(words, values.length);\n  }\n  function readTlv(data, position) {\n    var tag = data[position++];\n    var length = data[position++];\n    if (length & 128) {\n      var count = length & 127;\n      if (!count || count > 4) throw new Error('Invalid RSA public key DER length');\n      length = 0;\n      while (count--) length = length * 256 + data[position++];\n    }\n    var end = position + length;\n    if (end > data.length) throw new Error('Truncated RSA public key DER');\n    return { tag: tag, start: position, end: end };\n  }\n  function integer(data, part) {\n    if (part.tag !== 2) throw new Error('Invalid RSA public key integer');\n    var value = BigInt(0);\n    for (var i = part.start; i < part.end; i++) value = value * BigInt(256) + BigInt(data[i]);\n    return value;\n  }\n  function modPow(base, exponent, modulus) {\n    var result = BigInt(1);\n    while (exponent > 0) {\n      if (exponent & BigInt(1)) result = result * base % modulus;\n      base = base * base % modulus;\n      exponent >>= BigInt(1);\n    }\n    return result;\n  }\n  var encoded = String(pem || '').replace(/-----[^-]+-----/g, '').replace(/\\s/g, '');\n  var der = bytes(CryptoJS.enc.Base64.parse(encoded));\n  var outer = readTlv(der, 0);\n  if (outer.tag !== 48 || outer.end !== der.length) throw new Error('Expected SPKI RSA public key');\n  var algorithm = readTlv(der, outer.start);\n  var bitString = readTlv(der, algorithm.end);\n  if (algorithm.tag !== 48 || bitString.tag !== 3 || der[bitString.start] !== 0) throw new Error('Expected SPKI RSA public key');\n  var key = readTlv(der, bitString.start + 1);\n  var modulusPart = readTlv(der, key.start);\n  var exponentPart = readTlv(der, modulusPart.end);\n  if (key.tag !== 48 || exponentPart.end !== key.end) throw new Error('Invalid RSA public key');\n  var modulus = integer(der, modulusPart);\n  var exponent = integer(der, exponentPart);\n  var keyBytes = Math.ceil((modulus.toString(2).length) / 8);\n  var chunkSize = keyBytes - 11;\n  if (chunkSize < 1 || exponent < 3) throw new Error('Invalid RSA public key size or exponent');\n  var input = bytes(CryptoJS.enc.Utf8.parse(jsonStr));\n  var output = [];\n  for (var offset = 0; offset < input.length; offset += chunkSize) {\n    var chunk = input.slice(offset, offset + chunkSize);\n    var padLength = keyBytes - chunk.length - 3;\n    var block = [0, 2];\n    var random = new Uint8Array(padLength);\n    crypto.getRandomValues(random);\n    for (var j = 0; j < padLength; j++) {\n      while (random[j] === 0) crypto.getRandomValues(random.subarray(j, j + 1));\n      block.push(random[j]);\n    }\n    block.push(0);\n    block.push.apply(block, chunk);\n    var number = BigInt(0);\n    for (var k = 0; k < block.length; k++) number = number * BigInt(256) + BigInt(block[k]);\n    var encrypted = modPow(number, exponent, modulus);\n    var result = new Array(keyBytes);\n    for (var p = keyBytes - 1; p >= 0; p--) {\n      result[p] = Number(encrypted % BigInt(256));\n      encrypted /= BigInt(256);\n    }\n    output.push.apply(output, result);\n  }\n  return CryptoJS.enc.Base64.stringify(wordArray(output));\n}";
+        pm.collectionVariables.set('__helpers_v20260923_portable_v2', __h);
+      }
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // Complete Pre-auth + payout - RSA payload with payout array; hash: merchant_auth+request_time+merchant_id
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var amount = fmtAmt(C.get('amount'));
+      var payouts = [];
+      var payoutRaw = (C.get('payout_json') || '').trim();
+      if (payoutRaw) { try { payouts = JSON.parse(payoutRaw); } catch (e) {} }
+      else { payouts = [{ acc: '000133879', amt: amount, reason: 'test' }]; }
+      var payload = { mc_id: C.get('merchant_id'), tran_id: C.get('last_tran_id') || genTranId(), complete_amount: amount, payout: payouts };
+      var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'preauth_payout_merchant_auth');
+      if (!auth) {
+        console.log('SKIP: merchant_auth could not be computed. RSA secure randomness is unavailable and {{preauth_payout_merchant_auth}} is empty.');
+        pm.execution.skipRequest();
+      }
+      var msg = auth + reqTime + C.get('merchant_id');
+      C.set('request_time', reqTime);
+      C.set('computed_merchant_auth', auth);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('RSA payload:', JSON.stringify(payload));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      if (rsaMissing(j)) {
+        pm.test('SKIPPED - RSA payload not configured', function () { pm.expect(true).to.eql(true); });
+        console.log('SKIPPED: RSA encryption was unavailable, so no request was sent. Use a Postman runtime with crypto.getRandomValues or set {{preauth_payout_merchant_auth}} manually.');
+      } else {
+        var code = j.statusCode || (j.status && j.status.code);
+        pm.test('Complete Pre-auth with Payout responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });
+        if (String(code) === '0' || String(code) === '00') { console.log('Pre-auth captured with payout split.'); }
+        else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }
+      }
+    language: text/javascript
+order: 2000

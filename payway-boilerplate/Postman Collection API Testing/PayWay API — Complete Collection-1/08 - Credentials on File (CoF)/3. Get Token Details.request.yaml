@@ -1,0 +1,61 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. **Send** after Link Account/Card — uses the auto-saved `{{request_id}}`; on success saves `{{pwt}}`/`{{ctid}}` for Payment/Renew/Remove.
+  2. `code 09 Data not found` = the customer hasn't completed the link yet — expected; approve the deeplink/QR first, then re-send.
+
+  Hash formula: merchant_id + request_time + request_id
+
+  Use the {{request_id}} logged by Link Account/Card. On success the test saves {{pwt}} + {{ctid}} for Payment / Renew / Remove.
+url: "{{baseUrl}}/api/payment-credential/v3/token-management/get-token-details"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "request_id":   "{{request_id}}",
+      "merchant_id":  "{{merchant_id}}",
+      "hash":         "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Get Token Details - hash: merchant_id+request_time+request_id
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      if (!C.get('request_id')) throw new Error('Set {{request_id}} (log from Link Account/Card, or after callback).');
+      var msg = C.get('merchant_id') + reqTime + C.get('request_id');
+      C.set('request_time', reqTime);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      var sc = respCode(j);
+      pm.test('Get Token Details responded (status.code ' + (sc || 'HTTP ' + pm.response.code) + ')', function () { pm.expect(sc || pm.response.code).to.not.be.undefined; });
+      if (sc === '09' || pm.response.code === 403) {
+        // sandbox-verified: code 09 'Data not found' = token not issued yet (link not completed)
+        console.log('Token not issued yet (code 09). Complete the ABA-app link flow from Link Account/Card (deeplink or QR), or wait for the callback, then re-send with the SAME {{request_id}}.');
+      } else if (okStatus(j)) {
+        if (j.data && j.data.pwt) { pm.collectionVariables.set('pwt', j.data.pwt); console.log('pwt saved to collection variables.'); }
+        if (j.data && j.data.ctid) { pm.collectionVariables.set('ctid', j.data.ctid); console.log('ctid saved:', j.data.ctid); }
+        pm.test('pwt available for Payment/Renew/Remove', function () { pm.expect(pm.collectionVariables.get('pwt')).to.not.be.empty; });
+      } else if (j.status) {
+        console.log('status.code:', sc, '-', j.status.message);
+      }
+      if (pm.response.code === 200) assertJsonSchema({"type":"object","required":["status"],"properties":{"status":{"type":"object","properties":{"code":{"type":["number","string"]},"message":{"type":"string"}}},"data":{"type":"object"}}});
+    language: text/javascript
+order: 3000

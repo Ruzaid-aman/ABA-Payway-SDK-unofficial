@@ -78,7 +78,10 @@
               "C.set('computed_hash', hmac512(msg, C.get('secret_key')));",
               "console.log('RSA payload:', JSON.stringify(payload));",
               "console.log('b4hash:', msg);"
-            ]
+            ],
+            "packages": {
+              "node-forge": "1.3.1"
+            }
           }
         },
         {

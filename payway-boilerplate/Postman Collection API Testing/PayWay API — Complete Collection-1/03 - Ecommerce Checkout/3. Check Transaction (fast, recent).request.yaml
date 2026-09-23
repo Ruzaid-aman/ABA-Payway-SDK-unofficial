@@ -1,0 +1,64 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. **Send** — reads `{{last_tran_id}}` and logs the transaction's `payment_status`; saves it to `{{poll_status}}`.
+  2. `2 (PENDING)`? Keep sending, or let **Flow A2 (folder 11)** loop for you in the Collection Runner.
+  3. Only sees the **last 7 days**, and **cannot see KHQR/QR transactions** — for those use **2. Get Transaction Details** (sandbox-verified).
+
+  **Hash:** `req_time + merchant_id + tran_id`
+url: "{{baseUrl}}/api/payment-gateway/v1/payments/check-transaction-2"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "req_time": "{{req_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "tran_id": "{{tran_id}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Check Transaction - hash: req_time+merchant_id+tran_id
+      // Reads the last purchase's tran_id; set {{tran_id}} manually to override.
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var tranId = C.get('last_tran_id') || C.get('tran_id');
+      if (!tranId) throw new Error('No tran_id - run Purchase first (sets {{last_tran_id}}) or set {{tran_id}} manually.');
+      var msg = reqTime + C.get('merchant_id') + tranId;
+      C.set('req_time', reqTime);
+      C.set('tran_id', tranId);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      var sc = respCode(j);
+      pm.collectionVariables.set('poll_status', sc);
+      // Sandbox-verified: status.code is the QUERY status ('00' = query OK). The TRANSACTION
+      // status is data.payment_status_code: 0 approved | 2 pending | 3 declined | 4 refunded | 7 cancelled
+      var pay = j.data && j.data.payment_status_code !== undefined ? String(j.data.payment_status_code) : '';
+      if (pay) pm.collectionVariables.set('last_pay_status', pay);
+      pm.test('Check responded (query ' + sc + ', payment ' + (pay || 'n/a') + ')', function () { pm.expect(sc).to.not.be.empty; });
+      console.log('payment_status:', (j.data && j.data.payment_status) || '-', '(code ' + pay + ') - tran:', j.data && j.data.transaction_id);
+      console.log('status.code (query):', sc, '-', j.status && j.status.message);
+      if (pay === '0') console.log('NEXT: APPROVED - try Refund (5), Close (4), Transaction List (6), or run Flow A in folder 11.');
+      else if (pay === '2') console.log('NEXT: still PENDING - pay the hosted page (Purchase -> Visualize tab) or poll with Flow A2 (folder 11).');
+      else if (pay === '3') console.log('NEXT: DECLINED - re-run Purchase and pay with a success test card (folder 01).');
+      else if (!pay && sc === '5') console.log('NEXT: code 5 - check-transaction-2 only sees the last 7 days and not KHQR; use 2. Get Transaction Details.');
+      assertJsonSchema({"type":"object","required":["status"],"properties":{"status":{"type":"object","required":["code"],"properties":{"code":{"type":["number","string"]},"message":{"type":"string"}}}}});
+    language: text/javascript
+order: 3000

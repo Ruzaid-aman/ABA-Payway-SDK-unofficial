@@ -1,0 +1,40 @@
+$kind: http-request
+description: "Flow A step 4 (final). Refunds `{{last_tran_id}}` for `{{refund_amount}}` (RSA — node-forge or `{{refund_merchant_auth}}`). Ends Flow A: the Runner stops here (`setNextRequest(null)`)."
+url: "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/refund"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "merchant_auth": "{{computed_merchant_auth}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var tranId = C.get('last_tran_id') || C.get('tran_id');
+      var auth = rsaFallback(JSON.stringify({mc_id: C.get('merchant_id'), tran_id: tranId, refund_amount: fmtAmt(C.get('refund_amount'))}), C.get('rsa_public_key'), 'refund_merchant_auth');
+      var msg = reqTime + C.get('merchant_id') + auth;
+      C.set('request_time', reqTime);
+      C.set('computed_merchant_auth', auth);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      var j = pm.response.json();
+      var code = j.statusCode || (j.status && j.status.code);
+      pm.test('Refund responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });
+      postman.setNextRequest(null); // end of Flow A - do not bleed into Flow B
+    language: text/javascript
+order: 5000

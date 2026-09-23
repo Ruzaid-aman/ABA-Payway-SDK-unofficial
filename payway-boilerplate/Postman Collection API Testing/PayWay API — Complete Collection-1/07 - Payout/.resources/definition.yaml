@@ -1,0 +1,7 @@
+$kind: collection
+description: |-
+  ## Payout
+  Mass payouts (up to 250 beneficiaries) plus the whitelist that authorities them.
+
+  **Sequence:** whitelist the payee account first, then send a payout. Both need RSA (folder 06 variables). Payout hashes use the **body beneficiaries ciphertext** as a hash input, so the hash must be computed AFTER encryption.
+order: 6000

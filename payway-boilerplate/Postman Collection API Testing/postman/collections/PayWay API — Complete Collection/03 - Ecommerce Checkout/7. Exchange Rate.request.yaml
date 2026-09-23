@@ -1,0 +1,47 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Just hit **Send** — zero setup; returns today's `exchange_rates` (USD ↔ KHR).
+
+  **Hash:** `req_time + merchant_id`
+url: "{{baseUrl}}/api/payment-gateway/v1/exchange-rate"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "req_time": "{{req_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // Exchange Rate - hash: req_time+merchant_id
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var msg = reqTime + C.get('merchant_id');
+      C.set('req_time', reqTime);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) { }
+      var sc = respCode(j);
+      pm.test('Exchange rate responded (status.code ' + sc + ')', function () { pm.expect(sc).to.not.be.empty; });
+      pm.test('Exchange rate success (0/00)', function () { pm.expect(okStatus(j)).to.eql(true); });
+      if (j.exchange_rates) console.log('rates:', JSON.stringify(j.exchange_rates).slice(0, 200));
+    language: text/javascript
+order: 7000

@@ -1,22 +1,24 @@
-const fs = require('fs');
-const c = JSON.parse(fs.readFileSync('D:\\PayWay_Postman\\PayWay_API_Postman_Collection.postman_collection.json', 'utf8'));
+const path = require('node:path');
+const { loadYamlCollection } = require('./yaml_collection');
 
-let total = 0, bad = 0;
-const walkItems = (items, path) => items.forEach((it) => {
-  const p = path + ' / ' + (it.name || '(folder)');
-  if (it.item) { walkItems(it.item, p); return; }
-  (it.event || []).forEach((e) => {
+const collectionDir = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.join(__dirname, '..', 'postman', 'collections', 'PayWay API — Complete Collection');
+const collection = loadYamlCollection(collectionDir);
+
+let total = 0;
+let bad = 0;
+for (const request of collection.requests) {
+  for (const script of request.scripts || []) {
     total++;
-    const src = (e.script.exec || []).join('\n');
-    try { new Function(src); } catch (err) { bad++; console.log('SYNTAX: ' + p + ' [' + e.listen + ']: ' + err.message); }
-  });
-});
-walkItems(c.item, '');
-
-const globalPre = c.event && c.event.find((e) => e.listen === 'prerequest');
-if (globalPre) {
-  try { new Function(globalPre.script.exec.join('\n')); console.log('Global pre-request: OK'); }
-  catch (e) { console.log('GLOBAL PRE SYNTAX: ' + e.message); }
+    try {
+      new Function(String(script.code || ''));
+    } catch (error) {
+      bad++;
+      console.log(`SYNTAX: ${request.relativePath} [${script.type || 'script'}]: ${error.message}`);
+    }
+  }
 }
 
-console.log('Checked ' + total + ' scripts. Errors: ' + bad);
+console.log(`Checked ${total} YAML scripts across ${collection.requests.length} requests. Errors: ${bad}`);
+process.exitCode = bad ? 1 : 0;

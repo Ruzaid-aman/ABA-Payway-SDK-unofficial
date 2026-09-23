@@ -1,0 +1,86 @@
+$kind: http-request
+description: |-
+  ## Create Payment Link
+  RSA payload: `{ "mc_id": "...", "title": "...", "amount": "...", "currency": "...", "description": "...", "payment_limit": "...", "expired_date": "...", "return_url": "base64...", "merchant_ref_no": "...", "payout": Array|null }`
+  Hash: `request_time + merchant_id + merchant_auth`.
+
+  - `expired_date` format `yyyy-mm-dd hh:mm:ss`.
+  - `return_url` inside the RSA payload must be **base64-encoded**.
+  - Without node-forge, set `{{pl_merchant_auth}}` with the pre-encrypted payload.
+
+  ```php
+  $data = json_encode($payload);
+  openssl_public_encrypt($data, $enc, $key, OPENSSL_PKCS1_PADDING);
+  $merchant_auth = base64_encode($enc);
+  ```
+url: "{{baseUrl}}/api/merchant-portal/merchant-access/payment-link/create"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: text
+      key: request_time
+      value: "{{request_time}}"
+    - type: text
+      key: merchant_id
+      value: "{{merchant_id}}"
+    - type: text
+      key: merchant_auth
+      value: "{{computed_merchant_auth}}"
+    - type: text
+      key: hash
+      value: "{{computed_hash}}"
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Create Payment Link - RSA payload per description; hash: request_time+merchant_id+merchant_auth
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var payload = {
+        mc_id: C.get('merchant_id'),
+        title: 'Test Payment Link',
+        amount: fmtAmt(C.get('amount')),
+        currency: C.get('currency'),
+        description: 'Created from Postman',
+        payment_limit: '50',
+        expired_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0,19).replace('T', ' '),
+        return_url: b64(C.get('return_url')),
+        merchant_ref_no: C.get('merchant_ref')
+      };
+      var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'pl_merchant_auth');
+      if (!auth) {
+        console.log('SKIP: merchant_auth could not be computed — node-forge is unavailable and {{pl_merchant_auth}} is empty. Install node-forge (Edit collection > Libraries) or paste a pre-encrypted value into {{pl_merchant_auth}}.');
+        pm.execution.skipRequest();
+      }
+      var msg = reqTime + C.get('merchant_id') + auth;
+      C.set('request_time', reqTime);
+      C.set('computed_merchant_auth', auth);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('RSA payload:', JSON.stringify(payload));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      var code = String((j.status && j.status.code) || j.statusCode || '');
+      var msgTxt = (j.status && j.status.message) || j.message || '';
+      pm.test('HTTP 200', function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test('Create Payment Link accepted (API status 0 or 00)', function () {
+        pm.expect(code).to.be.oneOf(['0', '00'], 'Expected success code 0/00 but got ' + code + ' — ' + msgTxt);
+      });
+      // Chain: save the created link id for Details/Void (payment_link_id = create response data.id)
+      if (j && j.data && j.data.id) {
+        pm.collectionVariables.set('payment_link_id', String(j.data.id));
+        console.log('payment_link_id saved:', String(j.data.id), '- NEXT: "Get Payment Link Details", or "Void Payment Link" (irreversible).');
+      } else {
+        console.log('WARNING: data.id not found in response — payment_link_id not saved. Response:', JSON.stringify(j).slice(0, 300));
+      }
+    language: text/javascript
+order: 1000

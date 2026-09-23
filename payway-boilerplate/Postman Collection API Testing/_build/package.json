@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "test:yaml": "node yaml_collection.test.js && node syntaxcheck.js && node validate.js && node verify_postman_import.js && node sim_khqr_flow.js"
+  },
   "dependencies": {
     "crypto-js": "^4.2.0",
     "newman": "^6.2.2",

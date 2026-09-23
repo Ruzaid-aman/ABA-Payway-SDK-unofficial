@@ -1,0 +1,87 @@
+$kind: http-request
+name: 2. Link Card (Credit/Debit)
+description: |-
+  ## ⚡ Quick test
+  1. Just hit **Send** — the **Visualize** tab shows a launcher for the card-entry page; complete it with a sandbox test card.
+  2. The card token arrives via callback; meanwhile poll **3. Get Token Details** with the logged `{{request_id}}`.
+
+  Hash: merchant_id + request_time + ctid + callback_url + request_id + token_flag + **frequency** + **amount** + currency + continue_success_url (frequency & amount empty strings; callback_url / continue_success_url decoded via base64 when https).
+
+  Body must use the same encoded strings as the hash. Returns HTML - open the returned page in a full browser window to perform card linking.
+url: "{{baseUrl}}/api/payment-credential/v3/cof/link-card"
+method: POST
+headers:
+  Content-Type: multipart/form-data
+body:
+  type: formdata
+  content:
+    - type: text
+      key: request_id
+      value: "{{request_id}}"
+    - type: text
+      key: request_time
+      value: "{{request_time}}"
+    - type: text
+      key: merchant_id
+      value: "{{merchant_id}}"
+    - type: text
+      key: ctid
+      value: "{{ctid}}"
+    - type: text
+      key: token_flag
+      value: "{{token_flag}}"
+    - type: text
+      key: currency
+      value: "{{currency}}"
+    - type: text
+      key: callback_url
+      value: "{{cof_callback_b64}}"
+    - type: text
+      key: continue_success_url
+      value: "{{cof_continue_b64}}"
+    - type: text
+      key: hash
+      value: "{{computed_hash}}"
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Link Card - hash: merchant_id+request_time+ctid+callback_url+request_id+token_flag+frequency+amount+currency+continue_success_url
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var requestId = genRequestId('CARD');
+      var cbB64 = ensureB64(C.get('cof_callback_url'));
+      var cuB64 = ensureB64(C.get('cof_continue_success_url'));
+      var msg = C.get('merchant_id') + reqTime + C.get('ctid') + cbB64 + requestId + (C.get('token_flag')||'CITI_FLEX') + '' + '' + (C.get('currency')||'USD') + cuB64;
+      C.set('request_id', requestId);
+      C.set('request_time', reqTime);
+      C.set('cof_callback_b64', cbB64);
+      C.set('cof_continue_b64', cuB64);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var ct = (pm.response.headers.get('Content-Type') || '').toLowerCase();
+      pm.test('Link Card returned the card-entry page (HTML)', function () {
+        pm.expect(pm.response.code).to.eql(200);
+        pm.expect(ct).to.include('html');
+      });
+      console.log('Card-entry page received. Complete the card form (sandbox test cards); the token arrives via {{callback_url}} or Get Token Details with {{request_id}}.');
+        // Merchant-style launcher: form-POST the signed fields so the checkout page is
+        // SERVED BY PayWay (its own origin) - saved .html opened from disk CORS-fails.
+        var fields = {};
+        if (pm.request.body && pm.request.body.formdata) {
+          pm.request.body.formdata.each(function (p) { if (!p.disabled) fields[p.key] = pm.variables.replaceIn(String(p.value)); });
+        }
+        visualizeFormPost(pm.variables.replaceIn(pm.request.url.toString()), fields, 'PayWay card linking',
+          'How real integrations open PayWay: a form POST with these signed fields. Click the button - the checkout page is served by PayWay itself (no CORS issues). Pay with the sandbox test cards, then re-send Check Transaction here to see APPROVED.');
+    language: text/javascript
+order: 2000

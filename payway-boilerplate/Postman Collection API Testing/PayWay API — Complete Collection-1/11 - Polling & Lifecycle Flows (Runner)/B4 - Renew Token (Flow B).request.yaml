@@ -1,0 +1,47 @@
+$kind: http-request
+description: Flow B step 4. Renews the ABA account token (+90 days) so `{{pwt}}` stays alive.
+url: "{{baseUrl}}/api/payment-credential/v3/token-management/renew-expired-account-token"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "merchant_id":  "{{merchant_id}}",
+      "request_id":   "{{request_id}}",
+      "ctid":         "{{ctid}}",
+      "pwt":          "{{pwt}}",
+      "hash":         "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var C = pm.collectionVariables;
+      if (!C.get('pwt')) throw new Error('Set {{pwt}} first.');
+      var reqTime = utcNow();
+      var requestId = genRequestId('RNW');
+      var msg = C.get('ctid') + reqTime + C.get('pwt') + C.get('merchant_id') + requestId;
+      C.set('request_time', reqTime);
+      C.set('request_id', requestId);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 200', function () { pm.response.to.have.status(200); });
+      try {
+        var j = pm.response.json();
+        if (j.status) {
+          pm.test('status.code present', function () { pm.expect(j.status.code).to.not.be.empty; });
+          console.log('status.code:', j.status.code, '-', j.status.message || '');
+          if (String(j.status.code) === '00') console.log('Token renewed (+90 days) - new request_id =', pm.collectionVariables.get('request_id'));
+        }
+      } catch (e) { console.log('Response was not JSON.'); }
+    language: text/javascript
+order: 9000

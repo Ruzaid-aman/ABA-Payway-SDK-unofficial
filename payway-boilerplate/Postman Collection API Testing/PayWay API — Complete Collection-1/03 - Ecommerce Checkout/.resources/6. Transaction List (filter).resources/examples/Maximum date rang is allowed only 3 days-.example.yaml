@@ -1,0 +1,50 @@
+$kind: http-example
+name: Maximum date rang is allowed only 3 days.
+request:
+  url: "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-list-2"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "req_time": "{{req_time}}",
+        "merchant_id": "{{merchant_id}}",
+        "from_date": "{{from_date}}",
+        "to_date": "{{to_date}}",
+        "from_amount": "",
+        "to_amount": "",
+        "status": "{{tran_status_filter}}",
+        "page": "1",
+        "pagination": "20",
+        "hash": "{{computed_hash}}"
+      }
+response:
+  statusCode: 403
+  statusText: Forbidden
+  headers:
+    date: Mon, 21 Sep 2026 17:47:08 GMT
+    content-type: application/json
+    transfer-encoding: chunked
+    connection: keep-alive
+    server: cloudflare
+    strict-transport-security: max-age=31536000; includeSubDomains; preload, max-age=31536000; includeSubDomains; preload
+    x-xss-protection: 1; mode=block
+    x-content-type-options: nosniff
+    cf-cache-status: DYNAMIC
+    content-encoding: gzip
+    cf-ray: a3eae4b09ee82107-HKG
+  body:
+    type: json
+    content: |-
+      {
+        "status": {
+          "code": "52",
+          "message": "Maximum date rang is allowed only 3 days.",
+          "tran_id": "179001282852500",
+          "lang": "en",
+          "trace_id": "257106571b47c7f6b3fbba1d7fcea94c"
+        }
+      }
+order: 1000

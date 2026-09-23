@@ -1,0 +1,7 @@
+$kind: collection
+description: |-
+  ## Pre-auth (Card holds)
+  Pre-authorisation flow: after a `purchase`, complete (capture) or cancel the hold. Use `pre-auth-completion` optionally with a **payout** split.
+
+  Order of fields in the hash differs per request - read the description before editing values.
+order: 5000

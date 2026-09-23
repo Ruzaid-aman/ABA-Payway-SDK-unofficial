@@ -1,0 +1,39 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/payment-gateway/v1/exchange-rate"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "req_time": "{{req_time}}",
+        "merchant_id": "{{merchant_id}}",
+        "hash": "{{computed_hash}}"
+      }
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    date: Mon, 21 Sep 2026 17:58:35 GMT
+    content-type: application/json
+    transfer-encoding: chunked
+    connection: keep-alive
+    server: cloudflare
+    strict-transport-security: max-age=31536000; includeSubDomains; preload, max-age=31536000; includeSubDomains; preload
+    x-xss-protection: 1; mode=block
+    x-content-type-options: nosniff
+    cf-cache-status: DYNAMIC
+    cf-ray: a3eaf5757ab428ee-HKG
+  body:
+    type: json
+    content: |-
+      {
+        "status": {
+          "pw_tran_id": "1QpGLNwxyZ",
+          "code": 26,
+          "message": "Invalid Merchant Profile"
+        }
+      }
+order: 2000

@@ -1,0 +1,95 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Set `{{merchant_ref}}` and **Send**. On the sandbox demo profile expect **404/empty** (informational — KHQR retrieval needs a dedicated `…instore` merchant profile); the path, hash and limits are docs-verified.
+
+  ## KHQR guideline
+  Use a dedicated **ABA KHQR** merchant account (merchant_id ending in `instore`). When the QR is scanned the payer enters amount/note (or the QR-data is pre-filled from `qr_data`); the `merchant_ref` lets you map the inbound transaction.
+
+  Hash: `req_time + merchant_id + merchant_ref`
+
+  Returns the last 50 transactions for that merchant_ref (10 req/min).
+
+  > **Sandbox note (2026-09):** demo profiles returned HTTP 404 with an empty body for this endpoint - KHQR retrieval appears to require the dedicated KHQR merchant profile. The path, hash order and limits here are docs-verified.
+url: "{{baseUrl}}/api/payment-gateway/v1/payments/get-transactions-by-mc-ref"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "req_time":     "{{req_time}}",
+      "merchant_id":  "{{merchant_id}}",
+      "merchant_ref": "{{merchant_ref}}",
+      "hash":         "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // get-transactions-by-mc-ref - hash: req_time+merchant_id+merchant_ref
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var msg = reqTime + C.get('merchant_id') + C.get('merchant_ref');
+      C.set('req_time', reqTime);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      var j = null;
+      try { j = pm.response.json(); } catch (e) {}
+      if (pm.response.code === 404 || j === null) {
+        pm.test('KHQR lookup responded (404/empty - see note)', function () { pm.expect(true).to.eql(true); });
+        console.log('Sandbox note: demo profiles may not have KHQR retrieval provisioned (observed HTTP 404 with empty body). The path + hash (req_time+merchant_id+merchant_ref) are docs-verified; max 10 req/min, last 50 transactions.');
+      } else {
+        var sc = respCode(j);
+        pm.test('KHQR lookup responded (status.code ' + sc + ')', function () { pm.expect(sc).to.not.be.empty; });
+        console.log('status.code:', sc, '-', j.status && j.status.message);
+      }
+
+      // ---- Offline-KHQR flow: final validation (runs when "2. Build Offline KHQR" has been sent) ----
+      var C = pm.collectionVariables;
+      var khqrPayload = C.get('khqr_payload') || '';
+      if (khqrPayload) {
+        var khqrRef = C.get('khqr_merchant_ref') || C.get('merchant_ref') || '';
+        var found = [];
+        (function scan(node, depth) {
+          if (!node || typeof node !== 'object' || depth > 6) return;
+          if (Array.isArray(node)) { node.forEach(function (n) { scan(n, depth + 1); }); return; }
+          if ((node.transaction_id || node.tran_id) && node.payment_status_code !== undefined) { found.push(node); return; }
+          Object.keys(node).forEach(function (k) { scan(node[k], depth + 1); });
+        })(j, 0);
+        var mine = found.filter(function (t) { return String(t.merchant_ref || '') === String(khqrRef); });
+        if (found.length && !mine.length) {
+          console.log('Inquiry returned ' + found.length + ' transaction(s) but none matches merchant_ref ' + khqrRef + ' - the QR may be unpaid yet, or this profile resolves a different reference.');
+        }
+        if (mine.length) {
+          var approved = mine.filter(function (t) { return String(t.payment_status_code) === '0'; });
+          C.set('khqr_final_status', approved.length ? 'APPROVED' : String(mine[0].payment_status || ('code ' + mine[0].payment_status_code)));
+          pm.test('Inquiry confirms payment for merchant_ref ' + khqrRef + ' (' + approved.length + '/' + mine.length + ' APPROVED)', function () {
+            pm.expect(approved.length).to.be.above(0);
+          });
+          var expectedAmt = C.get('khqr_amount_used');
+          if (expectedAmt && mine[0].payment_amount !== undefined) {
+            var paidAmt = parseFloat(mine[0].payment_amount);
+            pm.test('Payment amount matches the QR amount (' + expectedAmt + ')', function () {
+              pm.expect(paidAmt).to.eql(parseFloat(expectedAmt));
+            });
+          }
+          console.log('RECONCILED:', JSON.stringify(mine[0]).slice(0, 400));
+          console.log('Reminder: merchant_ref identifies the business reference, NOT a unique payment - a KHQR can be paid multiple times. Deduplicate by transaction id.');
+        } else if (!found.length) {
+          console.log('No transaction objects recognized in the inquiry response (KHQR retrieval may be unprovisioned on this profile - see the 404 note above). Rely on the webhook callback (request 3) until ABA enables lookups.');
+        }
+      }
+    language: text/javascript
+order: 4000

@@ -1,0 +1,21 @@
+$kind: http-request
+description: |-
+  ## 60-second walkthrough (zero setup)
+
+  1. **03 - Ecommerce Checkout → 1. Purchase (Hosted Checkout)** → **Send**.
+  2. Open the **Visualize** tab → click **Open payment page →** (form-POSTs the signed fields; the page is served by PayWay itself).
+  3. Pay with a sandbox test card:
+
+     | Card | Number | Expiry | CVV |
+     |---|---|---|---|
+     | ✅ Success | `4286 0900 0000 0206` | 04/30 | 777 |
+     | ❌ Declined | `5156 8302 7256 1029` | 04/30 | 777 |
+
+  4. Back in Postman: **3. Check Transaction** → `payment_status_code: 0 (APPROVED)`.
+
+  **What happened automatically:** the hash was signed (`b4hash:` in the Console), the response saved `{{last_tran_id}}`, and the Visualizer rendered the merchant-style launcher.
+
+  Next stops: **Flow A** (folder 11) for KHQR + polling, **08** for saved tokens, **10** for callbacks. Full guide: collection **Overview** tab.
+url: https://developer.payway.com.kh/overview-865678m0
+method: GET
+order: 1000

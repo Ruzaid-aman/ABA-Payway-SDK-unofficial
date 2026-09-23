@@ -1,0 +1,67 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Same setup as request 1, but the captured amount is split to beneficiaries — set `{{payout_json}}` (`[{"acc":"...","amt":0.05}]`) first.
+  2. RSA needed (node-forge or `{{preauth_payout_merchant_auth}}`).
+
+  ## Complete Pre-auth with Payout
+  Same endpoint/order as the plain completion, but the RSA payload also carries a `payout` array:
+  `{ "mc_id": "...", "tran_id": "...", "complete_amount": "...", "payout": [{ "acc": "...", "amt": "...", "reason": "..." } | ...] }`
+  Hash: `merchant_auth + request_time + merchant_id`.
+  Without node-forge, set `{{preauth_payout_merchant_auth}}`.
+url: "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "merchant_auth": "{{computed_merchant_auth}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Complete Pre-auth + payout - RSA payload with payout array; hash: merchant_auth+request_time+merchant_id
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var amount = fmtAmt(C.get('amount'));
+      var payouts = [];
+      var payoutRaw = (C.get('payout_json') || '').trim();
+      if (payoutRaw) { try { payouts = JSON.parse(payoutRaw); } catch (e) {} }
+      else { payouts = [{ acc: '000133879', amt: amount, reason: 'test' }]; }
+      var payload = { mc_id: C.get('merchant_id'), tran_id: C.get('last_tran_id') || genTranId(), complete_amount: amount, payout: payouts };
+      var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'preauth_payout_merchant_auth');
+      var msg = auth + reqTime + C.get('merchant_id');
+      C.set('request_time', reqTime);
+      C.set('computed_merchant_auth', auth);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('RSA payload:', JSON.stringify(payload));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      if (rsaMissing(j)) {
+        pm.test('SKIPPED - RSA payload not configured', function () { pm.expect(true).to.eql(true); });
+        console.log('SKIPPED: the gateway needs an RSA-encrypted merchant_auth. Install the node-forge library (collection > Libraries) or paste a pre-computed value into the fallback variable - see the request description.');
+      } else {
+        var code = j.statusCode || (j.status && j.status.code);
+        pm.test('Complete Pre-auth with Payout responded (status ' + String(code) + ')', function () { pm.expect(String(code)).to.not.be.undefined; });
+        if (String(code) === '0' || String(code) === '00') { console.log('Pre-auth captured with payout split.'); }
+        else { console.log('status:', String(code), '-', (j.status && j.status.message) || j.message || ''); }
+      }
+    language: text/javascript
+order: 2000

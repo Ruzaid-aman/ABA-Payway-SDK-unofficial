@@ -1,0 +1,62 @@
+$kind: http-request
+description: Flow A step 2. **Polling loop** via Get Transaction Details (works for QR *and* card transactions - sandbox-verified that check-transaction-2 cannot see KHQR records). Recomputes the hash every iteration and calls itself via `postman.setNextRequest` while `data.payment_status_code` is `2` (PENDING) or the record is not visible yet, up to `{{max_polls}}` tries. Run in the Collection Runner with delay >= 1000 ms.
+url: "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-detail"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "req_time": "{{req_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "tran_id": "{{last_tran_id}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var tranId = C.get('last_tran_id') || C.get('tran_id');
+      if (!tranId) throw new Error('No tran_id to poll - run A1 first (sets {{last_tran_id}}).');
+      var msg = reqTime + C.get('merchant_id') + tranId;
+      C.set('req_time', reqTime);
+      C.set('tran_id', tranId);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('poll b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |
+      pm.test("Poll 2/10 - status 2", function () {
+          var jsonData = pm.response.json();
+          pm.expect(jsonData.data.payment_status_code).to.eql(2);
+      });
+
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+
+      pm.test("Response time is less than 1000ms", function () {
+          pm.expect(pm.response.responseTime).to.be.below(1000);
+      });
+
+      pm.test("Content-Type is application/json", function () {
+          pm.response.to.have.header("Content-Type");
+          pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+      });
+
+      pm.test("Response has valid transaction structure", function () {
+          var jsonData = pm.response.json();
+          pm.expect(jsonData).to.have.property('data');
+          pm.expect(jsonData).to.have.property('status');
+          pm.expect(jsonData.data).to.have.property('transaction_id');
+          pm.expect(jsonData.data).to.have.property('payment_status');
+          pm.expect(jsonData.status).to.have.property('code', '00');
+      });
+    language: text/javascript
+order: 3000

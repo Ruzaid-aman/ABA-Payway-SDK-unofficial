@@ -1,0 +1,54 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. **Send** after any purchase/QR — reads `{{last_tran_id}}` (or set `{{tran_id}}`).
+  2. Expect `status.code "00"` + the full record in `data` (`payment_status_code`: 0 approved · 2 pending · 3 declined · 4 refunded · 7 cancelled). This is also the endpoint Flow A2 polls.
+
+  **Hash:** `req_time + merchant_id + tran_id`
+url: "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-detail"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "req_time": "{{req_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "tran_id": "{{tran_id}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Get Transaction Details - hash: req_time+merchant_id+tran_id
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var tranId = C.get('last_tran_id') || C.get('tran_id');
+      if (!tranId) throw new Error('No tran_id - run Purchase first (sets {{last_tran_id}}) or set {{tran_id}} manually.');
+      var msg = reqTime + C.get('merchant_id') + tranId;
+      C.set('req_time', reqTime);
+      C.set('tran_id', tranId);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      if (j.status) {
+        var sc = String(j.status.code);
+        pm.test('Detail responded (status.code ' + sc + ')', function () { pm.expect(sc).to.not.be.empty; });
+        if (sc === '0' || sc === '00') {
+          pm.test('Transaction found', function () { pm.expect(j.data).to.not.be.undefined; });
+          if (j.data) console.log('payment_status:', j.data.payment_status, '(code', String(j.data.payment_status_code) + ') - apv:', j.data.apv);
+        } else {
+          console.log('Business error', sc, '-', j.status.message);
+        }
+      }
+    language: text/javascript
+order: 2000

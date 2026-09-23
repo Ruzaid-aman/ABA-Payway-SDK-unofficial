@@ -1,0 +1,12 @@
+$kind: collection
+description: |-
+  ## KHQR Guideline - offline KHQR generation (local build -> scan -> webhook -> inquiry)
+  Build the KHQR payload **entirely in Postman scripts** per the PayWay KHQR guideline (EMVCo TLV + CRC-16/CCITT-FALSE) - no generate-qr call, no per-QR API dependency. Full flow:
+
+  1. **Create webhook.site Receiver** - fresh pushback catcher (or paste your own bin into `{{callback_listener}}`).
+  2. **Build Offline KHQR (TLV + CRC + QR)** - unique merchant reference per send, payload self-tested against the guideline's official sample, QR rendered on the **Visualize** tab. Pay with any KHQR app.
+  3. **Pull webhook.site Callbacks (KHQR)** - import the pushback (transaction id + payment status).
+  4. **Get Transactions by Merchant Ref** - inquiry/recovery path by the same reference (works even when the callback is missed).
+
+  > **Caveats:** offline KHQR has **no per-QR callback** - the pushback goes to the webhook URL provisioned on your merchant account (point it at webhook.site); KHQR lookups by reference need KHQR retrieval provisioned on the profile (demo profiles observe 404 - the request itself is docs-verified); a KHQR **can be paid multiple times** - deduplicate by `transaction_id`, reconcile by `merchant_ref`.
+order: 8000

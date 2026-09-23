@@ -1,0 +1,8 @@
+$kind: collection
+description: |-
+  ## Payment Link
+
+  Create a shareable payment link (sent via WhatsApp/email/SMS), query its stats, and void (permanently cancel) an unpaid link - void is IRREVERSIBLE and kills the hosted page for customers (code 07 shell).
+
+  > These are **portal APIs**: instead of a plain hash they require `merchant_auth` = base64 of the RSA-encrypted payload. Install node-forge or paste a pre-encrypted value into `{{pl_merchant_auth}}`.
+order: 4000

@@ -1,0 +1,80 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Run **Create Payment Link** first — its `payment_link_id` is auto-saved and consumed here.
+  2. RSA needed (node-forge or `{{pl_merchant_auth}}`); without it the test reports **SKIPPED**.
+
+  ## Get Payment Link Details
+  RSA payload: `{ "mc_id": "...", "id": "..." }` (id = link id from Create).
+  Hash: `request_time + merchant_id + merchant_auth`.
+  Without node-forge, set `{{pl_merchant_auth}}`.
+url: "{{baseUrl}}/api/merchant-portal/merchant-access/payment-link/void"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time": "{{request_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "merchant_auth": "{{computed_merchant_auth}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Void Payment Link - PERMANENT and IRREVERSIBLE. Signs like detail: RSA({mc_id,id}); hash: request_time+merchant_id+merchant_auth
+      var C = pm.collectionVariables;
+      var linkId = (C.get('payment_link_id') || '').trim();
+      if (!linkId) {
+        console.log('SKIP: {{payment_link_id}} is empty. Run "Create Payment Link" first — its test saves data.id automatically, or paste a Link ID into the payment_link_id collection variable. The id is the create response data.id - NOT the hosted slug, NOT tran_id.');
+        pm.execution.skipRequest();
+      }
+      var reqTime = utcNow();
+      var payload = { mc_id: C.get('merchant_id'), id: linkId };
+      var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'pl_merchant_auth');
+      if (!auth) {
+        console.log('SKIP: merchant_auth could not be computed — node-forge is unavailable and {{pl_merchant_auth}} is empty. Install node-forge (Edit collection > Libraries) or paste a pre-encrypted {mc_id,id} value into {{pl_merchant_auth}}.');
+        pm.execution.skipRequest();
+      }
+      var msg = reqTime + C.get('merchant_id') + auth;
+      C.set('request_time', reqTime);
+      C.set('computed_merchant_auth', auth);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('VOIDING link', linkId, '- this is IRREVERSIBLE. RSA payload:', JSON.stringify(payload));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      var j = {};
+      try { j = pm.response.json(); } catch (e) {}
+      var http = pm.response.code;
+      var code = String(j.statusCode || (j.status && j.status.code) || j.code || '');
+      var msgTxt = (j.status && j.status.message) || j.message || j.title || '';
+      pm.test('HTTP 200', function () {
+        pm.response.to.have.status(200);
+      });
+      pm.test('Payment link VOIDED (API status 0 or 00)', function () {
+        pm.expect(code).to.be.oneOf(['0', '00'], 'Expected success code 0/00 but got ' + code + ' — ' + msgTxt);
+      });
+      if (http === 200 && (code === '0' || code === '00')) {
+        console.log('Link permanently voided. Gateway log id (tran_id):', j.tran_id, '(numeric - a log id, not a payment).');
+        console.log('NEXT: re-send "Get Payment Link Details" - status now reads "VOIDED".');
+      } else if (http === 403 && code === 'PTL188') {
+        console.log('PTL188:', msgTxt || 'The payment link is already voided. This is a terminal state — treat as already done.');
+      } else if (http === 403 && code === '96') {
+        console.log('Code 96 "Invalid merchant data": the id is not a known Link ID. Use the create response data.id (NOT the hosted slug, NOT tran_id).');
+      } else {
+        console.log('Unexpected void response - HTTP', http, 'code', code, '-', msgTxt);
+      }
+    language: text/javascript
+order: 3000

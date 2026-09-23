@@ -1,0 +1,9 @@
+$kind: collection
+description: |-
+  ## Credentials on File (CoF) / Subscriptions
+  Tokenize a card or ABA account, then charge it later without re-entering credentials.
+
+  **Typical flow:** `1. Link Account` (or `2. Link Card`) -> wait for callback -> `3. Get Token Details` (auto-saves `{{pwt}}`/`{{ctid}}`) -> `4. Payment` -> `6. Remove` at the end.
+
+  `callback_url` must be base64-encoded in the hash/body - the scripts do that automatically for https URLs. Run `7. Subscription` to test recurring CITR_FIX payments.
+order: 7000

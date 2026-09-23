@@ -1,0 +1,77 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Needs `{{pwt}}` + `{{ctid}}` (saved by Get Token Details) — then just **Send**; it charges `{{amount}}` to the stored credential.
+
+  Prerequisite: {{pwt}} + {{ctid}} (run Get Token Details first).
+
+  Hash formula:
+  request_time + merchant_id + tran_id + amount + currency + items + ctid + pwt + first_name + last_name + email + phone + purchase_type + callback_url + custom_fields + return_params + payout + token_flag + shipping_fee
+url: "{{baseUrl}}/api/payment-gateway/v3/purchase/payment-credential"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "request_time":  "{{request_time}}",
+      "merchant_id":   "{{merchant_id}}",
+      "tran_id":       "{{tran_id}}",
+      "ctid":          "{{ctid}}",
+      "pwt":           "{{pwt}}",
+      "first_name":    "{{buyer_first_name}}",
+      "last_name":     "{{buyer_last_name}}",
+      "email":         "{{buyer_email}}",
+      "phone":         "{{buyer_phone}}",
+      "amount":        "{{cof_amount_fmt}}",
+      "shipping_fee":  "{{cof_shipping_fee}}",
+      "currency":      "{{currency}}",
+      "token_flag":    "{{cof_pay_token_flag}}",
+      "purchase_type": "purchase",
+      "callback_url":  null,
+      "items":         null,
+      "return_params": null,
+      "payout":        null,
+      "custom_fields": null,
+      "hash":          "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // Payment with token - hash: request_time+merchant_id+tran_id+amount+currency+items+ctid+pwt+first_name+last_name+email+phone+purchase_type+callback_url+custom_fields+return_params+payout+token_flag+shipping_fee
+      var C = pm.collectionVariables;
+      if (!C.get('pwt')) throw new Error('Set {{pwt}} first (run Get Token Details).');
+      var reqTime = utcNow();
+      var tranId = genTranId();
+      var amount = fmtAmt(C.get('cof_amount'), C.get('currency'));
+      var tokenFlag = 'CITU_FLEX';
+      var msg = reqTime + C.get('merchant_id') + tranId + amount + (C.get('currency')||'USD') + '' + C.get('ctid') + C.get('pwt')
+        + C.get('buyer_first_name') + C.get('buyer_last_name') + C.get('buyer_email') + C.get('buyer_phone')
+        + 'purchase' + '' + '' + '' + '' + tokenFlag + '0.00';
+      C.set('request_time', reqTime);
+      C.set('tran_id', tranId);
+      C.set('cof_amount_fmt', amount);
+      C.set('cof_shipping_fee', '0.00');
+      C.set('cof_pay_token_flag', tokenFlag);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 200', function () { pm.response.to.have.status(200); });
+      try {
+        var j = pm.response.json();
+        if (j.status) {
+          pm.test('status.code = 0 (approved)', function () { pm.expect(String(j.status.code)).to.eql('0'); });
+          console.log('status.code:', j.status.code, '-', j.status.message || '');
+          pm.collectionVariables.set('last_tran_id', pm.collectionVariables.get('tran_id'));
+          if (j.data) console.log('approved:', JSON.stringify(j.data).slice(0, 400));
+        }
+      } catch (e) { console.log('Response was not JSON.'); }
+    language: text/javascript
+order: 4000

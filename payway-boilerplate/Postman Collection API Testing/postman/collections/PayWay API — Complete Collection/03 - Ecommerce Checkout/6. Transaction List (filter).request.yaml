@@ -1,0 +1,84 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Just hit **Send** — `{{from_date}}`/`{{to_date}}` auto-fill to today (`yyyy-mm-dd hh:mm:ss` is mandatory; plain dates get code 49).
+  2. Filter with `{{tran_status_filter}}`: 0 approved · 2 pending · 3 declined · 4 refunded · 7 cancelled.
+
+  ## Transaction List
+  Hash: `req_time + merchant_id + from_date + to_date + from_amount + to_amount + status + page + pagination`.
+  Empty optional values (`from_amount`, `to_amount`, `status`) must be sent as empty strings in the hash.
+  Rate limit: 50/min. Date range: max 3 days.
+  Dates **`yyyy-mm-dd hh:mm:ss`** (sandbox-verified 2026-09 - plain `yyyy-mm-dd` returns code 49 "Invalid Start Date"). Auto-fills today 00:00:00 -> 23:59:59 unless set. Max range 3 days; rate limit 50/min.
+url: "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-list-2"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "req_time": "{{req_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "from_date": "{{from_date}}",
+      "to_date": "{{to_date}}",
+      "from_amount": "",
+      "to_amount": "",
+      "status": "{{tran_status_filter}}",
+      "page": "1",
+      "pagination": "20",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers_v20260923_portable_v2') || pm.collectionVariables.get('__helpers_v20260923_portable') || pm.collectionVariables.get('__helpers_v20260923') || pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+      // Transaction List - hash: req_time+merchant_id+from_date+to_date+from_amount+to_amount+status+page+pagination
+      var C = pm.collectionVariables;
+      var d = new Date();
+      // Sandbox-verified: dates must be 'yyyy-mm-dd hh:mm:ss' (plain yyyy-mm-dd -> code 49 'Invalid Start Date')
+      var day = d.getUTCFullYear() + '-' + _pad(d.getUTCMonth() + 1) + '-' + _pad(d.getUTCDate());
+      var fromD = C.get('from_date') || day + ' 00:00:00';
+      var toD = C.get('to_date') || day + ' 23:59:59';
+      if (fromD.length === 10) fromD += ' 00:00:00';
+      if (toD.length === 10) toD += ' 23:59:59';
+      C.set('from_date', fromD); C.set('to_date', toD);
+      var reqTime = utcNow();
+      var msg = reqTime + C.get('merchant_id') + C.get('from_date') + C.get('to_date')
+        + '' + '' + (C.get('tran_status_filter')||'') + '1' + '20';
+      C.set('req_time', reqTime);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |
+      pm.test("List responded (status.code 00)", function () {
+          var jsonData = pm.response.json();
+          pm.expect(jsonData.status.code).to.eql("00");
+      });
+
+      pm.test("Status code is 200 OK", function () {
+          pm.response.to.have.status(200);
+      });
+
+      pm.test("Response has pagination and data fields", function () {
+          var jsonData = pm.response.json();
+          pm.expect(jsonData).to.have.property("data");
+          pm.expect(jsonData).to.have.property("page");
+          pm.expect(jsonData).to.have.property("pagination");
+          pm.expect(jsonData.data).to.be.an("array");
+      });
+
+      pm.test("Transaction item has required fields", function () {
+          var jsonData = pm.response.json();
+          if (jsonData.data && jsonData.data.length > 0) {
+              var tx = jsonData.data[0];
+              pm.expect(tx).to.have.property("transaction_id");
+              pm.expect(tx).to.have.property("payment_status");
+              pm.expect(tx).to.have.property("original_amount");
+          }
+      });
+    language: text/javascript
+order: 6000

@@ -1,0 +1,47 @@
+$kind: http-request
+description: |-
+  ## ⚡ Quick test
+  1. Just hit **Send** — zero setup; returns today's `exchange_rates` (USD ↔ KHR).
+
+  **Hash:** `req_time + merchant_id`
+url: "{{baseUrl}}/api/payment-gateway/v1/exchange-rate"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "req_time": "{{req_time}}",
+      "merchant_id": "{{merchant_id}}",
+      "hash": "{{computed_hash}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Restore the shared PayWay helper library (Postman runs every script in its own scope):
+      var __h = pm.collectionVariables.get('__helpers');
+      if (!__h) throw new Error('The `__helpers` collection variable is missing - re-import the full collection JSON (it holds the shared helper library source).');
+      eval(__h);
+      // Exchange Rate - hash: req_time+merchant_id
+      var C = pm.collectionVariables;
+      var reqTime = utcNow();
+      var msg = reqTime + C.get('merchant_id');
+      C.set('req_time', reqTime);
+      C.set('computed_hash', hmac512(msg, C.get('secret_key')));
+      console.log('b4hash:', msg);
+    language: text/javascript
+  - type: afterResponse
+    code: |
+      pm.test("Exchange rate responded (status.code 00)", function () {
+          var jsonData = pm.response.json();
+          pm.expect(jsonData.status.code).to.eql("00");
+      });
+
+      pm.test("Exchange rate success (0/00)", function () {
+          var jsonData = pm.response.json();
+          pm.expect(jsonData.status.code === 0 || jsonData.status.code === "00").to.be.true;
+      });
+    language: text/javascript
+examples: ./.resources/7. Exchange Rate.resources/examples
+order: 7000
