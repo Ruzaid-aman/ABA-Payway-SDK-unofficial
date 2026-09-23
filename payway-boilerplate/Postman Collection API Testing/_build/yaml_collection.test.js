@@ -56,6 +56,7 @@ legacyVars.delete('__helpers_v20260923_portable_v2');
 legacyVars.set('__helpers_v20260923_portable', require('./part_00_info.json').variable.find((item) => item.key === '__helpers').value);
 legacyVars.set('__helpers_v20260923', require('./part_00_info.json').variable.find((item) => item.key === '__helpers').value);
 const createLink = collection.requests.find((request) => request.relativePath.endsWith('Create Payment Link.request.yaml'));
+const linkLogs = [];
 const legacyBox = vm.createContext({
   globalThis: undefined,
   pm: { collectionVariables: {
@@ -64,13 +65,97 @@ const legacyBox = vm.createContext({
   }, execution: { skipRequest() { throw new Error('Payment link was unexpectedly skipped'); } } },
   require(name) { if (name === 'crypto-js') return require('crypto-js'); throw new Error(name); },
   crypto: webcrypto,
-  console: { log() {} },
+  console: { log(...args) { linkLogs.push(args); } },
 });
 vm.runInContext(createLink.scripts.find((script) => script.type === 'beforeRequest').code, legacyBox);
+const linkPayload = JSON.parse(linkLogs.find((entry) => entry[0] === 'RSA payload:')[1]);
+assert.equal(typeof linkPayload.expired_date, 'number',
+  'payment-link expiry must be Unix epoch seconds inside merchant_auth');
+assert.ok(linkPayload.expired_date > Math.floor(Date.now() / 1000) + 6 * 86400,
+  'payment-link expiry must be in the future');
+assert.equal(linkPayload.return_url, legacyVars.get('return_url'),
+  'an already-base64 return_url must not be encoded a second time');
 assert.ok(legacyVars.get('__helpers_v20260923_portable_v2'),
   'payment-link request must migrate a stale import even if Postman does not refresh the collection-level script');
 const linkCipher = Buffer.from(legacyVars.get('computed_merchant_auth'), 'base64');
 assert.ok(linkCipher.length >= 128, 'the migrated payment-link request must compute RSA merchant_auth');
+const responseChecks = [];
+const responseVars = new Map();
+const visualizations = [];
+const createdLink = {
+  data: {
+    id: 'T0LxC5ScY16CB1vjSpRH7Q==',
+    title: 'Test Payment Link',
+    amount: '0.10',
+    currency: 'USD',
+    status: 'OPEN',
+    expired_date: 1790763875,
+    payment_link: 'https://link-sandbox.payway.com.kh/ABAPAYPe91300Q',
+  },
+  status: { code: '00', message: 'Success.' },
+  tran_id: 179015907417582,
+};
+vm.runInNewContext(createLink.scripts.find((script) => script.type === 'afterResponse').code, {
+  pm: {
+    test(name, check) { check(); responseChecks.push(name); },
+    collectionVariables: { set(key, value) { responseVars.set(key, String(value)); } },
+    visualizer: { set(template, data) { visualizations.push({ template, data }); } },
+    response: {
+      to: { have: { status(expected) { assert.equal(expected, 200, 'successful create responses must be accepted'); } } },
+      headers: { get() { return 'application/json'; } },
+      json() { return createdLink; },
+    },
+    expect: require('chai').expect,
+  },
+});
+assert.equal(responseChecks.length, 3, 'all create-link success checks must run');
+assert.equal(responseVars.get('payment_link_id'), createdLink.data.id,
+  'successful create must save the exact link ID for detail and void requests');
+assert.equal(visualizations.length, 1, 'successful create must render a payment-link Visualizer card');
+assert.equal(visualizations[0].data.url, createdLink.data.payment_link,
+  'Visualizer must show the gateway-provided hosted payment URL');
+assert.match(visualizations[0].template, /Copy link/, 'Visualizer must offer a copy action');
+assert.match(visualizations[0].template, /target="_blank"/, 'Visualizer link must open a new browser tab');
+const renderedLink = require('handlebars').compile(visualizations[0].template)(visualizations[0].data);
+assert.ok(renderedLink.includes(`href="${createdLink.data.payment_link}"`),
+  'rendered card must link to the exact hosted payment page');
+assert.ok(renderedLink.includes(`value="${createdLink.data.payment_link}"`),
+  'rendered card must expose the URL as selectable text');
+let copyClicked;
+let selected = false;
+const copyInput = { value: createdLink.data.payment_link, focus() {}, select() { selected = true; } };
+const copyStatus = { textContent: '' };
+const copyScript = visualizations[0].template.match(/<script>([\s\S]*?)<\/script>/);
+assert.ok(copyScript, 'Visualizer must include the copy-button interaction');
+vm.runInNewContext(copyScript[1], {
+  document: {
+    getElementById(id) {
+      return id === 'payway-link' ? copyInput : id === 'copy-status' ? copyStatus :
+        { addEventListener(event, callback) { if (event === 'click') copyClicked = callback; } };
+    },
+    execCommand(command) { assert.equal(command, 'copy'); return true; },
+  },
+});
+copyClicked();
+assert.equal(selected, true, 'copy fallback must select the payment URL');
+assert.equal(copyStatus.textContent, 'Link copied.', 'copy fallback must confirm success');
+const failedVisuals = [];
+const failedVars = new Map();
+vm.runInNewContext(createLink.scripts.find((script) => script.type === 'afterResponse').code, {
+  pm: {
+    test(_name, check) { try { check(); } catch (_error) {} },
+    collectionVariables: { set(key, value) { failedVars.set(key, value); } },
+    visualizer: { set(template, data) { failedVisuals.push({ template, data }); } },
+    response: {
+      to: { have: { status(expected) { assert.equal(expected, 400); } } },
+      headers: { get() { return 'application/json'; } },
+      json() { return { status: { code: 'PTL04', message: 'Parameter validation required' }, data: null }; },
+    },
+    expect: require('chai').expect,
+  },
+});
+assert.equal(failedVisuals.length, 0, 'failed create must not display a shareable payment link');
+assert.equal(failedVars.has('payment_link_id'), false, 'failed create must not replace the saved link ID');
 const helperBox = vm.createContext({
   globalThis: undefined,
   pm: {

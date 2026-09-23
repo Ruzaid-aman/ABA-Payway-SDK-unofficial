@@ -19,7 +19,10 @@ for (const request of collection.requests) {
   folders.set(folder, (folders.get(folder) || 0) + 1);
   if (!request.method) issues.push(`${request.relativePath}: missing method`);
   let match;
-  const source = JSON.stringify(request);
+  // Visualizer templates in scripts also use {{...}}, but those are Handlebars
+  // bindings, not Postman collection variables sent with the request.
+  const { scripts, ...requestFields } = request;
+  const source = JSON.stringify(requestFields);
   const scriptSource = (request.scripts || []).map((script) => String(script.code || '')).join('\n');
   while ((match = variablePattern.exec(source)) !== null) used.add(match[1]);
   for (const assignment of scriptSource.matchAll(/(?:collectionVariables|\bC)\.set\(['"]([^'"]+)['"]/g)) {

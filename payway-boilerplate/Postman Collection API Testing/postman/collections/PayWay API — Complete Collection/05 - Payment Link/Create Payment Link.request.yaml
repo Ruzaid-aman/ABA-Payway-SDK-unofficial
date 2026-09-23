@@ -1,12 +1,13 @@
 $kind: http-request
 description: |-
   ## Create Payment Link
-  RSA payload: `{ "mc_id": "...", "title": "...", "amount": "...", "currency": "...", "description": "...", "payment_limit": "...", "expired_date": "...", "return_url": "base64...", "merchant_ref_no": "...", "payout": Array|null }`
+  RSA payload: `{ "mc_id": "...", "title": "...", "amount": "...", "currency": "...", "description": "...", "payment_limit": "...", "expired_date": 1234567890, "return_url": "base64...", "merchant_ref_no": "...", "payout": Array|null }`
   Hash: `request_time + merchant_id + merchant_auth`.
 
-  - `expired_date` format `yyyy-mm-dd hh:mm:ss`.
-  - `return_url` inside the RSA payload must be **base64-encoded**.
+  - `expired_date` is a future Unix timestamp in seconds (this request defaults to seven days from now).
+  - `return_url` inside the RSA payload must be **base64-encoded exactly once**. `{{return_url}}` accepts a plain HTTPS URL or its base64 form.
   - RSA encryption runs inside this collection with no package download. If secure randomness is unavailable, set `{{pl_merchant_auth}}` with the pre-encrypted payload.
+  - On success, open the **Visualization** tab to copy or open the hosted payment link. The response also saves `data.id` as `{{payment_link_id}}` for Detail and Void.
 
   ```php
   $data = json_encode($payload);
@@ -51,8 +52,8 @@ scripts:
         currency: C.get('currency'),
         description: 'Created from Postman',
         payment_limit: '50',
-        expired_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0,19).replace('T', ' '),
-        return_url: b64(C.get('return_url')),
+        expired_date: Math.floor(Date.now() / 1000) + 7 * 86400,
+        return_url: ensureB64(C.get('return_url')),
         merchant_ref_no: C.get('merchant_ref')
       };
       var auth = rsaFallback(JSON.stringify(payload), C.get('rsa_public_key'), 'pl_merchant_auth');
@@ -69,8 +70,8 @@ scripts:
     language: text/javascript
   - type: afterResponse
     code: |-
-      pm.test("Status code is 400 or successful", function () {
-          pm.response.to.have.status(400);
+      pm.test("Payment link request returned HTTP 200", function () {
+          pm.response.to.have.status(200);
       });
 
       pm.test("Response content-type is application/json", function () {
@@ -81,4 +82,64 @@ scripts:
           var jsonData = pm.response.json();
           pm.expect(jsonData).to.have.property("status");
       });
+      var result = pm.response.json();
+      if (String(result.status && result.status.code) === '00' && result.data && result.data.id) {
+        pm.collectionVariables.set('payment_link_id', String(result.data.id));
+        var paymentUrl = String(result.data.payment_link || '');
+        if (/^https:\/\/[^\s<>"']+$/.test(paymentUrl) && pm.visualizer && pm.visualizer.set) {
+          var expiry = Number(result.data.expired_date);
+          var expiryLabel = expiry > 0 ? new Date(expiry * 1000).toLocaleString() + ' (local time)' : 'No expiry set';
+          var template = `
+            <style>
+              body { font: 14px/1.5 Arial, sans-serif; color: #17212b; background: #f6f8fb; margin: 0; padding: 24px; }
+              .card { max-width: 680px; margin: auto; padding: 24px; background: #fff; border: 1px solid #dfe5eb; border-radius: 12px; box-shadow: 0 4px 18px rgba(20,40,60,.07); }
+              h2 { margin: 0 0 4px; font-size: 20px; }
+              .sub { color: #586777; margin: 0 0 18px; }
+              .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+              .pill { background: #eef5fb; border-radius: 20px; padding: 5px 10px; font-size: 12px; }
+              label { display: block; font-weight: 600; margin-bottom: 6px; }
+              input { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #bdc9d5; border-radius: 7px; font: inherit; }
+              .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+              .button { display: inline-block; border: 0; border-radius: 7px; padding: 10px 15px; background: #0878c9; color: #fff; font: 600 14px Arial, sans-serif; text-decoration: none; cursor: pointer; }
+              .button.secondary { background: #e8f0f7; color: #16527c; }
+              .note { color: #607080; font-size: 12px; margin: 16px 0 0; overflow-wrap: anywhere; }
+            </style>
+            <main class="card">
+              <h2>Payment link ready</h2>
+              <p class="sub">Share this link with a sandbox payer.</p>
+              <div class="meta"><span class="pill">{{amount}} {{currency}}</span><span class="pill">{{status}}</span><span class="pill">Expires: {{expiry}}</span></div>
+              <label for="payway-link">Hosted payment URL</label>
+              <input id="payway-link" type="text" value="{{url}}" readonly aria-label="Hosted payment URL">
+              <div class="actions">
+                <a class="button" href="{{url}}" target="_blank" rel="noopener noreferrer">Open payment page ↗</a>
+                <button class="button secondary" id="copy-link" type="button">Copy link</button>
+              </div>
+              <p class="note" id="copy-status" role="status">If copying is blocked, select the URL above and press Ctrl+C. Link ID: {{id}}</p>
+            </main>
+            <script>
+              (function () {
+                var input = document.getElementById('payway-link');
+                var status = document.getElementById('copy-status');
+                document.getElementById('copy-link').addEventListener('click', function () {
+                  input.focus(); input.select();
+                  function fallback() {
+                    var copied = typeof document.execCommand === 'function' && document.execCommand('copy');
+                    status.textContent = copied ? 'Link copied.' : 'URL selected. Press Ctrl+C to copy it.';
+                  }
+                  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(input.value).then(function () { status.textContent = 'Link copied.'; }, fallback);
+                  } else { fallback(); }
+                });
+              }());
+            <\/script>`;
+          pm.visualizer.set(template, {
+            url: paymentUrl,
+            id: String(result.data.id),
+            amount: String(result.data.amount || ''),
+            currency: String(result.data.currency || ''),
+            status: String(result.data.status || ''),
+            expiry: expiryLabel
+          });
+        }
+      }
 order: 1000
