@@ -1,6 +1,7 @@
 $kind: collection
 description: |-
   ## ABA QR API
+
   `POST /generate-qr` creates an ABA KHQR for static/dynamic payment. Render `qr_data` as a QR image, or show `qr_image`. The payer scans with the ABA app.
 
   After payment, verify via **Check Transaction** or the callback. The purchase_type/payment_option both default to `{{payment_option}}`.

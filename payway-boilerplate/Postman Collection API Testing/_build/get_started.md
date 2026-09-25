@@ -1,6 +1,6 @@
 # 🚀 PayWay API — Get Started
 
-**Welcome!** This collection is a complete playground for the [PayWay merchant APIs](https://developer.payway.com.kh/). It ships **pre-configured with the public sandbox demo merchant**, so your first request works immediately — no signup, no keys.
+**Welcome!** This collection is a complete playground for the [PayWay merchant APIs](https://developer.payway.com.kh/). It ships pre-configured with **this project's sandbox merchant** (`ec476910`) and a Postman Secret variable for `secret_key`, so the first request can run without an external environment. Replace project credentials before using another merchant or production.
 
 > **While testing:** open the Postman **Console** (bottom-left). Every request logs its `b4hash:` signing string there so you can verify it against the docs.
 
@@ -31,7 +31,7 @@ That is the whole merchant lifecycle you are learning: **create → host the pag
 - **Signing** — every pre-request builds `hash = base64(HMAC-SHA512(field values in documented order, secret_key))` and logs the exact input as `b4hash:`. Amounts are formatted per `{{currency}}`: USD 2 decimals, KHR integer.
 - **Polling** — **11 - Polling & Lifecycle Flows → Flow A** loops on `data.payment_status_code` while it is `2 (PENDING)`, budgeted by `{{max_polls}}`. Run the folder in the **Collection Runner** (delay ≥ 1000 ms).
 - **Callbacks** — folder **10** documents payment/token payloads + `X-PayWay-Hmac-Sha512` verification, can replay samples to `{{callback_listener}}`, and can **pull** callbacks back from webhook.site into your variables.
-- **RSA endpoints** (Refund, Payment Link, Pre-auth, Payout, Whitelist) encrypt `merchant_auth`/`beneficiaries` automatically once the **node-forge** library is installed (collection → **Libraries**); without it they **skip with setup instructions** instead of failing.
+- **RSA endpoints** (Refund, Payment Link, Pre-auth, Payout, Whitelist) use the versioned portable helper embedded in the collection. If the helper is missing or a runtime cannot provide secure randomness, they **skip with setup instructions** instead of sending an unsafe request.
 - **Prerequisite guards** — requests that need earlier state (`{{pwt}}`, `{{request_id}}`, `{{last_tran_id}}`) stop with a clear message telling you exactly which request to run first.
 
 ## 3 · Pick your journey
@@ -57,7 +57,7 @@ That is the whole merchant lifecycle you are learning: **create → host the pag
 | `{{ctid}}` | Your consumer ID | CoF folders |
 | `{{baseUrl}}` | `https://checkout.payway.com.kh` | Production only |
 
-> ⚠️ The pre-filled demo credentials are **public** — use them only to explore. Replace them before touching anything real, and never commit your secret into source control.
+> ⚠️ These are project sandbox credentials. Use them only for sandbox testing, replace them for another merchant or production, and never commit a real secret into source control.
 
 ## 5 · Transaction statuses
 
@@ -83,13 +83,13 @@ The five snags that cost developers the most time, with the one-line fix:
 | Symptom | Fix |
 |---|---|
 | `Wrong hash` (code 1) | Open the **Console** → compare the `b4hash:` line with the docs' field order (each request's description lists it too). USD amounts need 2 decimals, KHR none — the scripts handle this via `fmtAmt`. |
-| RSA endpoints answer `SKIPPED` | Install **node-forge** under collection → **Libraries**, or paste a pre-encrypted value into the `{{…_merchant_auth}}` variable named in the description. |
+| RSA endpoints answer `SKIPPED` | Confirm the versioned portable helper is present; if secure randomness is unavailable, paste a pre-encrypted value into the `{{…_merchant_auth}}` variable named in the description. |
 | Code 5 / transaction not found | `check-transaction-2` only sees the **last 7 days** and **no KHQR** transactions — use **2. Get Transaction Details** instead. |
 | Code 49 Invalid Start Date | Transaction List dates must be `yyyy-mm-dd hh:mm:ss` (auto-filled for you — don't shorten them). |
-| Code 23 payment option not enabled | The demo profile doesn't allow that wallet — switch `{{payment_option}}` (try `cards` or `abapay_khqr`). |
+| Code 23 payment option not enabled | The project sandbox profile may not allow that wallet — switch `{{payment_option}}` (try `cards` or `abapay_khqr`) or use a merchant profile with that option enabled. |
 
 ## 7 · Environments
 
 - **Sandbox (default):** `https://checkout-sandbox.payway.com.kh`
-- **Production:** `https://checkout.payway.com.kh` — only after replacing the demo credentials
+- **Production:** `https://checkout.payway.com.kh` — only after replacing the project sandbox credentials
 - **Docs:** [developer.payway.com.kh](https://developer.payway.com.kh/)

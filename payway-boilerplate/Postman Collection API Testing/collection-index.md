@@ -1,21 +1,21 @@
 # PayWay API Postman Collection — Index
 
-Navigation index for the PayWay merchant-API Postman collection built in this workspace. The collection is a self-contained playground for merchant developers: every API call signs itself (HMAC-SHA512), auto-encrypts RSA payloads when possible, saves the variables the next step needs, and documents its hash order inline. Use this file to find the right folder/request without opening the 257 KB JSON.
+Navigation index for the PayWay merchant-API Postman collection built in this workspace. The canonical deliverable is the Postman YAML workspace under `postman/collections/PayWay API — Complete Collection/`: every API call signs itself (HMAC-SHA512), encrypts RSA payloads with the portable helper when available, saves the variables the next step needs, and documents its hash order inline.
 
-> The collection was built in the standalone `D:\PayWay_Postman` workspace and imported here on 21 Sep 2026 (v1.3.0): credential variables now carry **this repo's sandbox merchant** (see Quick start), and folder 05 gained **Void Payment Link** (contract: `docs/17-payment-link.md` §17.4, SANDBOX-FINDINGS §23).
+> The collection was imported from the standalone workspace and is now maintained as Postman YAML resources. The older JSON export and `Refrence-copy-PayWay API — Complete Collection-1/` are historical references only; do not edit them.
 
-**Last verified:** 22 Sep 2026 (v1.4.0 — folder 09 gained the offline-KHQR generation flow: local TLV+CRC builder + QR render + webhook.site receiver/callback sync + by-ref inquiry; stats extracted directly from the shipped collection JSON; official `postman-collection` SDK import check green).
+**Documentation review:** 25 Sep 2026. The YAML source currently contains 45 requests and 122 collection variables. The helper-sync test currently fails because the expected versioned portable helper is absent/empty in the YAML definition; treat the collection as not release-ready until `_build/sync_portable_helper.js` is run and the full suite is green.
 
 ## At a glance
 
 | Property | Value |
 |---|---|
-| Collection file | `exp-PayWay API — Complete Collection.postman_collection.json` (~257 KB) — **the deliverable** |
+| Collection source | `postman/collections/PayWay API — Complete Collection/` — **the deliverable** |
 | Postman name | **PayWay API — Complete Collection** |
-| Version / schema | unversioned export, collection format v2.1.0 (lineage: v1.2.1 in the `PayWay_Postman` workspace) |
+| Format | Postman YAML collection resources, with local mapping in `.postman/resources.yaml` |
 | Folders / requests | 10 folders, 45 requests (40 API/flow calls + 5 doc-only reference GETs) |
 | Scripts | 40 API/flow calls with pre-request **and** test scripts (80) + 2 collection-level scripts = 82, 0 syntax errors |
-| Collection variables | 114 (project sandbox merchant pre-filled; `secret_key` is a Postman Secret type; `__helpers` holds the shared script library; `khqr_*` carries the offline-KHQR merchant identity + flow outputs) |
+| Collection variables | 122 expected by the YAML tests (project sandbox merchant pre-filled; `secret_key` is secret-typed; versioned portable helper plus legacy migration keys; `khqr_*` carries offline-KHQR identity and flow outputs) |
 | Default `baseUrl` | `https://checkout-sandbox.payway.com.kh` (switch to `https://checkout.payway.com.kh` for production) |
 | JSON-Schema assertions | 5 endpoints via shared `assertJsonSchema()` helper |
 | Runner flows | Folder 11 (`setNextRequest`: QR polling loop + CoF lifecycle) |
@@ -24,7 +24,7 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 
 | File | Role |
 |---|---|
-| `exp-PayWay API — Complete Collection.postman_collection.json` | **The deliverable** — import this into Postman |
+| `postman/collections/PayWay API — Complete Collection/` | **The deliverable** — open/import this Postman YAML collection |
 | `OLD-Check Trasaction.postman_collection.json` | Legacy scratch export (renamed from `Check Trasaction…`, kept as regression baseline) |
 | `OLD-Create Transaction Defualt.postman_collection.json` | Legacy scratch export (hosted checkout; signs against other merchants, secrets via a Postman environment) |
 | `OLD-Create Transaction QR-AI HELMET SPA Copy.postman_collection.json` | Legacy scratch export (QR; `req_time` month bug included — historical only) |
@@ -32,15 +32,18 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 | `MAINTAINER_REPORT.md` | Audit findings, incidents, rebuild/validate instructions |
 | `Goal.txt.txt` | Original build objective |
 | `llms.txt` | Index of PayWay developer docs (Markdown per page) |
-| `_build/` | Per-folder JSON "parts" + merge/validate tooling — the source of the merged collection |
+| `postman/documents/` | Maintainer-authored working guides and troubleshooting references |
+| `_build/` | YAML loader, syntax, validation, import, simulation, and helper-sync tooling |
 
 ## Quick start
 
-1. Import `exp-PayWay API — Complete Collection.postman_collection.json` into Postman.
+1. Open/import `postman/collections/PayWay API — Complete Collection/` in Postman. `.postman/resources.yaml` maps the local workspace resources.
 2. Nothing to configure for a first test — **this repo's sandbox merchant is pre-filled** (merchant `ec476910`, `secret_key` Postman *Secret*, full `rsa_public_key` PEM, seeded beneficiary `500000001`, `ctid customer123`) — all as collection variables, no environment needed. For another merchant replace `merchant_id`/`secret_key`/`rsa_public_key`; switch `baseUrl` sandbox/production.
-3. The 11 RSA pre-requests (`Refund`, Payment Link, Pre-auth, Payout, Whitelist) declare **`node-forge@1.3.1`** in their script `packages`, so current Postman loads it automatically via script package-import — no manual setup. Fallback if your Postman build ignores `packages`: install node-forge under *Edit collection → Libraries*, or paste pre-encrypted values into the `*_merchant_auth` variables.
+3. RSA requests use the portable PKCS#1 v1.5 helper embedded in the versioned collection variable. Legacy helper keys are migration fallbacks. If a request reports that the shared helper is missing, run `_build/sync_portable_helper.js`, re-import/refresh the YAML collection, and rerun validation.
 4. Start at **03 - Ecommerce Checkout → 1. Purchase**, pay on the hosted page (Visualize tab launcher), then **Check Transaction**. Every request's description starts with a **⚡ Quick test** block: what to set, what to expect, what to send next — and the Console prints `NEXT:` hints after key responses.
 5. For callbacks, paste a `https://webhook.site/<uuid>` URL into `callback_url` / `callback_listener` (see folder 10) - or let **09 - KHQR Guideline → 1. Create webhook.site Receiver** create one for you.
+
+For the maintainer workflow, read [postman/documents/README.md](postman/documents/README.md) before changing scripts or descriptions.
 
 ## Folder & request index
 
@@ -170,12 +173,12 @@ Run the whole folder in **Collection Runner** (delay ≈ 1000 ms). Each step als
 - **Payout (07):** Add payee to whitelist → Payout to up to 250 beneficiaries.
 - **Transaction pooling (11):** Flow A polls Check Transaction until settled before details/refund.
 
-## Collection variables (93, grouped)
+## Collection variables (122, grouped)
 
 | Group | Keys | Notes |
 |---|---|---|
 | **Pre-filled (this repo's sandbox merchant)** | `baseUrl`, `merchant_id` (`ec476910`), `secret_key` (Postman Secret), `rsa_public_key` (PEM), `ctid` (`customer123`), `whitelist_payee` (`500000001`) | Replace only for another merchant; `secret_key` = HMAC-SHA512 secret (Postman Secret type, not an API key); `rsa_public_key` = PEM for portal APIs |
-| Shared script library | `__helpers` | The helper-library **JavaScript source** (single source of truth). Postman runs every script in its own scope, so each script evals this variable to restore the helpers — see Scripting architecture |
+| Shared script library | `__helpers_v20260923_portable_v2` | Versioned portable helper source. Legacy helper keys remain migration fallbacks; each script loads the versioned source into its own Postman scope. |
 | Buyer defaults | `buyer_first_name`, `buyer_last_name`, `buyer_email`, `buyer_phone` | |
 | Amount & currency | `currency` (USD/KHR), `amount` (USD min 0.01, KHR min 100) | |
 | Checkout options | `payment_option`, `purchase_type` (`purchase` \| `pre-auth`), `return_url`, `cancel_url`, `continue_success_url`, `return_params_raw`, `return_deeplink_raw`, `callback_url`, `items_json`, `custom_fields_json`, `payout_json`, `additional_params_json`, `google_pay_token`, `skip_success_page`, `view_type`, `payment_gate`, `lifetime`, `shipping_fee`, `qr_image_template` | `payment_option`: `cards`, `abapay_khqr`, `abapay_khqr_deeplink`, `abapay`, `abapay_deeplink`, `alipay`, `wechat`, `google_pay` |
@@ -185,7 +188,7 @@ Run the whole folder in **Collection Runner** (delay ≈ 1000 ms). Each step als
 | Callbacks & polling | `callback_listener`, `webhook_token`, `poll_count`, `max_polls`, `poll_status` | `webhook_token` = UUID from a webhook.site URL |
 | Offline KHQR | `khqr_bakong_id`, `khqr_mid`, `khqr_bank_name`, `khqr_mcc`, `khqr_merchant_name`, `khqr_merchant_city`, `khqr_payway_data`, `khqr_mode`, `khqr_expiry_minutes` | ABA-issued merchant identity for tags 30/52/59/60/62.68 (defaults = guideline example values - replace with your own) |
 | Offline KHQR outputs | `khqr_merchant_ref`, `khqr_payload`, `khqr_selftest`, `khqr_amount_used`, `khqr_currency_used`, `khqr_transaction_id`, `khqr_payment_status(_code)`, `khqr_payment_amount`, `khqr_payment_currency`, `khqr_callback_count`, `khqr_final_status` | Generated per Build Offline KHQR send; pushback + inquiry outputs |
-| RSA paste fallbacks | `refund_merchant_auth`, `pl_merchant_auth`, `preauth_merchant_auth`, `preauth_payout_merchant_auth`, `cancel_preauth_merchant_auth`, `payout_beneficiaries`, `add_whitelist_merchant_auth`, `update_whitelist_merchant_auth` | Only needed without node-forge |
+| RSA paste fallbacks | `refund_merchant_auth`, `pl_merchant_auth`, `preauth_merchant_auth`, `preauth_payout_merchant_auth`, `cancel_preauth_merchant_auth`, `payout_beneficiaries`, `add_whitelist_merchant_auth`, `update_whitelist_merchant_auth` | Used only when portable RSA encryption or secure randomness is unavailable |
 | Payout whitelist | `whitelist_payee` | |
 | List filters | `from_date`, `to_date`, `tran_status_filter` (0 approved, 2 pending, 3 declined, 4 refunded, 7 cancelled) | Dates auto-fill as today |
 | Refund | `refund_amount` | |
@@ -193,7 +196,7 @@ Run the whole folder in **Collection Runner** (delay ≈ 1000 ms). Each step als
 
 ## Scripting architecture
 
-- **Shared helper library (v1.2.0 — Postman script scopes):** the 18 helpers (`_pad`, `utcNow`, `hmac512`, `b64`, `b64json`, `ensureB64`, `fmtAmt`, `genTranId`, `genRequestId`, `okStatus`, `respCode`, `rsaMissing`, `openSslEncrypt`, `rsaFallback`, `escHtml`, `visualizeFormPost`, `visualizeQr`, `assertJsonSchema`) live **once** as the `__helpers` collection variable. Postman executes every script (collection / request-level, pre-request and test) in its **own scope**, so functions declared in one script are invisible to the next — until v1.2.0 the library sat in the collection pre-request and all 60 consuming scripts failed with "utcNow is not defined". Now every script that needs helpers starts with a 4-line loader: `eval(pm.collectionVariables.get('__helpers'))`. Every API pre-request also logs `b4hash:` to the Postman Console so the hashed string can be verified against the official docs.
+- **Shared helper library:** the portable helper source lives as `__helpers_v20260923_portable_v2`; older helper keys are migration fallbacks for stale Postman imports. Postman executes every script in its **own scope**, so each consumer loads the helper explicitly. Every API pre-request also logs `b4hash:` to the Postman Console so the hashed string can be verified against the official docs.
 - **Per-request helper text:** every request description starts with a **⚡ Quick test** block (what to set → what to expect → what to send next) above the technical hash/RSA notes; key test scripts print status-aware **`NEXT:`** console hints (Purchase, Check Transaction, Generate QR). Sources live in `get_started.md` (overview) and the `⚡ Quick test` blocks (injected into parts by `inject_quickstart.js`).
 - **Per-request:** each request description documents its exact hash field order (and PHP samples); 40 API/flow calls carry scenario pre+test scripts (error-code handling, variable chaining, approval-code asserts, JSON-Schema assertions).
 - **JSON-Schema assertions (5):** Purchase, Check Transaction, Generate QR, Get Token Details (folder 08) and B2 Get Token Details (Flow B).
@@ -201,7 +204,7 @@ Run the whole folder in **Collection Runner** (delay ≈ 1000 ms). Each step als
 
 ## Build system (`_build/`)
 
-The merged JSON is generated — edit parts, never the merged file. **Since v1.3.0 the shipped deliverable is `exp-PayWay API — Complete Collection.postman_collection.json`** (the postman-agent's latest export, which `part_00_info.json` does not fully reflect — reconcile before re-merging). Folder parts are re-synced by the wave patchers for the folders they touch: `part_05` (Void, v1.3.0) and `part_09`/`part_10` (offline KHQR flow + webhook.site host fix, v1.4.0).
+The canonical deliverable is the YAML workspace under `postman/collections/PayWay API — Complete Collection/`; edit its resource files and use `_build/yaml_collection.js` plus the validators. The JSON parts and `merge.js` are legacy history and must not be treated as the current source of truth.
 
 | Part | Folder |
 |---|---|

@@ -1,5 +1,11 @@
 # PayWay API Postman Collection — Maintainer Report
 
+## Current source and release gate (25 Sep 2026)
+
+The canonical collection is the Postman YAML workspace at `postman/collections/PayWay API — Complete Collection/`, mapped by `.postman/resources.yaml`; the JSON export and `Refrence-copy-PayWay API — Complete Collection-1/` are historical references only. Current YAML expectations are **45 requests and 122 collection variables**. The design includes the offline-KHQR flow, webhook.site receiver/callback synchronization, Payment Link voiding, portable RSA encryption, helper migration loaders, and Runner flows.
+
+The release gate is currently **not green**: `_build/yaml_collection.test.js` stops because `__helpers_v20260923_portable_v2` is absent/empty in `.resources/definition.yaml`. Run `_build/sync_portable_helper.js`, refresh or re-import the YAML collection, and rerun the complete `test:yaml` suite before describing the collection as verified. This is a source synchronization issue, not a documentation-only discrepancy.
+
 Updated: 22 Sep 2026 (v1.4.0 — **offline KHQR generation flow in folder 09**: the KHQR payload is now built entirely in Postman scripts per the developer.payway.com.kh KHQR guideline — EMVCo TLV + CRC-16/CCITT-FALSE with a per-send self-test that rebuilds the guideline's official sample payload byte-for-byte (incl. CRC `9FBD`) — rendering a scannable QR on the Visualize tab, generating a unique `khqr_merchant_ref` per send, creating a webhook.site receiver via API, syncing the payment pushback back into variables, and finishing with Get Transactions by Merchant Ref which cross-checks APPROVED status + amount; folder 10's webhook.site sync request was found silently broken (the `api.webhook.site` JSON API now serves an unrelated app) and was re-pointed at `webhook.site` with both response shapes parsed — fix live-verified through Newman; 45 requests, 82 scripts, 114 variables, 0 syntax errors, official SDK import check green; v1.3.1 — **second-pass script-compliance review**: every script object now carries the `packages` field current Postman exports emit, and the 11 RSA pre-requests declare `node-forge@1.3.1` via Postman's script package-import so the dependency loads automatically (no manual Libraries step); audit confirmed 58/58 helper-consuming scripts keep the `__helpers` eval loader, zero deprecated APIs (`pm.environment`/`pm.globals`/`tests[`/`setTimeout`/`fetch`), `require` limited to `crypto-js` (sandbox built-in) and the now-declared `node-forge`, and every `{{var}}` inside scripts is instructional text — Postman does not substitute collection variables in scripts, and none is read functionally; v1.3.0 — **workspace import + Void Payment Link + project credentials**: the collection now lives in the SDK repo at `payway-boilerplate/Postman Collection API Testing/exp-PayWay API — Complete Collection.postman_collection.json`; credential variables re-pointed from the public demo merchant to this project's sandbox merchant (merchant `ec476910`, `secret_key` Postman **Secret** type, full RSA public PEM, seeded beneficiary `500000001`, `ctid customer123`); folder 05 gains **Void Payment Link** — the live-verified (§23) permanently-cancel-an-unpaid-link endpoint — plus the create→`payment_link_id` chaining fix; 42 requests, 76 scripts, 0 syntax errors, official SDK import check green; v1.2.1 — **visualizer launcher fix**: "Open payment page" now opens the PayWay checkout in a new browser tab (`target="_blank"`) instead of navigating inside Postman's sandboxed Visualize iframe; v1.2.0 — **script-scope fix**: Postman runs every script in its own scope, so the collection-level helper library was invisible to all 60 request scripts; library moved to the `__helpers` collection variable + `eval` loaders, live-verified with Newman; v1.1.1 — helper-text pass: ⚡ Quick-test description blocks, `NEXT:` console hints, 60-second-fixes guide section; v1.1.0 — first live-tested release, Postman-Visualizer response rendering, SDK-verified importability)
 
 ## 1. Executive summary
@@ -110,7 +116,7 @@ Not live-verifiable without a human: paying the checkout page / scanning KHQR / 
 
 ## 4. Importability (verified with the official Postman SDK)
 
-`_build/verify_postman_import.js` loads the collection with **`postman-collection`** — the same parser the Postman app uses on import. Current verdict:
+`_build/verify_postman_import.js` loads the **legacy JSON export** with **`postman-collection`** — the same parser the Postman app uses on import. The following is a historical v1.3.0 snapshot, not the current YAML collection:
 
 ```
 JSON.parse: OK (218 KB) — sdk.Collection instantiated
@@ -120,7 +126,7 @@ URL issues: none — secret-typed variables: secret_key
 VERDICT: importable in Postman (re-run 2026-09-21 after the v1.3.0 import)
 ```
 
-Import path: Postman → **Import** → select `PayWay_API_Postman_Collection.postman_collection.json`. The SDK check also caught and fixed three doc requests whose URL objects had malformed host arrays (`https.` baked into host).
+Historical import path: Postman → **Import** → select `PayWay_API_Postman_Collection.postman_collection.json`. For the current project, use the YAML workspace at `postman/collections/PayWay API — Complete Collection/` mapped by `.postman/resources.yaml`.
 
 ## 5. Sandbox behaviours discovered (documented in the collection)
 
@@ -159,7 +165,7 @@ DX/security changes: since v1.3.0 `merchant_id`/`secret_key`/`rsa_public_key` ar
 
 ## 7. Build architecture & QA tooling
 
-- `part_00_info.json` — info + **Get Started guide** (source: `_build/get_started.md`, rendered in Postman's Overview tab), 93 collection variables (incl. the `__helpers` library), and the collection pre-request loader that evals the library into its own scope. Helper set (v1.2.0): `_pad, utcNow, hmac512, b64, b64json, ensureB64, fmtAmt(a,cur), genTranId, genRequestId, okStatus, respCode, rsaMissing, openSslEncrypt, rsaFallback, escHtml, visualizeFormPost, visualizeQr, assertJsonSchema`. **Postman runs every script in its own scope** — scripts that need the helpers must start with `eval(pm.collectionVariables.get('__helpers'))` (see §1.2).
+- `part_00_info.json` — **legacy JSON source** retained for historical patch analysis. Current descriptions and helper state live in the YAML collection resources; the active helper key is `__helpers_v20260923_portable_v2` with legacy migration fallbacks.
 - `part_01…part_11` — one part per folder (`{ folder, description, item }`).
 - `merge.js` — merges parts, preserves collection-level `event`, checks the global pre-request survives.
 - Validators: `syntaxcheck.js` (parses every script), `validate.js` (folders, setNextRequest targets, undefined vars, helpers), `audit.js`, `standards.js`.

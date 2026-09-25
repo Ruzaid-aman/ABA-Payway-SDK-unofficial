@@ -12,7 +12,7 @@ The collection should include clear error-code explanations, pre-request and pos
 Build a comprehensive, up-to-date Postman Collection for all APIs and callback webhooks documented at https://developer.payway.com.kh/.
 
 **Purpose:**  
-Provide merchant developers with a ready-to-use playground for testing the full PayWay API suite.
+Provide merchant developers with a ready-to-use playground for to share with developers for quickly  testing the full PayWay API suite.
 
 **Scope:**  
 - Cover all PayWay APIs and callback/webhook events.
@@ -24,6 +24,7 @@ Provide merchant developers with a ready-to-use playground for testing the full 
 
 **Audience:**  
 Merchant developers integrating with PayWay.
+Junior or non-devs trying ABA PayWay payment gateway apis for the first time.
 
 **Expected Outcome:**  
 A practical Postman Collection that enables merchant developers to test all PayWay services end-to-end.
