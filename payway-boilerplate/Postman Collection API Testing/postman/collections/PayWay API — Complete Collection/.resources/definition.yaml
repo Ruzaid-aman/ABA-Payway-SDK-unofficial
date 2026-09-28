@@ -314,9 +314,12 @@ variables:
     }
     function visualizeQr(dataUrl, qrText, title) {
       if (typeof pm.visualizer === 'undefined' || !pm.visualizer.set) return;
+      // qrImage is the TEMPLATED PNG (qr_image_template): branding above/below the code
+      // makes it non-square. Always scale proportionally (height:auto) - forcing a fixed
+      // square squashes the image vertically and the QR stops scanning.
       var img = dataUrl
-        ? '<img alt="QR code" style="width:300px;height:300px" src="' + dataUrl + '">'
-        : '<div id="qrbox">Rendering QR...</div>' +
+        ? '<div style="max-width:340px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px"><img alt="QR code" style="display:block;width:100%;height:auto" src="' + dataUrl + '"></div>'
+        : '<div id="qrbox" style="display:inline-block;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px">Rendering QR...</div>' +
           '<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"><\/script>' +
           '<script>try { new QRCode(document.getElementById("qrbox"), { text: ' + JSON.stringify(String(qrText || '')).replace(/</g, '\\u003c') + ', width: 300, height: 300 }); } catch (e) { document.getElementById("qrbox").textContent = "QR render failed - copy the string below into any QR tool."; }<\/script>';
       var tpl = '<html><head><meta charset="utf-8"><style>body{font:14px sans-serif;margin:16px;color:#222}code{display:block;white-space:pre-wrap;word-break:break-all;background:#f4f4f5;padding:10px;border-radius:6px;margin-top:14px;font-size:11px}h4{margin:0 0 12px}</style></head><body><h4>{{title}}</h4>{{{img}}}{{#if qrText}}<code>{{qrText}}</code>{{/if}}</body></html>';
