@@ -48,4 +48,5 @@ scripts:
       if (sc) pm.test('Close responded (status.code ' + sc + ')', function () { pm.expect(sc).to.not.be.empty; });
       console.log('status.code:', sc, '-', j.status && j.status.message);
     language: text/javascript
+examples: .resources/4. Close Transaction.resources/examples
 order: 4000

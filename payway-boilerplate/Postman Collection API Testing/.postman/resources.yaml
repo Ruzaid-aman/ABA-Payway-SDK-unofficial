@@ -1,13 +1,11 @@
-# Use this workspace to collaborate
 workspace:
   id: 98cc8641-0aae-40d8-9ca2-22882fc7b6d6
-
 localResources:
   collections:
     - ../postman/collections/PayWay API — Complete Collection
-
-# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
-
 cloudResources:
   collections:
     ../postman/collections/PayWay API — Complete Collection: a1451da9-e13b-4c71-a829-0899c8ecbbba
+resourceNameMappings:
+  specs:
+    - ../postman/specs/payway-openapi.yaml: payway-openapi.yaml

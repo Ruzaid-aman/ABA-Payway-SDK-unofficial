@@ -19,26 +19,26 @@ body:
   type: json
   content: |-
     {
-      "req_time": "{{req_time}}",
-      "merchant_id": "{{merchant_id}}",
-      "tran_id": "{{tran_id}}",
-      "amount": "{{amount}}",
-      "items": "{{items_b64}}",
-      "first_name": "{{buyer_first_name}}",
-      "last_name": "{{buyer_last_name}}",
-      "email": "{{buyer_email}}",
-      "phone": "{{buyer_phone}}",
-      "purchase_type": "{{purchase_type}}",
-      "payment_option": "{{payment_option}}",
-      "callback_url": "{{callback_url_b64}}",
-      "return_deeplink": "{{return_deeplink_b64}}",
-      "currency": "{{currency}}",
-      "custom_fields": "{{custom_fields_b64}}",
-      "return_params": "{{return_params}}",
-      "payout": "{{payout_b64}}",
-      "lifetime": "{{lifetime}}",
-      "qr_image_template": "{{qr_image_template}}",
-      "hash": "{{computed_hash}}"
+        "req_time": "{{req_time}}",
+        "merchant_id": "{{merchant_id}}",
+        "tran_id": "{{tran_id}}",
+        "amount": "{{amount}}",
+        "items": "{{items_b64}}",
+        "first_name": "{{buyer_first_name}}",
+        "last_name": "{{buyer_last_name}}",
+        "email": "{{buyer_email}}",
+        "phone": "{{buyer_phone}}",
+        "purchase_type": "{{purchase_type}}",
+        "payment_option": "{{payment_option}}",
+        "callback_url": "{{callback_url_b64}}",
+        "return_deeplink": "{{return_deeplink_b64}}",
+        "currency": "{{currency}}",
+        "custom_fields": "{{custom_fields_b64}}",
+        "return_params": "{{return_params}}",
+        "payout": "{{payout_b64}}",
+        "lifetime": "{{lifetime}}",
+        "qr_image_template": "{{qr_image_template}}",
+        "hash": "{{computed_hash}}"
     }
 scripts:
   - type: beforeRequest

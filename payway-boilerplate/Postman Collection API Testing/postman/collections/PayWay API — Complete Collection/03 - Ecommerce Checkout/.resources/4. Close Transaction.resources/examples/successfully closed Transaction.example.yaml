@@ -1,0 +1,43 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/payment-gateway/v1/payments/close-transaction"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "req_time": "{{req_time}}",
+        "merchant_id": "{{merchant_id}}",
+        "tran_id": "{{tran_id}}",
+        "hash": "{{computed_hash}}"
+      }
+response:
+  statusCode: 200
+  statusText: ""
+  headers:
+    :status: "200"
+    date: Mon, 28 Sep 2026 18:23:03 GMT
+    content-type: application/json
+    server: cloudflare
+    strict-transport-security: max-age=31536000; includeSubDomains; preload, max-age=31536000; includeSubDomains; preload
+    x-xss-protection: 1; mode=block
+    x-content-type-options: nosniff
+    content-security-policy: upgrade-insecure-requests
+    referrer-policy: same-origin
+    permissions-policy: geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+    cf-cache-status: DYNAMIC
+    content-encoding: gzip
+    cf-ray: a424c6edbf7013da-HKG
+  body:
+    type: json
+    content: |-
+      {
+        "status": {
+          "code": "00",
+          "message": "Success!",
+          "tran_id": "T1790619763855"
+        }
+      }
+order: 1790619794686
