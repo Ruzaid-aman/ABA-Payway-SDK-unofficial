@@ -1,0 +1,20 @@
+name: PayWay - Sandbox
+values:
+  - key: baseUrl
+    value: 'https://checkout-sandbox.payway.com.kh'
+  - key: merchant_id
+    value: ec476910
+  - key: secret_key
+    value: 05082504b76df71e468f8c0ff36f863e19e4cd29
+  - key: rsa_public_key
+    value: |-
+      -----BEGIN PUBLIC KEY-----
+      MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCOzQHS55DWKJADrAuuwu5pNHuT
+      SFQiCQHBt8bcROwQYxTrlZgPmJznvocVgIoawSLcldBZ6VWH1QFdYEGWo3VH9iC/
+      cm94em0lfzSti6P9C8N78yeXBjPYA7Wu954jzH5ClN+tB2tmNjFRF+iAiqO4b01H
+      lH5i2pyTppIfiX6oYQIDAQAB
+      -----END PUBLIC KEY-----
+  - key: ctid
+    value: customer123
+  - key: whitelist_payee
+    value: '500000001'

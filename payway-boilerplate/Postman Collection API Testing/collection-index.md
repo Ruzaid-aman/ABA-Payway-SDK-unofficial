@@ -30,8 +30,8 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 |---|---|
 | `postman/collections/PayWay API — Complete Collection/` | **The deliverable** — open/import this Postman YAML collection |
 | `dist/PayWay API — Complete Collection.postman_collection.json` | Single-file v2.1 distribution export **with saved response examples** (generated; do not hand-edit) |
-| `postman/environments/PayWay - Sandbox.postman_environment.json` | Sandbox environment mirroring the pre-filled collection values |
-| `postman/environments/PayWay - Production.postman_environment.json` | Production environment with placeholder credentials (env vars override collection vars once selected) |
+| `postman/environments/PayWay - Sandbox.environment.yaml` | Sandbox environment mirroring the pre-filled collection values |
+| `postman/environments/PayWay - Production.environment.yaml` | Production environment with placeholder credentials (env vars override collection vars once selected) |
 | `postman/specs/payway-openapi.yaml` | Bundled OpenAPI 3.1 contract (copy of the SDK repo's `payway-openapi/bundled.yaml`; see `postman/specs/README.md`) |
 | `postman/documents/error-codes.json` | Machine-readable error registry (copied from the SDK knowledge corpus; refresh on registry changes) |
 | `Refrence-copy-PayWay API — Complete Collection-1/` | Historical reference only; never edit |
@@ -45,7 +45,7 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 ## Quick start
 
 1. **One-file route:** import `dist/PayWay API — Complete Collection.postman_collection.json` into Postman (includes the saved response examples). **Workspace route:** open/import `postman/collections/PayWay API — Complete Collection/` — `.postman/resources.yaml` maps the local workspace resources.
-2. Nothing to configure for a first test — **this repo's sandbox merchant is pre-filled** (merchant `ec476910`, `secret_key` Postman *Secret*, full `rsa_public_key` PEM, seeded beneficiary `500000001`, `ctid customer123`) — all as collection variables, no environment needed. Optionally import `postman/environments/PayWay - Sandbox.postman_environment.json` (mirrors the pre-filled values) or `PayWay - Production…` (placeholders — environment variables override collection variables once selected). For another merchant replace `merchant_id`/`secret_key`/`rsa_public_key`; switch `baseUrl` sandbox/production.
+2. Nothing to configure for a first test — **this repo's sandbox merchant is pre-filled** (merchant `ec476910`, `secret_key` Postman *Secret*, full `rsa_public_key` PEM, seeded beneficiary `500000001`, `ctid customer123`) — all as collection variables, no environment needed. Optionally import `postman/environments/PayWay - Sandbox.environment.yaml` (mirrors the pre-filled values) or `PayWay - Production…` (placeholders — environment variables override collection variables once selected). For another merchant replace `merchant_id`/`secret_key`/`rsa_public_key`; switch `baseUrl` sandbox/production.
 3. RSA requests use the portable PKCS#1 v1.5 helper embedded in the versioned collection variable. Legacy helper keys are migration fallbacks. If a request reports that the shared helper is missing, run `_build/sync_portable_helper.js`, re-import/refresh the YAML collection, and rerun validation.
 4. Start at **03 - Ecommerce Checkout → 1. Purchase**, pay on the hosted page (Visualize tab launcher), then **Check Transaction**. Every request's description starts with a **⚡ Quick test** block: what to set, what to expect, what to send next — and the Console prints `NEXT:` hints after key responses. Saved response examples (dist export) show the expected success and error shapes per request without sending anything.
 5. For callbacks, paste a `https://webhook.site/<uuid>` URL into `callback_url` / `callback_listener` (see folder 10) - or let **09 - KHQR Guideline → 1. Create webhook.site Receiver** create one for you.
