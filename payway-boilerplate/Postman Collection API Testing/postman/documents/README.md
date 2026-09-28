@@ -11,8 +11,8 @@
 1. **One-file route:** import `dist/PayWay API — Complete Collection.postman_collection.json` into Postman (Import → File). This export also carries the saved response examples and is the artifact to share with merchant developers.
 2. **Workspace route (maintainers):** open the folder as a Postman Git workspace — `.postman/resources.yaml` maps `postman/collections/PayWay API — Complete Collection/` (the editable YAML source).
 3. The collection is **pre-configured with this project's sandbox merchant** (merchant `ec476910`, `secret_key` Postman *Secret*-typed, full `rsa_public_key` PEM, seeded beneficiary `500000001`, `ctid customer123`) — the first request works with zero setup.
-4. Optional: import an environment from `postman/environments/` (`PayWay - Sandbox` mirrors the pre-filled values; `PayWay - Production` carries placeholder credentials). Postman resolves environment variables *above* collection variables, so selecting an environment overrides the pre-filled identity — keep the Production environment selected only when you have filled in your own merchant values.
-5. For another merchant, replace `merchant_id` / `secret_key` / `rsa_public_key` / `ctid` in the collection Variables tab (or in your environment). Keep secrets in **Secret** variables; never commit live values to this repository. The pre-filled sandbox credentials are public demo values — replace them before touching anything real.
+4. Optional: import an environment from `postman/environments/` — `PayWay - Sandbox.environment.yaml` (mirrors the pre-filled values) or `PayWay - Production.environment.yaml` (placeholders). These are Postman v3 YAML resources and currently local-only (not mapped in `.postman/resources.yaml`); environment variables override collection variables once selected, so keep the Production environment selected only when you have filled in your own merchant values.
+5. For another merchant, replace `merchant_id` / `secret_key` / `rsa_public_key` / `ctid` in the collection Variables tab (or in your environment). Keep secrets in **Secret** variables — note the typing is Postman app/cloud state: the YAML files on disk store every value, including `secret_key`, as plain text, so repo-level protection is what keeps them safe. Never commit live values to this repository. The pre-filled sandbox credentials are public demo values — replace them before touching anything real.
 
 Start at **03 - Ecommerce Checkout → 1. Purchase (Hosted Checkout)** — the ⚡ Quick test block in each request's description says what to set, what to expect, and what to send next. The collection **Overview** tab carries the full walkthrough, the error-code table, and a 60-second fixes section.
 
@@ -95,6 +95,8 @@ npm ci                 # once
 npm run test:yaml      # structure · scripts · import shape · KHQR sim · spec parity
 node sync_portable_helper.js   # after editing the helper source (then re-run test:yaml)
 node export_json.js    # regenerate dist export with examples (CI enforces freshness)
+node verify_index.js   # after editing collection-index.md
+node readme_path_audit.js      # after editing postman/documents/README.md
 ```
 
 The suite must be green before describing the collection as verified; CI (`.github/workflows/ci.yml`, job `postman-collection`) enforces the same gate on every push/PR.
