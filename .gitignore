@@ -65,6 +65,11 @@ test-output/
 # OpenAPI bundled output
 dist/openapi.bundled.yaml
 
+# Postman distribution export IS committed — it is the shareable single-file
+# collection (with saved examples) for merchant developers, and CI gates its
+# freshness (export_json.js --check)
+!payway-boilerplate/Postman Collection API Testing/dist/
+
 /payway-output/
 stryker-tmp/
 reports/

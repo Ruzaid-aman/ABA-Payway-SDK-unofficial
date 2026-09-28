@@ -222,8 +222,177 @@ variables:
   sub_con_b64: ""
   computed_header: ""
   last_callback_status: ""
+  __helpers_v20260923_portable_v2: |-
+    var CryptoJS = require('crypto-js');
+
+    function _pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+    function utcNow() {
+      var d = new Date();
+      return '' + d.getUTCFullYear() + _pad(d.getUTCMonth()+1) + _pad(d.getUTCDate()) +
+             _pad(d.getUTCHours()) + _pad(d.getUTCMinutes()) + _pad(d.getUTCSeconds());
+    }
+
+    function hmac512(msg, secret) {
+      return CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA512(msg, secret));
+    }
+
+    function b64(str) {
+      return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(str));
+    }
+
+    function b64json(obj) {
+      if (typeof obj === 'string') return b64(obj);
+      return b64(JSON.stringify(obj));
+    }
+
+    function ensureB64(url) {
+      url = (url || '').trim();
+      if (!url) return '';
+      if (/^https?:\/\//i.test(url)) return b64(url);
+      return url;
+    }
+
+    function fmtAmt(a, cur) { var n = parseFloat(a) || 0; if (String(cur || '').toUpperCase() === 'KHR') return String(Math.round(n)); return n.toFixed(2); }
+    function genTranId() { return 'T' + Date.now().toString(); }
+    function genRequestId(p) { return (p || 'REQ') + Date.now().toString().slice(-12); }
+    function okStatus(j) { return !!(j && j.status && (String(j.status.code) === '0' || String(j.status.code) === '00')); }
+    function respCode(j) { return j && j.status ? String(j.status.code) : ''; }
+    function rsaMissing(j) {
+      // true when the gateway rejected the call only because the RSA payload (merchant_auth / beneficiaries) was empty
+      var errs = (j && j.errors) || (j && j.status && j.status.errors) || null;
+      var code = String((j && j.statusCode) || (j && j.status && j.status.code) || '');
+      if (code !== '04') return false;
+      return !!errs && /merchant_auth|beneficiaries/i.test(Object.keys(errs).join(' '));
+    }
+
+
+    function rsaFallback(jsonStr, pem, fallbackVar) {
+      var enc = openSslEncrypt(jsonStr, pem);
+      if (enc) return enc;
+      var fb = pm.collectionVariables.get(fallbackVar) || '';
+      if (!fb) {
+        console.log('WARN: secure randomness unavailable and {{' + fallbackVar + '}} is empty. Paste a fresh pre-computed value.');
+      }
+      return fb;
+    }
+
+    // ---- JSON Schema assertions (draft-04 subset) ----
+    // Usage: assertJsonSchema({ required: ['status', 'data'], properties: { status: { type: 'object' } } })
+    function assertJsonSchema(schema, expected) {
+      if (typeof expected === 'undefined') expected = 200;
+      pm.test('HTTP ' + expected, function () { pm.response.to.have.status(expected); });
+      if (!schema) { pm.test('JSON Schema defined', function () { pm.expect(schema).to.not.be.empty; }); return; }
+      pm.test('Response matches JSON Schema', function () {
+        pm.response.to.have.jsonSchema(schema);
+      });
+    }
+    function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+    // ---- Postman Visualizer helpers (no-ops in newman/CI) ----
+    function visualizeFormPost(action, fields, title, note) {
+      if (typeof pm.visualizer === 'undefined' || !pm.visualizer.set) return;
+      var inputs = '';
+      for (var k in fields) {
+        inputs += '<input type="hidden" name="' + escHtml(k) + '" value="' + escHtml(fields[k]) + '">';
+      }
+      var tpl = '<html><head><meta charset="utf-8"><style>body{font:14px/1.5 sans-serif;margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#fafafa;color:#222}.card{max-width:560px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06)}h4{margin:0 0 8px}p{margin:0 0 16px;color:#555;font-size:13px}button{font:600 14px sans-serif;padding:10px 18px;border:0;border-radius:8px;background:#0a7d38;color:#fff;cursor:pointer}</style></head><body><div class="card"><h4>{{title}}</h4><p>{{note}}</p><p style="margin:-6px 0 16px;color:#8a8f98;font-size:12px">The checkout opens in a new browser tab. If nothing opens, allow pop-ups for Postman and click again.</p><form method="POST" action="{{action}}" target="_blank">{{{inputs}}}<button type="submit">Open payment page in a new tab &rarr;</button></form></div></body></html>';
+      pm.visualizer.set(tpl, { title: String(title || ''), note: String(note || ''), action: String(action || ''), inputs: inputs });
+    }
+    function visualizeQr(dataUrl, qrText, title) {
+      if (typeof pm.visualizer === 'undefined' || !pm.visualizer.set) return;
+      var img = dataUrl
+        ? '<img alt="QR code" style="width:300px;height:300px" src="' + dataUrl + '">'
+        : '<div id="qrbox">Rendering QR...</div>' +
+          '<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"><\/script>' +
+          '<script>try { new QRCode(document.getElementById("qrbox"), { text: ' + JSON.stringify(String(qrText || '')).replace(/</g, '\\u003c') + ', width: 300, height: 300 }); } catch (e) { document.getElementById("qrbox").textContent = "QR render failed - copy the string below into any QR tool."; }<\/script>';
+      var tpl = '<html><head><meta charset="utf-8"><style>body{font:14px sans-serif;margin:16px;color:#222}code{display:block;white-space:pre-wrap;word-break:break-all;background:#f4f4f5;padding:10px;border-radius:6px;margin-top:14px;font-size:11px}h4{margin:0 0 12px}</style></head><body><h4>{{title}}</h4>{{{img}}}{{#if qrText}}<code>{{qrText}}</code>{{/if}}</body></html>';
+      pm.visualizer.set(tpl, { title: String(title || 'Scan with the ABA Mobile app'), img: img, qrText: String(qrText || '') });
+    }
+
+    function openSslEncrypt(jsonStr, pem) {
+      if (typeof BigInt !== 'function' || typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') return null;
+      var CryptoJS = require('crypto-js');
+      function bytes(wordArray) {
+        var result = [];
+        for (var i = 0; i < wordArray.sigBytes; i++) result.push((wordArray.words[i >>> 2] >>> (24 - 8 * (i % 4))) & 255);
+        return result;
+      }
+      function wordArray(values) {
+        var words = [];
+        for (var i = 0; i < values.length; i++) words[i >>> 2] = (words[i >>> 2] || 0) | (values[i] << (24 - 8 * (i % 4)));
+        return CryptoJS.lib.WordArray.create(words, values.length);
+      }
+      function readTlv(data, position) {
+        var tag = data[position++];
+        var length = data[position++];
+        if (length & 128) {
+          var count = length & 127;
+          if (!count || count > 4) throw new Error('Invalid RSA public key DER length');
+          length = 0;
+          while (count--) length = length * 256 + data[position++];
+        }
+        var end = position + length;
+        if (end > data.length) throw new Error('Truncated RSA public key DER');
+        return { tag: tag, start: position, end: end };
+      }
+      function integer(data, part) {
+        if (part.tag !== 2) throw new Error('Invalid RSA public key integer');
+        var value = BigInt(0);
+        for (var i = part.start; i < part.end; i++) value = value * BigInt(256) + BigInt(data[i]);
+        return value;
+      }
+      function modPow(base, exponent, modulus) {
+        var result = BigInt(1);
+        while (exponent > 0) {
+          if (exponent & BigInt(1)) result = result * base % modulus;
+          base = base * base % modulus;
+          exponent >>= BigInt(1);
+        }
+        return result;
+      }
+      var encoded = String(pem || '').replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+      var der = bytes(CryptoJS.enc.Base64.parse(encoded));
+      var outer = readTlv(der, 0);
+      if (outer.tag !== 48 || outer.end !== der.length) throw new Error('Expected SPKI RSA public key');
+      var algorithm = readTlv(der, outer.start);
+      var bitString = readTlv(der, algorithm.end);
+      if (algorithm.tag !== 48 || bitString.tag !== 3 || der[bitString.start] !== 0) throw new Error('Expected SPKI RSA public key');
+      var key = readTlv(der, bitString.start + 1);
+      var modulusPart = readTlv(der, key.start);
+      var exponentPart = readTlv(der, modulusPart.end);
+      if (key.tag !== 48 || exponentPart.end !== key.end) throw new Error('Invalid RSA public key');
+      var modulus = integer(der, modulusPart);
+      var exponent = integer(der, exponentPart);
+      var keyBytes = Math.ceil((modulus.toString(2).length) / 8);
+      var chunkSize = keyBytes - 11;
+      if (chunkSize < 1 || exponent < 3) throw new Error('Invalid RSA public key size or exponent');
+      var input = bytes(CryptoJS.enc.Utf8.parse(jsonStr));
+      var output = [];
+      for (var offset = 0; offset < input.length; offset += chunkSize) {
+        var chunk = input.slice(offset, offset + chunkSize);
+        var padLength = keyBytes - chunk.length - 3;
+        var block = [0, 2];
+        var random = new Uint8Array(padLength);
+        crypto.getRandomValues(random);
+        for (var j = 0; j < padLength; j++) {
+          while (random[j] === 0) crypto.getRandomValues(random.subarray(j, j + 1));
+          block.push(random[j]);
+        }
+        block.push(0);
+        block.push.apply(block, chunk);
+        var number = BigInt(0);
+        for (var k = 0; k < block.length; k++) number = number * BigInt(256) + BigInt(block[k]);
+        var encrypted = modPow(number, exponent, modulus);
+        var result = new Array(keyBytes);
+        for (var p = keyBytes - 1; p >= 0; p--) {
+          result[p] = Number(encrypted % BigInt(256));
+          encrypted /= BigInt(256);
+        }
+        output.push.apply(output, result);
+      }
+      return CryptoJS.enc.Base64.stringify(wordArray(output));
+    }
   __helpers: ""
-  __helpers_v20260923_portable_v2: ""
 scripts:
   - type: http:beforeRequest
     code: |-

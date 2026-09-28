@@ -97,3 +97,22 @@ jobs:
         run: npm install --no-save --package-lock=false better-sqlite3@13.0.3
       - run: npm run build
       - run: npm test -- src/__tests__/webhook-storage-sqlite.test.ts src/__tests__/webhook-storage-factory.test.ts
+
+  postman-collection:
+    name: Postman collection gate
+    runs-on: ubuntu-latest
+    needs: secret-scan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - name: Install collection build dependencies
+        working-directory: payway-boilerplate/Postman Collection API Testing/_build
+        run: npm ci
+      - name: Run collection test suite (structure · scripts · import shape · KHQR sim)
+        working-directory: payway-boilerplate/Postman Collection API Testing/_build
+        run: npm run test:yaml
+      - name: Check dist export freshness (examples + v2.1 JSON)
+        working-directory: payway-boilerplate/Postman Collection API Testing/_build
+        run: node export_json.js --check

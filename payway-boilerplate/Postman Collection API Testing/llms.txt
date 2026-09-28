@@ -1,5 +1,14 @@
 # Developer Suite
 
+## This workspace (ABA PayWay Postman collection)
+
+- [Collection index](collection-index.md): Full map of the Postman collection — 10 folders, 45 requests, every endpoint URL, variables, Runner flows, and the build/validation tooling. Start here.
+- [Dist export](dist/PayWay%20API%20—%20Complete%20Collection.postman_collection.json): Single-file Postman v2.1 JSON with 49 saved response examples (success + common error shapes) across 26 requests — machine-readable request/response pairs for the whole merchant API.
+- [OpenAPI 3.1 spec (bundled)](postman/specs/payway-openapi.yaml): Hand-authored contract for all 22 documented endpoints; `x-hmac-fields` on each operation expresses the ordered body-field HMAC-SHA512 signing model (no transport auth in PayWay).
+- [Error code registry](postman/documents/error-codes.json): 83 codes across 8 families with meanings, fixes, sandbox-verification flags, and production telemetry.
+- [Workspace README](postman/documents/README.md): Quick start, credential handling, callback testing, artifact map, and documentation rules.
+- Key sandbox facts: status.code is mixed string/number ("00" vs 0/1/4); payment status lives in data.payment_status_code (0 APPROVED, 2 PENDING up to ~24h, 3 DECLINED, 4 REFUNDED, 7 CANCELLED; no EXPIRED/CLOSED anywhere); check-transaction sees only the last 7 days and no KHQR transactions; transaction-list dates are UTC+7 and need "yyyy-mm-dd hh:mm:ss"; payment-link pushbacks and offline-KHQR pushbacks carry NO hash by design; USD amounts 2 decimals / KHR integer amounts.
+
 ## Docs
 - [Overview](https://developer.payway.com.kh/overview-865678m0.md): 
 - [API Endpoints](https://developer.payway.com.kh/api-endpoints-984508m0.md): 

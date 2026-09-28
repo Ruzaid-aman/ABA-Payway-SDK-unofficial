@@ -1,0 +1,453 @@
+{
+  "_meta": {
+    "description": "Saved-response examples injected into the dist v2.1 JSON export by export_json.js. Keyed by request path relative to the collection root. `code` = HTTP status, `status` = HTTP reason, `language` = Postman preview language. Values are sandbox-shaped samples: fields and enum values follow the collection's live-verified captures and the SDK OpenAPI spec; long payloads are truncated with ellipses. Error messages marked (observed) come from live gateway telemetry recorded in the SDK error registry; others are close paraphrases of the documented meaning.",
+    "regenerate": "node _build/export_json.js",
+    "verify": "node _build/export_json.js --check"
+  },
+  "examples": {
+    "03 - Ecommerce Checkout/1. Purchase (Hosted Checkout) - multipart.request.yaml": [
+      {
+        "name": "Success — hosted checkout page (HTML 200)",
+        "code": 200,
+        "status": "OK",
+        "language": "html",
+        "description": "Purchase success is NOT JSON: PayWay returns the hosted checkout page itself (HTTP 200, text/html). The test script saves {{last_tran_id}} and the Visualize tab renders the form-POST launcher. Pay with a sandbox test card (folder 01), then send 3. Check Transaction.",
+        "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>ABA PayWay — Secure Checkout</title>\n</head>\n<body>\n  <!-- Full hosted checkout page served by PayWay (truncated here).\n       Its own JS drives the QR / card / wallet UI on PayWay's origin.\n       Session: checkout-sandbox.payway.com.kh/<base64 session> -->\n  <div id=\"payment-form\" data-step=\"abapay_khqr_request_qr\">…</div>\n</body>\n</html>"
+      },
+      {
+        "name": "Business error — wrong hash (code 1)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Business errors are HTTP 200 JSON with a non-00 status.code. Code 1 = HMAC mismatch: open the Console, compare the b4hash: line with the hash order in the request description (field order, USD 2-decimals / KHR integer amounts, base64 — not hex).",
+        "body": "{\n  \"status\": {\n    \"code\": 1,\n    \"message\": \"Wrong Hash.\"\n  }\n}"
+      },
+      {
+        "name": "Business error — duplicated tran_id (code 4)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "tran_id already exists for this merchant. The pre-request always generates a fresh unique tran_id — this error usually means a variable was hand-set to a previously used value. Note: gateway status.code types are mixed string/number across endpoints; the test scripts normalize both.",
+        "body": "{\n  \"status\": {\n    \"code\": \"4\",\n    \"message\": \"Duplicated Transaction ID.\"\n  }\n}"
+      }
+    ],
+    "03 - Ecommerce Checkout/2. Get Transaction Details.request.yaml": [
+      {
+        "name": "Success — APPROVED transaction (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Full record, including history for both online and in-store payments. payment_status_code: 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED. There is no EXPIRED/CLOSED status remotely — long-PENDING is the gateway's terminal representation for expired transactions.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"transaction_id\": \"TEST-178865526240157\",\n    \"apv\": \"108425\",\n    \"transaction_date\": \"2026-09-28 10:15:30\",\n    \"payment_status\": \"APPROVED\",\n    \"payment_status_code\": 0,\n    \"original_amount\": 0.1,\n    \"original_currency\": \"USD\",\n    \"total_amount\": 0.1,\n    \"discount_amount\": 0,\n    \"refund_amount\": 0,\n    \"payment_amount\": 0.1,\n    \"payment_currency\": \"USD\",\n    \"payment_option\": \"abapay_khqr\"\n  }\n}"
+      }
+    ],
+    "03 - Ecommerce Checkout/3. Check Transaction (fast, recent).request.yaml": [
+      {
+        "name": "APPROVED (payment_status_code 0)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "The query status lives in status.code (\"00\" = lookup worked); the PAYMENT status lives in data.payment_status_code. This fast endpoint only sees transactions created in the last 7 days and cannot see KHQR/QR-created transactions — use 2. Get Transaction Details for those.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"tran_id\": \"TEST-178865526240157\",\n    \"payment_status\": \"APPROVED\",\n    \"payment_status_code\": 0,\n    \"total_amount\": 0.1,\n    \"original_amount\": 0.1,\n    \"refund_amount\": 0,\n    \"payment_amount\": 0.1,\n    \"currency\": \"USD\"\n  }\n}"
+      },
+      {
+        "name": "PENDING (payment_status_code 2) — keep polling",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "PENDING can persist up to ~24h; poll with delay (Flow A in folder 11 does this). Do not treat a missing callback as proof of non-payment — callbacks are single best-effort; this inquiry is the source of truth.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"tran_id\": \"TEST-178865526240157\",\n    \"payment_status\": \"PENDING\",\n    \"payment_status_code\": 2,\n    \"total_amount\": 0.1,\n    \"currency\": \"USD\"\n  }\n}"
+      },
+      {
+        "name": "Not found (code 6)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "No transaction with this tran_id inside the 7-day window (message paraphrased). KHQR transactions always answer this way here — use Get Transaction Details instead.",
+        "body": "{\n  \"status\": {\n    \"code\": \"6\",\n    \"message\": \"tran_id not found\"\n  }\n}"
+      }
+    ],
+    "03 - Ecommerce Checkout/4. Close Transaction.request.yaml": [
+      {
+        "name": "Success (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "The transaction no longer accepts payment. Customer-side the QR scan is refused; keep a local closed flag — no read API reports a CLOSED status.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Transaction not found (code 5)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(observed) The tran_id does not exist on this merchant.",
+        "body": "{\n  \"status\": {\n    \"code\": 5,\n    \"message\": \"Transaction not found\"\n  }\n}"
+      },
+      {
+        "name": "Already paid — not closable (code 2)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) Closing an already PAID transaction answers HTTP 403 code 2. Only OPEN/PENDING transactions can be closed — refund instead.",
+        "body": "{\n  \"status\": {\n    \"code\": 2,\n    \"message\": \"Transaction Not Closable\"\n  }\n}"
+      }
+    ],
+    "03 - Ecommerce Checkout/5. Refund - RSA merchant_auth.request.yaml": [
+      {
+        "name": "Success (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Full or partial refund within 30 days of creation. ABA PAY and KHQR refunds are immediate; Card/WeChat/Alipay follow your agreement. Partial refunds: set {{refund_amount}} below the paid amount.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Transaction not found or invalid (PTL36)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) Verify the original tran_id — refunds need a captured transaction.",
+        "body": "{\n  \"status\": {\n    \"code\": \"PTL36\",\n    \"message\": \"Transaction not found or is invalid\"\n  }\n}"
+      },
+      {
+        "name": "Status/amount mismatch (PTL57)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) Check BOTH the transaction status (Get Transaction Details) and that {{refund_amount}} fits paid − already-refunded.",
+        "body": "{\n  \"status\": {\n    \"code\": \"PTL57\",\n    \"message\": \"Unable to process refund due to an invalid transaction status or an incorrect refund amount\"\n  }\n}"
+      }
+    ],
+    "03 - Ecommerce Checkout/6. Transaction List (filter).request.yaml": [
+      {
+        "name": "Success — filtered rows (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Dates are gateway time UTC+7 and must be `yyyy-mm-dd hh:mm:ss` (auto-filled by the pre-request). Unpaid QR-only transactions never appear; unpaid purchase-channel ones do. The gateway spells DECLINED as `DECLINDED` in list rows — handle its typo. Sample rates/values illustrative.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"page\": \"1\",\n  \"pagination\": \"50\",\n  \"data\": [\n    {\n      \"transaction_id\": \"TEST-178865526240157\",\n      \"transaction_date\": \"2026-09-28 10:15:30\",\n      \"apv\": \"108425\",\n      \"payment_status\": \"APPROVED\",\n      \"payment_status_code\": 0,\n      \"original_amount\": 0.1,\n      \"original_currency\": \"USD\",\n      \"total_amount\": 0.1,\n      \"discount_amount\": 0,\n      \"refund_amount\": 0,\n      \"payment_amount\": 0.1,\n      \"payment_currency\": \"USD\"\n    },\n    {\n      \"transaction_id\": \"TEST-178865526240158\",\n      \"transaction_date\": \"2026-09-28 10:20:05\",\n      \"apv\": \"\",\n      \"payment_status\": \"PENDING\",\n      \"payment_status_code\": 2,\n      \"original_amount\": 1,\n      \"original_currency\": \"USD\",\n      \"total_amount\": 1,\n      \"discount_amount\": 0,\n      \"refund_amount\": 0,\n      \"payment_amount\": 0,\n      \"payment_currency\": \"USD\"\n    }\n  ]\n}"
+      },
+      {
+        "name": "Invalid date format (code 49)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(observed) Dates must be `yyyy-mm-dd hh:mm:ss` — plain `yyyy-mm-dd` is rejected. The pre-request auto-fills today 00:00:00 → 23:59:59.",
+        "body": "{\n  \"status\": {\n    \"code\": 49,\n    \"message\": \"Invalid Start Date\"\n  }\n}"
+      }
+    ],
+    "03 - Ecommerce Checkout/7. Exchange Rate.request.yaml": [
+      {
+        "name": "Success (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Rates mirror ababank.com/en/forex-exchange, keyed by lowercase currency code. Rates below are illustrative samples.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"exchange_rates\": {\n    \"usd\": { \"sell\": \"1.0000\", \"buy\": \"1.0000\" },\n    \"khr\": { \"sell\": \"4100.00\", \"buy\": \"4030.00\" },\n    \"thb\": { \"sell\": \"115.50\", \"buy\": \"112.75\" },\n    \"sgd\": { \"sell\": \"3090.00\", \"buy\": \"3010.00\" }\n  }\n}"
+      },
+      {
+        "name": "Invalid merchant profile (code 26)",
+        "code": 400,
+        "status": "Bad Request",
+        "language": "json",
+        "description": "(observed) The merchant_id is not recognized in this environment — check {{merchant_id}} / the sandbox vs production base URL.",
+        "body": "{\n  \"status\": {\n    \"code\": 26,\n    \"message\": \"Invalid Merchant Profile\"\n  }\n}"
+      }
+    ],
+    "04 - ABA QR API/Generate QR.request.yaml": [
+      {
+        "name": "Success — KHQR payload (code 0)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "generate-qr reports numeric code 0 (most purchase-path endpoints report string \"00\" — normalize both). Render {{qr_image_template}} for the PNG template. The QR stays PENDING until paid; poll with transaction-detail (folder 11 Flow A). Image data-URL truncated here.",
+        "body": "{\n  \"status\": {\n    \"code\": 0,\n    \"message\": \"Success\"\n  },\n  \"qrString\": \"00020101021229370012PAYWAY@ABA020610259006049E4C53038495406410.005802KH5910Test User6007PHNOM PENH62150111TEST-17886563030303410.006304…\",\n  \"qrImage\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAfQAAAH0CAIAAAB16WQOAA… (truncated)\"\n}"
+      },
+      {
+        "name": "Lifetime elapsed before payment (code 21)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(observed) The transaction/QR lifetime elapsed before the payment completed — create a fresh transaction. Match --lifetime to the polling budget; there is no EXPIRED status to query afterwards.",
+        "body": "{\n  \"status\": {\n    \"code\": 21,\n    \"message\": \"End of API lifetime.\"\n  }\n}"
+      }
+    ],
+    "05 - Payment Link/Create Payment Link.request.yaml": [
+      {
+        "name": "Success — link created (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Live-captured shape. Save data.id (the test does → {{payment_link_id}}): it is the ONLY valid key for Details/Void — never the merchant ref or URL slug. Share data.payment_link; expiry is enforced merchant-side. Sample id/URL from a real sandbox capture.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"id\": \"T0LxC5ScY16CB1vjSpRH7Q==\",\n    \"title\": \"Test Payment Link\",\n    \"amount\": \"0.10\",\n    \"currency\": \"USD\",\n    \"status\": \"OPEN\",\n    \"expired_date\": 1790763875,\n    \"payment_link\": \"https://link-sandbox.payway.com.kh/ABAPAYPe91300Q\"\n  },\n  \"tran_id\": 179015907417582\n}"
+      },
+      {
+        "name": "Validation rejected (PTL04)",
+        "code": 400,
+        "status": "Bad Request",
+        "language": "json",
+        "description": "(observed) PTL04 is the catch-all create rejection — amount < 0.01 USD / < 100 KHR, past or < 5-minute expired_date, unsupported currency, malformed payout total.",
+        "body": "{\n  \"status\": {\n    \"code\": \"PTL04\",\n    \"message\": \"Parameter validation required\"\n  },\n  \"data\": null\n}"
+      }
+    ],
+    "05 - Payment Link/Get Payment Link Details.request.yaml": [
+      {
+        "name": "OPEN — unpaid link (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Consumes {{payment_link_id}} saved by Create. Unpaid links keep reading OPEN even after expiry — enforce expiry merchant-side.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"id\": \"T0LxC5ScY16CB1vjSpRH7Q==\",\n    \"title\": \"Test Payment Link\",\n    \"amount\": \"0.10\",\n    \"currency\": \"USD\",\n    \"status\": \"OPEN\",\n    \"expired_date\": 1790763875,\n    \"payment_link\": \"https://link-sandbox.payway.com.kh/ABAPAYPe91300Q\"\n  }\n}"
+      },
+      {
+        "name": "VOIDED — after Void",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "VOIDED is a real status in detail output; the hosted page then renders the invalid-data shell (code 07) and the customer form is dead.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"id\": \"T0LxC5ScY16CB1vjSpRH7Q==\",\n    \"title\": \"Test Payment Link\",\n    \"amount\": \"0.10\",\n    \"currency\": \"USD\",\n    \"status\": \"VOIDED\",\n    \"expired_date\": 1790763875,\n    \"payment_link\": \"https://link-sandbox.payway.com.kh/ABAPAYPe91300Q\"\n  }\n}"
+      },
+      {
+        "name": "Unknown link id (code 96)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) A bogus id answers 96, not the documented PTL132. Pass the opaque data.id from Create — not merchant_ref_no, not the URL slug.",
+        "body": "{\n  \"status\": {\n    \"code\": 96,\n    \"message\": \"Invalid merchant data\"\n  }\n}"
+      }
+    ],
+    "05 - Payment Link/Void Payment Link.request.yaml": [
+      {
+        "name": "Success — link voided (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Permanently cancels an UNPAID link — irreversible. tran_id here is the numeric gateway log id, not a payment transaction. Confirm with Get Payment Link Details (status reads VOIDED). Do not void paid links — refund instead.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"tran_id\": 179015907417582\n}"
+      },
+      {
+        "name": "Already voided (PTL188) — terminal, not an error",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) Void is NOT idempotent: a second void on the same link always answers 403 PTL188. Treat it as the desired terminal state.",
+        "body": "{\n  \"status\": {\n    \"code\": \"PTL188\",\n    \"message\": \"Payment link is already voided.\"\n  }\n}"
+      },
+      {
+        "name": "Unknown link id (code 96)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) The id does not reference a known payment link on this merchant.",
+        "body": "{\n  \"status\": {\n    \"code\": 96,\n    \"message\": \"Invalid merchant data\"\n  }\n}"
+      }
+    ],
+    "06 - Pre-auth/1. Complete Pre-auth.request.yaml": [
+      {
+        "name": "Success — funds captured (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Captures a pre-authorization. Default capture window is 30 days, after which the hold auto-releases — with no webhook, so track the window merchant-side.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Status/amount mismatch (PTL59)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) The transaction is not in a capturable state (never authorized, already completed/cancelled) or the completion amount is incorrect.",
+        "body": "{\n  \"status\": {\n    \"code\": \"PTL59\",\n    \"message\": \"Unable to complete pre-authorization: The transaction status is invalid or the completion amount is incorrect\"\n  }\n}"
+      }
+    ],
+    "06 - Pre-auth/3. Cancel Pre-auth.request.yaml": [
+      {
+        "name": "Success — hold released (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Releases the temporary hold on the customer's payment method.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Not cancellable (PTL170)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) Only OPEN/PENDING pre-auths can be cancelled — check the current status first.",
+        "body": "{\n  \"status\": {\n    \"code\": \"PTL170\",\n    \"message\": \"Unable to cancel pre-authorization: The transaction status is invalid\"\n  }\n}"
+      }
+    ],
+    "07 - Payout/1. Payout (to beneficiaries).request.yaml": [
+      {
+        "name": "Success — payout queued (code 0)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Payout reports numeric code 0. Payouts settle immediately; there is NO standard refund after a payout or split — verify beneficiaries before sending.",
+        "body": "{\n  \"status\": {\n    \"code\": 0,\n    \"message\": \"Success\"\n  }\n}"
+      },
+      {
+        "name": "Payee not whitelisted (code 37)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed) Whitelist the payee first (request 2 in this folder) and match the currency to the beneficiary account.",
+        "body": "{\n  \"status\": {\n    \"code\": 37,\n    \"message\": \"Payout accounts are not in whitelist.\"\n  }\n}"
+      }
+    ],
+    "07 - Payout/2. Add Account to Payout Whitelist - RSA.request.yaml": [
+      {
+        "name": "Success — payee whitelisted (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "The account can now receive payouts. Use the seeded sandbox beneficiaries (e.g. {{whitelist_payee}} = 500000001); docs sample accounts are not on this profile's whitelist.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Payee already exists (PTL148)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(observed) The most common add-whitelist response in production — benign. Re-enable via Update Payser Status if it was disabled.",
+        "body": "{\n  \"status\": {\n    \"code\": \"PTL148\",\n    \"message\": \"Payee already exists.\"\n  }\n}"
+      }
+    ],
+    "08 - Credentials on File (CoF)/1. Link Account (ABA Account).request.yaml": [
+      {
+        "name": "Success — QR + deeplink returned (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "The token does NOT come back here: the customer scans/deep-links, approves in ABA Mobile, and PayWay pushes the token (pwt) to your callback_url. Get Token Details is the fallback when the callback is missed. The deeplink scheme is abamobilebank://ababank.com?type=payway&qrcode=<QR_STRING>.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success\"\n  },\n  \"data\": {\n    \"request_id\": \"TESTREQ0001\",\n    \"qr_string\": \"00020101021129370012PAYWAY@ABA020610259006049E4C53038495802KH5910ABA PAYWAY62150111TESTREQ00016304…\",\n    \"deeplink\": \"abamobilebank://ababank.com?type=payway&qrcode=00020101021129370012PAYWAY…\"\n  }\n}"
+      }
+    ],
+    "08 - Credentials on File (CoF)/2. Link Card (Credit-Debit).request.yaml": [
+      {
+        "name": "Success — hosted card-entry HTML (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Link Card answers with the hosted card-entry PAGE (Visa/Mastercard/JCB/UPI), like Purchase answers with the checkout page. The test script renders the launcher on the Visualize tab; after the customer submits, the token (pwt) arrives via callback_url.",
+        "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><title>ABA PayWay — Link Card</title></head>\n<body>\n  <!-- Hosted card-linking form served by PayWay (truncated here).\n       Submit posts back to PayWay and the token is pushed to callback_url. -->\n  <form id=\"link-card\" method=\"post\">…</form>\n</body>\n</html>"
+      }
+    ],
+    "08 - Credentials on File (CoF)/3. Get Token Details.request.yaml": [
+      {
+        "name": "Token not linked yet (code 09)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(observed) Expected until the customer completes the ABA-app link — finish that step, then re-send. This endpoint is the fallback when the linking callback was missed; it takes request_id ONLY (no ctid/pwt).",
+        "body": "{\n  \"status\": {\n    \"code\": \"09\",\n    \"message\": \"Data not found\"\n  }\n}"
+      }
+    ],
+    "08 - Credentials on File (CoF)/4. Payment (Using Token).request.yaml": [
+      {
+        "name": "Success — charged stored credential (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Charges the customer's stored credential ({{pwt}} + {{ctid}}, saved automatically by the token endpoints / Flow B).",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Invalid or expired token (code 105)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(observed) The payment credential token is invalid/expired — re-link (link-account/link-card) or renew (account tokens expire 90 days after last use; Renew Token restarts the window).",
+        "body": "{\n  \"status\": {\n    \"code\": 105,\n    \"message\": \"Invalid pwt or ctid.\"\n  }\n}"
+      }
+    ],
+    "08 - Credentials on File (CoF)/7. Subscription (Scheduled Payment).request.yaml": [
+      {
+        "name": "Success — purchase + token link (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Subscription = a purchase that also links the customer's card/ABA account. Success returns the checkout QR string; once the customer pays, the token is pushed back for future scheduled charges (CITR_FIX on the purchase path, {{sub_frequency}} = 1W/1M/2M).",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"qrString\": \"00020101021229370012PAYWAY@ABA020610259006049E4C530384954069.995802KH5910Test User6007PHNOM PENH62150111TEST-178865630304…\"\n}"
+      }
+    ],
+    "09 - KHQR Guideline/1. Create webhook.site Receiver.request.yaml": [
+      {
+        "name": "Success — receiver bin created",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "webhook.site's JSON API (NOT api.webhook.site — that host was retired and answers with an unrelated app's JSON). The test saves {{callback_listener}} and {{webhook_token}} for the pull requests.",
+        "body": "{\n  \"uuid\": \"b1dd1e2e-4f5c-4a26-a1e0-3d4a9f0f1a2b\",\n  \"default_content_type\": \"application/json\",\n  \"timeout\": 0,\n  \"created_at\": \"2026-09-28T03:41:07+00:00\"\n}"
+      }
+    ],
+    "09 - KHQR Guideline/3. Pull webhook.site Callbacks (KHQR).request.yaml": [
+      {
+        "name": "Pushback matched — KHQR payment received",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "webhook.site pull (paginated {data:[…]} shape; the legacy top-level array is parsed too). PayWay's offline-KHQR pushback is a plain JSON notification — correlate by merchant_ref; there is no per-QR callback field and no hash to verify (inquiry is the source of truth). The test imports the transaction id/status/amounts into the khqr_* variables. Field names illustrative.",
+        "body": "{\n  \"data\": [\n    {\n      \"id\": \"9f2c1b4a-77d3-4f56-9a10-2b8e5c6d7f01\",\n      \"method\": \"POST\",\n      \"content\": \"{\\\"tran_id\\\":\\\"178865526240157\\\",\\\"merchant_ref\\\":\\\"MREF-KHQR-260928\\\",\\\"payment_status\\\":\\\"APPROVED\\\",\\\"payment_status_code\\\":0,\\\"payment_amount\\\":\\\"4100.00\\\",\\\"payment_currency\\\":\\\"KHR\\\"}\"\n    }\n  ],\n  \"total\": 1,\n  \"page\": 1\n}"
+      },
+      {
+        "name": "No pushback yet (empty bin)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "The designed 'nothing has paid the QR yet' signal — the KHQR stays PENDING until a human scans and pays it. Re-send this request after paying.",
+        "body": "{\n  \"data\": [],\n  \"total\": 0,\n  \"page\": 1\n}"
+      }
+    ],
+    "09 - KHQR Guideline/4. Get Transactions by Merchant Ref.request.yaml": [
+      {
+        "name": "Success — KHQR payment found, APPROVED (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "KHQRs can be paid MULTIPLE times — the test asserts ≥1 APPROVED row matching {{khqr_merchant_ref}} and cross-checks the amount against the QR. A KHQR can be paid multiple times; one row per completed payment. Sample values illustrative.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": [\n    {\n      \"transaction_id\": \"178865526240157\",\n      \"transaction_date\": \"2026-09-28 10:31:44\",\n      \"merchant_ref\": \"MREF-KHQR-260928\",\n      \"payment_status\": \"APPROVED\",\n      \"payment_status_code\": 0,\n      \"payment_amount\": 4100,\n      \"payment_currency\": \"KHR\"\n    }\n  ]\n}"
+      },
+      {
+        "name": "404 — profile without KHQR retrieval (demo profiles)",
+        "code": 404,
+        "status": "Not Found",
+        "language": "json",
+        "description": "(observed) KHQR lookups by reference additionally need KHQR retrieval provisioned on the merchant profile — demo profiles answer 404/empty. The request itself is docs-verified; treat as informational and request provisioning from PayWay.",
+        "body": "{\n  \"message\": \"Not Found\"\n}"
+      }
+    ],
+    "10 - Callbacks & Webhooks/Payment Result Callback - Sample Sender.request.yaml": [
+      {
+        "name": "What your receiver gets — signed payment callback",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "This is the payload the SAMPLE SENDER posts to {{callback_listener}} — the wire format PayWay uses. Verify the X-PayWay-Hmac-Sha512 header: sort keys ascending (apv, return_params, status, tran_id), concat the values (arrays/objects JSON-encoded), HMAC-SHA512 with secret_key, Base64, compare constant-time. status 0/2/3/4/7; apv = approval code. Verify final payment via Check Transaction — a received callback alone is not proof of payment.",
+        "body": "{\n  \"tran_id\": \"TEST-178865526240157\",\n  \"apv\": 1,\n  \"status\": \"0\",\n  \"return_params\": \"\"\n}"
+      }
+    ],
+    "10 - Callbacks & Webhooks/Token Result Callback (CoF) - Sample Sender.request.yaml": [
+      {
+        "name": "What your receiver gets — CoF token callback",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Sent to callback_url after the customer completes link-account / link-card / renewal. Store pwt + ctid — they are the charge pair for 4. Payment (Using Token). Sample token truncated.",
+        "body": "{\n  \"request_id\": \"TESTREQ0001\",\n  \"payment_credential\": {\n    \"ctid\": \"customer123\",\n    \"pwt\": \"8f14e45fceea167a5a36dedd4bea2543…\",\n    \"source_of_fund\": \"\",\n    \"type\": \"CARD\",\n    \"status\": \"ACTIVE\",\n    \"expired_at\": \"2026-12-31 00:00:00\",\n    \"token_flag\": \"CITI_FLEX\",\n    \"frequency\": \"\",\n    \"subscribed_amount\": \"\"\n  }\n}"
+      }
+    ],
+    "10 - Callbacks & Webhooks/Sync webhook.site - Postman (pull callbacks).request.yaml": [
+      {
+        "name": "Pushback pulled — tran_id/pwt/ctid imported",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "webhook.site pull in both response shapes (legacy top-level array and paginated {data}). The test scans the latest callbacks and imports tran_id / pwt / ctid into collection variables so the CoF chain can continue. Content field illustrative.",
+        "body": "{\n  \"data\": [\n    {\n      \"id\": \"9f2c1b4a-77d3-4f56-9a10-2b8e5c6d7f02\",\n      \"method\": \"POST\",\n      \"content\": \"{\\\"request_id\\\":\\\"TESTREQ0001\\\",\\\"payment_credential\\\":{\\\"ctid\\\":\\\"customer123\\\",\\\"pwt\\\":\\\"8f14e45fceea167a5a36dedd4bea2543…\\\",\\\"token_flag\\\":\\\"CITI_FLEX\\\"}}\"\n    }\n  ]\n}"
+      }
+    ]
+  }
+}

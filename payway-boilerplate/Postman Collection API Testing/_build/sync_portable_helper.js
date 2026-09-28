@@ -35,7 +35,9 @@ function loader(indent, migrate) {
 
 const definition = fs.readFileSync(definitionPath, 'utf8');
 const yamlValue = `  ${helperKey}: |-\n${helperSource.split('\n').map((line) => line ? `    ${line}` : '').join('\n')}\n`;
-let updated = definition;
+// An unsynced collection may carry the helper as an empty scalar (""); drop that
+// line first or inserting the block below duplicates the mapping key.
+let updated = definition.replace(/^  __helpers_v20260923_portable(?:_v2)?: ["']["']?\r?\n/m, '');
 const previousHelperBlock = /^  __helpers_v20260923_portable(?:_v2)?: \|-\r?\n[\s\S]*?(?=^  __helpers:|^scripts:)/m;
 if (previousHelperBlock.test(updated)) {
   updated = updated.replace(previousHelperBlock, yamlValue);

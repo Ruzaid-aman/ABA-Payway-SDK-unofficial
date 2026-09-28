@@ -1,0 +1,769 @@
+{
+  "registryVersion": 1,
+  "generated": "2026-09-15T14:18:38.008Z",
+  "source": "src/cli/explain-code.ts",
+  "description": "Consolidated ABA PayWay error/status code registry. sandboxVerified: true means the meaning was reproduced against the live sandbox; evidence points into docs/SANDBOX-FINDINGS. observedOn/observedMessage carry ABA production telemetry (dev-team CSV, 2026-09-15): the gateway APIs where the code was seen and the exact gateway message; API labels map to paths in docs/12 (errors-and-debugging topic). Regenerate with `npm run gen:error-registry`. DISTRIBUTED WITH THE POSTMAN COLLECTION: this copy lives at postman/documents/error-codes.json so the Postman workspace is self-contained for AI tools; refresh it from the SDK knowledge corpus (knowledge/error-codes.json, npm run gen:error-registry) when the registry changes.",
+  "codes": [
+    {
+      "code": "CDA00",
+      "family": "cda",
+      "title": "ABA account payment OK",
+      "hint": "Payer-account success — treat like 00 (purchase telemetry: tens of thousands of occurrences).",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "OK"
+    },
+    {
+      "code": "CDA09",
+      "family": "cda",
+      "title": "ABA account payment declined — transient",
+      "hint": "Payer-account decline, usually transient — the customer-facing message advises retrying in a few minutes; safe to surface as-is.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Sorry, we couldn't process the payment. Please try again in few minutes or contact to the merchant directly."
+    },
+    {
+      "code": "CDA45",
+      "family": "cda",
+      "title": "ABA account insufficient funds",
+      "hint": "The payer ABA account lacks funds — customer tops up or pays from another account.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Payer account has insufficient funds."
+    },
+    {
+      "code": "1",
+      "family": "cof",
+      "title": "Invalid hash",
+      "hint": "Wrong HMAC composition — check the field order for the CoF endpoint being called.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §6"
+    },
+    {
+      "code": "01",
+      "family": "cof",
+      "title": "Invalid hash",
+      "hint": "Wrong HMAC composition — check the field order for the CoF endpoint being called.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §16"
+    },
+    {
+      "code": "04",
+      "family": "cof",
+      "title": "Validation / binding failure",
+      "hint": "Laravel-style binding/validation layer rejected the request — inspect the errors{} field map on the thrown error.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §13",
+      "observedOn": [
+        "purchase",
+        "generate-qr"
+      ],
+      "observedMessage": "The given data was invalid."
+    },
+    {
+      "code": "09",
+      "family": "cof",
+      "title": "Token not found",
+      "hint": "The ctid/request_id does not reference a known account token — verify or re-link.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §16"
+    },
+    {
+      "code": "98",
+      "family": "cof",
+      "title": "Merchant ID not found",
+      "hint": "Merchant ID not found — verify the merchant credential (env/profile) for the target environment."
+    },
+    {
+      "code": "104",
+      "family": "cof",
+      "title": "Merchant not enabled for token flag",
+      "hint": "The merchant account is not enabled for this token_flag — contact PayWay to provision, or use a linking enum (CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX).",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §16"
+    },
+    {
+      "code": "105",
+      "family": "cof",
+      "title": "Invalid payment credential token",
+      "hint": "The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken. On purchase/charge the gateway also words it \"Invalid pwt or ctid.\" — for ctid-keyed charges check the ctid→pwt resolution first (production telemetry 2026-09).",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §16",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Invalid pwt or ctid."
+    },
+    {
+      "code": "0",
+      "family": "gateway",
+      "title": "Success",
+      "hint": "Business success. purchase/exchange-rate/close-transaction/transaction-list and the merchant-portal APIs report \"00\"; generate-qr and payout report \"0\".",
+      "observedOn": [
+        "purchase",
+        "generate-qr",
+        "close-transaction",
+        "exchange-rate",
+        "transaction-list",
+        "payout",
+        "cof-charge",
+        "cof-link-account",
+        "refund",
+        "pre-auth-complete",
+        "pre-auth-cancel",
+        "whitelist-add",
+        "whitelist-status",
+        "payment-link-create",
+        "payment-link-detail"
+      ]
+    },
+    {
+      "code": "1",
+      "family": "gateway",
+      "title": "Wrong Hash",
+      "hint": "HMAC signature mismatch — check API key, field ordering, base64 vs hex encoding.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §6",
+      "observedOn": [
+        "purchase",
+        "generate-qr"
+      ],
+      "observedMessage": "Wrong Hash."
+    },
+    {
+      "code": "2",
+      "family": "gateway",
+      "title": "Transaction Not Closable",
+      "hint": "Transaction status does not allow close — sandbox-verified: closing an already PAID transaction answers 403 code 2 (SANDBOX-FINDINGS §21). Only OPEN/PENDING transactions can be closed.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §21"
+    },
+    {
+      "code": "3",
+      "family": "gateway",
+      "title": "Invalid Transaction Amount",
+      "hint": "Amount rejected (non-positive, wrong decimal scale, or mismatched) — seen on purchase, pre-auth-completion and refund (production telemetry 2026-09).",
+      "observedOn": [
+        "purchase",
+        "pre-auth-complete",
+        "refund"
+      ],
+      "observedMessage": "Invalid Transaction Amount."
+    },
+    {
+      "code": "4",
+      "family": "gateway",
+      "title": "Duplicated Transaction ID",
+      "hint": "tran_id already exists for this merchant — send a fresh unique tran_id (production telemetry 2026-09: purchase, generate-qr, payout). The STRING code \"04\" is the separate validation/binding failure.",
+      "observedOn": [
+        "purchase",
+        "generate-qr",
+        "payout"
+      ],
+      "observedMessage": "Duplicated Transaction ID."
+    },
+    {
+      "code": "5",
+      "family": "gateway",
+      "title": "Transaction Not Found",
+      "hint": "Close/cancel target does not exist — verify tran_id.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §8",
+      "observedOn": [
+        "close-transaction"
+      ],
+      "observedMessage": "Transaction not found"
+    },
+    {
+      "code": "6",
+      "family": "gateway",
+      "title": "tran_id not found",
+      "hint": "check-transaction found no transaction with this ID. On purchase the same numeric code means \"Requested Domain is not in whitelist\" (production telemetry 2026-09) — ask PayWay to whitelist the domain."
+    },
+    {
+      "code": "7",
+      "family": "gateway",
+      "title": "Invalid Request Data",
+      "hint": "Missing or malformed field - check parameter types."
+    },
+    {
+      "code": "8",
+      "family": "gateway",
+      "title": "merchant_id not found",
+      "hint": "Merchant identity rejected on this endpoint (sandbox-verified HTTP 403 on check-transaction) - check PAYWAY_MERCHANT_ID or the active profile. Production telemetry 2026-09: on refund/payout/transaction-list/generate-qr an 8 is instead a GENERIC 500-class \"Something went wrong\" — retry once, then contact PayWay support with the trace id.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §6",
+      "observedOn": [
+        "purchase",
+        "generate-qr",
+        "payout",
+        "refund",
+        "transaction-list"
+      ],
+      "observedMessage": "Something went wrong. Please reach out to our digital support team for assistance"
+    },
+    {
+      "code": "12",
+      "family": "gateway",
+      "title": "Payment currency not allowed",
+      "hint": "Payout currency must match the beneficiary account currency and your merchant credential currency (e.g. send USD to a USD account).",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §9",
+      "observedOn": [
+        "purchase",
+        "generate-qr"
+      ],
+      "observedMessage": "Payment currency is not allowed."
+    },
+    {
+      "code": "15",
+      "family": "gateway",
+      "title": "Invalid Merchant",
+      "hint": "merchant_id not recognized in this environment."
+    },
+    {
+      "code": "16",
+      "family": "gateway",
+      "title": "Invalid Amount",
+      "hint": "Amount format wrong — use formatAmount()/decimal rules for the currency."
+    },
+    {
+      "code": "17",
+      "family": "gateway",
+      "title": "Invalid Currency",
+      "hint": "Currency must be 'USD' or 'KHR'."
+    },
+    {
+      "code": "22",
+      "family": "gateway",
+      "title": "Expired Transaction",
+      "hint": "Transaction/token expired — create a new one or renew the token."
+    },
+    {
+      "code": "23",
+      "family": "gateway",
+      "title": "Transaction Not Found",
+      "hint": "No transaction with this tran_id (may have been closed)."
+    },
+    {
+      "code": "24",
+      "family": "gateway",
+      "title": "Invalid Beneficiary Data",
+      "hint": "RSA-encrypted beneficiaries malformed — verify public key + account format."
+    },
+    {
+      "code": "26",
+      "family": "gateway",
+      "title": "Invalid Merchant Profile",
+      "hint": "Merchant identity rejected (sandbox-verified HTTP 400 on exchange-rate with unknown merchant_id) — check PAYWAY_MERCHANT_ID or the active profile.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §6",
+      "observedOn": [
+        "exchange-rate"
+      ],
+      "observedMessage": "Invalid Merchant Profile"
+    },
+    {
+      "code": "29",
+      "family": "gateway",
+      "title": "Card Inactive",
+      "hint": "Issuer reports the card inactive — customer uses another card (purchase telemetry 2026-09: \"your card is inactive\").",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Sorry, your payment cannot be processed as your card is inactive. Please use another card."
+    },
+    {
+      "code": "30",
+      "family": "gateway",
+      "title": "Card Declined By Issuer",
+      "hint": "Issuer declined — customer verifies the card is active or uses another card.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Your payment is declined by the card issuer bank. Please make sure your card is active, or contact your issuer bank for support."
+    },
+    {
+      "code": "37",
+      "family": "gateway",
+      "title": "Payout Whitelist",
+      "hint": "Payout account not whitelisted — call addBeneficiary() first (production message: \"Payout accounts are not in whitelist.\").",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §9",
+      "observedOn": [
+        "payout"
+      ],
+      "observedMessage": "Payout accounts are not in whitelist."
+    },
+    {
+      "code": "49",
+      "family": "gateway",
+      "title": "Invalid Request",
+      "hint": "Validation failed. For transaction-list dates use \"YYYY-MM-DD HH:mm:ss\".",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §8"
+    },
+    {
+      "code": "52",
+      "family": "gateway",
+      "title": "Incorrect Card Details",
+      "hint": "Card number/expiry/CVV failed — customer re-enters the card details.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Incorrect card details. Please check and try again."
+    },
+    {
+      "code": "58",
+      "family": "gateway",
+      "title": "Card Declined By Issuer",
+      "hint": "Issuer declined without detail — customer contacts the issuer bank or uses another card.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Your payment is declined by the card issuer bank. Please contact issuer bank for support."
+    },
+    {
+      "code": "59",
+      "family": "gateway",
+      "title": "Card Insufficient Funds",
+      "hint": "Card funds/limit exhausted — customer uses another card or frees funds first.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Your payment card has insufficient funds. Please check and try again."
+    },
+    {
+      "code": "60",
+      "family": "gateway",
+      "title": "Card Usage Limit Reached",
+      "hint": "Card hit its issuer usage limit — another card, or issuer-bank support.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Your payment card has reached its usage limit. Please use another card, or contact issuer bank for support."
+    },
+    {
+      "code": "68",
+      "family": "gateway",
+      "title": "Card Declined By Issuer",
+      "hint": "Issuer declined without detail — customer contacts the issuer bank or uses another card.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Your payment is declined by the card issuer bank. Please contact issuer bank for support."
+    },
+    {
+      "code": "69",
+      "family": "gateway",
+      "title": "Lifetime Below Minimum",
+      "hint": "Checkout purchase lifetime must be >= 3 minutes (API takes minutes; max 43200 = 30 days; spec-documented)."
+    },
+    {
+      "code": "75",
+      "family": "gateway",
+      "title": "Card Declined By Issuer",
+      "hint": "Issuer declined; message advises another card or issuer-bank support.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Your payment is declined by the card issuer bank. Please use another card, or contact issuer bank for support."
+    },
+    {
+      "code": "96",
+      "family": "gateway",
+      "title": "Payee / Merchant Data",
+      "hint": "Beneficiary payee unknown, or payment-link id invalid (detail).",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §22/§23",
+      "observedOn": [
+        "generate-qr",
+        "whitelist-add"
+      ],
+      "observedMessage": "Invalid merchant data"
+    },
+    {
+      "code": "500",
+      "family": "gateway",
+      "title": "Gateway Error",
+      "hint": "Generic 500-class failure (\"Something went wrong... digital support team\") — retry once, then contact PayWay support with the trace id (telemetry: transaction-list, generate-qr, payment-link detail).",
+      "observedOn": [
+        "transaction-list",
+        "generate-qr",
+        "payment-link-detail"
+      ],
+      "observedMessage": "Something went wrong. Please reach out to our digital support team for assistance"
+    },
+    {
+      "code": "503",
+      "family": "gateway",
+      "title": "System Under Maintenance",
+      "hint": "PayWay is under maintenance — pause and retry later (telemetry: purchase).",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "System under maintenance. We'll update you when available. Thanks for your patience."
+    },
+    {
+      "code": "999",
+      "family": "gateway",
+      "title": "Something Went Wrong",
+      "hint": "Generic gateway failure, \"please try again later\" — retry with backoff; not a merchant config issue (telemetry: purchase).",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Something went wrong. Please try again later."
+    },
+    {
+      "code": "PTL05",
+      "family": "payment-link",
+      "title": "Parameter Invalid Format",
+      "hint": "Check datatypes — amounts are numbers in the SDK (the official docs declare strings; the gateway accepts numbers). Sandbox probes: malformed values answered PTL04 instead."
+    },
+    {
+      "code": "PTL99",
+      "family": "payment-link",
+      "title": "Merchant Invalid Currency",
+      "hint": "Currency not enabled for the merchant profile. Sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile."
+    },
+    {
+      "code": "PTL132",
+      "family": "payment-link",
+      "title": "Invalid Payment Link",
+      "hint": "Invalid payment link — pass the opaque data.id returned by create, NOT merchant_ref_no, NOT the URL slug. Sandbox note (2026-09-06): a bogus id answered 96 instead."
+    },
+    {
+      "code": "PTL188",
+      "family": "payment-link",
+      "title": "Payment Link Already Voided",
+      "hint": "The payment link is already voided — already in the desired terminal state, not a failure. Void is not idempotent (HTTP 403, SANDBOX-FINDINGS §23); a second void on the same link id always answers PTL188.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §23"
+    },
+    {
+      "code": "12",
+      "family": "payout",
+      "title": "Payment currency not allowed",
+      "hint": "Payout currency must match the beneficiary account currency and your merchant credential currency. Send USD to a USD account; KHR to a KHR account.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §9",
+      "observedOn": [
+        "purchase",
+        "generate-qr"
+      ],
+      "observedMessage": "Payment currency is not allowed."
+    },
+    {
+      "code": "PTL-PAYOUT-36",
+      "family": "payout",
+      "title": "Payout amount mismatch",
+      "hint": "Sum of beneficiary amounts must equal the payout (transaction complete) amount."
+    },
+    {
+      "code": "PTL-PAYOUT-37",
+      "family": "payout",
+      "title": "Payout account not whitelisted",
+      "hint": "Whitelist the beneficiary first via addBeneficiary()."
+    },
+    {
+      "code": "PTL46",
+      "family": "payout",
+      "title": "Payout account not whitelisted",
+      "hint": "Whitelist the beneficiary first via addBeneficiary()."
+    },
+    {
+      "code": "PTL146",
+      "family": "payout",
+      "title": "Payout account not whitelisted",
+      "hint": "Whitelist the beneficiary first via addBeneficiary()."
+    },
+    {
+      "code": "PTL147",
+      "family": "payout",
+      "title": "Payment currency not allowed",
+      "hint": "Payout currency must match the beneficiary account currency and your merchant credential currency. Send USD to a USD account; KHR to a KHR account."
+    },
+    {
+      "code": "PTL148",
+      "family": "payout",
+      "title": "Payee already exists",
+      "hint": "The payee is already on the payout whitelist — benign, no action needed (production telemetry 2026-09: the most common add-whitelist response). Re-enable via update-whitelist-status if it was disabled.",
+      "observedOn": [
+        "whitelist-add"
+      ],
+      "observedMessage": "Payee already exists."
+    },
+    {
+      "code": "PTL59",
+      "family": "pre-auth",
+      "title": "Unable to complete pre-auth",
+      "hint": "Transaction status does not allow capture, OR the completion amount is incorrect (never authorized, already completed/cancelled) — production message checks both.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §9",
+      "observedOn": [
+        "pre-auth-complete"
+      ],
+      "observedMessage": "Unable to complete pre-authorization: The transaction status is invalid or the completion amount is incorrect"
+    },
+    {
+      "code": "PTL62",
+      "family": "pre-auth",
+      "title": "Merchant information invalid",
+      "hint": "Sandbox profile lacks permission for this operation (e.g. complete-with-payout) — contact PayWay to provision.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §6/§9"
+    },
+    {
+      "code": "PTL170",
+      "family": "pre-auth",
+      "title": "Unable to cancel pre-auth",
+      "hint": "Only OPEN/PENDING pre-auths can be cancelled — check current status first.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §9",
+      "observedOn": [
+        "pre-auth-cancel"
+      ],
+      "observedMessage": "Unable to cancel pre-authorization: The transaction status is invalid"
+    },
+    {
+      "code": "PTL172",
+      "family": "pre-auth",
+      "title": "Pre-auth completion failed (PSP error)",
+      "hint": "The payment service provider returned an unexpected response during completion — retry once, then contact PayWay support with the trace id (production telemetry 2026-09).",
+      "observedOn": [
+        "pre-auth-complete"
+      ],
+      "observedMessage": "Pre-authorization completion failed: The payment service provider returned an unexpected response"
+    },
+    {
+      "code": "1",
+      "family": "qr",
+      "title": "QR request rejected (wrong hash or malformed request)",
+      "hint": "Check the 19-field HMAC order (req_time..payout) and the API key.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §6"
+    },
+    {
+      "code": "6",
+      "family": "qr",
+      "title": "Requested Domain is not in whitelist",
+      "hint": "The request origin/return domain is not whitelisted for this merchant profile — ask PayWay to whitelist it (purchase telemetry 2026-09). Legacy gateway gloss: tran_id not found on check-transaction.",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Requested Domain is not in whitelist."
+    },
+    {
+      "code": "12",
+      "family": "qr",
+      "title": "Payment currency not allowed",
+      "hint": "Currency not enabled for the merchant profile — use USD/KHR or ask PayWay to enable it (generate-qr + purchase telemetry).",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §9",
+      "observedOn": [
+        "generate-qr",
+        "purchase"
+      ],
+      "observedMessage": "Payment currency is not allowed."
+    },
+    {
+      "code": "16",
+      "family": "qr",
+      "title": "Invalid First Name",
+      "hint": "first_name must not contain numbers/special characters and is capped at 100 chars (purchase field validation — the spec-page gloss \"invalid amount\" does not match production).",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Invalid First Name. It must not contain numbers or special characters or not more than 100 characters."
+    },
+    {
+      "code": "17",
+      "family": "qr",
+      "title": "Invalid Last Name",
+      "hint": "last_name must not contain numbers/special characters and is capped at 100 chars (purchase field validation).",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Invalid Last Name. It must not contain numbers or special characters or not more than 100 characters."
+    },
+    {
+      "code": "18",
+      "family": "qr",
+      "title": "QR gateway error code 18",
+      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+    },
+    {
+      "code": "19",
+      "family": "qr",
+      "title": "Invalid Email",
+      "hint": "The email field is malformed (purchase field validation).",
+      "observedOn": [
+        "purchase"
+      ],
+      "observedMessage": "Invalid Email."
+    },
+    {
+      "code": "21",
+      "family": "qr",
+      "title": "End of API lifetime",
+      "hint": "The transaction/QR lifetime elapsed before payment completed — create a fresh transaction (generate-qr telemetry; the spec-page gloss \"invalid transaction ID\" does not match production).",
+      "observedOn": [
+        "generate-qr"
+      ],
+      "observedMessage": "End of API lifetime."
+    },
+    {
+      "code": "23",
+      "family": "qr",
+      "title": "QR gateway error code 23",
+      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+    },
+    {
+      "code": "32",
+      "family": "qr",
+      "title": "Service is not enabled",
+      "hint": "The service/feature this call needs is not enabled on the merchant profile (e.g. pushback) — ask PayWay to provision it; sandbox-verified on payment-link create (§22). Gateway message literally reads \"Service is not enable.\"",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §22",
+      "observedOn": [
+        "generate-qr",
+        "purchase"
+      ],
+      "observedMessage": "Service is not enable."
+    },
+    {
+      "code": "35",
+      "family": "qr",
+      "title": "QR gateway error code 35",
+      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+    },
+    {
+      "code": "44",
+      "family": "qr",
+      "title": "Purchase has reached transaction limit",
+      "hint": "The merchant/profile transaction limit was reached (purchase telemetry; the spec-page gloss \"invalid template\" does not match production)."
+    },
+    {
+      "code": "47",
+      "family": "qr",
+      "title": "QR gateway error code 47",
+      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+    },
+    {
+      "code": "48",
+      "family": "qr",
+      "title": "QR gateway error code 48",
+      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+    },
+    {
+      "code": "96",
+      "family": "qr",
+      "title": "Invalid merchant data",
+      "hint": "Merchant data rejected — verify merchant_id/credential for the target environment (generate-qr + add-whitelist-payout telemetry).",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §22/§23"
+    },
+    {
+      "code": "102",
+      "family": "qr",
+      "title": "QR gateway error code 102",
+      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+    },
+    {
+      "code": "403",
+      "family": "qr",
+      "title": "Forbidden",
+      "hint": "Merchant credential not authorized for generate-qr in this environment."
+    },
+    {
+      "code": "429",
+      "family": "qr",
+      "title": "Rate limit exceeded",
+      "hint": "Pace requests — the SDK throttles locally, but concurrent callers share the window.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §11"
+    },
+    {
+      "code": "PTL02",
+      "family": "refund",
+      "title": "Invalid hash",
+      "hint": "Check API key and HMAC field ordering.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §6/§9"
+    },
+    {
+      "code": "PTL04",
+      "family": "refund",
+      "title": "Parameter validation required",
+      "hint": "Amount must be ≥ $0.01 USD / ≥ 1 KHR; check other required fields.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §9/§22",
+      "observedOn": [
+        "payment-link-create",
+        "pre-auth-complete",
+        "whitelist-add"
+      ],
+      "observedMessage": "Parameter validation required"
+    },
+    {
+      "code": "PTL36",
+      "family": "refund",
+      "title": "Transaction not found",
+      "hint": "Verify the original tran_id — refunds need a captured transaction.",
+      "sandboxVerified": true,
+      "evidence": "SANDBOX-FINDINGS §8/§9",
+      "observedOn": [
+        "refund",
+        "pre-auth-cancel"
+      ],
+      "observedMessage": "Transaction not found or is invalid"
+    },
+    {
+      "code": "PTL37",
+      "family": "refund",
+      "title": "Refund exceeds original amount",
+      "hint": "Reduce the refund amount to fit the remaining refundable balance."
+    },
+    {
+      "code": "PTL57",
+      "family": "refund",
+      "title": "Unable to refund",
+      "hint": "Production message: \"invalid transaction status or an incorrect refund amount\" — check BOTH the transaction status (transaction-detail) and that the amount fits paid − already-refunded.",
+      "observedOn": [
+        "refund"
+      ],
+      "observedMessage": "Unable to process refund due to an invalid transaction status or an incorrect refund amount"
+    },
+    {
+      "code": "PTL58",
+      "family": "refund",
+      "title": "Refund failed",
+      "hint": "PayWay could not process the refund (PSP returned an unexpected response) — retry once, then contact PayWay support with the trace id.",
+      "observedOn": [
+        "refund"
+      ],
+      "observedMessage": "Refund failed: The payment service provider returned an unexpected response"
+    },
+    {
+      "code": "PTL168",
+      "family": "refund",
+      "title": "Concurrent request rejected",
+      "hint": "Another request for this transaction is in flight — retry after it settles. Shared by refund AND pre-auth completion/cancellation (\"Another request is already in progress. Please wait a few seconds and try again.\").",
+      "observedOn": [
+        "refund",
+        "pre-auth-complete",
+        "pre-auth-cancel"
+      ],
+      "observedMessage": "Another request is already in progress. Please wait a few seconds and try again."
+    },
+    {
+      "code": "PTL181",
+      "family": "refund",
+      "title": "Insufficient merchant balance",
+      "hint": "Top up the merchant account before retrying."
+    }
+  ]
+}

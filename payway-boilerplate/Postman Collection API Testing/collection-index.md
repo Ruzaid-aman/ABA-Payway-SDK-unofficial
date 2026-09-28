@@ -4,7 +4,7 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 
 > The collection was imported from the standalone workspace and is now maintained as Postman YAML resources. The older JSON export and `Refrence-copy-PayWay API — Complete Collection-1/` are historical references only; do not edit them.
 
-**Documentation review:** 25 Sep 2026. The YAML source currently contains 45 requests and 122 collection variables. The helper-sync test currently fails because the expected versioned portable helper is absent/empty in the YAML definition; treat the collection as not release-ready until `_build/sync_portable_helper.js` is run and the full suite is green.
+**Documentation review:** 28 Sep 2026. The YAML source contains 45 requests and 122 collection variables; the full `test:yaml` suite (structure · scripts · import shape · KHQR sim · spec parity) is green and the same gate runs in CI. The dist export (`dist/PayWay API — Complete Collection.postman_collection.json`) carries 49 saved response examples across 26 requests.
 
 ## At a glance
 
@@ -12,10 +12,14 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 |---|---|
 | Collection source | `postman/collections/PayWay API — Complete Collection/` — **the deliverable** |
 | Postman name | **PayWay API — Complete Collection** |
-| Format | Postman YAML collection resources, with local mapping in `.postman/resources.yaml` |
+| Format | Postman v3 YAML collection resources, with local mapping in `.postman/resources.yaml` |
 | Folders / requests | 10 folders, 45 requests (40 API/flow calls + 5 doc-only reference GETs) |
 | Scripts | 40 API/flow calls with pre-request **and** test scripts (80) + 2 collection-level scripts = 82, 0 syntax errors |
 | Collection variables | 122 expected by the YAML tests (project sandbox merchant pre-filled; `secret_key` is secret-typed; versioned portable helper plus legacy migration keys; `khqr_*` carries offline-KHQR identity and flow outputs) |
+| Distribution export | `dist/PayWay API — Complete Collection.postman_collection.json` — single-file v2.1 JSON with **49 saved response examples across 26 requests**; rebuilt by `_build/export_json.js`, freshness-gated by `--check` |
+| OpenAPI spec | `postman/specs/payway-openapi.yaml` (OpenAPI 3.1, bundled) — path parity with the collection enforced by `_build/spec_parity.js` |
+| Error registry | `postman/documents/error-codes.json` — 83 codes, 8 families, sandbox-verified + production telemetry |
+| Environments | `postman/environments/` — Sandbox (mirrors pre-filled values) + Production (placeholders) |
 | Default `baseUrl` | `https://checkout-sandbox.payway.com.kh` (switch to `https://checkout.payway.com.kh` for production) |
 | JSON-Schema assertions | 5 endpoints via shared `assertJsonSchema()` helper |
 | Runner flows | Folder 11 (`setNextRequest`: QR polling loop + CoF lifecycle) |
@@ -25,22 +29,25 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 | File | Role |
 |---|---|
 | `postman/collections/PayWay API — Complete Collection/` | **The deliverable** — open/import this Postman YAML collection |
-| `OLD-Check Trasaction.postman_collection.json` | Legacy scratch export (renamed from `Check Trasaction…`, kept as regression baseline) |
-| `OLD-Create Transaction Defualt.postman_collection.json` | Legacy scratch export (hosted checkout; signs against other merchants, secrets via a Postman environment) |
-| `OLD-Create Transaction QR-AI HELMET SPA Copy.postman_collection.json` | Legacy scratch export (QR; `req_time` month bug included — historical only) |
+| `dist/PayWay API — Complete Collection.postman_collection.json` | Single-file v2.1 distribution export **with saved response examples** (generated; do not hand-edit) |
+| `postman/environments/PayWay - Sandbox.postman_environment.json` | Sandbox environment mirroring the pre-filled collection values |
+| `postman/environments/PayWay - Production.postman_environment.json` | Production environment with placeholder credentials (env vars override collection vars once selected) |
+| `postman/specs/payway-openapi.yaml` | Bundled OpenAPI 3.1 contract (copy of the SDK repo's `payway-openapi/bundled.yaml`; see `postman/specs/README.md`) |
+| `postman/documents/error-codes.json` | Machine-readable error registry (copied from the SDK knowledge corpus; refresh on registry changes) |
+| `Refrence-copy-PayWay API — Complete Collection-1/` | Historical reference only; never edit |
 | `collection-index.md` | This index |
 | `MAINTAINER_REPORT.md` | Audit findings, incidents, rebuild/validate instructions |
 | `Goal.txt.txt` | Original build objective |
-| `llms.txt` | Index of PayWay developer docs (Markdown per page) |
-| `postman/documents/` | Maintainer-authored working guides and troubleshooting references |
-| `_build/` | YAML loader, syntax, validation, import, simulation, and helper-sync tooling |
+| `llms.txt` | Index of PayWay developer docs (Markdown per page) + workspace pointers for AI tools |
+| `postman/documents/` | Workspace README (quick start, artifact map, docs rules) + error registry |
+| `_build/` | YAML loader, syntax, validation, import, simulation, helper-sync, examples/export, and spec-parity tooling |
 
 ## Quick start
 
-1. Open/import `postman/collections/PayWay API — Complete Collection/` in Postman. `.postman/resources.yaml` maps the local workspace resources.
-2. Nothing to configure for a first test — **this repo's sandbox merchant is pre-filled** (merchant `ec476910`, `secret_key` Postman *Secret*, full `rsa_public_key` PEM, seeded beneficiary `500000001`, `ctid customer123`) — all as collection variables, no environment needed. For another merchant replace `merchant_id`/`secret_key`/`rsa_public_key`; switch `baseUrl` sandbox/production.
+1. **One-file route:** import `dist/PayWay API — Complete Collection.postman_collection.json` into Postman (includes the saved response examples). **Workspace route:** open/import `postman/collections/PayWay API — Complete Collection/` — `.postman/resources.yaml` maps the local workspace resources.
+2. Nothing to configure for a first test — **this repo's sandbox merchant is pre-filled** (merchant `ec476910`, `secret_key` Postman *Secret*, full `rsa_public_key` PEM, seeded beneficiary `500000001`, `ctid customer123`) — all as collection variables, no environment needed. Optionally import `postman/environments/PayWay - Sandbox.postman_environment.json` (mirrors the pre-filled values) or `PayWay - Production…` (placeholders — environment variables override collection variables once selected). For another merchant replace `merchant_id`/`secret_key`/`rsa_public_key`; switch `baseUrl` sandbox/production.
 3. RSA requests use the portable PKCS#1 v1.5 helper embedded in the versioned collection variable. Legacy helper keys are migration fallbacks. If a request reports that the shared helper is missing, run `_build/sync_portable_helper.js`, re-import/refresh the YAML collection, and rerun validation.
-4. Start at **03 - Ecommerce Checkout → 1. Purchase**, pay on the hosted page (Visualize tab launcher), then **Check Transaction**. Every request's description starts with a **⚡ Quick test** block: what to set, what to expect, what to send next — and the Console prints `NEXT:` hints after key responses.
+4. Start at **03 - Ecommerce Checkout → 1. Purchase**, pay on the hosted page (Visualize tab launcher), then **Check Transaction**. Every request's description starts with a **⚡ Quick test** block: what to set, what to expect, what to send next — and the Console prints `NEXT:` hints after key responses. Saved response examples (dist export) show the expected success and error shapes per request without sending anything.
 5. For callbacks, paste a `https://webhook.site/<uuid>` URL into `callback_url` / `callback_listener` (see folder 10) - or let **09 - KHQR Guideline → 1. Create webhook.site Receiver** create one for you.
 
 For the maintainer workflow, read [postman/documents/README.md](postman/documents/README.md) before changing scripts or descriptions.
@@ -117,7 +124,7 @@ Folder numbers skip 02; numbering is kept stable to stay aligned with the `_buil
 | Request | Method | Endpoint | Scripts |
 |---|---|---|---|
 | 1. Link Account (ABA Account) | POST | `{{baseUrl}}/api/payment-credential/v3/aof/link-account` | pre+test |
-| 2. Link Card (Credit/Debit) | POST | `{{baseUrl}}/api/payment-credential/v3/cof/link-card` | pre+test |
+| 2. Link Card (Credit-Debit) | POST | `{{baseUrl}}/api/payment-credential/v3/cof/link-card` | pre+test |
 | 3. Get Token Details | POST | `{{baseUrl}}/api/payment-credential/v3/token-management/get-token-details` | pre+test, JSON-Schema; saves `pwt`/`ctid` |
 | 4. Payment (Using Token) | POST | `{{baseUrl}}/api/payment-gateway/v3/purchase/payment-credential` | pre+test |
 | 5. Renew Token (ABA account) | POST | `{{baseUrl}}/api/payment-credential/v3/token-management/renew-expired-account-token` | pre+test |
@@ -141,7 +148,7 @@ The builder reproduces the KHQR guideline's official sample payload **byte-for-b
 |---|---|---|---|
 | Payment Result Callback - Sample Sender | POST | `{{callback_listener}}` | pre (signs `X-PayWay-Hmac-Sha512`) + test |
 | Token Result Callback (CoF) - Sample Sender | POST | `{{callback_listener}}` | pre + test |
-| Sync webhook.site -> Postman (pull callbacks) | GET | `https://webhook.site/token/{{webhook_token}}/requests` | pre+test; imports `tran_id`/`pwt`/`ctid` from latest callback. (v1.4.0: host moved from the retired `api.webhook.site` JSON API; response parsed as legacy array *or* paginated `data`) |
+| Sync webhook.site - Postman (pull callbacks) | GET | `https://webhook.site/token/{{webhook_token}}/requests` | pre+test; imports `tran_id`/`pwt`/`ctid` from latest callback. (v1.4.0: host moved from the retired `api.webhook.site` JSON API; response parsed as legacy array *or* paginated `data`) |
 | Webhook Design Notes | GET | `https://developer.payway.com.kh/resources/webhooks` | doc-only |
 
 The folder description documents three ways to get an inbound callback URL: webhook.site (with the REST sync trick above), a Postman Mock Server, or ngrok + local listener.
@@ -152,7 +159,7 @@ Run the whole folder in **Collection Runner** (delay ≈ 1000 ms). Each step als
 
 | Request | Method | Endpoint | Notes |
 |---|---|---|---|
-| Flow B - README: run the flows | GET | `{{baseUrl}}/api/payment-gateway/v1/exchange-rate` | Doc-only placeholder |
+| Flow B - README- run the flows | GET | `{{baseUrl}}/api/payment-gateway/v1/exchange-rate` | Doc-only placeholder |
 | A1 - Create QR | POST | `.../v1/payments/generate-qr` | Starts Flow A |
 | A2 - Poll Transaction Status (loops) | POST | `.../v1/payments/transaction-detail` | `setNextRequest` loops on itself up to `max_polls`, then advances |
 | A3 - Get Transaction Details | POST | `.../v1/payments/transaction-detail` | |
@@ -182,12 +189,12 @@ Run the whole folder in **Collection Runner** (delay ≈ 1000 ms). Each step als
 | Buyer defaults | `buyer_first_name`, `buyer_last_name`, `buyer_email`, `buyer_phone` | |
 | Amount & currency | `currency` (USD/KHR), `amount` (USD min 0.01, KHR min 100) | |
 | Checkout options | `payment_option`, `purchase_type` (`purchase` \| `pre-auth`), `return_url`, `cancel_url`, `continue_success_url`, `return_params_raw`, `return_deeplink_raw`, `callback_url`, `items_json`, `custom_fields_json`, `payout_json`, `additional_params_json`, `google_pay_token`, `skip_success_page`, `view_type`, `payment_gate`, `lifetime`, `shipping_fee`, `qr_image_template` | `payment_option`: `cards`, `abapay_khqr`, `abapay_khqr_deeplink`, `abapay`, `abapay_deeplink`, `alipay`, `wechat`, `google_pay` |
-| Runtime-managed | `tran_id`, `last_tran_id`, `request_time`, `request_id`, `computed_hash`, `merchant_ref` | Set by pre-requests/tests; don't hand-edit mid-flow |
+| Runtime-managed | `tran_id`, `last_tran_id`, `request_time`, `req_time`, `request_id`, `computed_hash`, `merchant_ref`, `return_params`, `items_b64`, `return_url_b64`, `cancel_url_b64`, `continue_success_url_b64`, `return_deeplink_b64`, `custom_fields_b64`, `payout_b64`, `additional_params_b64`, `callback_url_b64`, `computed_merchant_auth`, `computed_beneficiaries`, `cof_return_deeplink_b64`, `cof_callback_b64`, `cof_continue_b64`, `sub_items_b64`, `sub_ret_b64`, `sub_can_b64`, `sub_con_b64`, `sub_amount_fmt`, `computed_header`, `last_pay_status`, `last_callback_status` | Set by pre-requests/tests (signed body fields, base64-encoded payloads, computed RSA `merchant_auth`, signed callback header); don't hand-edit mid-flow |
 | CoF & subscriptions | `pwt`, `token_flag`, `sub_frequency` (1W/1M/2M), `sub_lifetime`, `sub_payment_option`, `sub_firstname`, `sub_lastname`, `sub_email`, `sub_phone`, `cof_return_deeplink`, `cof_callback_url`, `cof_continue_success_url`, `cof_amount` | `pwt`/`ctid` auto-saved by token endpoints |
 | Payment Link | `payment_link_id` | Saved by Create, consumed by Details/Void |
 | Callbacks & polling | `callback_listener`, `webhook_token`, `poll_count`, `max_polls`, `poll_status` | `webhook_token` = UUID from a webhook.site URL |
 | Offline KHQR | `khqr_bakong_id`, `khqr_mid`, `khqr_bank_name`, `khqr_mcc`, `khqr_merchant_name`, `khqr_merchant_city`, `khqr_payway_data`, `khqr_mode`, `khqr_expiry_minutes` | ABA-issued merchant identity for tags 30/52/59/60/62.68 (defaults = guideline example values - replace with your own) |
-| Offline KHQR outputs | `khqr_merchant_ref`, `khqr_payload`, `khqr_selftest`, `khqr_amount_used`, `khqr_currency_used`, `khqr_transaction_id`, `khqr_payment_status(_code)`, `khqr_payment_amount`, `khqr_payment_currency`, `khqr_callback_count`, `khqr_final_status` | Generated per Build Offline KHQR send; pushback + inquiry outputs |
+| Offline KHQR outputs | `khqr_merchant_ref`, `khqr_payload`, `khqr_selftest`, `khqr_amount_used`, `khqr_currency_used`, `khqr_transaction_id`, `khqr_payment_status`, `khqr_payment_status_code`, `khqr_payment_amount`, `khqr_payment_currency`, `khqr_callback_count`, `khqr_final_status` | Generated per Build Offline KHQR send; pushback + inquiry outputs |
 | RSA paste fallbacks | `refund_merchant_auth`, `pl_merchant_auth`, `preauth_merchant_auth`, `preauth_payout_merchant_auth`, `cancel_preauth_merchant_auth`, `payout_beneficiaries`, `add_whitelist_merchant_auth`, `update_whitelist_merchant_auth` | Used only when portable RSA encryption or secure randomness is unavailable |
 | Payout whitelist | `whitelist_payee` | |
 | List filters | `from_date`, `to_date`, `tran_status_filter` (0 approved, 2 pending, 3 declined, 4 refunded, 7 cancelled) | Dates auto-fill as today |
@@ -200,6 +207,7 @@ Run the whole folder in **Collection Runner** (delay ≈ 1000 ms). Each step als
 - **Per-request helper text:** every request description starts with a **⚡ Quick test** block (what to set → what to expect → what to send next) above the technical hash/RSA notes; key test scripts print status-aware **`NEXT:`** console hints (Purchase, Check Transaction, Generate QR). Sources live in `get_started.md` (overview) and the `⚡ Quick test` blocks (injected into parts by `inject_quickstart.js`).
 - **Per-request:** each request description documents its exact hash field order (and PHP samples); 40 API/flow calls carry scenario pre+test scripts (error-code handling, variable chaining, approval-code asserts, JSON-Schema assertions).
 - **JSON-Schema assertions (5):** Purchase, Check Transaction, Generate QR, Get Token Details (folder 08) and B2 Get Token Details (Flow B).
+- **Saved response examples:** `_build/examples.json` is the source of truth (keyed by request path; success + common business-error shapes, grounded in live captures and the SDK OpenAPI spec); `_build/export_json.js` injects them into the dist v2.1 export as standard Postman examples (49 examples / 26 requests). The YAML workspace itself carries none — Postman's v3 YAML example-file schema is not publicly pinned, so examples live in the distribution artifact.
 - **`setNextRequest`:** only inside folder 11 (A2 self-loop → A3; Flow B is linear).
 
 ## Build system (`_build/`)
@@ -220,7 +228,7 @@ The canonical deliverable is the YAML workspace under `postman/collections/PayWa
 | `part_10_callbacks.json` | 10 - Callbacks & Webhooks |
 | `part_11_polling.json` | 11 - Polling & Lifecycle Flows (Runner) |
 
-Tooling: `merge.js` (merge all parts → deliverable; checks the global pre-request survives), `validate.js`, `syntaxcheck.js`, `audit.js`, `standards.js`, `wire_schemas.js`, `rebuild.js`, `inject_descs.js` (injects folder descriptions into parts), `inject_quickstart.js` (helper-text pass: overview sync, ⚡ Quick test description blocks, `NEXT:` console hints), `verify_postman_import.js` (official SDK import check), `inspect.js` / `inspect_parts.js` (per-request coverage and per-part hash-line dumps for review), `smoketest.js` (runs the collection's real scripts in mock `pm` sandboxes with **per-script scopes**, matching Postman; `node smoketest.js live` also hits safe sandbox endpoints), `scope_audit.js` (maps which scripts define/reference the shared helpers — used to diagnose the v1.2.0 scope bug), `fix_scope.js` (the idempotent v1.2.0 patch: library → `__helpers` variable, eval loader into every consuming script) and `fix_visualizer_tab.js` (the idempotent v1.2.1 patch: the form-POST launcher opens the checkout in a new tab via `target="_blank"`). Review/dump utilities: `dump_structure.js` (+ `dump_structure.json`), `count_helpers.js`, `verify_index.js`, `index_diff.js`, `dump_scripts.js`, `dump_folder_descs.js`, `dump_one.js` (print one request's pre/test scripts by name), `survey_descs.js`, `review_helpers.js`, `inspect_desc_format.js`, `inspect_guide_sync.js`, `probe_khqr.js`, `probe_khqr2.js`, `probe_list_date.js`, `probe_purchase_urlencoded.js`, and `fix_round1.js`, `fix_round2.js`, `fix_round3.js`, `fix_round4.js`, `fix_round5.js`, `fix_round6.js`, `fix_round7.js` (deterministic patch history). `package.json` / `package-lock.json` declare `crypto-js` (Node tooling) and `newman` (headless collection runner used for live QA). Legacy `merge.ps1` is superseded — do not use.
+Tooling: `merge.js` (merge all parts → deliverable; checks the global pre-request survives), `yaml_collection.js` (the YAML loader shared by every validator), `yaml_collection.test.js` + `sim_khqr_flow.js` (the `test:yaml` gate: structure/script/import-shape assertions + the 37-check offline KHQR flow simulation), `portable_rsa.js` (the single RSA source `sync_portable_helper.js` regenerates the collection helper from), `validate.js`, `syntaxcheck.js`, `audit.js`, `standards.js`, `wire_schemas.js`, `rebuild.js`, `inject_descs.js` (injects folder descriptions into parts), `inject_quickstart.js` (helper-text pass: overview sync, ⚡ Quick test description blocks, `NEXT:` console hints), `sync_portable_helper.js` (regenerates the versioned portable helper variable into `.resources/definition.yaml` from one RSA source; idempotent, handles the empty-scalar state), `export_json.js` (builds the dist v2.1 export with saved-response examples from the YAML workspace; `--check` freshness gate used by CI), `spec_parity.js` (asserts the OpenAPI spec paths are a subset of the collection endpoints; collection-only paths need a documented justification), `verify_postman_import.js` (official SDK import check), `inspect.js` / `inspect_parts.js` (per-request coverage and per-part hash-line dumps for review), `smoketest.js` (runs the collection's real scripts in mock `pm` sandboxes with **per-script scopes**, matching Postman; `node smoketest.js live` also hits safe sandbox endpoints), `scope_audit.js` (maps which scripts define/reference the shared helpers — used to diagnose the v1.2.0 scope bug), `fix_scope.js` (the idempotent v1.2.0 patch: library → `__helpers` variable, eval loader into every consuming script) and `fix_visualizer_tab.js` (the idempotent v1.2.1 patch: the form-POST launcher opens the checkout in a new tab via `target="_blank"`). Review/dump utilities: `dump_structure.js` (+ `dump_structure.json`), `count_helpers.js`, `verify_index.js`, `index_diff.js`, `dump_scripts.js`, `dump_folder_descs.js`, `dump_one.js` (print one request's pre/test scripts by name), `survey_descs.js`, `review_helpers.js`, `inspect_desc_format.js`, `inspect_guide_sync.js`, `probe_khqr.js`, `probe_khqr2.js`, `probe_list_date.js`, `probe_purchase_urlencoded.js`, and `fix_round1.js`, `fix_round2.js`, `fix_round3.js`, `fix_round4.js`, `fix_round5.js`, `fix_round6.js`, `fix_round7.js` (deterministic patch history). `package.json` / `package-lock.json` declare `crypto-js` (Node tooling) and `newman` (headless collection runner used for live QA). Legacy `merge.ps1` is superseded — do not use.
 
 ```powershell
 cd "payway-boilerplate/Postman Collection API Testing"   # from the repo root
