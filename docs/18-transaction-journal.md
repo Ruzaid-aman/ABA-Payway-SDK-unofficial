@@ -99,8 +99,13 @@ with `check-transaction` before acting.
 - **`journal explain -t <id> [--json]`** — the root-cause narrative: one line verdict
   plus a chronological step reconstruction (creation, retries, gateway answers,
   status changes, callback, artifacts) and hints pulled from the repo's
-  sandbox-verified gotchas (gateway code hints, never-retried callbacks, the
-  PENDING-forever blind spot, unpaid-QR list invisibility).
+  sandbox-verified gotchas (never-retried callbacks, the
+  PENDING-forever blind spot, unpaid-QR list invisibility). When a failed
+  attempt carries a gateway `paywayCode`, the matching entry from the shared
+  `GATEWAY_CODE_HINTS` registry (the same table `payway-sdk explain <code>`
+  serves) renders as `Gateway hint for code N: Title: hint` — fixed 2026-09-29:
+  an object-vs-string comparison had silently disabled these hints since Phase 6
+  shipped.
 - **`journal anomalies [--json]`** — documented heuristics: error spikes and retry
   bursts (a day at ≥ 3× the mean of the *other* active days), and latency outliers
   (endpoint p99 ≥ 3× p50 over ≥ 5 samples). Heuristics are printed with the output.

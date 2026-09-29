@@ -28,9 +28,9 @@
       "description": "The full documentation map: start-here routes, per-domain guides, troubleshooting.",
       "source": "docs/README.md",
       "file": "docs-index.md",
-      "bytes": 7715,
-      "sha256": "be6bab8bcd9979cc",
-      "sourceSha256": "6dabeec0136a67ab"
+      "bytes": 8010,
+      "sha256": "a8b18762ca8ebc3f",
+      "sourceSha256": "8ad34f03f4196619"
     },
     {
       "topic": "overview",

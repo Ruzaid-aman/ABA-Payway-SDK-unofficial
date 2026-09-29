@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### Test expansion wave + journal-explain hint fix (2026-09-29)
+
+- **Fixed: `journal explain` gateway hints never rendered.** `hintForCode`
+  compared `GATEWAY_CODE_HINTS[code]` (a `{title, hint}` object) against a
+  string, so the "Gateway hint for code N" lines were silently dead since the
+  journal intelligence layer shipped. Hints now render as `Title: hint`
+  (`src/journal/intelligence.ts` — caught by the new expansion suites and
+  pinned at both the CLI and SDK levels).
+- **Coverage-driven test expansion (+78 cases; 2,042 → 2,120 tests / 147
+  files).** Coverage rose **79.74% → 82.9% stmts / 73.13% → 76.1% branch /
+  88.1% funcs / 83.8% lines**, and the CI floors ratcheted accordingly
+  (74/69/80/74 → **79/73/84/80** in `vitest.config.ts`). New suites:
+  `cli-gap-expansion.test.ts` (49 in-process CLI cases: journal analytics
+  subcommands, docs human branches, `mcp --list-tools`, the webhook-workbench
+  command bodies, and `--json` validation/preflight branches across
+  refund/payout/get-transactions-by-ref/generate-checkout/request-qr/
+  sandbox-beneficiaries/self-activation) and `sdk-gap-expansion.test.ts`
+  (29 hermetic SDK cases: payout-domain guards + wire shape, webhook receiver
+  lifecycle, payment-lifecycle, journal explain/anomalies heuristics, MCP
+  extras, QR render helpers).
+- **Test reliability:** the three child-process-heavy suites that false-failed
+  at vitest's 5s default under machine load (skills-mirror identity walk,
+  skills-doctor missing-dir, built-CLI cancel-online-QR) now carry explicit
+  30s ceilings. Full-coverage runs may still want `--testTimeout=20000`.
+- **Publishing-DX audit artifacts** committed under
+  `audit-results/publishing-dx-audit-2026-09-29/` (docs/skills/AI audit,
+  webhook-vs-postman audit, SDK/CLI evidence + reproductions); the 33 MB
+  consumer smoke-install tree in `.scratch/` is gitignored, not committed.
+- **Postman collection state sync** (concurrent session): the folder-03
+  hosted-checkout request renamed `multipart` → `purchase`, a new pre-auth
+  hosted-checkout request in folder 06, a Close-Transaction code-26 saved
+  example, and the CryptoJS helper source captured to
+  `_build/helper-variable-paste.txt`.
+- Knowledge corpus resynced (`npm run sync:knowledge`) to clear
+  freshness-gate drift left by the docs-reorg link edits.
+
 ### Publish-prep docs wave (2026-09-14)
 
 - **`docs/RELEASE-READINESS.md` rewritten as the maintainer's manual-actions

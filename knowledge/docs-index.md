@@ -85,5 +85,6 @@ These materials support maintenance and investigation; they are not onboarding p
 - Sandbox findings, [close-transaction evidence](payway-sdk docs close-transaction-findings), open questions.
 - [Error-code registry (generated)](payway-sdk docs error-codes) — every `explain`-known code as versioned JSON; regenerate with `npm run gen:error-registry`.
 - Integration gaps & consolidated ABA questions (2026-09-12 scan: what the docs cannot answer developers + the prioritized send-to-ABA list).
+- Publishing-DX audit (2026-09-29) — docs/skills/AI developer-experience audit plus the webhook-vs-postman and SDK/CLI evidence dossiers (gate logs and the consumer smoke-install evidence live in `.scratch/publishing-dx-audit-2026-09-29/`; the reproducible install tree itself is gitignored).
 - Historical project status: PROJECT_STATUS, [agent setup playbook](payway-sdk docs agent-setup-playbook), callback capture recipe.
 - Competitive analyses: Stripe/Razorpay CLI + npm ecosystem audit with the P0→Wave-2 roadmap (webhook workbench shipped 2026-09-10, re-audited with live evidence), CutLuy comparison, Canadia Bank portal comparison (2026-09-11: portal-polish leader, non-runnable samples — generated per-flow diagrams and a published error-code registry are the adoptable patterns), Stripe-standard DX audit.
