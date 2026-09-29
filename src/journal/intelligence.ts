@@ -8,7 +8,6 @@
  * exists remotely, and a missing callback is not proof of non-payment.
  */
 
-import path from 'node:path';
 import { GATEWAY_CODE_HINTS } from '../constants.js';
 import type { JournalEventV1 } from './types.js';
 import { computeJournalStats } from './stats.js';
@@ -35,8 +34,10 @@ export interface RcaOptions {
 
 function hintForCode(code: string | undefined): string | undefined {
   if (!code) return undefined;
-  const hint = GATEWAY_CODE_HINTS[code];
-  return typeof hint === 'string' ? hint : undefined;
+  const entry = GATEWAY_CODE_HINTS[code];
+  // GATEWAY_CODE_HINTS values are {title, hint} objects — render both parts
+  // (a bare-string comparison here silently disabled every gateway hint).
+  return entry ? `${entry.title}: ${entry.hint}` : undefined;
 }
 
 export function explainTransaction(
