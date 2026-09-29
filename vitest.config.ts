@@ -18,12 +18,13 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/types.ts'],
       // Floor thresholds: CI fails if coverage regresses below these.
-      // Ratchet upward as the P1/P2 testability work lands (2026-08-30 review).
+      // Ratcheted 2026-09-29 after the coverage-driven CLI/SDK test expansion
+      // wave (actual: 82.9 stmts / 76.1 branch / 88.1 funcs / 83.8 lines).
       thresholds: {
-        statements: 74,
-        branches: 69,
-        functions: 80,
-        lines: 74,
+        statements: 79,
+        branches: 73,
+        functions: 84,
+        lines: 80,
       },
     },
   },
