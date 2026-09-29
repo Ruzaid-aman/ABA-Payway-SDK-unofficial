@@ -410,6 +410,9 @@ variables:
       return CryptoJS.enc.Base64.stringify(wordArray(output));
     }
   __helpers: ""
+  cof_amount_fmt: ""
+  cof_shipping_fee: ""
+  cof_pay_token_flag: ""
 scripts:
   - type: http:beforeRequest
     code: |-

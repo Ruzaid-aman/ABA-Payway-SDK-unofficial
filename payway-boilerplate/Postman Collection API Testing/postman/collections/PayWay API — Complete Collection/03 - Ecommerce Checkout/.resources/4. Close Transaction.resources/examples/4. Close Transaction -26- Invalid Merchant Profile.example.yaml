@@ -1,0 +1,43 @@
+$kind: http-example
+name: 4. Close Transaction "26" Invalid Merchant Profile
+request:
+  url: "{{baseUrl}}/api/payment-gateway/v1/payments/close-transaction"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "req_time": "{{req_time}}",
+        "merchant_id": "{{merchant_id}}",
+        "tran_id": "{{tran_id}}",
+        "hash": "{{computed_hash}}"
+      }
+response:
+  statusCode: 403
+  statusText: ""
+  headers:
+    :status: "403"
+    date: Tue, 29 Sep 2026 09:42:54 GMT
+    content-type: application/json
+    server: cloudflare
+    strict-transport-security: max-age=31536000; includeSubDomains; preload, max-age=31536000; includeSubDomains; preload
+    x-xss-protection: 1; mode=block
+    x-content-type-options: nosniff
+    cf-cache-status: DYNAMIC
+    content-encoding: gzip
+    cf-ray: a42a0a5bbc3f3de7-SIN
+  body:
+    type: json
+    content: |-
+      {
+        "status": {
+          "code": "26",
+          "message": "Invalid Merchant Profile",
+          "tran_id": "T1790674769286",
+          "lang": "en",
+          "trace_id": "6c6bfc18612569fed7bde4410be59e2f"
+        }
+      }
+order: 440017784353892
