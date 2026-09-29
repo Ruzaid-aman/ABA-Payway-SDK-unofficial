@@ -239,7 +239,9 @@ describe('CLI in-process (runCli)', () => {
     expect([undefined, 0, 1]).toContain(exitCode);
   });
 
-  it('skills doctor tolerates a missing packaged-skills directory and reports diagnostics', async () => {
+  // 30s ceiling: walks the whole skills tree; the 5s default false-fails when
+  // the machine is loaded (seen 2026-09-29 under parallel coverage runs).
+  it('skills doctor tolerates a missing packaged-skills directory and reports diagnostics', { timeout: 30_000 }, async () => {
     const { text, exitCode } = await run(['skills', 'doctor']);
     expect(text.length).toBeGreaterThan(0);
     expect(text).not.toContain('ENOENT'); // missing dir is reported, not crashed on

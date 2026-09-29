@@ -391,7 +391,9 @@ describe('built CLI', () => {
   // QR-REQ-03: Confirmation prompt tests
   // -----------------------------------------------------------------------
 
-  it('cancels online QR generation when user answers no to confirmation prompt', () => {
+  // 30s ceiling: spawns the built CLI; the 5s default false-fails when the
+  // machine is loaded (seen 2026-09-29 under parallel coverage runs).
+  it('cancels online QR generation when user answers no to confirmation prompt', { timeout: 30_000 }, () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);
 

@@ -23,7 +23,9 @@ function parseFrontmatter(content: string): { name: string; description: string;
 }
 
 describe('packaged AI skills', () => {
-  it('keeps the tracked skill mirror identical, including scripts and references', async () => {
+  // 30s ceiling: full-tree mirror comparison; the 5s default false-fails when
+  // the machine is loaded (seen 2026-09-29 under parallel coverage runs).
+  it('keeps the tracked skill mirror identical, including scripts and references', { timeout: 30_000 }, async () => {
     const mirror = path.resolve(skillsDirectory, '..', '.zcode', 'skills');
     async function compare(relative: string): Promise<void> {
       const entries = await readdir(path.join(skillsDirectory, relative), { withFileTypes: true });
