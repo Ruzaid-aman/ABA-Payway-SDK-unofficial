@@ -1,0 +1,138 @@
+{
+  "runtime": "v24.21.0",
+  "temp": "C:\\Users\\SYED~1.SOH\\AppData\\Local\\Temp\\payway-publishing-dx-audit-IZfyCz",
+  "results": [
+    {
+      "args": [
+        "--help"
+      ],
+      "exit": 0,
+      "ms": 3828,
+      "validJson": false,
+      "stdout": "Usage: payway-sdk [options] [command]\n\nCLI for the ABA PayWay TypeScript SDK\n\nSetup:\n  init                     Initialize PayWay integration in the current project\n  doctor                   Validate environment configuration and connectivity\n  config                   Display loaded configuration and validate environment\n                           variables\n  profiles                 Manage saved sandbox and production credential\n                           profiles\n  onboard                  Guided setup: scan config, configure an inference\n                           provider + PayWay profile, verify readiness\n  completions              Emit a shell completion script for payway-sdk\n                           (derived from the live command registry)\nPayments:\n  generate-qr              Generate a QR code (online via PayWay API or offline)\n  request-qr               Create a Soundbox QR (payments/request-qr) — amount\n                           optional for on-device keypad entry; spec-derived\n                           contract, not yet live-verified\n  generate-checkout        Create a PayWay checkout and optionally save its QR\n                           as a PNG\n  cof                      Credentials-on-file: link account/card, charge, and\n                           renew/inspect/remove tokens\n  checkout-form            Generate the hosted-checkout HTML form (local\n                           signing, no API call)\n  payment-link             Create and inspect PayWay payment links (requires RSA\n                           credentials)\n  setup-webhook            Start a local webhook listener for PayWay callbacks\n  webhook                  Local webhook workbench: verify, trigger, resend\n                           captured callbacks\nTransactions:\n  check-transaction        Check the payment status of a transaction (rate\n                           limit: 600/s)\n  poll-transaction         Poll a transaction until it reaches a terminal status\n                           (APPROVED, DECLINED, CANCELLED, REFUNDED)\n  transaction-detail       Get full detail for one transaction (strict rate\n                           limit: 10/min)\n  transaction-list         List transactions in a time window (rate limit:\n                           50/min; defaults to today). Dates are GATEWAY time\n                           UTC+7 — a UTC/local-derived window silently returns 0\n                           rows.\n  get-transactions-by-ref  Get up to 50 transactions by merchant reference\n                           (Customer Module reconciliation: use the portal\n                           Customer ID as the reference)\n  close-transaction        Void/close an open transaction before it is paid\n  tx-batch                 Run one transaction operation (close | check |\n                           detail) over a set of IDs\nMoney-out:\n  refund                   Refund a captured transaction (pre-flight balance\n                           check against transaction-detail)\n  payout                   Send a payout / split-payout to one or more\n                           whitelisted beneficiary accounts\n  pre-auth                 Complete, complete-with-payout, or cancel a PayWay\n                           pre-authorization\n  beneficiary              Manage payout beneficiary whitelist accounts\n                           (requires RSA key)\n  self-activation          Merchant self-activation via partner credentials\n                           (new-merchant, credential-info, mc-info) —\n                           spec-derived, not live-verified\nReference:\n  docs                     Read the built-in PayWay knowledge base (guides,\n                           sandbox learnings, error codes) — offline\n  status                   Display payment status codes and refund error codes\n                           reference\n  explain                  Decode a PayWay error/status code (e.g. explain\n                           PTL36, explain 49). No credentials needed.\n  validate                 Validate a refund amount or transaction ID locally\n  exchange-rate            Fetch the current USD/KHR exchange rate from PayWay\n  sandbox-beneficiaries    List seeded sandbox beneficiary accounts and test\n                           MIDs for payout testing (SANDBOX ONLY)\n  sandbox-test-cards       List ABA sandbox test cards for hosted card-checkout\n                           testing (SANDBOX ONLY)\nAgent & skills:\n  ask                      Ask the PayWay agent to perform a request (single\n                           shot)\n  agent                    Agentic PayWay CLI (REPL when run without a\n                           subcommand)\n  skills                   Manage AI skill guides for coding agents\n  demo                     Run a credential-free simulated payment journey on\n                           localhost\n  test                     Run the PayWay sandbox test suite\n  mcp                      Serve the PayWay tool catalog as an MCP stdio server\n                           (read-only by default; --allow-mutations opts in)\n  session                  Interactive command-first shell over the CLI (:use\n                           <tran-id> sticks a transaction id; :help for\n                           directives)\nOther:\n  credential-info          Inquire encrypted merchant credential details by\n                           register_ref (get-mc-credential-info)\n  journal                  Query the local transaction journal (enable recording\n                           with --journal or PAYWAY_JOURNAL=1)\n  mc-info                  Fetch merchant API info (accounts, payment methods)\n                           by merchant key (get-mc-info)\n  new-merchant             Register a merchant via online-self-activation\n                           (partner credentials; returns the onboarding form URL\n                           + session token)\n\nOptions:\n  -V, --version                       output the version number\n  --profile <name>                    Use a saved credential profile for this\n                                      command\n  --no-color                          Disable ANSI colors in output\n  --journal                           Force the transaction journal on (<data\n                                      root>/journal.jsonl; ON by default for API\n                                      commands)\n  --no-journal                        Disable the transaction journal for this\n                                      invocation\n  -h, --help                          display help for command\n\nJourney examples:\n  $ payway-sdk init && payway-sdk doctor --live   set up, then prove a real sandbox round-trip\n  $ payway-sdk generate-qr -a 5.00                create QR (scans right in your terminal) and poll until paid\n  $ payway-sdk check-transaction -t <id>          one-shot status check\n  $ payway-sdk poll-transaction -t <id> --json    watch a transaction until terminal status (agent-friendly)\n  $ payway-sdk transaction-list                   today's transactions\n  $ payway-sdk refund -t <id> -a 2.00             partial refund with pre-flight balance check\n  $ payway-sdk explain PTL36                      decode any PayWay error code\n\nExit codes: 0 success · 1 input/validation · 2 PayWay API failure · 3 network/timeout/rate-limit.\n\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "check-transaction",
+        "--help"
+      ],
+      "exit": 0,
+      "ms": 4172,
+      "validJson": false,
+      "stdout": "Usage: payway-sdk check-transaction [options]\n\nCheck the payment status of a transaction (rate limit: 600/s)\n\nOptions:\n  -t, --transaction-id <id>  Transaction ID\n  --json                     Print the raw JSON response\n  -h, --help                 display help for command\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "check-transaction",
+        "--json"
+      ],
+      "exit": 1,
+      "ms": 3469,
+      "validJson": false,
+      "stdout": "",
+      "stderr": "error: required option '-t, --transaction-id <id>' not specified\n"
+    },
+    {
+      "args": [
+        "payment-link",
+        "detail",
+        "--json"
+      ],
+      "exit": 1,
+      "ms": 2527,
+      "validJson": false,
+      "stdout": "",
+      "stderr": "error: required option '-i, --id <id>' not specified\n"
+    },
+    {
+      "args": [
+        "refund",
+        "--json"
+      ],
+      "exit": 1,
+      "ms": 2352,
+      "validJson": true,
+      "stdout": "{\n  \"error\": {\n    \"kind\": \"validation\",\n    \"exitCode\": 1,\n    \"type\": \"PayWayConfigError\",\n    \"message\": \"error: required option '-t, --transaction-id <id>' not specified\"\n  }\n}\n",
+      "stderr": "error: required option '-t, --transaction-id <id>' not specified\n"
+    },
+    {
+      "args": [
+        "generate-qr",
+        "-a",
+        "nonsense",
+        "-y",
+        "--json",
+        "--no-polling",
+        "--no-open-image"
+      ],
+      "exit": 1,
+      "ms": 1608,
+      "validJson": false,
+      "stdout": "",
+      "stderr": "error: unknown option '--json'\n"
+    },
+    {
+      "args": [
+        "--profile",
+        "audit-nonexistent",
+        "check-transaction",
+        "-t",
+        "audit01",
+        "--json"
+      ],
+      "exit": 1,
+      "ms": 1255,
+      "validJson": false,
+      "stdout": "",
+      "stderr": "Error: Credential profile \"audit-nonexistent\" does not exist\n    at activateSelectedProfile (D:\\Antigravity_google\\SDK-prepration\\src\\cli.ts:1014:23)\n    at Object.callback (D:\\Antigravity_google\\SDK-prepration\\src\\cli.ts:1036:3)\n    at file:///D:/Antigravity_google/SDK-prepration/node_modules/commander/lib/command.js:1528:27\n    at Command._chainOrCall (file:///D:/Antigravity_google/SDK-prepration/node_modules/commander/lib/command.js:1500:12)\n    at file:///D:/Antigravity_google/SDK-prepration/node_modules/commander/lib/command.js:1527:21\n    at Array.forEach (<anonymous>)\n    at Command._chainOrCallHooks (file:///D:/Antigravity_google/SDK-prepration/node_modules/commander/lib/command.js:1526:11)\n    at Command._parseCommand (file:///D:/Antigravity_google/SDK-prepration/node_modules/commander/lib/command.js:1614:27)\n    at file:///D:/Antigravity_google/SDK-prepration/node_modules/commander/lib/command.js:1379:27\n    at Command._chainOrCall (file:///D:/Antigravity_google/SDK-prepration/node_modules/commander/lib/command.js:1500:12)\n"
+    },
+    {
+      "args": [
+        "onboard",
+        "--stage",
+        "not-a-stage"
+      ],
+      "exit": 0,
+      "ms": 1237,
+      "validJson": true,
+      "stdout": "{\n  \"command\": \"onboard\",\n  \"stage\": \"not-a-stage\",\n  \"allowed\": [\n    \"provider\",\n    \"profile\",\n    \"callback\",\n    \"privacy\",\n    \"verify\"\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "mcp",
+        "--list-tools",
+        "--json"
+      ],
+      "exit": 0,
+      "ms": 1433,
+      "validJson": true,
+      "stdout": "[\n  {\n    \"name\": \"get_payment_link_details\",\n    \"description\": \"Get the status and details of a payment link by its opaque Link ID (data.id from create — not the merchant ref, not the URL slug).\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"query_journal\",\n    \"description\": \"Query the local transaction journal (no network): the chronological timeline of one transaction, aggregate stats (latency/retries/errors/funnel), reconcile creations vs webhook callbacks, or detect anomalies. Only knows what was journaled while recording was on.\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"query_knowledge\",\n    \"description\": \"Search or read the built-in PayWay knowledge base offline (no network): integration guides, gateway error-code hints, and sandbox-verified lessons for web checkout, QR, callbacks/webhooks, payment links, COF, pre-auth, payouts, and deployment. Prefer this over guessing gateway behavior.\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"check_transaction\",\n    \"description\": \"Check the status of a transaction by its transaction id.\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"check_transaction_by_merchant_ref\",\n    \"description\": \"Check a transaction using the merchant reference.\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"poll_transaction\",\n    \"description\": \"Poll a transaction until it reaches a terminal state or times out.\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"save_artifact\",\n    \"description\": \"Persist a generated artifact (QR string, content, etc.) to disk/session.\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"open_artifact\",\n    \"description\": \"Open a previously saved artifact or an explicit HTTPS URL.\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"copy_to_clipboard\",\n    \"description\": \"Copy text to the system clipboard.\",\n    \"readOnly\": true,\n    \"source\": \"agent-parity\"\n  },\n  {\n    \"name\": \"list_transactions\",\n    \"description\": \"List transactions in a time window via the PayWay gateway. Dates are GATEWAY time UTC+7 — a UTC/local-derived window silently returns 0 rows. Max window 3 days, page size ≤1000; defaults to the current gateway day. Read-only.\",\n    \"readOnly\": true,\n    \"source\": \"mcp-extra\"\n  },\n  {\n    \"name\": \"journal_stats\",\n    \"description\": \"Local transaction-journal statistics (latency, retries, errors, funnel) recorded by the CLI/SDK while journaling was enabled. No network call. Read-only.\",\n    \"readOnly\": true,\n    \"source\": \"mcp-extra\"\n  },\n  {\n    \"name\": \"journal_timeline\",\n    \"description\": \"Reconstruct one transaction from the local transaction journal: chronological digest events plus an RCA verdict/steps/hints. Digest projection only — request/response bodies never leave the machine. No network call. Read-only.\",\n    \"readOnly\": true,\n    \"source\": \"mcp-extra\"\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "init",
+        "--help"
+      ],
+      "exit": 0,
+      "ms": 1959,
+      "validJson": false,
+      "stdout": "Usage: payway-sdk init [options]\n\nInitialize PayWay integration in the current project\n\nOptions:\n  --mode <mode>          Setup path: demo or sandbox (default: \"sandbox\")\n  --template <template>  Starter: framework or first-payment (default:\n                         \"framework\")\n  -h, --help             display help for command\n\nFirst-payment path:\n  First payment: use --mode sandbox --template first-payment, then doctor --route online-qr.\n\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "doctor",
+        "--json"
+      ],
+      "exit": 1,
+      "ms": 1741,
+      "validJson": true,
+      "stdout": "{\n  \"ok\": false,\n  \"route\": \"online-qr\",\n  \"context\": {\n    \"credentialSource\": \"environment\",\n    \"environment\": \"sandbox\",\n    \"endpoint\": \"http://127.0.0.1:9\"\n  },\n  \"framework\": \"unknown\",\n  \"frameworkEvidence\": [\n    \"no package.json found\"\n  ],\n  \"dataRoot\": \"C:\\\\Users\\\\SYED~1.SOH\\\\AppData\\\\Local\\\\Temp\\\\payway-publishing-dx-audit-IZfyCz\\\\data\",\n  \"checks\": [\n    {\n      \"id\": \"env-file\",\n      \"label\": \".env file exists\",\n      \"ok\": true,\n      \"detail\": \"not present; using profile or environment variables\"\n    },\n    {\n      \"id\": \"framework\",\n      \"label\": \"Framework detected\",\n      \"ok\": true,\n      \"detail\": \"unknown (advisory — no web framework needed for SDK/CLI usage; no package.json found)\",\n      \"fix\": \"Optional: install a supported framework: next, express, fastify, or nuxt\"\n    },\n    {\n      \"id\": \"env-PAYWAY_ENV\",\n      \"label\": \"PAYWAY_ENV is set\",\n      \"ok\": true,\n      \"detail\": \"set to sandbox\"\n    },\n    {\n      \"id\": \"env-PAYWAY_MERCHANT_ID\",\n      \"label\": \"PAYWAY_MERCHANT_ID is set\",\n      \"ok\": true,\n      \"detail\": \"configured\"\n    },\n    {\n      \"id\": \"env-PAYWAY_API_KEY\",\n      \"label\": \"PAYWAY_API_KEY is set\",\n      \"ok\": true,\n      \"detail\": \"configured (11 characters)\"\n    },\n    {\n      \"id\": \"env-apikey-length\",\n      \"label\": \"API key length\",\n      \"ok\": false,\n      \"detail\": \"Only 11 characters (PayWay keys are usually longer)\",\n      \"fix\": \"Verify you copied the full API key from the PayWay merchant portal\"\n    },\n    {\n      \"id\": \"env-value\",\n      \"label\": \"PAYWAY_ENV value\",\n      \"ok\": true,\n      \"detail\": \"\\\"sandbox\\\"\"\n    },\n    {\n      \"id\": \"journal\",\n      \"label\": \"Transaction journal\",\n      \"ok\": true,\n      \"detail\": \"recording off (the CLI journals by default — an override disabled it)\",\n      \"fix\": \"Remove the --no-journal flag or the falsy PAYWAY_JOURNAL value (0/false/no/off) to keep a local record of every exchange (docs/18)\"\n    },\n    {\n      \"id\": \"env-PAYWAY_CALLBACK_URL\",\n      \"label\": \"PAYWAY_CALLBACK_URL is set\",\n      \"ok\": false,\n      \"detail\": \"required for online QR and webhook confirmation\",\n      \"fix\": \"Set PAYWAY_CALLBACK_URL=<public-https-url> or run `payway-sdk setup-webhook --tunnel`\"\n    }\n  ],\n  \"envIssues\": [\n    {\n      \"code\": \"E-PAYWAY_API_KEY-TOO-SHORT\",\n      \"severity\": \"warn\",\n      \"varName\": \"PAYWAY_API_KEY\",\n      \"message\": \"PAYWAY_API_KEY is suspiciously short (11 chars); PayWay-issued keys are usually longer\"\n    },\n    {\n      \"code\": \"W-PAYWAY-UNKNOWN-VAR\",\n      \"severity\": \"warn\",\n      \"varName\": \"PAYWAY_NO_UPDATE_CHECK\",\n      \"message\": \"Unrecognized PayWay environment variable(s): PAYWAY_NO_UPDATE_CHECK. Check for typos or removed configuration keys.\"\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ]
+}

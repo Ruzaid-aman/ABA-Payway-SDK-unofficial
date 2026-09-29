@@ -1,0 +1,20 @@
+{
+  "temp": "C:\\Users\\SYED~1.SOH\\AppData\\Local\\Temp\\payway-mcp-profile-audit-ShJxv0",
+  "stdio": {
+    "exit": 0,
+    "stdoutFirstLines": [
+      "  Using profile: audit-profile (sandbox)",
+      "{\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"payway-sdk\",\"version\":\"1.6.0\"}},\"jsonrpc\":\"2.0\",\"id\":1}"
+    ],
+    "stderr": "payway-sdk MCP server listening on stdio (tools: 12, mutations: off)\n"
+  },
+  "envMutations": {
+    "exit": 0,
+    "count": 12,
+    "stderr": "  Using profile: audit-profile (sandbox)\n"
+  },
+  "flagMutations": {
+    "exit": 0,
+    "count": 17
+  }
+}

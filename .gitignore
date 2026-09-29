@@ -80,3 +80,8 @@ reports/
 /.release-audit/
 /.scratch/opensource-release-polish/
 .next/
+
+# Publishing-DX audit (2026-09-29): the consumer smoke-install tree (packed tgz +
+# npm install + installed skills) is reproducible evidence, not source — keep the
+# logs and evidence JSON, drop the 33 MB install itself.
+/.scratch/publishing-dx-audit-2026-09-29/consumer/

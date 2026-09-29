@@ -1,0 +1,121 @@
+{
+  "node": "v24.21.0",
+  "packFiles": 127,
+  "packedBytes": 944618,
+  "unpackedBytes": 3492713,
+  "esm": true,
+  "cjs": true,
+  "types": true,
+  "cliHelp": true,
+  "demo": true,
+  "skills": 34,
+  "skillsDoctor": "\n\u001b[1mABA PayWay Skills Doctor\u001b[0m\n\nPackaged skills: \u001b[36m34\u001b[0m\n\n  \u001b[32m✓\u001b[0m \u001b[1mcodex\u001b[0m  \u001b[32m34/34 skills installed\u001b[0m  \u001b[2mD:\\Antigravity_google\\SDK-prepration\\.scratch\\publishing-dx-audit-2026-09-29\\consumer\\installed-skills\u001b[0m\n\n  \u001b[32mAll checked agents are healthy.\u001b[0m\n\n",
+  "docsListContainsQuickstart": true,
+  "mcpCatalog": [
+    {
+      "name": "get_payment_link_details",
+      "description": "Get the status and details of a payment link by its opaque Link ID (data.id from create — not the merchant ref, not the URL slug).",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "query_journal",
+      "description": "Query the local transaction journal (no network): the chronological timeline of one transaction, aggregate stats (latency/retries/errors/funnel), reconcile creations vs webhook callbacks, or detect anomalies. Only knows what was journaled while recording was on.",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "query_knowledge",
+      "description": "Search or read the built-in PayWay knowledge base offline (no network): integration guides, gateway error-code hints, and sandbox-verified lessons for web checkout, QR, callbacks/webhooks, payment links, COF, pre-auth, payouts, and deployment. Prefer this over guessing gateway behavior.",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "check_transaction",
+      "description": "Check the status of a transaction by its transaction id.",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "check_transaction_by_merchant_ref",
+      "description": "Check a transaction using the merchant reference.",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "poll_transaction",
+      "description": "Poll a transaction until it reaches a terminal state or times out.",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "save_artifact",
+      "description": "Persist a generated artifact (QR string, content, etc.) to disk/session.",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "open_artifact",
+      "description": "Open a previously saved artifact or an explicit HTTPS URL.",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "copy_to_clipboard",
+      "description": "Copy text to the system clipboard.",
+      "readOnly": true,
+      "source": "agent-parity"
+    },
+    {
+      "name": "list_transactions",
+      "description": "List transactions in a time window via the PayWay gateway. Dates are GATEWAY time UTC+7 — a UTC/local-derived window silently returns 0 rows. Max window 3 days, page size ≤1000; defaults to the current gateway day. Read-only.",
+      "readOnly": true,
+      "source": "mcp-extra"
+    },
+    {
+      "name": "journal_stats",
+      "description": "Local transaction-journal statistics (latency, retries, errors, funnel) recorded by the CLI/SDK while journaling was enabled. No network call. Read-only.",
+      "readOnly": true,
+      "source": "mcp-extra"
+    },
+    {
+      "name": "journal_timeline",
+      "description": "Reconstruct one transaction from the local transaction journal: chronological digest events plus an RCA verdict/steps/hints. Digest projection only — request/response bodies never leave the machine. No network call. Read-only.",
+      "readOnly": true,
+      "source": "mcp-extra"
+    }
+  ],
+  "internalDossierPackaged": true,
+  "missingLlmsTargets": [
+    "docs/guides/QUICK-START-1-PAGER.md",
+    "docs/README.md",
+    "docs/guides/01-overview-and-concepts.md",
+    "docs/guides/02-prerequisites-and-setup.md",
+    "docs/guides/03-web-implementation.md",
+    "docs/guides/04-native-app-implementation.md",
+    "docs/guides/05-webview-implementation.md",
+    "docs/guides/06-telegram-mini-app.md",
+    "docs/guides/07-qr-code-handling.md",
+    "docs/guides/08-deep-linking.md",
+    "docs/guides/09-link-unlink-renew-lifecycle.md",
+    "docs/guides/10-ui-customization.md",
+    "docs/guides/11-callbacks-and-webhooks.md",
+    "docs/guides/12-error-handling-and-debugging.md",
+    "docs/guides/13-deployment-checklist.md",
+    "docs/guides/14-appendix-code-snippets.md",
+    "docs/guides/15-merchant-scenario-requirements.md",
+    "docs/guides/16-webhook-setup-guide.md",
+    "docs/guides/17-payment-link.md",
+    "docs/guides/18-transaction-journal.md",
+    "docs/guides/19-customer-module-qr.md",
+    "docs/guides/20-settlement-and-disputes.md",
+    "docs/guides/22-api-datetime-and-timezones.md",
+    "docs/recipes/cloudflare-free-webhook.md",
+    "docs/guides/AGENT-SETUP-PLAYBOOK.md",
+    "docs/guides/AGENTIC-PAYWAY-CLI-USER-GUIDE.md",
+    "docs/guides/FIRST-PAYMENT-WALKTHROUGH.md",
+    "docs/internal/CLOSE-TRANSACTION-FINDINGS.md",
+    "docs/reference/SDK-AND-CLI-REFERENCE.md",
+    "docs/error-codes.json"
+  ]
+}
