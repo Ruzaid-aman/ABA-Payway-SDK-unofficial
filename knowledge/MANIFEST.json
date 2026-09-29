@@ -248,9 +248,9 @@
       "description": "Free-tier Cloudflare Worker webhook receiver setup.",
       "source": "docs/recipes/cloudflare-free-webhook.md",
       "file": "cloudflare-webhook.md",
-      "bytes": 25625,
-      "sha256": "267c3c4f15be79b8",
-      "sourceSha256": "267c3c4f15be79b8"
+      "bytes": 24658,
+      "sha256": "37b595f949e51f75",
+      "sourceSha256": "37b595f949e51f75"
     },
     {
       "topic": "agent-setup-playbook",
@@ -258,9 +258,9 @@
       "description": "Configuring the agentic CLI: providers, capability modes, privacy ack.",
       "source": "docs/guides/AGENT-SETUP-PLAYBOOK.md",
       "file": "agent-setup-playbook.md",
-      "bytes": 13487,
-      "sha256": "b800a536e15adfd5",
-      "sourceSha256": "b800a536e15adfd5"
+      "bytes": 13284,
+      "sha256": "69694b9402dae37b",
+      "sourceSha256": "69694b9402dae37b"
     },
     {
       "topic": "agentic-cli-guide",
