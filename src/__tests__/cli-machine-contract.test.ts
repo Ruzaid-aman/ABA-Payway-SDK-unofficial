@@ -159,7 +159,7 @@ describe('machine-output failure contract (S05)', () => {
   });
 
   it('still honors the refund machine contract through the generalized path', async () => {
-    const { stdout, exitCode } = await run(['refund', '--json']);
+    const { stdout } = await run(['refund', '--json']);
     const envelope = expectOneEnvelope(stdout);
     expect(envelope.error.exitCode).toBe(1);
   });

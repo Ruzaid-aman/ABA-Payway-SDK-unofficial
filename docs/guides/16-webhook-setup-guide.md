@@ -53,8 +53,9 @@ npm exec -- payway-sdk setup-webhook --tunnel --forward-to http://localhost:3000
 | `--tunnel` | `false` | Start a Cloudflare Tunnel for a public URL |
 | `--url <string>` | — | Use an existing public URL (skips tunnel startup) |
 | `--journal` | `false` | Also set `PAYWAY_JOURNAL=1` in `.env` so `journal reconcile` works out of the box |
-| `--forward-to <url>` | — | Re-POST every captured callback (all three routes) to this local app URL after capture — the capture/store/journal contract is unchanged, and forward failures never reject or lose the original callback |
+| `--forward-to <url>` | — | Re-POST every captured callback (all three routes) to this local app URL in the background after capture — the ACK never waits on forwarding (each delivery is bounded by a 5 s timeout; a saturated queue drops the forward, never the capture), and forward failures never reject or lose the original callback |
 | `--forward-headers <headers>` | — | Extra headers on forwarded deliveries: `"Key1:Value1, Key2:Value2"` |
+| `--host <host>` | `127.0.0.1` | Bind interface. The listener captures raw callback bodies (customer PII, signatures) — bind wider (e.g. `0.0.0.0`) only when you accept exposing them beyond this machine; the log warns on any non-loopback bind |
 
 ---
 
@@ -268,7 +269,10 @@ The offline KHQR route has no assumed online HMAC contract. The listener retains
 | Background run without `--url` or `--tunnel` | Fails with exit code 2 instead of waiting for an interactive prompt |
 | Public tunnel origin unavailable | Listener is stopped and callback URL is not persisted |
 | Transient quick-tunnel startup failure | One retry is attempted; a second failure shuts down cleanly |
-| Receiver cleanup | `npm exec -- payway-sdk webhook stop` stops only the receiver owned by saved lifecycle state |
+| Receiver cleanup | `npm exec -- payway-sdk webhook stop` verifies the running receiver's instance id against the saved state, then triggers that receiver's own graceful shutdown (tunnel stop, `.env` restore, listener close) — it never signals a PID; a reused PID or a foreign receiver is reported (`pid-reused`) and left untouched |
+| Receiver ignores shutdown | `webhook stop` reports `shutdown-not-confirmed` instead of success; check the receiver terminal and stop it manually |
+| Oversized delivery | Bodies over 2 MiB are refused with HTTP 413 and not stored (bounded memory) |
+| Capture growth | The JSON capture store compacts to the newest 1,000 records |
 | Missing `PAYWAY_API_KEY` | Online HMAC verification skipped; both routes are still saved |
 | SIGINT / SIGTERM | Graceful shutdown — finishes processing current request, stops server |
 

@@ -27,7 +27,7 @@ const state = paymentLifecycle(result.data?.payment_status);
 
 ## Local Testing Without the ABA Simulator
 
-Test the full receiver path in seconds, offline: `setup-webhook --forward-to <your-app-url>` captures and re-POSTs every delivery to your app, `webhook trigger --event payment.approved` sends a correctly-signed fixture (a correct `verifyCallback` accepts it; a broken key or `hash`-field mistake rejects it), `webhook resend --record wh_… --to <url>` replays a captured delivery, and `webhook verify-callback --sig …` explains why a specific delivery failed. Fixture deliveries are synthetic — the gateway never saw the `tran_id`; never fulfill on them. The pushback and KHQR fixtures deliberately carry no signature, matching their real no-hash contracts.
+Test the full receiver path in seconds, offline: `setup-webhook --forward-to <your-app-url>` captures and re-POSTs every delivery to your app in the background (the callback ACK never waits on the forward; each delivery is bounded by a 5 s timeout and queue saturation drops the forward, never the capture — `webhook resend` covers a dropped one), `webhook trigger --event payment.approved` sends a correctly-signed fixture (a correct `verifyCallback` accepts it; a broken key or `hash`-field mistake rejects it), `webhook resend --record wh_… --to <url>` replays a captured delivery, and `webhook verify-callback --sig …` explains why a specific delivery failed. Fixture deliveries are synthetic — the gateway never saw the `tran_id`; never fulfill on them. The pushback and KHQR fixtures deliberately carry no signature, matching their real no-hash contracts.
 
 ## Trust and Fulfillment
 
@@ -56,6 +56,15 @@ a run starts clean and ends clean:
    npm exec -- payway-sdk webhook status
    npm exec -- payway-sdk webhook stop
    ```
+   `stop` is identity-verified: it compares the running receiver's instance id
+   against the saved lifecycle state and only then triggers that receiver's own
+   graceful shutdown (tunnel stop, `.env` restore, listener close). It never
+   sends an OS signal — a reused PID or a foreign receiver is reported
+   (`pid-reused`) and left untouched. Outcomes: `stopped`, `stale` (receiver
+   already gone), `pid-reused`, `unreachable`, `shutdown-not-confirmed`
+   (accepted the request but the process did not exit — check its terminal).
+   The listener binds `127.0.0.1` by default; pass `--host` explicitly only if
+   you accept exposing raw callback bodies beyond this machine.
    Check the port before starting anything:
    ```sh
    # Windows
@@ -102,4 +111,4 @@ Do not rely on callback retries — **ABA confirmed (2026-09-12) callbacks are s
 
 Do not log raw callbacks, keys, or customer data. Saved CLI profiles contain plaintext credentials; use a secret manager and explicit SDK configuration in deployed services. The development capture server is not an application fulfillment handler.
 
-For recorded investigations use the opt-in [journal](../aba-payway-journal/SKILL.md); it is not a prerequisite for receiving and verifying a first payment.
+For recorded investigations use the [journal](../aba-payway-journal/SKILL.md); it is not a prerequisite for receiving and verifying a first payment.

@@ -517,9 +517,12 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
     writeFileSync(
       receiverStateFile(),
       `${JSON.stringify({
-        version: 1,
+        version: 2,
+        instanceId: 'status-live-instance',
+        controlToken: 't'.repeat(64),
         pid: process.pid,
         port: 45677,
+        host: '127.0.0.1',
         publicBaseUrl: null,
         callbackUrl: null,
         previousCallbackUrl: null,
@@ -533,7 +536,7 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
 
     writeFileSync(
       receiverStateFile(),
-      `${JSON.stringify({ version: 1, pid: 999999999, port: 45678, startedAt: new Date().toISOString() })}\n`,
+      `${JSON.stringify({ version: 2, instanceId: 'status-stale-instance', controlToken: 't'.repeat(64), pid: 999999999, port: 45678, host: '127.0.0.1', startedAt: new Date().toISOString() })}\n`,
       'utf8',
     );
     const stale = parseJsonDocument((await run(['webhook', 'status', '--json'])).stdout);
@@ -546,18 +549,20 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
     expect(json.state).toBe('absent');
   });
 
-  it('stop is a no-op when no receiver runs, and kills+clears a recorded one', async () => {
+  it('stop is a no-op when no receiver runs, and reports stale (clearing state) for a dead recorded receiver', async () => {
     const absent = parseJsonDocument((await run(['webhook', 'stop', '--json'])).stdout);
-    expect(absent).toEqual({ stopped: false, state: 'absent' });
+    expect(absent).toMatchObject({ stopped: false, reason: 'absent' });
 
+    // WP02: the recorded receiver is dead and nothing answers on its port —
+    // the record is stale: cleared, honestly reported as NOT stopped (there
+    // was nothing to stop), exit code stays clean.
     writeFileSync(
       receiverStateFile(),
-      `${JSON.stringify({ version: 1, pid: 999999999, port: 45679, startedAt: new Date().toISOString() })}\n`,
+      `${JSON.stringify({ version: 2, instanceId: 'cli-gap-stale-instance', controlToken: 't'.repeat(64), pid: 999999999, port: 45679, host: '127.0.0.1', startedAt: new Date().toISOString() })}\n`,
       'utf8',
     );
     const stopped = parseJsonDocument((await run(['webhook', 'stop', '--json'])).stdout);
-    expect(stopped.stopped).toBe(true);
-    expect(stopped.pid).toBe(999999999);
+    expect(stopped).toMatchObject({ stopped: false, reason: 'stale', pid: 999999999 });
     expect(existsSync(receiverStateFile())).toBe(false);
     const human = await run(['webhook', 'stop']);
     expect(human.stdout).toContain('not running');

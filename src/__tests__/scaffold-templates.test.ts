@@ -94,8 +94,14 @@ interface MockRes {
 
 function mockRes(): MockRes {
   const res = { statusCode: 200, body: undefined as unknown } as MockRes;
-  res.status = (code) => ((res.statusCode = code), res);
-  res.json = (payload) => ((res.body = payload), res);
+  res.status = (code) => {
+    res.statusCode = code;
+    return res;
+  };
+  res.json = (payload) => {
+    res.body = payload;
+    return res;
+  };
   return res;
 }
 

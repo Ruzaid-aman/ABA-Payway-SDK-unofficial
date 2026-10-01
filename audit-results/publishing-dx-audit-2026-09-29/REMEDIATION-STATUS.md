@@ -49,6 +49,28 @@ Addresses every actionable finding in [ITEMS-1-2-REVIEW-2026-10-01.md](ITEMS-1-2
    Recorded explicitly below; they block public publication, not further
    remediation batches.
 
+## Fourth pass — work package 5: webhook lifecycle and acceptance (2026-10-01)
+
+Implements remediation item 5 (WP02/WP03/WP07) from REPORT.md §11. Mechanics landed as
+`432b039`; acceptance tests and claim alignment complete the pass.
+
+| Finding | Status | Fix and evidence |
+|---|---|---|
+| WP02 — receiver "ownership" was only a shared PID; stop could signal a reused or unrelated process and reported success without confirmation | **FIXED** | Lifecycle state v2 (`src/webhook/lifecycle.ts`) carries a random `instanceId` + control token per receiver instance (v1 files read as absent by design). The receiver exposes a control route (`POST /aba-payway-control`): `identify` reveals the instance id, `shutdown` requires a timing-safe token match and triggers the receiver's OWN graceful shutdown (tunnel stop, `.env` restore, listener close) — `setup-webhook` wires its existing shutdown routine as the handler. `webhook stop` (`src/webhook/receiver-control.ts`) is identity-first and graceful-first: it identifies the process on the recorded port and REFUSES to act on an instance-id mismatch (`pid-reused` — a reused PID cannot answer with our random id); outcomes are honest (`stopped` / `stale` / `pid-reused` / `unreachable` / `unauthorized` / `shutdown-not-confirmed`); it waits for ACTUAL process exit (default 5 s) before reporting success and only clears the state file when our receiver is confirmed gone (or provably stale). **No OS signal is ever sent to any PID.** Acceptance in `src/__tests__/webhook-receiver-lifecycle.test.ts` (11 tests): the happy path proves identify-before-shutdown ordering; reused-PID/foreign-receiver refusal (nothing signalled, state kept for the CLI to clear), stale, unreachable-live-PID, shutdown-accepted-but-wedged (`shutdown-not-confirmed` — the audit's "receiver that ignores shutdown never yields a misleading successful stop"), unauthorized token, and the real-server control route (identify, wrong-token 403, correct-token ACK + handler invocation, 404 without control wiring). |
+| WP03 — forwarding blocked the callback ACK with no application timeout | **FIXED** | Captured deliveries now drain through a bounded background queue (`WebhookForwardQueue`, `src/webhook/forwarder.ts`): `handleRequest` dispatches synchronously and ACKs right after the durable capture, so a slow or hung receiver can never delay the acknowledgement. Every forward is bounded by `AbortSignal.timeout` (default 5 s; configurable) and counted truthfully (`delivered`/`failed`/`timedOut`). The queue is bounded (default 100 pending): saturation DROPS the forward — never the capture — with a visible warning pointing at `webhook resend`; `server.stop()` awaits the in-flight delivery and then refuses further enqueues; `forwardStats` is exposed on the server result for truthful shutdown reporting. Acceptance in `src/__tests__/webhook-forward-queue.test.ts` (7 tests): the core isolation proof — a callback against a real server whose receiver hangs forever is ACKed in under 1 s while the forward eventually times out and is counted; the timeout budget aborts and counts `timedOut` (distinct from fast non-2xx `failed`); enqueue never awaits the network; saturation drops with count; `stopAccepting` on shutdown; `idle()` holds until the in-flight delivery resolves. |
+| WP07 — listener bound all interfaces and buffered/persisted unbounded input | **FIXED** | The listener binds `127.0.0.1` by default and LOGS its binding (a non-loopback bind prints an explicit warning); `setup-webhook --host` makes wider binding a conscious, documented opt-in. Request bodies are capped (`maxBodyBytes`, default 2 MiB): the cap trips mid-stream, responds 413 `{error: "payload too large"}`, stops buffering, and discards the tail. `JsonWebhookStorage` compacts to `maxRecords` (default 1000, oldest dropped; `Infinity` opts out) — the capture file cannot grow without limit, and dropped records remain covered by the forward/resend workflow. Acceptance in `src/__tests__/webhook-wp7-bounds.test.ts` (8 tests): loopback default + explicit-host surface, 413 with nothing stored, normal body under the cap still accepted/captured, compaction keeps the NEWEST records (verified on disk bytes, not a read filter), `Infinity` opt-out, and the default bound. |
+
+Also aligned the claims that the mechanics made stale: the webhook-production Skill
+(`skills/` + its byte-identical `.zcode/skills` mirror) now documents identity-verified
+stop semantics, the loopback default and the background forward model; guide 16's flag
+table documents `--host`, the background forward (ACK never waits, 5 s bound, drop
+semantics), the lifecycle table's receiver-cleanup row states the instance-verified
+protocol plus the new 413/retention rows. Corpus resynced in the same commit.
+
+Gate snapshot: typecheck exit 0; lint exit 0; full offline suite **2,200 tests / 154
+files, 0 failed** (2026-10-01, Windows, Node v24.21.0, npm 12.0.2) — includes the 26
+new WP5 acceptance tests; `mcp --list-tools --json` counts unchanged (12/17).
+
 ## Third pass — work packages 3 and 4 (2026-10-01)
 
 Implements remediation items 3 (safe first integration — S01/S02/WP01) and 4 (MCP and
@@ -142,8 +164,18 @@ request design first. `.postman/resources.yaml` gained Postman-app noise
 | `npm run lint` | exit 0 (2 pre-existing warnings in journal files) |
 | Postman `test:yaml` (incl. the 16 distribution-scan negative controls) / `export_json --check` / `verify_index` / `verify_postman_import` / `syntaxcheck` / `validate` / `readme_path_audit` | PASS |
 
-## Next in the ordered plan (not started)
+## Work package 6 � Public corpus (2026-10-01)
 
-Work package 5 (WP02/WP03/WP07 — webhook receiver lifecycle), then 6 (D02–D07 — one
-navigable public corpus). Work packages 1–4 are complete or carry only the recorded
-owner gates.
+See [item 6 verification](ITEM-6-CORPUS-2026-10-01.md). D03�D07 are implemented
+and offline-verified. D02 topics work in the installed package; security mailbox
+ownership and monitoring remains the release-owner check. Generated corpus has
+35 topics and 34 Skills, full readable guides, valid file/anchor navigation, and
+a runnable simulated starter. Package/repository/consumer gates and 60 focused
+tests pass. Typecheck passes; current whole-repo lint has two unrelated scaffold
+test assignment-expression errors.
+
+## Next in the ordered plan
+
+Work package 6 (D02–D07 — one navigable public corpus), then 7 (WP05/WP06/WP08/WP09/WP11 —
+Postman callback and recipient journey). Work packages 1–5 are complete or carry only the
+recorded owner gates.
