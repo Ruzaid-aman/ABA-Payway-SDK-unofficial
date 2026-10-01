@@ -5,7 +5,7 @@
     "verify": "node _build/export_json.js --check"
   },
   "examples": {
-    "03 - Ecommerce Checkout/1. Purchase (Hosted Checkout) - multipart.request.yaml": [
+    "03 - Ecommerce Checkout/1. Purchase (Hosted Checkout) - purchase.request.yaml": [
       {
         "name": "Success — hosted checkout page (HTML 200)",
         "code": 200,

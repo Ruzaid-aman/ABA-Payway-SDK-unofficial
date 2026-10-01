@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Collection, Variable, Example } = require('postman-collection');
 const { loadYamlCollection, readYaml, requestFiles } = require('./yaml_collection');
+const { applyDistributionPolicy } = require('./distribution-scan');
 
 const projectDir = path.join(__dirname, '..');
 const collectionDir = path.join(projectDir, 'postman', 'collections', 'PayWay API — Complete Collection');
@@ -139,7 +140,7 @@ function build() {
 
   const knownRequests = new Set(collection.requests.map((r) => r.relativePath.split(path.sep).join('/')));
   for (const key of Object.keys(examplesByPath)) {
-    if (!knownRequests.has(key)) stats.missing.push(key);
+    if (!knownRequests.has(key)) exampleStats.missing.push(key);
   }
 
   const out = {
@@ -159,7 +160,12 @@ function build() {
         item: folder.items.sort((a, b) => a.order - b.order || a.item.name.localeCompare(b.item.name)).map((entry) => entry.item),
       })),
   };
-  return { out, stats: { requests: collection.requests.length, folders: folders.size, variables: variables.length, ...exampleStats } };
+  // Distribution policy (audit WP10): sanitize + scan the export on every
+  // build and --check. The shareable artifact carries only the documented
+  // demo identity — personal workspace/cloud linkage, runtime capture
+  // tokens, and live receiver URLs must never reach it.
+  const sanitized = applyDistributionPolicy(out);
+  return { out, stats: { requests: collection.requests.length, folders: folders.size, variables: variables.length, sanitized, ...exampleStats } };
 }
 
 function verify(json, stats) {
@@ -188,19 +194,20 @@ if (stats.missing.length) {
 const serialized = JSON.stringify(out, null, 2) + '\n';
 
 if (require.main === module) {
+  const sanitizedNote = stats.sanitized.length ? `; distribution policy: ${stats.sanitized.join('; ')}` : '';
   if (checkOnly) {
     const committed = fs.existsSync(distPath) ? fs.readFileSync(distPath, 'utf8') : '';
     if (committed !== serialized) {
       console.error('dist export is stale — run: node _build/export_json.js');
       process.exit(1);
     }
-    console.log(`dist export fresh (${stats.requests} requests, ${stats.attached} examples, ${stats.variables} variables)`);
+    console.log(`dist export fresh (${stats.requests} requests, ${stats.attached} examples, ${stats.variables} variables${sanitizedNote})`);
   } else {
     fs.mkdirSync(distDir, { recursive: true });
     fs.writeFileSync(distPath, serialized);
     verify(out, stats);
     console.log(`dist export written: ${path.relative(projectDir, distPath)}`);
-    console.log(`SDK import: OK — ${stats.folders} folders, ${stats.requests} requests, ${stats.attached} examples, ${stats.variables} variables (${new Set(Object.keys(examplesByPath)).size} requests documented)`);
+    console.log(`SDK import: OK — ${stats.folders} folders, ${stats.requests} requests, ${stats.attached} examples, ${stats.variables} variables (${new Set(Object.keys(examplesByPath)).size} requests documented)${sanitizedNote}`);
   }
 }
 

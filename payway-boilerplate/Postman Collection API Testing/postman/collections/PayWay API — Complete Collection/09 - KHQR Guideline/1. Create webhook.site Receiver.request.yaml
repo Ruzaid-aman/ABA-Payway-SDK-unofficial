@@ -1,7 +1,8 @@
 $kind: http-request
 description: |-
   ## ⚡ Quick test
-  Send it. The response `uuid` becomes a fresh webhook.site bin: the test script saves `https://webhook.site/<uuid>` into `{{callback_listener}}` and the UUID into `{{webhook_token}}` (the same variables folder 10 uses).
+
+  Send it. The response `uuid` becomes a fresh webhook.site bin: the test script saves `https://webhook.site/` into `{{callback_listener}}` and the UUID into `{{webhook_token}}` (the same variables folder 10 uses).
 
   **Why this exists:** an offline KHQR has **no per-QR callback field** - PayWay POSTs the payment notification to the webhook URL provisioned on your merchant account. Create the bin here, point that provisioning at it (ABA), and steps 3-4 of this folder can verify payments end-to-end. Re-running creates a NEW bin and repoints the variables.
 url: https://webhook.site/token
