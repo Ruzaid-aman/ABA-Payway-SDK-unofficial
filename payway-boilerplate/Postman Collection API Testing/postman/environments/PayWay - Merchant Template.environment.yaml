@@ -1,0 +1,15 @@
+name: PayWay - Merchant Template
+values:
+  - key: baseUrl
+    value: 'https://checkout-sandbox.payway.com.kh'
+  - key: merchant_id
+    value: ''
+  - key: secret_key
+    value: ''
+    type: secret
+  - key: rsa_public_key
+    value: ''
+  - key: ctid
+    value: ''
+  - key: whitelist_payee
+    value: ''

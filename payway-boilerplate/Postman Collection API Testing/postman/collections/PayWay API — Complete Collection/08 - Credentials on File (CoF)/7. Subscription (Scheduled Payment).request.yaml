@@ -17,81 +17,107 @@ body:
     - type: text
       key: req_time
       value: "{{request_time}}"
+      description: UTC now, YYYYMMDDHHmmss (auto)
     - type: text
       key: merchant_id
       value: "{{merchant_id}}"
+      description: PayWay merchant ID (sandbox demo pre-filled)
     - type: text
       key: tran_id
       value: "{{tran_id}}"
+      description: Unique per transaction — reusing one answers code 4 (auto-generated)
     - type: text
       key: firstname
       value: "{{sub_firstname}}"
+      description: Buyer first name (sandbox demo value)
     - type: text
       key: lastname
       value: "{{sub_lastname}}"
+      description: Buyer last name (sandbox demo value)
     - type: text
       key: email
       value: "{{sub_email}}"
+      description: Buyer email (sandbox demo value)
     - type: text
       key: phone
       value: "{{sub_phone}}"
+      description: Buyer phone (sandbox demo value)
     - type: text
       key: type
       value: purchase
+      description: purchase | pre-auth (pre-auth places a hold for later completion)
     - type: text
       key: payment_option
       value: "{{sub_payment_option}}"
+      description: cards | abapay | abapay_khqr | abapay_khqr_deeplink | abapay_deeplink | alipay | wechat | google_pay
     - type: text
       key: items
       value: "{{sub_items_b64}}"
+      description: Base64 of the items JSON (auto)
     - type: text
       key: shipping
       value: "0"
+      description: Shipping fee added to the amount (0.00 if none)
     - type: text
       key: amount
       value: "{{sub_amount_fmt}}"
+      description: USD 2 decimals / KHR integer (e.g. 6.12)
     - type: text
       key: return_url
       value: "{{sub_ret_b64}}"
+      description: Where PayWay POSTs the payment result (base64-encoded by the helper when https)
     - type: text
       key: cancel_url
       value: "{{sub_can_b64}}"
+      description: Browser redirect when the buyer cancels (base64-encoded by the helper when https)
     - type: text
       key: continue_success_url
       value: "{{sub_con_b64}}"
+      description: Post-payment browser continuation — fires with skip_success_page 0 (base64 by helper)
     - type: text
       key: return_deeplink
       value: ""
+      description: Mobile-app deeplink that receives the payment result (base64 by helper)
     - type: text
       key: currency
       value: "{{currency}}"
+      description: USD (2 decimals) | KHR (integer)
     - type: text
       key: custom_fields
       value: ""
+      description: Base64 of a JSON object echoed back with the payment result (auto)
     - type: text
       key: return_params
       value: ""
+      description: Optional pass-through data returned with the payment result (base64 by helper)
     - type: text
       key: payout
       value: ""
+      description: Base64 of the split-payout array [{"acc":"...","amt":...}] — total must equal amount (auto)
     - type: text
       key: lifetime
       value: "{{sub_lifetime}}"
+      description: 'Checkout session lifetime in seconds (sandbox hosted sessions: abapay_khqr ~5 min, cards/deeplink ~3 min)'
     - type: text
       key: skip_success_page
       value: ""
+      description: 0 + continue_success_url moves the buyer browser to your success URL after payment
     - type: text
       key: ctid
       value: "{{ctid}}"
+      description: Your stable per-customer key — the stored credential links to it after the first payment
     - type: text
       key: token_flag
       value: CITR_FIX
+      description: CITI_FLEX | CITO_FLEX — the stored-credential flag to link with this subscription
     - type: text
       key: frequency
       value: "{{sub_frequency}}"
+      description: 'Recurring frequency: 1W | 1M | 2M'
     - type: text
       key: hash
       value: "{{computed_hash}}"
+      description: HMAC-SHA512 over the fields listed in the request Hash order (auto)
 scripts:
   - type: beforeRequest
     code: |-

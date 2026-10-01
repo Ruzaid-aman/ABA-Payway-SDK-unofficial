@@ -22,15 +22,19 @@ body:
     - type: text
       key: request_time
       value: "{{request_time}}"
+      description: UTC now, YYYYMMDDHHmmss (auto)
     - type: text
       key: merchant_id
       value: "{{merchant_id}}"
+      description: PayWay merchant ID (sandbox demo pre-filled)
     - type: text
       key: merchant_auth
       value: "{{computed_merchant_auth}}"
+      description: Base64 of the RSA-encrypted JSON payload (mc_id, title, amount, currency, description, payment_limit, expired_date, return_url, merchant_ref_no, payout) — built automatically; manual fallback {{pl_merchant_auth}}
     - type: text
       key: hash
       value: "{{computed_hash}}"
+      description: HMAC-SHA512 over request_time + merchant_id + merchant_auth (auto)
 scripts:
   - type: beforeRequest
     code: |-

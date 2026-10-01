@@ -11,7 +11,7 @@
 1. **One-file route:** import `dist/PayWay API — Complete Collection.postman_collection.json` into Postman (Import → File). This export also carries the saved response examples and is the artifact to share with merchant developers.
 2. **Workspace route (maintainers):** open the folder as a Postman Git workspace — `.postman/resources.yaml` maps `postman/collections/PayWay API — Complete Collection/` (the editable YAML source).
 3. The collection is **pre-configured with this project's sandbox merchant** (merchant `ec476910`, `secret_key` Postman *Secret*-typed, full `rsa_public_key` PEM, seeded beneficiary `500000001`, `ctid customer123`) — the first request works with zero setup.
-4. Optional: import an environment from `postman/environments/` — `PayWay - Sandbox.environment.yaml` (mirrors the pre-filled values) or `PayWay - Production.environment.yaml` (placeholders). These are Postman v3 YAML resources and currently local-only (not mapped in `.postman/resources.yaml`); environment variables override collection variables once selected, so keep the Production environment selected only when you have filled in your own merchant values.
+4. Optional: import an environment from `postman/environments/` — `PayWay - Sandbox.environment.yaml` (mirrors the pre-filled values), `PayWay - Merchant Template.environment.yaml` (all empty; fill in YOUR merchant credentials — mark `secret_key` **Secret**-typed and keep the value in **Current value** so it stays local), or `PayWay - Production.environment.yaml` (placeholders). These are Postman v3 YAML resources and currently local-only (not mapped in `.postman/resources.yaml`); environment variables override collection variables once selected, so keep the Production environment selected only when you have filled in your own merchant values.
 5. For another merchant, replace `merchant_id` / `secret_key` / `rsa_public_key` / `ctid` in the collection Variables tab (or in your environment). Keep secrets in **Secret** variables — note the typing is Postman app/cloud state: the YAML files on disk store every value, including `secret_key`, as plain text, so repo-level protection is what keeps them safe. Never commit live values to this repository.
 
 ### Distribution credential policy (what may ship in the export)
@@ -51,13 +51,26 @@ Start with the hosted checkout flow:
 
 After hosted checkout works, use the Runner flows (folder 11) or the per-folder requests for QR, payment links, pre-auth, payout, credentials on file, KHQR, and polling. Each flow may have different prerequisites and sandbox limitations.
 
+### 4. Troubleshooting FAQ
+
+The one-line versions live in the collection's **Overview** tab (§ 6 · 60-second fixes). The longer answers:
+
+- **"Wrong hash" (code 1)** — compare the `b4hash:` line in the Postman Console against the hash order in the request's description. USD amounts need exactly 2 decimals, KHR none; the scripts handle this via `fmtAmt`, so hand-edited `{{amount}}` values are the usual culprit.
+- **Variables read empty after you set them** — environment values must go in the **Current value** column; **Initial value** is only the shared template that syncs to Postman's cloud. Secret-typed variables render masked, which can look empty — paste again and re-send.
+- **Variable edits on disk don't reach a running request** — Postman seeds collection variables from the YAML **initial** values but keeps app-side **current** values across restarts and re-syncs. Overwrite the variable in the collection's **Variables** tab (initial *and* current) when a fix doesn't seem to apply. (This bit us during the QR-visualizer fix — see MAINTAINER_REPORT.md.)
+- **RSA endpoints answer `SKIPPED`** — the runtime lacks secure randomness (`crypto.getRandomValues`); use the desktop app, or paste a pre-encrypted value into the fallback variable the request names (e.g. `{{pl_merchant_auth}}`).
+- **Malformed-PEM-class errors** (`Too few bytes to parse DER`, `Invalid PEM formatted message`) — the key material must be a complete PEM block (`-----BEGIN PUBLIC KEY-----` … `-----END PUBLIC KEY-----`); check that no trailing newline or placeholder text got pasted in.
+- **Web Postman is slow or CORS-blocked** — use the desktop app; the web build relays requests through Postman's backend.
+- **Sandbox TLS errors** — the sandbox presents a self-signed cert chain; that's expected. In Node tooling, scope `NODE_TLS_REJECT_UNAUTHORIZED='0'` to the single command, never globally.
+- **A request fails with a code you don't recognize** — look it up in `postman/documents/error-codes.json` (83 codes, 8 families) or the error table in the Overview tab; each entry carries the verified meaning and first fix.
+
 ## Workspace map (what actually exists)
 
 | Artifact | Purpose |
 | --- | --- |
 | `postman/collections/PayWay API — Complete Collection/` | **The deliverable** — editable Postman v3 YAML resources mapped by `.postman/resources.yaml` |
 | `dist/PayWay API — Complete Collection.postman_collection.json` | **Distribution export** — single-file v2.1 JSON with saved response examples; regenerate with `node _build/export_json.js`, freshness-gated by `--check` |
-| `postman/environments/` | Importable Sandbox (mirrors pre-filled values) and Production (placeholders) environments |
+| `postman/environments/` | Importable Sandbox (mirrors pre-filled values), Production (placeholders), and Merchant Template (all empty — bring your own credentials; `secret_key` typed secret) environments |
 | `postman/specs/payway-openapi.yaml` | Bundled OpenAPI 3.1 contract (`x-hmac-fields` documents the body-hash signing model) — the machine-readable surface for AI tools and codegen; path parity with the collection is tested |
 | `postman/documents/error-codes.json` | Machine-readable error registry (83 codes, 8 families, sandbox-verified + production telemetry) — copied from the SDK knowledge corpus |
 | `collection-index.md` | Full index: folders, requests, variables, flows, build tooling |
@@ -78,6 +91,8 @@ The following maintainers' guides are planned but do **not** exist yet — do no
 6. `06-troubleshooting-and-error-codes.md` — superseded for now by `error-codes.json` + the Overview error table
 7. `07-maintainer-validation.md` — the edit/build/validate workflow (see "Documentation rules" below and MAINTAINER_REPORT.md)
 8. `08-sandbox-findings.md` — observed sandbox behavior (see MAINTAINER_REPORT.md §2/§5 until written)
+
+**Written guides:** [postman-authoring-standards.md](postman-authoring-standards.md) — collection authoring standards benchmarked against WeChat Pay's public Postman workspace (Oct 2026): body-as-documentation, saved-example coverage targets, minimal environment templates, distribution/fork patterns, and the differences we protect (test scripts, error registry, OpenAPI parity, CI gates). Its §Actionable backlog is the source list for the next documentation waves.
 
 ## Important limitations
 

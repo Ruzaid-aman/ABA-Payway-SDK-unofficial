@@ -18,30 +18,39 @@ body:
     - type: text
       key: request_id
       value: "{{request_id}}"
+      description: Unique per linking request (auto-generated) — the token outcome references it
     - type: text
       key: request_time
       value: "{{request_time}}"
+      description: UTC now, YYYYMMDDHHmmss (auto)
     - type: text
       key: merchant_id
       value: "{{merchant_id}}"
+      description: PayWay merchant ID (sandbox demo pre-filled)
     - type: text
       key: ctid
       value: "{{ctid}}"
+      description: Your stable per-customer key (e.g. customer123)
     - type: text
       key: token_flag
       value: "{{token_flag}}"
+      description: CITI_FLEX | CITO_FLEX — profile must be enabled, else the hosted page reports error 104
     - type: text
       key: currency
       value: "{{currency}}"
+      description: USD | KHR
     - type: text
       key: callback_url
       value: "{{cof_callback_b64}}"
+      description: Where the token result (pwt) is pushed (base64-encoded by the helper when https)
     - type: text
       key: continue_success_url
       value: "{{cof_continue_b64}}"
+      description: Browser redirect after the hosted card-entry page
     - type: text
       key: hash
       value: "{{computed_hash}}"
+      description: HMAC-SHA512 over merchant_id + request_time + ctid + callback_url + request_id + token_flag + frequency + amount + currency + continue_success_url (auto)
 scripts:
   - type: beforeRequest
     code: |-

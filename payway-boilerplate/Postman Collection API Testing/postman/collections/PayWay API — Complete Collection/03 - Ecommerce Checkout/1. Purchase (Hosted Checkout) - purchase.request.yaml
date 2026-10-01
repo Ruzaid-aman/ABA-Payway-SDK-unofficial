@@ -21,30 +21,39 @@ body:
     - type: text
       key: req_time
       value: "{{req_time}}"
+      description: UTC now, YYYYMMDDHHmmss (auto)
     - type: text
       key: merchant_id
       value: "{{merchant_id}}"
+      description: PayWay merchant ID (sandbox demo pre-filled)
     - type: text
       key: tran_id
       value: "{{tran_id}}"
+      description: Unique per transaction — reusing one answers code 4 (auto-generated)
     - type: text
       key: firstname
       value: "{{buyer_first_name}}"
+      description: Buyer first name (sandbox demo value)
     - type: text
       key: lastname
       value: "{{buyer_last_name}}"
+      description: Buyer last name (sandbox demo value)
     - type: text
       key: email
       value: "{{buyer_email}}"
+      description: Buyer email (sandbox demo value)
     - type: text
       key: phone
       value: "{{buyer_phone}}"
+      description: Buyer phone (sandbox demo value)
     - type: text
       key: type
       value: "{{purchase_type}}"
+      description: purchase | pre-auth (pre-auth places a hold for later completion)
     - type: text
       key: payment_option
       value: "{{payment_option}}"
+      description: cards | abapay | abapay_khqr | abapay_khqr_deeplink | abapay_deeplink | alipay | wechat | google_pay
     - type: text
       key: items
       value: "{{items_b64}}"
@@ -52,54 +61,71 @@ body:
     - type: text
       key: shipping
       value: "{{shipping}}"
+      description: Shipping fee added to the amount (0.00 if none)
     - type: text
       key: amount
       value: "{{amount}}"
+      description: USD 2 decimals / KHR integer (e.g. 6.12)
     - type: text
       key: return_url
       value: "{{return_url_b64}}"
+      description: Where PayWay POSTs the payment result (base64-encoded by the helper when https)
     - type: text
       key: continue_success_url
       value: "{{continue_success_url_b64}}"
+      description: Post-payment browser continuation — fires with skip_success_page 0 (base64 by helper)
     - type: text
       key: return_params
       value: "{{return_params}}"
+      description: Optional pass-through data returned with the payment result (base64 by helper)
     - type: text
       key: view_type
       value: "{{view_type}}"
+      description: Hosted-page view switch (hosted_view with payment_gate 0); leave the default unless ABA advises otherwise
     - type: text
       key: payment_gate
       value: "{{payment_gate}}"
+      description: 0 = return the hosted checkout HTML page (sandbox-verified); empty = gateway default routing
     - type: text
       key: custom_fields
       value: "{{custom_fields_b64}}"
+      description: Base64 of a JSON object echoed back with the payment result (auto)
     - type: text
       key: payout
       value: "{{payout_b64}}"
+      description: Base64 of the split-payout array [{"acc":"...","amt":...}] — total must equal amount (auto)
     - type: text
       key: additional_params
       value: "{{additional_params_b64}}"
+      description: Base64 JSON passed through to callbacks (auto)
     - type: text
       key: google_pay_token
       value: "{{google_pay_token}}"
+      description: Google Pay payment payload (optional; online Google Pay reported unavailable — confirm with ABA)
     - type: text
       key: skip_success_page
       value: "{{skip_success_page}}"
+      description: 0 + continue_success_url moves the buyer browser to your success URL after payment
     - type: text
       key: lifetime
       value: "{{lifetime}}"
+      description: 'Checkout session lifetime in seconds (sandbox hosted sessions: abapay_khqr ~5 min, cards/deeplink ~3 min)'
     - type: text
       key: currency
       value: "{{currency}}"
+      description: USD (2 decimals) | KHR (integer)
     - type: text
       key: cancel_url
       value: "{{cancel_url_b64}}"
+      description: Browser redirect when the buyer cancels (base64-encoded by the helper when https)
     - type: text
       key: return_deeplink
       value: "{{return_deeplink_b64}}"
+      description: Mobile-app deeplink that receives the payment result (base64 by helper)
     - type: text
       key: hash
       value: "{{computed_hash}}"
+      description: HMAC-SHA512 over the fields listed in the request Hash order (auto)
 scripts:
   - type: beforeRequest
     code: |-

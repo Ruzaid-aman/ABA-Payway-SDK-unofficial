@@ -6,6 +6,7 @@ values:
     value: REPLACE_WITH_YOUR_PRODUCTION_MERCHANT_ID
   - key: secret_key
     value: REPLACE_WITH_YOUR_PRODUCTION_SECRET_KEY
+    type: secret
   - key: rsa_public_key
     value: REPLACE_WITH_YOUR_PRODUCTION_RSA_PUBLIC_KEY_PEM
   - key: ctid

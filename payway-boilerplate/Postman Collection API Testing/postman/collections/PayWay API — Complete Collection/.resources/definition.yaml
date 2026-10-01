@@ -92,7 +92,7 @@ description: |-
 
   ## 6 · 60-second fixes
 
-  The five snags that cost developers the most time, with the one-line fix:
+  The snags that cost developers the most time, with the one-line fix:
 
   | Symptom | Fix |
   | --- | --- |
@@ -101,6 +101,9 @@ description: |-
   | Code 5 / transaction not found | `check-transaction-2` only sees the **last 7 days** and **no KHQR** transactions — use **2\. Get Transaction Details** instead. |
   | Code 49 Invalid Start Date | Transaction List dates must be `yyyy-mm-dd hh:mm:ss` (auto-filled for you — don't shorten them). |
   | Code 23 payment option not enabled | The demo profile doesn't allow that wallet — switch `{{payment_option}}` (try `cards` or `abapay_khqr`). |
+  | Script reads an empty variable you DID set | Environment values go in the **Current value** column (Initial value is the shared template); secret-typed values show masked — paste them again and re-send. |
+  | Fixed a variable on disk, scripts still see the old value | Collection variables keep their **current value** across restarts and re-syncs — overwrite it in the collection's **Variables** tab, then re-send. |
+  | Web Postman is slow or CORS-blocked | Use the **desktop app** — the web build relays requests through Postman's backend. |
 
   ## 7 · Environments
 

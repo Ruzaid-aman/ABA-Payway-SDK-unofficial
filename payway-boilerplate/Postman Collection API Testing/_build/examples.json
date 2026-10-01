@@ -448,6 +448,196 @@
         "description": "webhook.site pull in both response shapes (legacy top-level array and paginated {data}). The test scans the latest callbacks and imports tran_id / pwt / ctid into collection variables so the CoF chain can continue. Content field illustrative.",
         "body": "{\n  \"data\": [\n    {\n      \"id\": \"9f2c1b4a-77d3-4f56-9a10-2b8e5c6d7f02\",\n      \"method\": \"POST\",\n      \"content\": \"{\\\"request_id\\\":\\\"TESTREQ0001\\\",\\\"payment_credential\\\":{\\\"ctid\\\":\\\"customer123\\\",\\\"pwt\\\":\\\"8f14e45fceea167a5a36dedd4bea2543…\\\",\\\"token_flag\\\":\\\"CITI_FLEX\\\"}}\"\n    }\n  ]\n}"
       }
+    ],
+    "06 - Pre-auth/1.1 Purchase (Hosted Checkout) - pre-auth.request.yaml": [
+      {
+        "name": "Success — hosted checkout page (HTML 200)",
+        "code": 200,
+        "status": "OK",
+        "language": "html",
+        "description": "Same hosted page as the plain purchase — success is NOT JSON (HTTP 200 text/html). This run carries the pre-auth type: paying places a hold on the card (default capture window 30 days; auto-release has NO webhook). Complete it with 1. Complete Pre-auth or 2. Complete Pre-auth with Payout; the Visualize tab renders the form-POST launcher.",
+        "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>ABA PayWay — Secure Checkout</title>\n</head>\n<body>\n  <!-- Full hosted checkout page served by PayWay (truncated here).\n       Its own JS drives the QR / card / wallet UI on PayWay's origin.\n       Session: checkout-sandbox.payway.com.kh/<base64 session> -->\n  <div id=\"payment-form\" data-step=\"abapay_khqr_request_qr\">…</div>\n</body>\n</html>"
+      }
+    ],
+    "06 - Pre-auth/2. Complete Pre-auth with Payout.request.yaml": [
+      {
+        "name": "Success — funds captured + split (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Same envelope as the plain completion. The `payout` array inside the RSA payload must total the completed amount; splits settle immediately — there is NO standard refund after a payout, so verify `{{payout_json}}` before sending.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Status/amount mismatch (PTL59)",
+        "code": 403,
+        "status": "Forbidden",
+        "language": "json",
+        "description": "(observed on the plain completion) The transaction is not capturable or the completion amount is wrong — with a payout split, also check that the split total equals the completed amount.",
+        "body": "{\n  \"status\": {\n    \"code\": \"PTL59\",\n    \"message\": \"Unable to complete pre-authorization: The transaction status is invalid or the completion amount is incorrect\"\n  }\n}"
+      }
+    ],
+    "07 - Payout/3. Update Payser Status - RSA.request.yaml": [
+      {
+        "name": "Success — whitelist status updated (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flips `{{whitelist_payee}}` between enable/disable. Disabled payees reject payouts with code 37 until re-enabled. The test script accepts numeric `0` or string `\"00\"` — normalize both (same convention as the payout endpoint).",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Unknown payee (code 96)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(paraphrase of registry 96 — payee/merchant data) Add the payee first (request 2 in this folder) before flipping its status.",
+        "body": "{\n  \"status\": {\n    \"code\": 96,\n    \"message\": \"Payee is not in whitelist.\"\n  }\n}"
+      }
+    ],
+    "08 - Credentials on File (CoF)/5. Renew Token (ABA account).request.yaml": [
+      {
+        "name": "Success — token renewed +90 days (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Spec adds `new_token` — store it if the gateway returns one; the linked account/card is unchanged. Account tokens only (card tokens are not renewable); the ~90-day window restarts from today.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"new_token\": \"b6138a89f26e45c7a0d94f31e07…\"\n}"
+      },
+      {
+        "name": "Invalid or expired token (code 105)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(registry 105, observed on Payment Using Token) The token in `{{pwt}}` is unknown to this merchant — re-link (B1 / request 1 in this folder) instead of renewing.",
+        "body": "{\n  \"status\": {\n    \"code\": 105,\n    \"message\": \"Invalid pwt or ctid.\"\n  }\n}"
+      }
+    ],
+    "08 - Credentials on File (CoF)/6. Remove Token (irreversible).request.yaml": [
+      {
+        "name": "Success — token removed (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Irreversible: the token can no longer pay or renew, and the test script clears `{{pwt}}`. A Get Token Details call afterwards answers code 09 (Data not found).",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      },
+      {
+        "name": "Token not found (code 09)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "(observed envelope on Get Token Details) Nothing to remove — `{{pwt}}` was already removed or never linked.",
+        "body": "{\n  \"status\": {\n    \"code\": \"09\",\n    \"message\": \"Data not found\"\n  }\n}"
+      }
+    ],
+    "09 - KHQR Guideline/2. Build Offline KHQR (TLV + CRC + QR).request.yaml": [
+      {
+        "name": "200 — guideline page; payload built locally (Console + Visualize)",
+        "code": 200,
+        "status": "OK",
+        "language": "html",
+        "description": "The HTTP call only fetches the guideline page — the deliverable is built locally: the Console prints the TLV breakdown and the byte-for-byte self-test against the guideline's official sample (CRC 9FBD), and the Visualize tab renders the scannable QR. Reconcile payments by `{{khqr_merchant_ref}}` (request 4); one KHQR can be paid multiple times.",
+        "body": "<!DOCTYPE html>\n…(developer.payway.com.kh KHQR guideline page — truncated; the KHQR payload prints to the Console and renders in the Visualize tab)…"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/A1 - Create QR.request.yaml": [
+      {
+        "name": "Success — KHQR payload (code 0)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flow A step 1. Saves `{{last_tran_id}}`; the Runner continues to A2 (poll loop). Sandbox note: the KHQR record stays PENDING until paid — transaction-detail sees it, the 7-day-window check-transaction cannot.",
+        "body": "{\n  \"status\": {\n    \"code\": 0,\n    \"message\": \"Success\"\n  },\n  \"qrString\": \"00020101021229370012PAYWAY@ABA020610259006049E4C53038495406410.005802KH5910Test User6007PHNOM PENH62150111TEST-17886563030303410.006304…\",\n  \"qrImage\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAfQAAAH0CAIAAAB16WQOAA… (truncated)\"\n}"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/A2 - Poll Transaction Status (loops).request.yaml": [
+      {
+        "name": "APPROVED (payment_status_code 0) — loop ends",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Settled — the test script stops looping and moves on to A3. The record lives in `data`; A2 re-computes the hash and calls itself on every iteration.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"tran_id\": \"TEST-178865526240157\",\n    \"payment_status\": \"APPROVED\",\n    \"payment_status_code\": 0,\n    \"total_amount\": 0.1,\n    \"original_amount\": 0.1,\n    \"refund_amount\": 0,\n    \"payment_amount\": 0.1,\n    \"currency\": \"USD\"\n  }\n}"
+      },
+      {
+        "name": "PENDING (payment_status_code 2) — keep looping",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "The loop re-sends this request (max `{{max_polls}}` tries, Runner delay ≥ 1000 ms) while PENDING or not yet visible. PENDING can persist up to ~24h; a missing callback is NOT proof of non-payment.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"tran_id\": \"TEST-178865526240157\",\n    \"payment_status\": \"PENDING\",\n    \"payment_status_code\": 2,\n    \"total_amount\": 0.1,\n    \"currency\": \"USD\"\n  }\n}"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/A3 - Get Transaction Details.request.yaml": [
+      {
+        "name": "Success — APPROVED transaction (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flow A step 3: the full record for `{{last_tran_id}}` — payment_status_code: 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED. In the Runner it follows A2 automatically.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"transaction_id\": \"TEST-178865526240157\",\n    \"apv\": \"108425\",\n    \"transaction_date\": \"2026-09-28 10:15:30\",\n    \"payment_status\": \"APPROVED\",\n    \"payment_status_code\": 0,\n    \"original_amount\": 0.1,\n    \"original_currency\": \"USD\",\n    \"total_amount\": 0.1,\n    \"discount_amount\": 0,\n    \"refund_amount\": 0,\n    \"payment_amount\": 0.1,\n    \"payment_currency\": \"USD\",\n    \"payment_option\": \"abapay_khqr\"\n  }\n}"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/A4 - Refund.request.yaml": [
+      {
+        "name": "Success (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flow A final step: refunds `{{last_tran_id}}` for `{{refund_amount}}` and ends Flow A (`setNextRequest(null)`). ABA PAY and KHQR refunds are immediate; card/WeChat/Alipay follow your agreement.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/B1 - Link Account (Flow B).request.yaml": [
+      {
+        "name": "Success — QR + deeplink returned (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flow B step 1. The token does NOT come back here — approve the link in ABA Mobile; the pwt arrives via callback_url or B2. The Visualize tab renders the linking QR/deeplink.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success\"\n  },\n  \"data\": {\n    \"request_id\": \"TESTREQ0001\",\n    \"qr_string\": \"00020101021129370012PAYWAY@ABA020610259006049E4C53038495802KH5910ABA PAYWAY62150111TESTREQ00016304…\",\n    \"deeplink\": \"abamobilebank://ababank.com?type=payway&qrcode=00020101021129370012PAYWAY…\"\n  }\n}"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/B2 - Get Token Details (Flow B).request.yaml": [
+      {
+        "name": "Token not linked yet (code 09)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flow B step 2, expected until the customer approves the link in ABA Mobile — finish that step, then re-send; on success the test script saves `{{pwt}}`/`{{ctid}}` for B3+.",
+        "body": "{\n  \"status\": {\n    \"code\": \"09\",\n    \"message\": \"Data not found\"\n  }\n}"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/B3 - Payment using Token (Flow B).request.yaml": [
+      {
+        "name": "Success — charged stored credential (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flow B step 3: charges `{{amount}}` to the stored credential (`{{pwt}}` + `{{ctid}}` saved by B2).",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/B4 - Renew Token (Flow B).request.yaml": [
+      {
+        "name": "Success — token renewed +90 days (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flow B step 4: keeps `{{pwt}}` alive (+90 days from today, account tokens only); the linked account/card is unchanged.",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"new_token\": \"b6138a89f26e45c7a0d94f31e07…\"\n}"
+      }
+    ],
+    "11 - Polling & Lifecycle Flows (Runner)/B5 - Remove Token (Flow B).request.yaml": [
+      {
+        "name": "Success — token removed (code 00)",
+        "code": 200,
+        "status": "OK",
+        "language": "json",
+        "description": "Flow B final step: irreversibly removes the token and clears `{{pwt}}`; ends Flow B (`setNextRequest(null)`).",
+        "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}"
+      }
     ]
   }
 }

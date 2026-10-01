@@ -3,7 +3,7 @@
 ## This workspace (ABA PayWay Postman collection)
 
 - [Collection index](collection-index.md): Full map of the Postman collection — 10 folders, 45 requests, every endpoint URL, variables, Runner flows, and the build/validation tooling. Start here.
-- [Dist export](dist/PayWay%20API%20—%20Complete%20Collection.postman_collection.json): Single-file Postman v2.1 JSON with 49 saved response examples (success + common error shapes) across 26 requests — machine-readable request/response pairs for the whole merchant API.
+- [Dist export](dist/PayWay%20API%20—%20Complete%20Collection.postman_collection.json): Single-file Postman v2.1 JSON with 69 saved response examples (success + common error shapes) across 41 requests — every API/flow request covered — machine-readable request/response pairs for the whole merchant API.
 - [OpenAPI 3.1 spec (bundled)](postman/specs/payway-openapi.yaml): Hand-authored contract for all 22 documented endpoints; `x-hmac-fields` on each operation expresses the ordered body-field HMAC-SHA512 signing model (no transport auth in PayWay).
 - [Error code registry](postman/documents/error-codes.json): 83 codes across 8 families with meanings, fixes, sandbox-verification flags, and production telemetry.
 - [Workspace README](postman/documents/README.md): Quick start, credential handling, callback testing, artifact map, and documentation rules.

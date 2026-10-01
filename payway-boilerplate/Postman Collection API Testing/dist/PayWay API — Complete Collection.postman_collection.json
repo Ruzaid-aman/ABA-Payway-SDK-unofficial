@@ -2,7 +2,7 @@
   "info": {
     "name": "PayWay API — Complete Collection",
     "_postman_id": "f2a1c9e0-8d7b-4c3a-9e5f-1a2b3c4d5e6f",
-    "description": "# 🚀 PayWay API — Get Started\n\n**Welcome!** This collection is a complete playground for the [PayWay merchant APIs](https://developer.payway.com.kh/). It ships **pre-configured with this project's sandbox merchant credentials** (merchant `ec476910`), so your first request works immediately — no extra setup.\n\n> **While testing:** open the Postman **Console** (bottom-left). Every request logs its `b4hash:` signing string there so you can verify it against the docs. \n  \n\n---\n\n## 1 · Your first transaction (60 seconds, zero setup)\n\n1. Open **03 - Ecommerce Checkout → 1. Purchase (Hosted Checkout)** → hit **Send**.\n    \n2. Open the **Visualize** tab of the response → click **Open payment page →**.  \n    The button form-POSTs your signed fields and the checkout page is served by PayWay itself — no CORS problems.\n    \n3. Pay with the sandbox test card:\n    \n    | Card | Number | Expiry | CVV | 3-D Secure |\n    | --- | --- | --- | --- | --- |\n    | ✅ Success | `4286 0900 0000 0206` | 04/30 | 777 | Yes (any code) |\n    | ✅ Success (no 3DS) | `5156 8399 3770 6777` | 01/30 | 993 | No |\n    | ❌ Declined | `5156 8302 7256 1029` | 04/30 | 777 | Yes |\n    \n4. Back in Postman, send **3\\. Check Transaction** → `payment_status_code: 0 (APPROVED)` 🎉\n    \n\nThat is the whole merchant lifecycle you are learning: **create → host the page → verify**.\n\n> 💡 **Helper text everywhere:** every request's description starts with a **⚡ Quick test** block — what to set (usually nothing), what you'll see, and what to send next. After key responses the **Console** also prints a `NEXT:` hint. \n  \n\n## 2 · What happens automatically\n\n- **Chaining** — every response saves what the next request needs: `{{last_tran_id}}`, `{{pwt}}`, `{{ctid}}`, `{{request_id}}`, `{{payment_link_id}}`. Just send requests in the documented order.\n    \n- **Signing** — every pre-request builds `hash = base64(HMAC-SHA512(field values in documented order, secret_key))` and logs the exact input as `b4hash:`. Amounts are formatted per `{{currency}}`: USD 2 decimals, KHR integer.\n    \n- **Polling** — **11 - Polling & Lifecycle Flows → Flow A** loops on `data.payment_status_code` while it is `2 (PENDING)`, budgeted by `{{max_polls}}`. Run the folder in the **Collection Runner** (delay ≥ 1000 ms).\n    \n- **Callbacks** — folder **10** documents payment/token payloads + `X-PayWay-Hmac-Sha512` verification, can replay samples to `{{callback_listener}}`, and can **pull** callbacks back from webhook.site into your variables.\n    \n- **RSA endpoints** (Refund, Payment Link, Pre-auth, Payout, Whitelist) encrypt `merchant_auth`/`beneficiaries` with the self-contained PKCS#1 v1.5 helper and Postman's secure random source. No library installation or package download is needed.\n    \n- **Prerequisite guards** — requests that need earlier state (`{{pwt}}`, `{{request_id}}`, `{{last_tran_id}}`) stop with a clear message telling you exactly which request to run first.\n    \n\n## 3 · Pick your journey\n\n| You want to… | Go to |\n| --- | --- |\n| Take a card / ABA Pay / wallet payment | **03 - Ecommerce Checkout** |\n| Show a QR to scan (ABA app) | **04 - ABA QR API**, then poll with **Flow A** in **11** |\n| Link a card/account, charge later | **08 - Credentials on File (CoF)** |\n| Sell via a shareable link | **05 - Payment Link** |\n| Hold funds, capture or release later | **06 - Pre-auth** |\n| Split payments to beneficiaries | **07 - Payout** |\n| Look up KHQR payments by merchant ref | **09 - KHQR Guideline** |\n| Test your webhook handling | **10 - Callbacks & Webhooks** |\n\n## 4 · Switching to your own merchant (before real integration)\n\n| Variable | Replace with | Notes |\n| --- | --- | --- |\n| `{{merchant_id}}` | Your sandbox merchant ID | From PayWay onboarding |\n| `{{secret_key}}` | Your sandbox secret | Stored as a **Postman secret** type — masked in UI/exports |\n| `{{rsa_public_key}}` | Your RSA public key (PEM) | Needed by the RSA endpoints above |\n| `{{ctid}}` | Your consumer ID | CoF folders |\n| `{{baseUrl}}` | `https://checkout.payway.com.kh` | Production only |\n\n> ⚠️ The pre-filled demo credentials are **public** — use them only to explore. Replace them before touching anything real, and never commit your secret into source control. \n  \n\n## 5 · Transaction statuses\n\n`data.payment_status_code`: **0** APPROVED / PRE-AUTH · **2** PENDING · **3** DECLINED · **4** REFUNDED · **7** CANCELLED\n\nGateway `status.code` is `\"00\"`/`0` on success and otherwise an error code (string _or_ number) — test scripts normalize both. Most common errors:\n\n| Code | Meaning |  | Code | Meaning |\n| --- | --- | --- | --- | --- |\n| 1 | Wrong hash |  | 5 | Transaction not found |\n| 4 | Given data was invalid |  | 6 | Domain not whitelisted |\n| 2 | Invalid transaction ID |  | 12 | Currency not allowed |\n| 4 | Duplicated transaction ID |  | 47 | KHR must be ≥ 100 |\n| 23 | Payment option not enabled |  | 429 | Rate limit exceeded |\n| PTL02 | Wrong hash (portal APIs) |  | 503 | Under maintenance |\n\nFull table: [developer.payway.com.kh](https://developer.payway.com.kh/) · `b4hash:` in the Console is your first stop for any `Wrong hash`.\n\n## 6 · 60-second fixes\n\nThe five snags that cost developers the most time, with the one-line fix:\n\n| Symptom | Fix |\n| --- | --- |\n| `Wrong hash` (code 1) | Open the **Console** → compare the `b4hash:` line with the docs' field order (each request's description lists it too). USD amounts need 2 decimals, KHR none — the scripts handle this via `fmtAmt`. |\n| RSA endpoints answer `SKIPPED` | Ensure the Postman runtime supports `crypto.getRandomValues`; or paste a fresh pre-encrypted value into the fallback variable named in the request. |\n| Code 5 / transaction not found | `check-transaction-2` only sees the **last 7 days** and **no KHQR** transactions — use **2\\. Get Transaction Details** instead. |\n| Code 49 Invalid Start Date | Transaction List dates must be `yyyy-mm-dd hh:mm:ss` (auto-filled for you — don't shorten them). |\n| Code 23 payment option not enabled | The demo profile doesn't allow that wallet — switch `{{payment_option}}` (try `cards` or `abapay_khqr`). |\n\n## 7 · Environments\n\n- **Sandbox (default):** `https://checkout-sandbox.payway.com.kh`\n    \n- **Production:** `https://checkout.payway.com.kh` — only after replacing the demo credentials\n    \n- **Docs:** [developer.payway.com.kh](https://developer.payway.com.kh/)",
+    "description": "# 🚀 PayWay API — Get Started\n\n**Welcome!** This collection is a complete playground for the [PayWay merchant APIs](https://developer.payway.com.kh/). It ships **pre-configured with this project's sandbox merchant credentials** (merchant `ec476910`), so your first request works immediately — no extra setup.\n\n> **While testing:** open the Postman **Console** (bottom-left). Every request logs its `b4hash:` signing string there so you can verify it against the docs. \n  \n\n---\n\n## 1 · Your first transaction (60 seconds, zero setup)\n\n1. Open **03 - Ecommerce Checkout → 1. Purchase (Hosted Checkout)** → hit **Send**.\n    \n2. Open the **Visualize** tab of the response → click **Open payment page →**.  \n    The button form-POSTs your signed fields and the checkout page is served by PayWay itself — no CORS problems.\n    \n3. Pay with the sandbox test card:\n    \n    | Card | Number | Expiry | CVV | 3-D Secure |\n    | --- | --- | --- | --- | --- |\n    | ✅ Success | `4286 0900 0000 0206` | 04/30 | 777 | Yes (any code) |\n    | ✅ Success (no 3DS) | `5156 8399 3770 6777` | 01/30 | 993 | No |\n    | ❌ Declined | `5156 8302 7256 1029` | 04/30 | 777 | Yes |\n    \n4. Back in Postman, send **3\\. Check Transaction** → `payment_status_code: 0 (APPROVED)` 🎉\n    \n\nThat is the whole merchant lifecycle you are learning: **create → host the page → verify**.\n\n> 💡 **Helper text everywhere:** every request's description starts with a **⚡ Quick test** block — what to set (usually nothing), what you'll see, and what to send next. After key responses the **Console** also prints a `NEXT:` hint. \n  \n\n## 2 · What happens automatically\n\n- **Chaining** — every response saves what the next request needs: `{{last_tran_id}}`, `{{pwt}}`, `{{ctid}}`, `{{request_id}}`, `{{payment_link_id}}`. Just send requests in the documented order.\n    \n- **Signing** — every pre-request builds `hash = base64(HMAC-SHA512(field values in documented order, secret_key))` and logs the exact input as `b4hash:`. Amounts are formatted per `{{currency}}`: USD 2 decimals, KHR integer.\n    \n- **Polling** — **11 - Polling & Lifecycle Flows → Flow A** loops on `data.payment_status_code` while it is `2 (PENDING)`, budgeted by `{{max_polls}}`. Run the folder in the **Collection Runner** (delay ≥ 1000 ms).\n    \n- **Callbacks** — folder **10** documents payment/token payloads + `X-PayWay-Hmac-Sha512` verification, can replay samples to `{{callback_listener}}`, and can **pull** callbacks back from webhook.site into your variables.\n    \n- **RSA endpoints** (Refund, Payment Link, Pre-auth, Payout, Whitelist) encrypt `merchant_auth`/`beneficiaries` with the self-contained PKCS#1 v1.5 helper and Postman's secure random source. No library installation or package download is needed.\n    \n- **Prerequisite guards** — requests that need earlier state (`{{pwt}}`, `{{request_id}}`, `{{last_tran_id}}`) stop with a clear message telling you exactly which request to run first.\n    \n\n## 3 · Pick your journey\n\n| You want to… | Go to |\n| --- | --- |\n| Take a card / ABA Pay / wallet payment | **03 - Ecommerce Checkout** |\n| Show a QR to scan (ABA app) | **04 - ABA QR API**, then poll with **Flow A** in **11** |\n| Link a card/account, charge later | **08 - Credentials on File (CoF)** |\n| Sell via a shareable link | **05 - Payment Link** |\n| Hold funds, capture or release later | **06 - Pre-auth** |\n| Split payments to beneficiaries | **07 - Payout** |\n| Look up KHQR payments by merchant ref | **09 - KHQR Guideline** |\n| Test your webhook handling | **10 - Callbacks & Webhooks** |\n\n## 4 · Switching to your own merchant (before real integration)\n\n| Variable | Replace with | Notes |\n| --- | --- | --- |\n| `{{merchant_id}}` | Your sandbox merchant ID | From PayWay onboarding |\n| `{{secret_key}}` | Your sandbox secret | Stored as a **Postman secret** type — masked in UI/exports |\n| `{{rsa_public_key}}` | Your RSA public key (PEM) | Needed by the RSA endpoints above |\n| `{{ctid}}` | Your consumer ID | CoF folders |\n| `{{baseUrl}}` | `https://checkout.payway.com.kh` | Production only |\n\n> ⚠️ The pre-filled demo credentials are **public** — use them only to explore. Replace them before touching anything real, and never commit your secret into source control. \n  \n\n## 5 · Transaction statuses\n\n`data.payment_status_code`: **0** APPROVED / PRE-AUTH · **2** PENDING · **3** DECLINED · **4** REFUNDED · **7** CANCELLED\n\nGateway `status.code` is `\"00\"`/`0` on success and otherwise an error code (string _or_ number) — test scripts normalize both. Most common errors:\n\n| Code | Meaning |  | Code | Meaning |\n| --- | --- | --- | --- | --- |\n| 1 | Wrong hash |  | 5 | Transaction not found |\n| 4 | Given data was invalid |  | 6 | Domain not whitelisted |\n| 2 | Invalid transaction ID |  | 12 | Currency not allowed |\n| 4 | Duplicated transaction ID |  | 47 | KHR must be ≥ 100 |\n| 23 | Payment option not enabled |  | 429 | Rate limit exceeded |\n| PTL02 | Wrong hash (portal APIs) |  | 503 | Under maintenance |\n\nFull table: [developer.payway.com.kh](https://developer.payway.com.kh/) · `b4hash:` in the Console is your first stop for any `Wrong hash`.\n\n## 6 · 60-second fixes\n\nThe snags that cost developers the most time, with the one-line fix:\n\n| Symptom | Fix |\n| --- | --- |\n| `Wrong hash` (code 1) | Open the **Console** → compare the `b4hash:` line with the docs' field order (each request's description lists it too). USD amounts need 2 decimals, KHR none — the scripts handle this via `fmtAmt`. |\n| RSA endpoints answer `SKIPPED` | Ensure the Postman runtime supports `crypto.getRandomValues`; or paste a fresh pre-encrypted value into the fallback variable named in the request. |\n| Code 5 / transaction not found | `check-transaction-2` only sees the **last 7 days** and **no KHQR** transactions — use **2\\. Get Transaction Details** instead. |\n| Code 49 Invalid Start Date | Transaction List dates must be `yyyy-mm-dd hh:mm:ss` (auto-filled for you — don't shorten them). |\n| Code 23 payment option not enabled | The demo profile doesn't allow that wallet — switch `{{payment_option}}` (try `cards` or `abapay_khqr`). |\n| Script reads an empty variable you DID set | Environment values go in the **Current value** column (Initial value is the shared template); secret-typed values show masked — paste them again and re-send. |\n| Fixed a variable on disk, scripts still see the old value | Collection variables keep their **current value** across restarts and re-syncs — overwrite it in the collection's **Variables** tab, then re-send. |\n| Web Postman is slow or CORS-blocked | Use the **desktop app** — the web build relays requests through Postman's backend. |\n\n## 7 · Environments\n\n- **Sandbox (default):** `https://checkout-sandbox.payway.com.kh`\n    \n- **Production:** `https://checkout.payway.com.kh` — only after replacing the demo credentials\n    \n- **Docs:** [developer.payway.com.kh](https://developer.payway.com.kh/)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -557,47 +557,56 @@
                 {
                   "key": "req_time",
                   "value": "{{req_time}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "UTC now, YYYYMMDDHHmmss (auto)"
                 },
                 {
                   "key": "merchant_id",
                   "value": "{{merchant_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "PayWay merchant ID (sandbox demo pre-filled)"
                 },
                 {
                   "key": "tran_id",
                   "value": "{{tran_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Unique per transaction — reusing one answers code 4 (auto-generated)"
                 },
                 {
                   "key": "firstname",
                   "value": "{{buyer_first_name}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer first name (sandbox demo value)"
                 },
                 {
                   "key": "lastname",
                   "value": "{{buyer_last_name}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer last name (sandbox demo value)"
                 },
                 {
                   "key": "email",
                   "value": "{{buyer_email}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer email (sandbox demo value)"
                 },
                 {
                   "key": "phone",
                   "value": "{{buyer_phone}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer phone (sandbox demo value)"
                 },
                 {
                   "key": "type",
                   "value": "{{purchase_type}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "purchase | pre-auth (pre-auth places a hold for later completion)"
                 },
                 {
                   "key": "payment_option",
                   "value": "{{payment_option}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "cards | abapay | abapay_khqr | abapay_khqr_deeplink | abapay_deeplink | alipay | wechat | google_pay"
                 },
                 {
                   "key": "items",
@@ -608,87 +617,104 @@
                 {
                   "key": "shipping",
                   "value": "{{shipping}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Shipping fee added to the amount (0.00 if none)"
                 },
                 {
                   "key": "amount",
                   "value": "{{amount}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "USD 2 decimals / KHR integer (e.g. 6.12)"
                 },
                 {
                   "key": "return_url",
                   "value": "{{return_url_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Where PayWay POSTs the payment result (base64-encoded by the helper when https)"
                 },
                 {
                   "key": "continue_success_url",
                   "value": "{{continue_success_url_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Post-payment browser continuation — fires with skip_success_page 0 (base64 by helper)"
                 },
                 {
                   "key": "return_params",
                   "value": "{{return_params}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Optional pass-through data returned with the payment result (base64 by helper)"
                 },
                 {
                   "key": "view_type",
                   "value": "{{view_type}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Hosted-page view switch (hosted_view with payment_gate 0); leave the default unless ABA advises otherwise"
                 },
                 {
                   "key": "payment_gate",
                   "value": "{{payment_gate}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "0 = return the hosted checkout HTML page (sandbox-verified); empty = gateway default routing"
                 },
                 {
                   "key": "custom_fields",
                   "value": "{{custom_fields_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 of a JSON object echoed back with the payment result (auto)"
                 },
                 {
                   "key": "payout",
                   "value": "{{payout_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 of the split-payout array [{\"acc\":\"...\",\"amt\":...}] — total must equal amount (auto)"
                 },
                 {
                   "key": "additional_params",
                   "value": "{{additional_params_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 JSON passed through to callbacks (auto)"
                 },
                 {
                   "key": "google_pay_token",
                   "value": "{{google_pay_token}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Google Pay payment payload (optional; online Google Pay reported unavailable — confirm with ABA)"
                 },
                 {
                   "key": "skip_success_page",
                   "value": "{{skip_success_page}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "0 + continue_success_url moves the buyer browser to your success URL after payment"
                 },
                 {
                   "key": "lifetime",
                   "value": "{{lifetime}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Checkout session lifetime in seconds (sandbox hosted sessions: abapay_khqr ~5 min, cards/deeplink ~3 min)"
                 },
                 {
                   "key": "currency",
                   "value": "{{currency}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "USD (2 decimals) | KHR (integer)"
                 },
                 {
                   "key": "cancel_url",
                   "value": "{{cancel_url_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Browser redirect when the buyer cancels (base64-encoded by the helper when https)"
                 },
                 {
                   "key": "return_deeplink",
                   "value": "{{return_deeplink_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Mobile-app deeplink that receives the payment result (base64 by helper)"
                 },
                 {
                   "key": "hash",
                   "value": "{{computed_hash}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "HMAC-SHA512 over the fields listed in the request Hash order (auto)"
                 }
               ]
             },
@@ -1653,22 +1679,26 @@
                 {
                   "key": "request_time",
                   "value": "{{request_time}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "UTC now, YYYYMMDDHHmmss (auto)"
                 },
                 {
                   "key": "merchant_id",
                   "value": "{{merchant_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "PayWay merchant ID (sandbox demo pre-filled)"
                 },
                 {
                   "key": "merchant_auth",
                   "value": "{{computed_merchant_auth}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 of the RSA-encrypted JSON payload (mc_id, title, amount, currency, description, payment_limit, expired_date, return_url, merchant_ref_no, payout) — built automatically; manual fallback {{pl_merchant_auth}}"
                 },
                 {
                   "key": "hash",
                   "value": "{{computed_hash}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "HMAC-SHA512 over request_time + merchant_id + merchant_auth (auto)"
                 }
               ]
             },
@@ -2135,47 +2165,56 @@
                 {
                   "key": "req_time",
                   "value": "{{req_time}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "UTC now, YYYYMMDDHHmmss (auto)"
                 },
                 {
                   "key": "merchant_id",
                   "value": "{{merchant_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "PayWay merchant ID (sandbox demo pre-filled)"
                 },
                 {
                   "key": "tran_id",
                   "value": "{{tran_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Unique per transaction — reusing one answers code 4 (auto-generated)"
                 },
                 {
                   "key": "firstname",
                   "value": "{{buyer_first_name}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer first name (sandbox demo value)"
                 },
                 {
                   "key": "lastname",
                   "value": "{{buyer_last_name}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer last name (sandbox demo value)"
                 },
                 {
                   "key": "email",
                   "value": "{{buyer_email}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer email (sandbox demo value)"
                 },
                 {
                   "key": "phone",
                   "value": "{{buyer_phone}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer phone (sandbox demo value)"
                 },
                 {
                   "key": "type",
                   "value": "{{purchase_type}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "purchase | pre-auth (pre-auth places a hold for later completion)"
                 },
                 {
                   "key": "payment_option",
                   "value": "{{payment_option}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "cards | abapay | abapay_khqr | abapay_khqr_deeplink | abapay_deeplink | alipay | wechat | google_pay"
                 },
                 {
                   "key": "items",
@@ -2186,87 +2225,104 @@
                 {
                   "key": "shipping",
                   "value": "{{shipping}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Shipping fee added to the amount (0.00 if none)"
                 },
                 {
                   "key": "amount",
                   "value": "{{amount}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "USD 2 decimals / KHR integer (e.g. 6.12)"
                 },
                 {
                   "key": "return_url",
                   "value": "{{return_url_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Where PayWay POSTs the payment result (base64-encoded by the helper when https)"
                 },
                 {
                   "key": "continue_success_url",
                   "value": "{{continue_success_url_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Post-payment browser continuation — fires with skip_success_page 0 (base64 by helper)"
                 },
                 {
                   "key": "return_params",
                   "value": "{{return_params}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Optional pass-through data returned with the payment result (base64 by helper)"
                 },
                 {
                   "key": "view_type",
                   "value": "{{view_type}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Hosted-page view switch (hosted_view with payment_gate 0); leave the default unless ABA advises otherwise"
                 },
                 {
                   "key": "payment_gate",
                   "value": "{{payment_gate}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "0 = return the hosted checkout HTML page (sandbox-verified); empty = gateway default routing"
                 },
                 {
                   "key": "custom_fields",
                   "value": "{{custom_fields_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 of a JSON object echoed back with the payment result (auto)"
                 },
                 {
                   "key": "payout",
                   "value": "{{payout_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 of the split-payout array [{\"acc\":\"...\",\"amt\":...}] — total must equal amount (auto)"
                 },
                 {
                   "key": "additional_params",
                   "value": "{{additional_params_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 JSON passed through to callbacks (auto)"
                 },
                 {
                   "key": "google_pay_token",
                   "value": "{{google_pay_token}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Google Pay payment payload (optional; online Google Pay reported unavailable — confirm with ABA)"
                 },
                 {
                   "key": "skip_success_page",
                   "value": "{{skip_success_page}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "0 + continue_success_url moves the buyer browser to your success URL after payment"
                 },
                 {
                   "key": "lifetime",
                   "value": "{{lifetime}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Checkout session lifetime in seconds (sandbox hosted sessions: abapay_khqr ~5 min, cards/deeplink ~3 min)"
                 },
                 {
                   "key": "currency",
                   "value": "{{currency}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "USD (2 decimals) | KHR (integer)"
                 },
                 {
                   "key": "cancel_url",
                   "value": "{{cancel_url_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Browser redirect when the buyer cancels (base64-encoded by the helper when https)"
                 },
                 {
                   "key": "return_deeplink",
                   "value": "{{return_deeplink_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Mobile-app deeplink that receives the payment result (base64 by helper)"
                 },
                 {
                   "key": "hash",
                   "value": "{{computed_hash}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "HMAC-SHA512 over the fields listed in the request Hash order (auto)"
                 }
               ]
             },
@@ -2363,7 +2419,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — hosted checkout page (HTML 200)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-gateway/v1/payments/purchase",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "html",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/html"
+                }
+              ],
+              "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>ABA PayWay — Secure Checkout</title>\n</head>\n<body>\n  <!-- Full hosted checkout page served by PayWay (truncated here).\n       Its own JS drives the QR / card / wallet UI on PayWay's origin.\n       Session: checkout-sandbox.payway.com.kh/<base64 session> -->\n  <div id=\"payment-form\" data-step=\"abapay_khqr_request_qr\">…</div>\n</body>\n</html>",
+              "description": "Same hosted page as the plain purchase — success is NOT JSON (HTTP 200 text/html). This run carries the pre-auth type: paying places a hold on the card (default capture window 30 days; auto-release has NO webhook). Complete it with 1. Complete Pre-auth or 2. Complete Pre-auth with Payout; the Visualize tab renders the form-POST launcher."
+            }
+          ]
         },
         {
           "name": "1. Complete Pre-auth",
@@ -2554,7 +2629,44 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — funds captured + split (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}",
+              "description": "Same envelope as the plain completion. The `payout` array inside the RSA payload must total the completed amount; splits settle immediately — there is NO standard refund after a payout, so verify `{{payout_json}}` before sending."
+            },
+            {
+              "name": "Status/amount mismatch (PTL59)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion",
+                "method": "POST"
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"PTL59\",\n    \"message\": \"Unable to complete pre-authorization: The transaction status is invalid or the completion amount is incorrect\"\n  }\n}",
+              "description": "(observed on the plain completion) The transaction is not capturable or the completion amount is wrong — with a payout split, also check that the split total equals the completed amount."
+            }
+          ]
         },
         {
           "name": "3. Cancel Pre-auth",
@@ -2974,7 +3086,44 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — whitelist status updated (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}",
+              "description": "Flips `{{whitelist_payee}}` between enable/disable. Disabled payees reject payouts with code 37 until re-enabled. The test script accepts numeric `0` or string `\"00\"` — normalize both (same convention as the payout endpoint)."
+            },
+            {
+              "name": "Unknown payee (code 96)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": 96,\n    \"message\": \"Payee is not in whitelist.\"\n  }\n}",
+              "description": "(paraphrase of registry 96 — payee/merchant data) Add the payee first (request 2 in this folder) before flipping its status."
+            }
+          ]
         }
       ]
     },
@@ -3085,47 +3234,56 @@
                 {
                   "key": "request_id",
                   "value": "{{request_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Unique per linking request (auto-generated) — the token outcome references it"
                 },
                 {
                   "key": "request_time",
                   "value": "{{request_time}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "UTC now, YYYYMMDDHHmmss (auto)"
                 },
                 {
                   "key": "merchant_id",
                   "value": "{{merchant_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "PayWay merchant ID (sandbox demo pre-filled)"
                 },
                 {
                   "key": "ctid",
                   "value": "{{ctid}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Your stable per-customer key (e.g. customer123)"
                 },
                 {
                   "key": "token_flag",
                   "value": "{{token_flag}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "CITI_FLEX | CITO_FLEX — profile must be enabled, else the hosted page reports error 104"
                 },
                 {
                   "key": "currency",
                   "value": "{{currency}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "USD | KHR"
                 },
                 {
                   "key": "callback_url",
                   "value": "{{cof_callback_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Where the token result (pwt) is pushed (base64-encoded by the helper when https)"
                 },
                 {
                   "key": "continue_success_url",
                   "value": "{{cof_continue_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Browser redirect after the hosted card-entry page"
                 },
                 {
                   "key": "hash",
                   "value": "{{computed_hash}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "HMAC-SHA512 over merchant_id + request_time + ctid + callback_url + request_id + token_flag + frequency + amount + currency + continue_success_url (auto)"
                 }
               ]
             },
@@ -3452,7 +3610,44 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — token renewed +90 days (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-credential/v3/token-management/renew-expired-account-token",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"new_token\": \"b6138a89f26e45c7a0d94f31e07…\"\n}",
+              "description": "Spec adds `new_token` — store it if the gateway returns one; the linked account/card is unchanged. Account tokens only (card tokens are not renewable); the ~90-day window restarts from today."
+            },
+            {
+              "name": "Invalid or expired token (code 105)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-credential/v3/token-management/renew-expired-account-token",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": 105,\n    \"message\": \"Invalid pwt or ctid.\"\n  }\n}",
+              "description": "(registry 105, observed on Payment Using Token) The token in `{{pwt}}` is unknown to this merchant — re-link (B1 / request 1 in this folder) instead of renewing."
+            }
+          ]
         },
         {
           "name": "6. Remove Token (irreversible)",
@@ -3512,7 +3707,44 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — token removed (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-credential/v3/token-management/remove-token",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}",
+              "description": "Irreversible: the token can no longer pay or renew, and the test script clears `{{pwt}}`. A Get Token Details call afterwards answers code 09 (Data not found)."
+            },
+            {
+              "name": "Token not found (code 09)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-credential/v3/token-management/remove-token",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"09\",\n    \"message\": \"Data not found\"\n  }\n}",
+              "description": "(observed envelope on Get Token Details) Nothing to remove — `{{pwt}}` was already removed or never linked."
+            }
+          ]
         },
         {
           "name": "7. Subscription (Scheduled Payment)",
@@ -3525,132 +3757,158 @@
                 {
                   "key": "req_time",
                   "value": "{{request_time}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "UTC now, YYYYMMDDHHmmss (auto)"
                 },
                 {
                   "key": "merchant_id",
                   "value": "{{merchant_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "PayWay merchant ID (sandbox demo pre-filled)"
                 },
                 {
                   "key": "tran_id",
                   "value": "{{tran_id}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Unique per transaction — reusing one answers code 4 (auto-generated)"
                 },
                 {
                   "key": "firstname",
                   "value": "{{sub_firstname}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer first name (sandbox demo value)"
                 },
                 {
                   "key": "lastname",
                   "value": "{{sub_lastname}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer last name (sandbox demo value)"
                 },
                 {
                   "key": "email",
                   "value": "{{sub_email}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer email (sandbox demo value)"
                 },
                 {
                   "key": "phone",
                   "value": "{{sub_phone}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buyer phone (sandbox demo value)"
                 },
                 {
                   "key": "type",
                   "value": "purchase",
-                  "type": "text"
+                  "type": "text",
+                  "description": "purchase | pre-auth (pre-auth places a hold for later completion)"
                 },
                 {
                   "key": "payment_option",
                   "value": "{{sub_payment_option}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "cards | abapay | abapay_khqr | abapay_khqr_deeplink | abapay_deeplink | alipay | wechat | google_pay"
                 },
                 {
                   "key": "items",
                   "value": "{{sub_items_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 of the items JSON (auto)"
                 },
                 {
                   "key": "shipping",
                   "value": "0",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Shipping fee added to the amount (0.00 if none)"
                 },
                 {
                   "key": "amount",
                   "value": "{{sub_amount_fmt}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "USD 2 decimals / KHR integer (e.g. 6.12)"
                 },
                 {
                   "key": "return_url",
                   "value": "{{sub_ret_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Where PayWay POSTs the payment result (base64-encoded by the helper when https)"
                 },
                 {
                   "key": "cancel_url",
                   "value": "{{sub_can_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Browser redirect when the buyer cancels (base64-encoded by the helper when https)"
                 },
                 {
                   "key": "continue_success_url",
                   "value": "{{sub_con_b64}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Post-payment browser continuation — fires with skip_success_page 0 (base64 by helper)"
                 },
                 {
                   "key": "return_deeplink",
                   "value": "",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Mobile-app deeplink that receives the payment result (base64 by helper)"
                 },
                 {
                   "key": "currency",
                   "value": "{{currency}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "USD (2 decimals) | KHR (integer)"
                 },
                 {
                   "key": "custom_fields",
                   "value": "",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 of a JSON object echoed back with the payment result (auto)"
                 },
                 {
                   "key": "return_params",
                   "value": "",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Optional pass-through data returned with the payment result (base64 by helper)"
                 },
                 {
                   "key": "payout",
                   "value": "",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Base64 of the split-payout array [{\"acc\":\"...\",\"amt\":...}] — total must equal amount (auto)"
                 },
                 {
                   "key": "lifetime",
                   "value": "{{sub_lifetime}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Checkout session lifetime in seconds (sandbox hosted sessions: abapay_khqr ~5 min, cards/deeplink ~3 min)"
                 },
                 {
                   "key": "skip_success_page",
                   "value": "",
-                  "type": "text"
+                  "type": "text",
+                  "description": "0 + continue_success_url moves the buyer browser to your success URL after payment"
                 },
                 {
                   "key": "ctid",
                   "value": "{{ctid}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Your stable per-customer key — the stored credential links to it after the first payment"
                 },
                 {
                   "key": "token_flag",
                   "value": "CITR_FIX",
-                  "type": "text"
+                  "type": "text",
+                  "description": "CITI_FLEX | CITO_FLEX — the stored-credential flag to link with this subscription"
                 },
                 {
                   "key": "frequency",
                   "value": "{{sub_frequency}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Recurring frequency: 1W | 1M | 2M"
                 },
                 {
                   "key": "hash",
                   "value": "{{computed_hash}}",
-                  "type": "text"
+                  "type": "text",
+                  "description": "HMAC-SHA512 over the fields listed in the request Hash order (auto)"
                 }
               ]
             },
@@ -3997,7 +4255,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 — guideline page; payload built locally (Console + Visualize)",
+              "originalRequest": {
+                "url": "https://developer.payway.com.kh/khqr-guideline-3192101f0",
+                "method": "GET"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "html",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/html"
+                }
+              ],
+              "body": "<!DOCTYPE html>\n…(developer.payway.com.kh KHQR guideline page — truncated; the KHQR payload prints to the Console and renders in the Visualize tab)…",
+              "description": "The HTTP call only fetches the guideline page — the deliverable is built locally: the Console prints the TLV breakdown and the byte-for-byte self-test against the guideline's official sample (CRC 9FBD), and the Visualize tab renders the scannable QR. Reconcile payments by `{{khqr_merchant_ref}}` (request 4); one KHQR can be paid multiple times."
+            }
+          ]
         },
         {
           "name": "3. Pull webhook.site Callbacks (KHQR)",
@@ -4627,7 +4904,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — KHQR payload (code 0)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-gateway/v1/payments/generate-qr",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": 0,\n    \"message\": \"Success\"\n  },\n  \"qrString\": \"00020101021229370012PAYWAY@ABA020610259006049E4C53038495406410.005802KH5910Test User6007PHNOM PENH62150111TEST-17886563030303410.006304…\",\n  \"qrImage\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAfQAAAH0CAIAAAB16WQOAA… (truncated)\"\n}",
+              "description": "Flow A step 1. Saves `{{last_tran_id}}`; the Runner continues to A2 (poll loop). Sandbox note: the KHQR record stays PENDING until paid — transaction-detail sees it, the 7-day-window check-transaction cannot."
+            }
+          ]
         },
         {
           "name": "A2 - Poll Transaction Status (loops)",
@@ -4703,7 +4999,44 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "APPROVED (payment_status_code 0) — loop ends",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-detail",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"tran_id\": \"TEST-178865526240157\",\n    \"payment_status\": \"APPROVED\",\n    \"payment_status_code\": 0,\n    \"total_amount\": 0.1,\n    \"original_amount\": 0.1,\n    \"refund_amount\": 0,\n    \"payment_amount\": 0.1,\n    \"currency\": \"USD\"\n  }\n}",
+              "description": "Settled — the test script stops looping and moves on to A3. The record lives in `data`; A2 re-computes the hash and calls itself on every iteration."
+            },
+            {
+              "name": "PENDING (payment_status_code 2) — keep looping",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-detail",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"tran_id\": \"TEST-178865526240157\",\n    \"payment_status\": \"PENDING\",\n    \"payment_status_code\": 2,\n    \"total_amount\": 0.1,\n    \"currency\": \"USD\"\n  }\n}",
+              "description": "The loop re-sends this request (max `{{max_polls}}` tries, Runner delay ≥ 1000 ms) while PENDING or not yet visible. PENDING can persist up to ~24h; a missing callback is NOT proof of non-payment."
+            }
+          ]
         },
         {
           "name": "A3 - Get Transaction Details",
@@ -4764,7 +5097,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — APPROVED transaction (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-gateway/v1/payments/transaction-detail",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"data\": {\n    \"transaction_id\": \"TEST-178865526240157\",\n    \"apv\": \"108425\",\n    \"transaction_date\": \"2026-09-28 10:15:30\",\n    \"payment_status\": \"APPROVED\",\n    \"payment_status_code\": 0,\n    \"original_amount\": 0.1,\n    \"original_currency\": \"USD\",\n    \"total_amount\": 0.1,\n    \"discount_amount\": 0,\n    \"refund_amount\": 0,\n    \"payment_amount\": 0.1,\n    \"payment_currency\": \"USD\",\n    \"payment_option\": \"abapay_khqr\"\n  }\n}",
+              "description": "Flow A step 3: the full record for `{{last_tran_id}}` — payment_status_code: 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED. In the Runner it follows A2 automatically."
+            }
+          ]
         },
         {
           "name": "A4 - Refund",
@@ -4825,7 +5177,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/merchant-portal/merchant-access/online-transaction/refund",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}",
+              "description": "Flow A final step: refunds `{{last_tran_id}}` for `{{refund_amount}}` and ends Flow A (`setNextRequest(null)`). ABA PAY and KHQR refunds are immediate; card/WeChat/Alipay follow your agreement."
+            }
+          ]
         },
         {
           "name": "B1 - Link Account (Flow B)",
@@ -4896,7 +5267,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — QR + deeplink returned (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-credential/v3/aof/link-account",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success\"\n  },\n  \"data\": {\n    \"request_id\": \"TESTREQ0001\",\n    \"qr_string\": \"00020101021129370012PAYWAY@ABA020610259006049E4C53038495802KH5910ABA PAYWAY62150111TESTREQ00016304…\",\n    \"deeplink\": \"abamobilebank://ababank.com?type=payway&qrcode=00020101021129370012PAYWAY…\"\n  }\n}",
+              "description": "Flow B step 1. The token does NOT come back here — approve the link in ABA Mobile; the pwt arrives via callback_url or B2. The Visualize tab renders the linking QR/deeplink."
+            }
+          ]
         },
         {
           "name": "B2 - Get Token Details (Flow B)",
@@ -4962,7 +5352,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Token not linked yet (code 09)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-credential/v3/token-management/get-token-details",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"09\",\n    \"message\": \"Data not found\"\n  }\n}",
+              "description": "Flow B step 2, expected until the customer approves the link in ABA Mobile — finish that step, then re-send; on success the test script saves `{{pwt}}`/`{{ctid}}` for B3+."
+            }
+          ]
         },
         {
           "name": "B3 - Payment using Token (Flow B)",
@@ -5028,7 +5437,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — charged stored credential (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-gateway/v3/purchase/payment-credential",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}",
+              "description": "Flow B step 3: charges `{{amount}}` to the stored credential (`{{pwt}}` + `{{ctid}}` saved by B2)."
+            }
+          ]
         },
         {
           "name": "B4 - Renew Token (Flow B)",
@@ -5086,7 +5514,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — token renewed +90 days (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-credential/v3/token-management/renew-expired-account-token",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  },\n  \"new_token\": \"b6138a89f26e45c7a0d94f31e07…\"\n}",
+              "description": "Flow B step 4: keeps `{{pwt}}` alive (+90 days from today, account tokens only); the linked account/card is unchanged."
+            }
+          ]
         },
         {
           "name": "B5 - Remove Token (Flow B)",
@@ -5146,7 +5593,26 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Success — token removed (code 00)",
+              "originalRequest": {
+                "url": "{{baseUrl}}/api/payment-credential/v3/token-management/remove-token",
+                "method": "POST"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": {\n    \"code\": \"00\",\n    \"message\": \"Success.\"\n  }\n}",
+              "description": "Flow B final step: irreversibly removes the token and clears `{{pwt}}`; ends Flow B (`setNextRequest(null)`)."
+            }
+          ]
         }
       ]
     }
