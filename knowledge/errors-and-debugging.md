@@ -150,12 +150,13 @@ try {
 | `"0"` / `"00"` | Success / Success! | 200 | Business success — `"00"` on purchase, exchange-rate, close-transaction, transaction-list and the merchant-portal APIs; generate-qr and payout report `"0"` | — |
 | `"1"` | Wrong Hash | 403 | HMAC signature doesn't match | Check API key, field ordering, encoding (Base64 vs hex) |
 | `"04"` | The given data was invalid | 400 | String form of the binding/validation code — observed on `generate-qr` when `lifetime` is below the 3-minute minimum (the SDK now rejects sub-180s locally) | Send `lifetime >= 180` seconds; if you still hit `"04"`, another field is malformed — compare against the OpenAPI request schema |
-| `"3"` | Invalid Transaction Amount | 400 | Amount rejected (non-positive, wrong decimal scale, or mismatch) — purchase / pre-auth-completion / refund telemetry | Check the amount against the currency's decimal rules and the operation's amount constraints |
-| `"4"` | Duplicated Transaction ID | 400 | `tran_id` already exists for this merchant (purchase, generate-qr, payout — production telemetry 2026-09) | Send a fresh unique `tran_id`. The STRING code `"04"` is the separate validation failure |
+| `"3"` | Invalid Transaction Amount | 400 | Amount rejected (non-positive, wrong decimal scale, or mismatch) — purchase / pre-auth-completion / refund telemetry. Below-minimum floor: USD < 0.01 / KHR < 100 (payment-credential endpoint table 2026-10) | Check the amount against the currency's decimal rules and the operation's amount constraints |
+| `"4"` | Duplicated Transaction ID | 400 | `tran_id` already exists for this merchant (purchase, generate-qr, payout — production telemetry 2026-09). On the payment-credential purchase leg the duplicate code is instead `83` | Send a fresh unique `tran_id`. The STRING code `"04"` is the separate validation failure |
 | `"5"` | Transaction not found | 404 | Close target does not exist (close-transaction telemetry) | Verify `tran_id` |
 | `"6"` | Requested Domain is not in whitelist | 403 | On purchase: the request origin/return domain is not whitelisted for the merchant profile (production telemetry 2026-09). Legacy gateway gloss: `tran_id` not found on check-transaction | Ask PayWay to whitelist the domain |
 | `"7"` | Invalid Request Data | 400/403 | Missing or malformed field | Check parameter types and required fields |
-| `"8"` | merchant_id not found — or generic failure | 403/500 | Sandbox-verified: merchant identity rejected on check-transaction (check `PAYWAY_MERCHANT_ID`). Production telemetry: on refund / payout / transaction-list / generate-qr an `8` is instead a generic 500-class "Something went wrong… digital support team" | Verify merchant config; generic-8 → retry once, then contact PayWay support with the trace id |
+| `"8"` | merchant_id not found — or generic failure | 403/500 | Sandbox-verified: merchant identity rejected on check-transaction (check `PAYWAY_MERCHANT_ID`). Production telemetry: on refund / payout / transaction-list / generate-qr an `8` is instead a generic 500-class "Something went wrong… digital support team" (the payment-credential endpoint table 2026-10 confirms the generic reading on purchase too) | Verify merchant config; generic-8 → retry once, then contact PayWay support with the trace id |
+| `"11"` | Something went wrong. Try again or contact the merchant for help. | — | No valid response returned from the payment processor (payment-credential endpoint table 2026-10) | Transient upstream failure — retry once, then contact PayWay support with the trace id |
 | `"15"` | Invalid Merchant | 403 | Merchant ID not recognized | Verify `merchantId` in your config |
 | `"16"` | Invalid First Name | 400 | purchase `first_name` validation — no numbers/special characters, ≤ 100 chars (production telemetry 2026-09; the legacy "invalid amount" gloss does not match what the gateway sends) | Sanitize the name fields |
 | `"17"` | Invalid Last Name | 400 | purchase `last_name` validation — same rules as `first_name` | Sanitize the name fields |
@@ -166,19 +167,30 @@ try {
 | `"59"` | Card insufficient funds | 402 | Card funds/limit exhausted | Customer uses another card or frees funds |
 | `"60"` | Card usage limit reached | 402 | Card hit its issuer usage limit | Another card, or issuer-bank support |
 | `"44"` | Purchase has reached transaction limit | 403 | Merchant/profile transaction limit reached | Raise the limit with PayWay or wait for the window to reset |
-| `"12"` / `"PTL147"` | Payment currency not allowed | 403 | Payout currency doesn't match the beneficiary account currency or the merchant credential currency | Send USD to a USD account and KHR to a KHR account; align the merchant profile currency |
-| `"22"` | Expired Transaction | 403 | Token or transaction has expired | Call `renew()` for tokens, or create new transaction |
+| `"12"` / `"PTL147"` | Payment currency not allowed | 403 | Payout currency doesn't match the beneficiary account currency or the merchant credential currency. Root cause per the payment-credential endpoint table (2026-10): the profile has no settlement account for the requested currency | Send USD to a USD account and KHR to a KHR account; align the merchant profile currency |
+| `"22"` | Expired Transaction | 403 | Token or transaction has expired. On purchase/payment-credential the code instead means "This service is not enabled" — the requested transaction type is not supported for this merchant profile (endpoint error table 2026-10) | Call `renew()` for tokens, or create new transaction; transaction-type 22 → contact PayWay to provision the profile |
 | `"23"` | Transaction Not Found | 403 | No transaction with given `tran_id` | Check transaction ID, it may have been closed |
 | `"24"` | Invalid Beneficiary Data | 403 | RSA-encrypted beneficiary data is wrong | Verify public key PEM and beneficiary account format |
+| `"25"` | Allow maximum 10 beneficiaries per requests | — | Payout/split list exceeds the 10-beneficiary maximum (payment-credential endpoint table 2026-10) | Split the payout across multiple requests |
+| `"36"` | Payout account or amount is invalid | — | A payout entry is invalid or the beneficiary amounts do not total the transaction amount — the SDK and payment-link create enforce the total-matches rule locally; sibling `PTL-PAYOUT-36` covers pre-auth complete-payout (payment-credential endpoint table 2026-10) | Fix the payout entries so the amounts total the transaction amount |
 | `"37"` | Payout Whitelist | 403 | Payout account not whitelisted ("Payout accounts are not in whitelist.") | Call `addBeneficiary()` first (sandbox-verified) |
+| `"38"` | Payout contain invalid Transaction ID | — | A payout entry carries an invalid `tran_id` (payment-credential endpoint table 2026-10) | Check the payout entry `tran_id` format/uniqueness |
+| `"39"` | Payout contain Duplicated Account | — | The same beneficiary account appears more than once in the payout list (payment-credential endpoint table 2026-10) | Dedupe the payout list |
+| `"40"` | Payout contain Duplicated Transaction ID | — | A payout `tran_id` already exists — payout tran_ids must be unique per merchant (payment-credential endpoint table 2026-10) | Send a fresh unique `tran_id` for the payout entry |
+| `"41"` | Payout info contain mid not link with any Merchant Profile | — | The payout MID is not linked to any merchant profile (payment-credential endpoint table 2026-10) | Verify the split-payout MID with PayWay |
 | `"49"` | Invalid Request | 400/403 | Generic validation error — for lists, dates must be `"YYYY-MM-DD HH:mm:ss"` | Check all parameters against the OpenAPI spec |
 | `"69"` | Lifetime below minimum | 400 | purchase `lifetime` < 3 minutes (checkout API takes minutes; spec-documented, max 43200 = 30 days; the SDK now rejects sub-3-minute values locally) | Send `lifetime >= 3` (minutes) |
+| `"46"` | Purchase amount for KHR currency could not contain decimal place | — | KHR amounts must be whole numbers (payment-credential endpoint table 2026-10) — the SDK already rejects decimal KHR amounts locally with `PayWayConfigError` | Send an integer KHR amount |
 | `"96"` | Payee Not Found / Invalid merchant data | 403 | Beneficiary not whitelisted, payment-link id invalid, or merchant data rejected (generate-qr / add-whitelist telemetry) | Whitelist the payee; verify the link id / merchant credential |
+| `"71"` | Payout for card payment is not allowed to ABA account | — | Card-token payouts cannot target an ABA account (payment-credential endpoint table 2026-10) | Use a whitelisted bank/beneficiary account as the payout target |
+| `"77"` | Merchant transactions do not support transaction fees | — | Consumer/merchant transaction-fee configuration is not supported for this card-on-file purchase (payment-credential endpoint table 2026-10) | Drop the fee fields from the request |
+| `"80"` | Custom fields invalid | — | `custom_fields` or `items` cannot be decoded, or too many items per request (payment-credential endpoint table 2026-10) | Send valid JSON and trim the items list |
+| `"83"` | Transaction is duplicated | — | `tran_id` already used for this merchant profile — on the payment-credential purchase leg the duplicate code is `83`, not `4` (endpoint table 2026-10) | Send a fresh unique `tran_id` |
 | `"500"` | Something went wrong | 500 | Generic gateway failure (transaction-list, generate-qr, payment-link detail telemetry) | Retry once, then contact PayWay support with the trace id |
 | `"503"` | System under maintenance | 503 | PayWay maintenance window (purchase telemetry) | Pause and retry later |
 | `"999"` | Something went wrong. Please try again later. | 500 | Generic gateway failure (purchase telemetry) | Retry with backoff; not a merchant config issue |
 
-> 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema, verified against sandbox probe responses, and — as of 2026-09-15 — cross-checked against **ABA production telemetry** (dev-team CSV of code+message occurrences per API). Telemetry superseded several legacy glosses (notably `4`, `16`, `17`, `21`, `44`) and added the card-decline, CDA, and 5xx codes. The full hint map ships in `GATEWAY_CODE_HINTS` and is queryable via `payway-sdk explain <code>`; `docs/error-codes.json` carries the per-API `observedOn` fields.
+> 📋 **Source:** These codes are consolidated from the OpenAPI spec's `ErrorStatus` schema, verified against sandbox probe responses, cross-checked against **ABA production telemetry** (dev-team CSV of code+message occurrences per API, 2026-09-15), and — as of 2026-10-01 — against the **purchase payment-credential endpoint error table** (ABA dev team; see [its own section below](#purchase-payment-credential-endpoint-error-table-added-2026-10-01)). Telemetry superseded several legacy glosses (notably `4`, `16`, `17`, `21`, `44`) and added the card-decline, CDA, and 5xx codes. The full hint map ships in `GATEWAY_CODE_HINTS` and is queryable via `payway-sdk explain <code>`; `docs/error-codes.json` carries the per-API `observedOn` fields.
 
 ### COF error family *(new in v1.3.6)*
 
@@ -190,7 +202,7 @@ Codes observed on the credentials-on-file endpoints (`link-account`, `link-card`
 | `"01"` / `"1"` / `"PTL02"` | Wrong Hash | `PayWaySignatureError` with the endpoint's hash-order hint; upgrade to ≥ v1.3.6 hash orders. On link-card the wrong hash renders as the hosted `01 Wrong Hash` page — the hash IS enforced in sandbox (§24 LC-3) |
 | `"98"` | Merchant profile not configured for CoF | Enable CoF on the merchant profile with ABA before linking |
 | `"104"` | **Merchant not enabled token flag** (live 2026-09-12, §24 LC-1: link-card hosted page — profile-level, not per-token) | Ask ABA to enable card tokenization on the merchant profile |
-| `"105"` | Invalid payment credential token (live 2026-09-12: `cof charge` with an unknown/expired pwt) | Re-link via linkAccount/linkCard, or renew via renewToken |
+| `"105"` | Invalid payment credential token (live 2026-09-12: `cof charge` with an unknown/expired pwt). Payment-credential endpoint table (2026-10) enumerates the causes: token not found / removed / frozen / expired, token_flag not allowed, or amount above the token per-transaction limit | Re-link via linkAccount/linkCard, renew via renewToken, or lower the amount |
 | `"09"` | Data not found (live 2026-09-12: `getTokenDetails` for a request that never linked) | Check the token's lifecycle state via `getTokenDetails()` |
 
 > 📋 **§24 live notes (2026-09-12):** `removeToken` answers `00 Success` even for a
@@ -212,16 +224,66 @@ String codes observed on `generate-qr` (KHQR). Note: `"8"` and `"12"` intentiona
 | `"21"` | End of API lifetime — the QR/transaction lifetime elapsed before payment; create a fresh transaction |
 | `"23"` | Transaction not found |
 | `"32"` | "Service is not enable." — the feature this call needs is not provisioned on the merchant profile (e.g. pushback); sandbox-verified on payment-link create (§22) |
-| `"35"` | Invalid hash |
-| `"44"` | Purchase has reached transaction limit |
+| `"35"` | Payout info invalid — a payout entry cannot be parsed or has invalid structure (payment-credential endpoint table 2026-10; supersedes the old spec-page gloss "Invalid hash") |
+| `"44"` | Purchase has reached transaction limit — daily/monthly transaction or amount limit (payment-credential endpoint table 2026-10) |
 | `"47"` | Invalid items data *(spec-page gloss, not yet telemetry-observed)* |
 | `"48"` | Invalid purchase type *(spec-page gloss, not yet telemetry-observed)* |
 | `"96"` | Invalid merchant data / payee not found |
-| `"102"` | QR request limit exceeded |
+| `"102"` | URL not in whitelist — callback_url host is not whitelisted or is not a valid URL (payment-credential endpoint table 2026-10; supersedes the old "QR request limit exceeded" gloss) |
 | `"403"` | Forbidden (merchant not enabled for this operation) |
 | `"429"` | Too many requests — throttled, retry after the window |
 
 All of these are queryable via `payway-sdk explain <code>` (the `explain` command now covers `cof` and `qr` families — `explainAll()` ships ≥ 6 CoF and 18 QR entries).
+
+### Purchase payment-credential endpoint error table *(added 2026-10-01)*
+
+The ABA dev team shared the authoritative error table for
+`POST /api/payment-gateway/v3/purchase/payment-credential` — the endpoint the
+SDK hits for `purchase()` with a saved credential (pwt) and `cof charge`
+(`ENDPOINTS.payment`). Its scope is **this endpoint only**, and it both adds
+codes nothing else documented (11, 25, 36, 38–41, 46, 71, 77, 80, 83) and
+settles per-endpoint meanings for shared numeric codes (`22`, `35`, `102`;
+`83` is the duplicate-tran_id code here, where other endpoints answer `4`).
+All rows are folded into the explain maps and the machine registry:
+
+| Code | Gateway message | Meaning / fix |
+|---|---|---|
+| `00` | Success. | Payment approved (or redirect to 3DS page) |
+| `01` | Wrong Hash. | Hash mismatch — see the `"1"` row above |
+| `04` | The given data was invalid. | Field validation failed — see the COF `"04"` row (`errors{}` field map) |
+| `3` | Invalid Transaction Amount. | Below minimum: USD < 0.01 / KHR < 100 |
+| `6` | Requested Domain is not in whitelist. | Referer/IP not in the merchant whitelist |
+| `08` / `8` | Something went wrong. Please reach out to our digital support team… | Unexpected internal failure — retry once, then support |
+| `11` | Something went wrong. Try again or contact the merchant for help. | No valid response from the payment processor — transient |
+| `12` | Payment currency is not allowed. | No settlement account for the currency on the profile |
+| `22` | This service is not enabled. Please contact support… | Transaction type not supported for this merchant profile |
+| `25` | Allow maximum 10 beneficiaries per requests. | Payout list > 10 beneficiaries — split the request |
+| `26` | Invalid Merchant Profile. | merchant_id not found / inactive / not an online outlet |
+| `32` | Service is not enable. | Feature not enabled on the profile (pre-auth, payout, AOF, COF) |
+| `35` | Payout Info is invalid. | Payout data unparseable / invalid structure |
+| `36` | Payout account or amount is invalid. | Payout total doesn't match the amount, or an entry is invalid |
+| `37` | Payout accounts are not in whitelist. | A payout account isn't whitelisted — `addBeneficiary()` first |
+| `38` | Payout contain invalid Transaction ID. | A payout entry has an invalid `tran_id` |
+| `39` | Payout contain Duplicated Account. | Same beneficiary account twice |
+| `40` | Payout contain Duplicated Transaction ID. | Payout `tran_id` already exists |
+| `41` | Payout info contain mid not link with any Merchant Profile. | Payout MID not linked to any merchant profile |
+| `44` | Purchase has reached transaction limit. | Daily/monthly transaction or amount limit |
+| `46` | Purchase amount for KHR currency could not contain decimal place. | KHR amounts are integers (SDK rejects decimals locally) |
+| `71` | Payout for card payment is not allowed to ABA account. | Card-token payout can't target an ABA account |
+| `77` | Merchant transactions do not support transaction fees. | Fee configuration unsupported for this COF purchase |
+| `80` | Custom fields invalid. | `custom_fields`/`items` undecodable, or too many items |
+| `83` | Transaction is duplicated. | `tran_id` already used for this merchant profile |
+| `102` | The URL is not in the whitelist. | `callback_url` host not whitelisted / not a valid URL |
+| `105` | Invalid payment credential token. | Token not found / removed / frozen / expired, flag not allowed, or above per-transaction limit |
+| `CDA45` | Payer account has insufficient funds. | Payer ABA balance too low |
+| `503` | System under maintenance. We'll update you when available. | Maintenance mode — pause and retry |
+
+> 📋 **Provenance:** endpoint-scoped documentation table from the ABA dev team
+> (2026-10-01). Unlike the telemetry CSV it is documentation, not production
+> observation — these rows carry no `observedOn` data, and codes the SDK
+> live-verified in the sandbox keep their `sandboxVerified` flags. The raw
+> table is archived for maintainers at
+> `docs/internal/PAYMENT-CREDENTIAL-ERROR-TABLE-2026-10.md`.
 
 ### Pre-Authorization Error Codes
 
@@ -453,11 +515,13 @@ Fields:
 | Field | Meaning |
 |---|---|
 | `code` | The code as the gateway/CLI reports it (normalized form) |
-| `family` | `gateway` \| `refund` \| `pre-auth` \| `payout` \| `payment-link` \| `cof` \| `qr` — the endpoint domain the code belongs to |
+| `family` | `gateway` \| `refund` \| `pre-auth` \| `payout` \| `payment-link` \| `cof` \| `qr` \| `cda` — the endpoint domain the code belongs to |
 | `title` | Short human-readable meaning |
 | `hint` | Branch/recovery advice (what to check next) |
 | `sandboxVerified` | `true` when the meaning was reproduced against the live sandbox; absent means spec-derived or inferred |
 | `evidence` | For live-verified codes: pointer into `SANDBOX-FINDINGS` (e.g. `SANDBOX-FINDINGS §8/§9`) |
+| `observedOn` | APIs (short labels) where ABA production telemetry observed the code (2026-09-15 CSV) |
+| `observedMessage` | The exact gateway message from the same telemetry |
 
 The CLI surfaces the same provenance: `payway-sdk explain PTL36` prints a `✓ sandbox-verified` line in text mode, and `payway-sdk explain PTL36 --json` emits the exact registry entry as one JSON document (`explain --json` with no code lists all of them).
 

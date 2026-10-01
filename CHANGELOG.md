@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Purchase payment-credential endpoint error table folded into the registry (2026-10-01)
+
+- **Registry 83 → 95 codes.** The ABA dev team's authoritative error table for
+  `POST /api/payment-gateway/v3/purchase/payment-credential` (the endpoint
+  behind `purchase()` with a saved credential / `cof charge`) is now folded
+  into the explain maps and `docs/error-codes.json`. Twelve codes are new to
+  the gateway family — `11` (processor unresponsive), `25` (max 10
+  beneficiaries), `36` (payout account/amount invalid), `38`–`41` (payout
+  entry validation), `46` (KHR decimals), `71` (card payout can't target an
+  ABA account), `77` (fee config unsupported), `80` (custom fields invalid),
+  `83` (duplicated tran_id on this leg — other endpoints answer `4`).
+- **Per-endpoint meanings settled for shared numeric codes.** `22` gains the
+  "service not enabled / transaction type not supported" reading on
+  purchase/payment-credential; the QR entries `35` ("Payout Info is invalid")
+  and `102` ("URL is not in the whitelist") supersede their old spec-page
+  glosses; `3` gains the explicit USD 0.01 / KHR 100 minimums; `12` gains the
+  no-settlement-account root cause; COF `105` gains the full cause list
+  (not found / removed / frozen / expired, flag not allowed, over
+  per-transaction limit).
+- **New drift pins** in `src/__tests__/error-registry.test.ts`: every
+  endpoint-table code must resolve through `explainPayWayCode`, the 12 new
+  codes stay gateway-family with provenance hints, and the 4↔83
+  duplicate cross-reference holds. Raw table archived for maintainers at
+  `docs/internal/PAYMENT-CREDENTIAL-ERROR-TABLE-2026-10.md`; guide section in
+  `docs/guides/12` ("Purchase payment-credential endpoint error table").
+
 ### Test expansion wave + journal-explain hint fix (2026-09-29)
 
 - **Fixed: `journal explain` gateway hints never rendered.** `hintForCode`

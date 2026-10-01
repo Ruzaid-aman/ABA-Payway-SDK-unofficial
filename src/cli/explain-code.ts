@@ -222,7 +222,7 @@ const COF_HINTS: Record<string, string> = {
   '09': 'The ctid/request_id does not reference a known account token — verify or re-link.',
   '98': 'Merchant ID not found — verify the merchant credential (env/profile) for the target environment.',
   '104': 'The merchant account is not enabled for this token_flag — contact PayWay to provision, or use a linking enum (CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX).',
-  '105': 'The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken. On purchase/charge the gateway also words it "Invalid pwt or ctid." — for ctid-keyed charges check the ctid→pwt resolution first (production telemetry 2026-09).',
+  '105': 'The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken. On purchase/charge the gateway also words it "Invalid pwt or ctid." — for ctid-keyed charges check the ctid→pwt resolution first (production telemetry 2026-09). The payment-credential endpoint table (2026-10) enumerates the causes: token not found / removed / frozen / expired, token_flag not allowed, or amount above the token per-transaction limit.',
 };
 
 // ABA-account (CDA) response codes echoed on purchase when the payer pays
@@ -247,7 +247,10 @@ const CDA_HINTS: Record<string, string> = {
  * production telemetry (2026-09-15 CSV) — the shared numeric code space is
  * also used by the purchase validators, and several spec-page glosses
  * ("invalid amount" for 16, "invalid transaction ID" for 21, "invalid
- * template" for 44) do NOT match what the gateway actually sends.
+ * template" for 44) do NOT match what the gateway actually sends. Meanings
+ * for 35/102 come from the purchase payment-credential endpoint error table
+ * (ABA, 2026-10-01 — docs/internal/PAYMENT-CREDENTIAL-ERROR-TABLE-2026-10.md)
+ * and supersede those two codes' old spec-page glosses.
  */
 const QR_CODES = ['1', '6', '12', '16', '17', '18', '19', '21', '23', '32', '35', '44', '47', '48', '96', '102', '403', '429'] as const;
 
@@ -260,10 +263,12 @@ const QR_TITLES: Record<string, string> = {
   '19': 'Invalid Email',
   '21': 'End of API lifetime',
   '32': 'Service is not enabled',
+  '35': 'Payout Info is invalid',
   '44': 'Purchase has reached transaction limit',
   '96': 'Invalid merchant data',
   '403': 'Forbidden',
   '429': 'Rate limit exceeded',
+  '102': 'URL is not in the whitelist',
 };
 
 const QR_HINTS: Record<string, string> = {
@@ -275,10 +280,12 @@ const QR_HINTS: Record<string, string> = {
   '19': 'The email field is malformed (purchase field validation).',
   '21': 'The transaction/QR lifetime elapsed before payment completed — create a fresh transaction (generate-qr telemetry; the spec-page gloss "invalid transaction ID" does not match production).',
   '32': 'The service/feature this call needs is not enabled on the merchant profile (e.g. pushback) — ask PayWay to provision it; sandbox-verified on payment-link create (§22). Gateway message literally reads "Service is not enable."',
-  '44': 'The merchant/profile transaction limit was reached (purchase telemetry; the spec-page gloss "invalid template" does not match production).',
+  '35': 'Payout info invalid — a payout entry cannot be parsed or has invalid structure (payment-credential endpoint error table 2026-10; supersedes the old generate-qr spec-page gloss "Invalid hash").',
+  '44': 'The merchant/profile transaction limit was reached (purchase telemetry; the spec-page gloss "invalid template" does not match production). payment-credential endpoint table (2026-10): daily/monthly transaction or amount limit.',
   '96': 'Merchant data rejected — verify merchant_id/credential for the target environment (generate-qr + add-whitelist-payout telemetry).',
   '403': 'Merchant credential not authorized for generate-qr in this environment.',
   '429': 'Pace requests — the SDK throttles locally, but concurrent callers share the window.',
+  '102': 'URL not in whitelist — callback_url host is not whitelisted or is not a valid URL (payment-credential endpoint error table 2026-10; supersedes the old "QR request limit exceeded" gloss).',
 };
 
 export function explainPayWayCode(rawCode: string): CodeExplanation | undefined {

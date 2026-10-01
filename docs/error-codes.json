@@ -1,8 +1,8 @@
 {
   "registryVersion": 1,
-  "generated": "2026-09-15T14:18:38.008Z",
+  "generated": "2026-10-01T10:52:59.040Z",
   "source": "src/cli/explain-code.ts",
-  "description": "Consolidated ABA PayWay error/status code registry. sandboxVerified: true means the meaning was reproduced against the live sandbox; evidence points into docs/SANDBOX-FINDINGS.md. observedOn/observedMessage carry ABA production telemetry (dev-team CSV, 2026-09-15): the gateway APIs where the code was seen and the exact gateway message; API labels map to paths in docs/12 (errors-and-debugging topic). Regenerate with `npm run gen:error-registry`.",
+  "description": "Consolidated ABA PayWay error/status code registry. sandboxVerified: true means the meaning was reproduced against the live sandbox; evidence points into docs/SANDBOX-FINDINGS.md. observedOn/observedMessage carry ABA production telemetry (dev-team CSV, 2026-09-15): the gateway APIs where the code was seen and the exact gateway message; API labels map to paths in docs/12 (errors-and-debugging topic). Hints additionally fold the purchase payment-credential endpoint error table (ABA dev team, 2026-10-01 — raw table archived at docs/internal/PAYMENT-CREDENTIAL-ERROR-TABLE-2026-10.md, maintainers only). Regenerate with `npm run gen:error-registry`.",
   "codes": [
     {
       "code": "CDA00",
@@ -89,7 +89,7 @@
       "code": "105",
       "family": "cof",
       "title": "Invalid payment credential token",
-      "hint": "The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken. On purchase/charge the gateway also words it \"Invalid pwt or ctid.\" — for ctid-keyed charges check the ctid→pwt resolution first (production telemetry 2026-09).",
+      "hint": "The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken. On purchase/charge the gateway also words it \"Invalid pwt or ctid.\" — for ctid-keyed charges check the ctid→pwt resolution first (production telemetry 2026-09). The payment-credential endpoint table (2026-10) enumerates the causes: token not found / removed / frozen / expired, token_flag not allowed, or amount above the token per-transaction limit.",
       "sandboxVerified": true,
       "evidence": "SANDBOX-FINDINGS §16",
       "observedOn": [
@@ -145,7 +145,7 @@
       "code": "3",
       "family": "gateway",
       "title": "Invalid Transaction Amount",
-      "hint": "Amount rejected (non-positive, wrong decimal scale, or mismatched) — seen on purchase, pre-auth-completion and refund (production telemetry 2026-09).",
+      "hint": "Amount rejected (non-positive, wrong decimal scale, or mismatched) — seen on purchase, pre-auth-completion and refund (production telemetry 2026-09). Below-minimum floor: USD < 0.01 / KHR < 100 (payment-credential endpoint error table 2026-10).",
       "observedOn": [
         "purchase",
         "pre-auth-complete",
@@ -157,7 +157,7 @@
       "code": "4",
       "family": "gateway",
       "title": "Duplicated Transaction ID",
-      "hint": "tran_id already exists for this merchant — send a fresh unique tran_id (production telemetry 2026-09: purchase, generate-qr, payout). The STRING code \"04\" is the separate validation/binding failure.",
+      "hint": "tran_id already exists for this merchant — send a fresh unique tran_id (production telemetry 2026-09: purchase, generate-qr, payout). The STRING code \"04\" is the separate validation/binding failure. On the payment-credential purchase leg the duplicate code is instead 83.",
       "observedOn": [
         "purchase",
         "generate-qr",
@@ -181,7 +181,7 @@
       "code": "6",
       "family": "gateway",
       "title": "tran_id not found",
-      "hint": "check-transaction found no transaction with this ID. On purchase the same numeric code means \"Requested Domain is not in whitelist\" (production telemetry 2026-09) — ask PayWay to whitelist the domain."
+      "hint": "check-transaction found no transaction with this ID. On purchase the same numeric code means \"Requested Domain is not in whitelist\" (production telemetry 2026-09, confirmed by the payment-credential endpoint error table 2026-10) — ask PayWay to whitelist the domain."
     },
     {
       "code": "7",
@@ -193,7 +193,7 @@
       "code": "8",
       "family": "gateway",
       "title": "merchant_id not found",
-      "hint": "Merchant identity rejected on this endpoint (sandbox-verified HTTP 403 on check-transaction) - check PAYWAY_MERCHANT_ID or the active profile. Production telemetry 2026-09: on refund/payout/transaction-list/generate-qr an 8 is instead a GENERIC 500-class \"Something went wrong\" — retry once, then contact PayWay support with the trace id.",
+      "hint": "Merchant identity rejected on this endpoint (sandbox-verified HTTP 403 on check-transaction) - check PAYWAY_MERCHANT_ID or the active profile. Production telemetry 2026-09: on refund/payout/transaction-list/generate-qr an 8 is instead a GENERIC 500-class \"Something went wrong\" — retry once, then contact PayWay support with the trace id (the payment-credential endpoint error table 2026-10 confirms the generic reading on purchase too).",
       "sandboxVerified": true,
       "evidence": "SANDBOX-FINDINGS §6",
       "observedOn": [
@@ -206,10 +206,16 @@
       "observedMessage": "Something went wrong. Please reach out to our digital support team for assistance"
     },
     {
+      "code": "11",
+      "family": "gateway",
+      "title": "Payment Processor Unresponsive",
+      "hint": "No valid response returned from the payment processor — transient upstream failure; surface the gateway advice (\"Something went wrong. Try again or contact the merchant for help.\"), retry once, then contact PayWay support (payment-credential endpoint error table 2026-10)."
+    },
+    {
       "code": "12",
       "family": "gateway",
       "title": "Payment currency not allowed",
-      "hint": "Payout currency must match the beneficiary account currency and your merchant credential currency (e.g. send USD to a USD account).",
+      "hint": "Payout currency must match the beneficiary account currency and your merchant credential currency (e.g. send USD to a USD account). Root cause per the payment-credential endpoint table (2026-10): the merchant profile has no settlement account for the requested currency.",
       "sandboxVerified": true,
       "evidence": "SANDBOX-FINDINGS §9",
       "observedOn": [
@@ -240,7 +246,7 @@
       "code": "22",
       "family": "gateway",
       "title": "Expired Transaction",
-      "hint": "Transaction/token expired — create a new one or renew the token."
+      "hint": "Transaction/token expired — create a new one or renew the token. On purchase/payment-credential the code instead means \"This service is not enabled\" — the requested transaction type is not supported for this merchant profile (endpoint error table 2026-10)."
     },
     {
       "code": "23",
@@ -253,6 +259,12 @@
       "family": "gateway",
       "title": "Invalid Beneficiary Data",
       "hint": "RSA-encrypted beneficiaries malformed — verify public key + account format."
+    },
+    {
+      "code": "25",
+      "family": "gateway",
+      "title": "Too Many Beneficiaries",
+      "hint": "Payout/split list exceeds the 10-beneficiary maximum per request — split across multiple requests (payment-credential endpoint error table 2026-10)."
     },
     {
       "code": "26",
@@ -287,6 +299,12 @@
       "observedMessage": "Your payment is declined by the card issuer bank. Please make sure your card is active, or contact your issuer bank for support."
     },
     {
+      "code": "36",
+      "family": "gateway",
+      "title": "Payout Account or Amount Invalid",
+      "hint": "A payout entry is invalid or the beneficiary amounts do not total the transaction amount — the SDK and payment-link create enforce the total-matches rule locally; sibling PTL-PAYOUT-36 covers pre-auth complete-payout (payment-credential endpoint error table 2026-10)."
+    },
+    {
       "code": "37",
       "family": "gateway",
       "title": "Payout Whitelist",
@@ -297,6 +315,36 @@
         "payout"
       ],
       "observedMessage": "Payout accounts are not in whitelist."
+    },
+    {
+      "code": "38",
+      "family": "gateway",
+      "title": "Payout Invalid Transaction ID",
+      "hint": "A payout entry carries an invalid tran_id — check format and uniqueness (payment-credential endpoint error table 2026-10)."
+    },
+    {
+      "code": "39",
+      "family": "gateway",
+      "title": "Payout Duplicated Account",
+      "hint": "The same beneficiary account appears more than once in the payout list — dedupe before retry (payment-credential endpoint error table 2026-10)."
+    },
+    {
+      "code": "40",
+      "family": "gateway",
+      "title": "Payout Duplicated Transaction ID",
+      "hint": "A payout tran_id already exists — payout tran_ids must be unique per merchant (payment-credential endpoint error table 2026-10)."
+    },
+    {
+      "code": "41",
+      "family": "gateway",
+      "title": "Payout MID Not Linked",
+      "hint": "The payout mid is not linked to any merchant profile — verify the split-payout MID with PayWay (payment-credential endpoint error table 2026-10)."
+    },
+    {
+      "code": "46",
+      "family": "gateway",
+      "title": "KHR Amount Has Decimals",
+      "hint": "KHR amounts must be whole numbers — the SDK already rejects decimal KHR amounts locally with PayWayConfigError (payment-credential endpoint error table 2026-10)."
     },
     {
       "code": "49",
@@ -363,6 +411,12 @@
       "hint": "Checkout purchase lifetime must be >= 3 minutes (API takes minutes; max 43200 = 30 days; spec-documented)."
     },
     {
+      "code": "71",
+      "family": "gateway",
+      "title": "Card Payout To ABA Account Not Allowed",
+      "hint": "Card-token payouts cannot target an ABA account — use a whitelisted bank/beneficiary account (payment-credential endpoint error table 2026-10)."
+    },
+    {
       "code": "75",
       "family": "gateway",
       "title": "Card Declined By Issuer",
@@ -371,6 +425,24 @@
         "purchase"
       ],
       "observedMessage": "Your payment is declined by the card issuer bank. Please use another card, or contact issuer bank for support."
+    },
+    {
+      "code": "77",
+      "family": "gateway",
+      "title": "Transaction Fees Not Supported",
+      "hint": "Consumer/merchant transaction-fee configuration is not supported for this card-on-file purchase — drop the fee fields (payment-credential endpoint error table 2026-10)."
+    },
+    {
+      "code": "80",
+      "family": "gateway",
+      "title": "Custom Fields Invalid",
+      "hint": "custom_fields or items cannot be decoded, or too many items per request — send valid JSON and trim the list (payment-credential endpoint error table 2026-10)."
+    },
+    {
+      "code": "83",
+      "family": "gateway",
+      "title": "Transaction Duplicated",
+      "hint": "tran_id already used for this merchant profile — on the payment-credential purchase leg the duplicate code is 83, not 4 (endpoint error table 2026-10); same remediation as 4: send a fresh unique tran_id."
     },
     {
       "code": "96",
@@ -637,14 +709,14 @@
     {
       "code": "35",
       "family": "qr",
-      "title": "QR gateway error code 35",
-      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+      "title": "Payout Info is invalid",
+      "hint": "Payout info invalid — a payout entry cannot be parsed or has invalid structure (payment-credential endpoint error table 2026-10; supersedes the old generate-qr spec-page gloss \"Invalid hash\")."
     },
     {
       "code": "44",
       "family": "qr",
       "title": "Purchase has reached transaction limit",
-      "hint": "The merchant/profile transaction limit was reached (purchase telemetry; the spec-page gloss \"invalid template\" does not match production)."
+      "hint": "The merchant/profile transaction limit was reached (purchase telemetry; the spec-page gloss \"invalid template\" does not match production). payment-credential endpoint table (2026-10): daily/monthly transaction or amount limit."
     },
     {
       "code": "47",
@@ -669,8 +741,8 @@
     {
       "code": "102",
       "family": "qr",
-      "title": "QR gateway error code 102",
-      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+      "title": "URL is not in the whitelist",
+      "hint": "URL not in whitelist — callback_url host is not whitelisted or is not a valid URL (payment-credential endpoint error table 2026-10; supersedes the old \"QR request limit exceeded\" gloss)."
     },
     {
       "code": "403",
