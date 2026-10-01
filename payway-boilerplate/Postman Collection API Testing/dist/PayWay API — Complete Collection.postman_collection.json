@@ -4434,7 +4434,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"request_id\": \"TESTREQ0001\",\n  \"payment_credential\": {\n    \"ctid\": \"customer123\",\n    \"pwt\": \"8f14e45fceea167a5a36dedd4bea2543…\",\n    \"source_of_fund\": \"\",\n    \"type\": \"CARD\",\n    \"status\": \"ACTIVE\",\n    \"expired_at\": \"2026-12-31 00:00:00\",\n    \"token_flag\": \"CITI_FLEX\",\n    \"frequency\": \"\",\n    \"subscribed_amount\": \"\"\n  }\n}",
+              "body": "{\n  \"request_id\": \"TESTREQ0001\",\n  \"payment_credential\": {\n    \"ctid\": \"customer123\",\n    \"pwt\":\"REDACTED-pwt\",\n    \"source_of_fund\": \"\",\n    \"type\": \"CARD\",\n    \"status\": \"ACTIVE\",\n    \"expired_at\": \"2026-12-31 00:00:00\",\n    \"token_flag\": \"CITI_FLEX\",\n    \"frequency\": \"\",\n    \"subscribed_amount\": \"\"\n  }\n}",
               "description": "Sent to callback_url after the customer completes link-account / link-card / renewal. Store pwt + ctid — they are the charge pair for 4. Payment (Using Token). Sample token truncated."
             }
           ]
@@ -4516,7 +4516,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"data\": [\n    {\n      \"id\": \"9f2c1b4a-77d3-4f56-9a10-2b8e5c6d7f02\",\n      \"method\": \"POST\",\n      \"content\": \"{\\\"request_id\\\":\\\"TESTREQ0001\\\",\\\"payment_credential\\\":{\\\"ctid\\\":\\\"customer123\\\",\\\"pwt\\\":\\\"8f14e45fceea167a5a36dedd4bea2543…\\\",\\\"token_flag\\\":\\\"CITI_FLEX\\\"}}\"\n    }\n  ]\n}",
+              "body": "{\n  \"data\": [\n    {\n      \"id\": \"9f2c1b4a-77d3-4f56-9a10-2b8e5c6d7f02\",\n      \"method\": \"POST\",\n      \"content\": \"{\\\"request_id\\\":\\\"TESTREQ0001\\\",\\\"payment_credential\\\":{\\\"ctid\\\":\\\"customer123\\\",\\\"pwt\\\":\\\"REDACTED-pwt\\\",\\\"token_flag\\\":\\\"CITI_FLEX\\\"}}\"\n    }\n  ]\n}",
               "description": "webhook.site pull in both response shapes (legacy top-level array and paginated {data}). The test scans the latest callbacks and imports tran_id / pwt / ctid into collection variables so the CoF chain can continue. Content field illustrative."
             }
           ]

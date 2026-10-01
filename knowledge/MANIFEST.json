@@ -8,9 +8,9 @@
       "description": "First sandbox payment end to end: credentials, .env, generate-qr, check-transaction, polling.",
       "source": "QUICKSTART.md",
       "file": "quickstart.md",
-      "bytes": 12088,
-      "sha256": "38205bb717c9405b",
-      "sourceSha256": "50ca507897328598"
+      "bytes": 12070,
+      "sha256": "b4fdf5e74175d46c",
+      "sourceSha256": "5e7bff3e6b50d90f"
     },
     {
       "topic": "quickstart-1-page",

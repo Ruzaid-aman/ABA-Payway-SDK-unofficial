@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test:yaml": "node yaml_collection.test.js && node syntaxcheck.js && node validate.js && node verify_postman_import.js && node sim_khqr_flow.js && node spec_parity.js"
+    "test:yaml": "node yaml_collection.test.js && node syntaxcheck.js && node validate.js && node verify_postman_import.js && node sim_khqr_flow.js && node spec_parity.js && node distribution-scan.test.js"
   },
   "dependencies": {
     "chai": "^6.2.2",
