@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Dependency advisories resolved in the production graph (R04, 2026-10-01)
+
+- **`npm audit --omit=dev` is now clean: 0 findings.** `fast-uri` 3.1.6 →
+  3.1.8 (high: authority injection / host confusion — via `ajv`, in-range
+  under `^3.0.1`); `qs` deduplicated to 6.16.0 (moderate DoS family — via
+  `express` inside `@modelcontextprotocol/sdk`; the shipped MCP transport is
+  stdio, so the affected HTTP modes were never exposed, and the update
+  removes the finding regardless); `ip-address` 10.7.0 → 10.7.2 (moderate —
+  via `express-rate-limit`). No overrides, no force-upgrades.
+- **Dev-graph disposition recorded:** `@redocly/cli` (devDependency; this
+  repo only invokes `bundle`) stays at 1.29.0 — its single remaining
+  moderate (path traversal in the `split` subcommand, unused here) is
+  preferable to upgrading into the 1.31.1–2.33.2 high chain
+  (`respect-core` → `@faker-js/faker` / `undici`). Manifest range unchanged
+  (`^1.25.0`); only the lockfile resolution is pinned. Revisit when redocly
+  ships a fixed line past 2.33.2.
+- Verified from a clean install (`npm ci`): build, full offline suite
+  (2,216 tests / 154 files), package-content gate and the packed-consumer
+  smoke all pass on the updated lockfile.
+
 ### Configuration and helper contracts hardened (publishing-DX audit item 8, 2026-10-01)
 
 - **S06 — partner-only credentials work for self-activation.** A client

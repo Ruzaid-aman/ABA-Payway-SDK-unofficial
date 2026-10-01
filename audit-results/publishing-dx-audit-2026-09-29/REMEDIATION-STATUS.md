@@ -191,10 +191,36 @@ warnings); full offline suite **2,216 tests / 154 files, 0 failed** (2026-10-01,
 Windows, Node v24.21.0, npm 12.0.2) — includes the 17 new S06/S07/S08/D09
 acceptance tests.
 
+## Work package 9 (partial) — R04 dependency disposition (2026-10-01)
+
+R04 is CLOSED; R06 and R07 of item 9 remain open (release-engineering work on the
+candidate). R04 acceptance: "production graph has no unreviewed high/moderate
+findings; resulting lockfile and clean installation pass package, MCP and
+application tests."
+
+| Element | Disposition and evidence |
+|---|---|
+| `fast-uri@3.1.6` (HIGH — authority injection / host confusion / case normalization, via `ajv@^8`) | **FIXED in range.** `npm update fast-uri` → **3.1.8** (ajv declares `^3.0.1`; no override, no force). |
+| `qs@6.15.1` (MODERATE — stringify crash / array-limit bypass / isBuffer DoS, via `express@5` + `body-parser` inside `@modelcontextprotocol/sdk`) | **FIXED in range.** `npm audit fix` deduped the tree to **qs@6.16.0** (express `^6.14.0`, body-parser `^6.15.2`). Reachability note per the audit: the MCP transport here is stdio, so the affected express/qs HTTP modes are not exposed by the shipped product; the update removes the finding regardless. |
+| `ip-address@10.7.0` (MODERATE — isInSubnet family confusion / unbounded parse diagnostics, via `express-rate-limit` in the MCP SDK; advisory is NEWER than the audit report) | **FIXED in range.** → **10.7.2** (`^10.2.0`). |
+| Dev graph | **Reviewed disposition.** `@redocly/cli` (devDependency, used ONLY as `npx @redocly/cli bundle …` for the OpenAPI bundle script) retained at **1.29.0**: the one remaining full-graph finding is the moderate GHSA path traversal in its `split` subcommand, which this repo never invokes. Upgrading past it is currently WORSE, not better: `1.31.1–2.33.2` carries a HIGH chain (`@redocly/respect-core` ≤ 2.51.0 → `@faker-js/faker` RCE-class + `undici` ≤ 6.28.0), and `npm audit fix` ping-pongs between those states (probed 1.34.20 → 4 high; 1.31.0 → 12 findings). Revisit when redocly ships > 2.33.2 or a fixed respect-core line. Manifest range stays `^1.25.0`; only the lockfile resolution is pinned. |
+
+Resulting state: `npm audit --omit=dev` → **0 findings** (info/low/moderate/high/critical all 0); full graph → 1 moderate (the redocly disposition above). Clean-install acceptance: `npm ci` from the updated lockfile → build PASS → full offline suite **2,216 tests / 154 files, 0 failed** (incl. real-stdio MCP smoke and the sqlite-backend suites after the lockless `better-sqlite3 --no-save` driver was reinstalled); `check:package` 143 files / 34 skills; `smoke:package` full packed-consumer pass (ESM/CJS/declarations, CLI demo, corpus navigation, starter create/verify/fulfill, install/doctor/upgrade/remove preservation).
+
+Operational note (recurring): every bare `npm install`/`npm ci` wipes the lockless
+`better-sqlite3` driver and 24 sqlite suites SKIP — reinstall with
+`npm install --no-save better-sqlite3` after any dependency operation before
+counting the suite (npm 12 blocks unrelated `core-js` postinstall as before; it is
+a funding script and stays blocked).
+
+Gate snapshot (2026-10-01, Windows, Node v24.21.0, npm 12.0.2): audits as above;
+build/typecheck PASS; suite 2,216/154, 0 failed; lint exit 0 (2 pre-existing
+journal warnings); check:package + smoke:package PASS.
+
 ## Next in the ordered plan
 
-Work package 8 is complete (see the section above). Remaining ordered items: 7
-(WP05/WP06/WP08/WP09/WP11 — Postman callback and recipient journey), then 9 (R04/R06/R07
-— dependency disposition, reviewed generated docs, clean candidate) and the
-owner-controlled item 10. Work packages 1–6 and 8 are complete or carry only the
-recorded owner gates.
+Work package 8 is complete and R04 (item 9’s dependency disposition) is closed
+— see the sections above. Remaining: item 7 (WP05/WP06/WP08/WP09/WP11 — Postman
+callback and recipient journey), then the rest of item 9 (R06 publish workflow /
+candidate validation, R07 generated-docs review) and the owner-controlled item 10.
+Work packages 1–6 and 8 are complete or carry only the recorded owner gates.
