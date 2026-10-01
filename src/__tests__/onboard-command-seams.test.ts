@@ -85,7 +85,7 @@ function ioScript(overrides: Partial<OnboardingIO> = {}): OnboardingIO & { calls
 }
 
 describe('runOnboardCommand — non-interactive', () => {
-  it('with --stage prints the stage plan JSON and does not change the exit code', async () => {
+  it('with --stage prints the stage plan JSON, marks it unexecuted, and does not change the exit code', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();
     await runOnboardCommand({ stage: 'privacy' }, { interactive: false, log, setExitCode });
@@ -96,9 +96,33 @@ describe('runOnboardCommand — non-interactive', () => {
       command: 'onboard',
       stage: 'privacy',
       allowed: ['provider', 'profile', 'callback', 'privacy', 'verify'],
+      executed: false,
+      message: 'Plan only — no stage was executed (non-interactive run).',
     });
     expect(setExitCode).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(priorExitCode);
+  });
+
+  it('rejects an invalid --stage with a machine envelope and exit code 1 (audit S08)', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    await runOnboardCommand({ stage: 'not-a-stage' }, { interactive: false, log, setExitCode });
+
+    expect(log).toHaveBeenCalledTimes(1);
+    const parsed = JSON.parse(log.mock.calls[0][0] as string) as {
+      version: string;
+      status: string;
+      request: string;
+      message: string;
+      error: { code: string; message: string; detail: string };
+    };
+    expect(parsed.version).toBe('agent-command/v1');
+    expect(parsed.status).toBe('failed');
+    expect(parsed.request).toBe('onboard');
+    expect(parsed.message).toContain('not-a-stage');
+    expect(parsed.error.code).toBe('INVALID_STAGE');
+    expect(parsed.error.detail).toBe('Use one of: provider, profile, callback, privacy, verify');
+    expect(setExitCode).toHaveBeenCalledWith(1);
   });
 
   it('without --stage prints the blocked agent-command/v1 result and exits 1', async () => {

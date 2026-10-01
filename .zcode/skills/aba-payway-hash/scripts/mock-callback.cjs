@@ -15,13 +15,21 @@
  *
  * Flags: --tran-id, --merchant-ref, --amount, --currency USD|KHR,
  *        --status APPROVED|PENDING|DECLINED|REFUNDED|CANCELLED,
- *        --api-key (or PAYWAY_API_KEY), --customer-name
+ *        --api-key (or PAYWAY_API_KEY), --customer-name, --timeout <ms>
+ *
+ * Exit codes (bundled-script contract, skills/README.md):
+ *   0 — the handler answered 2xx (acknowledged), or --example printed.
+ *   1 — runtime failure at execution time: network error, timeout, or the
+ *       handler answered non-2xx ("did NOT acknowledge" is a FAILURE result).
+ *   2 — usage/environment error: bad flags, invalid --status/--currency/
+ *       --amount, missing API key.
  */
 const crypto = require('node:crypto');
 const http = require('node:http');
 const https = require('node:https');
 
 const STATUS_CODES = { APPROVED: 0, PENDING: 2, DECLINED: 3, REFUNDED: 4, CANCELLED: 7 };
+const SUPPORTED_CURRENCIES = ['USD', 'KHR'];
 
 function formatRequestTime(date) {
   const d = date || new Date();
@@ -58,8 +66,19 @@ function buildCallbackBody(opts) {
     throw new Error(`Invalid --status "${status}". Valid: ${Object.keys(STATUS_CODES).join(', ')}`);
   }
   const currency = (opts.currency || 'USD').toUpperCase();
-  const amount =
-    currency === 'KHR' ? Math.round(Number(opts.amount || 40000)).toString() : Number(opts.amount || 10).toFixed(2);
+  // D09 (publishing-DX audit): unsupported currencies and malformed amounts
+  // used to slip through (EUR shipped USD-formatted; bad numbers coerced to a
+  // literal "NaN" in the payload). Reject both before anything is signed.
+  if (!SUPPORTED_CURRENCIES.includes(currency)) {
+    throw new Error(`Invalid --currency "${currency}". Valid: ${SUPPORTED_CURRENCIES.join(', ')}`);
+  }
+  const rawAmount = Number(
+    opts.amount === undefined || opts.amount === '' ? (currency === 'KHR' ? 40000 : 10) : opts.amount,
+  );
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+    throw new Error(`Invalid --amount "${String(opts.amount)}". Use a positive number.`);
+  }
+  const amount = currency === 'KHR' ? String(Math.round(rawAmount)) : rawAmount.toFixed(2);
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const tranId = opts['tran-id'] || `mock-${Math.floor(Math.random() * 1e9)}`;
@@ -85,7 +104,8 @@ function buildCallbackBody(opts) {
   };
 }
 
-function postJson(url, body, headers) {
+function postJson(url, body, headers, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 10000;
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const mod = url.startsWith('https') ? https : http;
@@ -94,7 +114,7 @@ function postJson(url, body, headers) {
       {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
-        timeout: 10000,
+        timeout: timeoutMs,
       },
       (res) => {
         let raw = '';
@@ -105,7 +125,7 @@ function postJson(url, body, headers) {
     );
     req.on('error', reject);
     req.on('timeout', () => {
-      req.destroy(new Error('timeout after 10s'));
+      req.destroy(new Error(`timeout after ${timeoutMs}ms`));
     });
     req.write(data);
     req.end();
@@ -161,6 +181,7 @@ async function main() {
     console.error('Missing API key. Pass --api-key or set PAYWAY_API_KEY (your handler verifies with the same key).');
     process.exit(2);
   }
+  const timeoutMs = Number(args.timeout ?? '') || 10000;
 
   let body;
   try {
@@ -182,15 +203,18 @@ async function main() {
   console.log(`tran_id: ${body.tran_id}  merchant_ref: ${body.merchant_ref}`);
   console.log(`signature: ${sig}`);
   try {
-    const res = await postJson(args.url, body, { 'X-PAYWAY-HMAC-SHA512': sig });
+    const res = await postJson(args.url, body, { 'X-PAYWAY-HMAC-SHA512': sig }, { timeoutMs });
     console.log(`\n=== RESPONSE ===`);
     console.log(`HTTP ${res.statusCode}`);
     if (res.body) console.log(res.body);
-    console.log(
-      res.statusCode >= 200 && res.statusCode < 300
-        ? '\nHandler acknowledged (2xx).'
-        : '\nHandler did NOT acknowledge with 2xx — check your handler logs.',
-    );
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      console.log('\nHandler acknowledged (2xx).');
+    } else {
+      // D09: a non-2xx answer is a runtime failure (exit 1 per the
+      // bundled-script contract) — never a successful smoke check.
+      console.log('\nHandler did NOT acknowledge with 2xx — check your handler logs.');
+      process.exitCode = 1;
+    }
   } catch (e) {
     console.error(`Request failed: ${e.message}`);
     process.exit(1);

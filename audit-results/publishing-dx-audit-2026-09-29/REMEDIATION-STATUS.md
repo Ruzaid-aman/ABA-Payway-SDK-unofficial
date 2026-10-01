@@ -164,9 +164,9 @@ request design first. `.postman/resources.yaml` gained Postman-app noise
 | `npm run lint` | exit 0 (2 pre-existing warnings in journal files) |
 | Postman `test:yaml` (incl. the 16 distribution-scan negative controls) / `export_json --check` / `verify_index` / `verify_postman_import` / `syntaxcheck` / `validate` / `readme_path_audit` | PASS |
 
-## Work package 6 � Public corpus (2026-10-01)
+## Work package 6 � Public corpus (2026-10-01)
 
-See [item 6 verification](ITEM-6-CORPUS-2026-10-01.md). D03�D07 are implemented
+See [item 6 verification](ITEM-6-CORPUS-2026-10-01.md). D03�D07 are implemented
 and offline-verified. D02 topics work in the installed package; security mailbox
 ownership and monitoring remains the release-owner check. Generated corpus has
 35 topics and 34 Skills, full readable guides, valid file/anchor navigation, and
@@ -174,8 +174,27 @@ a runnable simulated starter. Package/repository/consumer gates and 60 focused
 tests pass. Typecheck passes; current whole-repo lint has two unrelated scaffold
 test assignment-expression errors.
 
+## Work package 8 — Remaining configuration/helper contracts (2026-10-01)
+
+Implements remediation item 8 from REPORT.md §11 (S06/S07/S08/D09). Full fix and
+evidence table: [ITEM-8-CONFIG-HELPER-CONTRACTS-2026-10-01.md](ITEM-8-CONFIG-HELPER-CONTRACTS-2026-10-01.md).
+
+| Finding | Status | Fix and evidence |
+|---|---|---|
+| S06 — partner-only self-activation required merchant credentials at construction | **FIXED** | Partner credentials are now a complete credential class for CONSTRUCTION (src/client.ts `resolveConfig`); the merchant requirement is enforced where consumed — guards atop `request()`/`requestWithMerchantAuth()` throw the same `PayWayConfigError` messages before any HMAC or fetch. Partner-only clients reach the mocked `online-self-activation/new-merchant` endpoint with `partner_id`/`request_data`/`hash` and NO merchant fields; merchant-signed calls (QR plain path + payment-link merchant-auth path) still fail clearly with zero requests. 4 acceptance tests in `client.test.ts`. |
+| S07 — invalid `maxRetries` (-1/NaN) became a misleading `Retry limit exceeded` with zero fetch attempts | **FIXED** | `maxRetries` (finite non-negative integer) and `retryDelayMs` (finite non-negative number) are validated at the configuration boundary with `PayWayConfigError`; zero retries constructs and makes exactly one attempt (pinned). 2 acceptance tests in `client.test.ts`. |
+| S08 — noninteractive `onboard --stage <invalid>` printed a plan and exited 0 | **FIXED** | Stage validation now precedes any output in both modes: invalid stage → `agent-command/v1` machine envelope (`status: 'failed'`, `error.code: 'INVALID_STAGE'`, allowed list in `error.detail`) + exit 1 non-TTY; cancel banner + exit 1 TTY. Valid noninteractive plans are explicitly labeled `executed: false` / "Plan only — no stage was executed". Pinned in `onboard-command-seams.test.ts`. |
+| D09 — bundled `mock-callback.cjs` accepted any currency, shipped literal `NaN` amounts, and exited 0 on HTTP 400 | **FIXED** | Currency (USD/KHR) and amount (finite > 0) are rejected before signing (exit 2, usage class); non-2xx handler responses now exit 1 per the shared bundled-script contract; `postJson` gained a bounded, flag-configurable timeout (`--timeout <ms>`); header + `aba-payway-hash` SKILL.md (+ byte-identical `.zcode` mirror) document the 0/1/2 contract. Acceptance: 4 pure tests (formatting/defaults unchanged, signature still verifies) + 7 process-level tests against child-hosted fixture servers (200→0, 400→1, 500→1, refused→1, hung handler `--timeout 300`→1 "timeout after 300ms", malformed amount→2, unsupported currency→2). Child→child loopback probed working 2026-10-01 (the parent-hosted restriction from `starter-e2e.test.ts` does not apply child→child; probe kept at `.scratch/loopback-probe/`). |
+
+Gate snapshot: build/typecheck PASS; lint exit 0 (2 pre-existing journal
+warnings); full offline suite **2,216 tests / 154 files, 0 failed** (2026-10-01,
+Windows, Node v24.21.0, npm 12.0.2) — includes the 17 new S06/S07/S08/D09
+acceptance tests.
+
 ## Next in the ordered plan
 
-Work package 6 (D02–D07 — one navigable public corpus), then 7 (WP05/WP06/WP08/WP09/WP11 —
-Postman callback and recipient journey). Work packages 1–5 are complete or carry only the
+Work package 8 is complete (see the section above). Remaining ordered items: 7
+(WP05/WP06/WP08/WP09/WP11 — Postman callback and recipient journey), then 9 (R04/R06/R07
+— dependency disposition, reviewed generated docs, clean candidate) and the
+owner-controlled item 10. Work packages 1–6 and 8 are complete or carry only the
 recorded owner gates.

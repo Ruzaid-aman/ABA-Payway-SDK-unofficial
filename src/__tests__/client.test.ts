@@ -99,6 +99,101 @@ describe('PayWay constructor', () => {
   });
 });
 
+describe('PayWay configuration validation (audit S06/S07)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('S07: rejects an invalid retry configuration with PayWayConfigError before execution', () => {
+    expect(() => new PayWay({ ...TEST_CONFIG, maxRetries: -1 })).toThrow(PayWayConfigError);
+    expect(() => new PayWay({ ...TEST_CONFIG, maxRetries: -1 })).toThrow(
+      'maxRetries must be a non-negative integer, received: -1',
+    );
+    expect(() => new PayWay({ ...TEST_CONFIG, maxRetries: Number.NaN })).toThrow(/maxRetries/);
+    expect(() => new PayWay({ ...TEST_CONFIG, maxRetries: 1.5 })).toThrow(/maxRetries/);
+    expect(() => new PayWay({ ...TEST_CONFIG, maxRetries: Number.POSITIVE_INFINITY })).toThrow(/maxRetries/);
+    expect(() => new PayWay({ ...TEST_CONFIG, retryDelayMs: -5 })).toThrow(PayWayConfigError);
+    expect(() => new PayWay({ ...TEST_CONFIG, retryDelayMs: -5 })).toThrow(
+      'retryDelayMs must be a non-negative number of milliseconds, received: -5',
+    );
+    expect(() => new PayWay({ ...TEST_CONFIG, retryDelayMs: Number.NaN })).toThrow(/retryDelayMs/);
+  });
+
+  it('S07: zero retries is a valid configuration that makes exactly one attempt', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: '00' }, qrString: 'x' }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const payway = new PayWay({ ...TEST_CONFIG, maxRetries: 0, retryDelayMs: 0 });
+    await payway.qr.generateQr({
+      transactionId: 'one-attempt-1',
+      paymentOption: 'abapay',
+      amount: 1,
+      currency: 'USD',
+      callbackUrl: 'https://example.com/cb',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('S06: partner-only credentials construct without merchant credentials', () => {
+    expect(() =>
+      new PayWay({
+        partnerId: 'partner-1',
+        partnerApiKey: 'partner-key-1',
+        publicKeyPem: TEST_RSA.publicKey,
+      }),
+    ).not.toThrow();
+  });
+
+  it('S06: partner-only configuration reaches the partner endpoint with correct auth and no merchant fields', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: '00' } }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const payway = new PayWay({
+      partnerId: 'partner-1',
+      partnerApiKey: 'partner-key-1',
+      publicKeyPem: TEST_RSA.publicKey,
+    });
+    await payway.selfActivation.registerMerchant({
+      pushbackUrl: 'https://example.com/pushback',
+      redirectUrl: 'https://example.com/redirect',
+      registerRef: 'req-0001',
+      currency: 'USD',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, { body: string }];
+    expect(String(url)).toContain('/api/merchant-portal/online-self-activation/new-merchant');
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    expect(body['partner_id']).toBe('partner-1');
+    expect(typeof body['request_data']).toBe('string');
+    expect(typeof body['hash']).toBe('string');
+    // The partner contract carries NO merchant identity.
+    expect(body['merchant_id']).toBeUndefined();
+    expect(body['merchant_auth']).toBeUndefined();
+  });
+
+  it('S06: merchant-signed calls still fail clearly without merchant credentials — before any request', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const payway = new PayWay({
+      partnerId: 'partner-1',
+      partnerApiKey: 'partner-key-1',
+      publicKeyPem: TEST_RSA.publicKey,
+    });
+    // Plain-request path (QR domain):
+    await expect(
+      payway.qr.generateQr({
+        transactionId: 'guard-1',
+        paymentOption: 'abapay',
+        amount: 1,
+        currency: 'USD',
+        callbackUrl: 'https://example.com/cb',
+      }),
+    ).rejects.toThrow('merchantId is required');
+    // Merchant-auth path (payment links):
+    await expect(payway.paymentLink.getDetails('some-link-id')).rejects.toThrow('merchantId is required');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe('PayWay environment configuration', () => {
   afterEach(() => {
     vi.unstubAllEnvs();

@@ -1,10 +1,11 @@
 import { createHmac } from 'node:crypto';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * Contract tests for the dependency-free .cjs tools bundled with the skills
@@ -173,6 +174,144 @@ describe('mock-callback.cjs (signed fake callbacks)', () => {
   it('maps status names to sandbox-verified codes and rejects unknown statuses', () => {
     expect(mockCb.STATUS_CODES.REFUNDED).toBe(4);
     expect(() => mockCb.buildCallbackBody({ status: 'NOPE' })).toThrow();
+  });
+
+  it('rejects unsupported currencies before anything is signed (audit D09)', () => {
+    expect(() => mockCb.buildCallbackBody({ currency: 'EUR' })).toThrow(/Invalid --currency "EUR". Valid: USD, KHR/);
+    // Case-insensitive acceptance for the supported set is preserved:
+    expect(mockCb.buildCallbackBody({ currency: 'usd' }).payment_currency).toBe('USD');
+    expect(mockCb.buildCallbackBody({ currency: 'khr' }).payment_currency).toBe('KHR');
+  });
+
+  it('rejects malformed, zero and negative amounts instead of shipping NaN (audit D09)', () => {
+    expect(() => mockCb.buildCallbackBody({ amount: 'abc' })).toThrow(/Invalid --amount "abc"/);
+    expect(() => mockCb.buildCallbackBody({ amount: 'NaN' })).toThrow(/Invalid --amount/);
+    expect(() => mockCb.buildCallbackBody({ amount: '0' })).toThrow(/Invalid --amount "0"/);
+    expect(() => mockCb.buildCallbackBody({ amount: '-5' })).toThrow(/Invalid --amount "-5"/);
+    expect(() => mockCb.buildCallbackBody({ amount: Number.POSITIVE_INFINITY })).toThrow(/Invalid --amount/);
+  });
+
+  it('keeps the documented currency formatting for valid input (USD 2dp, KHR integer, defaults)', () => {
+    expect(mockCb.buildCallbackBody({}).payment_amount).toBe('10.00');
+    expect(mockCb.buildCallbackBody({ currency: 'KHR', amount: '40000.4' }).payment_amount).toBe('40000');
+    const khrDefault = mockCb.buildCallbackBody({ currency: 'KHR' });
+    expect(khrDefault.payment_amount).toBe('40000');
+    expect(khrDefault.original_amount).toBe('40000');
+  });
+});
+
+describe('mock-callback.cjs process contract (audit D09: accurate helper exits)', () => {
+  // Spawned children cannot open loopback TCP to a PARENT-hosted server on
+  // some Windows setups (see starter-e2e.test.ts), but child→child loopback
+  // works (probed 2026-10-01), so the fixture HTTP servers run as their own
+  // child processes and mock-callback.cjs as another.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mock-callback-proc-'));
+  const mockScript = require.resolve('../../skills/aba-payway-hash/scripts/mock-callback.cjs');
+  // Path-encoded contract: /status/<code> answers that code; other paths 404.
+  const statusServerScript = path.join(dir, 'fixture-server.cjs');
+  fs.writeFileSync(
+    statusServerScript,
+    [
+      'const http = require("node:http");',
+      'const s = http.createServer((req, res) => {',
+      '  const m = (req.url || "").match(/^\\/status\\/(\\d{3})/);',
+      '  if (!m) { res.writeHead(404); res.end("bad path"); return; }',
+      '  res.writeHead(Number(m[1]), { "content-type": "text/plain" });',
+      '  res.end("fixture");',
+      '});',
+      's.listen(0, "127.0.0.1", () => console.log("up", s.address().port));',
+    ].join('\n'),
+  );
+  // Accepts the connection and never responds (for the --timeout test).
+  const hangServerScript = path.join(dir, 'hang-server.cjs');
+  fs.writeFileSync(
+    hangServerScript,
+    [
+      'const http = require("node:http");',
+      'const s = http.createServer(() => { /* never respond */ });',
+      's.listen(0, "127.0.0.1", () => console.log("up", s.address().port));',
+    ].join('\n'),
+  );
+
+  const started: ReturnType<typeof spawn>[] = [];
+  let serverPort = 0;
+
+  const startServer = (script: string): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [script]);
+      started.push(child);
+      let out = '';
+      const timer = setTimeout(() => reject(new Error(`fixture server never became ready: ${out}`)), 8000);
+      child.stdout.on('data', (d: Buffer) => {
+        out += String(d);
+        const m = out.match(/up (\d+)/);
+        if (m) {
+          clearTimeout(timer);
+          resolve(Number(m[1]));
+        }
+      });
+      child.on('exit', (code) => reject(new Error(`fixture server exited early (${code}): ${out}`)));
+    });
+
+  const runMock = (url: string, extraArgs: string[] = []) =>
+    spawnSync(process.execPath, [mockScript, '--url', url, '--api-key', 'fixture-key', ...extraArgs], {
+      encoding: 'utf8',
+      timeout: 15000,
+    });
+
+  beforeAll(async () => {
+    serverPort = await startServer(statusServerScript);
+  });
+
+  afterAll(() => {
+    for (const child of started.splice(0)) child.kill();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('exits 0 and reports acknowledgment on HTTP 2xx', () => {
+    const r = runMock(`http://127.0.0.1:${serverPort}/status/200`);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('Handler acknowledged (2xx)');
+  });
+
+  it('exits 1 on HTTP 400 (a non-2xx answer is a runtime failure, not success)', () => {
+    const r = runMock(`http://127.0.0.1:${serverPort}/status/400`);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('HTTP 400');
+    expect(r.stdout).toContain('did NOT acknowledge');
+  });
+
+  it('exits 1 on HTTP 500', () => {
+    const r = runMock(`http://127.0.0.1:${serverPort}/status/500`);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('did NOT acknowledge');
+  });
+
+  it('exits 1 on network failure (connection refused)', () => {
+    const r = runMock('http://127.0.0.1:1/cb');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('Request failed');
+  });
+
+  it('exits 1 on a handler that never answers when --timeout bounds the wait', async () => {
+    const hangPort = await startServer(hangServerScript);
+    const r = runMock(`http://127.0.0.1:${hangPort}/status/200`, ['--timeout', '300']);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('timeout after 300ms');
+  }, 20000);
+
+  it('exits 2 on a malformed amount without sending anything', () => {
+    const r = runMock(`http://127.0.0.1:${serverPort}/status/200`, ['--amount', 'abc']);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('Invalid --amount "abc"');
+    expect(r.stdout).not.toContain('SENDING');
+  });
+
+  it('exits 2 on an unsupported currency', () => {
+    const r = runMock(`http://127.0.0.1:${serverPort}/status/200`, ['--currency', 'EUR']);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('Invalid --currency "EUR"');
+    expect(r.stdout).not.toContain('SENDING');
   });
 });
 

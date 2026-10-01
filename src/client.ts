@@ -1315,10 +1315,18 @@ export class PayWay {
       khqr: resolveKhqrConfiguration(config.khqr),
     };
 
-    if (!resolvedConfig.merchantId) {
-      throw new PayWayConfigError('merchantId is required');
-    }
-    if (!resolvedConfig.apiKey) {
+    // S06 (publishing-DX audit): partner credentials (online-self-activation)
+    // are a complete credential class for construction — the partner request
+    // path authenticates with partnerId/partnerApiKey and injects NO merchant
+    // fields. Merchant credentials are enforced where they are consumed
+    // ({@link PayWay.request} / {@link PayWay.requestWithMerchantAuth}), so a
+    // partner-only configuration can construct and reach partner endpoints
+    // while merchant calls still fail clearly before anything is signed.
+    const hasMerchantCredentials = Boolean(resolvedConfig.merchantId && resolvedConfig.apiKey);
+    if (!hasMerchantCredentials && !resolvedConfig.partnerId) {
+      if (!resolvedConfig.merchantId) {
+        throw new PayWayConfigError('merchantId is required');
+      }
       throw new PayWayConfigError('apiKey is required');
     }
     if (
@@ -1327,6 +1335,25 @@ export class PayWay {
     ) {
       throw new PayWayConfigError(
         `timeout must be a positive number of milliseconds, received: ${resolvedConfig.timeout}`,
+      );
+    }
+    // S07 (publishing-DX audit): an invalid retry configuration used to reach
+    // the execution loop and surface as a misleading "Retry limit exceeded"
+    // transport error with zero fetch attempts. Reject it at the boundary.
+    if (
+      resolvedConfig.maxRetries !== undefined &&
+      (!Number.isInteger(resolvedConfig.maxRetries) || resolvedConfig.maxRetries < 0)
+    ) {
+      throw new PayWayConfigError(
+        `maxRetries must be a non-negative integer, received: ${resolvedConfig.maxRetries}`,
+      );
+    }
+    if (
+      resolvedConfig.retryDelayMs !== undefined &&
+      (!Number.isFinite(resolvedConfig.retryDelayMs) || resolvedConfig.retryDelayMs < 0)
+    ) {
+      throw new PayWayConfigError(
+        `retryDelayMs must be a non-negative number of milliseconds, received: ${resolvedConfig.retryDelayMs}`,
       );
     }
     if (!resolvedConfig.debug) {
@@ -1767,6 +1794,12 @@ export class PayWay {
     fetchOptions?: { retry?: 'transient' | 'none' },
     callOptions?: RequestCallOptions,
   ): Promise<TResponse> {
+    // S06: with partner-only credentials construction succeeds, so the
+    // merchant requirement is enforced here — before any HMAC is computed or
+    // request is sent (an empty-key HMAC would otherwise go out silently).
+    if (!this.config.merchantId || !this.config.apiKey) {
+      throw new PayWayConfigError(this.config.merchantId ? 'apiKey is required' : 'merchantId is required');
+    }
     const fullBody: Record<string, unknown> = {
       ...body,
       merchant_id: this.config.merchantId,
@@ -1811,6 +1844,12 @@ export class PayWay {
       callOptions?: RequestCallOptions;
     } = {},
   ): Promise<TResponse> {
+    // S06: same merchant-credential enforcement as {@link PayWay.request} —
+    // fail before signing when a partner-only configuration calls a
+    // merchant-authenticated domain.
+    if (!this.config.merchantId || !this.config.apiKey) {
+      throw new PayWayConfigError(this.config.merchantId ? 'apiKey is required' : 'merchantId is required');
+    }
     if (!this.config.publicKeyPem) {
       throw new PayWayConfigError('publicKeyPem is required for RSA-encrypted endpoints');
     }

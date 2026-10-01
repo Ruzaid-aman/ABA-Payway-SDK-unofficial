@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### Configuration and helper contracts hardened (publishing-DX audit item 8, 2026-10-01)
+
+- **S06 — partner-only credentials work for self-activation.** A client
+  configured with only partner credentials (`partnerId`/`partnerApiKey` or
+  `PAYWAY_PARTNER_ID`/`PAYWAY_PARTNER_API_KEY` + RSA key) now constructs
+  successfully: merchant credentials are enforced where they are consumed
+  (`request()` / `requestWithMerchantAuth()`) instead of at construction, so
+  the documented partner workflow can begin with its own credential class.
+  Merchant calls still fail with the same clear `PayWayConfigError`
+  (`merchantId is required` / `apiKey is required`) before anything is
+  signed or sent.
+- **S07 — invalid retry configuration fails fast.** `maxRetries` (must be a
+  finite non-negative integer) and `retryDelayMs` (finite non-negative
+  milliseconds) are validated at the configuration boundary with
+  `PayWayConfigError`; previously `maxRetries: -1`/`NaN` surfaced as a
+  misleading `Retry limit exceeded` transport error with zero fetch
+  attempts. `maxRetries: 0` remains valid and makes exactly one attempt.
+- **S08 — `onboard --stage <invalid>` no longer exits 0.** The stage
+  argument is validated before any output in both modes: non-TTY runs get an
+  `agent-command/v1` failure envelope (`error.code: 'INVALID_STAGE'` with
+  the allowed list) and exit 1; TTY runs show the cancel banner and exit 1.
+  Valid noninteractive plans now explicitly state no setup executed
+  (`executed: false`).
+- **D09 — `mock-callback.cjs` (skills helper) honors its advertised
+  exit/validation contract.** Unsupported currencies and non-finite or
+  non-positive amounts are rejected before signing (exit 2, usage class);
+  a non-2xx handler response is a runtime failure and exits 1 ("did NOT
+  acknowledge" is no longer a successful smoke check); a bounded
+  `--timeout <ms>` (default 10000) covers hung handlers. Covered by pure
+  and process-level fixture tests (HTTP 200/400/500, connection refused,
+  hung handler, malformed inputs); `aba-payway-hash` SKILL.md documents the
+  contract.
+
 ### Purchase payment-credential endpoint error table folded into the registry (2026-10-01)
 
 - **Registry 83 → 95 codes.** The ABA dev team's authoritative error table for

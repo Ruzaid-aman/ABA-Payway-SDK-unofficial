@@ -70,10 +70,53 @@ export async function runOnboardCommand(opts: { stage?: string }, deps: OnboardC
 
   const interactive = deps.interactive ?? isInteractiveTerminal();
 
-  // Non-interactive with an explicit --stage: print the stage plan only
-  // (historical behavior — no blocked result, no exit-code change).
+  // S08 (publishing-DX audit): validate the --stage argument BEFORE emitting
+  // anything, in either mode — an invalid stage must never read as success.
+  // Non-TTY gets a machine envelope; TTY gets the cancel banner. Both exit 1.
+  const stageError = validateStageArg(opts.stage);
+  if (stageError) {
+    if (!interactive) {
+      log(
+        JSON.stringify(
+          {
+            version: 'agent-command/v1',
+            status: 'failed',
+            request: 'onboard',
+            message: stageError,
+            error: {
+              code: 'INVALID_STAGE',
+              message: stageError,
+              detail: `Use one of: ${ALL_STAGES.join(', ')}`,
+            },
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      banners.cancel(stageError);
+    }
+    setExitCode(1);
+    return;
+  }
+
+  // Non-interactive with a valid explicit --stage: print the stage plan only
+  // (historical behavior — no blocked result, no exit-code change), now
+  // explicitly labeled as a plan: no setup has executed.
   if (!interactive && opts.stage) {
-    log(JSON.stringify({ command: 'onboard', stage: opts.stage, allowed: ALL_STAGES }, null, 2));
+    log(
+      JSON.stringify(
+        {
+          command: 'onboard',
+          stage: opts.stage,
+          allowed: ALL_STAGES,
+          executed: false,
+          message: 'Plan only — no stage was executed (non-interactive run).',
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
@@ -86,9 +129,6 @@ export async function runOnboardCommand(opts: { stage?: string }, deps: OnboardC
   // Interactive: structured scan → stage machine → final readiness.
   banners.intro('PayWay Agent Onboarding');
   try {
-    const stageError = validateStageArg(opts.stage);
-    if (stageError) throw new Error(stageError);
-
     const snapshot = scanOnboardingState(env);
     const rows = readinessRows(snapshot);
     const lines = rows
