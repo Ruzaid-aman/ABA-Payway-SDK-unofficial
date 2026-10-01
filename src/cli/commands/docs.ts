@@ -16,7 +16,9 @@ function knowledgeUnavailableJson(): number {
     JSON.stringify(
       {
         error: {
-          kind: 'config_error',
+          // StructuredError kind union (src/cli/output.ts): 'config_error' is
+          // the SDK error `type`, not a CLI envelope kind.
+          kind: 'validation',
           exitCode: 1,
           type: 'PayWayConfigError',
           message:

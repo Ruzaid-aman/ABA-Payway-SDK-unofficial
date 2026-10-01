@@ -66,6 +66,15 @@ try {
     "import type { PayWayConfig, TransactionSession } from 'aba-payway-ts';\nconst config: PayWayConfig = { merchantId: 'm', apiKey: 'k' };\nconst session: TransactionSession | undefined = undefined;\nvoid config; void session;\n",
     'utf8',
   );
+  // Typed CommonJS consumer (audit C1): under NodeNext a .cts file resolves
+  // types through the `require` condition, so it fails with TS1479 unless the
+  // exports map points `require.types` at the ESM-typed dist/index.d.cts. The
+  // runtime require() in smoke.cjs cannot catch this — types are never loaded.
+  writeFileSync(
+    path.join(temporaryRoot, 'smoke.cts'),
+    "import { PayWay } from 'aba-payway-ts';\nimport type { PayWayConfig, TransactionSession } from 'aba-payway-ts';\nconst config: PayWayConfig = { merchantId: 'm', apiKey: 'k' };\nconst session: TransactionSession | undefined = undefined;\nvoid config;\nvoid session;\nvoid PayWay;\n",
+    'utf8',
+  );
 
   execFileSync(process.execPath, ['smoke.mjs'], { cwd: temporaryRoot, stdio: 'pipe' });
   execFileSync(process.execPath, ['smoke.cjs'], { cwd: temporaryRoot, stdio: 'pipe' });
@@ -83,6 +92,7 @@ try {
       'NodeNext',
       '--skipLibCheck',
       'smoke.ts',
+      'smoke.cts',
     ],
     { cwd: temporaryRoot, stdio: 'pipe', encoding: 'utf8', env: process.env },
   );
@@ -190,7 +200,7 @@ try {
   );
   if (installedPackage.name !== 'aba-payway-ts') throw new Error('installed package identity mismatch');
 
-  console.log(`Packed-package smoke passed: ESM, CJS, declarations, CLI demo, corpus links/anchors, offline navigation, data root, starter create/verify/fulfill once, ${skillCount} skills, and install/doctor/upgrade/remove preservation.`);
+  console.log(`Packed-package smoke passed: ESM, CJS, typed ESM + typed CJS declarations, CLI demo, corpus links/anchors, offline navigation, data root, starter create/verify/fulfill once, ${skillCount} skills, and install/doctor/upgrade/remove preservation.`);
 } finally {
   const resolvedTemporaryRoot = path.resolve(temporaryRoot);
   const resolvedSystemTemp = path.resolve(tmpdir());

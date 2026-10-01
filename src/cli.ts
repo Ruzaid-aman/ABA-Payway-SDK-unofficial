@@ -346,6 +346,19 @@ function printApiErrorJson(e: unknown): number {
 }
 
 /**
+ * Unified CLI error router (audit C2): every catch block on a command that
+ * accepts `--json` funnels here so the machine-output contract has one
+ * implementation — JSON mode prints the canonical
+ * `{ error: { kind, exitCode, … } }` envelope to stdout, human mode keeps the
+ * legacy block. Exit codes are identical in both modes (classifyError).
+ * `json` is intentionally `unknown`: Record-typed action opts carry option
+ * values as `string | boolean | undefined`, and truthiness is the contract.
+ */
+function routeCliError(e: unknown, json: unknown): number {
+  return json ? printApiErrorJson(e) : printApiError(e);
+}
+
+/**
  * Validation-failure envelope for commands whose local checks run BEFORE the
  * try block (generate-checkout's amount/currency pre-flight) — same shape
  * printApiErrorJson emits, so agents branch on one envelope contract (T5.4).
@@ -1507,7 +1520,7 @@ program
       }
       printApiResultJson(result, payway);
     } catch (error) {
-      process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
+      process.exitCode = routeCliError(error, opts.json);
     }
   });
 
@@ -1518,7 +1531,7 @@ program
   .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: { transactionId: string; json?: boolean }) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -1569,13 +1582,17 @@ program
   .option('--poll-timeout <seconds>', 'Give up after this many seconds — exit code 3, outcome unknown (default: 600)', '600')
   .option('--json', 'Emit one JSON object per event (poll/terminal/aborted) for agents')
   .action(async (opts: { transactionId: string; pollInterval: string; pollTimeout: string; json?: boolean }) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
     try {
       validateTransactionId(opts.transactionId);
     } catch (e) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson((e as Error).message);
+        return;
+      }
       console.log(`  ${c.red('✗')} ${(e as Error).message}`);
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -1590,7 +1607,7 @@ program
       });
       process.exitCode = mapPollOutcomeToExitCode(outcome);
     } catch (error) {
-      process.exitCode = printApiError(error);
+      process.exitCode = routeCliError(error, opts.json);
     }
   });
 
@@ -1603,7 +1620,7 @@ program
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: { transactionId: string; force?: boolean; json?: boolean }) => {
     const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -1636,7 +1653,7 @@ program
         console.log('  Cancelled by user.');
         process.exit(130);
       }
-      process.exitCode = printApiError(error);
+      process.exitCode = routeCliError(error, opts.json);
     }
   });
 
@@ -1755,7 +1772,7 @@ program
         process.exitCode = EXIT_OK;
         return;
       }
-      if (!assertCredentialsPresent()) {
+      if (!assertCredentialsPresent(Boolean(opts.json))) {
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -1771,6 +1788,10 @@ program
           return;
         }
       } else if (op === 'close' && !opts.force) {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson('Batch close requires -y/--force when running non-interactively (--json)');
+          return;
+        }
         console.log(`  ${c.red('✗')} Batch close requires -y/--force when running non-interactively (--json)`);
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -1818,8 +1839,15 @@ program
       if (opts.report) {
         try {
           writeFileSync(opts.report, renderTxBatchReport(op, items, { pace_ms: String(paceMs) }));
-          console.log(`  ${c.dim(`Report written: ${opts.report}`)}`);
+          // stdout purity under --json (audit C2): the report path is a side
+          // channel, so its notice goes to stderr in machine mode.
+          const reportNote = opts.json ? console.error : console.log;
+          reportNote(`  ${c.dim(`Report written: ${opts.report}`)}`);
         } catch (error) {
+          if (opts.json) {
+            process.exitCode = printValidationErrorJson(`Cannot write --report: ${(error as Error).message}`);
+            return;
+          }
           console.log(`  ${c.red('✗')} Cannot write --report: ${(error as Error).message}`);
           process.exitCode = EXIT_VALIDATION;
           return;
@@ -1853,7 +1881,7 @@ program
   )
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: { transactionId: string; wait?: string; json?: boolean }) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -1910,7 +1938,7 @@ program
         if (data?.[key] !== undefined) console.log(`  ${key.padEnd(20)} ${c.cyan(String(data[key]))}`);
       }
     } catch (error) {
-      process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
+      process.exitCode = routeCliError(error, opts.json);
     }
   });
 
@@ -1938,7 +1966,7 @@ program
       pagination: string;
       json?: boolean;
     }) => {
-      if (!assertCredentialsPresent()) {
+      if (!assertCredentialsPresent(Boolean(opts.json))) {
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -1954,6 +1982,12 @@ program
       const toDate = opts.to ?? gwTo;
 
       if (!DATE_FMT.test(fromDate) || !DATE_FMT.test(toDate)) {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson(
+            'Dates must use "YYYY-MM-DD HH:mm:ss" — example: --from "2026-08-25 00:00:00" --to "2026-08-25 23:59:59" (compact formats like 20260825 are rejected by PayWay with code 49 — sandbox-verified)',
+          );
+          return;
+        }
         console.log(`  ${c.red('✗')} Dates must use "YYYY-MM-DD HH:mm:ss"`);
         console.log(`  ${c.dim('Example: --from "2026-08-25 00:00:00" --to "2026-08-25 23:59:59"')}`);
         console.log(`  ${c.dim('(Compact formats like 20260825 are rejected by PayWay with code 49 — sandbox-verified.)')}`);
@@ -1967,6 +2001,12 @@ program
       const winFromMs = Date.parse(fromDate.replace(' ', 'T'));
       const winToMs = Date.parse(toDate.replace(' ', 'T'));
       if (!Number.isNaN(winFromMs) && !Number.isNaN(winToMs) && winToMs - winFromMs > 3 * 86_400_000) {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson(
+            'The requested window spans more than 3 days, which PayWay rejects — split the query into ≤3-day windows (sandbox-verified: the gateway returns HTTP 403 for windows wider than 3 days)',
+          );
+          return;
+        }
         console.log(`  ${c.red('✗')} The requested window spans more than 3 days, which PayWay rejects.`);
         console.log(`  ${c.dim('Split the query into ≤3-day windows (e.g. --from "2026-08-25 00:00:00" --to "2026-08-27 23:59:59").')}`);
         console.log(`  ${c.dim('(Sandbox-verified: the gateway returns HTTP 403 for windows wider than 3 days.)')}`);
@@ -1975,6 +2015,12 @@ program
       }
       const pageSize = Number(opts.pagination);
       if (Number.isNaN(pageSize) || !Number.isInteger(pageSize) || pageSize <= 0 || pageSize > 1000) {
+        if (opts.json) {
+          process.exitCode = printValidationErrorJson(
+            `--pagination must be a whole number between 1 and 1000, received: ${String(opts.pagination)} (PayWay caps the page size at 1000)`,
+          );
+          return;
+        }
         console.log(`  ${c.red('✗')} --pagination must be a whole number between 1 and 1000, received: ${String(opts.pagination)}`);
         console.log(`  ${c.dim('PayWay caps the page size at 1000 — wider pages are rejected server-side.')}`);
         process.exitCode = EXIT_VALIDATION;
@@ -2036,7 +2082,7 @@ program
         }
         console.log();
       } catch (error) {
-        process.exitCode = printApiError(error);
+        process.exitCode = routeCliError(error, opts.json);
       }
     },
   );
@@ -2195,7 +2241,7 @@ program
           console.log('  Cancelled by user.');
           process.exit(130);
         }
-        process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
+        process.exitCode = routeCliError(error, opts.json);
       }
     },
   );
@@ -2220,7 +2266,7 @@ program
       console.log(`  ${c.green('✓')} Exchange rate:`);
       console.log(`  ${JSON.stringify(result).slice(0, 300)}`);
     } catch (error) {
-      process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
+      process.exitCode = routeCliError(error, opts.json);
     }
   });
 
@@ -3009,7 +3055,7 @@ program
     nonInteractive?: boolean;
   }) => {
     if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — Soundbox QR (request-qr)\n`);
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = 1;
       return;
     }
@@ -3075,11 +3121,7 @@ program
       }
       process.exitCode = EXIT_OK;
     } catch (e) {
-      if (opts.json) {
-        process.exitCode = printApiErrorJson(e);
-        return;
-      }
-      process.exitCode = printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -3245,7 +3287,7 @@ program
       failStructured(new PayWayConfigError(message));
       return;
     }
-    if (!outputMode && !assertCredentialsPresent()) {
+    if (!outputMode && !assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = 1;
       return;
     }
@@ -3431,11 +3473,7 @@ program
       // transaction-detail now covers generate-checkout — gateway
       // rejections (04/35/104) and SDK-local validation both emit
       // `{ error: { kind, exitCode, … } }` under --json.
-      if (opts.json) {
-        process.exitCode = printApiErrorJson(e);
-        return;
-      }
-      process.exitCode = printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -3462,6 +3500,7 @@ paymentLinkCmd
     'Split-payout beneficiaries — JSON array [{acc, amt}] or string; total amt must equal --amount',
   )
   .option('--no-show-qr', 'Do not render the shareable-link QR in the terminal (auto-enabled for interactive terminals)')
+  .option('-y, --force', 'Skip the interactive confirmation (for scripts/agents)', false)
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
     if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — create payment link\n`);
@@ -3592,7 +3631,7 @@ paymentLinkCmd
       return;
     }
 
-    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json)) || !assertRsaKeyPresent(Boolean(opts.json))) {
       process.exitCode = 1;
       return;
     }
@@ -3664,11 +3703,7 @@ paymentLinkCmd
       // Same agent envelope contract as check-transaction / transaction-detail /
       // generate-checkout (T5.4): under --json branch on the structured
       // `{ error: { kind, exitCode, … } }` envelope, not on human text.
-      if (opts.json) {
-        process.exitCode = printApiErrorJson(e);
-        return;
-      }
-      process.exitCode = printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -3680,7 +3715,7 @@ paymentLinkCmd
   .action(async (opts: { id: string; json?: boolean }) => {
     if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — payment link details\n`);
 
-    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json)) || !assertRsaKeyPresent(Boolean(opts.json))) {
       process.exitCode = 1;
       return;
     }
@@ -3721,11 +3756,7 @@ paymentLinkCmd
       console.log(`  ${c.bold('Link:')}        ${c.cyan(data?.payment_link ?? '-')}`);
       console.log();
     } catch (e) {
-      if (opts.json) {
-        process.exitCode = printApiErrorJson(e);
-        return;
-      }
-      process.exitCode = printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -3739,7 +3770,7 @@ paymentLinkCmd
     const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
     if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — void payment link\n`);
 
-    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json)) || !assertRsaKeyPresent(Boolean(opts.json))) {
       process.exitCode = 1;
       return;
     }
@@ -3772,11 +3803,7 @@ paymentLinkCmd
         console.log('  Cancelled by user.');
         process.exit(130);
       }
-      if (opts.json) {
-        process.exitCode = printApiErrorJson(e);
-        return;
-      }
-      process.exitCode = printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -3789,6 +3816,10 @@ program
   .action((opts: { currency?: string; json?: boolean }) => {
     const currency = opts.currency?.toUpperCase();
     if (currency && currency !== 'USD' && currency !== 'KHR') {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`--currency must be USD or KHR, received: ${currency}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} --currency must be USD or KHR, received: ${currency}`);
       process.exitCode = 1;
       return;
@@ -3828,6 +3859,10 @@ program
   .action((opts: { outcome?: string; json?: boolean }) => {
     const outcome = opts.outcome?.toLowerCase();
     if (outcome && outcome !== 'approved' && outcome !== 'declined') {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`--outcome must be "approved" or "declined", received: ${String(opts.outcome)}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} --outcome must be "approved" or "declined", received: ${opts.outcome}`);
       process.exitCode = 1;
       return;
@@ -3963,7 +3998,7 @@ program
       }
       console.log();
     } catch (e) {
-      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -3986,7 +4021,7 @@ cofCmd
   .option('-y, --force', 'Skip the interactive confirmation (for scripts/agents)', false)
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | boolean | undefined>) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -4087,7 +4122,7 @@ cofCmd
       console.log(`  ${c.bold('CTID:')}       ${c.cyan(opts.ctid as string)}`);
       console.log(`  ${c.dim('Result arrives via the callback_url; then charge with "cof charge" using --token <pwt>.')}\n`);
     } catch (e) {
-      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -4105,7 +4140,7 @@ cofCmd
   .option('--no-open-page', 'Never open the hosted card page automatically')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | boolean | undefined>) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -4210,7 +4245,7 @@ cofCmd
         process.exitCode = EXIT_OK;
         return;
       }
-      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -4231,7 +4266,7 @@ cofCmd
   .option('--out <path>', 'Write the raw sweep results JSON here (default: payway-output/cof-flag-sweep-<ts>.json)')
   .option('--json', 'Print the machine-readable summary instead of the table')
   .action(async (opts: Record<string, string | boolean | undefined>) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -4454,13 +4489,17 @@ cofCmd
   .option('-y, --force', 'Skip the interactive confirmation (for scripts/agents)', false)
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | boolean | undefined>) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
     warnDuplicateTransactionId(opts.transactionId as string, opts);
     const amount = Number(opts.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
+      if (opts.json) {
+        process.exitCode = printValidationErrorJson(`Amount must be a positive number, received: ${String(opts.amount)}`);
+        return;
+      }
       console.log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -4571,7 +4610,7 @@ cofCmd
       }
       console.log(`  ${c.dim(`Next: verify with payway-sdk check-transaction -t ${String(data.tran_id)}`)}\n`);
     } catch (e) {
-      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -4585,7 +4624,7 @@ cofTokenCmd
   .requiredOption('--token <pwt>', 'Existing payment token (pwt) to renew')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -4617,7 +4656,7 @@ cofTokenCmd
       console.log(`  ${c.dim('Result arrives via the callback_url.')}`);
       console.log(`  ${c.dim(localNote)}\n`);
     } catch (e) {
-      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -4627,7 +4666,7 @@ cofTokenCmd
   .requiredOption('-r, --request-id <id>', 'Unique request id (5-24 characters)')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -4644,7 +4683,7 @@ cofTokenCmd
       console.log(`  ${c.bold('Request ID:')} ${c.cyan(opts.requestId as string)}`);
       console.log(`  ${c.dim(JSON.stringify(result).slice(0, 300))}\n`);
     } catch (e) {
-      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -4655,7 +4694,7 @@ cofTokenCmd
   .requiredOption('--token <pwt>', 'Payment token (pwt) to remove')
   .option('--json', 'Print the raw JSON response')
   .action(async (opts: Record<string, string | undefined>) => {
-    if (!assertCredentialsPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -4686,7 +4725,7 @@ cofTokenCmd
       console.log(`  ${c.bold('CTID:')} ${c.cyan(opts.ctid as string)}`);
       console.log(`  ${c.dim(localNote)}\n`);
     } catch (e) {
-      process.exitCode = opts.json ? printApiErrorJson(e) : printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -4762,7 +4801,7 @@ beneficiaryCmd
   .argument('<payee>', 'Beneficiary account number (ABA account or test MID)')
   .option('--json', 'Print the raw JSON response')
   .action(async (payee: string, opts: { json?: boolean }) => {
-    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json)) || !assertRsaKeyPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -4777,7 +4816,7 @@ beneficiaryCmd
       console.log(`  ${c.bold('Payee:')} ${c.cyan(payee)}`);
       console.log(`  ${c.dim('Activation is usually manual/async — confirm status via beneficiary update-status.')}\n`);
     } catch (e) {
-      process.exitCode = printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -4788,7 +4827,7 @@ beneficiaryCmd
   .requiredOption('-s, --status <0|1>', 'New status: 0 (deactivated) or 1 (active)')
   .option('--json', 'Print the raw JSON response')
   .action(async (payee: string, opts: { status: string; json?: boolean }) => {
-    if (!assertCredentialsPresent() || !assertRsaKeyPresent()) {
+    if (!assertCredentialsPresent(Boolean(opts.json)) || !assertRsaKeyPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
@@ -4809,7 +4848,7 @@ beneficiaryCmd
       console.log(`  ${c.bold('Payee:')}  ${c.cyan(payee)}`);
       console.log(`  ${c.bold('Status:')} ${status === 1 ? c.green('1 (active)') : c.yellow('0 (deactivated)')}\n`);
     } catch (e) {
-      process.exitCode = printApiError(e);
+      process.exitCode = routeCliError(e, opts.json);
     }
   });
 
@@ -5112,7 +5151,7 @@ const preAuthComplete = new Command('complete')
           console.log('  Cancelled by user.');
           process.exit(130);
         }
-        process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
+        process.exitCode = routeCliError(error, opts.json);
       }
     },
   );
@@ -5183,7 +5222,7 @@ const preAuthCompletePayout = new Command('complete-payout')
           console.log('  Cancelled by user.');
           process.exit(130);
         }
-        process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
+        process.exitCode = routeCliError(error, opts.json);
       }
     },
   );
@@ -5244,7 +5283,7 @@ const preAuthCancel = new Command('cancel')
           console.log('  Cancelled by user.');
           process.exit(130);
         }
-        process.exitCode = opts.json ? printApiErrorJson(error) : printApiError(error);
+        process.exitCode = routeCliError(error, opts.json);
       }
     },
   );
@@ -5257,8 +5296,12 @@ program
   .addCommand(preAuthCancel);
 
 // --- self-activation (partner onboarding; spec-derived, not live-verified) ---
-const selfActivationNewMerchant = program
-  .command('new-merchant')
+// Build the sub-commands standalone (`new Command(...)`, same pattern as the
+// pre-auth group above) and attach them ONLY to the self-activation group —
+// constructing them via `program.command(...)` also registered them at the
+// CLI root, so `--help`/completions listed new-merchant/credential-info/mc-info
+// twice (audit M3).
+const selfActivationNewMerchant = new Command('new-merchant')
   .description(
     'Register a merchant via online-self-activation (partner credentials; returns the onboarding form URL + session token)',
   )
@@ -5313,16 +5356,11 @@ const selfActivationNewMerchant = program
       }
       process.exitCode = EXIT_OK;
     } catch (error) {
-      if (opts.json) {
-        process.exitCode = printApiErrorJson(error);
-        return;
-      }
-      process.exitCode = printApiError(error);
+      process.exitCode = routeCliError(error, opts.json);
     }
   });
 
-const selfActivationCredentialInfo = program
-  .command('credential-info')
+const selfActivationCredentialInfo = new Command('credential-info')
   .description('Inquire encrypted merchant credential details by register_ref (get-mc-credential-info)')
   .requiredOption('--register-ref <ref>', 'The register_ref used at new-merchant')
   .option('--json', 'Print the raw JSON response')
@@ -5345,16 +5383,11 @@ const selfActivationCredentialInfo = program
       }
       process.exitCode = EXIT_OK;
     } catch (error) {
-      if (opts.json) {
-        process.exitCode = printApiErrorJson(error);
-        return;
-      }
-      process.exitCode = printApiError(error);
+      process.exitCode = routeCliError(error, opts.json);
     }
   });
 
-const selfActivationMcInfo = program
-  .command('mc-info')
+const selfActivationMcInfo = new Command('mc-info')
   .description('Fetch merchant API info (accounts, payment methods) by merchant key (get-mc-info)')
   .requiredOption('--merchant-key <key>', 'The merchant key to inquire')
   .option('--request-time <utc>', 'Pin request_time (required: the HMAC covers partner_id + merchant_key + request_time)')
@@ -5385,11 +5418,7 @@ const selfActivationMcInfo = program
       }
       process.exitCode = EXIT_OK;
     } catch (error) {
-      if (opts.json) {
-        process.exitCode = printApiErrorJson(error);
-        return;
-      }
-      process.exitCode = printApiError(error);
+      process.exitCode = routeCliError(error, opts.json);
     }
   });
 
