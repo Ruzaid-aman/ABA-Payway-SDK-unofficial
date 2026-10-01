@@ -137,7 +137,17 @@ export function runInit(options: InitOptions = {}): InitResult {
     envIssues,
     envWritten,
     reportPath,
-    nextCommand: mode === 'demo' ? 'payway-sdk demo' : template === 'first-payment' ? 'node payway-first-payment.mjs' : 'payway-sdk doctor',
+    nextCommand:
+      mode === 'demo'
+        ? 'payway-sdk demo'
+        : template === 'first-payment'
+          ? // Audit S01: Node does not read .env on its own — without this
+            // flag the starter exited with a missing-callback error even
+            // though the generated .env was correctly filled in.
+            // --env-file-if-exists keeps the command working when a user
+            // deletes .env and prefers real environment variables instead.
+            'node --env-file-if-exists=.env payway-first-payment.mjs'
+          : 'payway-sdk doctor',
   };
   writeFileSync(reportPath, renderReport(report), { encoding: 'utf8' });
 

@@ -49,6 +49,27 @@ Addresses every actionable finding in [ITEMS-1-2-REVIEW-2026-10-01.md](ITEMS-1-2
    Recorded explicitly below; they block public publication, not further
    remediation batches.
 
+## Third pass — work packages 3 and 4 (2026-10-01)
+
+Implements remediation items 3 (safe first integration — S01/S02/WP01) and 4 (MCP and
+machine contracts — S03/S04/S05/S09) from REPORT.md §11.
+
+| Finding | Status | Fix and evidence |
+|---|---|---|
+| S01 — generated first-payment starter does not load its generated `.env` | **FIXED** | `init` now prints `node --env-file-if-exists=.env payway-first-payment.mjs` (Node ≥20.12 loads the file without overriding real environment variables, which keep precedence) and the generated starter documents the environment strategy in its header. Acceptance exercised in `src/__tests__/starter-e2e.test.ts`: a child process executes EXACTLY the printed command with only `.env` populated (ambient `PAYWAY_*` stripped) and the SDK's pre-network callback validator fires on the configured value — proving `.env` → SDK propagation through the printed command; the full create is executed in-process against a local gateway stub (children cannot open loopback TCP to a parent-hosted server on this machine — documented in the test header); the recovery leg proves the ORIGINAL attempt id is surfaced when the gateway is unreachable. Environment note: `--env-file-if-exists` keeps the command working when a user deletes `.env`. |
+| S02 — framework scaffolds trust client pricing and name a nonexistent API | **FIXED** | Both `src/config/templates/express.ts` and `nextApp.ts` rewritten around a shared generated `order-store` module: server-owned order values from a catalog (the browser sends a SKU, never a price), artifact projection only (`paymentArtifact`/`responseType`/`expiresAt` — the raw session never leaves the server), the REAL verification API (`verifyCallbackDetailed` — the nonexistent `sdk.auth` TODO is gone), durable single-acceptance delivery inbox, fail-closed on invalid signature / unknown transaction / non-approved status / amount mismatch, fulfill-once guarded by the order state, and `{{variable}}`-shaped create errors that preserve the attempt id. Executable acceptance in `src/__tests__/scaffold-templates.test.ts` (11 tests): generated files are transpiled and their route handlers DRIVEN through the trust matrix — client `amount: 999999` is ignored (the stub sees 3.00), forged signatures 401, unknown transactions and wrong amounts park unfulfilled, replays/concurrent duplicates ACK `duplicate` with a single fulfillment, verified declines update without fulfilling. The executable test caught a real generated-code bug the filename tests never could: the old id scheme exceeded the gateway's 20-character `tran_id` cap (502 on every create) — fixed in both templates and pinned by a ≤20-char assertion. |
+| WP01 — production callback example ACKs before durable work, never checks approval/funds | **FIXED** | `docs/guides/11-callbacks-and-webhooks.md` "Production Version" replaced with a durable inbox/outbox flow: HMAC verification via the real API, `INSERT … ON CONFLICT DO NOTHING` delivery acceptance BEFORE any decision, APPROVED check (`payment_status_code` 0 with the string guard separating PRE-AUTH), amount/currency matched against the STORED order (mismatch → `needs_review`, never fulfilled), fulfill-once via a conditional `UPDATE … WHERE status <> 'paid'`, outbox row for external work, ACK last — plus the schema sketch and an explicit "refuses to do" list. The minimal example above it no longer equates a valid signature with confirmed payment. Body fields now match the real online callback shape (`payment_status_code`/`payment_amount`/`payment_currency` — the old snippet destructured `amount`/`currency`/`status{code,message}` fields the pushback never carries). Corpus resynced; docs-acceptance + knowledge suites green. |
+| S03 — a saved profile corrupts the MCP stdio protocol | **FIXED** | The `mcp` command is excluded from the `preAction` profile hook in `src/cli.ts` (its per-tool-call `resolvePayWayContext` handles profiles itself). Acceptance in `src/__tests__/mcp-stdio-smoke.test.ts` over a REAL stdio pipe: with a saved default profile store, with a `PAYWAY_PROFILE` naming a nonexistent profile, and with a malformed profile store, the server answers initialize + tools/list and EVERY stdout line parses as JSON-RPC (a non-protocol line now fails the test with the offending line quoted). |
+| S04 — `PAYWAY_MCP_ALLOW_MUTATIONS` opt-in ignored | **FIXED** | `--allow-mutations` no longer carries a Commander default; `undefined` falls through to the environment in `resolveAllowMutations`. Precedence pinned in `src/__tests__/mcp-cli.test.ts`: absent → 12 tools, env opt-in → 17, env opt-out → 12, explicit flag beats env opt-out → 17. Default stays read-only. |
+| S05 — machine-readable failure handling incomplete before command execution | **FIXED** | `runCli` now routes EVERY pre-execution failure under machine output to the uniform envelope: program-level `exitOverride()` makes missing-option/unknown-command/profile-hook failures catchable, and `argvRequestsMachineOutput()` detects `--json` / `--output json|ndjson` from the raw argv (usage errors fire before parsing). The refund-only special case is subsumed. Human mode unchanged (empty stdout, diagnostic stderr, exit 1); help/version remain human + exit 0. Matrix in `src/__tests__/cli-machine-contract.test.ts` (10 tests): missing required options on two commands, unknown command, unknown option, nonexistent profile (envelope instead of stack, no stack on stderr), both `--output` spellings, human-mode legacy channel, help preservation, refund regression. |
+| S09 — MCP advertises a version that drifts from the package | **FIXED** | `SERVER_INFO.version` is derived from the built `package.json` (import-relative first, `node dist/cli.js` layout fallback, `unknown` last resort — never a fabricated number). Verified over the real stdio pipe: the initialize response's `serverInfo.version` equals the built package version (`mcp-stdio-smoke.test.ts`). |
+
+Gate snapshot for this pass: typecheck exit 0, lint exit 0 (2 pre-existing warnings),
+focused suites green (mcp-cli 6, mcp-stdio-smoke 4, cli-machine-contract 10,
+scaffold-templates 11, starter-e2e 4, init 8, knowledge/docs 21); full offline suite
+2,160 tests / 151 files, 0 failed (2026-10-01, Windows, Node v24.21.0, npm 12.0.2);
+`mcp --list-tools --json` counts unchanged (12/17).
+
 ## Work package 1 — Public payload and identity (R03/D01, WP10)
 
 | Finding | Status | Fix and evidence |
@@ -121,4 +142,6 @@ request design first. `.postman/resources.yaml` gained Postman-app noise
 
 ## Next in the ordered plan (not started)
 
-Work package 3 (S01/S02/WP01 — safe first integration), then 4 (MCP S03/S04/S05/S09).
+Work package 5 (WP02/WP03/WP07 — webhook receiver lifecycle), then 6 (D02–D07 — one
+navigable public corpus). Work packages 1–4 are complete or carry only the recorded
+owner gates.

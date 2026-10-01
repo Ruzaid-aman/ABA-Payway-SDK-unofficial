@@ -91,6 +91,8 @@ describe('runInit', () => {
     const second = runInit({ cwd: TEST_DIR, env: {}, mode: 'sandbox', template: 'first-payment' });
     expect(second.skippedFiles).toContain('payway-first-payment.mjs');
     expect(readFileSync(starterPath, 'utf8')).toBe('// merchant edit\n');
-    expect(second.nextCommand).toBe('node payway-first-payment.mjs');
+    // Audit S01: the printed command must load the generated .env — a bare
+    // `node payway-first-payment.mjs` left the starter blind to its config.
+    expect(second.nextCommand).toBe('node --env-file-if-exists=.env payway-first-payment.mjs');
   });
 });
