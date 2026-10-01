@@ -9,7 +9,7 @@
  * is idempotent, and the raw gateway session never reaches the browser.
  */
 import { createServer, type Server } from 'node:http';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHmac } from 'node:crypto';
@@ -99,12 +99,20 @@ function mockRes(): MockRes {
   return res;
 }
 
+// Guide-parity online callback body (docs/guides/11-callbacks-and-webhooks.md
+// → "Production Version"): the scaffolds must speak the SAME field contract
+// the public durable reference teaches.
 const APPROVAL_BODY = (tranId: string): Record<string, string> => ({
   tran_id: tranId,
-  status: '0',
-  payway_amount: '3.00',
-  payway_currency: 'USD',
-  apex_mark: '000000',
+  payment_status: 'APPROVED',
+  payment_status_code: '0',
+  payment_amount: '3.00',
+  payment_currency: 'USD',
+});
+const DECLINE_BODY = (tranId: string): Record<string, string> => ({
+  ...APPROVAL_BODY(tranId),
+  payment_status: 'DECLINED',
+  payment_status_code: '3',
 });
 
 describe('generated scaffold files (S02)', () => {
@@ -210,10 +218,55 @@ describe('generated scaffold files (S02)', () => {
     it('parks a wrong-amount approval unfulfilled', async () => {
       const created = await createOrder({ sku: 'demo-item' });
       const tranId = String(created.body.transactionId);
-      const body = { ...APPROVAL_BODY(tranId), payway_amount: '999999.00' };
+      const body = { ...APPROVAL_BODY(tranId), payment_amount: '999999.00' };
       const res = await deliver(body);
       expect(res.statusCode).toBe(202);
-      expect((res.body as { reason?: string }).reason).toBe('amount mismatch');
+      expect((res.body as { reason?: string }).reason).toBe('amount/currency mismatch');
+    });
+
+    it('parks an approval with a MISSING amount (fail closed, not accepted as a match)', async () => {
+      const created = await createOrder({ sku: 'demo-item' });
+      const tranId = String(created.body.transactionId);
+      const body = APPROVAL_BODY(tranId);
+      delete body.payment_amount;
+      const res = await deliver(body);
+      expect(res.statusCode).toBe(202);
+      expect((res.body as { reason?: string }).reason).toBe('amount/currency mismatch');
+      // The parked delivery was still ACCEPTED (idempotency key = tran+code),
+      // so a redelivery ACKs as duplicate instead of re-deciding — and the
+      // order stays unfulfilled. (Recovery is the operator's job, as labeled.)
+      const replay = await deliver({ ...body, payment_amount: '3.00' });
+      expect((replay.body as { duplicate?: boolean }).duplicate).toBe(true);
+    });
+
+    it('parks an approval with a MISSING currency', async () => {
+      const created = await createOrder({ sku: 'demo-item' });
+      const tranId = String(created.body.transactionId);
+      const body = APPROVAL_BODY(tranId);
+      delete body.payment_currency;
+      const res = await deliver(body);
+      expect(res.statusCode).toBe(202);
+      expect((res.body as { reason?: string }).reason).toBe('amount/currency mismatch');
+    });
+
+    it('parks a wrong-CURRENCY approval even when the amount matches', async () => {
+      const created = await createOrder({ sku: 'demo-item' });
+      const tranId = String(created.body.transactionId);
+      const body = { ...APPROVAL_BODY(tranId), payment_currency: 'KHR' };
+      const res = await deliver(body);
+      expect(res.statusCode).toBe(202);
+      expect((res.body as { reason?: string }).reason).toBe('amount/currency mismatch');
+    });
+
+    it('does not fulfill a PRE-AUTH delivery even though it shares code 0', async () => {
+      const created = await createOrder({ sku: 'demo-item' });
+      const tranId = String(created.body.transactionId);
+      const body = { ...APPROVAL_BODY(tranId), payment_status: 'PRE-AUTH' };
+      const res = await deliver(body);
+      expect((res.body as { fulfilled?: boolean }).fulfilled).toBe(false);
+      // A later real approval still fulfills: PRE-AUTH never consumed the order.
+      const approval = await deliver(APPROVAL_BODY(tranId));
+      expect((approval.body as { fulfilled?: boolean }).fulfilled).toBe(true);
     });
 
     it('fulfills exactly once across replays and duplicates, then idempotently ACKs', async () => {
@@ -233,21 +286,92 @@ describe('generated scaffold files (S02)', () => {
 
       // Fulfillment ran once (setImmediate job): a further approval for the
       // same order reports the paid state, not a new fulfillment.
-      const again = deliver({ ...body, status: '0', apex_mark: '000001' });
+      const again = deliver({ ...body, payment_status_code: '0' });
       expect((await again).body).toEqual({ ok: true, duplicate: true });
     });
 
     it('updates the order but fulfills nothing for a verified decline', async () => {
       const created = await createOrder({ sku: 'demo-item' });
       const tranId = String(created.body.transactionId);
-      const body = { ...APPROVAL_BODY(tranId), status: '3' };
-      const res = await deliver(body);
+      const res = await deliver(DECLINE_BODY(tranId));
       expect((res.body as { fulfilled?: boolean }).fulfilled).toBe(false);
     });
 
     it('rejects an unknown item with a 400 instead of pricing it', async () => {
       const { statusCode } = await createOrder({ sku: 'not-in-catalog' });
       expect(statusCode).toBe(400);
+    });
+
+    it('restart/multi-instance: fresh module state loses orders (the labeled non-durability, demonstrated)', async () => {
+      // The store's own warning says in-memory state does not survive a
+      // restart nor span instances. This test pins that HONESTY: a fresh
+      // module GRAPH (new directory = fresh URLs for store AND callback,
+      // like a restarted process) no longer knows the fulfilled order.
+      const created = await createOrder({ sku: 'demo-item' });
+      const tranId = String(created.body.transactionId);
+      const first = await deliver(APPROVAL_BODY(tranId));
+      expect((first.body as { fulfilled?: boolean }).fulfilled).toBe(true);
+
+      const restartedRoutes = path.join(dir, 'routes-restarted', 'payment');
+      mkdirSync(restartedRoutes, { recursive: true });
+      for (const name of ['order-store.js', 'callback.js']) {
+        writeFileSync(path.join(restartedRoutes, name), readFileSync(path.join(dir, 'routes', 'payment', name), 'utf8'));
+      }
+      const freshModule = await import(pathToFileURL(path.join(restartedRoutes, 'callback.js')).href);
+      const freshHandler = freshModule.default.routes[0].handler;
+      const res = mockRes();
+      await freshHandler(
+        { headers: { 'x-payway-hmac-sha512': sign(APPROVAL_BODY(tranId)) }, body: APPROVAL_BODY(tranId) },
+        res,
+      );
+      // NOT "duplicate" — the restarted process has no delivery or order
+      // record, so the callback is treated as unknown. Exactly why the
+      // module demands a database adapter before deployment.
+      expect(res.statusCode).toBe(202);
+      expect((res.body as { reason?: string }).reason).toBe('unknown transaction');
+    });
+  });
+
+  describe('callback schema parity with the public durable guide', () => {
+    const GUIDE_FIELDS = ['payment_status_code', 'payment_amount', 'payment_currency'];
+    const FORBIDDEN_LEGACY = [/payway_amount/, /payway_currency/, /status\s*!==?\s*'0'/, /apex_mark/];
+
+    it('generated callback code speaks the guide field contract, not legacy shapes', () => {
+      for (const template of [EXPRESS_TEMPLATE, NEXT_APP_TEMPLATE]) {
+        const callback = template.files.find((file) => file.path.includes('callback'));
+        expect(callback, `${template.framework} callback missing`).toBeDefined();
+        for (const field of GUIDE_FIELDS) {
+          expect(callback?.content.includes(field), `${template.framework} callback lacks ${field}`).toBe(true);
+        }
+        for (const pattern of FORBIDDEN_LEGACY) {
+          expect(pattern.test(callback?.content ?? ''), `${template.framework} uses legacy shape ${pattern}`).toBe(false);
+        }
+        // PRE-AUTH shares code 0 with APPROVED — the guard must exist.
+        expect(callback?.content.includes('PRE-AUTH'), `${template.framework} lacks the PRE-AUTH guard`).toBe(true);
+      }
+    });
+
+    it('the guide section itself carries the same field contract (scaffold ↔ guide parity)', () => {
+      // Reads the PUBLIC guide this repo ships: if the durable reference and
+      // the generated scaffolds ever drift apart again, this fails.
+      const guide = readFileSync(path.join(repoRoot, 'docs', 'guides', '11-callbacks-and-webhooks.md'), 'utf8');
+      const productionSection = guide.slice(guide.indexOf('Production Version: Durable Acceptance'));
+      expect(productionSection.length).toBeGreaterThan(1000);
+      for (const field of GUIDE_FIELDS) {
+        expect(productionSection.includes(field), `guide Production Version lacks ${field}`).toBe(true);
+      }
+      for (const pattern of FORBIDDEN_LEGACY) {
+        expect(pattern.test(productionSection), `guide Production Version uses legacy shape ${pattern}`).toBe(false);
+      }
+    });
+
+    it('the store module is labeled non-durable and points at the durable guide', () => {
+      for (const template of [EXPRESS_TEMPLATE, NEXT_APP_TEMPLATE]) {
+        const store = template.files.find((file) => file.path.includes('order-store'));
+        expect(store?.content).toContain('NON-PRODUCTION DEMO STATE');
+        expect(store?.content).toContain('NOT DURABLE');
+        expect(store?.content).toContain('docs/guides/11-callbacks-and-webhooks.md');
+      }
     });
   });
 

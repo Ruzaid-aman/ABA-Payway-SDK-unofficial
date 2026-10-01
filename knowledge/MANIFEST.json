@@ -138,9 +138,9 @@
       "description": "Single best-effort callback delivery, HMAC verification, webhook workbench.",
       "source": "docs/guides/11-callbacks-and-webhooks.md",
       "file": "callbacks-webhooks.md",
-      "bytes": 25745,
-      "sha256": "ff5148fef15039ab",
-      "sourceSha256": "9232a8802e089197"
+      "bytes": 25902,
+      "sha256": "1299cc016b3ac84d",
+      "sourceSha256": "5f41c4418860a3df"
     },
     {
       "topic": "errors-and-debugging",

@@ -225,10 +225,12 @@ router.post('/', async (req, res) => {
   const statusText = String(req.body.payment_status ?? '');
 
   // 2. Accept exactly once, BEFORE deciding anything (deliveryId should be
-  //    the provider's delivery/event id when one exists; tran_id+status is
-  //    the fallback). INSERT ... ON CONFLICT returns 0 rows for a replay —
+  //    the provider's delivery/event id when one exists; the fallback uses
+  //    tran_id + the STATUS STRING — PRE-AUTH shares code 0 with APPROVED,
+  //    so the bare numeric code would collide and let one suppress the
+  //    other). INSERT ... ON CONFLICT returns 0 rows for a replay —
   //    ack it and stop.
-  const deliveryId = `${tranId}:${statusCode}`;
+  const deliveryId = `${tranId}:${statusText || statusCode}`;
   const accepted = await db.query(
     `INSERT INTO payment_events (delivery_id, tran_id, payload)
      VALUES ($1, $2, $3)
