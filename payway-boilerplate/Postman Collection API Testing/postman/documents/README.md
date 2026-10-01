@@ -1,5 +1,7 @@
 # PayWay API Postman Collection
 
+> **Merchant developers:** start with the step-by-step [postman-guide.md](postman-guide.md) — get the collection, configure an environment, send your first payment, and how it all works. This README is the maintainer-facing counterpart.
+
 > **Unofficial and unsupported implementation**
 >
 > This collection is provided only to help developers get started quickly and test the PayWay APIs. It is not an official PayWay SDK, integration, or support channel. It may be incomplete, change without notice, and require updates when the API or sandbox behavior changes. Always confirm request formats, security requirements, response handling, and production-readiness with the official PayWay documentation and PayWay support team.

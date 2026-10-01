@@ -41,6 +41,7 @@ Navigation index for the PayWay merchant-API Postman collection built in this wo
 | `llms.txt` | Index of PayWay developer docs (Markdown per page) + workspace pointers for AI tools |
 | `postman/documents/` | Workspace README (quick start, artifact map, docs rules) + error registry |
 | `postman/documents/postman-authoring-standards.md` | Authoring standards benchmarked against WeChat Pay's public Postman workspace (Oct 2026) — patterns to adopt, differences to protect, ordered backlog |
+| `postman/documents/postman-guide.md` | **Merchant-facing developer guide** (modeled on WeChat Pay's Postman debugging-tool doc): prerequisites, 3-step quick start, how the signing scripts work, variables, security, updates, FAQ |
 | `_build/` | YAML loader, syntax, validation, import, simulation, helper-sync, examples/export, and spec-parity tooling |
 
 ## Quick start
