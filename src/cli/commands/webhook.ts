@@ -31,6 +31,7 @@ import {
 import { parseForwardHeaders } from '../../webhook/forwarder.js';
 import type { WebhookRecord, WebhookStorage } from '../../webhook/storage.js';
 import { clearLifecycleState, readLifecycleState } from '../../webhook/lifecycle.js';
+import { stopReceiver } from '../../webhook/receiver-control.js';
 
 const EXIT_VALIDATION = 1;
 const EXIT_NETWORK = 3;
@@ -110,16 +111,37 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
     const running = state ? (() => { try { process.kill(state.pid, 0); return true; } catch { return false; } })() : false;
     const result = { state: state ? (running ? 'running' : 'stale') : 'absent', receiver: state };
     if (opts.json) log(JSON.stringify(result));
-    else log(state ? `Webhook receiver: ${result.state} (pid ${state.pid}, port ${state.port})` : 'Webhook receiver: absent');
+    else log(state ? `Webhook receiver: ${result.state} (pid ${state.pid}, port ${state.port}, host ${state.host})` : 'Webhook receiver: absent');
   });
 
-  const stop = new Command('stop').description('Stop the owned local webhook receiver').option('--json').action((opts: { json?: boolean }) => {
-    const state = readLifecycleState();
-    if (!state) { if (opts.json) log(JSON.stringify({ stopped: false, state: 'absent' })); else log('Webhook receiver is not running.'); return; }
-    try { process.kill(state.pid, 'SIGTERM'); } catch { /* stale process */ }
-    clearLifecycleState();
-    if (opts.json) log(JSON.stringify({ stopped: true, pid: state.pid })); else log(`Stopped webhook receiver pid ${state.pid}.`);
-  });
+  const stop = new Command('stop')
+    .description('Stop the owned local webhook receiver (identity-verified; never signals a foreign process)')
+    .option('--json')
+    .action(async (opts: { json?: boolean }) => {
+      const state = readLifecycleState();
+      if (!state) {
+        if (opts.json) log(JSON.stringify({ stopped: false, reason: 'absent', detail: 'no receiver state recorded' }));
+        else log('Webhook receiver is not running.');
+        return;
+      }
+      const outcome = await stopReceiver({
+        state,
+        fetchImpl: deps.fetchImpl,
+        log,
+        quiet: opts.json === true,
+      });
+      // Clear the state file only when OUR receiver is confirmed gone; a
+      // pid-reused/unreachable receiver keeps its record for diagnosis.
+      if (outcome.stateCleared || outcome.reason === 'pid-reused') clearLifecycleState();
+      if (opts.json) {
+        log(JSON.stringify({ stopped: outcome.stopped, reason: outcome.reason, detail: outcome.detail, pid: outcome.pid, port: outcome.port }));
+      } else if (outcome.stopped) {
+        log(`Stopped webhook receiver pid ${outcome.pid}.`);
+      } else {
+        log(`  ${c.red('✗')} Not stopped (${outcome.reason}): ${outcome.detail}`);
+      }
+      if (!outcome.stopped && outcome.reason !== 'stale' && outcome.reason !== 'absent') process.exitCode = EXIT_NETWORK;
+    });
 
   // --- webhook verify-callback (W-4) -------------------------------------
   const verify = new Command('verify-callback')

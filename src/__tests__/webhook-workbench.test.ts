@@ -56,7 +56,7 @@ describe('WebhookForwarder', () => {
     });
 
     expect(outcome).toEqual({ ok: true, status: 200 });
-    expect(forwarder.statistics).toEqual({ delivered: 1, failed: 0 });
+    expect(forwarder.statistics).toEqual({ delivered: 1, failed: 0, timedOut: 0 });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('http://localhost:3000/webhooks/aba');
     expect(init.method).toBe('POST');
@@ -77,7 +77,7 @@ describe('WebhookForwarder', () => {
 
     expect(outcome.ok).toBe(false);
     expect(outcome.error).toContain('ECONNREFUSED');
-    expect(forwarder.statistics).toEqual({ delivered: 0, failed: 1 });
+    expect(forwarder.statistics).toEqual({ delivered: 0, failed: 1, timedOut: 0 });
   });
 
   it('counts non-2xx receiver answers as failures without throwing', async () => {
@@ -87,7 +87,7 @@ describe('WebhookForwarder', () => {
     const outcome = await forwarder.forward('{}', {});
 
     expect(outcome).toEqual({ ok: false, status: 500 });
-    expect(forwarder.statistics).toEqual({ delivered: 0, failed: 1 });
+    expect(forwarder.statistics).toEqual({ delivered: 0, failed: 1, timedOut: 0 });
   });
 
   it('joins array-valued signature headers with commas', async () => {

@@ -16,7 +16,9 @@
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import { verifyCallbackDetailed } from '../auth.js';
+import { CONTROL_PATH } from './receiver-control.js';
 import { classifyCallback, parseCustomerQrCallback } from './customer-callback.js';
 import { extractTransactionIdFrom } from '../journal/digest.js';
 import { createJournalEmitter } from '../journal/writer.js';
@@ -24,7 +26,7 @@ import type { JournalContext } from '../journal/types.js';
 import { parsePaymentLinkPushback } from '../domains/payment-link.js';
 import { isCofLinkCallback, parseCofLinkCallback } from './cof-callback.js';
 import { maskPwt, resolveTokenStoreDir, saveLinkedToken } from './token-store.js';
-import { WebhookForwarder, parseForwardHeaders } from './forwarder.js';
+import { WebhookForwardQueue, WebhookForwarder, parseForwardHeaders } from './forwarder.js';
 import { formatPortBusyMessage } from '../cli/commands/setup-webhook-helpers.js';
 import { extractJsonPayload, parseKhqrPaymentNotification } from './khqr-notification.js';
 import type { WebhookRecord, WebhookSignatureVerdict, WebhookStorage } from './storage.js';
@@ -86,6 +88,39 @@ export interface WebhookServerOptions {
    * raw but their token is NOT persisted.
    */
   tokenStoreDir?: string;
+  /**
+   * Bind interface (audit WP07). Default `'127.0.0.1'` — the listener is a
+   * LOCAL development capture tool and must not expose raw callback bodies
+   * (which contain customer PII and signatures) to the network by default.
+   * Wider binding (`'0.0.0.0'`, a specific interface) is an explicit,
+   * documented opt-in.
+   */
+  host?: string;
+  /**
+   * Request-body cap in bytes (audit WP07). Bodies are buffered in memory
+   * before storage; an unbounded stream lets any poster pin memory. A body
+   * over the cap is refused with 413 and the remaining input discarded.
+   * Default: 2 MiB (PayWay callbacks are small JSON documents).
+   */
+  maxBodyBytes?: number;
+  /**
+   * Control-plane wiring (audit WP02): gives the receiver a random instance
+   * identity and an authenticated shutdown route so `webhook stop` can verify
+   * ownership and trigger the receiver's OWN graceful shutdown instead of
+   * signalling a possibly-reused PID. SDK/embedders may omit it — the control
+   * route answers 404 and lifecycle tooling reports the receiver as
+   * uncontrolled.
+   */
+  control?: {
+    instanceId: string;
+    controlToken: string;
+    /** Invoked after an authenticated shutdown request; must end the process. */
+    onShutdown: () => void | Promise<void>;
+  };
+  /** Forward queue capacity (audit WP03). Default 100 pending deliveries. */
+  forwardQueueCapacity?: number;
+  /** Per-forward timeout in ms (audit WP03). Default 5000. */
+  forwardTimeoutMs?: number;
 }
 
 export interface WebhookServerResult {
@@ -95,6 +130,10 @@ export interface WebhookServerResult {
   stop(): Promise<void>;
   /** The port the server is listening on. */
   readonly port: number;
+  /** The bind interface (audit WP07: '127.0.0.1' unless explicitly widened). */
+  readonly host: string;
+  /** Forward queue statistics (delivered/failed/timedOut/queued/dropped). */
+  readonly forwardStats: import('./forwarder.js').ForwardQueueStats | null;
   /** Whether the server is currently accepting connections. */
   readonly isRunning: boolean;
 }
@@ -140,6 +179,9 @@ function firstStringOf(source: Record<string, unknown> | undefined, ...keys: str
 
 export function createWebhookServer(storage: WebhookStorage, options: WebhookServerOptions = {}): WebhookServerResult {
   const port = options.port ?? 8443;
+  // Audit WP07: loopback by default — external binding is an explicit opt-in.
+  const host = options.host ?? '127.0.0.1';
+  const maxBodyBytes = options.maxBodyBytes ?? 2 * 1024 * 1024;
   const apiKey = options.apiKey;
   const quiet = options.quiet ?? false;
   const khqrPath = options.khqr?.path ?? KHQR_WEBHOOK_PATH;
@@ -157,6 +199,9 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
   let running = false;
 
   // W-1: optional forwarder. Constructed once; invalid URL fails fast.
+  // Audit WP03: deliveries drain through a bounded BACKGROUND queue — the
+  // callback ACK is sent after the durable capture, never after the network
+  // forward, so a slow or hung receiver cannot delay the acknowledgement.
   const forwarder = options.forwardTo
     ? new WebhookForwarder({
         url: options.forwardTo,
@@ -164,24 +209,86 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         quiet,
         log: (line) => log(line),
         fetchImpl: options.forwardFetch,
+        timeoutMs: options.forwardTimeoutMs,
+      })
+    : null;
+  const forwardQueue = forwarder
+    ? new WebhookForwardQueue(forwarder, {
+        maxQueue: options.forwardQueueCapacity,
+        quiet,
+        log: (line) => log(line),
       })
     : null;
 
   /**
-   * Forward a captured delivery without ever breaking the response path:
-   * the outcome is logged (forwarder counts stats) but errors are swallowed
-   * by design — capture survives receiver downtime.
+   * Hand a captured delivery to the background forward queue (audit WP03).
+   * Synchronous and non-blocking: the response path returns immediately,
+   * the queue owns the network call. Errors and outcomes are logged by the
+   * forwarder/queue — capture never depends on delivery.
    */
-  function forwardCaptured(
+  function dispatchForward(
     body: string,
     headers: Record<string, string | string[] | undefined>,
     label: string,
-  ): Promise<void> {
-    if (!forwarder) return Promise.resolve();
-    return forwarder
-      .forward(body, { headers, label })
-      .then(() => undefined)
-      .catch(() => undefined);
+  ): void {
+    forwardQueue?.enqueue(body, { headers, label });
+  }
+
+  /**
+   * Control route (audit WP02): `identify` reveals the random instance id
+   * (stop compares it with the state file — a reused PID cannot answer with
+   * our id); `shutdown` requires the control token and triggers the owner's
+   * graceful shutdown (listener close, tunnel stop, .env restore) — no OS
+   * signal ever reaches this process from the CLI. Without `control` wiring
+   * the route answers 404 (SDK embedders keep the old surface).
+   */
+  function handleControlRequest(req: IncomingMessage, res: ServerResponse): void {
+    if (!options.control) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not found' }));
+      return;
+    }
+    void collectBody(req, res).then(async (body) => {
+      if (body === null) return;
+      let payload: { action?: string; token?: string } = {};
+      try {
+        payload = JSON.parse(body) as { action?: string; token?: string };
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid JSON' }));
+        return;
+      }
+      if (payload.action === 'identify') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ instanceId: options.control?.instanceId, pid: process.pid, port, startedAt: new Date().toISOString() }));
+        return;
+      }
+      if (payload.action === 'shutdown') {
+        const expected = options.control?.controlToken ?? '';
+        const presented = typeof payload.token === 'string' ? payload.token : '';
+        const authorized =
+          expected.length > 0
+          && presented.length === expected.length
+          && timingSafeEqual(Buffer.from(presented, 'utf8'), Buffer.from(expected, 'utf8'));
+        if (!authorized) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'unauthorized' }));
+          return;
+        }
+        // ACK first so the stopping CLI sees success; then run the owner's
+        // graceful shutdown (which ends the process).
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ acknowledged: true }));
+        try {
+          await options.control?.onShutdown();
+        } catch (error) {
+          log(`  \x1b[31m✗ Control shutdown failed: ${error instanceof Error ? error.message : String(error)}\x1b[0m`);
+        }
+        return;
+      }
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'unknown action' }));
+    });
   }
 
   function log(msg: string): void {
@@ -209,11 +316,30 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
     }
   }
 
-  function collectBody(req: IncomingMessage): Promise<string> {
+  /** Collect the request body with a hard cap (audit WP07): bounded memory,
+   * 413 + `null` when the client exceeds it. */
+  function collectBody(req: IncomingMessage, res: ServerResponse): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
-      req.on('data', (chunk: Buffer) => chunks.push(chunk));
-      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+      let received = 0;
+      let overLimit = false;
+      req.on('data', (chunk: Buffer) => {
+        if (overLimit) return; // discard the tail once the cap tripped
+        received += chunk.length;
+        if (received > maxBodyBytes) {
+          overLimit = true;
+          chunks.length = 0;
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: `payload too large (limit ${maxBodyBytes} bytes)` }));
+          req.resume(); // drain and discard the remainder
+          return;
+        }
+        chunks.push(chunk);
+      });
+      req.on('end', () => {
+        if (!overLimit) resolve(Buffer.concat(chunks).toString('utf-8'));
+        else resolve(null);
+      });
       req.on('error', reject);
     });
   }
@@ -332,6 +458,10 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
     const isOnlineWebhook = req.url === WEBHOOK_PATH;
     const isKhqrWebhook = req.url === khqrPath;
     const isPushback = req.url === pushbackPath;
+    if (req.url === CONTROL_PATH && req.method === 'POST') {
+      handleControlRequest(req, res);
+      return;
+    }
     if (req.method !== 'POST' || (!isOnlineWebhook && !isKhqrWebhook && !isPushback)) {
       const knownPath = isOnlineWebhook || isKhqrWebhook || isPushback;
       res.writeHead(knownPath ? 405 : 404, { 'Content-Type': 'application/json' });
@@ -339,8 +469,9 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
       return;
     }
 
-    collectBody(req)
+    collectBody(req, res)
       .then(async (body) => {
+        if (body === null) return; // 413 already sent (audit WP07)
         // Parse headers
         const headers: Record<string, string | string[] | undefined> = {};
         if (req.headers) {
@@ -389,7 +520,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
               log(`  Unable to store pushback parse metadata: ${error instanceof Error ? error.message : String(error)}`);
             }
           }
-          await forwardCaptured(body, headers, `payment-link pushback [${record.id}]`);
+          dispatchForward(body, headers, `payment-link pushback [${record.id}]`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ acknowledged: true, id: record.id }));
           return;
@@ -485,7 +616,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
                 log(`  Unable to store customer-qr parse metadata: ${error instanceof Error ? error.message : String(error)}`);
               }
             }
-            await forwardCaptured(body, headers, `customer-module callback [${record.id}]`);
+            dispatchForward(body, headers, `customer-module callback [${record.id}]`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ acknowledged: true, id: record.id }));
             return;
@@ -514,7 +645,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
             }
           }
           log(`  Received offline KHQR notification [${record.id}] at ${record.receivedAt}`);
-          await forwardCaptured(body, headers, `KHQR notification [${record.id}]`);
+          dispatchForward(body, headers, `KHQR notification [${record.id}]`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ acknowledged: true, id: record.id }));
           return;
@@ -595,7 +726,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           return;
         }
 
-        await forwardCaptured(body, headers, `callback [${record.id}]`);
+        dispatchForward(body, headers, `callback [${record.id}]`);
 
         // Always respond 200 otherwise — never reject based on content
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -610,6 +741,10 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
 
   return {
     port,
+    host,
+    get forwardStats() {
+      return forwardQueue ? forwardQueue.statistics : null;
+    },
     get isRunning() {
       return running;
     },
@@ -628,16 +763,30 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           }
         });
 
-        server.listen(port, () => {
+        // Audit WP07: explicit host — loopback by default; the log states the
+        // actual binding so a wide bind is never silent.
+        server.listen(port, host, () => {
           running = true;
-          log(`\n  \x1b[1mWebhook listener running on\x1b[0m \x1b[36mhttp://localhost:${port}${WEBHOOK_PATH}\x1b[0m`);
+          const binding = host === '127.0.0.1' ? `http://localhost:${port}${WEBHOOK_PATH}` : `http://${host}:${port}${WEBHOOK_PATH}`;
+          log(`\n  \x1b[1mWebhook listener running on\x1b[0m \x1b[36m${binding}\x1b[0m`);
+          if (host !== '127.0.0.1' && host !== 'localhost') {
+            log(`  \x1b[33m⚠ Bound to ${host} — raw callback bodies (customer PII, signatures) are reachable beyond this machine.\x1b[0m`);
+          }
           log(`  \x1b[2mPress Ctrl+C to stop.\x1b[0m\n`);
           resolve();
         });
       });
     },
 
-    stop(): Promise<void> {
+    async stop(): Promise<void> {
+      // Audit WP03: let the in-flight background forward finish (bounded by
+      // the per-delivery timeout), then refuse further enqueues — queued
+      // deliveries are dropped, but every accepted capture is already on
+      // disk for `webhook resend`.
+      if (forwardQueue) {
+        await forwardQueue.idle();
+        forwardQueue.stopAccepting();
+      }
       return new Promise((resolve) => {
         if (!server || !running) {
           resolve();

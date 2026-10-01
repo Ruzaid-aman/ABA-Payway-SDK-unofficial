@@ -38,6 +38,8 @@ function makeFakeServer() {
     start: vi.fn(async () => {}),
     stop: vi.fn(async () => {}),
     port: 8443,
+    host: '127.0.0.1',
+    forwardStats: null,
     isRunning: false,
   };
 }
@@ -131,7 +133,15 @@ describe('setup-webhook command seams', () => {
     const content = readFileSync(envFile, 'utf-8');
     expect(content).toContain('EXISTING=1');
     expect(content).toContain('PAYWAY_CALLBACK_URL=https://example.ngrok.app/aba-payway-webhook');
-    expect(h.state.serverOptions).toEqual({ port: 8443, apiKey: 'test-key' });
+    // WP02/WP07: the receiver now carries control identity + explicit loopback bind.
+    const options = h.state.serverOptions as Record<string, unknown>;
+    expect(options.port).toBe(8443);
+    expect(options.apiKey).toBe('test-key');
+    expect(options.host).toBe('127.0.0.1');
+    const control = options.control as { instanceId: string; controlToken: string; onShutdown: () => unknown };
+    expect(control.instanceId).toBeTruthy();
+    expect(control.controlToken).toBeTruthy();
+    expect(typeof control.onShutdown).toBe('function');
     expect(h.server.start).toHaveBeenCalledTimes(1);
     expect(h.exitSpy).not.toHaveBeenCalled();
   });

@@ -279,9 +279,12 @@ describe('WebhookServer', () => {
 
 describe('WebhookServer port conflict (WH-TC-08)', () => {
   it('rejects with helpful error when port is busy', async () => {
-    // Create a server that occupies a port
+    // Create a server that occupies a port — on the SAME interface the
+    // webhook server binds (loopback since audit WP07; Windows treats a
+    // wildcard bind and a loopback bind as distinct endpoints, so the
+    // occupier must bind 127.0.0.1 to actually conflict).
     const occupyingSrv = http.createServer();
-    await new Promise<void>((resolve) => occupyingSrv.listen(0, resolve));
+    await new Promise<void>((resolve) => occupyingSrv.listen(0, '127.0.0.1', resolve));
     const addr = occupyingSrv.address();
     const port = addr && typeof addr === 'object' ? addr.port : 0;
 

@@ -17,15 +17,26 @@ const DEFAULT_PATH = (): string => join(resolveWebhookDir(), 'callbacks.jsonl');
 export interface JsonWebhookStorageOptions {
   /** Internal filesystem seam used to verify failed atomic replacements. */
   renameFile?: (oldPath: string, newPath: string) => void;
+  /**
+   * Retention bound (audit WP07): the capture file must not grow without
+   * limit. When a save pushes the store past `maxRecords`, the OLDEST
+   * records are compacted away (newest `maxRecords` kept). Default 1000 —
+   * plenty for a dev loop; every dropped record was already delivered/
+   * loggable, and `resend` works from retained ones. `Infinity` disables
+   * compaction.
+   */
+  maxRecords?: number;
 }
 
 export class JsonWebhookStorage implements WebhookStorage {
   private readonly filePath: string;
   private readonly renameFile: (oldPath: string, newPath: string) => void;
+  private readonly maxRecords: number;
 
   constructor(filePath?: string, options: JsonWebhookStorageOptions = {}) {
     this.filePath = filePath ? resolve(filePath) : resolve(DEFAULT_PATH());
     this.renameFile = options.renameFile ?? renameSync;
+    this.maxRecords = options.maxRecords ?? 1_000;
     const dir = dirname(this.filePath);
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
@@ -41,7 +52,25 @@ export class JsonWebhookStorage implements WebhookStorage {
 
     const line = `${JSON.stringify(entry)}\n`;
     appendFileSync(this.filePath, line, 'utf-8');
+    this.compactIfOverBound();
     return entry;
+  }
+
+  /** Enforce the retention bound by dropping the oldest records. */
+  private compactIfOverBound(): void {
+    if (!Number.isFinite(this.maxRecords)) return;
+    let count = this.count();
+    if (count <= this.maxRecords) return;
+    const records = this.getAll();
+    const retained = records.slice(records.length - this.maxRecords);
+    const temporaryPath = `${this.filePath}.${randomBytes(8).toString('hex')}.tmp`;
+    try {
+      writeFileSync(temporaryPath, `${retained.map((record) => JSON.stringify(record)).join('\n')}\n`, 'utf-8');
+      this.renameFile(temporaryPath, this.filePath);
+      count = retained.length;
+    } finally {
+      if (existsSync(temporaryPath)) unlinkSync(temporaryPath);
+    }
   }
 
   updateKhqrMetadata(id: string, khqr: KhqrWebhookMetadata): WebhookRecord {

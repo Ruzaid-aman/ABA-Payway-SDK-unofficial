@@ -14,6 +14,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import readline from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
@@ -63,6 +64,12 @@ export interface SetupWebhookOptions {
   forwardTo?: string;
   /** Extra headers attached to forwarded deliveries (`"Key:Value, K2:V2"`). */
   forwardHeaders?: string;
+  /**
+   * Bind interface (audit WP07). Default '127.0.0.1' — the listener captures
+   * raw callback bodies (customer PII, signatures) and must not expose them
+   * to the network by default. Wider binding is an explicit opt-in.
+   */
+  host?: string;
   /** Refuse implicit prompts when running from a background/non-TTY process. */
   nonInteractive?: boolean;
 }
@@ -204,11 +211,28 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   const storageFactory = deps.storageFactory ?? createStorage;
   const storage = await storageFactory(storageType);
   const serverFactory = deps.serverFactory ?? createWebhookServer;
+  // Audit WP07: explicit bind interface — loopback by default; a wide bind
+  // is a conscious choice the user typed.
+  const bindHost = opts.host?.trim() || '127.0.0.1';
+  // Audit WP02: instance identity + control token — `webhook stop` verifies
+  // these against the receiver's control route and triggers THIS process's
+  // graceful shutdown instead of signalling a possibly-reused PID.
+  const instanceId = randomUUID();
+  const controlToken = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
+  // Assigned to the real shutdown routine once it exists (declared later);
+  // the control route may fire before Step 7 in principle.
+  let gracefulShutdown: (() => void | Promise<void>) | null = null;
   const webhookServer: WebhookServerResult = serverFactory(storage, {
     port,
     apiKey,
+    host: bindHost,
     forwardTo: opts.forwardTo,
     forwardHeaders: opts.forwardHeaders,
+    control: {
+      instanceId,
+      controlToken,
+      onShutdown: () => gracefulShutdown?.(),
+    },
   });
   try {
     await webhookServer.start();
@@ -280,9 +304,12 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   }
 
   writeLifecycleState({
-    version: 1,
+    version: 2,
+    instanceId,
+    controlToken,
     pid: process.pid,
     port,
+    host: bindHost,
     publicBaseUrl: publicUrl,
     callbackUrl: publicUrl ? webhookUrl : null,
     previousCallbackUrl,
@@ -349,6 +376,10 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     clearLifecycleState();
     exit(0);
   };
+
+  // Audit WP02: the control route's authenticated shutdown triggers THIS
+  // graceful path (tunnel stop, .env restore, listener close) — never a signal.
+  gracefulShutdown = shutdown;
 
   const register = deps.registerSignal ?? ((signal, handler) => process.on(signal, handler));
   register('SIGINT', () => {

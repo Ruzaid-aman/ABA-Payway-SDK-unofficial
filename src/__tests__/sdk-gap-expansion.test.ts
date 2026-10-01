@@ -166,9 +166,12 @@ describe('webhook receiver lifecycle state', () => {
   it('round-trips a written state and validates it', () => {
     writeLifecycleState(
       {
-        version: 1,
+        version: 2,
+        instanceId: 'instance-a',
+        controlToken: 'token-a',
         pid: 4242,
         port: 8080,
+        host: '127.0.0.1',
         publicBaseUrl: 'https://tunnel.example',
         callbackUrl: 'https://tunnel.example/webhooks/aba',
         previousCallbackUrl: null,
@@ -197,7 +200,7 @@ describe('webhook receiver lifecycle state', () => {
 
   it('clear is idempotent', () => {
     writeLifecycleState(
-      { version: 1, pid: 1, port: 1, publicBaseUrl: null, callbackUrl: null, previousCallbackUrl: null, startedAt: 'x' },
+      { version: 2, instanceId: 'i', controlToken: 't', pid: 1, port: 1, host: '127.0.0.1', publicBaseUrl: null, callbackUrl: null, previousCallbackUrl: null, startedAt: 'x' },
       env(),
     );
     clearLifecycleState(env());
@@ -266,7 +269,7 @@ describe('explainTransaction verdict matrix', () => {
   const ev = (partial: Record<string, unknown>): Record<string, unknown> => {
     seq += 1;
     return {
-      version: 1,
+      version: 2,
       ts: `2026-09-29T03:0${seq % 10}:00.000Z`,
       eventId: `rca-${seq}`,
       kind: 'execution.request',
@@ -365,7 +368,7 @@ describe('detectJournalAnomalies heuristics', () => {
   const write = (events: Record<string, unknown>[]) =>
     writeFileSync(path.join(dir, 'journal.jsonl'), `${events.map((e) => JSON.stringify(e)).join('\n')}\n`, 'utf8');
   const ev = (partial: Record<string, unknown>): Record<string, unknown> => ({
-    version: 1,
+    version: 2,
     ts: '2026-09-29T03:00:00.000Z',
     eventId: `an-${Math.random().toString(36).slice(2)}`,
     kind: 'execution.request',
@@ -436,7 +439,7 @@ describe('mcp extras validation and projection', () => {
   const write = (events: Record<string, unknown>[]) =>
     writeFileSync(path.join(dir, 'journal.jsonl'), `${events.map((e) => JSON.stringify(e)).join('\n')}\n`, 'utf8');
   const ev = (partial: Record<string, unknown>): Record<string, unknown> => ({
-    version: 1,
+    version: 2,
     ts: '2026-09-29T03:00:00.000Z',
     eventId: `mx-${Math.random().toString(36).slice(2)}`,
     kind: 'execution.request',

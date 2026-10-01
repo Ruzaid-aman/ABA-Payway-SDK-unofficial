@@ -5019,6 +5019,7 @@ program
     'Re-POST every captured callback to this local app URL after capture (test your receiver without the ABA Simulator)',
   )
   .option('--forward-headers <headers>', 'Extra headers for forwarded deliveries: "Key1:Value1, Key2:Value2"')
+  .option('--host <host>', "Bind interface for the listener (default '127.0.0.1'; use '0.0.0.0' etc. only when you accept exposing raw callback bodies beyond this machine)")
   .option('--non-interactive', 'Fail instead of prompting when no --url/--tunnel is supplied')
   .action(
     async (opts: {
@@ -5029,6 +5030,7 @@ program
       journal?: boolean;
       forwardTo?: string;
       forwardHeaders?: string;
+      host?: string;
       nonInteractive?: boolean;
     }) => {
       await runSetupWebhook({
@@ -5039,6 +5041,7 @@ program
         journal: opts.journal,
         forwardTo: opts.forwardTo,
         forwardHeaders: opts.forwardHeaders,
+        host: opts.host,
         nonInteractive: opts.nonInteractive,
       });
     },
