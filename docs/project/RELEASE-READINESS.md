@@ -21,7 +21,12 @@ This file is the register of actions that only the maintainer can take (decision
 
 Work A → I in order: A–C decide what the public artifact even is; D–F provision the surfaces; G–H execute the release; I follows through.
 
-### A. Git-history + public-tree disposition — DECISION REQUIRED
+### A. Git-history + public-tree disposition — DECIDED
+
+**Owner decision (2026-10-01):** Publish a fresh public history from a curated
+tree and retain this checkout as the private development line. The public-tree
+file list remains an approval item under work B; do not create, push, or tag
+the public repository until it is agreed.
 
 The local history (346 commits, ~11.7 MiB pack) contains 36 occurrences of 19 secret values across 217 commits (triage above), and the tracked tree contains internal material a stranger should not need: `docs/SANDBOX-FINDINGS.md`, `docs/INTEGRATION-GAPS-AND-ABA-QUESTIONS.md`, `audit-results/`, `docs/HISTORY-SECRET-TRIAGE.*`, `HANDOFF.md` internals, competitive analyses, `payway-openapi/` (ABA's shared spec), and `docs/archive/`. The npm package already excludes all of these (the knowledge corpus is curated separately); repo visibility is a separate decision.
 
@@ -33,7 +38,14 @@ Options:
 
 DoD: written choice recorded here; if (1), the curated-tree file list is agreed; if (2)/(3), every triage finding has an owner disposition (rotate/revoke where the owner says so).
 
-### B. Redistribution & identity review — DECISION REQUIRED
+### B. Redistribution & identity review — PARTIALLY DECIDED
+
+**Owner decision (2026-10-01):** The ABA sandbox demo identity (merchant
+`ec476910` and its demo key) is authorized for public redistribution. The
+Postman distribution policy may retain that exact allowlisted demo identity.
+
+The third-party-material, public author/security-mailbox, native-SDK scope,
+repository-destination, version, and publishing decisions remain pending.
 
 MIT on this project does not license third-party material. Before public visibility: confirm rights or exclude `payway-openapi/` (ABA's shared spec — ask ABA), `docs/archive/` official-doc copies, quotes/screenshots inside competitive analyses, and `payway-boilerplate/` remnants if any survive in the chosen tree. Also confirm the `Antigravity <info@antigravity.dev>` author identity and `security@antigravity.dev` domain are intended for the public package. DoD: per-item disposition (publish / exclude / permission on file).
 
