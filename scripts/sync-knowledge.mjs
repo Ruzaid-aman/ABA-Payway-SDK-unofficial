@@ -21,13 +21,35 @@
  *    while the prose section references stay meaningful.
  */
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SOURCES } from './knowledge-sources.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hash = (buf) => createHash('sha256').update(buf).digest('hex').slice(0, 16);
+
+/**
+ * Public-corpus provenance gate (audit D01/R03): curated topics may only
+ * originate from user-facing directories. Enforced here at generation time
+ * AND in src/__tests__/knowledge.test.ts against the written manifest, so an
+ * intentionally introduced internal source fails both before and after sync.
+ * New public source locations must be added consciously to BOTH gates.
+ */
+const PUBLIC_SOURCE_PATTERN = /^(?:[^/]+\.(?:md|json)$|docs\/README\.md$|docs\/guides\/|docs\/recipes\/|docs\/reference\/|docs\/error-codes\.json$)/;
+
+export function assertPublicSources(sources) {
+  const offenders = sources.filter(({ topic, source }) => {
+    const normalized = source.replaceAll('\\', '/');
+    return !PUBLIC_SOURCE_PATTERN.test(normalized);
+  });
+  if (offenders.length) {
+    const detail = offenders.map(({ topic, source }) => `${topic} -> ${source}`).join(', ');
+    throw new Error(
+      `sync-knowledge: knowledge sources must live in public directories (docs/guides|recipes|reference, docs/error-codes.json, or a root *.md) — refusing to package internal content: ${detail}`,
+    );
+  }
+}
 
 /** topic → all link spellings that resolve to its source file. */
 function buildTargetMap() {
@@ -107,7 +129,9 @@ function renderLlmsTxt(manifest) {
     '',
     '## Agent integration',
     '',
-    '- `payway-sdk skills add <agent>` — install the 32 packaged skill guides for claude/codex/opencode/cursor/copilot.',
+    // Count from the repo inventory, never a literal — the hardcoded "32"
+    // contradicted llms.txt's own 34 (audit D05/stale count pins).
+    `- \`payway-sdk skills add <agent>\` — install the ${countPackagedSkills()} packaged skill guides for claude/codex/opencode/cursor/copilot.`,
     '- `payway-sdk ask "<request>"` — single-shot LLM plan with 14 PayWay tools (incl. `query_knowledge`).',
     '- `payway-sdk agent` — interactive REPL; `agent doctor` shows the readiness matrix.',
     '',
@@ -115,7 +139,16 @@ function renderLlmsTxt(manifest) {
   return `${lines.join('\n')}\n`;
 }
 
+function countPackagedSkills() {
+  const skillsDir = path.join(repoRoot, 'skills');
+  if (!existsSync(skillsDir)) return 0;
+  return readdirSync(skillsDir, { withFileTypes: true }).filter(
+    (entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'),
+  ).length;
+}
+
 function main() {
+  assertPublicSources(SOURCES);
   const knowledgeDir = path.join(repoRoot, 'knowledge');
   rmSync(knowledgeDir, { recursive: true, force: true });
   mkdirSync(knowledgeDir, { recursive: true });

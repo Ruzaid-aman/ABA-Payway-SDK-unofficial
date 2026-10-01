@@ -3,23 +3,44 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizePackReport } from './lib/pack-report.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = mkdtempSync(path.join(tmpdir(), 'aba-payway-package-smoke-'));
 const npmExecPath = process.env.npm_execpath;
 
-function runNpm(args, cwd) {
+function runNpm(args, cwd, env = process.env) {
   if (npmExecPath) {
-    return execFileSync(process.execPath, [npmExecPath, ...args], { cwd, encoding: 'utf8' });
+    return execFileSync(process.execPath, [npmExecPath, ...args], { cwd, env, encoding: 'utf8' });
   }
   const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  return execFileSync(command, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+  return execFileSync(command, args, { cwd, env, encoding: 'utf8', shell: process.platform === 'win32' });
+}
+
+/**
+ * A clean consumer environment for the temp install. `npm run` exports every
+ * parent config entry as npm_config_* env vars, and npm 12 REJECTS env-sourced
+ * allowScripts on project-scoped installs ("--allow-scripts is not allowed in
+ * project-scoped installs"). The consumer must resolve npm config from files
+ * (~/.npmrc / project .npmrc), not from the maintainer's session.
+ */
+function consumerNpmEnv() {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('npm_config_')) delete env[key];
+  }
+  return env;
 }
 
 try {
-  const packReport = JSON.parse(
-    runNpm(['pack', '--json', '--ignore-scripts', '--pack-destination', temporaryRoot], repositoryRoot),
-  )[0];
+  // npm ≤11 emits an ARRAY of pack reports; npm 12 emits an OBJECT keyed by
+  // package name — normalize both (audit R02: `[0]` indexing broke on npm 12).
+  const packReport = normalizePackReport(
+    JSON.parse(
+      runNpm(['pack', '--json', '--ignore-scripts', '--pack-destination', temporaryRoot], repositoryRoot),
+    ),
+  );
+  if (!packReport.filename) throw new Error('npm pack report missing .filename');
   const tarball = path.join(temporaryRoot, packReport.filename);
 
   writeFileSync(
@@ -27,7 +48,7 @@ try {
     JSON.stringify({ private: true, type: 'module' }),
     'utf8',
   );
-  runNpm(['install', tarball, '--ignore-scripts', '--no-audit', '--no-fund'], temporaryRoot);
+  runNpm(['install', tarball, '--ignore-scripts', '--no-audit', '--no-fund'], temporaryRoot, consumerNpmEnv());
 
   writeFileSync(
     path.join(temporaryRoot, 'smoke.mjs'),
@@ -85,7 +106,16 @@ try {
   const skillCount = readdirSync(skillsRoot, { withFileTypes: true }).filter(
     (entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'),
   ).length;
-  if (skillCount !== 32) throw new Error(`expected 32 installed skills, found ${skillCount}`);
+  // Authoritative inventory: compare the installed count against the repo's
+  // own skills directory, so the gate can never go stale when skills are
+  // added or removed (audit R02: a hardcoded 32 broke against the 34-skill
+  // package).
+  const expectedSkillCount = readdirSync(path.join(repositoryRoot, 'skills'), { withFileTypes: true }).filter(
+    (entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'),
+  ).length;
+  if (skillCount !== expectedSkillCount) {
+    throw new Error(`expected ${expectedSkillCount} installed skills (repo inventory), found ${skillCount}`);
+  }
 
   // Exercise the consumer's dependency graph (including the YAML parser) and
   // installed paths, rather than only counting guides in the tarball.

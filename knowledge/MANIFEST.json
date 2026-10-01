@@ -28,9 +28,9 @@
       "description": "The full documentation map: start-here routes, per-domain guides, troubleshooting.",
       "source": "docs/README.md",
       "file": "docs-index.md",
-      "bytes": 8010,
-      "sha256": "a8b18762ca8ebc3f",
-      "sourceSha256": "8ad34f03f4196619"
+      "bytes": 8113,
+      "sha256": "ca0d4c09ca195d41",
+      "sourceSha256": "9414d36ca4f1261c"
     },
     {
       "topic": "overview",
@@ -98,9 +98,9 @@
       "description": "Online vs offline KHQR, scan-time validity windows, rendering and expiry semantics.",
       "source": "docs/guides/07-qr-code-handling.md",
       "file": "qr-handling.md",
-      "bytes": 39821,
-      "sha256": "96ac8f3f698eea95",
-      "sourceSha256": "37ded52b6839100b"
+      "bytes": 39806,
+      "sha256": "a01620bd0c531362",
+      "sourceSha256": "9e26d17e5fa4ebcc"
     },
     {
       "topic": "deep-linking",
@@ -283,14 +283,14 @@
       "sourceSha256": "0b7a0e1a47964a80"
     },
     {
-      "topic": "close-transaction-findings",
-      "title": "Close-transaction findings",
-      "description": "What close-transaction really does remotely (QR kill vs hosted-card sessions).",
-      "source": "docs/internal/CLOSE-TRANSACTION-FINDINGS.md",
-      "file": "close-transaction-findings.md",
-      "bytes": 10821,
-      "sha256": "8eefc8f138cdeddd",
-      "sourceSha256": "9722e648e6c0aa5a"
+      "topic": "close-transaction",
+      "title": "Close transaction",
+      "description": "Channel-dependent close semantics: QR kill vs stale hosted-card sessions, the local closed flag, reconciliation.",
+      "source": "docs/guides/23-close-transaction.md",
+      "file": "close-transaction.md",
+      "bytes": 3872,
+      "sha256": "28b122e63dc7e59b",
+      "sourceSha256": "4223b3e56745c312"
     },
     {
       "topic": "sdk-cli-reference",
@@ -298,9 +298,9 @@
       "description": "Every SDK domain method and CLI command with flags and contracts.",
       "source": "docs/reference/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
-      "bytes": 47018,
-      "sha256": "69fe1f595cc34666",
-      "sourceSha256": "b2a864442342184d"
+      "bytes": 47019,
+      "sha256": "8eef04f74a2a483e",
+      "sourceSha256": "1dfdfd0815829d30"
     },
     {
       "topic": "error-codes",

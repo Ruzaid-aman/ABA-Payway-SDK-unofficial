@@ -84,9 +84,25 @@ describe('knowledge corpus freshness', () => {
 
   it('never ships internal audit dossiers', () => {
     const files = manifest.topics.map((t) => t.file.toLowerCase());
-    for (const forbidden of ['sandbox-findings', 'integration-gaps', 'project-status', 'competitive']) {
+    for (const forbidden of [
+      'sandbox-findings',
+      'integration-gaps',
+      'project-status',
+      'competitive',
+      'close-transaction-findings',
+    ]) {
       expect(files.some((f) => f.includes(forbidden))).toBe(false);
     }
+  });
+
+  it('sources every topic from a public directory — no internal provenance (D01/R03)', () => {
+    // Mirrors the generator-side gate in scripts/sync-knowledge.mjs: this test
+    // fails on an intentionally introduced internal source BEFORE packaging.
+    const publicSource = /^(?:[^/]+\.(?:md|json)$|docs\/README\.md$|docs\/guides\/|docs\/recipes\/|docs\/reference\/|docs\/error-codes\.json$)/;
+    const offenders = manifest.topics
+      .filter((t) => !publicSource.test(t.source.replaceAll('\\', '/')))
+      .map((t) => `${t.topic} -> ${t.source}`);
+    expect(offenders).toEqual([]);
   });
 
   it('generates llms.txt listing every topic', () => {
@@ -102,6 +118,7 @@ describe('knowledge corpus freshness', () => {
       const content = readFileSync(path.join(knowledgeDir, topic.file), 'utf8');
       expect(content).not.toMatch(/SANDBOX-FINDINGS\.md/i);
       expect(content).not.toMatch(/HANDOFF\.md/i);
+      expect(content).not.toMatch(/CLOSE-TRANSACTION-FINDINGS/i);
     }
   });
 });

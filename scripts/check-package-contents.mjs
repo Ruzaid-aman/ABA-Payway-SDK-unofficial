@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { normalizePackReport } from './lib/pack-report.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmArgs = ['pack', '--dry-run', '--json', '--ignore-scripts'];
@@ -19,9 +20,9 @@ if (packed.status !== 0) {
 }
 
 // npm ≤11 emits an ARRAY of pack reports; npm 12 emits an OBJECT keyed by
-// package name. Normalize both before reading `files`.
+// package name — the shared helper normalizes both before reading `files`.
 const parsedReport = JSON.parse(packed.stdout);
-const report = Array.isArray(parsedReport) ? parsedReport[0] : Object.values(parsedReport)[0];
+const report = normalizePackReport(parsedReport);
 const files = report.files.map((entry) => entry.path.replaceAll('\\', '/'));
 const fileSet = new Set(files);
 const required = [
@@ -50,10 +51,18 @@ const forbiddenPathPatterns = [
   /(?:^|\/)HANDOFF\.md$/,
   /\.map$/,
   /(?:WAVE5-captures|ABA-QUESTIONS|SANDBOX-FINDINGS)\.md$/i,
+  // Generated corpus filename of the retired internal dossier (audit D01/R03):
+  // the topic must never return under its old name.
+  /close-transaction-findings\.md$/i,
 ];
 const forbiddenPaths = files.filter((entry) => forbiddenPathPatterns.some((pattern) => pattern.test(entry)));
 
 const skillCount = files.filter((entry) => /^skills\/aba-payway-[^/]+\/SKILL\.md$/.test(entry)).length;
+// Authoritative inventory (audit R02): compare against the repo's skills
+// directory instead of a hardcoded count that goes stale on every skill wave.
+const expectedSkillCount = readdirSync(path.join(repositoryRoot, 'skills'), { withFileTypes: true }).filter(
+  (entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'),
+).length;
 const textExtensions = new Set(['.js', '.cjs', '.json', '.md', '.ts', '.cts']);
 const forbiddenContentPatterns = [
   /[A-Z]:[\\/]Users[\\/]/i,
@@ -61,6 +70,7 @@ const forbiddenContentPatterns = [
   /WAVE5-captures\.md/i,
   /ABA-QUESTIONS-\d{4}-\d{2}-\d{2}\.md/i,
   /SANDBOX-FINDINGS\.md/i,
+  /CLOSE-TRANSACTION-FINDINGS\.md/i,
   /HANDOFF\.md/i,
   /(?:^|[\\/])test-output[\\/]/i,
   /(?:^|[\\/])\.scratch[\\/]/i,
@@ -94,7 +104,7 @@ for (const entry of files) {
 const failures = [
   ...(missing.length ? [`Missing required files: ${missing.join(', ')}`] : []),
   ...(forbiddenPaths.length ? [`Forbidden package paths: ${forbiddenPaths.join(', ')}`] : []),
-  ...(skillCount !== 34 ? [`Expected 34 skill guides, found ${skillCount}`] : []),
+  ...(skillCount !== expectedSkillCount ? [`Expected ${expectedSkillCount} skill guides (repo inventory), found ${skillCount}`] : []),
   ...(contentViolations.length ? [`Forbidden embedded content: ${contentViolations.join(', ')}`] : []),
   ...(brokenLocalLinks.length ? [`Broken packaged Markdown links: ${brokenLocalLinks.join(', ')}`] : []),
 ];

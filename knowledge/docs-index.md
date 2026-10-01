@@ -39,7 +39,7 @@ Offline KHQR has separate merchant configuration and notification rules; see the
 | `failed` | A confirmed rejection or cancellation. Inspect the reason before a fresh attempt. |
 | `unknown` | Missing, ambiguous, or unsupported result. Look up the existing transaction before replacing it. |
 
-These are first-payment terms. Legacy session `completed` and gateway statuses remain available unchanged. PRE-AUTH and REFUNDED require their domain workflows; neither is approval to fulfill a new order. Local expiry and closure do not become remote failure: gateway reads can remain PENDING.
+These are first-payment terms. Legacy session `completed` and gateway statuses remain available unchanged. PRE-AUTH and REFUNDED require their domain workflows; neither is approval to fulfill a new order. Local expiry and closure do not become remote failure: gateway reads can remain PENDING. For what `close-transaction` really does per channel and the local `closed` flag policy, see [close transaction](payway-sdk docs close-transaction).
 
 Use [callbacks and webhooks](payway-sdk docs callbacks-webhooks), [webhook setup](payway-sdk docs webhook-setup), and the reference app for verification and idempotent fulfillment. Payment-link pushbacks are unsigned; verify them through a status lookup.
 
@@ -82,7 +82,7 @@ For tool-based integration without skills: expose the [MCP server](payway-sdk do
 These materials support maintenance and investigation; they are not onboarding prerequisites.
 
 - Contributing, handoff, release readiness, release checklist, versioning, maintenance plan.
-- Sandbox findings, [close-transaction evidence](payway-sdk docs close-transaction-findings), open questions.
+- Sandbox findings, close-transaction evidence, open questions.
 - [Error-code registry (generated)](payway-sdk docs error-codes) — every `explain`-known code as versioned JSON; regenerate with `npm run gen:error-registry`.
 - Integration gaps & consolidated ABA questions (2026-09-12 scan: what the docs cannot answer developers + the prioritized send-to-ABA list).
 - Publishing-DX audit (2026-09-29) — docs/skills/AI developer-experience audit plus the webhook-vs-postman and SDK/CLI evidence dossiers (gate logs and the consumer smoke-install evidence live in `.scratch/publishing-dx-audit-2026-09-29/`; the reproducible install tree itself is gitignored).

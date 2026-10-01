@@ -39,7 +39,7 @@ Offline KHQR has separate merchant configuration and notification rules; see the
 | `failed` | A confirmed rejection or cancellation. Inspect the reason before a fresh attempt. |
 | `unknown` | Missing, ambiguous, or unsupported result. Look up the existing transaction before replacing it. |
 
-These are first-payment terms. Legacy session `completed` and gateway statuses remain available unchanged. PRE-AUTH and REFUNDED require their domain workflows; neither is approval to fulfill a new order. Local expiry and closure do not become remote failure: gateway reads can remain PENDING.
+These are first-payment terms. Legacy session `completed` and gateway statuses remain available unchanged. PRE-AUTH and REFUNDED require their domain workflows; neither is approval to fulfill a new order. Local expiry and closure do not become remote failure: gateway reads can remain PENDING. For what `close-transaction` really does per channel and the local `closed` flag policy, see [close transaction](./guides/23-close-transaction.md).
 
 Use [callbacks and webhooks](./guides/11-callbacks-and-webhooks.md), [webhook setup](./guides/16-webhook-setup-guide.md), and the [reference app](../examples/first-payment/README.md) for verification and idempotent fulfillment. Payment-link pushbacks are unsigned; verify them through a status lookup.
 
