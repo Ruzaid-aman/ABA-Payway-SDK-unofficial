@@ -9,7 +9,7 @@ const projectDir = path.join(__dirname, '..');
 const collectionDir = path.join(projectDir, 'postman', 'collections', 'PayWay API — Complete Collection');
 const collection = loadYamlCollection(collectionDir);
 
-assert.equal(collection.variables.size, 125, 'latest YAML collection variable count changed');
+assert.equal(collection.variables.size, 127, 'latest YAML collection variable count changed');
 assert.equal(collection.requests.length, 46, 'latest YAML collection request count changed');
 assert.ok(collection.requests.every((request) => request.url), 'every request must have a URL');
 assert.ok(collection.requests.some((request) => request.relativePath.includes('Build Offline KHQR')),

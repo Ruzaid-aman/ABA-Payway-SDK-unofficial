@@ -107,6 +107,8 @@ info:
 servers:
   - url: https://checkout-sandbox.payway.com.kh
     description: Sandbox (per PayWay docs export; confirm production host separately — likely checkout.payway.com.kh, not verified here)
+security:
+  - bodyFieldHmac: []
 tags:
   - name: Ecommerce Checkout
     description: Core hosted-checkout payment flow
@@ -137,6 +139,7 @@ paths:
         - tran_id
         - amount
         - items
+        - ctid
         - shipping
         - firstname
         - lastname
@@ -176,6 +179,12 @@ paths:
                 oneOf:
                   - $ref: '#/components/schemas/PurchaseQrResponse'
                   - $ref: '#/components/schemas/ErrorStatus'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v1/payments/check-transaction-2:
     post:
       operationId: checkTransaction
@@ -206,6 +215,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CheckTransactionResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v1/payments/close-transaction:
     post:
       operationId: closeTransaction
@@ -250,6 +265,12 @@ paths:
                     status:
                       code: '1'
                       message: Wrong hash
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v1/payments/transaction-detail:
     post:
       operationId: getTransactionDetail
@@ -280,6 +301,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionDetailResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v1/payments/transaction-list-2:
     post:
       operationId: getTransactionList
@@ -322,6 +349,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionListResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/merchant-portal/merchant-access/online-transaction/refund:
     post:
       operationId: refundTransaction
@@ -378,6 +411,12 @@ paths:
                     status:
                       code: PTL02
                       message: Wrong Hash
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v1/exchange-rate:
     post:
       operationId: getExchangeRate
@@ -406,6 +445,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExchangeRateResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-credential/v3/aof/link-account:
     post:
       operationId: linkAccount
@@ -413,16 +458,16 @@ paths:
       tags:
         - Credentials on File
       description: |
-        Returns a QR code or ABA Mobile deeplink, enabling users to scan or use the deeplink to launch ABA Mobile and select an account to link. Once linked, PayWay sends account details and token to the merchant via callback_url.
+        Returns a QR code or ABA Mobile deeplink, enabling users to scan or use the deeplink to launch ABA Mobile and select an account to link. Once linked, PayWay sends account details and token to the merchant via callback_url. The QR/deeplink expires in 10 minutes. Live docs mark ctid, token_flag, and currency as REQUIRED.
       x-hmac-fields:
-        - request_time
         - merchant_id
-        - request_id
+        - request_time
         - ctid
         - return_deeplink
+        - callback_url
+        - request_id
         - token_flag
         - currency
-        - callback_url
       requestBody:
         required: true
         content:
@@ -436,6 +481,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LinkAccountResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-credential/v3/cof/link-card:
     post:
       operationId: linkCard
@@ -443,17 +494,18 @@ paths:
       tags:
         - Credentials on File
       description: |
-        Securely stores a customer's credit/debit card. Returns a hosted checkout page or token depending on integration type.
+        Securely stores a customer's credit/debit card. ALWAYS responds with an HTML page (Visa/Mastercard/JCB/UPI form) to render in an iframe — on success AND on error; the token is delivered via callback_url. Live docs mark ctid, token_flag, and currency as REQUIRED.
       x-hmac-fields:
-        - request_time
         - merchant_id
-        - request_id
+        - request_time
         - ctid
-        - return_deeplink
+        - callback_url
+        - request_id
         - token_flag
         - frequency
-        - return_url
-        - callback_url
+        - amount
+        - currency
+        - continue_success_url
       requestBody:
         required: true
         content:
@@ -462,11 +514,17 @@ paths:
               $ref: '#/components/schemas/LinkCardRequest'
       responses:
         '200':
-          description: Hosted checkout for card linking
+          description: Hosted card-linking HTML page (returned on success AND error)
+          content:
+            text/html:
+              schema:
+                type: string
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LinkCardResponse'
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v3/purchase/payment-credential:
     post:
       operationId: cofPayment
@@ -474,18 +532,27 @@ paths:
       tags:
         - Credentials on File
       description: |
-        Initiates a payment using a previously linked account or card token. Supports both customer-initiated (CITR) and merchant-initiated (MITR) transactions. Use token_flag to specify the context.
+        Initiates a payment using a previously linked account or card token. Live-documented token_flag values: CITU_FLEX, MITU_FLEX, MITR_FIX (ensure the merchant profile enables the matching business case). Amount floor: KHR >= 100, USD >= 0.01.
       x-hmac-fields:
         - request_time
         - merchant_id
-        - request_id
         - tran_id
         - amount
+        - currency
+        - items
         - ctid
         - pwt
-        - token_flag
-        - currency
+        - first_name
+        - last_name
+        - email
+        - phone
+        - purchase_type
         - callback_url
+        - custom_fields
+        - return_params
+        - payout
+        - token_flag
+        - shipping_fee
       requestBody:
         required: true
         content:
@@ -499,6 +566,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CofPaymentResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-credential/v3/token-management/renew-expired-account-token:
     post:
       operationId: renewToken
@@ -506,13 +579,13 @@ paths:
       tags:
         - Credentials on File
       description: |
-        Used to update or refresh existing payment credentials before they expire. Generates a new token while keeping the linked account/card.
+        Renews an expired (or expiring) ACCOUNT token — card tokens cannot be renewed. CITI_FLEX/CITO_FLEX tokens expire 90 days after linking, renewal, or the last successful transaction (whichever is most recent). Renewal extends by 90 days. A callback is expected within 3 minutes; otherwise fall back to Get Token Details.
       x-hmac-fields:
+        - ctid
         - request_time
+        - pwt
         - merchant_id
         - request_id
-        - ctid
-        - pwt
       requestBody:
         required: true
         content:
@@ -526,6 +599,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RenewTokenResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-credential/v3/token-management/get-token-details:
     post:
       operationId: getTokenDetails
@@ -533,13 +612,11 @@ paths:
       tags:
         - Credentials on File
       description: |
-        Retrieves the details associated with a stored payment token, including masked account/card information and token status.
+        Manual retrieval when a link/renew callback was missed. Per the live docs this endpoint takes ONLY request_time, merchant_id, and request_id — no ctid and no pwt.
       x-hmac-fields:
-        - request_time
         - merchant_id
+        - request_time
         - request_id
-        - ctid
-        - pwt
       requestBody:
         required: true
         content:
@@ -553,6 +630,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetTokenDetailsResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-credential/v3/token-management/remove-token:
     post:
       operationId: removeToken
@@ -560,12 +643,11 @@ paths:
       tags:
         - Credentials on File
       description: |
-        Deletes the stored account or card token. Once removed, the token can no longer be used for payments or renewals.
+        Removes a linked account OR card token. IRREVERSIBLE — future charges decline with purchase error 87 and the ABA Mobile user is notified. Users can also remove the token themselves in ABA Mobile; the merchant then receives a CoF callback with status 0.
       x-hmac-fields:
-        - request_time
         - merchant_id
-        - request_id
         - ctid
+        - request_time
         - pwt
       requestBody:
         required: true
@@ -580,6 +662,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RemoveTokenResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v1/payments/generate-qr:
     post:
       operationId: generateQr
@@ -621,6 +709,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenerateQrResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/merchant-portal/merchant-access/payment-link/create:
     post:
       operationId: createPaymentLink
@@ -638,16 +732,17 @@ paths:
         chunk_size_bytes: 117
         plaintext_shape:
           mc_id: same value as merchant_id
-          title: title of the payment link
-          amount: payment amount
+          title: title of the payment link (max 250 chars)
+          amount: payment amount (min 100 KHR / 0.01 USD, not null/zero)
           currency: USD or KHR — REQUIRED (PTL04 when omitted)
           description: optional description of the payment link (max 250 characters — PTL04 when exceeded)
-          payment_limit: optional limit on payments
+          payment_limit: optional limit on payments (blank = unlimited)
+          expired_date: expiration timestamp in seconds (a null value means no expiry; sample passes time())
           return_url: base64-encoded callback URL — REQUIRED (PTL04 when omitted)
-          merchant_ref_no: unique reference number
-          expired_date: optional expiration timestamp in seconds
+          merchant_ref_no: optional merchant-side link reference (max 50, echoed in callback)
+          payout: optional JSON [{acc, amt}] — total payout must equal the link amount
         process: |
-          JSON-encode the plaintext shape -> split into 117-byte chunks -> RSA-encrypt each chunk -> concatenate -> base64 encode into merchant_auth field.
+          JSON-encode the plaintext shape -> split into 117-byte chunks -> RSA-encrypt each chunk -> concatenate -> base64 encode into merchant_auth field. The optional top-level `image` (max 3MB, JPG/JPEG/PNG) is sent as a multipart part and never hashed.
       requestBody:
         required: true
         content:
@@ -661,6 +756,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreatePaymentLinkResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/merchant-portal/merchant-access/payment-link/detail:
     post:
       operationId: getPaymentLinkDetails
@@ -694,6 +795,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetPaymentLinkDetailsResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/merchant-portal/merchant-access/payment-link/void:
+    post:
+      operationId: voidPaymentLink
+      summary: Void (cancel) a payment link
+      tags:
+        - Payment Link
+      description: |
+        Voids a previously created payment link before it has been paid. Once voided the link can no longer receive payments and the action CANNOT be reversed. UNDOCUMENTED by PayWay (no official docs page) — the full contract is live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11): same request family as detail (RSA-encrypted merchant_auth carrying {mc_id, id}); Content-Type lenient (both application/json and urlencoded accepted); success answers {status:{code:"00",message:"Success."}, tran_id} with a NUMERIC tran_id; double-void answers HTTP 403 code PTL188 "The payment link is already voided."; a bogus link id answers HTTP 403 code 96 "Invalid merchant data". Post-void, detail reports status "VOIDED" and the hosted page renders an invalid-data shell (page code 07).
+      x-hmac-fields:
+        - request_time
+        - merchant_id
+        - merchant_auth
+      x-merchant-auth-encryption:
+        algorithm: RSA public-key encryption, PKCS1 padding
+        chunk_size_bytes: 117
+        plaintext_shape:
+          mc_id: same value as merchant_id
+          id: the payment link ID to void (the data.id value returned by create — NOT the URL slug)
+        process: |
+          JSON-encode {mc_id, id} -> RSA-encrypt in 117-byte chunks -> base64 encode into merchant_auth.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VoidPaymentLinkRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoidPaymentLinkRequest'
+      responses:
+        '200':
+          description: Payment link voided (terminal — a second void answers 403 PTL188)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoidPaymentLinkResponse'
+        4XX:
+          description: Client error (PTL188 already voided, 96 invalid link id, wrong hash)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/merchant-portal/merchant-access/online-transaction/pre-auth-completion:
     post:
       operationId: completePreAuth
@@ -728,6 +877,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CompletePreAuthResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation:
     post:
       operationId: cancelPreAuth
@@ -761,6 +916,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CancelPreAuthResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v2/direct-payment/merchant/payout:
     post:
       operationId: payout
@@ -790,6 +951,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PayoutResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status:
     post:
       operationId: updateBeneficiaryStatus
@@ -814,6 +981,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BeneficiaryResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout:
     post:
       operationId: addBeneficiary
@@ -838,6 +1011,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BeneficiaryResponse'
+        4XX:
+          description: Client error (invalid hash, missing parameters, validation failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/payment-gateway/v1/payments/get-transactions-by-mc-ref:
     post:
       operationId: getTransactionsByMerchantRef
@@ -888,6 +1067,13 @@ webhooks:
         '200':
           description: Acknowledge receipt (merchant endpoint's own response, not PayWay's)
 components:
+  securitySchemes:
+    bodyFieldHmac:
+      type: apiKey
+      in: query
+      name: hash
+      description: |
+        PayWay uses body-field HMAC signing — not a transport-level header. Every request carries a `hash` field inside the request body, computed as base64(HMAC-SHA512(concat(fields...), api_key)). See the `x-hmac-fields` extension on each operation for the ordered field list. This security scheme is a spec-level marker only; SDK codegen tooling must read `x-hmac-fields` explicitly.
   schemas:
     PurchaseRequest:
       type: object
@@ -1051,6 +1237,39 @@ components:
             - message
       required:
         - status
+    StatusBlock:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: |
+            Endpoint-specific status code. NOTE: check-transaction and close-transaction each define their own code space (e.g. "00" success vs "0" on purchase-family errors) — do not assume a single shared enum across endpoints; encode per-operation code tables separately in the generated SDK's error types.
+        message:
+          type: string
+          description: Human-readable detail for `code`.
+        tran_id:
+          type: string
+          description: Echoes the transaction id the status applies to.
+        lang:
+          type: string
+          description: |
+            Observed empirically (live sandbox probe, 2026-07-16) on transaction-list-2's error responses only (e.g. "en"). Not confirmed present on other -2 endpoints or on success responses -- treat as optional/nullable everywhere, and re-verify before assuming it appears on a given operation.
+        trace_id:
+          type: string
+          description: |
+            Observed empirically (live sandbox probe, 2026-07-16) on transaction-list-2's error responses only. Same caveat as `lang` -- optional, not confirmed on other endpoints.
+    ErrorResponse:
+      type: object
+      description: |
+        Standard error response returned by PayWay on validation failures, authentication errors, or business-logic rejections. The `status.code` field contains an endpoint-specific error code (e.g. "1" for wrong hash, "49" for invalid date). The `status.message` provides a human-readable explanation.
+      properties:
+        status:
+          $ref: '#/components/schemas/StatusBlock'
+      required:
+        - status
     TranLookupRequest:
       type: object
       required:
@@ -1072,7 +1291,7 @@ components:
         hash:
           type: string
           description: base64(HMAC-SHA512(req_time + merchant_id + tran_id, api_key)).
-    StatusBlock:
+    ecommerce-checkout_StatusBlock:
       type: object
       required:
         - code
@@ -1132,7 +1351,7 @@ components:
               type: string
               description: Timestamp the transaction was created in the payment gateway.
         status:
-          $ref: '#/components/schemas/StatusBlock'
+          $ref: '#/components/schemas/ecommerce-checkout_StatusBlock'
       example:
         data:
           payment_status_code: 0
@@ -1155,7 +1374,7 @@ components:
         - status
       properties:
         status:
-          $ref: '#/components/schemas/StatusBlock'
+          $ref: '#/components/schemas/ecommerce-checkout_StatusBlock'
     TransactionOperation:
       type: object
       description: One entry in a transaction's operation history (capture, pre-auth completion/cancellation, refund).
@@ -1268,7 +1487,7 @@ components:
               items:
                 $ref: '#/components/schemas/TransactionOperation'
         status:
-          $ref: '#/components/schemas/StatusBlock'
+          $ref: '#/components/schemas/ecommerce-checkout_StatusBlock'
           description: |
             code space for this endpoint: "00" success, "5" wrong hash (note: NOT "1" as in check/close-transaction — do not assume a shared numeric code space across endpoints), "6" transaction not found, "8" invalid merchant profile, "11" internal server error, "429" rate limit exceeded.
     TransactionListRequest:
@@ -1286,22 +1505,27 @@ components:
         merchant_id:
           type: string
         from_date:
-          type: string
-          nullable: true
+          type:
+            - string
+            - 'null'
           description: Format YYYY-MM-DD HH:mm:ss. Defaults to today 00:00:00 if omitted.
         to_date:
-          type: string
-          nullable: true
+          type:
+            - string
+            - 'null'
           description: Format YYYY-MM-DD HH:mm:ss. Defaults to today 23:59:59 if omitted. Date range capped at 3 days total.
         from_amount:
-          type: number
-          nullable: true
+          type:
+            - number
+            - 'null'
         to_amount:
-          type: number
-          nullable: true
+          type:
+            - number
+            - 'null'
         status:
-          type: string
-          nullable: true
+          type:
+            - string
+            - 'null'
           description: Comma-separated for multiple values. Case-insensitive. One of APPROVED, PRE-AUTH, REFUNDED, PENDING, DECLINED, CANCELLED.
         page:
           type: string
@@ -1404,7 +1628,7 @@ components:
           type: string
           description: Records per page (max 1000).
         status:
-          $ref: '#/components/schemas/StatusBlock'
+          $ref: '#/components/schemas/ecommerce-checkout_StatusBlock'
           description: |
             code space: "00" success, "1" wrong hash, "8" invalid merchant profile, "11" internal server error, "429" rate limit exceeded (50 req/min on this endpoint).
     RefundRequest:
@@ -1519,11 +1743,14 @@ components:
         - request_id
         - request_time
         - merchant_id
+        - ctid
+        - token_flag
+        - currency
         - hash
       properties:
         request_id:
           type: string
-          description: Unique request identifier generated by the merchant.
+          description: Unique request identifier generated by the merchant. 5–24 chars, letters+digits only. "We only return the last record" for a reused request_id.
         request_time:
           type: string
           description: UTC timestamp, format YYYYMMDDHHmmss.
@@ -1532,31 +1759,26 @@ components:
           description: Merchant key issued by ABA Bank.
         ctid:
           type: string
-          description: Customer token identifier — merchant-side unique ID for the customer.
+          description: Customer token identifier — merchant-side unique ID for the customer. 5–24 chars, letters+digits only. Required per live docs.
         return_deeplink:
           type: string
           description: Base64-encoded JSON {ios_scheme, android_scheme} for mobile app integration.
         token_flag:
           type: string
           enum:
-            - CITR_FIX
-            - CITR_FLEX
-            - MITR_FIX
-            - MITR_FLEX
-            - CITI_FIX
             - CITI_FLEX
-            - MITU_FIX
-            - MITU_FLEX
+            - CITO_FLEX
           description: |
-            Defines who triggers transactions and whether the amount is fixed or variable. CITR = Customer-Initiated Token Registration, MITR = Merchant-Initiated Token Registration.
+            Live docs list CITI_FLEX (customer-initiated, variable amount) and CITO_FLEX (merchant charges later, variable) for link-account. Sandbox additionally accepted CITO_FIX / CITR_FLEX (§9b) — keep sending them only if the merchant profile enables them.
         currency:
           type: string
           enum:
             - KHR
             - USD
+          description: Required per live docs (profile-enabled currency).
         callback_url:
           type: string
-          description: URL where PayWay sends the account details and token after linking.
+          description: Base64-encoded URL where PayWay sends the account details and token after linking. Defaults to the profile pushback_url.
         hash:
           type: string
           description: base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)).
@@ -1568,24 +1790,37 @@ components:
           properties:
             code:
               type: string
+              description: 00 success; 04 invalid data (see errors map); 01 wrong hash; 98 merchant id not found; 104 merchant not enabled token flag.
             message:
               type: string
-        qr_string:
-          type: string
-          description: QR code payload for scanning.
-        abapay_deeplink:
-          type: string
-          description: Deeplink to open ABA Mobile.
+            trace_id:
+              type: string
+          description: On code 04 the binding layer adds an `errors` object keyed by field name.
+        data:
+          type: object
+          properties:
+            deeplink:
+              type: string
+              description: ABA Mobile deeplink for linking.
+            qr_string:
+              type: string
+              description: QR payload for linking.
+            expire_in:
+              description: QR/deeplink expiry (10 minutes per live docs).
     LinkCardRequest:
       type: object
       required:
         - request_id
         - request_time
         - merchant_id
+        - ctid
+        - token_flag
+        - currency
         - hash
       properties:
         request_id:
           type: string
+          description: 5–24 chars, letters+digits only.
         request_time:
           type: string
           description: UTC timestamp, YYYYMMDDHHmmss.
@@ -1593,57 +1828,51 @@ components:
           type: string
         ctid:
           type: string
-          description: Customer token identifier.
-        return_deeplink:
-          type: string
+          description: Customer token identifier. 5–24 chars, letters+digits only. Required per live docs.
         token_flag:
           type: string
           enum:
-            - CITR_FIX
-            - CITR_FLEX
-            - MITR_FIX
-            - MITR_FLEX
-            - CITI_FIX
             - CITI_FLEX
-            - MITU_FIX
-            - MITU_FLEX
+            - CITO_FLEX
+          description: Live docs list CITI_FLEX / CITO_FLEX for link-card.
         frequency:
           type: string
           enum:
             - 1W
             - 1M
             - 2M
-          description: Required for Link Card. Billing frequency.
-        return_url:
+          description: Marked 'Required for Link Card' in live docs; the SDK warns when omitted (§16 realignment). Billing frequency.
+        amount:
           type: string
-          description: Base64-encoded callback URL.
+          description: |
+            Hash position ONLY (§16) — it participates in the HMAC (hashes as '') but has NO request body field. Listed here to document the quirk; do not send it.
+        continue_success_url:
+          type: string
+          description: Base64-encoded URL — target of the hosted form's "Done" button.
         callback_url:
           type: string
+          description: Base64-encoded token pushback URL; defaults to the profile pushback_url.
+        currency:
+          type: string
+          enum:
+            - KHR
+            - USD
+          description: Required per live docs (sandbox binds USD by default — §9a).
         hash:
           type: string
-    LinkCardResponse:
-      type: object
-      properties:
-        status:
-          type: object
-          properties:
-            code:
-              type: string
-            message:
-              type: string
     CofPaymentRequest:
       type: object
       required:
-        - request_id
         - request_time
         - merchant_id
         - tran_id
         - amount
-        - payment_token
+        - currency
+        - ctid
+        - pwt
+        - token_flag
         - hash
       properties:
-        request_id:
-          type: string
         request_time:
           type: string
           description: UTC timestamp, YYYYMMDDHHmmss.
@@ -1651,34 +1880,69 @@ components:
           type: string
         tran_id:
           type: string
+          maxLength: 20
           description: Merchant-generated unique transaction identifier.
         amount:
           type: number
-          description: Payment amount.
+          description: 'Payment amount. Floor: KHR >= 100, USD >= 0.01.'
         pwt:
           type: string
-          description: Token from link-account or link-card.
+          description: PayWay token from link-account or link-card.
         ctid:
           type: string
+          maxLength: 24
           description: Customer token identifier.
+        first_name:
+          type: string
+          maxLength: 20
+        last_name:
+          type: string
+          maxLength: 20
+        email:
+          type: string
+          maxLength: 50
+        phone:
+          type: string
+          maxLength: 20
+        purchase_type:
+          type: string
+          enum:
+            - purchase
+            - pre-auth
+          default: purchase
+        callback_url:
+          type: string
+          description: Base64-encoded.
+        items:
+          type: string
+          maxLength: 500
+          description: Base64-encoded JSON [{name,quantity,price}].
+        return_params:
+          type: string
+          maxLength: 500
+        payout:
+          type: string
+          maxLength: 500
+          description: Base64-encoded JSON [{acc,amt}].
+        custom_fields:
+          type: string
+          maxLength: 500
+          description: Base64-encoded JSON.
         token_flag:
           type: string
           enum:
-            - CITR_FIX
-            - CITR_FLEX
-            - MITR_FIX
-            - MITR_FLEX
-            - CITI_FIX
-            - CITI_FLEX
-            - MITU_FIX
+            - CITU_FLEX
             - MITU_FLEX
+            - MITR_FIX
+          description: Live-documented charging flags. Sandbox additionally accepted MITU_FIX / MITR_FLEX (§9b).
+        shipping_fee:
+          type: number
+          description: Shipping fee — 'can be any amount' per live docs.
         currency:
           type: string
           enum:
             - KHR
             - USD
-        callback_url:
-          type: string
         hash:
           type: string
     CofPaymentResponse:
@@ -1689,10 +1953,14 @@ components:
           properties:
             code:
               type: string
+              description: 00 success; 04 invalid data (errors map); 01 wrong hash; 98 merchant id not found.
             message:
               type: string
             tran_id:
               type: string
+            trace_id:
+              type: string
+          description: On code 04 the binding layer adds an `errors` object keyed by field name.
     RenewTokenRequest:
       type: object
       required:
@@ -1702,15 +1970,19 @@ components:
         - ctid
         - pwt
         - hash
+      description: |
+        Account tokens only. Live-documented hash order: ctid, request_time, pwt, merchant_id, request_id (differs from every other CoF endpoint).
       properties:
         request_id:
           type: string
+          description: 5–24 chars, letters+digits only.
         request_time:
           type: string
         merchant_id:
           type: string
         ctid:
           type: string
+          description: 5–24 chars, letters+digits only.
         pwt:
           type: string
         hash:
@@ -1723,7 +1995,12 @@ components:
           properties:
             code:
               type: string
+              description: 00 success (example also carries tran_id); 4 invalid data; 1 wrong hash; 98 merchant id not found; 105 invalid payment credential token.
             message:
+              type: string
+            tran_id:
+              type: string
+            trace_id:
               type: string
         new_token:
           type: string
@@ -1734,19 +2011,16 @@ components:
         - request_id
         - request_time
         - merchant_id
-        - ctid
-        - pwt
         - hash
+      description: |
+        Per the live docs this endpoint takes ONLY request_time, merchant_id, and request_id — no ctid, no pwt. Hash order: merchant_id, request_time, request_id.
       properties:
         request_id:
           type: string
+          description: 5–24 chars, letters+digits only — the original link/renew request_id.
         request_time:
           type: string
         merchant_id:
-          type: string
-        ctid:
-          type: string
-        pwt:
           type: string
         hash:
           type: string
@@ -1758,35 +2032,55 @@ components:
           properties:
             code:
               type: string
+              description: 00 success; 04 invalid data (errors map); 1 wrong hash; 98 merchant id not found; 104 data not found.
             message:
+              type: string
+            trace_id:
               type: string
         data:
           type: object
           properties:
-            token:
+            source_of_fund:
               type: string
-            token_type:
+              description: Masked account/card — last 4 visible.
+            type:
               type: string
-              description: ACCOUNT or CARD.
-            masked_account:
+              description: Visa | MC | CUP | JCB | ABA ACCOUNT.
+            status:
+              type: integer
+              description: 0 removed, 1 active, 2 frozen.
+            expired_at:
               type: string
-              description: Masked account number or card PAN.
-            token_status:
+              description: Token expiry (date-time).
+            token_flag:
               type: string
-            expiry_date:
+              description: CITI_FLEX | CITO_FLEX | CITR_FIX.
+            frequency:
+              type: string
+              description: Empty for FLEX flags; 1W/1M/2M for CITR_FIX.
+            amount_limit_per_tran:
+              type: number
+              description: '= subscribed_amount for CITR_FIX.'
+            ctid:
+              type: string
+            pwt:
+              type: string
+            subscribed_amount:
+              type: number
+              description: Fixed recurring amount; 0 for FLEX flags.
+            currency:
               type: string
     RemoveTokenRequest:
       type: object
       required:
-        - request_id
         - request_time
         - merchant_id
         - ctid
         - pwt
         - hash
+      description: |
+        Per the live docs the request carries request_time, merchant_id, ctid, and pwt — no request_id. Hash order: merchant_id, ctid, request_time, pwt.
       properties:
-        request_id:
-          type: string
         request_time:
           type: string
         merchant_id:
@@ -1805,7 +2099,10 @@ components:
           properties:
             code:
               type: string
+              description: 00 success; 04 invalid data (errors map); 98 merchant id not found; 01 wrong hash.
             message:
+              type: string
+            trace_id:
               type: string
     GenerateQrRequest:
       type: object
@@ -1942,7 +2239,7 @@ components:
         - merchant_auth
         - hash
       description: |
-        Uses RSA-encrypted merchant_auth containing transaction details. See x-merchant-auth-encryption on the operation for encryption process. Sandbox-verified: currency and return_url are REQUIRED inside merchant_auth (PTL04 "Parameter validation required" when omitted).
+        Uses RSA-encrypted merchant_auth containing transaction details. See x-merchant-auth-encryption on the operation for encryption process. Sandbox-verified: currency and return_url are REQUIRED inside merchant_auth (PTL04 "Parameter validation required" when omitted). Sent as multipart/form-data. The HMAC hash covers request_time + merchant_id + merchant_auth ONLY — the optional image bytes are never hashed (per ABA's official PHP sample).
       properties:
         request_time:
           type: string
@@ -1953,17 +2250,19 @@ components:
         merchant_auth:
           type: string
           description: |
-            Base64 of RSA-encrypted, chunked JSON containing transaction details (title, amount, currency, description, payment_limit, return_url, merchant_ref_no, expired_date).
+            Base64 of RSA-encrypted, chunked JSON containing transaction details (title, amount, currency, description, payment_limit, return_url, merchant_ref_no, expired_date, payout).
         hash:
           type: string
           description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+        payout:
+          type: string
+          description: |
+            Optional split-payout instructions INSIDE the merchant_auth plaintext (JSON array "[{acc, amt}]" as a string value — the whole auth payload is JSON-encoded, so an array value would double-encode). Documented rule: the total payout amt must equal the link amount. Officially optional. Listed here as a top-level property so schema tooling can see it; the wire format is the merchant_auth plaintext shape (see x-merchant-auth-encryption).
         image:
           type: string
           format: binary
-          description: >
-            Optional image shown with the payment link (top-level multipart
-            part, not part of the hash). The created PaymentLink echoes it
-            back as the `image` object.
+          description: |
+            Optional image shown with the payment link (top-level multipart part, not part of the hash). The created PaymentLink echoes it back as the `image` object.
     PaymentLinkStatus:
       type: object
       properties:
@@ -2012,12 +2311,16 @@ components:
           type: integer
         total_amount_org:
           type: number
+          description: Total payment amount before refunds (official schema says string; observed numeric — do not rely on the type).
         total_refund:
           type: number
+          description: 'Total refunded amount (official create schema: number; official detail schema: string — observed numeric; do not rely on the type).'
         total_amount:
           type: number
+          description: Total amount after refunds.
         total_trxn:
           type: integer
+          description: The total number of completed payment transactions (0 on create).
         created_at:
           type: string
           description: YYYY-MM-DD HH:mm:ss
@@ -2028,10 +2331,15 @@ components:
           oneOf:
             - type: integer
             - type: string
-          description: Epoch seconds when set; empty string or "0" when unset.
+          description: |
+            Epoch seconds when set; echoes "0" (string) when unset. Number or string both accepted at create. Sandbox-verified (2026-09-06): a past value or one under ~5 minutes in the future is rejected PTL04; offsets from +300s upward are accepted. No EXPIRED status exists — detail keeps reporting OPEN after expiry and the hosted page still answers 200.
         return_url:
           type: string
           description: Decoded callback URL.
+        pushback_url:
+          type: string
+          description: |
+            The URL the gateway calls to send payment status updates (detail endpoint; official detail schema — absent from sandbox detail responses). The pushback body is live-captured (2026-09-06): POST application/json, User-Agent PayWayApp/3.0, body {tran_id (string), status (numeric 0 = approved), merchant_ref_no} — NO hash field; verify via check-transaction, not verifyCallback.
         merchant_ref_no:
           type: string
         outlet_id:
@@ -2039,8 +2347,12 @@ components:
         outlet_name:
           type: string
         payout:
-          nullable: true
-          description: Payout details (null when none).
+          oneOf:
+            - type: object
+            - type: array
+            - type: 'null'
+          description: |
+            Payout details (null when none). PLACEMENT IS UNVERIFIED: the official apidog create schema places a top-level payout array of {acc, amt, acc_name}; the official overview sample response shows it inside data as an array. oneOf both shapes until probe V-2 settles it (see HANDOFF §9 open items) — do not rely on either.
         payment_link:
           type: string
           description: Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N).
@@ -2050,8 +2362,11 @@ components:
         status:
           $ref: '#/components/schemas/PaymentLinkStatus'
         tran_id:
-          type: integer
-          description: Numeric gateway transaction id (also present as a string in status.tran_id).
+          description: |
+            Gateway log id. Official schemas say string; sandbox-observed as a NUMBER on both create and detail (2026-09-06) — coerce, do not rely on the type.
+          oneOf:
+            - type: integer
+            - type: string
         data:
           $ref: '#/components/schemas/PaymentLink'
     GetPaymentLinkDetailsRequest:
@@ -2075,14 +2390,53 @@ components:
           description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
     GetPaymentLinkDetailsResponse:
       type: object
+      description: |
+        Sandbox-observed (2026-09-06): a bogus link id answers HTTP 403 code 96 "Invalid merchant data" — the officially documented PTL132 was NOT reproduced on this sandbox profile. Sandbox detail responses carry no pushback_url.
       properties:
         status:
           $ref: '#/components/schemas/PaymentLinkStatus'
         tran_id:
-          type: integer
-          description: Numeric gateway transaction id (also present as a string in status.tran_id).
+          description: |
+            Gateway log id. Official schemas say string; sandbox-observed as a NUMBER (2026-09-06) — coerce, do not rely on the type.
+          oneOf:
+            - type: integer
+            - type: string
         data:
           $ref: '#/components/schemas/PaymentLink'
+    VoidPaymentLinkRequest:
+      type: object
+      required:
+        - request_time
+        - merchant_id
+        - merchant_auth
+        - hash
+      description: |
+        UNDOCUMENTED endpoint — live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11). Content-Type lenient: both application/json and application/x-www-form-urlencoded are accepted.
+      properties:
+        request_time:
+          type: string
+          description: UTC timestamp, YYYYMMDDHHmmss.
+        merchant_id:
+          type: string
+        merchant_auth:
+          type: string
+          description: RSA-encrypted JSON {mc_id, id} — same shape as the detail endpoint.
+        hash:
+          type: string
+          description: base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)).
+    VoidPaymentLinkResponse:
+      type: object
+      description: |
+        Live-verified (SANDBOX-FINDINGS §23, 2026-09-11): success answers {status:{code:"00",message:"Success.",lang,trace_id}, tran_id}. Void is NOT idempotent — a second void answers HTTP 403 code PTL188 "The payment link is already voided."; a bogus link id answers HTTP 403 code 96 "Invalid merchant data". Post-void, detail reports the previously-unobserved status "VOIDED".
+      properties:
+        status:
+          $ref: '#/components/schemas/PaymentLinkStatus'
+        tran_id:
+          description: |
+            Gateway log id. Sandbox-observed as a NUMBER (2026-09-11) — coerce, do not rely on the type.
+          oneOf:
+            - type: integer
+            - type: string
     CompletePreAuthRequest:
       type: object
       required:
@@ -2323,12 +2677,29 @@ components:
           type: string
     GetTransactionsByMcRefResponse:
       type: object
+      description: |
+        Response envelope as merchant-captured in production (2026-08): rows under `data`, status under a nested `status` object with STRING code ("00" = Success). The official doc page models {status: integer, transactions: []} but every captured production response uses the data/status-object shape; consumers should tolerate both (SDK normalizes). Status codes: "00"/0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error.
       properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/KhqrTransaction'
         status:
-          type: integer
-          description: 0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error.
+          type: object
+          properties:
+            code:
+              oneOf:
+                - type: string
+                  description: '"00" = Success (captured production shape)'
+                - type: integer
+                  description: 0 = Success (doc-page shape)
+            message:
+              type: string
+            merchant_ref:
+              type: string
         transactions:
           type: array
+          description: Legacy doc-page row slot — production captures use `data`.
           items:
             $ref: '#/components/schemas/KhqrTransaction'
     PaymentCallbackBody:

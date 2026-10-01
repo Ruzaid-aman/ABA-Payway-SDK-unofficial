@@ -217,10 +217,45 @@ Gate snapshot (2026-10-01, Windows, Node v24.21.0, npm 12.0.2): audits as above;
 build/typecheck PASS; suite 2,216/154, 0 failed; lint exit 0 (2 pre-existing
 journal warnings); check:package + smoke:package PASS.
 
+## Fifth pass — work package 7: Postman callback and recipient journey (2026-10-01)
+
+Implements remediation item 7 (WP05/WP06/WP08/WP09/WP11) from REPORT.md §11. Collection
+mechanics are executable-tested in the `test:yaml` gate; the guide/skill legs are
+executable-tested in the repo suite.
+
+| Finding | Status | Fix and evidence |
+|---|---|---|
+| WP05 — callback pull promotes unsigned tokens/transaction ids into operative variables and logs the token | **FIXED** | `10 - Callbacks & Webhooks → Sync webhook.site - Postman (pull callbacks)` rewritten around the SDK receiver's trust model (`computeSignatureVerdict` parity): signature channels are the `X-PayWay-Hmac-Sha512` header (object-map, name/value-array, and raw `req_headers` webhook.site shapes all tolerated) first, the classic body `hash` field second, with the stripHash concatenation rule; verdicts are `verified`/`invalid`/`unsigned` against `{{secret_key}}` (no key → `unsigned`, server parity). CoF token callbacks promote `{{pwt}}`/`{{ctid}}`/`{{token_flag}}` ONLY when signature `verified` AND `request_id` equals the session `{{request_id}}` (Link Account output) — unsigned, invalid, tampered, unrelated, or partial token callbacks never touch operative values and are named in the skip report. Unsigned payment pushbacks promote only as **lookup hints** when `merchant_ref_no`/`merchant_ref` matches the session reference; unanchored candidates park in the new `{{unverified_tran_id}}` (operative `{{tran_id}}` untouched). Tokens are never logged — masked (`<n> chars, ends …xxxx`); the full trust report lands in the new `{{callback_sync_trust}}` variable, and pm.test invariants FAIL the request visibly if operative variables ever change without their trust condition. |
+| WP06 — newest-first import leaves the oldest values selected; fields can mix across callbacks | **FIXED** | The sync classifies records first, then selects the **newest complete record per category** — explicit timestamp sort when webhook.site provides one, documented API newest-first order as fallback (original index as stable tiebreaker). Each association (request_id ↔ pwt/ctid/token_flag; ref ↔ tran_id/status) is built from ONE record; incomplete token callbacks (pwt without ctid) can never win over a complete older record and are reported. Folder 09's KHQR pull got the sibling fix: a pushback imports ONLY when its `merchant_ref` equals the session `{{khqr_merchant_ref}}` — unset or mismatched references import nothing. |
+| WP08 — offline-KHQR recovery guidance points to online transaction lookup | **FIXED** | Channel split everywhere the guidance appeared: guide 16's fixture-table note now says payment-link pushbacks verify via `check-transaction -t <tran_id>` while offline-KHQR notifications have no online `tran_id` at all (reconcile via `get-transactions-by-mc-ref`; `check-transaction` cannot see offline KHQR); `postman/documents/README.md` §2 carries the same two-channel procedure naming folder 09's inquiry request; the webhook-production Skill (+ byte-identical `.zcode` mirror) states the same per-channel recovery commands. `P/llms.txt`'s check-transaction fact was already correct. |
+| WP09 — verdict-mode snippet not runnable; contradictory retry/trust language | **FIXED** | Guide 16's snippet is now executable as written: `await createStorage('json')` (async factory), explicit `await listener.start()` / `await listener.stop()`. The unsigned row of the semantics table says unsigned is **captured but never trusted to fulfill** (no retry implication); the capture-vs-verdict paragraph now teaches the gateway's **single best-effort delivery** (no redelivery on reject/miss) and pairs verdict mode with merchant-reference reconciliation and idempotent handlers; "redelivery storms" and "gateway may omit it on retries" are gone. Executable acceptance `src/__tests__/webhook-verdict-mode-doc.test.ts` (2 tests): a doc-drift guard pins the correct API forms and the removed false claims, and the EXACT published snippet (only `port` substituted) runs against a real listener — valid signature 200, tampered 401, unsigned 200-and-captured, stop() releases the port. |
+| WP11 — collection scope overstated; Postman invisible from the root indexes | **FIXED** | Scope matrix added to `collection-index.md` ("Scope matrix (what Complete covers — and what it does not)"): 23 spec paths (22 documented + live-verified void), 46 collection requests incl. 5 doc-only pages, SDK 28-of-33 archived-spec coverage with the deliberate legacy-v1 exclusion, and the spec-derived `request-qr`/`self-activation` additions labeled NOT live-verified. The bundled spec relationship is now reproducible AND current: `npm run bundle` regenerated the stale `payway-openapi/bundled.yaml` (it predated void), the copy at `postman/specs/payway-openapi.yaml` was refreshed, and `_build/spec_parity.js` now asserts EXACT parity (23 = 23) with an emptied (kept) COLLECTION_ONLY mechanism; the specs README's stale "void is absent from the bundle" claim is corrected. `P/llms.txt` no longer claims "whole merchant API" / "all 22 documented endpoints". Postman is now a first-class route from every principal index: root README (Explore table), QUICKSTART.md (prefer-Postman callout), docs/README.md (Start Here table), and root `llms.txt` (a generated — `sync:knowledge` — Postman-collection section; the line was added to the generator so regeneration preserves it). Package-boundary constraint honored: README/QUICKSTART/llms.txt ship in the npm package verbatim and `payway-boilerplate/` is a FORBIDDEN package path, so those shared files reference the workspace by name + code path (no Markdown link), while repo-only `docs/README.md` carries the real `%20`-encoded links (validated by `check:repository`; the package link gate caught the dead-link version as a designed failure). |
+
+New collection variables: `callback_sync_trust`, `unverified_tran_id` (127 total) — both in the
+distribution scan's MUST_BE_EMPTY runtime-capture policy. New trust-gate suite
+`_build/callback-import.test.js` (34 checks: newest-complete selection, timestamp/order/duplicate
+fixtures, partial-payload no-mixing, verified+correlated happy path, unsigned/invalid/tampered/
+unrelated/no-key refusal paths, header-shape tolerance, hint-tier and parked pushback tiers,
+designed failure signal, folder-09 correlation gates, and a no-secret-in-any-log sweep) — pinned
+into the CI `test:yaml` chain.
+
+Still open for item 7 (not locally executable): the fresh Postman Desktop import/Visualizer
+check of the actual sanitized distribution (owner/recipient verification), as recorded in the
+audit's bounded follow-ups.
+
+Gate snapshot: Postman `test:yaml` chain green end-to-end (46 requests / 127 variables, 0 syntax
+errors, 37 KHQR sim checks, 34 trust-gate checks, 23/23 spec parity, 16 distribution-scan
+negative controls), `export_json.js --check` fresh (46/69/127), `verify_index.js` ALL CHECKS
+PASSED, `readme_path_audit.js` 0 unresolved. Repo: `sync:knowledge` 35 topics (guide-16/
+QUICKSTART/README edits same-commit), `check:repository` 1653 paths / 11 entry docs (new
+`%20`-encoded Postman links resolve), knowledge/docs/verdict-mode suites 36/36, lint exit 0
+(2 pre-existing journal warnings); FULL offline suite **2,218 tests / 155 files, 0 failed**
+(2026-10-01, Windows, Node v24.21.0, npm 12.0.2) incl. the package-boundary gate re-run.
+
 ## Next in the ordered plan
 
-Work package 8 is complete and R04 (item 9’s dependency disposition) is closed
-— see the sections above. Remaining: item 7 (WP05/WP06/WP08/WP09/WP11 — Postman
-callback and recipient journey), then the rest of item 9 (R06 publish workflow /
-candidate validation, R07 generated-docs review) and the owner-controlled item 10.
-Work packages 1–6 and 8 are complete or carry only the recorded owner gates.
+Work packages 1–8 are complete and R04 (item 9’s dependency disposition) is closed
+— see the sections above. Remaining: the rest of item 9 (R06 publish workflow /
+candidate validation, R07 generated-docs review), the fresh Postman Desktop
+import/Visualizer check of the sanitized distribution, and the owner-controlled
+item 10.

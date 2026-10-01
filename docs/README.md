@@ -8,6 +8,7 @@ Follow the [quickstart](../QUICKSTART.md) to install, try the credential-free de
 |---|---|
 | What is this project, and should I use SDK, CLI, or skills? | [Project introduction](../README.md) |
 | How do I go from zero to a verified test payment? | [Quickstart](../QUICKSTART.md) — the canonical beginner path |
+| Do I test the API in Postman instead of writing code? | [Postman guide](../payway-boilerplate/Postman%20Collection%20API%20Testing/postman/documents/postman-guide.md) — import the [distribution export](../payway-boilerplate/Postman%20Collection%20API%20Testing/dist/PayWay%20API%20%E2%80%94%20Complete%20Collection.postman_collection.json) and follow the first-payment sequence |
 | How do I get ABA sandbox keys or configure profiles? | [Credentials and setup](./guides/02-prerequisites-and-setup.md#how-to-get-sandbox-credentials) |
 | How do I receive a callback on my development machine? | [Webhook setup](./guides/16-webhook-setup-guide.md#quick-start) |
 | How do I test my callback receiver without the ABA Simulator? | [Local webhook workbench](./guides/16-webhook-setup-guide.md#local-webhook-workbench) — signed fixture triggers, forwarding, resend, verify |

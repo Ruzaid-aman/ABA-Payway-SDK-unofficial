@@ -235,12 +235,18 @@ deliveries, pass `rejectInvalidSignature` when creating the listener:
 ```typescript
 import { createWebhookServer, createStorage } from 'aba-payway-ts';
 
-const storage = createStorage('json');
+// createStorage is an async factory — await it before handing the adapter to
+// the server, then start the listener explicitly.
+const storage = await createStorage('json');
 const listener = createWebhookServer(storage, {
   port: 8443,
   apiKey: process.env.PAYWAY_API_KEY, // required for verification
   rejectInvalidSignature: true, // ← 401 on invalid signatures (default: false)
 });
+await listener.start(); // resolves when the port is bound
+
+// ... later, on shutdown:
+await listener.stop();
 ```
 
 Semantics in verdict mode:
@@ -249,14 +255,18 @@ Semantics in verdict mode:
 |---|---|---|
 | Valid signature | ✅ | `200 { acknowledged: true }` |
 | **Invalid signature** | ✅ (audit trail kept) | **`401 { error: 'invalid signature' }`** |
-| No signature header | ✅ | `200` (nothing to verify against — gateway may omit it on retries) |
+| No signature header | ✅ | `200` (unsigned is not trusted: the record is captured for reconciliation but can never fulfill anything on its own) |
 
-Capture-vs-verdict separation matters for ABA callback retries: a capture sink
-never causes redelivery storms, while a 401-verdict endpoint should be paired
-with idempotent business handlers. When in doubt, keep the default and enforce
-verdicts inside your own handler after persisting the payload.
+Capture-vs-verdict separation is an operational choice, not a retry mechanism:
+a capture sink never rejects a delivery, while a 401-verdict endpoint explicitly
+refuses tampered ones. PayWay callbacks are **single best-effort** — the gateway
+does not redeliver when your endpoint rejects or misses one — so pair verdict
+mode with your own reconciliation (an inquiry by merchant reference for missed
+or failed deliveries) and keep business handlers idempotent. When in doubt, keep
+the default and enforce verdicts inside your own handler after persisting the
+payload.
 
-> **Important:** This development listener never rejects either route based on its capture processing. Production online checkout handling must reject invalid HMACs; offline KHQR handling must use only an ABA-confirmed verification contract.
+> **Important:** In the default capture mode the listener never rejects either route based on its capture processing (the verdict mode above is the deliberate exception for invalid online signatures). Production online checkout handling must reject invalid HMACs; offline KHQR handling must use only an ABA-confirmed verification contract.
 
 The offline KHQR route has no assumed online HMAC contract. The listener retains its raw body, headers, source IP, parsed `transaction_id`, unknown fields, and parse errors. Receiving or parsing it does not mean a payment is verified or an order is paid. Deduplicate on `transaction_id`, reconcile against your own `merchant_ref`, and only fulfil after implementing the verification mechanism ABA actually supplies for your merchant.
 
@@ -380,7 +390,7 @@ Your receiver sees a real POST with a body shaped exactly like a gateway callbac
 
 Flags: `-t/--tran-id`, `--merchant-ref`, `-a/--amount`, `-c/--currency USD|KHR`, `--payer-name`, `--forward-headers`, `--json`. Two deliberate contract notes:
 
-- **Pushback and KHQR fixtures are unsigned on purpose** — their real-world deliveries carry no hash, so a receiver must never expect one for them. Verify those payments via `check-transaction -t <tran_id>`.
+- **Pushback and KHQR fixtures are unsigned on purpose** — their real-world deliveries carry no hash, so a receiver must never expect one for them. Confirm them by channel: a **payment-link pushback** is an online transaction — verify via `check-transaction -t <tran_id>`; an **offline-KHQR notification** has no online `tran_id` to look up — reconcile via the merchant-reference inquiry (`get-transactions-by-mc-ref`; `check-transaction` cannot see offline KHQR payments at all).
 - **Fixtures are synthetic** — the gateway never saw this `tran_id`. The command prints a reminder; do not treat a fixture delivery as evidence about any real transaction.
 
 ### `webhook verify-callback` — one-shot signature check

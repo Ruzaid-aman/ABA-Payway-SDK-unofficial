@@ -64,6 +64,8 @@ const AUTHORIZED_VALUES = new Set([
 const MUST_BE_EMPTY_VARIABLES = [
   'pwt',
   'webhook_token',
+  'callback_sync_trust',
+  'unverified_tran_id',
   'callback_listener',
   'tran_id',
   'last_tran_id',

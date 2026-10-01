@@ -53,7 +53,12 @@ scripts:
         var tid = String(body.transaction_id || body.tran_id || '');
         if (!tid) return; // not a payment pushback
         var bref = String(body.merchant_ref || '');
-        if (!ref || !bref || bref === ref) matches.push({ at: String(r.created_at || ''), body: body });
+        // Correlation gate (audit WP06): a pushback is only a candidate when the
+        // session reference is set AND the payload echoes exactly that reference —
+        // an unset or mismatched reference never imports, so unrelated captures
+        // cannot pollute the KHQR flow variables.
+        if (!ref || !bref) return;
+        if (bref === ref) matches.push({ at: String(r.created_at || ''), body: body });
       });
       // newest first (webhook.site returns latest-first, but do not rely on it)
       matches.sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); });
@@ -74,9 +79,9 @@ scripts:
         if (matches.length > 1) console.log('NOTE: ' + matches.length + ' payments matched this reference - a KHQR can be PAID MULTIPLE TIMES (guideline). Store every transaction_id; deduplicate by transaction id, never by merchant_ref.');
       } else {
         pm.test('KHQR callback captured for merchant_ref ' + ref, function () {
-          pm.expect(matches.length).to.be.above(0, 'No payment pushback yet. Pay the QR, wait a few seconds, re-run this request. Also check that your merchant-account KHQR webhook is provisioned to THIS webhook.site bin (ABA provisioning).');
+          pm.expect(matches.length).to.be.above(0, 'No pushback matched. Pay the QR, wait a few seconds, re-run this request. A pushback only imports when its merchant_ref equals the session reference ({{khqr_merchant_ref}}) - and check that your merchant-account KHQR webhook is provisioned to THIS webhook.site bin (ABA provisioning).');
         });
-        console.log('No recognizable KHQR pushback yet (looked for JSON bodies with transaction_id + matching merchant_ref). Captured entries in bin:', list.length, '| response shape keys:', Object.keys(j).join(', '));
+        console.log('No recognizable KHQR pushback yet (JSON bodies with transaction_id AND merchant_ref === session reference). Captured entries in bin:', list.length, '| response shape keys:', Object.keys(j).join(', '));
       }
     language: text/javascript
 order: 3000

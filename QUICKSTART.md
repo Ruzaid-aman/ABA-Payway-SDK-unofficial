@@ -26,6 +26,8 @@ Run the first three commands in the SDK checkout. Replace the application direct
 
 After publication, use `npm install aba-payway-ts`. Run the project-local CLI as `npm exec -- payway-sdk`. Avoid bare `npx payway-sdk`, which currently resolves to an unrelated package.
 
+> **Prefer Postman?** Import `payway-boilerplate/Postman Collection API Testing/dist/PayWay API — Complete Collection.postman_collection.json` into Postman and follow `postman/documents/postman-guide.md` in that workspace (source repository; not distributed in the npm package) — every request signs itself and the first payment needs zero setup with the bundled sandbox demo identity.
+
 ## 2. Explore without credentials
 
 ```bash

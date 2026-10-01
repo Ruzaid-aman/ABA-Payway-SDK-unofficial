@@ -35,7 +35,7 @@ Keep the receiver open while testing. When PayWay sends the callback:
 
 - Check the HTTP status and request body.
 - Confirm the merchant reference, transaction ID, amount, and payment status.
-- Verify the callback signature (`X-PayWay-Hmac-Sha512`) using the configured credentials before trusting the payload — except payment-link pushbacks and offline-KHQR pushbacks, which carry **no hash by design**; verify those via Check Transaction.
+- Verify the callback signature (`X-PayWay-Hmac-Sha512`) using the configured credentials before trusting the payload. Exceptions, by channel: **payment-link pushbacks** and **offline-KHQR pushbacks** carry **no hash by design** — confirm a payment-link pushback via **Check Transaction** (it is an online transaction), and reconcile an offline-KHQR notification via **Get Transactions By Merchant Ref** (folder 09) — Check Transaction cannot see offline KHQR payments at all.
 - Use the transaction inquiry or polling request to confirm the final gateway status; do not treat receipt of a callback alone as proof of payment.
 
 Callback behavior is profile- and sandbox-dependent. Treat observed behavior as a **sandbox observation**, not a guarantee of production behavior.

@@ -239,6 +239,8 @@ variables:
   sub_con_b64: ""
   computed_header: ""
   last_callback_status: ""
+  callback_sync_trust: ""
+  unverified_tran_id: ""
   __helpers_v20260923_portable_v2: |-
     var CryptoJS = require('crypto-js');
 

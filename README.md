@@ -59,6 +59,7 @@ The [first-payment reference app](docs-packaged/guides/FIRST-PAYMENT-WALKTHROUGH
 | Set up your first payment | [Quickstart](QUICKSTART.md) |
 | Browse commands and SDK examples | [SDK and CLI reference](docs-packaged/reference/SDK-AND-CLI-REFERENCE.md) |
 | Choose an integration path | [Documentation index](docs-packaged/README.md) |
+| Test the API in Postman | `payway-boilerplate/Postman Collection API Testing/postman/documents/postman-guide.md` — import the workspace's ready-made `dist/PayWay API — Complete Collection.postman_collection.json` (source repository; not distributed in the npm package) |
 | Understand verification limits | `payway-sdk docs support` |
 | Install coding-agent guides | [Skills](skills/README.md) |
 | Review changes | [Changelog](CHANGELOG.md) |

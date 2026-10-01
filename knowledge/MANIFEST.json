@@ -48,9 +48,9 @@
       "description": "First sandbox payment end to end: credentials, .env, generate-qr, check-transaction, polling.",
       "source": "QUICKSTART.md",
       "file": "quickstart.md",
-      "bytes": 11957,
-      "sha256": "cdcb79c7e3f484c8",
-      "sourceSha256": "01cf4aca206916b6"
+      "bytes": 12348,
+      "sha256": "ac2b181fa5e5ebe9",
+      "sourceSha256": "c271fd1a03d7ae1f"
     },
     {
       "topic": "quickstart-1-page",
@@ -68,9 +68,9 @@
       "description": "The full documentation map: start-here routes, per-domain guides, troubleshooting.",
       "source": "docs/README.md",
       "file": "docs-index.md",
-      "bytes": 7828,
-      "sha256": "6fd6e56cd0b71798",
-      "sourceSha256": "9414d36ca4f1261c"
+      "bytes": 7975,
+      "sha256": "a5c5f9c879f4d967",
+      "sourceSha256": "12730e5537211a62"
     },
     {
       "topic": "overview",
@@ -228,9 +228,9 @@
       "description": "Local listener, tunnels, forwarding, and production webhook configuration.",
       "source": "docs/guides/16-webhook-setup-guide.md",
       "file": "webhook-setup.md",
-      "bytes": 22398,
-      "sha256": "ff29baee32e66ae1",
-      "sourceSha256": "260ebb761a93fd2a"
+      "bytes": 23339,
+      "sha256": "effc3052f5d4424c",
+      "sourceSha256": "6cdcdb660274ab44"
     },
     {
       "topic": "payment-link",
@@ -356,7 +356,7 @@
   "generated": [
     {
       "file": "llms.txt",
-      "sha256": "70eaba1193e8bb7e"
+      "sha256": "8bff2299a3f00864"
     },
     {
       "file": "docs-packaged/guides/21-storage-service.md",
@@ -368,7 +368,7 @@
     },
     {
       "file": "docs-packaged/README.md",
-      "sha256": "9fbd23521b2e9c39"
+      "sha256": "bb158421441cbb5a"
     },
     {
       "file": "docs-packaged/guides/01-overview-and-concepts.md",
@@ -432,7 +432,7 @@
     },
     {
       "file": "docs-packaged/guides/16-webhook-setup-guide.md",
-      "sha256": "b27f7a5b119b7d47"
+      "sha256": "a18f6115348af2b6"
     },
     {
       "file": "docs-packaged/guides/17-payment-link.md",

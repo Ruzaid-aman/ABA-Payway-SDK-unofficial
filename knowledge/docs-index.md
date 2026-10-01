@@ -8,6 +8,7 @@ Follow the [quickstart](quickstart.md) to install, try the credential-free demo,
 |---|---|
 | What is this project, and should I use SDK, CLI, or skills? | [Project introduction](../README.md) |
 | How do I go from zero to a verified test payment? | [Quickstart](quickstart.md) — the canonical beginner path |
+| Do I test the API in Postman instead of writing code? | Postman guide — import the distribution export and follow the first-payment sequence |
 | How do I get ABA sandbox keys or configure profiles? | [Credentials and setup](setup.md#how-to-get-sandbox-credentials) |
 | How do I receive a callback on my development machine? | [Webhook setup](webhook-setup.md#quick-start) |
 | How do I test my callback receiver without the ABA Simulator? | [Local webhook workbench](webhook-setup.md#local-webhook-workbench) — signed fixture triggers, forwarding, resend, verify |

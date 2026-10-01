@@ -31,7 +31,7 @@ Test the full receiver path in seconds, offline: `setup-webhook --forward-to <yo
 
 ## Trust and Fulfillment
 
-For signed online callbacks, verify using `payway.verifyCallback` and the signing contract for that route. Preserve the required signed input and reject invalid signatures. Payment-link pushbacks are unsigned: treat their transaction ID as an untrusted lookup hint, verify via PayWay, and bind the result to your stored order. Offline KHQR has its own notification contract; do not use online HMAC or transaction-ID assumptions.
+For signed online callbacks, verify using `payway.verifyCallback` and the signing contract for that route. Preserve the required signed input and reject invalid signatures. Payment-link pushbacks are unsigned: treat their transaction ID as an untrusted lookup hint, verify via `payway-sdk check-transaction -t <id>`, and bind the result to your stored order. Offline KHQR has its own notification contract — no online `tran_id` exists to look up (`check-transaction` cannot see offline KHQR payments); reconcile by merchant reference with `get-transactions-by-mc-ref` and never use online HMAC or transaction-ID assumptions.
 
 The lifecycle is `created`, `pending`, `approved`, `failed`, `unknown`. Only verified `approved` is eligible for fulfillment after matching the stored transaction ID, amount, and currency. PRE-AUTH and REFUNDED need separate domain handling. Creation, redirects, and request status codes are not approval.
 

@@ -15,10 +15,12 @@ const specPath = path.join(projectDir, 'postman', 'specs', 'payway-openapi.yaml'
 const collectionDir = path.join(projectDir, 'postman', 'collections', 'PayWay API — Complete Collection');
 
 // Endpoints the collection ships but the spec omits, with the reason.
-const COLLECTION_ONLY = new Map([
-  ['/api/merchant-portal/merchant-access/payment-link/void',
-    'Undocumented endpoint, live-verified (SANDBOX-FINDINGS §23); official docs do not publish it, so the hand-authored spec omits it.'],
-]);
+// Currently EMPTY: the root hand-authored spec (payway-openapi/openapi.yaml)
+// added payment-link void (live-verified, SANDBOX-FINDINGS §23) and the
+// refreshed bundled copy carries it, so spec and collection path sets are
+// exactly equal. Keep the mechanism — a future collection-only path must be
+// registered here with its justification.
+const COLLECTION_ONLY = new Map([]);
 
 const spec = yaml.load(fs.readFileSync(specPath, 'utf8'));
 const specPaths = new Set(Object.keys(spec.paths || {}));

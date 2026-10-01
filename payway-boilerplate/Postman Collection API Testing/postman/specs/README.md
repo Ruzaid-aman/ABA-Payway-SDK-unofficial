@@ -23,7 +23,8 @@ The spec documents what Postman scripts can only do implicitly:
 - Source of truth: `payway-openapi/` at the SDK repo root (hand-authored from
   developer.payway.com.kh). This file is the **bundled** export (all `$ref`s
   resolved) — regenerate the copy from there when the spec changes.
-- `_build/spec_parity.js` (part of `test:yaml`) asserts the spec paths are a
-  subset of the collection's endpoints. The one collection-only endpoint is
-  **Payment Link Void** — live-verified but deliberately undocumented by PayWay,
-  so it exists in the collection (folder 05) and not in the spec.
+- `_build/spec_parity.js` (part of `test:yaml`) asserts spec and collection path
+  sets match exactly (23 = 23). **Payment Link Void** — live-verified but
+  undocumented by PayWay — is deliberately included in the hand-authored spec
+  (`payway-openapi/openapi.yaml` at the SDK repo root), so the bundled copy
+  carries it too; there are no collection-only paths.

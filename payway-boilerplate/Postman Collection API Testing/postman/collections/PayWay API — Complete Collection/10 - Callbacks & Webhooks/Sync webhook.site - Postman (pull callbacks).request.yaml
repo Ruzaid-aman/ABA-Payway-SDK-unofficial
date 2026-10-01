@@ -1,18 +1,38 @@
 $kind: http-request
 name: Sync webhook.site -> Postman (pull callbacks)
 description: |-
-  ## Pull callbacks from webhook.site into Postman
+  ## Pull callbacks from webhook.site into Postman (trust-gated)
   webhook.site stores every request it receives and exposes them via a REST API:
-  `GET https://api.webhook.site/token/<uuid>/requests`
+  `GET https://webhook.site/token/<uuid>/requests` (paginated `{data: [...]}`; legacy
+  top-level array also accepted).
 
   The `<uuid>` is taken automatically from `{{callback_listener}}` (e.g. `https://webhook.site/abc-123` -> token `abc-123`) by the pre-request script, so set `{{callback_listener}}` first.
 
-  This request fetches all received payloads (newest first) and the test script imports them into collection variables:
-  - `tran_id` / `last_tran_id` (payment pushback)
-  - `ctid`, `pwt`, `token_flag` (CoF token callback)
-  - `last_callback_status`
+  ### What this sync imports (and under which trust conditions)
 
-  After clicking Send, later requests in folders 08 / 11 can immediately use `{{pwt}}` / `{{ctid}}` without manual copy-paste. (webhookbin.com has no such API; use webhook.site for this.)
+  Records are sorted newest-first (by capture timestamp when webhook.site provides
+  one), classified, and the **newest complete record per category** is selected. An
+  association is always built from ONE record — fields are never mixed across
+  callbacks. Operative collection variables change only when the trust conditions
+  below are met; everything the sync declined to promote is reported in the
+  `{{callback_sync_trust}}` variable (JSON) and the Postman Console.
+
+  | Category | Recognized by | Promoted to | Trust condition |
+  |---|---|---|---|
+  | CoF token callback | `payment_credential` with `pwt` **and** `ctid` | `{{pwt}}`, `{{ctid}}`, `{{token_flag}}` | HMAC signature **verified** (header `X-PayWay-Hmac-Sha512` or classic body `hash` field) **and** `request_id` in the payload equals `{{request_id}}` (set by Link Account). Unsigned or unrelated token callbacks are NEVER promoted — recover instead with **08 → 3. Get Token Details** (authoritative lookup by `{{request_id}}`). |
+  | Payment pushback | top-level `tran_id` | `{{tran_id}}`, `{{last_tran_id}}`, `{{last_callback_status}}` | **Verified** signature → promoted. **Unsigned** (payment-link / offline-KHQR pushbacks carry no hash by design) → promoted only as a **lookup hint** when its `merchant_ref_no`/`merchant_ref` matches the session reference; the inquiry you run next (Check Transaction / Get Transactions By Merchant Ref) remains the source of truth. Unsigned pushbacks with no matching reference go to `{{unverified_tran_id}}` only. |
+  | Anything else | — | nothing | Reported as unrelated; inspect the raw capture at webhook.site. |
+
+  A presented-but-invalid signature never promotes anything — the record is reported
+  as invalid and should be treated as tampered. Token values are never written to the
+  console (masked); unsigned callbacks are never materialized into staging variables
+  at all — inspect the raw capture instead.
+
+  After a **verified + correlated** token callback, later requests in folder 08 can
+  use `{{pwt}}` / `{{ctid}}` directly; for payment pushbacks, always confirm status
+  with the inquiry request for the channel (03 → Check Transaction, or 09 → Get
+  Transactions By Merchant Ref for offline KHQR — Check Transaction cannot see
+  offline KHQR payments).
 url: https://webhook.site/token/{{webhook_token}}/requests
 method: GET
 scripts:
@@ -30,32 +50,174 @@ scripts:
     code: |-
       pm.test('webhook.site API responded', function () { pm.response.to.have.status(200); });
       var C = pm.collectionVariables;
+      // Restore the shared PayWay helper library (hmac512 uses the gateway's exact rule):
+      var __h = C.get('__helpers_v20260923_portable_v2') || C.get('__helpers_v20260923_portable') || C.get('__helpers_v20260923') || C.get('__helpers');
+      if (!__h) throw new Error('The shared PayWay helper is missing. Re-import the complete collection.');
+      eval(__h);
+
       // webhook.site returns either a legacy top-level array or a paginated {data: [...]}.
       var pj = pm.response.json();
       var list = Array.isArray(pj) ? pj : (pj && pj.data) || [];
-      var synced = false;
-      list.forEach(function (req) {
-        if (!req || typeof req.content !== 'string') return;
+
+      // ---- trust-model helpers (mirror src/webhook/server.ts computeSignatureVerdict) ----
+      function findHeader(rec, wanted) {
+        // webhook.site header shapes differ by API version: object map, [{name,value}], or raw req_headers string.
+        var target = String(wanted || '').toLowerCase();
+        function norm(s) { return String(s || '').toLowerCase().replace(/_/g, '-'); }
+        var h = rec.headers || rec.header || {};
+        var k, v, i;
+        if (Array.isArray(h)) {
+          for (i = 0; i < h.length; i++) {
+            var nm = h[i] && (h[i].name || h[i].key || h[i].header);
+            if (norm(nm) === target) { v = h[i].value; return Array.isArray(v) ? v[0] : v; }
+          }
+        } else if (h && typeof h === 'object') {
+          for (k in h) {
+            if (norm(k) === target) { v = h[k]; return Array.isArray(v) ? v[0] : v; }
+          }
+        }
+        var raw = rec.req_headers;
+        if (typeof raw === 'string' && raw) {
+          var lines = raw.split(/\r?\n/);
+          for (i = 0; i < lines.length; i++) {
+            var idx = lines[i].indexOf(':');
+            if (idx > 0 && norm(lines[i].slice(0, idx).trim()) === target) return lines[i].slice(idx + 1).trim();
+          }
+        }
+        return undefined;
+      }
+      // ksorted concat of values; nested objects/arrays json_encoded; the classic
+      // top-level `hash` field is stripped before concatenation (stripHash contract).
+      function paywayConcat(obj) {
+        var keys = Object.keys(obj).filter(function (k) { return k !== 'hash'; }).sort();
+        return keys.map(function (k) {
+          var v = obj[k];
+          return (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v);
+        }).join('');
+      }
+      // 'verified' | 'invalid' | 'unsigned' — header channel first, then body `hash`.
+      function signatureVerdictOf(rec, body) {
+        var key = C.get('secret_key');
+        if (!key) return 'unsigned'; // no key configured -> nothing to verify against (server parity)
+        var presented = findHeader(rec, 'x-payway-hmac-sha512');
+        if (presented === undefined || presented === null || String(presented) === '') {
+          if (body && typeof body.hash === 'string' && body.hash.length > 0) presented = body.hash;
+        }
+        if (!presented) return 'unsigned';
+        try {
+          return String(presented).trim() === hmac512(paywayConcat(body), key) ? 'verified' : 'invalid';
+        } catch (e) { return 'invalid'; }
+      }
+      function maskSecret(v) {
+        var s = String(v === undefined || v === null ? '' : v);
+        if (!s) return '(empty)';
+        return s.length <= 8 ? '(' + s.length + ' chars)' : '(' + s.length + ' chars, ends ...' + s.slice(-4) + ')';
+      }
+      function recTime(rec) {
+        var t = rec && (rec.created_at || rec.timestamp || rec.time);
+        if (typeof t === 'number') return t;
+        var n = Date.parse(t);
+        return isNaN(n) ? NaN : n / 1000;
+      }
+
+      // Newest first: explicit sort when timestamps exist; otherwise trust the API's
+      // documented newest-first order (original index as the stable tiebreaker).
+      var indexed = [];
+      for (var ri = 0; ri < list.length; ri++) indexed.push({ rec: list[ri], idx: ri });
+      var anyTime = indexed.some(function (e) { return !isNaN(recTime(e.rec)); });
+      if (anyTime) {
+        indexed.sort(function (a, b) {
+          var ta = recTime(a.rec), tb = recTime(b.rec);
+          if (!isNaN(ta) && !isNaN(tb) && ta !== tb) return tb - ta;
+          return a.idx - b.idx;
+        });
+      }
+
+      // ---- classify + select newest COMPLETE record per category (no field mixing) ----
+      var report = { records: list.length, token: { found: 0, promoted: false, trust: '' }, pushback: { found: 0, promoted: false, trust: '', tranId: '' }, skipped: [], unrelated: 0 };
+      var picks = { token: null, pushback: null };
+      indexed.forEach(function (entry) {
+        var rec = entry.rec;
+        if (!rec || typeof rec.content !== 'string') { report.unrelated++; return; }
         var body;
-        try { body = JSON.parse(req.content); } catch (e) { return; }
-        if (body && body.tran_id) {
-          C.set('tran_id', body.tran_id);
-          C.set('last_tran_id', body.tran_id);
-          synced = true;
-          console.log('tran_id synced:', body.tran_id);
+        try { body = JSON.parse(rec.content); } catch (e) { report.unrelated++; return; }
+        if (!body || typeof body !== 'object') { report.unrelated++; return; }
+        var pc = (body.payment_credential && typeof body.payment_credential === 'object') ? body.payment_credential : null;
+        if (pc) {
+          report.token.found++;
+          if (pc.pwt && pc.ctid) { if (!picks.token) picks.token = { rec: rec, body: body, pc: pc }; }
+          else report.skipped.push('token callback #' + entry.idx + ' incomplete (pwt and ctid must travel together) - skipped, no field mixing');
+          return;
         }
-        if (body && body.payment_credential && typeof body.payment_credential === 'object') {
-          var pc = body.payment_credential;
-          if (pc.ctid) { C.set('ctid', pc.ctid); synced = true; console.log('ctid synced:', pc.ctid); }
-          if (pc.pwt)  { C.set('pwt', pc.pwt);   synced = true; console.log('pwt synced:',  pc.pwt);  }
-          if (pc.token_flag) C.set('token_flag', pc.token_flag);
+        if (body.tran_id) {
+          report.pushback.found++;
+          if (!picks.pushback) picks.pushback = { rec: rec, body: body };
+          return;
         }
-        if (body && body.apv !== undefined && body.status !== undefined) {
-          C.set('last_callback_status', body.status);
-          console.log('last_callback_status synced:', body.status);
+        report.unrelated++;
+      });
+
+      var pre = { pwt: C.get('pwt'), ctid: C.get('ctid'), tran_id: C.get('tran_id'), status: C.get('last_callback_status') };
+
+      // ---- CoF token callback: credential class -> verified AND correlated, or nothing ----
+      if (picks.token) {
+        var verdict = signatureVerdictOf(picks.token.rec, picks.token.body);
+        var sessionReq = C.get('request_id');
+        var bodyReq = picks.token.body.request_id !== undefined && picks.token.body.request_id !== null ? String(picks.token.body.request_id) : '';
+        var correlated = !!(sessionReq && bodyReq && String(sessionReq) === bodyReq);
+        if (verdict === 'verified' && correlated) {
+          C.set('pwt', picks.token.pc.pwt);
+          C.set('ctid', picks.token.pc.ctid);
+          if (picks.token.pc.token_flag) C.set('token_flag', picks.token.pc.token_flag);
+          report.token.promoted = true;
+          report.token.trust = 'verified+correlated';
+          console.log('CoF token promoted (verified+correlated, request_id matched): ctid set, pwt ' + maskSecret(picks.token.pc.pwt));
+        } else {
+          report.skipped.push('token callback NOT promoted (signature=' + verdict + ', request_id ' + (correlated ? 'matched' : (sessionReq ? 'MISMATCH - run Link Account, then re-sync' : 'not set - run Link Account first, then re-sync')) + '). Authoritative recovery: 08 -> 3. Get Token Details with {{request_id}}. Raw capture stays inspectable at webhook.site.');
+          console.log('CoF token callback rejected: signature=' + verdict + ', correlated=' + correlated + ' — {{pwt}}/{{ctid}} left unchanged.');
+        }
+      }
+
+      // ---- payment pushback: lookup key -> verified, or unsigned hint when ref-correlated ----
+      if (picks.pushback) {
+        var pverdict = signatureVerdictOf(picks.pushback.rec, picks.pushback.body);
+        var pb = picks.pushback.body;
+        var bodyRef = pb.merchant_ref_no !== undefined && pb.merchant_ref_no !== null ? String(pb.merchant_ref_no) : (pb.merchant_ref !== undefined && pb.merchant_ref !== null ? String(pb.merchant_ref) : '');
+        var sessionRef = C.get('merchant_ref_no') || C.get('merchant_ref') || '';
+        var refCorrelated = !!(bodyRef && sessionRef && bodyRef === String(sessionRef));
+        if (pverdict === 'verified' || (pverdict === 'unsigned' && refCorrelated)) {
+          C.set('tran_id', String(pb.tran_id));
+          C.set('last_tran_id', String(pb.tran_id));
+          if (pb.status !== undefined && pb.status !== null) C.set('last_callback_status', String(pb.status));
+          report.pushback.promoted = true;
+          report.pushback.trust = pverdict === 'verified' ? 'verified' : 'unsigned-hint (confirm via inquiry before acting)';
+          report.pushback.tranId = String(pb.tran_id);
+          console.log('Pushback imported [' + report.pushback.trust + ']: tran_id=' + pb.tran_id + (pb.status !== undefined ? ' status=' + pb.status : '') + ' — run the channel inquiry (Check Transaction, or Get Transactions By Merchant Ref for offline KHQR) to confirm.');
+        } else {
+          C.set('unverified_tran_id', String(pb.tran_id));
+          report.skipped.push('pushback NOT promoted to {{tran_id}} (signature=' + pverdict + (pverdict === 'invalid' ? ' — treat as tampered' : ' — unsigned notification whose merchant_ref did not match the session reference') + '). Confirm via the channel inquiry; candidate parked in {{unverified_tran_id}}.');
+          console.log('Pushback NOT promoted (signature=' + pverdict + ', refCorrelated=' + refCorrelated + ') — {{tran_id}} unchanged; candidate in {{unverified_tran_id}}.');
+        }
+      }
+
+      // ---- trust invariants, enforced as test output (visible in Postman) ----
+      pm.test('Operative token variables unchanged without a verified+correlated token callback', function () {
+        if (!report.token.promoted) {
+          pm.expect(C.get('pwt'), 'pwt changed without a verified+correlated token callback - trust-gate regression').to.eql(pre.pwt);
+          pm.expect(C.get('ctid'), 'ctid changed without a verified+correlated token callback - trust-gate regression').to.eql(pre.ctid);
         }
       });
-      pm.test('At least one recognizable callback was imported', function () { pm.expect(synced).to.eql(true, 'No callback payload with tran_id/payment_credential found yet - send one first.'); });
-      console.log(synced ? 'SYNC OK: variables updated from webhook.site' : 'No recognizable payloads yet - send a callback, then re-run.');
+      pm.test('Operative tran_id unchanged without a verified or ref-correlated pushback', function () {
+        if (!report.pushback.promoted) {
+          pm.expect(C.get('tran_id'), 'tran_id changed without a verified or ref-correlated pushback - trust-gate regression').to.eql(pre.tran_id);
+        }
+      });
+
+      C.set('callback_sync_trust', JSON.stringify(report));
+      pm.test('At least one recognizable callback was imported', function () {
+        var found = report.token.found + report.pushback.found;
+        pm.expect(found > 0, 'No callback payload with payment_credential/tran_id found yet - send one first.').to.eql(true);
+      });
+      console.log('SYNC ' + (report.token.promoted || report.pushback.promoted ? 'OK' : 'NOTHING PROMOTED') + ': records=' + report.records + ' token=' + report.token.found + ' pushback=' + report.pushback.found + ' unrelated=' + report.unrelated + (report.skipped.length ? ' skipped=[' + report.skipped.join(' | ') + ']' : '') + ' — report in {{callback_sync_trust}}');
     language: text/javascript
 order: 3000

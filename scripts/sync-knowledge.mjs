@@ -132,6 +132,11 @@ function renderLlmsTxt(manifest) {
   }
   lines.push(
     '',
+    '',
+    '## Postman collection',
+    '',
+    'The companion Postman workspace (`payway-boilerplate/Postman Collection API Testing/`, source repository only - not distributed in the npm package) ships a self-signing 46-request collection with saved examples, offline KHQR simulation and a scope matrix: merchant-facing guide `postman/documents/postman-guide.md`, AI index `llms.txt`, map `collection-index.md`.',
+    '',
     '## Agent integration',
     '',
     // Count from the repo inventory, never a literal — the hardcoded "32"
