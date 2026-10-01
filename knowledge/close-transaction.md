@@ -37,7 +37,7 @@ Additional facts that matter for policy:
    PayWay read APIs.
 2. **Never fulfill an order off close semantics.** Fulfill only on a verified
    APPROVED callback or server-side status verification (see
-   [callbacks & webhooks](payway-sdk docs callbacks-webhooks)).
+   [callbacks & webhooks](callbacks-webhooks.md)).
 3. **After closing, keep watching.** Poll `check-transaction` and process
    callbacks for a **late APPROVED after close** — if one arrives, route the
    payment to your refund path immediately.
@@ -63,6 +63,6 @@ cancellation UX.
 
 ## Related
 
-- CLI: `payway-sdk close-transaction -t <id>` · SDK: `payway.closeTransaction()` — both in the [SDK & CLI reference](payway-sdk docs sdk-cli-reference).
-- [Settlement & disputes](payway-sdk docs settlement-disputes) — where a late approval after close lands (refund boundaries per method).
-- [QR code handling](payway-sdk docs qr-handling) — scan-time validity windows and expiry semantics.
+- CLI: `payway-sdk close-transaction -t <id>` · SDK: `payway.closeTransaction()` — both in the [SDK & CLI reference](sdk-cli-reference.md).
+- [Settlement & disputes](settlement-disputes.md) — where a late approval after close lands (refund boundaries per method).
+- [QR code handling](qr-handling.md) — scan-time validity windows and expiry semantics.

@@ -830,7 +830,7 @@ echo $PAYWAY_API_KEY
 ### 2. Run the Verification Script
 
 ```bash
-npx payway-sdk doctor --live
+npm exec -- payway-sdk doctor --live
 ```
 
 If this fails, your credentials or network are the issue. (See Chapter 2 for the script.)

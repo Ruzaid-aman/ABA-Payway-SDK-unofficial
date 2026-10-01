@@ -311,7 +311,7 @@ Whenever you restart ngrok, you'll get a **new random URL**, so you'll need to u
 Before building your full integration, confirm your credentials work and you can reach the PayWay sandbox. The quickest path is the built-in doctor:
 
 ```bash
-npx payway-sdk doctor --live
+npm exec -- payway-sdk doctor --live
 ```
 
 If you want the equivalent logic inside your own codebase instead, save this script as `verify-credentials.ts` **before** running it:

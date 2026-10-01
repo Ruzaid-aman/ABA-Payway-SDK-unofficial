@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizePackReport } from './lib/pack-report.mjs';
+import { navigationFailures } from './lib/public-navigation.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = mkdtempSync(path.join(tmpdir(), 'aba-payway-package-smoke-'));
@@ -124,6 +125,52 @@ try {
   const cli = path.join(temporaryRoot, 'node_modules', 'aba-payway-ts', 'dist', 'cli.js');
   const dest = path.join(temporaryRoot, 'installed-skills');
   const runCli = (args) => execFileSync(process.execPath, [cli, ...args], { cwd: temporaryRoot, env: consumerEnv, encoding: 'utf8' });
+  const packageRoot = path.join(temporaryRoot, 'node_modules', 'aba-payway-ts');
+  const packedFiles = new Set(packReport.files.map(({ path: file }) => file.replaceAll('\\', '/')));
+  for (const file of packedFiles) {
+    if (!/\.(md|txt)$/.test(file)) continue;
+    const failures = navigationFailures(file, readFileSync(path.join(packageRoot, file), 'utf8'), packedFiles,
+      (target) => readFileSync(path.join(packageRoot, target), 'utf8'));
+    if (failures.length) throw new Error(failures.join('\n'));
+  }
+  for (const topic of ['support', 'contributing', 'security', 'first-payment-walkthrough', 'sdk-cli-reference', 'storage-service']) {
+    const result = runCli(['docs', topic]);
+    if (result.length < 300) throw new Error(`Installed docs ${topic} incomplete`);
+  }
+  runCli(['docs', 'search', 'local-webhook-workbench']);
+  const diagnosis = JSON.parse(runCli(['doctor', '--route', 'demo', '--json']));
+  if (!diagnosis.dataRoot) throw new Error('Installed doctor did not locate the data root');
+  // Execute the installed starter's HTTP create -> simulated approval -> verify
+  // flow, importing only its allowlisted files and the installed SDK.
+  writeFileSync(path.join(temporaryRoot, 'starter-smoke.mjs'), `
+import { OrderStore } from './node_modules/aba-payway-ts/docs-packaged/starter/app/store.js';
+import { createPaymentEngine } from './node_modules/aba-payway-ts/docs-packaged/starter/app/payments.js';
+import { startExampleServer, stopExampleServer } from './node_modules/aba-payway-ts/docs-packaged/starter/app/server.js';
+const store = new OrderStore('starter-store.json');
+const engine = createPaymentEngine({mode:'demo', publicBaseUrl:'http://127.0.0.1:0', store});
+const handle = await startExampleServer({port:0,host:'127.0.0.1',store,engine});
+const base = 'http://127.0.0.1:' + handle.port;
+engine.setCallbackBaseUrl(base);
+const post = async (route, body={}) => {
+  const response = await fetch(base + route, {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  if (!response.ok) throw new Error('Starter HTTP ' + response.status);
+  return response.json();
+};
+try {
+  const page = await fetch(base);
+  if (!page.ok || !(await page.text()).includes('SIMULATED')) throw new Error('Starter UI missing simulation marker');
+  const {order} = await post('/api/orders', {productId:'approve'});
+  const payment = await post('/api/orders/create-qr', {orderId:order.orderId});
+  if (!payment.simulated) throw new Error('Starter not simulated');
+  await new Promise(resolve => setTimeout(resolve, 700));
+  const verified = await post('/api/orders/status/' + payment.transactionId);
+  if (verified.order.status !== 'paid' || verified.gatewayStatus !== 'APPROVED') throw new Error('Starter verification failed');
+  await post('/api/orders/status/' + payment.transactionId);
+  if (store.listEvents(order.orderId).filter(event => event.type === 'payment_verified').length !== 1) throw new Error('Duplicate fulfillment');
+} finally { await stopExampleServer(handle.server); }
+`);
+  execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', 'starter-smoke.mjs'],
+    { cwd: temporaryRoot, env: consumerEnv, encoding: 'utf8', timeout: 30_000 });
   runCli(['skills', 'add', 'codex', '--dest', dest]);
   runCli(['skills', 'doctor', '--agent', 'codex', '--dest', dest]);
   if (!existsSync(path.join(dest, 'aba-payway-customer-qr', 'references', 'fulfillment-outbox.md'))) {
@@ -143,7 +190,7 @@ try {
   );
   if (installedPackage.name !== 'aba-payway-ts') throw new Error('installed package identity mismatch');
 
-  console.log(`Packed-package smoke passed: ESM, CJS, declarations, CLI demo, ${skillCount} skills, and install/doctor/upgrade/remove preservation.`);
+  console.log(`Packed-package smoke passed: ESM, CJS, declarations, CLI demo, corpus links/anchors, offline navigation, data root, starter create/verify/fulfill once, ${skillCount} skills, and install/doctor/upgrade/remove preservation.`);
 } finally {
   const resolvedTemporaryRoot = path.resolve(temporaryRoot);
   const resolvedSystemTemp = path.resolve(tmpdir());

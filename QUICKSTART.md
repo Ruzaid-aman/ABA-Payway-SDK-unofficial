@@ -80,11 +80,11 @@ npm exec -- payway-sdk setup-webhook --tunnel --non-interactive
 
 The listener binds locally, creates a temporary tunnel, and verifies the public callback before saving `PAYWAY_CALLBACK_URL`. For Customer Module QR payments, give ABA the dedicated route ending in `/aba-payway-khqr-webhook`, not the online-checkout route. Inspect or stop an SDK-owned development receiver with `npm exec -- payway-sdk webhook status` and `npm exec -- payway-sdk webhook stop`.
 
-Keep that terminal running. Follow its tunnel setup instructions and copy the complete public HTTPS URL, including `/aba-payway-webhook`. In your payment terminal, replace `PAYWAY_CALLBACK_URL` from step 3 with that URL. A localhost URL is not reachable by ABA. See [webhook setup and tunnel prerequisites](payway-sdk docs webhook-setup) if the tunnel cannot start. This listener captures deliveries for development; it is not an order-fulfillment service.
+Keep that terminal running. Follow its tunnel setup instructions and copy the complete public HTTPS URL, including `/aba-payway-webhook`. In your payment terminal, replace `PAYWAY_CALLBACK_URL` from step 3 with that URL. A localhost URL is not reachable by ABA. See [webhook setup and tunnel prerequisites](knowledge/webhook-setup.md) if the tunnel cannot start. This listener captures deliveries for development; it is not an order-fulfillment service.
 
-To check a receiver before any real payment, run it against the captured deliveries: add `--forward-to http://localhost:<your-app-port>/webhooks/aba` to the command above, then in a third terminal run `npm exec -- payway-sdk webhook trigger --event payment.approved`. The receiver gets a correctly-signed fixture callback in seconds — no ABA Simulator and no sandbox payment. Fixture callbacks are synthetic; never fulfill on them. Details: [Local Webhook Workbench](payway-sdk docs search local-webhook-workbench).
+To check a receiver before any real payment, run it against the captured deliveries: add `--forward-to http://localhost:<your-app-port>/webhooks/aba` to the command above, then in a third terminal run `npm exec -- payway-sdk webhook trigger --event payment.approved`. The receiver gets a correctly-signed fixture callback in seconds — no ABA Simulator and no sandbox payment. Fixture callbacks are synthetic; never fulfill on them. Details: [Local Webhook Workbench](knowledge/webhook-setup.md#local-webhook-workbench).
 
-Online QR is the default below. For a hosted payment page, use `doctor --route hosted-checkout` and the signed form command in step 6. For a shareable link, follow the [payment-link guide](payway-sdk docs payment-link); it additionally needs an RSA key.
+Online QR is the default below. For a hosted payment page, use `doctor --route hosted-checkout` and the signed form command in step 6. For a shareable link, follow the [payment-link guide](knowledge/payment-link.md); it additionally needs an RSA key.
 
 Check the intended route:
 
@@ -141,13 +141,13 @@ Success means a server-side lookup confirms approval and transaction detail matc
 |---|---|
 | Missing or rejected credentials | Recheck the sandbox email and selected CLI profile/environment; see the setup guide. |
 | Callback never arrives | Keep the tunnel running, check the complete URL, and query the transaction. See webhook setup. |
-| Sandbox certificate-chain error | See [TLS troubleshooting](payway-sdk docs errors-and-debugging); keep any sandbox workaround scoped to that command, never global or production. |
+| Sandbox certificate-chain error | See [TLS troubleshooting](knowledge/errors-and-debugging.md); keep any sandbox workaround scoped to that command, never global or production. |
 | Timeout or unknown result | Recover the original transaction ID and query it before replacing the attempt. |
 | QR cannot be paid | Check ABA test access and scan promptly; a pending record does not establish QR payability. |
 
 ## 6. Integrate the server
 
-Follow the [runnable first-payment walkthrough](payway-sdk docs first-payment-walkthrough) to see an artifact, verification, duplicate delivery, and recovery in the reference app.
+Follow the [runnable first-payment walkthrough](knowledge/first-payment-walkthrough.md) to see an artifact, verification, duplicate delivery, and recovery in the reference app.
 
 Use the existing `sdk.initiate` facade for a purchase QR or deeplink. All of this code runs on your server:
 
@@ -178,7 +178,7 @@ if (state === 'approved') {
 }
 ```
 
-This is the SDK call sequence, not a database implementation. The [reference app](payway-sdk docs first-payment-walkthrough) supplies a complete verification and fulfillment example. Keep the full session and raw gateway response server-side. `paymentArtifact` selects render fields; it does not verify payment or sanitize arbitrary HTML.
+This is the SDK call sequence, not a database implementation. The [reference app](knowledge/first-payment-walkthrough.md) supplies a complete verification and fulfillment example. Keep the full session and raw gateway response server-side. `paymentArtifact` selects render fields; it does not verify payment or sanitize arbitrary HTML.
 
 The facade defaults to no automatic create retry. Reserve each attempt in durable storage; PayWay transaction IDs alone do not provide idempotency. After an ambiguous response, query the saved ID before creating a replacement. Signed online callbacks use `payway.verifyCallback` with the route's signing contract; payment-link pushbacks are unsigned and require lookup. Never fulfill from a browser redirect.
 
@@ -198,4 +198,4 @@ For hosted checkout, generate a signed form locally and let the browser submit d
 npm exec -- payway-sdk checkout-form -a 5.00 -t order-002 --payment-gate 0 --auto-submit --out checkout.html
 ```
 
-Exit codes are `0` for completed command work, `1` for input/configuration, `2` for a PayWay API rejection, and `3` for network, rate-limit, or timeout failures. Saved CLI profiles contain plaintext credentials; use a server secret manager and explicit SDK configuration for deployment. See the [one-page guide](knowledge/quickstart-1-page.md) for lifecycle rules, [Transaction Journal](payway-sdk docs transaction-journal) for audit/reconciliation commands, and the [documentation index](payway-sdk docs docs-index) for deeper guides.
+Exit codes are `0` for completed command work, `1` for input/configuration, `2` for a PayWay API rejection, and `3` for network, rate-limit, or timeout failures. Saved CLI profiles contain plaintext credentials; use a server secret manager and explicit SDK configuration for deployment. See the [one-page guide](knowledge/quickstart-1-page.md) for lifecycle rules, [Transaction Journal](knowledge/transaction-journal.md) for audit/reconciliation commands, and the [documentation index](knowledge/docs-index.md) for deeper guides.

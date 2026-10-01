@@ -2,7 +2,7 @@
 
 # Chapter 8 — Deep Linking
 
-> **Estimated reading time:** 10 minutes  
+> **Estimated reading time:** 10 minutes
 > **Goal:** Understand how deep linking works with ABA Pay, and how to configure it for your native mobile app.
 
 ## Flow at a glance
@@ -413,8 +413,8 @@ func handleDeepLink(url: URL) {
 
 ## Next Steps
 
-- **For native app integration** → [Chapter 4 — Native App Implementation](payway-sdk docs native-apps)
-- **For WebView implementation** → [Chapter 5 — WebView Implementation](payway-sdk docs webviews)
-- **For QR code payments (alternative to deep links)** → [Chapter 7 — QR Code Handling](payway-sdk docs qr-handling)
+- **For native app integration** → [Chapter 4 — Native App Implementation](native-apps.md)
+- **For WebView implementation** → [Chapter 5 — WebView Implementation](webviews.md)
+- **For QR code payments (alternative to deep links)** → [Chapter 7 — QR Code Handling](qr-handling.md)
 
-> ← [Previous: Telegram Mini App](payway-sdk docs telegram-mini-app) | [Next: Callbacks & Webhooks →](payway-sdk docs callbacks-webhooks)
+> ← [Previous: Telegram Mini App](telegram-mini-app.md) | [Next: Callbacks & Webhooks →](callbacks-webhooks.md)

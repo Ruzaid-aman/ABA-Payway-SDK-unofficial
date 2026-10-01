@@ -2,7 +2,7 @@
 
 # Chapter 4 — Native App Implementation (iOS & Android)
 
-> **Estimated reading time:** 15 minutes  
+> **Estimated reading time:** 15 minutes
 > **Goal:** Integrate PayWay payments into native iOS and Android apps.
 
 ## Flow at a glance
@@ -595,7 +595,7 @@ Both iOS and Android implementations follow the same pattern:
 3. The **webhook callback** (Chapter 11) is still the authoritative source for database updates
 4. The native app's status check is for UX only — to show "Payment Successful" vs "Payment Failed"
 
-> **Flutter?** The identical architecture in Dart (webview checkout + return-URL interception + ABA Pay deeplink launcher) lives in `examples/flutter/payment_screen.dart`, documented in [Chapter 5](payway-sdk docs webviews).
+> **Flutter?** The identical architecture in Dart (webview checkout + return-URL interception + ABA Pay deeplink launcher) lives in `examples/flutter/payment_screen.dart`, documented in [Chapter 5](webviews.md#flutter-webview_flutter).
 
 ---
 
@@ -615,8 +615,8 @@ If you prefer the official native approach:
 
 ## Next Steps
 
-- **For WebView-specific details** → [Chapter 5 — WebView Implementation](payway-sdk docs webviews)
-- **For deep linking** → [Chapter 8 — Deep Linking](payway-sdk docs deep-linking)
-- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](payway-sdk docs callbacks-webhooks)
+- **For WebView-specific details** → [Chapter 5 — WebView Implementation](webviews.md)
+- **For deep linking** → [Chapter 8 — Deep Linking](deep-linking.md)
+- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](callbacks-webhooks.md)
 
-> ← [Previous: Web Implementation](payway-sdk docs web-implementation) | [Next: WebView Implementation →](payway-sdk docs webviews)
+> ← [Previous: Web Implementation](web-implementation.md) | [Next: WebView Implementation →](webviews.md)

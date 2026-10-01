@@ -1,6 +1,6 @@
 # Chapter 10 — UI Customization
 
-> **Estimated reading time:** 10 minutes  
+> **Estimated reading time:** 10 minutes
 > **Goal:** Understand what you can and cannot customize on PayWay's hosted checkout page.
 
 ---
@@ -29,7 +29,7 @@ Every parameter you pass to `createTransaction()` affects how the checkout page 
 | **Payment Option** | `paymentOption` | `'cards'`, `'abapay_khqr'`, `'alipay'`, `'wechat'`, `'google_pay'`, `'abapay_khqr_deeplink'` | Which payment methods appear on the checkout page |
 | **View Type** | `viewType` | `'hosted_view'` (default) or `'popup'` | Full-page redirect vs. popup overlay |
 | **Language** | Not exposed by this SDK | The hosted page's label sets are portal/team-configured per profile (ABA integration team, 2026-09-12); no client-supplied language parameter is documented — request label/locale changes via the merchant portal or the Integration Team | Locale/language of the checkout page |
-| **QR Image Template** | `qrImageTemplate` (QR API only) | `'template1'`, `'template1_color'`, `'template2'` (default), `'template2_color'`, `'template3_color'`, `'template4'`, `'template4_color'` | Visual style of generated QR codes — the full `QR_TEMPLATES` validator list (7 values). Rendered samples per template: see the [template gallery](payway-sdk docs qr-handling) |
+| **QR Image Template** | `qrImageTemplate` (QR API only) | `'template1'`, `'template1_color'`, `'template2'` (default), `'template2_color'`, `'template3_color'`, `'template4'`, `'template4_color'` | Visual style of generated QR codes — the full `QR_TEMPLATES` validator list (7 values). Rendered samples per template: see the [template gallery](qr-handling.md#qr-image-template-gallery) |
 
 ### Flow-Control Parameters
 
@@ -179,8 +179,8 @@ The following topics need verification from ABA's developer portal:
 
 ## Next Steps
 
-- **For webhook handling (the real transaction confirmation)** → [Chapter 11 — Callbacks & Webhooks](payway-sdk docs callbacks-webhooks)
-- **For QR-based UI (full control)** → [Chapter 7 — QR Code Handling](payway-sdk docs qr-handling)
-- **For the web implementation** → [Chapter 3 — Web Implementation](payway-sdk docs web-implementation)
+- **For webhook handling (the real transaction confirmation)** → [Chapter 11 — Callbacks & Webhooks](callbacks-webhooks.md)
+- **For QR-based UI (full control)** → [Chapter 7 — QR Code Handling](qr-handling.md)
+- **For the web implementation** → [Chapter 3 — Web Implementation](web-implementation.md)
 
-> ← [Previous: Link / Unlink / Renew Lifecycle](payway-sdk docs link-lifecycle) | [Next: Callbacks & Webhooks →](payway-sdk docs callbacks-webhooks)
+> ← [Previous: Link / Unlink / Renew Lifecycle](link-lifecycle.md) | [Next: Callbacks & Webhooks →](callbacks-webhooks.md)

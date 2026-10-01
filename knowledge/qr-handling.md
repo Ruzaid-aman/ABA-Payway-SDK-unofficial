@@ -2,7 +2,7 @@
 
 # Chapter 7 — QR Code Handling
 
-> **Estimated reading time:** 15 minutes  
+> **Estimated reading time:** 15 minutes
 > **Goal:** Generate and display KHQR QR codes for customers to scan and pay with their banking app.
 
 ## Flow at a glance
@@ -433,12 +433,12 @@ QR codes generated via the API have a limited lifetime:
 ### Sandbox-verified lifecycle facts (2026-08-25)
 
 - **Duplicate `tran_id` is silently accepted** on purchase in sandbox (HTTP 200, `code 0`). Generate unique transaction IDs (the CLI does: `qr<timestamp><random>`); do not rely on PayWay for idempotency. Production behavior is an open question — see SANDBOX-FINDINGS §8c.
-- **Closing an unpaid transaction keeps it reporting `PENDING`** via check/list APIs (not `CANCELLED`). Treat "closed" as a local state you track yourself; the close call returns `code 0 Success!` when accepted. **Customer-side, the close DOES kill the QR**: closed-unpaid KHQRs are refused by the ABA app at scan time with a generic "transaction expired" message (indistinguishable from natural expiry at scan time). Enforcement is channel-dependent: hosted-card sessions rendered before the close may still complete payment after a code-00 close — the full merchant policy is in [Close transaction](payway-sdk docs close-transaction).
+- **Closing an unpaid transaction keeps it reporting `PENDING`** via check/list APIs (not `CANCELLED`). Treat "closed" as a local state you track yourself; the close call returns `code 0 Success!` when accepted. **Customer-side, the close DOES kill the QR**: closed-unpaid KHQRs are refused by the ABA app at scan time with a generic "transaction expired" message (indistinguishable from natural expiry at scan time). Enforcement is channel-dependent: hosted-card sessions rendered before the close may still complete payment after a code-00 close — the full merchant policy is in [Close transaction](close-transaction.md).
 - **transaction-list visibility is unpaid-QR-only asymmetric** (SANDBOX-FINDINGS §14/§20): paid transactions ARE list-visible; unpaid QR-only ones never appear (check-transaction/detail see them instantly); unpaid checkout-path transactions DO appear. Timestamps shown are the **gateway clock, UTC+7** — a UTC/local-derived date window silently returns 0 rows, so omit `--from/--to` (full gateway day) or convert.
 - **`closeTransaction()` on a nonexistent ID** → HTTP 403, internal code `5` ("Transaction not found"), while `checkTransaction()` on a nonexistent ID → HTTP 200 with `status.code 6` ("tran_id not found"). Handle both shapes.
 - **Creation grace period:** the first check right after creating a transaction can return `status.code 6` for a few seconds before it becomes visible. `pollTransactionStatus()` yields `NOT_FOUND` for these and does **not** count them toward `maxConsecutiveErrors`. Verified live 2026-08-25: checkout-link flow saw 1× NOT_FOUND, then PENDING ×4 → APPROVED (~32s).
 - **Visibility is asymmetric across endpoints (measured 2026-08-25):** check-transaction sees a fresh transaction in <1s, but get-transaction-detail needs ~5s and is capped at 10/min. Poll status with `checkTransaction` / `pollTransactionStatus`; use detail only for reconciliation (`apv`, `bank_ref`, operation history) after the fact.
-- **Strict-cap responses look like permission errors:** exceeding a documented cap (detail 10/min, list 50/min) returns HTTP **403** with NUMERIC body `status.code` 429 ("Rate limit exceeded...") and no rate-limit headers. The SDK maps this to typed retryable `PayWayRateLimitError` and paces retries from its own observed window — see [Error Handling §Endpoint HTTP Behavior](payway-sdk docs errors-and-debugging).
+- **Strict-cap responses look like permission errors:** exceeding a documented cap (detail 10/min, list 50/min) returns HTTP **403** with NUMERIC body `status.code` 429 ("Rate limit exceeded...") and no rate-limit headers. The SDK maps this to typed retryable `PayWayRateLimitError` and paces retries from its own observed window — see [Error Handling §Endpoint HTTP Behavior](errors-and-debugging.md#endpoint-http-behavior).
 - **Hosted checkout link requires `payment_gate=0`:** via the JSON Create Transaction API (`checkout.purchase()`), the response includes `checkout_qr_url` only when you send `viewType: 'hosted_view'` + `paymentGate: 0` alongside `paymentOption: 'abapay_khqr_deeplink'`. Without gate 0 you get only `qrString` / `qrImage` / `abapay_deeplink`.
 - **Transaction-list date filters must be `"YYYY-MM-DD HH:mm:ss"`** (e.g. `"2026-08-25 00:00:00"`). Compact (`20260825`), ISO-date (`2026-08-25`), and epoch formats all fail with HTTP 403 / code `49` "Invalid Start Date."
 - **QR `lifetime` minimum is 3 minutes — sandbox-pinned 2026-08-30, now enforced by the SDK.** `lifetime: 179` → HTTP 400 code `"04"` ("The given data was invalid"); `lifetime: 180` → success. The API takes **minutes**; the SDK accepts seconds, floors to whole minutes (a live QR never outlives the merchant's displayed countdown), and **rejects sub-180s values locally** with `PayWayConfigError` before any network call (exported constant: `QR_LIFETIME_MIN_SECONDS`). `checkout.purchase` is different: its `lifetime` is **minutes** (spec min 3, max 43200 = 30 days); sub-3-minute values are rejected locally with `PayWayConfigError` (gateway error-69 parity). QR maximum per the spec is 120 days (not locally enforced; ~27h confirmed accepted live).
@@ -764,8 +764,8 @@ console.log(info);
 
 ## Next Steps
 
-- **For web checkout flows** → [Chapter 3 — Web Implementation](payway-sdk docs web-implementation)
-- **For mobile apps** → [Chapter 4 — Native App Implementation](payway-sdk docs native-apps)
-- **For production deployment** → [Chapter 13 — Deployment Checklist](payway-sdk docs deployment-checklist)
+- **For web checkout flows** → [Chapter 3 — Web Implementation](web-implementation.md)
+- **For mobile apps** → [Chapter 4 — Native App Implementation](native-apps.md)
+- **For production deployment** → [Chapter 13 — Deployment Checklist](deployment-checklist.md)
 
-> ← [Previous: Web Implementation](payway-sdk docs web-implementation) | [Next: Link / Unlink / Renew Lifecycle →](payway-sdk docs link-lifecycle)
+> ← [Previous: Web Implementation](web-implementation.md) | [Next: Link / Unlink / Renew Lifecycle →](link-lifecycle.md)

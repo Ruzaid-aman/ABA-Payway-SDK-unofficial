@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { normalizePackReport } from './lib/pack-report.mjs';
+import { navigationFailures } from './lib/public-navigation.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmArgs = ['pack', '--dry-run', '--json', '--ignore-scripts'];
@@ -63,7 +64,7 @@ const skillCount = files.filter((entry) => /^skills\/aba-payway-[^/]+\/SKILL\.md
 const expectedSkillCount = readdirSync(path.join(repositoryRoot, 'skills'), { withFileTypes: true }).filter(
   (entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'),
 ).length;
-const textExtensions = new Set(['.js', '.cjs', '.json', '.md', '.ts', '.cts']);
+const textExtensions = new Set(['.js', '.cjs', '.json', '.md', '.ts', '.cts', '.txt', '.html']);
 const forbiddenContentPatterns = [
   /[A-Z]:[\\/]Users[\\/]/i,
   /[A-Z]:[\\/]Antigravity_google[\\/]/i,
@@ -84,20 +85,20 @@ for (const entry of files) {
   const absolute = path.join(repositoryRoot, ...entry.split('/'));
   if (!existsSync(absolute)) continue;
   const content = readFileSync(absolute, 'utf8');
+  // Catch copyable bare npx invocations while allowing explanatory warnings
+  // about the package/bin-name mismatch in README and the first-payment Skill.
+  if (['.md', '.txt'].includes(path.extname(entry))) {
+    for (const line of content.split('\n')) {
+      if (/^\s*(?:\$\s*)?npx payway-sdk\b/.test(line)) contentViolations.push(`${entry}: bare npx payway-sdk invocation`);
+      if (/payway-sdk docs[^`\n]*--search/.test(line)) contentViolations.push(`${entry}: unsupported docs --search flag`);
+    }
+  }
   for (const pattern of forbiddenContentPatterns) {
     if (pattern.test(content)) contentViolations.push(`${entry}: ${pattern}`);
   }
-  if (path.extname(entry) === '.md') {
-    for (const match of content.matchAll(/\]\(([^)]+)\)/g)) {
-      const destination = match[1].trim().replace(/^<|>$/g, '');
-      if (!destination || destination.startsWith('#') || /^[a-z]+:/i.test(destination)) continue;
-      // CLI-served knowledge links ("payway-sdk docs <topic>") are resolved at
-      // runtime by the docs command, not by package-relative paths.
-      if (destination.startsWith('payway-sdk ')) continue;
-      const localPath = destination.split('#')[0].split('?')[0];
-      const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(entry), localPath.replace(/^\.\//, '')));
-      if (!fileSet.has(resolved)) brokenLocalLinks.push(`${entry} -> ${destination}`);
-    }
+  if (['.md', '.txt'].includes(path.extname(entry))) {
+    brokenLocalLinks.push(...navigationFailures(entry, content, fileSet,
+      (target) => readFileSync(path.join(repositoryRoot, target), 'utf8')));
   }
 }
 

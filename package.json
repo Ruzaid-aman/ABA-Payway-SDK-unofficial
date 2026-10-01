@@ -65,7 +65,7 @@
     "gen:error-registry": "tsx scripts/generate-error-registry.ts",
     "sync:knowledge": "node scripts/sync-knowledge.mjs",
     "clean": "node scripts/clean.mjs",
-    "check:package": "node scripts/check-package-contents.mjs",
+    "check:package": "node --test scripts/lib/public-navigation.test.mjs && node scripts/check-package-contents.mjs",
     "check:public-docs": "node scripts/check-public-docs.mjs",
     "check:repository": "node scripts/check-repository.mjs",
     "check:secret-allowlists": "node scripts/check-secret-allowlists.mjs",

@@ -69,7 +69,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk poll-transaction -t <id>` | Watch a transaction until terminal status (`--json` events for agents) |
 | `payway-sdk status` | Display payment status codes and refund error codes reference |
 | `payway-sdk explain [code]` | Decode a PayWay error code (e.g. `explain PTL36`, `explain 49`) with a fix hint — no credentials needed |
-| `payway-sdk docs list` | List the built-in knowledge base (31 topics: guides, sandbox learnings, error registry) |
+| `payway-sdk docs list` | List the built-in knowledge base (curated integration and support topics) |
 | `payway-sdk docs <topic>` | Print one knowledge topic offline (e.g. `docs quickstart`, `docs errors-and-debugging`, `docs payment-link`; `--json` adds metadata + envelope errors) |
 | `payway-sdk docs search <terms>` | AND-search the whole corpus (`--json` for structured hits); also available to the agent as the `query_knowledge` tool |
 | `payway-sdk validate` | Validate a refund amount or transaction ID locally |
@@ -874,9 +874,14 @@ as tools. stdout belongs to the protocol; diagnostics go to stderr.
   (`readOnlyHint`).
 - **Preview without serving:** `payway-sdk mcp --list-tools [--json]` prints
   the effective catalog (12 read-only / 17 with mutations).
-- **Client config (Claude Code style):**
-  `{"command":"npx","args":["tsx","src/cli.ts","mcp"]}` (or
-  `{"command":"payway-sdk","args":["mcp"]}` when installed globally).
+- **Installed-package client config (Claude Code style):** use the absolute
+  path to your application's installed CLI, so the host need not start in
+  the application directory:
+  `{"command":"node","args":["/absolute/path/to/your-app/node_modules/aba-payway-ts/dist/cli.js","mcp"]}`.
+  Replace the path with the real local path (escape Windows backslashes in JSON).
+  A global installation can use `{"command":"payway-sdk","args":["mcp"]}`.
+  For a source checkout only, with the host working directory set to its root,
+  use `{"command":"npx","args":["tsx","src/cli.ts","mcp"]}`.
   Credentials resolve per call via profiles/env exactly like other commands;
   journal/knowledge tools work offline without credentials.
 - Errors map to `isError:true` tool results with sanitized detail

@@ -34,3 +34,14 @@ catch (error) { if (error instanceof PayWayConfigError) console.error(error.mess
 ## Related Skills
 - [Purchase](../aba-payway-purchase/SKILL.md)
 - [Token Lifecycle](../aba-payway-token-lifecycle/SKILL.md)
+
+## Local recording and storage
+
+CLI API commands journal by default; disable with `--no-journal` or falsy
+`PAYWAY_JOURNAL=0|false|no|off`. The SDK library is opt-in (`journal: true`
+or `PAYWAY_JOURNAL=1`). Pure-local CLI commands do not record by default.
+Run `payway-sdk doctor --json` for `.dataRoot`. `PAYWAY_DATA_DIR` overrides
+the default `<APPDATA|~/.config>/aba-payway-sdk/data`; `PAYWAY_JOURNAL_DIR`
+overrides the journal directory. JSON files are default; the optional SQLite
+backend uses shared `payway.db`. `PAYWAY_FORCE_JSON_STORAGE=1` forces JSON.
+See `payway-sdk docs storage-service` and `payway-sdk docs transaction-journal`.

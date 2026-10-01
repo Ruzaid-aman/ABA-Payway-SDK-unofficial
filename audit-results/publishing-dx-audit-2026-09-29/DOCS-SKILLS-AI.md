@@ -1,5 +1,7 @@
 # Documentation, packaged Skills, and AI developer experience audit
 
+> **1 October item 6 remediation:** [Current corpus verification](ITEM-6-CORPUS-2026-10-01.md) resolves D03–D07 locally. D02's missing topics are fixed and work in an installed tarball; private security-mailbox operation remains an owner check. The findings below retain the original audit snapshot.
+
 > **30 September status addendum:** D08 (stale generated knowledge) is resolved in the resumed working tree at `34550df` plus the existing Postman edits. The root rerun passed 2,120 offline tests across 147 files with two workers, including corpus freshness. The earlier installer timeouts are not an open functional defect. D01–D07 and D09 remain open; MCP-specific runtime findings are in [SDK-CLI.md](SDK-CLI.md). Use [REPORT.md](REPORT.md) for the current decision and acceptance plan. Evidence below retains the original 29 September snapshot.
 
 Audit date: 2026-09-29. Scope: the current local checkout, README/QUICKSTART onboarding, source and packaged documentation, generated knowledge and llms.txt, 34 packaged Skills and their eight tools, installer ownership safeguards, MCP discoverability. No source, credentials, or user settings were changed. No gateway request was made. One tool-contract reproduction used a loopback HTTP server and an explicitly synthetic signing key.

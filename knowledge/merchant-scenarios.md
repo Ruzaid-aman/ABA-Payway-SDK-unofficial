@@ -188,7 +188,7 @@ joining them to the bank settlement report for the expected settlement date S
 has been observed but is not universal). Fees appear as separate debits — reconcile
 net vs gross per the agreement. Mismatches: send `tran_id` + date/time + amount +
 bank evidence to the Integration/Settlement team. Full pattern:
-[Chapter 20](payway-sdk docs settlement-disputes).
+[Chapter 20](settlement-disputes.md).
 
 ## TC-036 — Chargebacks and disputes
 
@@ -198,7 +198,7 @@ final/irrevocable once successful. ABA notifies the merchant's registered email
 with reason code, amount, PAN partial, approval code, purchase ID, and a response
 deadline; silence past the deadline is treated as acceptance. Merchants accept
 (refund) or dispute with evidence; ABA represents the case to the scheme. Monitor
-the registered email. Full flow: [Chapter 20](payway-sdk docs settlement-disputes).
+the registered email. Full flow: [Chapter 20](settlement-disputes.md).
 
 ## TC-037 — Payout and split timing
 
@@ -210,4 +210,4 @@ same operation, subject to liquidity and daily payout limits. Production require
 beneficiary whitelisting and the payout service enabled on the MID. **Once a
 transaction is processed via payout/split, the standard refund API is not
 available** — refunds are manual, or a pre-auth refund before the split. See
-[Chapter 20](payway-sdk docs settlement-disputes).
+[Chapter 20](settlement-disputes.md).

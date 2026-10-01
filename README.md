@@ -49,8 +49,8 @@ The [first-payment reference app](docs-packaged/guides/FIRST-PAYMENT-WALKTHROUGH
 ## For AI coding agents
 
 - **Skills:** install the packaged guides with `npm exec -- payway-sdk skills add claude` (also `codex`, `opencode`, `cursor`, `copilot`) — see [skills/README.md](skills/README.md).
-- **MCP server:** expose the SDK to any MCP host with `npm exec -- payway-sdk mcp` (stdio; 12 read-only tools by default, `--allow-mutations` adds the create tools; preview with `mcp --list-tools`) — see the [reference](docs-packaged/reference/SDK-AND-CLI-REFERENCE.md#MCP-Server).
-- **Offline knowledge base:** `npm exec -- payway-sdk docs list` / `docs <topic>` / `docs search "<terms>"` serves 30 integration topics without network access; the machine-readable index is [llms.txt](llms.txt).
+- **MCP server:** expose the SDK to any MCP host with `npm exec -- payway-sdk mcp` (stdio; 12 read-only tools by default, `--allow-mutations` adds the create tools; preview with `mcp --list-tools`) — see the [reference](docs-packaged/reference/SDK-AND-CLI-REFERENCE.md#mcp-server).
+- **Offline knowledge base:** `npm exec -- payway-sdk docs list` / `docs <topic>` / `docs search "<terms>"` serves the curated integration and support topics without network access; the machine-readable index is [llms.txt](llms.txt).
 
 ## Explore the SDK
 

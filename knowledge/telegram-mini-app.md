@@ -1,6 +1,6 @@
 # Chapter 6 — Telegram Mini App Integration
 
-> **Estimated reading time:** 10 minutes  
+> **Estimated reading time:** 10 minutes
 > **Goal:** Integrate ABA PayWay payments into a Telegram Mini App.
 
 ## Flow at a glance
@@ -626,8 +626,8 @@ bot.launch();
 
 ## Next Steps
 
-- **For standard web integration** → [Chapter 3 — Web Implementation](payway-sdk docs web-implementation)
-- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](payway-sdk docs callbacks-webhooks)
-- **For production deployment** → [Chapter 13 — Deployment Checklist](payway-sdk docs deployment-checklist)
+- **For standard web integration** → [Chapter 3 — Web Implementation](web-implementation.md)
+- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](callbacks-webhooks.md)
+- **For production deployment** → [Chapter 13 — Deployment Checklist](deployment-checklist.md)
 
-> ← [Previous: WebView Implementation](payway-sdk docs webviews) | [Next: Deep Linking →](payway-sdk docs deep-linking)
+> ← [Previous: WebView Implementation](webviews.md) | [Next: Deep Linking →](deep-linking.md)

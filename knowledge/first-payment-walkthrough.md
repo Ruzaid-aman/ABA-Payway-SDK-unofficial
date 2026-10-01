@@ -1,15 +1,14 @@
 # First payment: create, verify, recover
 
-This is the simulated application exercise after the [quickstart](payway-sdk docs quickstart). For ABA sandbox registration, callback setup, and completing an actual gateway test payment, follow that guide first. This exercise teaches verification and recovery without ABA test-payer access.
+This is the simulated application exercise after the [quickstart](quickstart.md). For ABA sandbox registration, callback setup, and completing an actual gateway test payment, follow that guide first. This exercise teaches verification and recovery without ABA test-payer access.
 
-This exercise uses the existing reference app and simulated payments. Run from
-the repository root with Node 22.12+ and dependencies installed. In a fresh shell,
+This exercise uses the included reference app and simulated payments. Use Node
+22.12+ with the SDK installed in your application. In a fresh shell,
 ensure `PAYWAY_MERCHANT_ID` and `PAYWAY_API_KEY` are unset; the app automatically
 selects sandbox mode when both are present. Stop if its startup banner says SANDBOX.
 
 ```sh
-npm --prefix examples/first-payment run setup
-npm --prefix examples/first-payment start
+node node_modules/aba-payway-ts/docs-packaged/starter/app/main.js
 ```
 
 Open the printed localhost URL. Confirm the SIMULATED banner before continuing.
@@ -26,6 +25,11 @@ attempts, not two simultaneous payments for the same pending order.
 
 Stop the app with Ctrl+C when done. Its local `first-payment-store.json` preserves
 orders and attempts across restarts; keep it private.
+
+For a source checkout, run `npm --prefix examples/first-payment run setup`
+and `npm --prefix examples/first-payment start` instead. Both paths use the
+same teaching app. Simulated transaction IDs exist only in this app: never
+send them to the real gateway with `check-transaction`.
 
 ## Check duplicate delivery and ambiguous creation
 
@@ -47,7 +51,7 @@ result is not permission to create another charge.
 
 ## Move to your application
 
-Use the [quickstart SDK sequence](payway-sdk docs quickstart) on your
+Use the [quickstart SDK sequence](quickstart.md#6-integrate-the-server) on your
 server. Return only the selected artifact to the authorized customer. Bind verified
 transaction ID, amount and currency to your stored order before fulfilling it.
 Payment-link callbacks require lookup because they are unsigned.
@@ -56,5 +60,5 @@ The reference app is a single-process teaching implementation backed by a JSON
 file. Its guard is not a distributed database lock or a transactional job queue.
 For deployment, use database uniqueness/transactions plus a durable fulfillment
 job, authenticate and authorize order access, and follow the
-[deployment checklist](payway-sdk docs deployment-checklist). Local closure can still be
+[deployment checklist](deployment-checklist.md). Local closure can still be
 followed by a late payment; reconcile it explicitly.

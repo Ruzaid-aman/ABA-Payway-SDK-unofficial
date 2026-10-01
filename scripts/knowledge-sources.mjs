@@ -9,6 +9,10 @@
  * package; their distilled facts reach agents via explain/the knowledge digest.
  */
 export const SOURCES = [
+  { topic: 'support', source: 'SUPPORT.md', title: 'Support and compatibility', description: 'Runtime, verification limits, support scope, and sanitized bug reports.' },
+  { topic: 'contributing', source: 'CONTRIBUTING.md', title: 'Contributing', description: 'Contributor setup, offline checks, gateway verification, and release review.' },
+  { topic: 'security', source: 'SECURITY.md', title: 'Security policy', description: 'Private vulnerability reporting and disclosure policy; mailbox launch check remains required.' },
+  { topic: 'storage-service', source: 'docs/guides/21-storage-service.md', title: 'Storage service', description: 'Unified data root, JSON defaults, optional SQLite backend, and store ownership.' },
   { topic: 'quickstart', source: 'QUICKSTART.md', title: 'Quickstart', description: 'First sandbox payment end to end: credentials, .env, generate-qr, check-transaction, polling.' },
   { topic: 'quickstart-1-page', source: 'docs/guides/QUICK-START-1-PAGER.md', title: 'One-page quickstart', description: 'Condensed create→verify→fulfill reference for the impatient.' },
   { topic: 'docs-index', source: 'docs/README.md', title: 'Docs index', description: 'The full documentation map: start-here routes, per-domain guides, troubleshooting.' },
@@ -29,7 +33,7 @@ export const SOURCES = [
   { topic: 'merchant-scenarios', source: 'docs/guides/15-merchant-scenario-requirements.md', title: 'Merchant scenario requirements', description: 'POS/billing/scenario requirements observed in real integrations.' },
   { topic: 'webhook-setup', source: 'docs/guides/16-webhook-setup-guide.md', title: 'Webhook setup guide', description: 'Local listener, tunnels, forwarding, and production webhook configuration.' },
   { topic: 'payment-link', source: 'docs/guides/17-payment-link.md', title: 'Payment link', description: 'Payment-link create/detail/void contract incl. pushbacks and VOIDED semantics.' },
-  { topic: 'transaction-journal', source: 'docs/guides/18-transaction-journal.md', title: 'Transaction journal', description: 'Opt-in JSONL journal: correlation ids, timeline/stats/reconcile/anomalies.' },
+  { topic: 'transaction-journal', source: 'docs/guides/18-transaction-journal.md', title: 'Transaction journal', description: 'CLI default recording, SDK opt-in, unified data root, timeline/stats/reconcile/anomalies.' },
   { topic: 'customer-module-qr', source: 'docs/guides/19-customer-module-qr.md', title: 'Customer module QR', description: 'Portal Customer-ID keyed QR generation and merchant-reference reconciliation.' },
   { topic: 'settlement-disputes', source: 'docs/guides/20-settlement-and-disputes.md', title: 'Settlement & disputes', description: 'Settlement timing, chargebacks, and refund boundaries per payment method.' },
   { topic: 'api-datetime-timezones', source: 'docs/guides/22-api-datetime-and-timezones.md', title: 'API datetime & timezones', description: 'Endpoint-specific UTC, UTC+7, epoch, naive datetime, callback, and parsing rules.' },

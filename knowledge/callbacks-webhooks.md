@@ -2,7 +2,7 @@
 
 # Chapter 11 — Callbacks & Webhooks
 
-> **Estimated reading time:** 15 minutes  
+> **Estimated reading time:** 15 minutes
 > **Goal:** Build a secure receiver for online checkout callbacks and a separate capture route for unverified offline ABA KHQR notifications.
 
 ## Flow at a glance
@@ -483,12 +483,12 @@ curl -X POST "https://abc123.ngrok.io/api/payway-webhook" \
 
 ## Next Steps
 
-- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](payway-sdk docs webhook-setup) — quick way to capture and inspect callbacks during development; the [Local Webhook Workbench](payway-sdk docs webhook-setup) in the same chapter sends correctly-signed fixture callbacks (`webhook trigger`), forwards captures to your app (`--forward-to`), replays stored records (`webhook resend`), and explains failed verifications (`webhook verify-callback`) — all without the ABA Simulator
-- **For error handling** → [Chapter 12 — Error Handling & Debugging](payway-sdk docs errors-and-debugging)
-- **For deployment** → [Chapter 13 — Deployment Checklist](payway-sdk docs deployment-checklist)
-- **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](payway-sdk docs web-implementation)
+- **For local webhook testing** → [Chapter 16 — Webhook Setup with the CLI](webhook-setup.md) — quick way to capture and inspect callbacks during development; the [Local Webhook Workbench](webhook-setup.md#local-webhook-workbench) in the same chapter sends correctly-signed fixture callbacks (`webhook trigger`), forwards captures to your app (`--forward-to`), replays stored records (`webhook resend`), and explains failed verifications (`webhook verify-callback`) — all without the ABA Simulator
+- **For error handling** → [Chapter 12 — Error Handling & Debugging](errors-and-debugging.md)
+- **For deployment** → [Chapter 13 — Deployment Checklist](deployment-checklist.md)
+- **For the web implementation that uses callbacks** → [Chapter 3 — Web Implementation](web-implementation.md)
 
-> ← [Previous: UI Customization](payway-sdk docs ui-customization) | [Next: Error Handling →](payway-sdk docs errors-and-debugging)
+> ← [Previous: UI Customization](ui-customization.md) | [Next: Error Handling →](errors-and-debugging.md)
 
 ---
 
@@ -540,5 +540,5 @@ User-Agent: PayWayApp/3.0
 - Receiver requirements: accept `POST` + `application/json`, answer 200 fast.
 
 Receiver setup (tunnel, storage, routes) is covered in
-[16. Webhook Setup](payway-sdk docs webhook-setup); the full payment-link
-lifecycle in [17. Payment Link API](payway-sdk docs payment-link) §17.7.
+[16. Webhook Setup](webhook-setup.md); the full payment-link
+lifecycle in [17. Payment Link API](payment-link.md) §17.7.

@@ -71,7 +71,7 @@ Both modes funnel through the same safety pipeline; only the plan source differs
 | 11 | `save_artifact` | no | Persist a produced artifact to `./payway-output` |
 | 12 | `open_artifact` | no | Open a saved artifact |
 | 13 | `copy_to_clipboard` | no | Copy an artifact value to the clipboard |
-| 14 | `query_knowledge` | no | Read-only offline knowledge base: `query: search|read` over the 31-topic PayWay corpus (`payway-sdk docs`) — pull integration guidance, error hints, and sandbox-verified lessons into a plan |
+| 14 | `query_knowledge` | no | Read-only offline knowledge base: `query: search|read` over the curated PayWay corpus (`payway-sdk docs`) — pull integration guidance, error hints, and sandbox-verified lessons into a plan |
 
 > `create_checkout_payload` builds a **local** signed payload; `create_checkout_purchase`
 > performs the actual **network** request. Treat them as distinct tools.
@@ -132,7 +132,9 @@ executes zero PayWay creates.
 - `payway-sdk agent sessions list|export|clear` — manage sessions. `export`
   scrubs secrets; `clear all` requires `--approve` in non-TTY.
 - `payway-sdk journal timeline|stats|reconcile|explain|anomalies` — inspect
-  opt-in transaction journal records. The agent can call the same read-only data
+  transaction journal records (CLI API commands record by default; SDK opt-in).
+  Find `.dataRoot` with `doctor --json`; `PAYWAY_DATA_DIR` overrides it.
+  Use `--no-journal` or falsy `PAYWAY_JOURNAL` to disable CLI recording. The agent can call the same read-only data
   through `query_journal`.
 - `payway-sdk agent` (no subcommand) — interactive REPL.
 

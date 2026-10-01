@@ -2,7 +2,7 @@
 
 # Chapter 14 — Appendix: Complete Code Snippets
 
-> **Estimated reading time:** Reference  
+> **Estimated reading time:** Reference
 > **Goal:** Copy-paste-ready, fully-commented code examples for every common integration pattern.
 
 ---
@@ -457,7 +457,7 @@ echo json_encode(['received' => true]);
 
 ## Payment Link: Create, Share, Reconcile
 
-Full lifecycle reference: [17. Payment Link API](payway-sdk docs payment-link). `paymentLink` requires the RSA public key; `returnUrl` is gateway-required and base64-encoded automatically.
+Full lifecycle reference: [17. Payment Link API](payment-link.md). `paymentLink` requires the RSA public key; `returnUrl` is gateway-required and base64-encoded automatically.
 
 ```typescript
 import { PayWay } from 'aba-payway-ts';
@@ -659,7 +659,7 @@ async function monitorMultiplePayments(transactionIds: string[]) {
 ### Error Handling Reference
 
 | Error | When | How to Handle |
-|---|---|---| 
+|---|---|---|
 | `PollingAbortedError` | `maxDurationMs` or `maxConsecutiveErrors` hit | Catch around `for await...of`, check `error.reason` |
 | `PollingAbortedError` with `reason: 'max_consecutive_errors'` | Network issues or API errors | Retry with fresh `pollTransactionStatus()` call |
 | `PollingAbortedError` with `reason: 'max_duration_exceeded'` | QR expired before payment | Generate new QR, notify customer |
@@ -669,9 +669,9 @@ async function monitorMultiplePayments(transactionIds: string[]) {
 
 ## See Also
 
-- **Full Chapter List:** README.md
+- **Full Chapter List:** [README.md](../README.md)
 - **SDK Source:** `../src/client.ts`
 - **Sandbox Findings:** `../SANDBOX-FINDINGS`
 - **OpenAPI Spec:** `../payway-openapi.yaml`
 
-> ← [Previous: Deployment Checklist](payway-sdk docs deployment-checklist) | Back to Documentation Home →
+> ← [Previous: Deployment Checklist](deployment-checklist.md) | [Back to Documentation Home →](../README.md)

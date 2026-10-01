@@ -30,6 +30,7 @@ interface KnowledgeManifest {
   schema: string;
   generator: string;
   topics: KnowledgeTopic[];
+  generated: { file: string; sha256: string; source?: string; sourceSha256?: string }[];
 }
 
 const manifest: KnowledgeManifest = JSON.parse(
@@ -39,6 +40,13 @@ const manifest: KnowledgeManifest = JSON.parse(
 const sha16 = (buf: Buffer | string) => createHash('sha256').update(buf).digest('hex').slice(0, 16);
 
 describe('knowledge corpus freshness', () => {
+  it('keeps readable package guides, starter files, and machine index fresh', () => {
+    expect(manifest.generated.length).toBeGreaterThan(30);
+    for (const entry of manifest.generated) {
+      expect(sha16(readFileSync(path.join(repoRoot, entry.file))), entry.file).toBe(entry.sha256);
+      if (entry.source) expect(sha16(readFileSync(path.join(repoRoot, entry.source))), entry.source).toBe(entry.sourceSha256);
+    }
+  });
   it('has a v1 manifest with topics', () => {
     expect(manifest.schema).toBe('knowledge-manifest/v1');
     expect(manifest.topics.length).toBeGreaterThanOrEqual(29);
@@ -109,7 +117,7 @@ describe('knowledge corpus freshness', () => {
     const llms = readFileSync(path.join(repoRoot, 'llms.txt'), 'utf8');
     expect(llms.startsWith('# aba-payway-ts')).toBe(true);
     for (const topic of manifest.topics) {
-      expect(llms).toContain(`](${topic.source})`);
+      expect(llms).toContain(`](knowledge/${topic.file})`);
     }
   });
 

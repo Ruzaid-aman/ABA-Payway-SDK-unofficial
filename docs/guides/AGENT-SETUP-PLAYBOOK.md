@@ -157,7 +157,7 @@ agentic guidance before PayWay credentials are entered.
     pings `/models` as ready — actual `/chat/completions` failures only surface at `ask` time,
     so always treat a `PROVIDER_PROPOSAL_FAILED` at runtime as "check the key + egress".
 12. **The `payway-sdk` bin is only on PATH after `npm link` or a global install.** From a
-    source checkout, invoke `node dist/cli.js <command>` (or `npx payway-sdk`); running bare
+    source checkout, invoke `node dist/cli.js <command>` (or `npm exec -- payway-sdk`); running bare
     `payway-sdk` in a fresh terminal fails with "not recognized".
 13. **The strict-JSON system prompt MUST embed the tool catalog.** The original prompt said
     `<tool_name>` without listing tools, so every model invented tool names (`generate_qr`,

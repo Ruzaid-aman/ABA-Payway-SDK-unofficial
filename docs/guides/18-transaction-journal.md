@@ -4,8 +4,8 @@
 > see `audit-results/transaction-data-audit/REPORT.md` for the full audit (gap register
 > G1–G18) and the phase plan.
 
-The Transaction Journal is an **opt-in, append-only JSONL record of every PayWay API
-exchange** the SDK makes: correlation id, retry attempts, duration, gateway trace id,
+The Transaction Journal is an **append-only JSONL record**: CLI API commands record
+by default, while the SDK library is opt-in. It records correlation id, retry attempts, duration, gateway trace id,
 and a redacted digest of each request/response body.
 
 It exists because today that metadata is computed inside the SDK's shared HTTP executor
@@ -111,7 +111,7 @@ queries `timeline` (reconstructed steps + verdict + hints for one transaction),
 approval gate — and hits no network. Ask the agent "what happened to transaction X"
 or "why did this checkout fail" and it answers from the journal when recording was
 on. Packaged skill: `aba-payway-journal` (install with the rest:
-`npx payway-sdk skills add opencode`).
+`npm exec -- payway-sdk skills add opencode`).
 
 The environment knob `PAYWAY_WEBHOOK_DIR` (registered) relocates the webhook capture
 store for `journal reconcile`.

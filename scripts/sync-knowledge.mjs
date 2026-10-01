@@ -2,18 +2,17 @@
 /**
  * Regenerates the packaged knowledge corpus: `knowledge/*.md|json` (curated,
  * user-facing docs), `knowledge/MANIFEST.json` (topic index + content hashes),
- * and the root `llms.txt` (machine-readable corpus index, audit A-2).
+ * the readable docs-packaged routes and bounded starter, and the root llms.txt.
  *
  * Run after editing any source doc (`npm run sync:knowledge`).
  * `src/__tests__/knowledge.test.ts` fails when the corpus is stale, so this
- * script is the ONLY way knowledge/ may change — never edit generated files.
+ * script is the ONLY way knowledge/ and docs-packaged/ may change — never edit generated files.
  *
  * Transforms applied to each copy so it works BOTH in the repo and inside the
  * npm package:
  *  - relative links that resolve to another corpus doc become
- *    `payway-sdk docs <topic>` (the docs command resolves them offline);
- *  - links into ../skills/… are kept (the package ships skills/ at the same
- *    relative location);
+ *    real relative knowledge-file links, preserving section anchors;
+ *  - skill and root README links are rebased for the generated location;
  *  - every other relative link (examples/, internal reports, …) is unwrapped
  *    to its link text;
  *  - the literal string "SANDBOX-FINDINGS.md" loses its .md suffix — the
@@ -25,6 +24,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync,
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SOURCES } from './knowledge-sources.mjs';
+import ts from 'typescript';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hash = (buf) => createHash('sha256').update(buf).digest('hex').slice(0, 16);
@@ -66,11 +66,15 @@ function rewriteLinks(content, sourcePath, targetMap) {
   const sourceDir = path.posix.dirname(path.posix.normalize(sourcePath.replaceAll('\\', '/')));
   return content.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (full, text, target) => {
     if (/^[a-z]+:/i.test(target) || target.startsWith('#')) return full; // absolute/anchor
-    if (target.includes('/skills/')) return full; // resolves inside the package too
-    const [local] = target.split('#');
+    const [local, anchor] = target.split('#');
     const resolved = path.posix.normalize(path.posix.join(sourceDir, local));
+    if (resolved.startsWith('skills/')) return `[${text}](../${resolved}${anchor ? '#' + anchor : ''})`;
+    if (resolved === 'README.md') return `[${text}](../README.md${anchor ? '#' + anchor : ''})`;
     const topic = targetMap.get(resolved) ?? targetMap.get(path.posix.basename(resolved));
-    if (topic) return `[${text}](payway-sdk docs ${topic})`;
+    if (topic) {
+      const source = SOURCES.find((entry) => entry.topic === topic);
+      return `[${text}](${topic}${path.posix.extname(source.source)}${anchor ? '#' + anchor : ''})`;
+    }
     return text; // unwrap: target has no meaning outside the repo
   });
 }
@@ -86,7 +90,8 @@ function transform(content, sourcePath, targetMap) {
   out = out.replaceAll('../../skills/', '../skills/');
   return out
     .replaceAll('SANDBOX-FINDINGS.md', 'SANDBOX-FINDINGS')
-    .replaceAll('HANDOFF.md', 'the repo HANDOFF');
+    .replaceAll('HANDOFF.md', 'the repo HANDOFF')
+    .replace(/[ \t]+$/gm, '');
 }
 
 function renderLlmsTxt(manifest) {
@@ -94,7 +99,7 @@ function renderLlmsTxt(manifest) {
     '# aba-payway-ts',
     '',
     '> ABA PayWay payment-gateway toolkit: a typed TypeScript SDK, an agent-first CLI',
-    '> (`payway-sdk`), and 34 installable agent skills — carrying sandbox-verified',
+    `> (\`payway-sdk\`), and ${countPackagedSkills()} installable agent skills — carrying sandbox-verified`,
     '> integration knowledge for ABA Bank PayWay (KHQR, hosted checkout, COF, payment',
     '> links, payouts, pre-auth, webhooks).',
     '',
@@ -123,7 +128,7 @@ function renderLlmsTxt(manifest) {
     '',
   ];
   for (const t of manifest.topics) {
-    lines.push(`- [${t.title}](${t.source}): ${t.description}`);
+    lines.push(`- [${t.title}](knowledge/${t.file}): ${t.description}`);
   }
   lines.push(
     '',
@@ -179,8 +184,44 @@ function main() {
   }
 
   const manifest = { schema: 'knowledge-manifest/v1', generator: 'scripts/sync-knowledge.mjs', topics };
-  writeFileSync(path.join(knowledgeDir, 'MANIFEST.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   writeFileSync(path.join(repoRoot, 'llms.txt'), renderLlmsTxt(manifest));
+  const generated = [{ file: 'llms.txt', sha256: hash(readFileSync(path.join(repoRoot, 'llms.txt'))) }];
+
+  // Readable package routes are generated from the SAME public sources.
+  const packagedDir = path.resolve(repoRoot, 'docs-packaged');
+  if (path.dirname(packagedDir) !== repoRoot) throw new Error('Unsafe packaged docs path');
+  rmSync(packagedDir, { recursive: true, force: true });
+  for (const entry of SOURCES.filter(({ source }) => source.startsWith('docs/') && source.endsWith('.md'))) {
+    const relative = entry.source.replace(/^docs\//, '');
+    const destination = path.join(packagedDir, relative);
+    mkdirSync(path.dirname(destination), { recursive: true });
+    const knowledge = readFileSync(path.join(knowledgeDir, entry.topic + '.md'), 'utf8');
+    const rebased = knowledge.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (full, label, target) => {
+      if (/^[a-z]+:/i.test(target) || target.startsWith('#')) return full;
+      const [local, anchor] = target.split('#');
+      const absolute = path.posix.normalize(path.posix.join('knowledge', local));
+      return `[${label}](${path.posix.relative(path.posix.dirname('docs-packaged/' + relative), absolute)}${anchor ? '#' + anchor : ''})`;
+    });
+    writeFileSync(destination, rebased);
+    generated.push({ file: 'docs-packaged/' + relative, sha256: hash(Buffer.from(rebased)) });
+  }
+  // Deliberately bounded teaching-app payload: no .env, captured store, vendor,
+  // lockfile, or repository setup scripts. Self-import resolves this package.
+  for (const relative of ['src/main.ts', 'src/payments.ts', 'src/server.ts', 'src/store.ts', 'public/index.html']) {
+    const destination = path.join(packagedDir, 'starter', relative.replace(/^src\//, 'app/').replace(/\.ts$/, '.js'));
+    mkdirSync(path.dirname(destination), { recursive: true });
+    const source = 'examples/first-payment/' + relative;
+    if (relative.endsWith('.ts')) {
+      const output = ts.transpileModule(readFileSync(path.join(repoRoot, source), 'utf8'), {
+        compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+      }).outputText.replace(/(from\s+['"]\.\/[^'"]+)\.ts(['"])/g, '$1.js$2');
+      writeFileSync(destination, output);
+    } else copyFileSync(path.join(repoRoot, source), destination);
+    generated.push({ file: path.relative(repoRoot, destination).replaceAll('\\', '/'), source,
+      sourceSha256: hash(readFileSync(path.join(repoRoot, source))), sha256: hash(readFileSync(destination)) });
+  }
+  manifest.generated = generated;
+  writeFileSync(path.join(knowledgeDir, 'MANIFEST.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
   const totalKb = Math.round(topics.reduce((sum, t) => sum + t.bytes, 0) / 1024);
   console.log(`knowledge: ${topics.length} topics, ${totalKb} KB → knowledge/ + llms.txt`);

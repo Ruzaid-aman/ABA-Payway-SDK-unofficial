@@ -2,7 +2,7 @@
 
 # Chapter 5 — WebView Implementation
 
-> **Estimated reading time:** 15 minutes  
+> **Estimated reading time:** 15 minutes
 > **Goal:** Understand how to use WebViews to display PayWay's checkout page inside your app, manage cookies and sessions, and capture payment results.
 
 ## Flow at a glance
@@ -321,8 +321,8 @@ const payway = new PayWay({
 
 ## Next Steps
 
-- **For native app architecture** → [Chapter 4 — Native App Implementation](payway-sdk docs native-apps)
-- **For Telegram Mini Apps** → [Chapter 6 — Telegram Mini App](payway-sdk docs telegram-mini-app)
-- **For deep linking** → [Chapter 8 — Deep Linking](payway-sdk docs deep-linking)
+- **For native app architecture** → [Chapter 4 — Native App Implementation](native-apps.md)
+- **For Telegram Mini Apps** → [Chapter 6 — Telegram Mini App](telegram-mini-app.md)
+- **For deep linking** → [Chapter 8 — Deep Linking](deep-linking.md)
 
-> ← [Previous: Native App Implementation](payway-sdk docs native-apps) | [Next: Telegram Mini App →](payway-sdk docs telegram-mini-app)
+> ← [Previous: Native App Implementation](native-apps.md) | [Next: Telegram Mini App →](telegram-mini-app.md)

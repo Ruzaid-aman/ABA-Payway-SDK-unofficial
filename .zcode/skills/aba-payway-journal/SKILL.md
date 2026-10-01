@@ -7,7 +7,7 @@ metadata:
 
 # Transaction Journal
 
-Opt-in, append-only JSONL record of every PayWay API exchange, command, poll,
+CLI default-on / SDK opt-in, append-only JSONL record of every PayWay API exchange, command, poll,
 observed status, artifact, and webhook capture. This is the AI/agent query
 layer over that record — read-only, never a source of payment truth.
 
@@ -23,8 +23,8 @@ Run the installed CLI as `npm exec -- payway-sdk`.
 
 
 ```sh
-# Record one invocation (command lifecycle + every API exchange)
-payway-sdk --journal generate-qr -a 5.00 -c USD --no-polling -y
+# API commands record by default (command lifecycle + every API exchange)
+payway-sdk generate-qr -a 5.00 -c USD --no-polling -y
 
 # Reconstruct what happened to one transaction
 payway-sdk journal timeline -t qrmt8onznj46fdc1 --json
@@ -63,17 +63,25 @@ pruneJournal(new Date(Date.now() - 30 * 86_400_000)); // drop events older than 
 payway-sdk journal prune --before 30    # same, via CLI
 ```
 
-## Enabling Recording
+## Recording defaults and location
 
-- Single invocation: global `--journal` flag (arms the whole command).
+- CLI API commands record by default. Use `--no-journal` or falsy
+  `PAYWAY_JOURNAL=0|false|no|off` to disable. Pure-local docs/journal/doctor
+  commands are exempt; `--journal` explicitly enables an invocation.
 - Persistent: `PAYWAY_JOURNAL=1` (+ optional `PAYWAY_JOURNAL_DIR`,
   `PAYWAY_JOURNAL_MODE=digest|full`, `PAYWAY_JOURNAL_MAX_AGE_DAYS` retention), or SDK
   config `journal: true | {dir, mode, maxAgeDays}`.
 - `--json` success envelopes carry `correlationId`/`traceId` — grep them in the
   journal to reconstruct the exact exchange. Create commands warn when the
   journal already holds the same tran_id (`--allow-duplicate-id` to suppress).
-- Default OFF — the library never writes files silently. File:
-  `<cwd>/payway-data/journal.jsonl`, one JSON event per line.
+- SDK library default OFF: enable with the configuration above.
+- File: `<data root>/journal.jsonl`. `PAYWAY_DATA_DIR` overrides the shared
+  root; otherwise it is `<APPDATA|~/.config>/aba-payway-sdk/data`.
+  An explicit journal directory or `PAYWAY_JOURNAL_DIR` overrides that root
+  for the journal. Run `payway-sdk doctor --json` to find `.dataRoot`.
+- JSON files are the default backend. Optional `better-sqlite3` selects a
+  shared `<data root>/payway.db` through the storage facade;
+  `PAYWAY_FORCE_JSON_STORAGE=1` forces JSON. See `payway-sdk docs storage-service`.
 - `digest` mode (default) stores allow-listed non-secret fields only — no
   hash, no merchant_auth, no pwt, no QR base64, no PII. `full` mode adds
   sanitizeForLog-redacted bodies, size-capped.

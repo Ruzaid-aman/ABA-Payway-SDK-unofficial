@@ -17,7 +17,7 @@ Package metadata remains at the unpublished 1.5.0 baseline. The raised runtime r
 | Offline KHQR | Requires ABA-issued merchant fields. Generic API credentials cannot substitute. Callbacks use a separate trust model. |
 | COF and subscriptions | Typed endpoints and CLI implemented. Subscription completion needs an enabled merchant profile; current evidence does not prove end-to-end registration. |
 | Payout and beneficiaries | Require RSA configuration, enablement, and whitelisted accounts. Current sandbox profile limits prevent complete payout validation. |
-| Transaction journal | Optional local recording; digest mode is default. Cannot reconstruct unrecorded events or prove non-payment from a missing callback. |
+| Transaction journal | CLI API commands record by default; the SDK library is opt-in. Digest mode is default. Cannot reconstruct unrecorded events or prove non-payment from a missing callback. |
 | Agent CLI | Optional provider integration with typed tools and approval gates. Review provider privacy settings; deployed applications should use explicit SDK configuration. |
 
 Creation success is not fulfillment authorization. Verify transaction, amount, and currency and fulfill idempotently. `PENDING` does not prove QR validity; closure may not prevent payment through an existing hosted-card session.

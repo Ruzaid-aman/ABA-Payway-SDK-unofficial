@@ -8,7 +8,7 @@ Requires Node.js 22.12 or later. The SDK runs on your server, where PayWay crede
 
 ## Getting started
 
-Use [QUICKSTART.md](payway-sdk docs quickstart) for installation, route selection, and the server-side first-payment flow. This page is the detailed reference.
+Use [QUICKSTART.md](quickstart.md) for installation, route selection, and the server-side first-payment flow. This page is the detailed reference.
 
 ## Secure architecture
 
@@ -38,7 +38,7 @@ Supported agents are `claude`, `codex`, `opencode`, `cursor`, and `copilot`. Use
 
 ### Agentic PayWay CLI
 
-The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk onboard`, `payway-sdk agent setup|doctor|sessions`). See the [1-pager agentic guide](payway-sdk docs quickstart-1-page) and the skill guides:
+The SDK ships an agentic CLI that lets a supported provider propose and run PayWay actions through a risk-gated pipeline (`payway-sdk ask`, `payway-sdk onboard`, `payway-sdk agent setup|doctor|sessions`). See the [1-pager agentic guide](quickstart-1-page.md#agentic-payway-cli) and the skill guides:
 
 - [aba-payway-agent skill](../skills/aba-payway-agent/SKILL.md) — provider modes, the 14 tools, risk gates, execution ledger, sessions, redaction, and read-only journal queries.
 - [aba-payway-first-payment skill](../skills/aba-payway-first-payment/SKILL.md) — choosing QR / checkout / payment-link for a first payment.
@@ -56,7 +56,7 @@ payway-sdk agent setup --provider opencode --model x-preview-f-free \
 payway-sdk ask "Generate an online QR for 3 USD" --yolo
 ```
 
-> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. The strict-JSON planning prompt embeds a full tool catalog, off-schema plans get one automatic repair round, and transient provider errors (429/5xx) are retried with backoff. Model-supplied callback URLs are overridden by your merchant profile's configured callback. Every agent action has a fully-supported manual equivalent. Setup requires a saved credential profile and a public HTTPS callback — see the [Agent Setup Playbook](payway-sdk docs agent-setup-playbook) for the field-tested path.
+> The provider API key is supplied **only** via `PAYWAY_AGENT_API_KEY` (never stored); secrets are redacted before reaching the provider. The strict-JSON planning prompt embeds a full tool catalog, off-schema plans get one automatic repair round, and transient provider errors (429/5xx) are retried with backoff. Model-supplied callback URLs are overridden by your merchant profile's configured callback. Every agent action has a fully-supported manual equivalent. Setup requires a saved credential profile and a public HTTPS callback — see the [Agent Setup Playbook](agent-setup-playbook.md) for the field-tested path.
 
 ### CLI commands
 
@@ -69,7 +69,7 @@ payway-sdk ask "Generate an online QR for 3 USD" --yolo
 | `payway-sdk poll-transaction -t <id>` | Watch a transaction until terminal status (`--json` events for agents) |
 | `payway-sdk status` | Display payment status codes and refund error codes reference |
 | `payway-sdk explain [code]` | Decode a PayWay error code (e.g. `explain PTL36`, `explain 49`) with a fix hint — no credentials needed |
-| `payway-sdk docs list` | List the built-in knowledge base (31 topics: guides, sandbox learnings, error registry) |
+| `payway-sdk docs list` | List the built-in knowledge base (curated integration and support topics) |
 | `payway-sdk docs <topic>` | Print one knowledge topic offline (e.g. `docs quickstart`, `docs errors-and-debugging`, `docs payment-link`; `--json` adds metadata + envelope errors) |
 | `payway-sdk docs search <terms>` | AND-search the whole corpus (`--json` for structured hits); also available to the agent as the `query_knowledge` tool |
 | `payway-sdk validate` | Validate a refund amount or transaction ID locally |
@@ -194,7 +194,7 @@ Profiles are stored as plaintext in `%APPDATA%\aba-payway-sdk\profiles.json` (or
 
 ## Client Configuration
 
-For verification and recovery, use the [documentation index](payway-sdk docs docs-index). Advanced options below are optional for first payment.
+For verification and recovery, use the [documentation index](docs-index.md). Advanced options below are optional for first payment.
 
 ### 1. Initialize the Client
 
@@ -347,7 +347,7 @@ app.post('/api/payway-webhook', (req, res) => {
   // The callback signature is sourced from the X-PAYWAY-HMAC-SHA512 header,
   // not from the request body, per PayWay webhook schema.
   const isValid = payway.verifyCallback(bodyWithoutHash, receivedSig);
-  
+
   if (!isValid) {
     return res.status(400).send('Invalid signature');
   }
@@ -601,7 +601,7 @@ const linkWithPayout = await payway.paymentLink.create({
 //   --payout '[{"acc":"500000001","amt":100.00},{"acc":"500000002","amt":50.00}]'
 ```
 
-Full lifecycle guide — parameter tables, datatype reality notes, pushback receiver, permutations & recipes, troubleshooting: **[docs/17-payment-link.md](payway-sdk docs payment-link)**.
+Full lifecycle guide — parameter tables, datatype reality notes, pushback receiver, permutations & recipes, troubleshooting: **[docs/17-payment-link.md](payment-link.md)**.
 
 ```sh
 # Inspecting a link from the CLI — the opaque Link ID from create's data.id:
@@ -874,9 +874,14 @@ as tools. stdout belongs to the protocol; diagnostics go to stderr.
   (`readOnlyHint`).
 - **Preview without serving:** `payway-sdk mcp --list-tools [--json]` prints
   the effective catalog (12 read-only / 17 with mutations).
-- **Client config (Claude Code style):**
-  `{"command":"npx","args":["tsx","src/cli.ts","mcp"]}` (or
-  `{"command":"payway-sdk","args":["mcp"]}` when installed globally).
+- **Installed-package client config (Claude Code style):** use the absolute
+  path to your application's installed CLI, so the host need not start in
+  the application directory:
+  `{"command":"node","args":["/absolute/path/to/your-app/node_modules/aba-payway-ts/dist/cli.js","mcp"]}`.
+  Replace the path with the real local path (escape Windows backslashes in JSON).
+  A global installation can use `{"command":"payway-sdk","args":["mcp"]}`.
+  For a source checkout only, with the host working directory set to its root,
+  use `{"command":"npx","args":["tsx","src/cli.ts","mcp"]}`.
   Credentials resolve per call via profiles/env exactly like other commands;
   journal/knowledge tools work offline without credentials.
 - Errors map to `isError:true` tool results with sanitized detail

@@ -2,7 +2,7 @@
 
 # Chapter 12 — Error Handling & Debugging
 
-> **Estimated reading time:** 15 minutes  
+> **Estimated reading time:** 15 minutes
 > **Goal:** Understand all the errors you might encounter and how to debug them effectively.
 
 ---
@@ -400,11 +400,11 @@ The payment-link endpoints (`create`, `detail`, `void`) use the `PTL*` family in
 > (gated) and `scripts/e2e-payment-link-void.ts` (evidence:
 > `test-output/payment-link-void-e2e/`, gitignored).
 
-Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](payway-sdk docs payment-link)**.
+Full lifecycle, pushback handling, and recipes: **[docs/17-payment-link.md](payment-link.md)**.
 
 ### ABA production telemetry — codes by API *(added 2026-09-15)*
 
-The ABA dev team shared a telemetry export grouping every gateway response by **API path + business code + message**. It is now folded into the registry: each code in [`error-codes.json`](payway-sdk docs error-codes) can carry `observedOn` (the APIs below, as short labels) and `observedMessage` (the exact gateway string). Provenance rules: `sandboxVerified` still means reproduced in the live sandbox; `observedOn` means seen in ABA production. Where telemetry and old spec-page glosses disagreed, telemetry won (`4`, `16`, `17`, `19`, `21`, `44`) — see the gateway/QR tables above.
+The ABA dev team shared a telemetry export grouping every gateway response by **API path + business code + message**. It is now folded into the registry: each code in [`error-codes.json`](error-codes.json) can carry `observedOn` (the APIs below, as short labels) and `observedMessage` (the exact gateway string). Provenance rules: `sandboxVerified` still means reproduced in the live sandbox; `observedOn` means seen in ABA production. Where telemetry and old spec-page glosses disagreed, telemetry won (`4`, `16`, `17`, `19`, `21`, `44`) — see the gateway/QR tables above.
 
 | API label | Gateway path | Codes observed (beyond `00`/`0` success) |
 |---|---|---|
@@ -504,7 +504,7 @@ The same lookup is available programmatically via `explainPayWayCode()` in `aba-
 
 ### Machine-readable registry
 
-Every code the CLI knows is also published as a versioned JSON artifact: [`error-codes.json`](payway-sdk docs error-codes). It is **generated**, not hand-maintained — the source of truth is the typed data behind `explain` (`src/cli/explain-code.ts` + `src/constants.ts`), and a drift test (`src/__tests__/error-registry.test.ts`) fails if the committed JSON ever diverges from it. Regenerate after changing any explain data:
+Every code the CLI knows is also published as a versioned JSON artifact: [`error-codes.json`](error-codes.json). It is **generated**, not hand-maintained — the source of truth is the typed data behind `explain` (`src/cli/explain-code.ts` + `src/constants.ts`), and a drift test (`src/__tests__/error-registry.test.ts`) fails if the committed JSON ever diverges from it. Regenerate after changing any explain data:
 
 ```bash
 npm run gen:error-registry
@@ -830,7 +830,7 @@ echo $PAYWAY_API_KEY
 ### 2. Run the Verification Script
 
 ```bash
-npx payway-sdk doctor --live
+npm exec -- payway-sdk doctor --live
 ```
 
 If this fails, your credentials or network are the issue. (See Chapter 2 for the script.)
@@ -988,8 +988,8 @@ curl -I https://your-domain.com/api/payway-webhook
 
 ## Next Steps
 
-- **For deployment** → [Chapter 13 — Deployment Checklist](payway-sdk docs deployment-checklist)
-- **For the webhook handler** → [Chapter 11 — Callbacks & Webhooks](payway-sdk docs callbacks-webhooks)
-- **For reference** → [Chapter 14 — Appendix: Code Snippets](payway-sdk docs code-snippets)
+- **For deployment** → [Chapter 13 — Deployment Checklist](deployment-checklist.md)
+- **For the webhook handler** → [Chapter 11 — Callbacks & Webhooks](callbacks-webhooks.md)
+- **For reference** → [Chapter 14 — Appendix: Code Snippets](code-snippets.md)
 
-> ← [Previous: Callbacks & Webhooks](payway-sdk docs callbacks-webhooks) | [Next: Deployment Checklist →](payway-sdk docs deployment-checklist)
+> ← [Previous: Callbacks & Webhooks](callbacks-webhooks.md) | [Next: Deployment Checklist →](deployment-checklist.md)

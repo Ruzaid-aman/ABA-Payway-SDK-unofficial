@@ -2,7 +2,7 @@
 
 # Chapter 9 — Link / Unlink / Renew Lifecycle
 
-> **Estimated reading time:** 15 minutes  
+> **Estimated reading time:** 15 minutes
 > **Goal:** Understand how to save, manage, and charge customer payment methods using Credentials-on-File (CoF).
 
 Token state machine at a glance: Link / Unlink State Machine — every transition keyed to the SDK method that performs it.
@@ -642,8 +642,8 @@ Related: `beneficiary add <payee>` / `beneficiary update-status <payee> --status
 
 ## Next Steps
 
-- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](payway-sdk docs callbacks-webhooks)
+- **For webhook handling** → [Chapter 11 — Callbacks & Webhooks](callbacks-webhooks.md)
 - **For pre-authorization flow** → The Pre-Auth domain in the SDK README
-- **For testing CoF with sandbox** → [Chapter 2 — Prerequisites & Setup](payway-sdk docs setup)
+- **For testing CoF with sandbox** → [Chapter 2 — Prerequisites & Setup](setup.md)
 
-> ← [Previous: QR Code Handling](payway-sdk docs qr-handling) | [Next: Callbacks & Webhooks →](payway-sdk docs callbacks-webhooks)
+> ← [Previous: QR Code Handling](qr-handling.md) | [Next: Callbacks & Webhooks →](callbacks-webhooks.md)
