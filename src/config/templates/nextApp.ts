@@ -81,6 +81,15 @@ export async function POST(req: Request): Promise<Response> {
   const orderId = \`o\${Date.now().toString(36)}\${Math.random().toString(36).slice(2, 6)}\`;
   const transactionId = \`pay\${orderId}\`;
 
+  // Persist expected state BEFORE submission; retain it after an unknown outcome.
+  orders.set(transactionId, {
+    orderId,
+    transactionId,
+    amount: product.amount,
+    currency: product.currency,
+    status: 'created',
+  });
+
   try {
     const session = await sdk.initiate(
       {
@@ -95,15 +104,6 @@ export async function POST(req: Request): Promise<Response> {
         environment: process.env.PAYWAY_ENV === 'production' ? 'production' : 'sandbox',
       },
     );
-
-    // Record what we EXPECT before showing anything to the customer.
-    orders.set(transactionId, {
-      orderId,
-      transactionId,
-      amount: product.amount,
-      currency: product.currency,
-      status: 'created',
-    });
 
     // Artifact projection only — the session (and its raw response) stays
     // on the server. Creation is NOT payment.

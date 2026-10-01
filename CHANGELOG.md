@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Merchant integration skill candidate (2026-10-01)
+
+- Added `aba-payway-integration`: project inspection, selective workflow routing,
+  self-contained generated public references, and Express/Next.js recipe assets.
+  The catalog now contains 35 skills; existing skill names remain available.
+- Recipes authorize server-owned orders, save attempts before submission,
+  queue callback hints durably, verify inquiry identity/amount/currency, and
+  atomically enqueue one fulfillment job. The SQLite example is a single-host
+  teaching adapter; production deployments must adapt the merchant database.
+- Existing Express/Next.js scaffolds now record orders before SDK submission.
+- Candidate preparation does not imply publication readiness: agent trials and
+  the existing publishing audit gates still require their recorded evidence.
+
 ### Purchase payment-credential endpoint error table folded into the registry (2026-10-01)
 
 - **Registry 83 → 95 codes.** The ABA dev team's authoritative error table for

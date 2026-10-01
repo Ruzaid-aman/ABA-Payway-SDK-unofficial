@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SOURCES } from './knowledge-sources.mjs';
 import ts from 'typescript';
+import { generateIntegrationSkill } from './lib/integration-skill.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hash = (buf) => createHash('sha256').update(buf).digest('hex').slice(0, 16);
@@ -219,6 +220,18 @@ function main() {
     } else copyFileSync(path.join(repoRoot, source), destination);
     generated.push({ file: path.relative(repoRoot, destination).replaceAll('\\', '/'), source,
       sourceSha256: hash(readFileSync(path.join(repoRoot, source))), sha256: hash(readFileSync(destination)) });
+  }
+  generated.push(...generateIntegrationSkill(repoRoot, topics));
+  // Canonical skill resources and their tracked installed mirror move together.
+  const canonicalSkill = path.join(repoRoot, 'skills/aba-payway-integration');
+  const mirrorSkill = path.join(repoRoot, '.zcode/skills/aba-payway-integration');
+  if (path.dirname(mirrorSkill) !== path.join(repoRoot, '.zcode/skills')) throw new Error('Unsafe skill mirror root');
+  rmSync(mirrorSkill, { recursive: true, force: true });
+  mkdirSync(mirrorSkill, { recursive: true });
+  for (const relative of ['SKILL.md', ...generated.filter(entry => entry.file.startsWith('skills/aba-payway-integration/'))
+    .map(entry => entry.file.replace('skills/aba-payway-integration/', ''))]) {
+    mkdirSync(path.dirname(path.join(mirrorSkill, relative)), { recursive: true });
+    copyFileSync(path.join(canonicalSkill, relative), path.join(mirrorSkill, relative));
   }
   manifest.generated = generated;
   writeFileSync(path.join(knowledgeDir, 'MANIFEST.json'), `${JSON.stringify(manifest, null, 2)}\n`);

@@ -180,7 +180,7 @@ scoped to the command only (same workaround as official boilerplate). Never set 
 
 ## Skills
 
-34 packaged guides install via `npx tsx src/cli.ts skills add <agent>` (claude | codex | opencode | cursor | copilot).
+35 packaged guides install via `npx tsx src/cli.ts skills add <agent>` (claude | codex | opencode | cursor | copilot).
 The installer is target-aware (2026-09-07, audit F09): opencode installs to `~/.config/opencode/skills`
 (the documented loader path), keeps a hash manifest, preserves user-modified files on upgrade
 (`--force-skills` to overwrite), removes only manifest-owned dirs, and supports

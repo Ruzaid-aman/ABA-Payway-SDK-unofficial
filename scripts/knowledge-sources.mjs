@@ -9,6 +9,8 @@
  * package; their distilled facts reach agents via explain/the knowledge digest.
  */
 export const SOURCES = [
+  { topic: 'agent-integration', source: 'docs/guides/24-agent-integration.md', title: 'Merchant agent integration', description: 'Project inspection, workflow capability/verification matrix, portable skill installation, recovery and production boundaries.' },
+  { topic: 'integration-recipes', source: 'docs/guides/integration-recipes.md', title: 'Express and Next.js integration recipes', description: 'Authenticated QR, hosted checkout and payment links; saved attempts, durable inbox, inquiry and fulfillment outbox.' },
   { topic: 'support', source: 'SUPPORT.md', title: 'Support and compatibility', description: 'Runtime, verification limits, support scope, and sanitized bug reports.' },
   { topic: 'contributing', source: 'CONTRIBUTING.md', title: 'Contributing', description: 'Contributor setup, offline checks, gateway verification, and release review.' },
   { topic: 'security', source: 'SECURITY.md', title: 'Security policy', description: 'Private vulnerability reporting and disclosure policy; mailbox launch check remains required.' },

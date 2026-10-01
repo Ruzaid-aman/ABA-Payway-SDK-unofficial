@@ -506,8 +506,10 @@ omission).
   `verifyCallback(body, signature, { stripHash: true })`), but the exact
   field set has never been captured: the sandbox merchant profile is not
   enabled for token flags, so no link completes and no callback fires
-  (SANDBOX-FINDINGS §24 LC-1). Validate heuristically and log the raw body on
-  first receipt.
+  (SANDBOX-FINDINGS §24 LC-1). Confirm the exact signature and customer/request
+  association schema with ABA before accepting a delivered token. Capture only
+  masked, allowlisted diagnostics in protected merchant storage; do not log raw
+  token-bearing callback bodies. A heuristic schema check does not establish trust.
 - **No callback fires for a FAILED link attempt** (live 2026-09-12, §24 LC-4):
   two 104 error-page attempts with a live tunneled `callback_url` produced
   zero deliveries. Silence after a hosted error page is expected — do not

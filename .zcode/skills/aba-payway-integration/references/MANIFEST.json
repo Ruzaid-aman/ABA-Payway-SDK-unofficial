@@ -1,0 +1,258 @@
+{
+  "schema": "payway-integration-resources/v1",
+  "generator": "scripts/sync-knowledge.mjs",
+  "resources": [
+    {
+      "file": "references/agent-integration.md",
+      "source": "docs/guides/24-agent-integration.md",
+      "sourceSha256": "1eea3e43d319bb2d",
+      "sha256": "999a46669755d54b"
+    },
+    {
+      "file": "references/integration-recipes.md",
+      "source": "docs/guides/integration-recipes.md",
+      "sourceSha256": "18d8f4f37c88e6fb",
+      "sha256": "18d8f4f37c88e6fb"
+    },
+    {
+      "file": "references/support.md",
+      "source": "SUPPORT.md",
+      "sourceSha256": "0cc568c91c87426b",
+      "sha256": "98f3ebdbc1e712d3"
+    },
+    {
+      "file": "references/contributing.md",
+      "source": "CONTRIBUTING.md",
+      "sourceSha256": "41f218094d6e015f",
+      "sha256": "ccb593341fe04eb5"
+    },
+    {
+      "file": "references/security.md",
+      "source": "SECURITY.md",
+      "sourceSha256": "62d6b1bf04cd699d",
+      "sha256": "06d39ad11c809ec0"
+    },
+    {
+      "file": "references/storage-service.md",
+      "source": "docs/guides/21-storage-service.md",
+      "sourceSha256": "a4dd3ee3599a64e1",
+      "sha256": "a4dd3ee3599a64e1"
+    },
+    {
+      "file": "references/quickstart.md",
+      "source": "QUICKSTART.md",
+      "sourceSha256": "e5212adadea1986c",
+      "sha256": "c4b90506c52d2852"
+    },
+    {
+      "file": "references/quickstart-1-page.md",
+      "source": "docs/guides/QUICK-START-1-PAGER.md",
+      "sourceSha256": "e69127c8176b0be9",
+      "sha256": "93e4cbb8fd0ac586"
+    },
+    {
+      "file": "references/docs-index.md",
+      "source": "docs/README.md",
+      "sourceSha256": "38f7c0ca1cc6951d",
+      "sha256": "8260cb30afc4602d"
+    },
+    {
+      "file": "references/overview.md",
+      "source": "docs/guides/01-overview-and-concepts.md",
+      "sourceSha256": "a6ee224008df187e",
+      "sha256": "bab416d4bf700ff5"
+    },
+    {
+      "file": "references/setup.md",
+      "source": "docs/guides/02-prerequisites-and-setup.md",
+      "sourceSha256": "ece96e50f2a65cca",
+      "sha256": "19cd1be60a9b509c"
+    },
+    {
+      "file": "references/web-implementation.md",
+      "source": "docs/guides/03-web-implementation.md",
+      "sourceSha256": "91c0999ae61130e4",
+      "sha256": "0fcaf6614553d62d"
+    },
+    {
+      "file": "references/native-apps.md",
+      "source": "docs/guides/04-native-app-implementation.md",
+      "sourceSha256": "0f0b39d40a74dfb6",
+      "sha256": "2ddb4da60f7de1ac"
+    },
+    {
+      "file": "references/webviews.md",
+      "source": "docs/guides/05-webview-implementation.md",
+      "sourceSha256": "f7b61fb76f2c9266",
+      "sha256": "2ee737d6e851649b"
+    },
+    {
+      "file": "references/telegram-mini-app.md",
+      "source": "docs/guides/06-telegram-mini-app.md",
+      "sourceSha256": "83eaf8a2f2c7e5a6",
+      "sha256": "bda972a1aceca2ee"
+    },
+    {
+      "file": "references/qr-handling.md",
+      "source": "docs/guides/07-qr-code-handling.md",
+      "sourceSha256": "9e26d17e5fa4ebcc",
+      "sha256": "61f84701fd3368ab"
+    },
+    {
+      "file": "references/deep-linking.md",
+      "source": "docs/guides/08-deep-linking.md",
+      "sourceSha256": "5b4f85e2ef2d0743",
+      "sha256": "9786c0bd2f941acc"
+    },
+    {
+      "file": "references/link-lifecycle.md",
+      "source": "docs/guides/09-link-unlink-renew-lifecycle.md",
+      "sourceSha256": "cd8a0fe52805973a",
+      "sha256": "43931f85274e7e1c"
+    },
+    {
+      "file": "references/ui-customization.md",
+      "source": "docs/guides/10-ui-customization.md",
+      "sourceSha256": "fe317726abd52460",
+      "sha256": "bc399eb4735ed742"
+    },
+    {
+      "file": "references/callbacks-webhooks.md",
+      "source": "docs/guides/11-callbacks-and-webhooks.md",
+      "sourceSha256": "b17dd3af7ca23e94",
+      "sha256": "8c87e5f137019830"
+    },
+    {
+      "file": "references/errors-and-debugging.md",
+      "source": "docs/guides/12-error-handling-and-debugging.md",
+      "sourceSha256": "f66ede921dceabde",
+      "sha256": "fd61b436691abe7e"
+    },
+    {
+      "file": "references/deployment-checklist.md",
+      "source": "docs/guides/13-deployment-checklist.md",
+      "sourceSha256": "5d9405930af7d3e7",
+      "sha256": "253d8ec596a7d7dc"
+    },
+    {
+      "file": "references/code-snippets.md",
+      "source": "docs/guides/14-appendix-code-snippets.md",
+      "sourceSha256": "b908d9dd11dcfae2",
+      "sha256": "d5eb5421aebfab48"
+    },
+    {
+      "file": "references/merchant-scenarios.md",
+      "source": "docs/guides/15-merchant-scenario-requirements.md",
+      "sourceSha256": "7617659e836622d2",
+      "sha256": "78bd854b3202bc02"
+    },
+    {
+      "file": "references/webhook-setup.md",
+      "source": "docs/guides/16-webhook-setup-guide.md",
+      "sourceSha256": "260ebb761a93fd2a",
+      "sha256": "ff29baee32e66ae1"
+    },
+    {
+      "file": "references/payment-link.md",
+      "source": "docs/guides/17-payment-link.md",
+      "sourceSha256": "5d168d17a35c80d9",
+      "sha256": "b4f9bd75aff11da7"
+    },
+    {
+      "file": "references/transaction-journal.md",
+      "source": "docs/guides/18-transaction-journal.md",
+      "sourceSha256": "a5b70b2982ec9261",
+      "sha256": "a5b70b2982ec9261"
+    },
+    {
+      "file": "references/customer-module-qr.md",
+      "source": "docs/guides/19-customer-module-qr.md",
+      "sourceSha256": "5be7d9010ce37297",
+      "sha256": "398ac850ba8086cc"
+    },
+    {
+      "file": "references/settlement-disputes.md",
+      "source": "docs/guides/20-settlement-and-disputes.md",
+      "sourceSha256": "a48bb5b9c551178c",
+      "sha256": "ebb4b9bf2307b3c4"
+    },
+    {
+      "file": "references/api-datetime-timezones.md",
+      "source": "docs/guides/22-api-datetime-and-timezones.md",
+      "sourceSha256": "cbd2ed3a8eaf4404",
+      "sha256": "cbd2ed3a8eaf4404"
+    },
+    {
+      "file": "references/cloudflare-webhook.md",
+      "source": "docs/recipes/cloudflare-free-webhook.md",
+      "sourceSha256": "dfdcc6d3a9134752",
+      "sha256": "dfdcc6d3a9134752"
+    },
+    {
+      "file": "references/agent-setup-playbook.md",
+      "source": "docs/guides/AGENT-SETUP-PLAYBOOK.md",
+      "sourceSha256": "01468d7a01fc8ba1",
+      "sha256": "01468d7a01fc8ba1"
+    },
+    {
+      "file": "references/agentic-cli-guide.md",
+      "source": "docs/guides/AGENTIC-PAYWAY-CLI-USER-GUIDE.md",
+      "sourceSha256": "2cdb235795a0b8b0",
+      "sha256": "c33fcebb710ea153"
+    },
+    {
+      "file": "references/first-payment-walkthrough.md",
+      "source": "docs/guides/FIRST-PAYMENT-WALKTHROUGH.md",
+      "sourceSha256": "97ddc9dade96ceb3",
+      "sha256": "eb5860a1b9548b3c"
+    },
+    {
+      "file": "references/close-transaction.md",
+      "source": "docs/guides/23-close-transaction.md",
+      "sourceSha256": "4223b3e56745c312",
+      "sha256": "35e7a4b32d272c43"
+    },
+    {
+      "file": "references/sdk-cli-reference.md",
+      "source": "docs/reference/SDK-AND-CLI-REFERENCE.md",
+      "sourceSha256": "f0d42ac9a8b4066f",
+      "sha256": "dfffbf9fc35219a2"
+    },
+    {
+      "file": "references/error-codes.json",
+      "source": "docs/error-codes.json",
+      "sourceSha256": "a84e49e61964fa1b",
+      "sha256": "ad6429e1c58dbc0a"
+    },
+    {
+      "file": "assets/service.ts",
+      "source": "examples/integration-recipes/service.ts",
+      "sourceSha256": "3daa3799e102d22d",
+      "sha256": "3daa3799e102d22d"
+    },
+    {
+      "file": "assets/sqlite-store.ts",
+      "source": "examples/integration-recipes/sqlite-store.ts",
+      "sourceSha256": "7dc208b247f2c4d9",
+      "sha256": "7dc208b247f2c4d9"
+    },
+    {
+      "file": "assets/payway-gateway.ts",
+      "source": "examples/integration-recipes/payway-gateway.ts",
+      "sourceSha256": "1b5517c4954b6ac2",
+      "sha256": "1b5517c4954b6ac2"
+    },
+    {
+      "file": "assets/express.ts",
+      "source": "examples/integration-recipes/express.ts",
+      "sourceSha256": "43a0171a556c76ea",
+      "sha256": "43a0171a556c76ea"
+    },
+    {
+      "file": "assets/next.ts",
+      "source": "examples/integration-recipes/next.ts",
+      "sourceSha256": "5b667294e9597e82",
+      "sha256": "5b667294e9597e82"
+    }
+  ]
+}

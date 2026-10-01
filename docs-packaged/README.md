@@ -70,6 +70,11 @@ Each flow chapter also opens with an inline "Flow at a glance" sequence diagram 
 
 ## Coding Agents
 
+For integration into an existing merchant project, start with the
+[integration journey and capability matrix](../knowledge/agent-integration.md)
+and [Express/Next.js recipes](../knowledge/integration-recipes.md), supported by the
+self-contained [integration skill](../skills/aba-payway-integration/SKILL.md).
+
 For a runnable local exercise covering artifacts, verification and recovery, use
 the [first-payment walkthrough](../knowledge/first-payment-walkthrough.md).
 

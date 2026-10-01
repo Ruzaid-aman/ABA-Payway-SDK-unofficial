@@ -1,0 +1,6 @@
+api/
+candidate/
+*.json
+*.jsonl
+*.log
+tools/

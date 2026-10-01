@@ -1,7 +1,7 @@
 # aba-payway-ts
 
 > ABA PayWay payment-gateway toolkit: a typed TypeScript SDK, an agent-first CLI
-> (`payway-sdk`), and 34 installable agent skills — carrying sandbox-verified
+> (`payway-sdk`), and 35 installable agent skills — carrying sandbox-verified
 > integration knowledge for ABA Bank PayWay (KHQR, hosted checkout, COF, payment
 > links, payouts, pre-auth, webhooks).
 
@@ -28,6 +28,8 @@ generate-checkout/cof charge/payment-link.
 Every doc below is also served by the CLI itself, offline:
 `payway-sdk docs list` · `payway-sdk docs <topic>` · `payway-sdk docs search <query>`
 
+- [Merchant agent integration](knowledge/agent-integration.md): Project inspection, workflow capability/verification matrix, portable skill installation, recovery and production boundaries.
+- [Express and Next.js integration recipes](knowledge/integration-recipes.md): Authenticated QR, hosted checkout and payment links; saved attempts, durable inbox, inquiry and fulfillment outbox.
 - [Support and compatibility](knowledge/support.md): Runtime, verification limits, support scope, and sanitized bug reports.
 - [Contributing](knowledge/contributing.md): Contributor setup, offline checks, gateway verification, and release review.
 - [Security policy](knowledge/security.md): Private vulnerability reporting and disclosure policy; mailbox launch check remains required.
@@ -66,7 +68,7 @@ Every doc below is also served by the CLI itself, offline:
 
 ## Agent integration
 
-- `payway-sdk skills add <agent>` — install the 34 packaged skill guides for claude/codex/opencode/cursor/copilot.
+- `payway-sdk skills add <agent>` — install the 35 packaged skill guides for claude/codex/opencode/cursor/copilot.
 - `payway-sdk ask "<request>"` — single-shot LLM plan with 14 PayWay tools (incl. `query_knowledge`).
 - `payway-sdk agent` — interactive REPL; `agent doctor` shows the readiness matrix.
 

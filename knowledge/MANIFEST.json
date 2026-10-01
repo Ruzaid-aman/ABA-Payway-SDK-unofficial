@@ -3,14 +3,34 @@
   "generator": "scripts/sync-knowledge.mjs",
   "topics": [
     {
+      "topic": "agent-integration",
+      "title": "Merchant agent integration",
+      "description": "Project inspection, workflow capability/verification matrix, portable skill installation, recovery and production boundaries.",
+      "source": "docs/guides/24-agent-integration.md",
+      "file": "agent-integration.md",
+      "bytes": 9880,
+      "sha256": "999a46669755d54b",
+      "sourceSha256": "1eea3e43d319bb2d"
+    },
+    {
+      "topic": "integration-recipes",
+      "title": "Express and Next.js integration recipes",
+      "description": "Authenticated QR, hosted checkout and payment links; saved attempts, durable inbox, inquiry and fulfillment outbox.",
+      "source": "docs/guides/integration-recipes.md",
+      "file": "integration-recipes.md",
+      "bytes": 7455,
+      "sha256": "18d8f4f37c88e6fb",
+      "sourceSha256": "18d8f4f37c88e6fb"
+    },
+    {
       "topic": "support",
       "title": "Support and compatibility",
       "description": "Runtime, verification limits, support scope, and sanitized bug reports.",
       "source": "SUPPORT.md",
       "file": "support.md",
-      "bytes": 3011,
-      "sha256": "5345cd8c87aa3920",
-      "sourceSha256": "e7da48747fbcd244"
+      "bytes": 2980,
+      "sha256": "98f3ebdbc1e712d3",
+      "sourceSha256": "0cc568c91c87426b"
     },
     {
       "topic": "contributing",
@@ -48,9 +68,9 @@
       "description": "First sandbox payment end to end: credentials, .env, generate-qr, check-transaction, polling.",
       "source": "QUICKSTART.md",
       "file": "quickstart.md",
-      "bytes": 11957,
-      "sha256": "cdcb79c7e3f484c8",
-      "sourceSha256": "01cf4aca206916b6"
+      "bytes": 11756,
+      "sha256": "c4b90506c52d2852",
+      "sourceSha256": "e5212adadea1986c"
     },
     {
       "topic": "quickstart-1-page",
@@ -68,9 +88,9 @@
       "description": "The full documentation map: start-here routes, per-domain guides, troubleshooting.",
       "source": "docs/README.md",
       "file": "docs-index.md",
-      "bytes": 7828,
-      "sha256": "6fd6e56cd0b71798",
-      "sourceSha256": "9414d36ca4f1261c"
+      "bytes": 8113,
+      "sha256": "6f37a3694c572a5e",
+      "sourceSha256": "38f7c0ca1cc6951d"
     },
     {
       "topic": "overview",
@@ -88,9 +108,9 @@
       "description": "Merchant portal, sandbox credentials, ABA Mobile simulator, environment variables.",
       "source": "docs/guides/02-prerequisites-and-setup.md",
       "file": "setup.md",
-      "bytes": 23657,
-      "sha256": "910dcf95cba70932",
-      "sourceSha256": "c54043833e724e2c"
+      "bytes": 23172,
+      "sha256": "3a3caa6bab8d8f56",
+      "sourceSha256": "ece96e50f2a65cca"
     },
     {
       "topic": "web-implementation",
@@ -178,9 +198,9 @@
       "description": "Single best-effort callback delivery, HMAC verification, webhook workbench.",
       "source": "docs/guides/11-callbacks-and-webhooks.md",
       "file": "callbacks-webhooks.md",
-      "bytes": 25807,
-      "sha256": "279518a6ec5ec0b4",
-      "sourceSha256": "5f41c4418860a3df"
+      "bytes": 26035,
+      "sha256": "8c87e5f137019830",
+      "sourceSha256": "b17dd3af7ca23e94"
     },
     {
       "topic": "errors-and-debugging",
@@ -188,9 +208,9 @@
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
       "source": "docs/guides/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
-      "bytes": 62748,
-      "sha256": "d785472c7e9070d7",
-      "sourceSha256": "4ea52750b3b29448"
+      "bytes": 61753,
+      "sha256": "fd61b436691abe7e",
+      "sourceSha256": "f66ede921dceabde"
     },
     {
       "topic": "deployment-checklist",
@@ -198,9 +218,9 @@
       "description": "Production go-live gates: credentials, RSA, callback URLs, base URL.",
       "source": "docs/guides/13-deployment-checklist.md",
       "file": "deployment-checklist.md",
-      "bytes": 11598,
-      "sha256": "007348b007948774",
-      "sourceSha256": "0241aa96551e55c0"
+      "bytes": 11309,
+      "sha256": "1e641c2103a4bc43",
+      "sourceSha256": "5d9405930af7d3e7"
     },
     {
       "topic": "code-snippets",
@@ -248,9 +268,9 @@
       "description": "CLI default recording, SDK opt-in, unified data root, timeline/stats/reconcile/anomalies.",
       "source": "docs/guides/18-transaction-journal.md",
       "file": "transaction-journal.md",
-      "bytes": 13928,
-      "sha256": "03ce5289b28509e7",
-      "sourceSha256": "03ce5289b28509e7"
+      "bytes": 13681,
+      "sha256": "a5b70b2982ec9261",
+      "sourceSha256": "a5b70b2982ec9261"
     },
     {
       "topic": "customer-module-qr",
@@ -288,9 +308,9 @@
       "description": "Free-tier Cloudflare Worker webhook receiver setup.",
       "source": "docs/recipes/cloudflare-free-webhook.md",
       "file": "cloudflare-webhook.md",
-      "bytes": 24658,
-      "sha256": "37b595f949e51f75",
-      "sourceSha256": "37b595f949e51f75"
+      "bytes": 24786,
+      "sha256": "dfdcc6d3a9134752",
+      "sourceSha256": "dfdcc6d3a9134752"
     },
     {
       "topic": "agent-setup-playbook",
@@ -298,9 +318,9 @@
       "description": "Configuring the agentic CLI: providers, capability modes, privacy ack.",
       "source": "docs/guides/AGENT-SETUP-PLAYBOOK.md",
       "file": "agent-setup-playbook.md",
-      "bytes": 13495,
-      "sha256": "04dbad26842e6d75",
-      "sourceSha256": "04dbad26842e6d75"
+      "bytes": 13292,
+      "sha256": "01468d7a01fc8ba1",
+      "sourceSha256": "01468d7a01fc8ba1"
     },
     {
       "topic": "agentic-cli-guide",
@@ -318,9 +338,9 @@
       "description": "Guided first sandbox payment with verification at each step.",
       "source": "docs/guides/FIRST-PAYMENT-WALKTHROUGH.md",
       "file": "first-payment-walkthrough.md",
-      "bytes": 3927,
-      "sha256": "a702bc49dfe51ce4",
-      "sourceSha256": "dc5a19a7dee606f9"
+      "bytes": 3863,
+      "sha256": "eb5860a1b9548b3c",
+      "sourceSha256": "97ddc9dade96ceb3"
     },
     {
       "topic": "close-transaction",
@@ -338,9 +358,9 @@
       "description": "Every SDK domain method and CLI command with flags and contracts.",
       "source": "docs/reference/SDK-AND-CLI-REFERENCE.md",
       "file": "sdk-cli-reference.md",
-      "bytes": 48295,
-      "sha256": "fcad6ecda6d60685",
-      "sourceSha256": "22736903dfdb4871"
+      "bytes": 47369,
+      "sha256": "b4bb89301c47f0b5",
+      "sourceSha256": "f0d42ac9a8b4066f"
     },
     {
       "topic": "error-codes",
@@ -356,7 +376,15 @@
   "generated": [
     {
       "file": "llms.txt",
-      "sha256": "70eaba1193e8bb7e"
+      "sha256": "4bd20f2400e07626"
+    },
+    {
+      "file": "docs-packaged/guides/24-agent-integration.md",
+      "sha256": "27888ffbd656e862"
+    },
+    {
+      "file": "docs-packaged/guides/integration-recipes.md",
+      "sha256": "18d8f4f37c88e6fb"
     },
     {
       "file": "docs-packaged/guides/21-storage-service.md",
@@ -368,7 +396,7 @@
     },
     {
       "file": "docs-packaged/README.md",
-      "sha256": "9fbd23521b2e9c39"
+      "sha256": "675e5579fffcaeb2"
     },
     {
       "file": "docs-packaged/guides/01-overview-and-concepts.md",
@@ -376,7 +404,7 @@
     },
     {
       "file": "docs-packaged/guides/02-prerequisites-and-setup.md",
-      "sha256": "9e086eaa390c552b"
+      "sha256": "5fda3604e741397e"
     },
     {
       "file": "docs-packaged/guides/03-web-implementation.md",
@@ -412,15 +440,15 @@
     },
     {
       "file": "docs-packaged/guides/11-callbacks-and-webhooks.md",
-      "sha256": "a81189fae6685049"
+      "sha256": "019a9d4d07b6a21e"
     },
     {
       "file": "docs-packaged/guides/12-error-handling-and-debugging.md",
-      "sha256": "46480ee794bcb9c7"
+      "sha256": "9f6472bd17f33800"
     },
     {
       "file": "docs-packaged/guides/13-deployment-checklist.md",
-      "sha256": "72e19543683164df"
+      "sha256": "0b3299805080227a"
     },
     {
       "file": "docs-packaged/guides/14-appendix-code-snippets.md",
@@ -440,7 +468,7 @@
     },
     {
       "file": "docs-packaged/guides/18-transaction-journal.md",
-      "sha256": "03ce5289b28509e7"
+      "sha256": "a5b70b2982ec9261"
     },
     {
       "file": "docs-packaged/guides/19-customer-module-qr.md",
@@ -456,11 +484,11 @@
     },
     {
       "file": "docs-packaged/recipes/cloudflare-free-webhook.md",
-      "sha256": "37b595f949e51f75"
+      "sha256": "dfdcc6d3a9134752"
     },
     {
       "file": "docs-packaged/guides/AGENT-SETUP-PLAYBOOK.md",
-      "sha256": "04dbad26842e6d75"
+      "sha256": "01468d7a01fc8ba1"
     },
     {
       "file": "docs-packaged/guides/AGENTIC-PAYWAY-CLI-USER-GUIDE.md",
@@ -468,7 +496,7 @@
     },
     {
       "file": "docs-packaged/guides/FIRST-PAYMENT-WALKTHROUGH.md",
-      "sha256": "732f3c9d80e92fd7"
+      "sha256": "83149aad6521e2d3"
     },
     {
       "file": "docs-packaged/guides/23-close-transaction.md",
@@ -476,7 +504,7 @@
     },
     {
       "file": "docs-packaged/reference/SDK-AND-CLI-REFERENCE.md",
-      "sha256": "2de53526156f7b3f"
+      "sha256": "b7e81539f999f994"
     },
     {
       "file": "docs-packaged/starter/app/main.js",
@@ -507,6 +535,262 @@
       "source": "examples/first-payment/public/index.html",
       "sourceSha256": "e3122d0e0b03868f",
       "sha256": "e3122d0e0b03868f"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/agent-integration.md",
+      "source": "docs/guides/24-agent-integration.md",
+      "sourceSha256": "1eea3e43d319bb2d",
+      "sha256": "999a46669755d54b"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/integration-recipes.md",
+      "source": "docs/guides/integration-recipes.md",
+      "sourceSha256": "18d8f4f37c88e6fb",
+      "sha256": "18d8f4f37c88e6fb"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/support.md",
+      "source": "SUPPORT.md",
+      "sourceSha256": "0cc568c91c87426b",
+      "sha256": "98f3ebdbc1e712d3"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/contributing.md",
+      "source": "CONTRIBUTING.md",
+      "sourceSha256": "41f218094d6e015f",
+      "sha256": "ccb593341fe04eb5"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/security.md",
+      "source": "SECURITY.md",
+      "sourceSha256": "62d6b1bf04cd699d",
+      "sha256": "06d39ad11c809ec0"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/storage-service.md",
+      "source": "docs/guides/21-storage-service.md",
+      "sourceSha256": "a4dd3ee3599a64e1",
+      "sha256": "a4dd3ee3599a64e1"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/quickstart.md",
+      "source": "QUICKSTART.md",
+      "sourceSha256": "e5212adadea1986c",
+      "sha256": "c4b90506c52d2852"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/quickstart-1-page.md",
+      "source": "docs/guides/QUICK-START-1-PAGER.md",
+      "sourceSha256": "e69127c8176b0be9",
+      "sha256": "93e4cbb8fd0ac586"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/docs-index.md",
+      "source": "docs/README.md",
+      "sourceSha256": "38f7c0ca1cc6951d",
+      "sha256": "8260cb30afc4602d"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/overview.md",
+      "source": "docs/guides/01-overview-and-concepts.md",
+      "sourceSha256": "a6ee224008df187e",
+      "sha256": "bab416d4bf700ff5"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/setup.md",
+      "source": "docs/guides/02-prerequisites-and-setup.md",
+      "sourceSha256": "ece96e50f2a65cca",
+      "sha256": "19cd1be60a9b509c"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/web-implementation.md",
+      "source": "docs/guides/03-web-implementation.md",
+      "sourceSha256": "91c0999ae61130e4",
+      "sha256": "0fcaf6614553d62d"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/native-apps.md",
+      "source": "docs/guides/04-native-app-implementation.md",
+      "sourceSha256": "0f0b39d40a74dfb6",
+      "sha256": "2ddb4da60f7de1ac"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/webviews.md",
+      "source": "docs/guides/05-webview-implementation.md",
+      "sourceSha256": "f7b61fb76f2c9266",
+      "sha256": "2ee737d6e851649b"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/telegram-mini-app.md",
+      "source": "docs/guides/06-telegram-mini-app.md",
+      "sourceSha256": "83eaf8a2f2c7e5a6",
+      "sha256": "bda972a1aceca2ee"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/qr-handling.md",
+      "source": "docs/guides/07-qr-code-handling.md",
+      "sourceSha256": "9e26d17e5fa4ebcc",
+      "sha256": "61f84701fd3368ab"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/deep-linking.md",
+      "source": "docs/guides/08-deep-linking.md",
+      "sourceSha256": "5b4f85e2ef2d0743",
+      "sha256": "9786c0bd2f941acc"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/link-lifecycle.md",
+      "source": "docs/guides/09-link-unlink-renew-lifecycle.md",
+      "sourceSha256": "cd8a0fe52805973a",
+      "sha256": "43931f85274e7e1c"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/ui-customization.md",
+      "source": "docs/guides/10-ui-customization.md",
+      "sourceSha256": "fe317726abd52460",
+      "sha256": "bc399eb4735ed742"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/callbacks-webhooks.md",
+      "source": "docs/guides/11-callbacks-and-webhooks.md",
+      "sourceSha256": "b17dd3af7ca23e94",
+      "sha256": "8c87e5f137019830"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/errors-and-debugging.md",
+      "source": "docs/guides/12-error-handling-and-debugging.md",
+      "sourceSha256": "f66ede921dceabde",
+      "sha256": "fd61b436691abe7e"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/deployment-checklist.md",
+      "source": "docs/guides/13-deployment-checklist.md",
+      "sourceSha256": "5d9405930af7d3e7",
+      "sha256": "253d8ec596a7d7dc"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/code-snippets.md",
+      "source": "docs/guides/14-appendix-code-snippets.md",
+      "sourceSha256": "b908d9dd11dcfae2",
+      "sha256": "d5eb5421aebfab48"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/merchant-scenarios.md",
+      "source": "docs/guides/15-merchant-scenario-requirements.md",
+      "sourceSha256": "7617659e836622d2",
+      "sha256": "78bd854b3202bc02"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/webhook-setup.md",
+      "source": "docs/guides/16-webhook-setup-guide.md",
+      "sourceSha256": "260ebb761a93fd2a",
+      "sha256": "ff29baee32e66ae1"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/payment-link.md",
+      "source": "docs/guides/17-payment-link.md",
+      "sourceSha256": "5d168d17a35c80d9",
+      "sha256": "b4f9bd75aff11da7"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/transaction-journal.md",
+      "source": "docs/guides/18-transaction-journal.md",
+      "sourceSha256": "a5b70b2982ec9261",
+      "sha256": "a5b70b2982ec9261"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/customer-module-qr.md",
+      "source": "docs/guides/19-customer-module-qr.md",
+      "sourceSha256": "5be7d9010ce37297",
+      "sha256": "398ac850ba8086cc"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/settlement-disputes.md",
+      "source": "docs/guides/20-settlement-and-disputes.md",
+      "sourceSha256": "a48bb5b9c551178c",
+      "sha256": "ebb4b9bf2307b3c4"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/api-datetime-timezones.md",
+      "source": "docs/guides/22-api-datetime-and-timezones.md",
+      "sourceSha256": "cbd2ed3a8eaf4404",
+      "sha256": "cbd2ed3a8eaf4404"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/cloudflare-webhook.md",
+      "source": "docs/recipes/cloudflare-free-webhook.md",
+      "sourceSha256": "dfdcc6d3a9134752",
+      "sha256": "dfdcc6d3a9134752"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/agent-setup-playbook.md",
+      "source": "docs/guides/AGENT-SETUP-PLAYBOOK.md",
+      "sourceSha256": "01468d7a01fc8ba1",
+      "sha256": "01468d7a01fc8ba1"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/agentic-cli-guide.md",
+      "source": "docs/guides/AGENTIC-PAYWAY-CLI-USER-GUIDE.md",
+      "sourceSha256": "2cdb235795a0b8b0",
+      "sha256": "c33fcebb710ea153"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/first-payment-walkthrough.md",
+      "source": "docs/guides/FIRST-PAYMENT-WALKTHROUGH.md",
+      "sourceSha256": "97ddc9dade96ceb3",
+      "sha256": "eb5860a1b9548b3c"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/close-transaction.md",
+      "source": "docs/guides/23-close-transaction.md",
+      "sourceSha256": "4223b3e56745c312",
+      "sha256": "35e7a4b32d272c43"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/sdk-cli-reference.md",
+      "source": "docs/reference/SDK-AND-CLI-REFERENCE.md",
+      "sourceSha256": "f0d42ac9a8b4066f",
+      "sha256": "dfffbf9fc35219a2"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/error-codes.json",
+      "source": "docs/error-codes.json",
+      "sourceSha256": "a84e49e61964fa1b",
+      "sha256": "ad6429e1c58dbc0a"
+    },
+    {
+      "file": "skills/aba-payway-integration/assets/service.ts",
+      "source": "examples/integration-recipes/service.ts",
+      "sourceSha256": "3daa3799e102d22d",
+      "sha256": "3daa3799e102d22d"
+    },
+    {
+      "file": "skills/aba-payway-integration/assets/sqlite-store.ts",
+      "source": "examples/integration-recipes/sqlite-store.ts",
+      "sourceSha256": "7dc208b247f2c4d9",
+      "sha256": "7dc208b247f2c4d9"
+    },
+    {
+      "file": "skills/aba-payway-integration/assets/payway-gateway.ts",
+      "source": "examples/integration-recipes/payway-gateway.ts",
+      "sourceSha256": "1b5517c4954b6ac2",
+      "sha256": "1b5517c4954b6ac2"
+    },
+    {
+      "file": "skills/aba-payway-integration/assets/express.ts",
+      "source": "examples/integration-recipes/express.ts",
+      "sourceSha256": "43a0171a556c76ea",
+      "sha256": "43a0171a556c76ea"
+    },
+    {
+      "file": "skills/aba-payway-integration/assets/next.ts",
+      "source": "examples/integration-recipes/next.ts",
+      "sourceSha256": "5b667294e9597e82",
+      "sha256": "5b667294e9597e82"
+    },
+    {
+      "file": "skills/aba-payway-integration/references/MANIFEST.json",
+      "sha256": "4f1f90b4b9982f98"
     }
   ]
 }

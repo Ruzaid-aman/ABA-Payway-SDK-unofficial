@@ -2,14 +2,14 @@
 name: aba-payway-first-payment
 description: Start an ABA PayWay payment, choose QR or hosted checkout or payment link, verify it, and fulfill once.
 metadata:
-  version: 1.4.3
+  version: 1.4.4
 ---
 
 # ABA PayWay First Payment
 
 ## Quick Start
 
-Use this skill first for a new integration. Choose one route, create one payment, verify it, and explain the next action. Read the installed package's QUICKSTART.md for setup. Keep all SDK code and credentials server-side.
+Use this skill for one first payment. For integrating PayWay into an existing merchant project, the separate aba-payway-integration skill inspects orders, authentication and storage and provides framework recipes. Choose one route, create one payment, verify it, and explain the next action. Read the installed package's QUICKSTART.md for setup. Keep all SDK code and credentials server-side.
 
 Run the installed CLI with `npm exec -- payway-sdk`; bare `npx payway-sdk` resolves to a different package. In a source checkout, `npx tsx src/cli.ts` is also supported.
 

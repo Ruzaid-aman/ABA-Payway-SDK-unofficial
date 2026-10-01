@@ -54,9 +54,8 @@ describe('skills installer (F09)', () => {
     // v2 envelope (second-pass audit R3/R4): schema + package version + files.
     expect(manifest.schemaVersion).toBe(2);
     expect(typeof manifest.packageVersion).toBe('string');
-    // 34 SKILL.md files + 8 bundled scripts + the outbox adapter reference
-    // (34 skills since the 2026-09-12 knowledge wave — flipped consciously).
-    expect(Object.keys(manifest.files).length).toBe(43);
+    // 35 guides, 8 scripts, outbox reference, and 43 integration resources.
+    expect(Object.keys(manifest.files).length).toBe(87);
   });
 
   it('installs a selected skill bundle only (--only)', async () => {

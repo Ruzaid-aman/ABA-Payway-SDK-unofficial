@@ -1,6 +1,6 @@
 # ABA PayWay SDK Skills
 
-34 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
+35 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
 them for a supported coding agent:
 
 ```sh
@@ -10,7 +10,7 @@ them for a supported coding agent:
 npx tsx src/cli.ts skills add claude        # or: codex | opencode  (or several at once)
 ```
 
-Start with [first payment](./aba-payway-first-payment/SKILL.md), then [webhook production](./aba-payway-webhook-production/SKILL.md). Choose only the QR, purchase, or payment-link guide you need. The shared journey is create, verify, and fulfill once.
+For a merchant project start with [integration](./aba-payway-integration/SKILL.md), a self-contained router with public references and Express/Next.js recipe assets. For one first payment use [first payment](./aba-payway-first-payment/SKILL.md), then [webhook production](./aba-payway-webhook-production/SKILL.md). Choose only the workflow you need. The shared journey is create, verify, and fulfill once.
 
 Each `aba-payway-*` directory is a self-contained AI guidance package. Five
 skills bundle dependency-free `.cjs` tools under their own `scripts/`
