@@ -952,6 +952,12 @@ program
   .name('payway-sdk')
   .description('CLI for the ABA PayWay TypeScript SDK')
   .version(readPackageVersion())
+  // Audit S05: route EVERY Commander failure (missing required options,
+  // unknown commands/options, help/version) through runCli's handler instead
+  // of a direct process.exit, so machine mode can emit the uniform error
+  // envelope and human mode keeps its diagnostic + exit code. Help/version
+  // surface as CommanderError with exitCode 0 and stay human.
+  .exitOverride()
   .option('--profile <name>', 'Use a saved credential profile for this command')
   .option('--no-color', 'Disable ANSI colors in output')
   .option(
@@ -1001,8 +1007,20 @@ function activateSelectedProfile(command: Command): void {
   // it emits a machine-sourced script meant for redirect (`> file`),
   // so any notice line would corrupt the artifact. `session` resolves its
   // own profile context inside the loop (and must stay clean when it
-  // rejects non-TTY runs).
-  if (command.name() === 'docs' || command.name() === 'completions' || command.name() === 'session') return;
+  // rejects non-TTY runs). `mcp` OWNS stdout for the JSON-RPC protocol
+  // (audit S03): any notice line here would precede protocol traffic and
+  // break hosts after ordinary profile onboarding — and its missing-profile
+  // throw would kill the server before the protocol starts. The MCP server
+  // resolves credentials per tool call via resolvePayWayContext(), so it
+  // does not need this hook's ambient activation.
+  if (
+    command.name() === 'docs'
+    || command.name() === 'completions'
+    || command.name() === 'session'
+    || command.name() === 'mcp'
+  ) {
+    return;
+  }
   const selectedName =
     program.opts<{ profile?: string }>().profile ??
     process.env.PAYWAY_PROFILE ??
@@ -5396,6 +5414,23 @@ for (const command of program.commands) {
 }
 
 /**
+ * True when the requested argv activates machine output — the per-command
+ * `--json` flag or the global `--output json|ndjson`. Inspecting the raw argv
+ * is the point: Commander usage errors fire BEFORE any option is parsed into
+ * a command, so the machine-output contract (audit S05) must be detectable
+ * without a parsed context.
+ */
+function argvRequestsMachineOutput(argv: string[]): boolean {
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--json') return true;
+    if (arg === '--output=json' || arg === '--output=ndjson') return true;
+    if (arg === '--output' && (argv[i + 1] === 'json' || argv[i + 1] === 'ndjson')) return true;
+  }
+  return false;
+}
+
+/**
  * Run the CLI in-process against an explicit argv (defaults to process.argv).
  * Exported so tests (and embedders) can drive commands without spawning a
  * child process; `node dist/cli.js` / `npx tsx src/cli.ts` executions go
@@ -5405,13 +5440,18 @@ export async function runCli(argv: string[]): Promise<void> {
   try {
     await program.parseAsync(argv, { from: 'user' });
   } catch (error) {
-    // Refund usage errors are part of its machine-output contract too.
-    // Its command-local exitOverride lets us render them without process.exit.
     if (error instanceof CommanderError && error.exitCode === 0) {
+      // Help/version succeeded — keep the human output and exit 0.
       process.exitCode = 0;
       return;
     }
-    if (program.args[0] === 'refund' && argv.includes('--json')) {
+    // Machine-output contract (audit S05, generalizing the old refund-only
+    // special case): EVERY pre-execution failure — missing/invalid options,
+    // unknown commands, profile-hook problems — emits the uniform
+    // `{ error: {...} }` envelope on stdout when machine output is active,
+    // so agents can branch on one parseable document with one documented
+    // exit code instead of several incompatible error channels.
+    if (argvRequestsMachineOutput(argv)) {
       process.exitCode = error instanceof CommanderError
         ? printValidationErrorJson(error.message)
         : printApiErrorJson(error);

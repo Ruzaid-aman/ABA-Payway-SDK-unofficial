@@ -17,6 +17,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -41,7 +44,30 @@ export interface McpServerOptions {
   env?: NodeJS.ProcessEnv;
 }
 
-const SERVER_INFO = { name: 'payway-sdk', version: '1.6.0' } as const;
+/**
+ * Single-source version (audit S09): the MCP server previously hardcoded a
+ * version that drifted from package.json (1.6.0 advertised vs 1.5.0 built).
+ * Read the built package's version — import.meta-relative first (src, vitest,
+ * bundled ESM), then the `node dist/cli.js` argv layout — and never fabricate
+ * a number.
+ */
+function readPackageVersion(): string {
+  const candidates: Array<{ path: string }> = [
+    { path: fileURLToPath(new URL('../../package.json', import.meta.url)) },
+    ...(process.argv[1] ? [{ path: path.join(path.dirname(process.argv[1]), '..', 'package.json') }] : []),
+  ];
+  for (const { path: candidate } of candidates) {
+    try {
+      const version = (JSON.parse(readFileSync(candidate, 'utf8')) as { version?: string }).version;
+      if (version) return version;
+    } catch {
+      // try the next candidate
+    }
+  }
+  return 'unknown';
+}
+
+const SERVER_INFO = { name: 'payway-sdk', version: readPackageVersion() } as const;
 
 function toolResultJson(payload: unknown): { content: Array<{ type: 'text'; text: string }>; isError?: boolean } {
   return { content: [{ type: 'text', text: JSON.stringify(payload) }] };

@@ -58,6 +58,40 @@ describe('payway-sdk mcp --list-tools', () => {
     expect(create?.readOnly).toBe(false);
   });
 
+  it('honors PAYWAY_MCP_ALLOW_MUTATIONS=1 without the flag (S04)', async () => {
+    // Audit S04 regression: the option used to default to a DEFINED false,
+    // which resolveAllowMutations treated as an explicit override — the
+    // documented environment opt-in was silently ignored.
+    process.env.PAYWAY_MCP_ALLOW_MUTATIONS = '1';
+    try {
+      const { stdout } = await run(['mcp', '--list-tools', '--json']);
+      const parsed = JSON.parse(stdout) as Array<{ name: string; readOnly: boolean }>;
+      expect(parsed).toHaveLength(17);
+    } finally {
+      delete process.env.PAYWAY_MCP_ALLOW_MUTATIONS;
+    }
+  });
+
+  it('keeps the read-only catalog when the environment opts out explicitly (S04)', async () => {
+    process.env.PAYWAY_MCP_ALLOW_MUTATIONS = '0';
+    try {
+      const { stdout } = await run(['mcp', '--list-tools', '--json']);
+      expect(JSON.parse(stdout)).toHaveLength(12);
+    } finally {
+      delete process.env.PAYWAY_MCP_ALLOW_MUTATIONS;
+    }
+  });
+
+  it('an explicit --allow-mutations flag wins over an opt-out environment (S04 precedence)', async () => {
+    process.env.PAYWAY_MCP_ALLOW_MUTATIONS = '0';
+    try {
+      const { stdout } = await run(['mcp', '--list-tools', '--json', '--allow-mutations']);
+      expect(JSON.parse(stdout)).toHaveLength(17);
+    } finally {
+      delete process.env.PAYWAY_MCP_ALLOW_MUTATIONS;
+    }
+  });
+
   it('human mode lists tool rows without JSON', async () => {
     const { stdout, stderr } = await run(['mcp', '--list-tools']);
     expect(stdout).toContain('check_transaction');

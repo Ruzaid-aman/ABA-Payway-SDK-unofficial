@@ -49,7 +49,7 @@ describe('normalizePackReport (npm pack --json shapes)', () => {
   });
 
   it('rejects a report without a filename', () => {
-    const broken = aReport();
+    const broken = aReport() as { filename?: string };
     delete broken.filename;
     expect(() => normalizePackReport([broken])).toThrow(/unrecognized shape/);
     expect(() => normalizePackReport({ 'aba-payway-ts': broken })).toThrow(/unrecognized shape/);
