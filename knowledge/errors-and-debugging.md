@@ -1,5 +1,3 @@
-<!-- GENERATED STUB: copy of docs/guides/12-error-handling-and-debugging.md for compatibility. Do not edit here. -->
-
 # Chapter 12 — Error Handling & Debugging
 
 > **Estimated reading time:** 15 minutes

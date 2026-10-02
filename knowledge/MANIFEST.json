@@ -78,9 +78,9 @@
       "description": "PayWay model: merchant credentials, hash signing, sandbox vs production, payment options.",
       "source": "docs/guides/01-overview-and-concepts.md",
       "file": "overview.md",
-      "bytes": 10910,
-      "sha256": "c8fb4e3b161ae8f3",
-      "sourceSha256": "a6ee224008df187e"
+      "bytes": 10799,
+      "sha256": "94ae9cc316227006",
+      "sourceSha256": "fa00fe5fa5e375c3"
     },
     {
       "topic": "setup",
@@ -88,9 +88,9 @@
       "description": "Merchant portal, sandbox credentials, ABA Mobile simulator, environment variables.",
       "source": "docs/guides/02-prerequisites-and-setup.md",
       "file": "setup.md",
-      "bytes": 23992,
-      "sha256": "dbb5e99c24ba43e6",
-      "sourceSha256": "8b03939ab77de113"
+      "bytes": 23877,
+      "sha256": "a0826075989a6f21",
+      "sourceSha256": "8a336f9ba0ec98b3"
     },
     {
       "topic": "web-implementation",
@@ -98,9 +98,9 @@
       "description": "Hosted checkout + server-side purchase flow for web apps, with callback verification.",
       "source": "docs/guides/03-web-implementation.md",
       "file": "web-implementation.md",
-      "bytes": 30253,
-      "sha256": "0fcaf6614553d62d",
-      "sourceSha256": "91c0999ae61130e4"
+      "bytes": 30145,
+      "sha256": "23e75db4cb2e6c1c",
+      "sourceSha256": "3396dc791cfe5e88"
     },
     {
       "topic": "native-apps",
@@ -108,9 +108,9 @@
       "description": "Android/iOS integration: deeplinks, webviews, return handling.",
       "source": "docs/guides/04-native-app-implementation.md",
       "file": "native-apps.md",
-      "bytes": 23801,
-      "sha256": "2ddb4da60f7de1ac",
-      "sourceSha256": "0f0b39d40a74dfb6"
+      "bytes": 23686,
+      "sha256": "46aafd6c57bb98b7",
+      "sourceSha256": "03fcaa491fa0c50c"
     },
     {
       "topic": "webviews",
@@ -118,9 +118,9 @@
       "description": "Mobile webview checkout patterns and deeplink return legs.",
       "source": "docs/guides/05-webview-implementation.md",
       "file": "webviews.md",
-      "bytes": 12055,
-      "sha256": "fb8b70c84aad078b",
-      "sourceSha256": "b9ecfbdf322397a5"
+      "bytes": 11943,
+      "sha256": "778c6b5e41c31249",
+      "sourceSha256": "dfd9685a4fe383f9"
     },
     {
       "topic": "telegram-mini-app",
@@ -138,9 +138,9 @@
       "description": "Online vs offline KHQR, scan-time validity windows, rendering and expiry semantics.",
       "source": "docs/guides/07-qr-code-handling.md",
       "file": "qr-handling.md",
-      "bytes": 39736,
-      "sha256": "61f84701fd3368ab",
-      "sourceSha256": "9e26d17e5fa4ebcc"
+      "bytes": 39630,
+      "sha256": "707a66abc9fa6848",
+      "sourceSha256": "d076e4c695397e25"
     },
     {
       "topic": "deep-linking",
@@ -148,9 +148,9 @@
       "description": "abamobilebank:// deeplink scheme and return-leg handling.",
       "source": "docs/guides/08-deep-linking.md",
       "file": "deep-linking.md",
-      "bytes": 13733,
-      "sha256": "9786c0bd2f941acc",
-      "sourceSha256": "5b4f85e2ef2d0743"
+      "bytes": 13631,
+      "sha256": "0acb3d778dbe0cdb",
+      "sourceSha256": "c896191707f2874d"
     },
     {
       "topic": "link-lifecycle",
@@ -158,9 +158,9 @@
       "description": "Credentials-on-file account/card lifecycle and token renewal.",
       "source": "docs/guides/09-link-unlink-renew-lifecycle.md",
       "file": "link-lifecycle.md",
-      "bytes": 29068,
-      "sha256": "43931f85274e7e1c",
-      "sourceSha256": "cd8a0fe52805973a"
+      "bytes": 28951,
+      "sha256": "c41a8937943618ef",
+      "sourceSha256": "e7bcbc62cecda1ab"
     },
     {
       "topic": "ui-customization",
@@ -178,9 +178,9 @@
       "description": "Single best-effort callback delivery, HMAC verification, webhook workbench.",
       "source": "docs/guides/11-callbacks-and-webhooks.md",
       "file": "callbacks-webhooks.md",
-      "bytes": 25807,
-      "sha256": "279518a6ec5ec0b4",
-      "sourceSha256": "5f41c4418860a3df"
+      "bytes": 25695,
+      "sha256": "b7f9dc7c151ba25c",
+      "sourceSha256": "325158e52d873f26"
     },
     {
       "topic": "errors-and-debugging",
@@ -188,9 +188,9 @@
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
       "source": "docs/guides/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
-      "bytes": 63205,
-      "sha256": "d15ce46fb9063e1c",
-      "sourceSha256": "8bdabb670950eaab"
+      "bytes": 63085,
+      "sha256": "1dc1e851d0c289ab",
+      "sourceSha256": "c5380e2d1c5fddb2"
     },
     {
       "topic": "deployment-checklist",
@@ -198,9 +198,9 @@
       "description": "Production go-live gates: credentials, RSA, callback URLs, base URL.",
       "source": "docs/guides/13-deployment-checklist.md",
       "file": "deployment-checklist.md",
-      "bytes": 11598,
-      "sha256": "007348b007948774",
-      "sourceSha256": "0241aa96551e55c0"
+      "bytes": 11486,
+      "sha256": "840f18bb37201086",
+      "sourceSha256": "b3524a5957ee775a"
     },
     {
       "topic": "code-snippets",
@@ -208,9 +208,9 @@
       "description": "Copy-paste hash signing, callback verification, and polling snippets.",
       "source": "docs/guides/14-appendix-code-snippets.md",
       "file": "code-snippets.md",
-      "bytes": 22622,
-      "sha256": "787902461a1d7df4",
-      "sourceSha256": "b908d9dd11dcfae2"
+      "bytes": 22510,
+      "sha256": "2f4cee6365991b21",
+      "sourceSha256": "c4df09af2db66084"
     },
     {
       "topic": "merchant-scenarios",
@@ -228,9 +228,9 @@
       "description": "Local listener, tunnels, forwarding, and production webhook configuration.",
       "source": "docs/guides/16-webhook-setup-guide.md",
       "file": "webhook-setup.md",
-      "bytes": 23339,
-      "sha256": "effc3052f5d4424c",
-      "sourceSha256": "6cdcdb660274ab44"
+      "bytes": 23230,
+      "sha256": "f583617b2578b5ce",
+      "sourceSha256": "b542f35f08e333e0"
     },
     {
       "topic": "payment-link",
@@ -258,9 +258,9 @@
       "description": "Portal Customer-ID keyed QR generation and merchant-reference reconciliation.",
       "source": "docs/guides/19-customer-module-qr.md",
       "file": "customer-module-qr.md",
-      "bytes": 11590,
-      "sha256": "e875e807435cfcc7",
-      "sourceSha256": "5be7d9010ce37297"
+      "bytes": 11482,
+      "sha256": "c57515cef7e19ebd",
+      "sourceSha256": "e55ca235192d367f"
     },
     {
       "topic": "settlement-disputes",
@@ -372,23 +372,23 @@
     },
     {
       "file": "docs-packaged/guides/01-overview-and-concepts.md",
-      "sha256": "5292436c91c0bf5a"
+      "sha256": "cec3f1daf57312f6"
     },
     {
       "file": "docs-packaged/guides/02-prerequisites-and-setup.md",
-      "sha256": "56fe4d89f442ecb5"
+      "sha256": "aafd91dfcedf4dfc"
     },
     {
       "file": "docs-packaged/guides/03-web-implementation.md",
-      "sha256": "ccf1a15e5bb8d649"
+      "sha256": "89588fd903313f46"
     },
     {
       "file": "docs-packaged/guides/04-native-app-implementation.md",
-      "sha256": "80cdf1a5e56e0c0a"
+      "sha256": "630ed934df8a2f72"
     },
     {
       "file": "docs-packaged/guides/05-webview-implementation.md",
-      "sha256": "0645b70eb858351c"
+      "sha256": "6fe779102aa41d89"
     },
     {
       "file": "docs-packaged/guides/06-telegram-mini-app.md",
@@ -396,15 +396,15 @@
     },
     {
       "file": "docs-packaged/guides/07-qr-code-handling.md",
-      "sha256": "05438b5403933134"
+      "sha256": "b58138e9f6409aca"
     },
     {
       "file": "docs-packaged/guides/08-deep-linking.md",
-      "sha256": "8cc4bdf465f47c1e"
+      "sha256": "44bca85d0d2ae050"
     },
     {
       "file": "docs-packaged/guides/09-link-unlink-renew-lifecycle.md",
-      "sha256": "f5d6ad588dd8cf5b"
+      "sha256": "a0e85714b593025f"
     },
     {
       "file": "docs-packaged/guides/10-ui-customization.md",
@@ -412,19 +412,19 @@
     },
     {
       "file": "docs-packaged/guides/11-callbacks-and-webhooks.md",
-      "sha256": "a81189fae6685049"
+      "sha256": "d2fa2559704f3e6f"
     },
     {
       "file": "docs-packaged/guides/12-error-handling-and-debugging.md",
-      "sha256": "c5cc09bd6f9ad1f9"
+      "sha256": "a459107b50dc025c"
     },
     {
       "file": "docs-packaged/guides/13-deployment-checklist.md",
-      "sha256": "72e19543683164df"
+      "sha256": "e782ac2332a7d8f5"
     },
     {
       "file": "docs-packaged/guides/14-appendix-code-snippets.md",
-      "sha256": "f5ed1f632966fecb"
+      "sha256": "9785317b6f77034e"
     },
     {
       "file": "docs-packaged/guides/15-merchant-scenario-requirements.md",
@@ -432,7 +432,7 @@
     },
     {
       "file": "docs-packaged/guides/16-webhook-setup-guide.md",
-      "sha256": "a18f6115348af2b6"
+      "sha256": "b612d97a841b1512"
     },
     {
       "file": "docs-packaged/guides/17-payment-link.md",
@@ -444,7 +444,7 @@
     },
     {
       "file": "docs-packaged/guides/19-customer-module-qr.md",
-      "sha256": "5be7d9010ce37297"
+      "sha256": "e55ca235192d367f"
     },
     {
       "file": "docs-packaged/guides/20-settlement-and-disputes.md",

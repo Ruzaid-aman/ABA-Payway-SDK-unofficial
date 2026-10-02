@@ -1,7 +1,9 @@
 # Branch consolidation & `codex/payway-integration-skills` merge plan
 
-**STATUS (2026-10-02):** PLAN ONLY — nothing merged, nothing pushed. Analysis complete;
-awaiting approval to execute Phase 0.
+**STATUS (2026-10-02):** EXECUTING — user authorized merging the integration branch
+into current main, pushing to the existing origin and cleaning up its worktree.
+The original no-push execution plan below is historical and superseded for this
+private-development push; public package/release publication remains separate.
 
 Date: 2026-10-02. Scope: decide how to merge and combine the repository's four local
 branches. Sources: live `git` inspection (`branch -a`, `merge-base`, `rev-list`,
@@ -276,3 +278,23 @@ npm run smoke:package
 4. **Scratch audit artifacts** (`.scratch/publishing-dx-audit-2026-09-29/api-docs/`,
    `profile-probe/`, `resume-cli-probe.mjs`, `resume-cli-evidence.json`) stay untracked
    per decision.
+
+## Execution evidence — 2026-10-02
+
+Initial main c3ec7f8, integration 62afa12, origin/main f4de67c; fetched origin had
+no commits absent from local main. GitHub repository metadata confirms the existing
+origin is private. Preserve the development history; this is not a public release.
+
+Phase 0 preserves and completes the existing guide-mirror repair: 14 canonical
+header removals, 22 current compatibility copies, idempotent generator and five
+drift/negative-control cases. The generator already used the correct em dash;
+no character substitution was necessary. Regenerated the 35-topic main corpus.
+Build/typecheck/lint/package pass; lint retains two existing warnings. Full offline
+suite passes 2,284 tests in 157 files, with SQLite enabled and opt-in sandbox
+contract excluded. No gateway or credentials changes.
+
+Pre-merge working patch and generator copy are retained under ignored
+.release-audit/integration-merge-2026-10-02/. The complete integration scratch
+evidence backup has 611 archive entries, SHA-256
+b21946767e681cb6e7093ed16d4325b2c622bd1bdf41e58c768324e289f1ed35.
+Other worktrees and unrelated merged branches are outside this cleanup scope.

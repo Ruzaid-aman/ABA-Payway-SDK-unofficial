@@ -1,5 +1,3 @@
-<!-- GENERATED STUB: copy of docs/guides/02-prerequisites-and-setup.md for compatibility. Do not edit here. -->
-
 # Chapter 2 — Prerequisites & Setup
 
 > **Estimated reading time:** 15 minutes  

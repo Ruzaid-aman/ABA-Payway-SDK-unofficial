@@ -1,5 +1,3 @@
-<!-- GENERATED STUB: copy of docs/guides/05-webview-implementation.md for compatibility. Do not edit here. -->
-
 # Chapter 5 — WebView Implementation
 
 > **Estimated reading time:** 15 minutes  

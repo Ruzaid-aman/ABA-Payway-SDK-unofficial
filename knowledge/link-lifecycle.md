@@ -1,5 +1,3 @@
-<!-- GENERATED STUB: copy of docs/guides/09-link-unlink-renew-lifecycle.md for compatibility. Do not edit here. -->
-
 # Chapter 9 — Link / Unlink / Renew Lifecycle
 
 > **Estimated reading time:** 15 minutes

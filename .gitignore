@@ -85,3 +85,9 @@ reports/
 # npm install + installed skills) is reproducible evidence, not source — keep the
 # logs and evidence JSON, drop the 33 MB install itself.
 /.scratch/publishing-dx-audit-2026-09-29/consumer/
+
+# Local publishing probes and generated API review trees.
+/.scratch/publishing-dx-audit-2026-09-29/api-docs/
+/.scratch/publishing-dx-audit-2026-09-29/profile-probe/
+/.scratch/publishing-dx-audit-2026-09-29/resume-cli-probe.mjs
+/.scratch/publishing-dx-audit-2026-09-29/resume-cli-evidence.json

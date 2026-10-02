@@ -1,5 +1,3 @@
-<!-- GENERATED STUB: copy of docs/guides/01-overview-and-concepts.md for compatibility. Do not edit here. -->
-
 # Chapter 1 — Overview & Core Concepts
 
 > **Estimated reading time:** 15 minutes

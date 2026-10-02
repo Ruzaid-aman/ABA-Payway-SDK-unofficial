@@ -1,5 +1,3 @@
-<!-- GENERATED STUB: copy of docs/guides/14-appendix-code-snippets.md for compatibility. Do not edit here. -->
-
 # Chapter 14 — Appendix: Complete Code Snippets
 
 > **Estimated reading time:** Reference

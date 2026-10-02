@@ -1,5 +1,3 @@
-<!-- GENERATED STUB: copy of docs/guides/07-qr-code-handling.md for compatibility. Do not edit here. -->
-
 # Chapter 7 — QR Code Handling
 
 > **Estimated reading time:** 15 minutes  

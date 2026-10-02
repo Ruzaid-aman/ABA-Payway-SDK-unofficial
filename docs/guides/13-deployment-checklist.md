@@ -1,5 +1,3 @@
-<!-- GENERATED STUB: copy of docs/guides/13-deployment-checklist.md for compatibility. Do not edit here. -->
-
 # Chapter 13 — Deployment Checklist
 
 > **Estimated reading time:** 10 minutes  
