@@ -43,6 +43,32 @@ export const REPL_DIRECTIVES = [
 /** Agent-management and meta commands must never be re-dispatched from the REPL. */
 const FORBIDDEN_DISPATCH = new Set(['agent', 'ask']);
 
+/**
+ * Registered commands `:run` may never re-dispatch. The agent surface carries
+ * no money-out tool (no refund, payout, void, beneficiary, or token-remove),
+ * so the shared REPL/session dispatcher must not become a side door to one.
+ * Top-level entries block the whole command group (`cof` contains charge and
+ * token removal; `tx-batch` can carry close); pair entries block only the
+ * destructive subcommand of an otherwise readable group. `pre-auth cancel`
+ * stays allowed — it releases a hold, it does not capture money.
+ */
+const BLOCKED_DISPATCH_TOP_LEVEL: Record<string, string> = {
+  refund: 'moves money out',
+  payout: 'moves money out',
+  beneficiary: 'mutates the payout whitelist (money-out path)',
+  'close-transaction': 'irreversibly kills customer-facing payments',
+  cof: 'contains card-on-file charge and token removal',
+  'tx-batch': 'can batch irreversible operations',
+};
+
+const BLOCKED_DISPATCH_PAIRS: Record<string, string> = {
+  'payment-link void': 'permanently voids a payment link',
+  'pre-auth complete': 'captures the held funds',
+  'pre-auth complete-payout': 'captures the held funds into a payout',
+  'profiles remove': 'deletes a credential profile without confirmation',
+  'skills remove': 'deletes installed skill files without confirmation',
+};
+
 /** Tokens that indicate a shell escape / executable / path / URI. */
 export function isUnsafeDispatch(rest: string): boolean {
   if (/[;&|`$<>(){}\n\r]/.test(rest)) return true;
@@ -63,7 +89,9 @@ export type DispatchDecision =
 /**
  * Validate a `:run` payload against the set of registered top-level command
  * names. Returns the tokens to dispatch or the exact rejection message the
- * REPL prints. A missing/empty registry rejects everything, matching the
+ * REPL prints. Precedence: registry first (an unregistered command is rejected
+ * generically), then the money-out/irreversible blocklist, then the shell/
+ * path/URI check. A missing/empty registry rejects everything, matching the
  * "not a dispatchable PayWay command" behavior of an unregistered program.
  */
 export function validateDispatch(rest: string, registeredNames: Iterable<string>): DispatchDecision {
@@ -78,6 +106,20 @@ export function validateDispatch(rest: string, registeredNames: Iterable<string>
       ok: false,
       message: `Rejected: '${name}' is not a dispatchable PayWay command (agent-management commands are blocked)`,
     };
+  }
+  // Top-level rules see tokens[0] alone; pair rules need the first two tokens.
+  const blockedMessage = (subject: string, reason: string) =>
+    `Rejected: '${subject}' is blocked in the REPL/session dispatcher for safety (${reason}) — run it from the normal CLI shell instead`;
+  const topLevelReason = BLOCKED_DISPATCH_TOP_LEVEL[name];
+  if (topLevelReason) {
+    return { ok: false, message: blockedMessage(name, topLevelReason) };
+  }
+  if (tokens.length > 1) {
+    const pair = `${name} ${tokens[1]}`;
+    const pairReason = BLOCKED_DISPATCH_PAIRS[pair];
+    if (pairReason) {
+      return { ok: false, message: blockedMessage(pair, pairReason) };
+    }
   }
   if (isUnsafeDispatch(rest)) {
     return { ok: false, message: `Rejected: '${rest}' looks like a shell, path, or URI — not a PayWay command` };

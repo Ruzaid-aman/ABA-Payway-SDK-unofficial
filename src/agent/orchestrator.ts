@@ -704,7 +704,13 @@ export class AgentOrchestrator {
   }
 
   private result(partial: Omit<AgentCommandResultV1, 'version'>): AgentCommandResultV1 {
-    const result = this.scrub({ version: 'agent-command/v1', ...partial }) as AgentCommandResultV1;
+    // `environment` is applied AFTER the spread: like the AUTH_ENVIRONMENT_MISMATCH
+    // gate, a caller-supplied claim is never authority — only the resolved context.
+    const result = this.scrub({
+      version: 'agent-command/v1',
+      ...partial,
+      environment: this.context.environment,
+    }) as AgentCommandResultV1;
     if (!validateCommandResult(result)) {
       throw new Error('Internal: produced an AgentCommandResultV1 that failed validation');
     }

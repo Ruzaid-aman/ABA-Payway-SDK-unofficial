@@ -291,6 +291,8 @@ export interface AgentCommandResultV1 {
   status: AgentCommandStatus;
   request?: string;
   message?: string;
+  /** Sandbox-vs-production of the RESOLVED context — machine output must state where actions ran. */
+  environment?: Environment;
   plan?: AgentPlanV1 | MaterializedAgentPlanV1;
   actions?: Array<Record<string, unknown>>;
   sessionId?: string;

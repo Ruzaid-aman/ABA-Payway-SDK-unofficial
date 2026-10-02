@@ -197,7 +197,9 @@ const payway = new PayWay({
     },
   },
 
-  // Optional: Debug hooks for logging requests and responses
+  // Optional: Debug hooks for logging requests and responses.
+  // Payloads arrive pre-redacted (redactHookBodies defaults to true):
+  // merchant_auth, hash, pwt and token-shaped keys are '***HIDDEN***'.
   onRequest: (endpoint, body) => {
     console.log(`[PayWay] Request to ${endpoint}:`, body);
   },
@@ -235,6 +237,7 @@ const payway = new PayWay({
 | `retryDelayMs` | `number` | ❌ No | `1000` | Base retry delay (ms) |
 | `onRequest` | `(endpoint, body) => void` | ❌ No | — | Callback before each API request |
 | `onResponse` | `(endpoint, status, body) => void` | ❌ No | — | Callback after each API response |
+| `redactHookBodies` | `boolean` | ❌ No | `true` | Sanitize `onRequest`/`onResponse` payloads (`merchant_auth`, `hash`, `pwt`, … → `***HIDDEN***`). Set `false` for raw wire bodies |
 | `baseUrl` | `string` | ❌ No | Auto (from environment) | Override base URL (advanced) |
 
 > ⚠️ **Always use `environment: 'sandbox'` during development.** Switching to `'production'` before you're ready will attempt real charges against live customer accounts.

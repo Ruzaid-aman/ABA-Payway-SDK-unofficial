@@ -35,6 +35,15 @@ function makeProgram(): { program: Command; received: Array<string[]> } {
     .action((opts: Record<string, unknown>): void => {
       received.push(['pre-auth complete', String(opts.transactionId), String(opts.amount ?? '-')]);
     });
+  // :run cannot dispatch `pre-auth complete` (money-out blocklist, audit M12);
+  // `cancel` is the group's allowed -t-declaring subcommand.
+  group
+    .command('cancel')
+    .description('cancel')
+    .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
+    .action((opts: Record<string, unknown>): void => {
+      received.push(['pre-auth cancel', String(opts.transactionId)]);
+    });
   program
     .command('exchange-rate')
     .description('no -t here')
@@ -100,7 +109,7 @@ describe('runSessionLoop', () => {
       });
       input.write(':use TRX-777\n');
       input.write('check-transaction\n');
-      input.write('pre-auth complete -a 2.00\n');
+      input.write('pre-auth cancel\n');
       input.write(':use off\n');
       input.write('exchange-rate\n');
       input.write(':exit\n');
@@ -110,7 +119,7 @@ describe('runSessionLoop', () => {
       captured.restore();
     }
     expect(received[0]).toEqual(['check-transaction', 'TRX-777']);
-    expect(received[1]).toEqual(['pre-auth complete', 'TRX-777', '2.00']);
+    expect(received[1]).toEqual(['pre-auth cancel', 'TRX-777']);
     expect(received[2]).toEqual(['exchange-rate']);
     expect(captured.stdout.join('\n')).toContain('sticky transaction: TRX-777');
   });

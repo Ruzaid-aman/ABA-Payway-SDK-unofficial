@@ -4,7 +4,8 @@ export type PayWayErrorType =
   | 'business_error'
   | 'network_error'
   | 'rate_limit_error'
-  | 'signature_error';
+  | 'signature_error'
+  | 'polling_aborted';
 
 export class PayWayError extends Error {
   public readonly type: PayWayErrorType;
@@ -137,7 +138,10 @@ export class PollingAbortedError extends PayWayError {
     totalAttempts: number;
     message?: string;
   }) {
-    super(options.message ?? `Polling aborted for ${options.transactionId}: ${options.reason}`, 'config_error');
+    // 'polling_aborted', not 'config_error': a poll abort is an outcome of the
+    // polling loop (max duration / consecutive errors / caller cancel), so a
+    // caller filtering config problems must not catch it (M6).
+    super(options.message ?? `Polling aborted for ${options.transactionId}: ${options.reason}`, 'polling_aborted');
     Object.setPrototypeOf(this, PollingAbortedError.prototype);
     this.name = 'PollingAbortedError';
     this.transactionId = options.transactionId;

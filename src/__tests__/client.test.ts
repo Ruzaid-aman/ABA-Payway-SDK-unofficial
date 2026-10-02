@@ -8,6 +8,7 @@ import {
   PayWayAPIError,
   PayWayBusinessError,
   PayWayConfigError,
+  PayWayError,
   PayWayNetworkError,
   PayWayRateLimitError,
   PollingAbortedError,
@@ -260,6 +261,106 @@ describe('PayWay debug logging', () => {
       expect.objectContaining({ hash: '***HIDDEN***' }),
       undefined,
     );
+  });
+});
+
+describe('hook body redaction (M8)', () => {
+  const RAW_RESPONSE_HASH = 'b'.repeat(64);
+
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let debugSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn().mockResolvedValue(
+      mockJsonResponse({ status: { code: '00', message: 'Success' }, hash: RAW_RESPONSE_HASH }),
+    );
+    vi.stubGlobal('fetch', fetchSpy);
+    // debug: true paths console.debug — keep test output clean.
+    debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** The JSON wire body the client actually sent (fetch init.body). */
+  function sentWireBody(): Record<string, string> {
+    const init = fetchSpy.mock.calls[0]?.[1] as { body: string };
+    return JSON.parse(init.body) as Record<string, string>;
+  }
+
+  it('redacts request and response payloads by default and never leaks the secret substring', async () => {
+    const onRequest = vi.fn();
+    const onResponse = vi.fn();
+    const payway = new PayWay({ ...TEST_CONFIG, onRequest, onResponse });
+
+    await payway.checkout.checkTransaction('TX-REDACT');
+
+    // onRequest keeps its string contract, but the wire hash is masked.
+    const wireBody = sentWireBody();
+    expect(wireBody.hash).toBeTruthy();
+    const requestPayload = onRequest.mock.calls[0]?.[1] as string;
+    expect(typeof requestPayload).toBe('string');
+    expect(requestPayload).not.toContain(wireBody.hash);
+    expect(JSON.parse(requestPayload)).toMatchObject({ hash: '***HIDDEN***', tran_id: 'TX-REDACT' });
+
+    // onResponse sees a sanitized deep copy — the raw response hash never arrives.
+    const responsePayload = onResponse.mock.calls[0]?.[2] as Record<string, unknown>;
+    expect(responsePayload.hash).toBe('***HIDDEN***');
+    expect(JSON.stringify(responsePayload)).not.toContain(RAW_RESPONSE_HASH);
+  });
+
+  it('redactHookBodies: false passes raw wire bodies to both hooks (escape hatch)', async () => {
+    const onRequest = vi.fn();
+    const onResponse = vi.fn();
+    const payway = new PayWay({ ...TEST_CONFIG, onRequest, onResponse, redactHookBodies: false });
+
+    await payway.checkout.checkTransaction('TX-RAW');
+
+    const wireBodyString = (fetchSpy.mock.calls[0]?.[1] as { body: string }).body;
+    expect(onRequest.mock.calls[0]?.[1]).toBe(wireBodyString);
+    expect(onResponse.mock.calls[0]?.[2]).toEqual({
+      status: { code: '00', message: 'Success' },
+      hash: RAW_RESPONSE_HASH,
+    });
+  });
+
+  it('redacts through the debug-mode wrapper exactly once (debug: true)', async () => {
+    const onRequest = vi.fn();
+    const payway = new PayWay({ ...TEST_CONFIG, debug: true, onRequest });
+
+    await payway.checkout.checkTransaction('TX-DEBUG-REDACT');
+
+    const wireBody = sentWireBody();
+    const requestPayload = onRequest.mock.calls[0]?.[1] as string;
+    expect(requestPayload).not.toContain(wireBody.hash);
+    expect(JSON.parse(requestPayload).hash).toBe('***HIDDEN***');
+    // The debug console path keeps its own redaction alongside the hook's.
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[payway] <- 200'),
+      expect.objectContaining({ hash: '***HIDDEN***' }),
+      undefined,
+    );
+  });
+
+  it('re-serializes urlencoded merchant-auth request bodies in their own format', async () => {
+    const onRequest = vi.fn();
+    // refund() goes through requestWithMerchantAuth, whose default content
+    // type is application/x-www-form-urlencoded (CONFIG_WITH_RSA supplies
+    // the publicKeyPem that endpoint requires).
+    const payway = new PayWay({ ...CONFIG_WITH_RSA, onRequest });
+
+    await payway.checkout.refund('TX-URL', 5.0).catch(() => undefined);
+
+    const init = fetchSpy.mock.calls[0]?.[1] as { body: string };
+    const hookPayload = onRequest.mock.calls[0]?.[1] as string;
+    // Still a urlencoded string — not silently converted to JSON.
+    expect(() => JSON.parse(hookPayload)).toThrow();
+    const hookBody = Object.fromEntries(new URLSearchParams(hookPayload));
+    expect(hookBody.merchant_auth).toBe('***HIDDEN***');
+    expect(hookBody.hash).toBe('***HIDDEN***');
+    // The wire body keeps the real encrypted merchant_auth — only the hook view masks it.
+    expect(new URLSearchParams(init.body).get('merchant_auth')).not.toBe('***HIDDEN***');
   });
 });
 
@@ -2048,6 +2149,10 @@ describe('checkout.pollTransactionStatus', () => {
     expect(json.reason).toBe('max_consecutive_errors');
     expect(json.lastStatus).toBe('PENDING');
     expect(json.totalAttempts).toBe(5);
+    // M6: a poll abort is not a config problem — its own taxonomy type.
+    expect(err.type).toBe('polling_aborted');
+    expect(json.type).toBe('polling_aborted');
+    expect(err).toBeInstanceOf(PayWayError);
   });
 
   it('yields error results with durationMs 0 and isTerminal false', async () => {

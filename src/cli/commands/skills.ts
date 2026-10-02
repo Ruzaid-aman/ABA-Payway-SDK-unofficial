@@ -4,6 +4,7 @@ import { cp, lstat, mkdir, readdir, readFile, rename, rm, rmdir, writeFile } fro
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { parseDocument } from 'yaml';
+import { lazyPalette } from '../ui/theme.js';
 
 /**
  * Per-agent install targets (audit F09, 2026-09-07). OpenCode loads skills
@@ -95,14 +96,9 @@ async function removeOwnedFile(root: string, rel: string, baseline: string, forc
   return true;
 }
 
-const c = {
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-};
+// Lazy palette: resolves per call, so the global `--no-color` flag (parsed
+// after this module is imported) and pipe/TTY detection both apply.
+const c = lazyPalette();
 
 function getSkillAgents(agentNames: string[]): SkillAgent[] {
   const invalidAgents = agentNames.filter((agent) => !(agent in SKILL_AGENT_DIRS));

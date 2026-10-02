@@ -619,28 +619,31 @@ const status = await withRetry(
 ### Pattern 3: Logging for Debugging
 
 ```typescript
-// Enable debug hooks when creating the PayWay client
+// Enable debug hooks when creating the PayWay client.
+// Redaction is ON by default (redactHookBodies: true): request and response
+// payloads pass through the same sanitizer as the debug console — merchant_auth,
+// hash, pwt, google_pay_token and token-shaped keys arrive as '***HIDDEN***'.
 const payway = new PayWay({
   merchantId: process.env.PAYWAY_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_API_KEY!,
   environment: 'sandbox',
 
-  // Log every API request (redact sensitive fields!)
   onRequest: (endpoint, body) => {
     console.log(`[PayWay] → ${endpoint}`);
-    console.log(`  Body:`, JSON.stringify(body).substring(0, 500));
+    // body is the redacted request payload string — safe to log
+    console.log(`  Body:`, body.substring(0, 500));
   },
 
-  // Log every API response
   onResponse: (endpoint, status, body) => {
     console.log(`[PayWay] ← ${endpoint} HTTP ${status}`);
-    // Redact full API key, tokens, and sensitive data in production
-    const safeBody = { ...body };
-    delete safeBody.hash;
-    delete safeBody.api_key;
-    console.log(`  Response:`, JSON.stringify(safeBody).substring(0, 500));
+    // body arrives pre-redacted — no manual delete of hash/api_key needed
+    console.log(`  Response:`, JSON.stringify(body).substring(0, 500));
   },
 });
+
+// Wire-level debugging (raw bodies, credentials/pwt/hash included) is an
+// explicit opt-out — never leave it enabled in production:
+//   new PayWay({ /* … */ redactHookBodies: false })
 ```
 
 ### Pattern 3b: Correlation metadata, error hooks, and the transaction journal
@@ -840,6 +843,8 @@ If this fails, your credentials or network are the issue. (See Chapter 2 for the
 ```typescript
 const payway = new PayWay({
   // ... other config ...
+  // Payloads arrive pre-redacted (redactHookBodies defaults to true);
+  // set redactHookBodies: false only for wire-level debugging.
   onRequest: (endpoint, body) => console.log('REQ:', endpoint, body),
   onResponse: (endpoint, status, body) => console.log('RES:', endpoint, status, body),
 });

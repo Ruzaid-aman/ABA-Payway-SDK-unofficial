@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   classifyReplLine,
   isUnsafeDispatch,
@@ -13,6 +13,8 @@ import {
   progressLabel,
   providerProposalFailedHint,
 } from '../agent/progress.js';
+import { ansi as c } from '../agent/ansi.js';
+import { setColorOverride } from '../cli/ui/theme.js';
 
 /**
  * Pure helper coverage for the agent REPL: directive classification, :run
@@ -106,6 +108,85 @@ describe('validateDispatch', () => {
       message: "Rejected: 'nope/x' is not a dispatchable PayWay command (agent-management commands are blocked)",
     });
   });
+
+  describe('money-out / irreversible blocklist', () => {
+    // Registry as the real CLI registers it: the blocked commands are all
+    // legitimate top-level commands, so only the blocklist stops them.
+    const full = [
+      ...registered,
+      'generate-checkout',
+      'payment-link',
+      'pre-auth',
+      'profiles',
+      'skills',
+      'refund',
+      'payout',
+      'beneficiary',
+      'close-transaction',
+      'cof',
+      'tx-batch',
+    ];
+
+    it('blocks money-out and irreversible top-level commands with the safety message', () => {
+      expect(validateDispatch('refund -t tx-1 -a 1.00', full)).toEqual({
+        ok: false,
+        message:
+          "Rejected: 'refund' is blocked in the REPL/session dispatcher for safety (moves money out) — run it from the normal CLI shell instead",
+      });
+      expect(validateDispatch('payout -t tx-1 -a 1 --account 500000001', full)).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("'payout' is blocked in the REPL/session dispatcher for safety"),
+      });
+      expect(validateDispatch('beneficiary add 500000001', full)).toMatchObject({ ok: false });
+      expect(validateDispatch('close-transaction -t tx-1', full)).toMatchObject({ ok: false });
+      expect(validateDispatch('tx-batch --file batch.json', full)).toMatchObject({ ok: false });
+    });
+
+    it('blocks the whole cof group even its read leaves, because charge/remove live there', () => {
+      expect(validateDispatch('cof charge -t order-1 -a 4.5 --token pwt', full)).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("'cof' is blocked"),
+      });
+      expect(validateDispatch('cof token details -r req-1', full)).toMatchObject({ ok: false });
+    });
+
+    it('blocks destructive subcommand pairs while leaving the readable pairs of the same group', () => {
+      expect(validateDispatch('payment-link void -i link-1 -y --json', full)).toEqual({
+        ok: false,
+        message:
+          "Rejected: 'payment-link void' is blocked in the REPL/session dispatcher for safety (permanently voids a payment link) — run it from the normal CLI shell instead",
+      });
+      expect(validateDispatch('pre-auth complete -t tx-1', full)).toMatchObject({ ok: false });
+      expect(validateDispatch('pre-auth complete-payout -t tx-1 --account 500000001 --amount 1', full)).toMatchObject({
+        ok: false,
+      });
+      expect(validateDispatch('profiles remove prod-profile', full)).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("'profiles remove' is blocked"),
+      });
+      expect(validateDispatch('skills remove claude', full)).toMatchObject({ ok: false });
+
+      expect(validateDispatch('payment-link detail -i link-1', full)).toMatchObject({ ok: true });
+      expect(validateDispatch('skills list', full)).toMatchObject({ ok: true });
+      expect(validateDispatch('profiles list', full)).toMatchObject({ ok: true });
+    });
+
+    it('keeps pre-auth cancel dispatchable — releasing a hold is not money-out', () => {
+      expect(validateDispatch('pre-auth cancel -t tx-1', full)).toMatchObject({
+        ok: true,
+        tokens: ['pre-auth', 'cancel', '-t', 'tx-1'],
+      });
+    });
+
+    it('still accepts a read-only command', () => {
+      expect(validateDispatch('check-transaction -t x', full)).toMatchObject({ ok: true });
+    });
+
+    it('keeps the agent/ask block working', () => {
+      expect(validateDispatch('agent doctor', full)).toMatchObject({ ok: false });
+      expect(validateDispatch('ask pay $3', full)).toMatchObject({ ok: false });
+    });
+  });
 });
 
 describe('classifyReplLine', () => {
@@ -146,6 +227,10 @@ describe('REPL static texts', () => {
 });
 
 describe('progress presentation helpers', () => {
+  afterEach(() => {
+    setColorOverride(undefined);
+  });
+
   it('maps orchestrator phases to labels', () => {
     expect(progressLabel({ phase: 'validate' })).toBe('Validating plan…');
     expect(progressLabel({ phase: 'authorize' })).toBe('Authorizing plan…');
@@ -182,5 +267,20 @@ describe('progress presentation helpers', () => {
     ttyPrinter({ phase: 'validate' });
     expect(lines).toHaveLength(1);
     expect(stripAnsi(lines[0])).toBe('  · Validating plan…');
+  });
+});
+
+describe('agent ansi palette', () => {
+  afterEach(() => {
+    setColorOverride(undefined);
+  });
+
+  it('resolves through the theme switches at call time — no ANSI into pipes', () => {
+    setColorOverride(false);
+    expect(c.bold('x')).toBe('x');
+    expect(c.red('x')).toBe('x');
+    setColorOverride(true);
+    expect(c.bold('x')).toBe('\x1b[1mx\x1b[0m');
+    expect(c.red('x')).toBe('\x1b[31mx\x1b[0m');
   });
 });

@@ -154,6 +154,7 @@ describe('AgentOrchestrator — one-shot success', () => {
     const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', payway }));
 
     expect(result.status).toBe('succeeded');
+    expect(result.environment).toBe('sandbox');
     expect(calls.generateQr).toBe(1);
     expect(result.actions?.[0].ok).toBe(true);
     expect(result.actions?.[0].artifact).toBeTruthy();
@@ -161,6 +162,35 @@ describe('AgentOrchestrator — one-shot success', () => {
     expect(result.message).toMatch(/poll/i);
     expect(result.executionIds?.length).toBe(1);
     expect(validateCommandResult(result)).toBe(true);
+  });
+});
+
+describe('AgentOrchestrator — machine output states the environment', () => {
+  it('stamps the resolved context environment onto non-succeeded results too', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = createOrchestrator({ context: makeContext({ environment: 'production' }), provider });
+
+    // Non-TTY + --yolo never authorizes in production: still a machine result.
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'yolo', environment: 'production', payway }));
+
+    expect(result.status).toBe('needs_confirmation');
+    expect(calls.generateQr).toBe(0);
+    expect(result.environment).toBe('production');
+    expect(validateCommandResult(result)).toBe(true);
+  });
+
+  it('the resolved context wins over a caller-supplied environment claim', async () => {
+    const provider = new FakeProvider(async () => onlineQrPlan());
+    const { payway, calls } = makePayWay();
+    const orch = createOrchestrator({ context: makeContext({ environment: 'production' }), provider });
+
+    const result = await orch.runOneShot('pay $3', baseOptions({ flag: 'approve', environment: 'sandbox', payway }));
+
+    expect(result.status).toBe('blocked');
+    expect(result.error?.code).toBe('AUTH_ENVIRONMENT_MISMATCH');
+    expect(result.environment).toBe('production');
+    expect(calls.generateQr).toBe(0);
   });
 });
 

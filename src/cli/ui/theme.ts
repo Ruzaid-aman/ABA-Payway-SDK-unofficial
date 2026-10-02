@@ -69,3 +69,20 @@ export function createStyler(enabled: boolean): AnsiPalette {
 export function currentPalette(stream: TtyStream = process.stdout, env: NodeJS.ProcessEnv = process.env): AnsiPalette {
   return createStyler(isColorEnabled(stream, env));
 }
+
+/**
+ * Palette for module-level `const c = lazyPalette()` in command modules: the
+ * Proxy forwards every property access to `currentPalette()` at CALL time, so
+ * a `setColorOverride()` issued after module load (the global `--no-color`
+ * flag is parsed long after imports run) still restyles existing call sites.
+ * A plain `currentPalette()` constant would freeze the switch state instead.
+ */
+export function lazyPalette(): AnsiPalette {
+  return new Proxy({} as AnsiPalette, {
+    get(_target, property) {
+      const palette = currentPalette();
+      const value = palette[property as keyof AnsiPalette];
+      return typeof value === 'function' ? (value as AnsiFn).bind(palette) : value;
+    },
+  });
+}

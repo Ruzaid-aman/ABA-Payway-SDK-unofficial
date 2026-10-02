@@ -88,6 +88,36 @@ describe('createDispatcher', () => {
     }
     expect(seen).toBe('42');
   });
+
+  it('blocks money-out subcommand pairs before dispatch while readable pairs still run', async () => {
+    const program = new Command();
+    let voidInvoked = false;
+    let detailInvoked = false;
+    const group = program.command('payment-link').description('pl');
+    group.command('void').description('v').action(() => {
+      voidInvoked = true;
+    });
+    group
+      .command('detail')
+      .description('d')
+      .option('-i, --id <id>')
+      .action(() => {
+        detailInvoked = true;
+      });
+    const dispatch = createDispatcher(() => program);
+
+    const captured = captureConsole();
+    try {
+      await dispatch('payment-link void -i link-1 -y --json');
+      await dispatch('payment-link detail -i link-1');
+    } finally {
+      captured.restore();
+    }
+    expect(captured.lines.some((l) => l.includes('blocked in the REPL/session dispatcher for safety'))).toBe(true);
+    expect(captured.lines.filter((l) => l.includes('Running:'))).toHaveLength(1);
+    expect(voidInvoked).toBe(false);
+    expect(detailInvoked).toBe(true);
+  });
 });
 
 // Keep the import used for type parity with the REPL harness.

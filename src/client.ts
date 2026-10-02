@@ -143,6 +143,14 @@ export interface PayWayConfig {
     meta?: PayWayHookMeta,
   ) => void;
   /**
+   * M8: `onRequest`/`onResponse` payloads pass through the same sanitizer as
+   * the debug console path (`sanitizeForLog` — merchant_auth, hash, pwt,
+   * google_pay_token and token-shaped keys become `***HIDDEN***`). Default
+   * `true`. Set `false` to receive raw wire bodies (credentials/pwt/hash
+   * included) — the explicit opt-in for wire-level debugging.
+   */
+  redactHookBodies?: boolean;
+  /**
    * Phase 2: fires on every failed attempt (HTTP errors, network, timeout,
    * business failures) — the paths `onResponse` never sees. Fail-open.
    */
@@ -1123,6 +1131,29 @@ function describeBodyForHook(bodyPayload: string | FormData): string {
 }
 
 /**
+ * Redacted view of a string wire body for the `onRequest` hook (M8): parsed
+ * and sanitized exactly like the debug console line, then re-serialized in
+ * the wire's own format so the `bodyPayload: string` contract keeps its
+ * shape (JSON in → JSON out, urlencoded in → urlencoded out). Opaque text
+ * degrades to the same 200-char preview the debug path shows.
+ */
+function redactHookBodyPayload(bodyPayload: string): string {
+  const looksLikeJson = bodyPayload.trimStart().startsWith('{') || bodyPayload.trimStart().startsWith('[');
+  if (!looksLikeJson && bodyPayload.includes('=')) {
+    // Urlencoded wire body (merchant-auth endpoints default to it) —
+    // re-encoding preserves the format hook consumers parse.
+    const sanitized = sanitizeForLog(parseDebugRequestBody(bodyPayload)) as Record<string, unknown>;
+    const form = new URLSearchParams();
+    for (const [key, value] of Object.entries(sanitized)) {
+      form.append(key, String(value));
+    }
+    return form.toString();
+  }
+  const sanitized = sanitizeForLog(parseDebugRequestBody(bodyPayload));
+  return typeof sanitized === 'string' ? sanitized : JSON.stringify(sanitized);
+}
+
+/**
  * Pull the gateway correlation id out of a response envelope
  * (`status.trace` per OpenAPI types.ts, with a bare `trace` fallback).
  */
@@ -1537,7 +1568,16 @@ export class PayWay {
                 : sanitizeForLog(describeMultipartBody(bodyPayload));
             console.debug(`[payway] -> POST ${endpoint} (cid=${correlationId})`, loggedBody);
           }
-          this.config.onRequest?.(endpoint, describeBodyForHook(bodyPayload), { correlationId, attempt });
+          // M8: this is the single funnel for the user hook (the debug-mode
+          // wrapper above delegates straight through), so redaction here
+          // covers both the direct and the wrapped path exactly once.
+          const hookPayload =
+            this.config.redactHookBodies === false
+              ? describeBodyForHook(bodyPayload)
+              : typeof bodyPayload === 'string'
+                ? redactHookBodyPayload(bodyPayload)
+                : describeMultipartBody(bodyPayload);
+          this.config.onRequest?.(endpoint, hookPayload, { correlationId, attempt });
         } catch {
           // Logging hooks must never fail SDK execution.
         }
@@ -1652,12 +1692,20 @@ export class PayWay {
               rateLimitInfo,
             );
           }
-          this.config.onResponse?.(endpoint, response.status, parsedBody, rateLimitInfo, {
-            correlationId,
-            attempt,
-            durationMs,
-            traceId: toTraceString(extractTraceId(parsedBody)),
-          });
+          // M8: sanitizeForLog returns a deep copy, so the error
+          // classification and journal digest below still see the raw body.
+          this.config.onResponse?.(
+            endpoint,
+            response.status,
+            this.config.redactHookBodies === false ? parsedBody : sanitizeForLog(parsedBody),
+            rateLimitInfo,
+            {
+              correlationId,
+              attempt,
+              durationMs,
+              traceId: toTraceString(extractTraceId(parsedBody)),
+            },
+          );
         } catch {
           // Logging hooks must never fail SDK execution.
         }

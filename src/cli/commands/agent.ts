@@ -78,7 +78,9 @@ export function registerAgentCommands(program: Command): void {
 
         if (!config) {
           if (!isInteractiveTerminal()) {
-            console.log(serializeCommandResult(blockedAgentResult(request)));
+            // Machine output always states the environment, even in the
+            // unconfigured-blocked case — the resolved context is in scope here.
+            console.log(serializeCommandResult({ ...blockedAgentResult(request), environment: context.environment }));
             process.exitCode = 1;
           } else {
             if (await maybeAutoOnboard()) return;
@@ -222,6 +224,7 @@ export function registerAgentCommands(program: Command): void {
         console.log(
           JSON.stringify(
             {
+              environment: context.environment,
               configured: !!config,
               provider: config?.provider ?? null,
               model: config?.model ?? null,

@@ -307,7 +307,9 @@ const payway = new PayWay({
   merchantId: process.env.PAYWAY_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_API_KEY!,
   environment: 'sandbox',
-  // Log every API call during development
+  // Log every API call during development.
+  // Payloads arrive pre-redacted (redactHookBodies defaults to true) —
+  // set redactHookBodies: false only for wire-level debugging.
   onRequest: (endpoint, body) => {
     console.log(`[PayWay] → ${endpoint}:`, JSON.stringify(body).substring(0, 500));
   },

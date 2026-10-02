@@ -132,6 +132,7 @@ describe('ask command (in-process)', () => {
     expect(parsed?.version).toBe('agent-command/v1');
     expect(parsed?.status).toBe('blocked');
     expect(parsed?.request).toBe('generate a QR for $3');
+    expect(parsed?.environment).toBe('sandbox');
     expect((parsed?.error as { code?: string }).code).toBe('AGENT_NOT_CONFIGURED');
     expect(process.exitCode).toBe(1);
   });
@@ -202,6 +203,15 @@ describe('agent setup / ack / doctor (in-process)', () => {
     expect(text).toContain('· unverified  Provider connectivity (agent not configured)');
     expect(text).toContain('Privacy acknowledgment');
     expect(text).not.toContain('payway-sdk onboard'); // no config → no hint
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('doctor --json states the resolved environment, agreeing with the main doctor', async () => {
+    const program = buildProgram();
+    await program.parseAsync(['agent', 'doctor', '--json'], { from: 'user' });
+    const parsed = jsonLog();
+    expect(parsed?.environment).toBe('sandbox'); // no PAYWAY_SANDBOX override → default
+    expect(parsed?.configured).toBe(false);
     expect(process.exitCode).toBeUndefined();
   });
 });

@@ -70,6 +70,18 @@ describe('serializeCommandResult', () => {
     expect(parsed.version).toBe('agent-command/v1');
     expect(parsed.message).toBe('ok');
   });
+
+  it('carries the resolved environment through serialization', () => {
+    const serialized = serializeCommandResult(baseResult({ environment: 'production', message: 'ok' }));
+    const parsed = JSON.parse(serialized) as AgentCommandResultV1;
+    expect(parsed.environment).toBe('production');
+  });
+
+  it('rejects an environment outside the sandbox/production enum', () => {
+    expect(() =>
+      serializeCommandResult(baseResult({ environment: 'staging' } as unknown as AgentCommandResultV1)),
+    ).toThrow('failed validation');
+  });
 });
 
 describe('renderCreatePlanConfirmation', () => {

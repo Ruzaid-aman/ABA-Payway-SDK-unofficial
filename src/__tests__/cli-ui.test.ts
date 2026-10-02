@@ -10,7 +10,7 @@ import { resolvePromptMode } from '../cli/ui/mode.js';
 import { formatKeyValueSummary, renderNextSteps } from '../cli/ui/panels.js';
 import { CliCancelled, createClackIO } from '../cli/ui/prompts.js';
 import { levenshtein, suggest, suggestMessage } from '../cli/ui/suggest.js';
-import { createStyler, isColorEnabled, setColorOverride } from '../cli/ui/theme.js';
+import { createStyler, isColorEnabled, lazyPalette, setColorOverride } from '../cli/ui/theme.js';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -101,6 +101,16 @@ describe('theme', () => {
   it('createStyler(true) wraps with ANSI codes', () => {
     const styled = createStyler(true);
     expect(styled.red('x')).toBe('\x1b[31mx\x1b[0m');
+  });
+
+  it('lazyPalette re-resolves the switches at every call, so a post-import override still applies', () => {
+    const lazy = lazyPalette();
+    setColorOverride(false);
+    expect(lazy.bold('x')).toBe('x');
+    expect(lazy.cyan('x')).toBe('x');
+    setColorOverride(true);
+    expect(lazy.bold('x')).toBe('\x1b[1mx\x1b[0m');
+    expect(lazy.cyan('x')).toBe('\x1b[36mx\x1b[0m');
   });
 });
 

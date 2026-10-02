@@ -88,9 +88,9 @@
       "description": "Merchant portal, sandbox credentials, ABA Mobile simulator, environment variables.",
       "source": "docs/guides/02-prerequisites-and-setup.md",
       "file": "setup.md",
-      "bytes": 23657,
-      "sha256": "910dcf95cba70932",
-      "sourceSha256": "c54043833e724e2c"
+      "bytes": 23992,
+      "sha256": "dbb5e99c24ba43e6",
+      "sourceSha256": "8b03939ab77de113"
     },
     {
       "topic": "web-implementation",
@@ -118,9 +118,9 @@
       "description": "Mobile webview checkout patterns and deeplink return legs.",
       "source": "docs/guides/05-webview-implementation.md",
       "file": "webviews.md",
-      "bytes": 11916,
-      "sha256": "2ee737d6e851649b",
-      "sourceSha256": "f7b61fb76f2c9266"
+      "bytes": 12055,
+      "sha256": "fb8b70c84aad078b",
+      "sourceSha256": "b9ecfbdf322397a5"
     },
     {
       "topic": "telegram-mini-app",
@@ -188,9 +188,9 @@
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
       "source": "docs/guides/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
-      "bytes": 62748,
-      "sha256": "d785472c7e9070d7",
-      "sourceSha256": "4ea52750b3b29448"
+      "bytes": 63205,
+      "sha256": "d15ce46fb9063e1c",
+      "sourceSha256": "8bdabb670950eaab"
     },
     {
       "topic": "deployment-checklist",
@@ -376,7 +376,7 @@
     },
     {
       "file": "docs-packaged/guides/02-prerequisites-and-setup.md",
-      "sha256": "9e086eaa390c552b"
+      "sha256": "56fe4d89f442ecb5"
     },
     {
       "file": "docs-packaged/guides/03-web-implementation.md",
@@ -388,7 +388,7 @@
     },
     {
       "file": "docs-packaged/guides/05-webview-implementation.md",
-      "sha256": "b54ba7c888f86ecc"
+      "sha256": "0645b70eb858351c"
     },
     {
       "file": "docs-packaged/guides/06-telegram-mini-app.md",
@@ -416,7 +416,7 @@
     },
     {
       "file": "docs-packaged/guides/12-error-handling-and-debugging.md",
-      "sha256": "46480ee794bcb9c7"
+      "sha256": "c5cc09bd6f9ad1f9"
     },
     {
       "file": "docs-packaged/guides/13-deployment-checklist.md",

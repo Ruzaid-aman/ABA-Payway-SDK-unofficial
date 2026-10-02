@@ -80,6 +80,7 @@ import {
   PayWayRateLimitError,
   PollingAbortedError,
 } from './errors.js';
+import { CircuitOpenError } from './circuit-breaker.js';
 import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConfiguration } from './khqr-config.js';
 import { openImageInDefaultViewer } from './open-image.js';
 import { sdk } from './sdk.js';
@@ -243,6 +244,9 @@ function warnDuplicateTransactionId(
 
 function classifyError(e: unknown): number {
   if (e instanceof PollingAbortedError) return e.reason === 'max_consecutive_errors' ? EXIT_API_FAILURE : EXIT_NETWORK;
+  // Transport refusal by the circuit breaker is a network condition, not a
+  // validation error — CircuitOpenError is a PayWayError subclass.
+  if (e instanceof CircuitOpenError) return EXIT_NETWORK;
   if (e instanceof PayWayNetworkError || e instanceof PayWayRateLimitError) return EXIT_NETWORK;
   if (e instanceof PayWayAPIError) {
     if (e.statusCode === undefined && e.retryable === true) return EXIT_NETWORK;

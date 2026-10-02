@@ -1,3 +1,5 @@
+import { PayWayError } from './errors.js';
+
 /**
  * Transport-level circuit breaker (TD-07, Pillar B §B.2 of the four-pillars
  * audit). Tracks consecutive transport failures per endpoint and stops
@@ -32,8 +34,13 @@ interface BreakerEntry {
   openedAt: number | null;
 }
 
-/** Thrown when a request is refused because the circuit for its endpoint is open. */
-export class CircuitOpenError extends Error {
+/**
+ * Thrown when a request is refused because the circuit for its endpoint is open.
+ * A transport-level refusal, so it joins the `PayWayError` taxonomy as
+ * `'network_error'` (M6) — `instanceof PayWayError` handling in caller code
+ * must see it.
+ */
+export class CircuitOpenError extends PayWayError {
   public readonly endpoint: string;
   public readonly retryInMs: number;
 
@@ -41,6 +48,7 @@ export class CircuitOpenError extends Error {
     super(
       `Circuit breaker OPEN for ${endpoint} — failing fast after repeated transport failures. ` +
         `Retry allowed in ~${Math.ceil(retryInMs / 1000)}s.`,
+      'network_error',
     );
     Object.setPrototypeOf(this, CircuitOpenError.prototype);
     this.name = 'CircuitOpenError';

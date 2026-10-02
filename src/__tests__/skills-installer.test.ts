@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,6 +11,7 @@ import {
   getPackagedSkillNames,
   SKILL_AGENTS,
 } from '../cli/commands/skills.js';
+import { setColorOverride } from '../cli/ui/theme.js';
 
 /**
  * F09 acceptance: fresh temporary homes, one selected agent, stale script,
@@ -310,5 +311,67 @@ describe('skills installer (F09)', () => {
     // metadata.version and a frontmatter-description summary.
     expect(output).toMatch(/v\d+\.\d+\.\d+/);
     expect(output).toContain('Use when');
+  });
+});
+
+describe('skills output color discipline', () => {
+  afterEach(() => {
+    setColorOverride(undefined);
+    vi.unstubAllEnvs();
+  });
+
+  function captureList(dest: string): { lines: string[]; run: () => Promise<void> } {
+    const lines: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => lines.push(String(args[0] ?? ''));
+    return {
+      lines,
+      run: async () => {
+        try {
+          await listSkills({ dest });
+        } finally {
+          console.log = originalLog;
+        }
+      },
+    };
+  }
+
+  it('emits ZERO ANSI escapes into a pipe (no flag at all)', async () => {
+    // Neutralize both env switches and clear the override so the decision
+    // falls through to TTY detection — a vitest worker's stdout is not a TTY.
+    vi.stubEnv('NO_COLOR', '');
+    vi.stubEnv('FORCE_COLOR', '');
+    const dest = newDest();
+    await addSkills(['claude'], REPO_SKILLS, { dest });
+
+    const capture = captureList(dest);
+    await capture.run();
+
+    const ansi = capture.lines.filter((line) => line.includes('\x1b['));
+    expect(ansi).toEqual([]);
+    expect(capture.lines.join('\n')).toContain('claude');
+  });
+
+  it('honours the global --no-color override (switch parsed after module import)', async () => {
+    vi.stubEnv('FORCE_COLOR', '');
+    setColorOverride(false);
+    const dest = newDest();
+    await addSkills(['claude'], REPO_SKILLS, { dest });
+
+    const capture = captureList(dest);
+    await capture.run();
+
+    expect(capture.lines.some((line) => line.includes('\x1b['))).toBe(false);
+  });
+
+  it('still styles when color is forced (TTY output unchanged)', async () => {
+    setColorOverride(true);
+    const dest = newDest();
+    await addSkills(['claude'], REPO_SKILLS, { dest });
+
+    const capture = captureList(dest);
+    await capture.run();
+
+    expect(capture.lines.some((line) => line.includes('\x1b['))).toBe(true);
   });
 });

@@ -273,6 +273,7 @@ const commandResultSchema = {
     status: { enum: ['succeeded', 'needs_confirmation', 'needs_clarification', 'blocked', 'failed'] },
     request: { type: 'string' },
     message: { type: 'string' },
+    environment: { enum: ['sandbox', 'production'] },
     plan: { type: 'object' },
     actions: { type: 'array', items: { type: 'object' } },
     sessionId: { type: 'string' },

@@ -4,6 +4,7 @@ import {
   CircuitOpenError,
   DEFAULT_CIRCUIT_BREAKER_OPTIONS,
 } from '../circuit-breaker.js';
+import { PayWayError } from '../errors.js';
 import { computeTokenExpiry, daysUntilTokenExpiry } from '../utils.js';
 import { createPayWayLogger, resolveLogLevel } from '../logger.js';
 import { PayWay } from '../client.js';
@@ -117,6 +118,25 @@ describe('CircuitBreaker (TD-07)', () => {
   it('exposes sane defaults', () => {
     expect(DEFAULT_CIRCUIT_BREAKER_OPTIONS.failureThreshold).toBe(5);
     expect(DEFAULT_CIRCUIT_BREAKER_OPTIONS.resetTimeoutMs).toBe(30_000);
+  });
+
+  it('CircuitOpenError joins the PayWayError taxonomy as network_error (M6)', () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 1, resetTimeoutMs: 60_000 });
+    breaker.recordFailure('ep');
+    try {
+      breaker.assertAllowed('ep');
+      expect.unreachable('circuit must be open');
+    } catch (error) {
+      expect(error).toBeInstanceOf(CircuitOpenError);
+      // Transport-level refusal: documented instanceof PayWayError handling must see it.
+      expect(error).toBeInstanceOf(PayWayError);
+      const err = error as CircuitOpenError;
+      expect(err.type).toBe('network_error');
+      expect(err.name).toBe('CircuitOpenError');
+      expect(err.endpoint).toBe('ep');
+      expect(err.retryInMs).toBe(60_000);
+      expect(err.message).toContain('Circuit breaker OPEN for ep');
+    }
   });
 });
 
