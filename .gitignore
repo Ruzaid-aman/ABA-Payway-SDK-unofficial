@@ -85,3 +85,6 @@ reports/
 # npm install + installed skills) is reproducible evidence, not source — keep the
 # logs and evidence JSON, drop the 33 MB install itself.
 /.scratch/publishing-dx-audit-2026-09-29/consumer/
+
+# Synthetic agent outputs/transcripts are local review evidence.
+/.scratch/payway-integration-skills/trials/codex-second-pass/

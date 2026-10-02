@@ -28,6 +28,11 @@ generate-checkout/cof charge/payment-link.
 Every doc below is also served by the CLI itself, offline:
 `payway-sdk docs list` · `payway-sdk docs <topic>` · `payway-sdk docs search <query>`
 
+- [Integration profile and merchant gates](knowledge/integration-onboarding.md): Structured intake, onboarding, simulator evidence, G0–G7 and controlled production/rollback.
+- [Integration contracts and callbacks](knowledge/integration-contracts.md): Source/version authority, callback variants and ACK, vectors, URL roles and inquiry policy.
+- [Integration finance evidence](knowledge/integration-finance.md): Receipts, report grain, authoritative joins, batch-to-bank matching and settlement signoff.
+- [Advanced integration operations](knowledge/integration-operations.md): Consent, billing, hold/refund/payout locks, monitoring, plugins and adjacent product boundaries.
+- [Customer UI and mobile acceptance](knowledge/integration-ui.md): Verified UI states, QR/app handoff, accessibility, physical-device evidence and operator roles.
 - [Merchant agent integration](knowledge/agent-integration.md): Project inspection, workflow capability/verification matrix, portable skill installation, recovery and production boundaries.
 - [Express and Next.js integration recipes](knowledge/integration-recipes.md): Authenticated QR, hosted checkout and payment links; saved attempts, durable inbox, inquiry and fulfillment outbox.
 - [Support and compatibility](knowledge/support.md): Runtime, verification limits, support scope, and sanitized bug reports.

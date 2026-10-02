@@ -10,6 +10,8 @@ Canonical mappings
 | --- | --- |
 | What does the gateway ACTUALLY do (live-verified)? | `docs/internal/SANDBOX-FINDINGS.md` (append-only, §-numbered evidence) |
 | What don't we know / what has ABA been asked? | `docs/internal/INTEGRATION-GAPS-AND-ABA-QUESTIONS.md` (Q-numbers, Parts 1–5) |
+| Additional integration/product/finance policy questions | `audit-results/four-pillars/ABA-OPEN-QUESTIONS.md`, Q44–Q56 (2026-10-02); owner inputs, not sent externally |
+| Restricted integration companion design | `docs/internal/INTEGRATION-SKILL-COMPANION.md` (proposed roles/approval/evidence boundary) |
 | Close-transaction semantics | `docs/internal/CLOSE-TRANSACTION-FINDINGS.md` |
 | Historical audits and remediation | `audit-results/` (see `audit-results/merged-remediation-review-2026-09-08/`) |
 | Where to find publish/package gating rules | `scripts/check-package-contents.mjs` and `docs/RELEASE-READINESS.md` |

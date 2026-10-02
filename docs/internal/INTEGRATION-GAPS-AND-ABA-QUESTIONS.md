@@ -446,3 +446,7 @@ lifecycle) now carries the live callback shape, the transitive-auth recovery pat
 the charge-time-only unlink detection rule, and the status-only charge response
 with tran_id-based reconciliation. Skills (`aba-payway-cof`, `aba-payway-link-account`)
 and the packaged knowledge corpus are synced to the same content.
+
+## Integration-skill enhancement — 2026-10-02
+
+The approved additional-requirements work records new owner inputs in the canonical [ABA open questions register](../../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md), Q44–Q56. These extend existing questions without erasing answered relay/campaign evidence: production acceptance, settlement sources/joins, callback versions/ACK/vectors, current-query proof/recovery, money/IDs, onboarding/network, simulator/UI, endpoint/method entitlement, COF scheduling/consent, pre-auth/refund, payout, plugins/adjacent products and public/internal maintenance. Answers must carry owner/version/date/environment/profile and publication permission before propagation.

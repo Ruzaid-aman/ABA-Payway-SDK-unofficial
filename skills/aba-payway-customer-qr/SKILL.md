@@ -2,7 +2,7 @@
 name: aba-payway-customer-qr
 description: Handle Merchant Portal Customer Module static QRs (Printed QR channel) — decoded payload anatomy, callback handling, and reconciliation via get-transactions-by-mc-ref.
 metadata:
-  version: 1.4.0
+  version: 1.4.1
 ---
 
 # Customer Module QR (Merchant Portal)
@@ -24,8 +24,8 @@ app.post('/payway/callback', async (req, res) => {
   if (!payway.verifyCallback(req.body, req.headers['x-payway-hmac-sha512'] as string)) {
     return res.status(400).send('Invalid signature');
   }
-  // This route's callback shape (sandbox-verified; same as the offline-KHQR
-  // notification and skills/aba-payway-hash/scripts/mock-callback.cjs):
+  // Captured signed Printed QR profile shape. Similar field names in offline
+  // KHQR do not imply the same authentication contract:
   //   payment_status   — the approval state ('APPROVED' | 'PENDING' | …)
   //   original_amount / original_currency — the MERCHANT-side order money
   //     (the obligation; amounts arrive as strings — coerce with Number())
@@ -122,6 +122,7 @@ For the full durability workflow (storage, retries, recovery) see
 - **One callback URL per merchant profile** serves every channel (online checkout + Customer Module + offline notifications), configured by the ABA integration team; production changes need a support ticket. Never provision an ephemeral trycloudflare tunnel URL — tunnels are for sandbox verification only.
 - SDK webhook server (`setup-webhook`): start it with `--tunnel --non-interactive`; it binds locally, retries one transient quick-tunnel failure, and probes the public `/aba-payway-khqr-webhook` route before saving the callback URL. The khqr route verifies the signature when the header is present (offline notifications stay 'unsigned'), attaches `customerQr` metadata, and sets `matchedTransactionId`/`matchedStatus` + replay markers; the online route classifies too. `webhook list` shows `route=customer-qr customer_id=…`; `webhook status`/`stop` inspect or stop only the SDK-owned development receiver.
 - Test the receiver without the Simulator: `payway-sdk webhook trigger --url <receiver> --event customer-qr.payment --merchant-ref <customer-id> --customer-name <name>` — a SIGNED fixture with the nested customer object (round-trips through `verifyCallbackDetailed` and `parseCustomerQrCallback`).
+- The capture receiver is a development tool. Production must select authentication by enrolled service/profile/version, reject a missing required signature, and never downgrade to unsigned processing based on a missing header. Confirm older cohorts with ABA; use inquiry for unsigned contracts.
 - Callback: HTTP POST with `X-PAYWAY-HMAC-SHA512` header, no retries (5s timeout). Same validation as the online QR flow — but the signature is only authenticity; the approved-state/money/dedup guards above are what prevent incorrect fulfillment.
 - Fallback: `get-transactions-by-mc-ref` using the Customer ID as `merchant_ref`. The endpoint returns AT MOST 50 matches and exposes NO pagination parameter — a single request is not a complete-history guarantee during a long outage or high-volume interval; treat a 50-row (saturated) result as a possible gap and reconcile against your own records before declaring completeness.
 

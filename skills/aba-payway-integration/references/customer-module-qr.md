@@ -104,7 +104,7 @@ The parser never authenticates anything — parse, then **verify the signature**
 
 `payway-sdk setup-webhook` hosts a capture server whose routes classify bodies, so one URL can serve every channel:
 
-- `/aba-payway-khqr-webhook` accepts both the unsigned offline-KHQR notification and the **signed Customer Module callback** — the signature header (not the body shape) distinguishes them, and the verdict is recorded durably (`signatureVerdict`, `customerQr` metadata, `matchedTransactionId/matchedStatus`, replay flag).
+- `/aba-payway-khqr-webhook` is a development capture receiver for unsigned offline KHQR and signed Customer Module deliveries; it records header-based verdicts and metadata (`signatureVerdict`, `customerQr`, `matchedTransactionId/matchedStatus`, replay flag). Production merchant processing must select the enrolled service/profile/version contract in configuration, not downgrade a signed callback when its header is absent. Use separate routes/policies where needed and authoritative inquiry before posting.
 - `/aba-payway-webhook` (the online route) classifies too — if your single profile URL points there, a Customer Module delivery still gets verified and tagged.
 - `webhook list` shows `route=customer-qr customer_id=dt-one-8989` for such captures; `webhook verify-callback --record wh_…` re-reports the stored verdict.
 

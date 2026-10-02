@@ -14,7 +14,8 @@ const consumer = path.join(trialRoot, 'dependencies');
 mkdirSync(consumer);
 writeFileSync(path.join(consumer, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
 run(['install', '--ignore-scripts', '--no-audit', '--no-fund', archive, 'express@5', '@types/express@5', 'typescript@5', '@types/node@24'], consumer);
-for (const agent of ['codex', 'claude']) {
+const agents=process.argv.includes('--codex-only')?['codex']:['codex','claude'];
+for (const agent of agents) {
   const dir = path.join(trialRoot, agent);
   mkdirSync(dir);
   // Full physical package copy; no junction back to the private checkout.
@@ -38,7 +39,7 @@ export function sessionUser(request: { headers: unknown }): string | undefined {
   writeFileSync(path.join(dir, 'TASK.md'), `Use the aba-payway-integration skill at .agents/skills/aba-payway-integration/SKILL.md.
 Add PayWay integration to this existing synthetic merchant project. Read merchant-context.ts and keep its orders/prices/authentication.
 Implement merchant.ts exporting createMerchant(gateway, databaseFile). It must return:
-{ expressApp, next: { qrPOST, hostedPOST, linkPOST, callbackPOST, statusGET(request,attemptId) }, store }.
+{ expressApp, next: { qrPOST, hostedPOST, linkPOST, callbackPOST, statusGET(request,attemptId) }, store, reconcile(attemptId,ownerId) }.
 Gateway is an injected synthetic provider with async create(attempt), lookup(attempt), following the recipe's interface.
 Express endpoints are POST /payments/create/qr|hosted|link, POST /payments/callback, GET /payments/status/:attemptId.
 Next handlers take standard Request objects. Customers send only orderId; existing server prices and session determine ownership.
@@ -46,6 +47,8 @@ Use durable storage across restart and expose store.jobs(), store.pending(), sto
 Use only synthetic callback signing key 'synthetic-trial-key'. Do not access real credentials or contact a payment gateway.
 Support QR, hosted form and payment link. Verify signed online callbacks, treat unsigned link notifications as hints, query the injected provider,
 fulfill once, and recover a lost response without another create. Return only attemptId and payment artifact to the customer.
+Customer status reads must use local verified state without contacting the provider. Expose reconcile(attemptId,ownerId) for the scheduled worker.
+Use the recipe's HTTP 200 plain-text callback acknowledgement after durable acceptance. Queuing fulfillment is not completed delivery.
 Compile and run the existing acceptance harness without editing it. Add DIAGNOSIS.md explaining code 104, code 1/Wrong Hash and ambiguous-create recovery,
 including evidence/enablement limits. Explain storage and production prerequisites. Keep all changes within this directory; do not modify dependencies.
 `);
@@ -73,11 +76,11 @@ for(const framework of ['express','next']) for(const route of ['qr','hosted','li
       if(endpoint==='/payments/callback')res=await app.next.callbackPOST(req);
       else if(method==='GET')res=await app.next.statusGET(req,endpoint.split('/').pop());
       else res=await app.next[route+'POST'](req);
-      return {status:res.status,body:await res.json()};
+      return {status:res.status,body:endpoint==='/payments/callback'?await res.text():await res.json()};
     }
     if(!server)server=await new Promise(resolve=>{const s=app.expressApp.listen(0,'127.0.0.1',()=>resolve(s));});
     const res=await fetch('http://127.0.0.1:'+server.address().port+endpoint,{method,headers:{'content-type':'application/json','x-demo-session':user,...(body?{'x-payway-hmac-sha512':signCallbackBody(body,'synthetic-trial-key')}:{})},...(body?{body:JSON.stringify(body)}:{})});
-    return {status:res.status,body:await res.json()};
+    return {status:res.status,body:endpoint==='/payments/callback'?await res.text():await res.json()};
   }
   const created=await request('POST','/payments/create/'+route,{orderId:'order-1',amount:0.01,currency:'KHR',ownerId:'mallory'});
   assert.equal(created.status,201); const id=created.body.attemptId; assert.ok(id); assert.equal(created.body.artifact.kind,route);
@@ -85,10 +88,12 @@ for(const framework of ['express','next']) for(const route of ['qr','hosted','li
   assert.equal((await request('POST','/payments/create/'+route,{orderId:'order-1'},'')).status,401);
   proofStatus='PENDING';
   const callback=route==='link'?{merchant_ref_no:id,tran_id:'untrusted-transaction',status:0}:{tran_id:id,payment_status:'APPROVED'};
-  assert.equal((await request('POST','/payments/callback',callback)).status,202);
+  assert.equal((await request('POST','/payments/callback',callback)).status,200);
+  await app.reconcile(id,'alice');
   await request('GET','/payments/status/'+id); assert.equal(app.store.jobs().length,0);
   proofStatus='APPROVED';
-  await Promise.all([request('GET','/payments/status/'+id),request('GET','/payments/status/'+id)]);
+  await Promise.all([app.reconcile(id,'alice'),app.reconcile(id,'alice')]);
+  assert.equal((await request('GET','/payments/status/'+id)).body.verified,true);
   assert.equal(app.store.jobs().length,1); assert.equal(submissions,1);
   if(server){await new Promise(resolve=>server.close(resolve));server=undefined;} app.store.close();
   app=createMerchant(gateway,file); assert.equal(app.store.jobs().length,1); app.store.close();checks++;
@@ -101,12 +106,12 @@ const req=()=>new Request('http://localhost/payments/create/qr',{method:'POST',h
 assert.equal((await app.next.qrPOST(req())).status,502);
 assert.equal((await app.next.qrPOST(req())).status,409);assert.equal(calls,1);
 const id=app.store.pending()[0];assert.ok(id);
-await app.next.statusGET(new Request('http://localhost/status',{headers:{'x-demo-session':'alice'}}),id);
+await app.reconcile(id,'alice');
 assert.equal(app.store.jobs().length,1);app.store.close();
 const diagnosis=readFileSync('DIAGNOSIS.md','utf8');assert.ok(diagnosis.length>200);
 rmSync(area,{recursive:true,force:true});
 console.log(JSON.stringify({passed:true,frameworkRouteCases:checks,recovery:true}));
 `);
 }
-writeFileSync(path.join(trialRoot, 'TRIALS.json'), JSON.stringify({ root: trialRoot, archive, agents: ['codex','claude'] }, null, 2));
+writeFileSync(path.join(trialRoot, 'TRIALS.json'), JSON.stringify({ root: trialRoot, archive, agents }, null, 2));
 console.log(JSON.stringify({ root: trialRoot, archive }));

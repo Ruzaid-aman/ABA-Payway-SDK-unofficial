@@ -102,7 +102,7 @@ describe('installed integration recipe decisions', () => {
     expect(f.store.get(id)?.state).toBe('unknown');
     await expect(f.service.create('order-1', 'alice', 'qr')).rejects.toThrow('reconcile');
     expect(calls).toBe(1);
-    expect((await f.service.reconcile(id)).fulfilled).toBe(true);
+    expect((await f.service.reconcile(id)).fulfillmentQueued).toBe(true);
   });
   it('durably accepts a callback without waiting for provider inquiry', async () => {
     const f = setup();
@@ -131,7 +131,7 @@ describe('installed integration recipe decisions', () => {
     const f = setup();
     const { attemptId } = await f.service.create('order-1', 'alice', 'qr');
     f.proof(proof);
-    expect((await f.service.reconcile(attemptId)).fulfilled).toBe(false);
+    expect((await f.service.reconcile(attemptId)).fulfillmentQueued).toBe(false);
     expect(f.store.jobs()).toHaveLength(0);
   });
   it('treats an unsigned link pushback as a hint and authenticates customer status reads', async () => {
@@ -141,12 +141,12 @@ describe('installed integration recipe decisions', () => {
     expect(
       f.service.signal({ merchant_ref_no: attemptId, tran_id: 'forged-paid-id', status: 0, amount: 300 }, ''),
     ).toEqual({ accepted: true });
-    expect((await f.service.reconcile(attemptId)).fulfilled).toBe(false);
+    expect((await f.service.reconcile(attemptId)).fulfillmentQueued).toBe(false);
     await expect(f.service.reconcile(attemptId, 'mallory')).rejects.toThrow('not found');
     expect(() => f.service.signal({ merchant_ref_no: attemptId }, '')).toThrow('Malformed');
     expect(f.store.jobs()).toHaveLength(0);
     f.proof({});
-    expect((await f.service.reconcile(attemptId, 'alice')).fulfilled).toBe(true);
+    expect((await f.service.reconcile(attemptId, 'alice')).fulfillmentQueued).toBe(true);
   });
   it('recovers across restart and two DB connections, queuing one fulfillment job', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'payway-recipe-db-'));
@@ -166,7 +166,7 @@ describe('installed integration recipe decisions', () => {
     serviceA.signal(body, signCallbackBody(body, key));
     serviceB.signal(body, signCallbackBody(body, key));
     const results = await Promise.all([serviceA.reconcile(attemptId), serviceB.reconcile(attemptId)]);
-    expect(results.filter((result) => result.fulfilled)).toHaveLength(1);
+    expect(results.filter((result) => result.fulfillmentQueued)).toHaveLength(1);
     expect(a.jobs()).toEqual([{ orderId: 'order-1', attemptId }]);
   });
   it('recovers a process stop between durable reservation and submission', async () => {
@@ -190,6 +190,8 @@ describe('installed integration recipe decisions', () => {
     vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
       calls.push(String(input));
       const body = JSON.parse(String(init?.body)) as { tran_id: string };
+      if (String(input).includes('/check-transaction-2'))
+        return Response.json({ status: { code: '00', tran_id: body.tran_id }, data: { payment_status: 'APPROVED' } });
       if (String(input).includes('/transaction-detail'))
         return Response.json({
           status: { code: '00' },
@@ -218,7 +220,7 @@ describe('installed integration recipe decisions', () => {
       route: 'qr',
     };
     expect((await gateway.create(attempt)).artifact.qrString).toBe('synthetic-qr');
-    expect(await gateway.lookup(attempt)).toEqual({
+    expect(await gateway.lookup(attempt)).toMatchObject({
       identity: attempt.attemptId,
       status: 'APPROVED',
       amount: 3,
@@ -227,7 +229,7 @@ describe('installed integration recipe decisions', () => {
     const html = (await gateway.create({ ...attempt, route: 'hosted' })).artifact.html!;
     expect(html).toContain('method="POST"');
     expect(html).toContain(attempt.attemptId);
-    expect(calls).toHaveLength(2); // hosted form generation is local
+    expect(calls).toHaveLength(3); // current status + approved detail; hosted generation is local
   });
   it('submits a real SDK hosted form as URL-encoded fields to a simulated local provider', async () => {
     let received = new URLSearchParams();
@@ -333,17 +335,17 @@ describe('installed integration recipe decisions', () => {
     const { attemptId } = await f.service.create('order-1', 'alice', 'link');
     expect(f.store.get(attemptId)?.linkId).toBe('saved-link');
     total = 4;
-    expect((await f.service.reconcile(attemptId)).fulfilled).toBe(false);
+    expect((await f.service.reconcile(attemptId)).fulfillmentQueued).toBe(false);
     total = 3;
     currency = 'KHR';
-    expect((await f.service.reconcile(attemptId)).fulfilled).toBe(false);
+    expect((await f.service.reconcile(attemptId)).fulfillmentQueued).toBe(false);
     currency = 'USD';
     refunded = 1;
-    expect((await f.service.reconcile(attemptId)).fulfilled).toBe(false);
+    expect((await f.service.reconcile(attemptId)).fulfillmentQueued).toBe(false);
     refunded = 0;
     responseId = 'another-link';
     await expect(f.service.reconcile(attemptId)).rejects.toThrow('identity');
     responseId = 'saved-link';
-    expect((await f.service.reconcile(attemptId)).fulfilled).toBe(true);
+    expect((await f.service.reconcile(attemptId)).fulfillmentQueued).toBe(true);
   });
 });

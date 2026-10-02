@@ -1,34 +1,30 @@
 # Express and Next.js payment recipes
 
-The integration skill includes five source assets: service, SQLite teaching store, PayWay adapter, Express router and Next.js handler factory. Copy them into the merchant's server directory and adapt its authenticated session resolver and database. Keep all imports/server credentials outside client bundles.
+Nine installed TypeScript assets provide service, scoped SQLite store, PayWay adapter, Express/Next handlers, exact money conversion, customer state, synthetic settlement matching and profile/gate evidence types. Copy only the needed server assets into the existing project; keep credentials and SDK code out of client bundles.
 
-## Runtime and installation
+## Runtime and scope
 
-Use the existing supported Node runtime (>=22.12), TypeScript, and the reviewed SDK package. The SQLite teaching store uses Node's built-in `node:sqlite`; Node 22.12 requires `--experimental-sqlite`. It is optional: implement the Store interface with the project's existing transactional database for production, particularly distributed/serverless deployments. No new SDK/MCP public API is required.
+Node >=22.12 is supported; built-in node:sqlite needs --experimental-sqlite on 22.12. SQLite is a one-host teaching adapter. Distributed/serverless merchants implement Store using their existing transactional DB, shared worker leases/endpoint budgets, migrations, backups and retention.
 
 ```ts
 import { createIntegration } from './service.js';
 import { SqliteStore } from './sqlite-store.js';
 import { paywayGateway } from './payway-gateway.js';
-
-const store = new SqliteStore('./private-payments.sqlite');
-// Seed from the server's catalog for a local test; production loads existing orders.
+const scope = { environment: 'sandbox' as const, merchantId: process.env.PAYWAY_MERCHANT_ID!, tenantId: 'merchant-tenant' };
+const store = new SqliteStore('./private-payments-v2.sqlite', scope);
 store.seed({ id: 'order-1', ownerId: 'customer-1', amountMinor: 300, currency: 'USD' });
 const gateway = paywayGateway({
-  merchantId: process.env.PAYWAY_MERCHANT_ID!,
-  apiKey: process.env.PAYWAY_API_KEY!,
-  environment: 'sandbox',
-  // Required for payment links; omit for QR/hosted-only applications.
-  publicKeyPem: process.env.PAYWAY_RSA_PUBLIC_KEY,
-}, 'https://merchant.example/payments/callback');
+  merchantId: scope.merchantId, environment: scope.environment, apiKey: process.env.PAYWAY_API_KEY!,
+  publicKeyPem: process.env.PAYWAY_RSA_PUBLIC_KEY, // Payment links require this key.
+}, 'https://merchant.example/payments/callback', scope.tenantId);
 const service = createIntegration(store, gateway, process.env.PAYWAY_API_KEY!);
 ```
 
-Store prices as integer minor units in this recipe only; the adapter converts to PayWay decimal currency amounts. Do not send minor-unit integers directly to the PayWay API. The sample currency set is USD/KHR.
+Explicit scope must match the gateway. The omitted store scope is teaching-only; never use it with a real merchant. Orders, attempts, receipts, inbox and jobs use scoped keys. Every attempt snapshots trusted owner, amount/currency and creation time. Pricing updates cannot rewrite an existing submitted obligation.
+
+**Recipe 1.1 migration:** amountMinor is USD cents and **whole KHR**, not hundredths of KHR. USD 3.01 is 301; KHR 301 is 301. Invalid precision/nonfinite/unsafe/negative prices fail without rounding. Existing teaching schema files require reviewed migration to version 2; startup refuses old schema rather than deleting records. Back up and preserve historical attempts/receipts. This changes recipe assets, not the public SDK API.
 
 ## Express
-
-Mount after JSON parsing and the application's existing authentication middleware:
 
 ```ts
 import express from 'express';
@@ -37,64 +33,67 @@ app.use(express.json({ limit: '64kb' }));
 app.use(integrationRouter(service, req => req.user?.id));
 ```
 
-Adapt the resolver's request type to the project's authenticated Express request type; the example does not implement login. The middleware must allow provider callbacks through without a customer session while protecting create/status routes.
+Adapt to the existing authenticated request type. Allow provider callbacks without a customer session; protect create/status routes and apply the application's CSRF/session policy. POST /payments/create/qr, /hosted or /link with only {orderId}. Ignore client prices/user IDs. GET /payments/status/:attemptId returns owned persisted state **without provider calls**.
 
-POST `/payments/create/qr`, `/payments/create/hosted` or `/payments/create/link` with only `{orderId}`. Browser-supplied price/user IDs are ignored. GET `/payments/status/:attemptId` checks ownership and queries PayWay. POST `/payments/callback` accepts a verified delivery into the inbox and schedules reconciliation, returning HTTP 202.
+Callbacks durably enqueue a validated hint before responding. Default ACK is HTTP 200 text RECEIVEOK; a third factory parameter can override {status,body} after confirming the actual service/profile contract. ACK failure must not report successful acceptance. Default is dated-guidance based, not fresh bank verification. Bound callback bodies/queues at the actual deployment edge.
 
-## Next.js App Router
+## Next.js
 
-The assets use NodeNext `.js` relative import specifiers for compiled Express
-applications. When copying TypeScript sources into Next.js, remove `.js` from
-their local relative imports (for example `./service.js` becomes `./service`),
-including imports in the shared initialization module. Keep the SDK package
-import unchanged. Next's bundler resolves those local TypeScript files directly.
+Remove .js from local TypeScript import specifiers when copying to Next's bundler; retain the SDK package import. Initialize once in a shared server module, never seed on each request.
 
 ```ts
-import { nextIntegration } from './next.js';
+import { nextIntegration } from './next';
 const handlers = nextIntegration(service, async request => {
   const session = await existingSessionResolver(request);
   return session?.user.id;
 });
-// app/api/payments/qr/route.ts (choose hosted/link for those endpoints)
+// app/api/payments/qr/route.ts (also hosted/link)
 export const runtime = 'nodejs';
 export const POST = handlers.create('qr');
-// app/api/payments/callback/route.ts
-// export const POST = handlers.callback;
-// An authenticated status route delegates to handlers.status(request, attemptId).
+// callback route: export const POST = handlers.callback;
+// owned GET route delegates to handlers.status(request, attemptId).
 ```
 
-Use a shared server module to initialize the service. Do not initialize or reseed SQLite on every request. Next dev hot reload can recreate modules; production serverless instances cannot share a local SQLite file reliably. Use the existing merchant database in those deployments.
+This uses the existing project session resolver; it does not implement login. Enforce body/queue limits in Next's deployed server/edge. A local SQLite file cannot coordinate multiple serverless hosts; replace Store accordingly.
 
-## Customer interaction
+## Verification and customer state
 
-Return only `{attemptId, artifact}`, never the SDK's raw response. A QR artifact contains its QR string. A link artifact contains the hosted URL. For hosted checkout, serve the returned signed form HTML as a browser document so it submits to PayWay; it is not an iframe of a saved gateway page. Avoid exposing it through an unauthenticated arbitrary-order endpoint.
+Creation returns only attemptId and the selected QR string, signed hosted form HTML or public link URL. Serve a hosted signed form as an owned browser document for POST to PayWay; it is not saved gateway HTML in an iframe.
 
-Creation does not mark an order paid. Maintain an authenticated status screen while a worker performs inquiry. The status result reuses SDK paymentLifecycle/paymentNextStep; approval still requires the stored identity, amount and currency checks. The SQLite adapter holds a unique fulfillment outbox row; the merchant's worker performs its actual shipping/email/stock update idempotently using the order ID as its downstream key.
+Status separates rawStatus, verified payment status, verification outcome and fulfillmentQueued. REVIEW is returned for rejected identity/money/currency evidence. Repeated approval remains verified; late pending cannot downgrade a posted receipt. fulfillmentQueued means this resolver inserted a durable job, **not** that shipping/email/stock finished. It is true only on the reconciliation that inserted the job; customer GET and duplicate reconciliation return false. Use a separate field/record for durable job existence or delivery status. Use customer-state.ts and [UI/mobile acceptance](integration-ui.md) for safe messaging/actions.
 
-## Durable recovery and worker
+Callback identity must match the saved route/reference. Paid callback replays are durably recorded without reopening active inquiry. Late create completion/error cannot overwrite a worker's committed paid/review decision or clear review recovery. Always read persisted verified state before displaying a restored payment interaction.
+
+Persist before submission. Repeating a create restores the existing ready artifact; pending/unknown/review cannot create a replacement. A deliberate create after authoritative DECLINED makes a new attempt and retains history. Local countdown/close/browser cancellation alone never unlocks another charge. Additional genuine late receipts are retained with one order fulfillment and an explicit additional-receipt review outcome.
+
+## Worker and inquiry
 
 ```ts
-// Run in the merchant's existing scheduled worker; handle failures per attempt.
+// Existing scheduled backend worker; do not expose as a public customer action.
 for (const id of service.pending()) {
   try { await service.reconcile(id); }
-  catch { /* keep queued; retry inquiry with endpoint pacing, never create */ }
+  catch { /* retain queued; back off and diagnose masked errors; never recreate */ }
 }
 ```
 
-An unknown create returns its saved attempt ID and never resubmits on a duplicate create request. Reconcile QR/hosted by that ID. A payment-link create timeout can leave the link ID unknown; recover through merchant records/ABA rather than guessing a paid transaction ID or creating another link. Every created attempt is queued for inquiry, so missing callbacks do not prevent recovery. Retain the merchant's own pacing and local expiry policy; PENDING never proves a live QR.
+The merchant scheduler must apply a bounded processing window, jitter/backoff and distributed lease/budget. The service coalesces concurrent lookup for one attempt in one process. Customer polling only reads durable state.
 
-For link payments the adapter inquires by the saved link ID and requires the returned ID/reference and currency to match the saved order. It supports one payment per exact-price link, requires exactly one completed transaction and zero refunds, and compares gross collected amount. It never trusts the unsigned body's amount/status/transaction association. Multi-payment links, discounts and partial payments require their domain reconciliation rules, not this one-order recipe.
+For QR/hosted, use Check Transaction during its seven-day window. Pending/declined need no historical detail. An approved current result lacks original currency, so paced detail enriches identity/original currency/amount before acceptance. Old attempts use detail directly. The adapter spaces detail calls conservatively per process; shared MID/endpoint limits across hosts require shared coordination. Verified core payments stop active inquiry; refunds/holds/settlement use separate operation workflows.
 
-The SQLite adapter is durable on a single host, with transactional inbox/reconciliation insertion and a unique fulfillment job per order. It does not implement a production database migration, retention, worker leasing or exactly-once external side effects. For production use the merchant's DB transactions, unique constraints, backups, bounded callback body/queues and idempotent worker.
+A lost create retains its saved ID and never resubmits. A lost link response may lack data.id: recover with ABA/merchant records; no made-up query or new replacement link. Every attempt is already queued, so missing callbacks do not prevent recovery.
 
-## Acceptance scenarios
+## Payment-link limit
 
-- All three flows in Express and Next.js, using server prices and actual session ownership.
-- Unknown order, another user's order, unauthenticated create/status; no provider call or fulfillment.
-- Callback signature invalid/missing, malformed/unknown reference, pending/declined/refunded/PRE-AUTH, wrong original amount/currency; no fulfillment.
-- A link's unsigned forged notification; only a paid inquiry of the saved link can fulfill.
-- Create timeout, process restart, concurrent duplicate notifications and concurrent inquiry; one saved attempt and one durable fulfillment job.
-- Lost callback recovered by inquiry; received callback acknowledged without waiting for slow provider inquiry.
-- SDK-backed synthetic fetch adapter: signed QR request, hosted form field generation, RSA payment-link request and trusted inquiry projections; no gateway payment is implied.
+The adapter queries the saved link ID/reference, requires exactly one completed payment, zero refunds and matching original total/currency. It ignores unsigned notification amount/status. Its link-total receipt key is an internal aggregate identity, **not a gateway receipt ID or bank settlement proof**. Reusable links, partial/discounted payments and excess receipts need their own ledger/association contract.
 
-Use synthetic credentials/providers for offline checks and label them simulated. A successful simulation is not a gateway test. The merchant's own sandbox paid cycles, enabled-profile checks and go-live review remain required.
+## Evidence, finance and production
+
+Use evidence.ts to create masked profiles and gate records with timezone-aware ISO timestamps; passed gates need evidence, G5/G6 need production evidence and ABA's approved rule. settlement.ts requires a nonempty merchant-normalized synthetic batch, explicit scope/operation/batch/currency and bank reference, deduplicates identical rows and rejects conflicting rows. It does not retrieve ABA reports, prove export completeness or implement currency conversion. Read [finance evidence](integration-finance.md).
+
+SQLite version 2 demonstrates durable scoped attempts, receipt posting, inbox/reconciliation and one outbox job. It is not a complete production ledger, schema migration, token vault, refund/capture/payout adapter, retention system, worker lease or exactly-once external fulfillment. Follow [advanced controls](integration-operations.md) when the selected flow needs them.
+
+## Acceptance
+
+Test all three routes in Express/Next with owned server prices; signed/unsigned policies; malformed/unknown/tampered callbacks; mismatched approval returning REVIEW; repeated/late evidence; immutable price; safe decline replacement; unknown-no-replay; currency scales; scoped isolation; restart/concurrent receipt/outbox; local customer reads; current-versus-history routing; confirmed ACK and durable-failure behavior.
+
+Add relevant UI/device/advanced/finance scenarios. Fixture, handler and synthetic signing checks prove local behavior only. Real sandbox/production/settlement stages remain unrun until explicitly executed under their approved contracts.

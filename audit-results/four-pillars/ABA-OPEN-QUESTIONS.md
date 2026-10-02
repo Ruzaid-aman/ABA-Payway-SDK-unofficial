@@ -841,3 +841,62 @@ the cycle were NOT yet in this register and are now formally filed:
    `ec476910` (§26 AOF-3), so card tokenization cycles remain un-testable
    end-to-end. Request the same enablement the account leg received (procedure per
    the Q22 answer), or confirm the plan/timeline.
+
+## Integration-skill enhancement questions — 2026-10-02 (append-only)
+
+Source: additional requirements review and approved enhancement of aba-payway-integration.
+Status for every item below: **OPEN — owner confirmation required**. No request has been sent externally. Existing answered facts and dated evidence remain intact; linked older questions are narrowed/extended rather than reopened wholesale.
+
+For each answer capture owner, source/rule/version, effective and verified dates, environment/profile/operation scope, approved public wording, examples/vectors, and whether it supersedes older evidence. Update the affected public guidance, vectors, tests and merchant gates after confirmation. Do not publish this internal register or restricted evidence.
+
+### Q44 — Existing production acceptance rule and launch boundary (P0)
+Owner: ABA Integration / Product / Settlement. Gates: G4–G6.
+Supply the current rule ID/version, exact transaction counts and amount caps, methods/schemes/issuers/currencies/outlets/accounts, required refund/capture/COF/payout cases, approved payers and signoff evidence. Can restricted customer traffic begin before first settlement verification, under what documented conditions? No replacement count or amount policy will be invented.
+
+### Q45 — Settlement sources, joins and finance signoff (P0)
+Owner: ABA Settlement + merchant Finance. Related: prior N4/N6.
+Provide actual portal/report/bank evidence names, schemas, grain, download/API/permissions, cutoffs/holiday handling and completeness. How do receipt/operation/MID IDs join reports, batches and aggregated bank bookings? Confirm agreement-specific fee/refund/FX/reserve/tax treatment, later-batch adjustments, approved tolerance and reviewer. Existing amount/time/APV similarity will be investigation-only.
+
+### Q46 — Callback service/profile versions, ACK and vectors (P0)
+Owner: PayWay API / Integration. Related: Q6, Q18.5, Q35, Q40.
+Confirm signature presence/key/canonical bytes for checkout, online QR, signed Customer Printed QR, unsigned offline KHQR, links, token linking and partner/payout variants. Provide approved scalar/boolean/null/nested/Unicode/extra-field vectors and merchant-cohort adapter rules. Confirm accepted status/body (including 200 RECEIVEOK and whether 202 is accepted), response timeout, actual retry/manual replay and policy source per service. Missing signature must not trigger silent downgrade.
+
+### Q47 — Current inquiry proof and recovery semantics (P0)
+Owner: PayWay API. Related: Q9/Q10/Q27/Q33/Q34.
+Current Check Transaction samples omit original currency. Is there an approved signed-callback/current-query proof combination that avoids detail enrichment, or must approval use paced historical detail? Confirm seven-day boundaries, rate-limit scope across MID/profile/host, 429 shape and scheduling guidance. Identify reliable original-operation recovery for lost link-create, refund, capture and payout responses; without it outcomes remain unknown/escalated. Confirm duplicate/multiple genuine receipt identity rules by QR/link type.
+
+### Q48 — Exact money/FX/ID contract by operation (P1)
+Owner: PayWay API / Settlement. Related: Q14/Q20/N2/N6.
+Confirm USD/KHR scale/serialization/minimum/maximum, zero/optional amounts, discounts/payable/original basis, FX time/rounding and refund amount rules for every endpoint. Supply ID character/length/uniqueness scope and timestamps/timezone/skew/lifetime/expiry units with vectors. Recipe-local cents/whole KHR is not an assertion that the API accepts internal minor units.
+
+### Q49 — Current onboarding, credentials and network transitions (P1)
+Owner: Sandbox onboarding / Integration / Security. Related: Q7/Q8/Q16/Q17/Q31.
+Confirm active registration/email/OTP/approval/credential delivery, credential kinds/expiry/rotation/overlap and default entitlements for merchant/partner/outlet profiles. Confirm callback-domain versus egress-IP whitelisting, ingress source controls, ports/WAF/TLS, hosting-outside-Cambodia policy and migration/rollback procedure. Validate historical activation expiry and timelines; do not universalize them.
+
+### Q50 — Simulator fixtures and approved UI/device coverage (P1)
+Owner: Simulator / Product Design / Integration. Related: prior N1/Q29/Q38.
+Provide current Android/iOS installation links/build/OS/account acquisition/reset/expiry/limits and approved scenarios. Which scan/deeplink/missing-app/embedded/cancel/return cases are supported? Supply public redistribution approval, current test-card outcome fixtures, UI/brand assets, and modal/bottom-sheet/hosted-QR rollout/entitlement rules. Never publish reusable simulator access secrets.
+
+### Q51 — Complete endpoint/method/entitlement contracts and vectors (P1)
+Owner: PayWay API / Product. Related: Q5/Q11/Q21/Q24/Q25/Q31.
+Provide approved versioned operation schemas, transport/encoding/signing/encryption/status/error/limits, golden vectors and conflicts with observed SDK contracts. Confirm per-flow scheme/method/currency/refund/pre-auth/COF support, sandbox availability and merchant enablement; a logo/enum/sample alone will not certify availability. Which derived specifications may be distributed publicly?
+
+### Q52 — COF consent, scheduling and revocation (P1)
+Owner: COF Product / API / Compliance. Related: Q18/Q22/Q41/Q42/Q43.
+Confirm approved consent/audit/retention and customer/MID/token ownership rules, CIT/MIT and 3DS use, exact token renewal/removal/expiry behavior and callback verification. Which schedules are provider-owned versus merchant-owned, and how are cancellation, in-flight charges, retries/grace/notifications and revoked consent handled? Existing account-cycle evidence remains valid in its dated scope; card/MIT enablement remains separately limited.
+
+### Q53 — Hold/capture/release and refund eligibility conflicts (P1)
+Owner: Card / Pre-auth / Refund Product / Settlement. Related: Q12/Q13/Q15/N2/N3.
+Confirm hold window, allowed lower/equal/higher card completion (public guide versus earlier relay), partial capture/remainder release timing, capture/cancel races, automatic expiry evidence and actual incremental/re-auth support. Confirm current refund windows/method enablement, partial/concurrent/issuer/NBC behavior, original-operation inquiry, portal fallback and finance impact. Do not invent extra endpoints or release-time guarantees.
+
+### Q54 — Payout sources, partial outcomes and financial proof (P1)
+Owner: Payout Product / API / Settlement. Related: Q19/Q20/Q36/N4.
+Confirm source account/CIF/currency versus settlement account rules, permissions/commercial limits, beneficiary status/currency/lookup, fees/allocation/rounding, request IDs, batch/per-beneficiary execution and recovery. Provide actual source debit/all-beneficiary credit evidence/report joins; incoming settlement exports do not automatically prove funds-out.
+
+### Q55 — Plugins and adjacent product contracts (P2; affected claims blocked)
+Owner: Commerce plugins / POS-ECR / ABA Mini Apps / Partner / BillZone.
+Provide official platform/plugin/source/version/feature/upgrade/rollback support, hardware/firmware/ECR transport/protocol, Mini App app/profile/environment/domain/method/return rules, partner legal/provisioning/entitlement/tenant isolation, and BillZone bill validation/posting/suspense/correction/reconciliation. Name each owner and separate UAT/production acceptance; ordinary PayWay sandbox checks cannot certify these products.
+
+### Q56 — Public/internal distribution and maintenance approvals (P2)
+Owner: Product / Developer Relations / Security / Support.
+Confirm approved brand/license/source redistribution, API/fact reviewers, public contact, maintainers, review cadence, compatibility/retirement and internal-companion access. Confirm current portal/go-live/support/VIP policies before restricted publication; internal staffing/Jira/SLA details stay outside the public skill. Repository destination/version/history decisions remain the existing release-owner decisions.

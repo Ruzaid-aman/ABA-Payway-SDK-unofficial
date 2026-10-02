@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const hash = content => createHash('sha256').update(content).digest('hex').slice(0, 16);
-export const RECIPE_FILES = ['service.ts', 'sqlite-store.ts', 'payway-gateway.ts', 'express.ts', 'next.ts'];
+export const RECIPE_FILES = ['service.ts', 'sqlite-store.ts', 'payway-gateway.ts', 'express.ts', 'next.ts', 'money.ts', 'customer-state.ts', 'settlement.ts', 'evidence.ts'];
 
 // Called only after the public-source provenance gate in sync-knowledge.
 // References share canonical public sources with knowledge/docs-packaged.

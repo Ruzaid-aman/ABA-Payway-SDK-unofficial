@@ -1,4 +1,11 @@
-import { IntegrationError, type Route, type createIntegration } from './service.js';
+import {
+  IntegrationError,
+  DEFAULT_CALLBACK_ACK,
+  validateAck,
+  type CallbackAck,
+  type Route,
+  type createIntegration,
+} from './service.js';
 
 type Service = ReturnType<typeof createIntegration>;
 // Export the returned POST/GET handler from the appropriate App Router route.ts.
@@ -6,7 +13,38 @@ type Service = ReturnType<typeof createIntegration>;
 export function nextIntegration(
   service: Service,
   authenticatedUserId: (request: Request) => Promise<string | undefined>,
+  ack: CallbackAck = DEFAULT_CALLBACK_ACK,
 ) {
+  validateAck(ack);
+  async function jsonBody(req: Request): Promise<unknown> {
+    if (!/^application\/json(?:;|$)/i.test(req.headers.get('content-type') ?? ''))
+      throw new IntegrationError(415, 'JSON content type required');
+    const reader = req.body?.getReader();
+    if (!reader) throw new IntegrationError(400, 'JSON body required');
+    const decoder = new TextDecoder();
+    let bytes = 0,
+      text = '';
+    try {
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        bytes += chunk.value.byteLength;
+        if (bytes > 65536) {
+          await reader.cancel();
+          throw new IntegrationError(413, 'Callback/request too large');
+        }
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+      text += decoder.decode();
+    } finally {
+      reader.releaseLock();
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new IntegrationError(400, 'Malformed JSON');
+    }
+  }
   const failure = (error: unknown) =>
     Response.json(
       {
@@ -19,7 +57,9 @@ export function nextIntegration(
       try {
         const owner = await authenticatedUserId(req);
         if (!owner) throw new IntegrationError(401, 'Authentication required');
-        const body = (await req.json()) as { orderId?: string };
+        const body = (await jsonBody(req)) as { orderId?: string };
+        if (!body || typeof body !== 'object' || Array.isArray(body))
+          throw new IntegrationError(400, 'Malformed order request');
         return Response.json(await service.create(body.orderId ?? '', owner, route), { status: 201 });
       } catch (error) {
         return failure(error);
@@ -27,10 +67,11 @@ export function nextIntegration(
     },
     callback: async (req: Request) => {
       try {
-        return Response.json(
-          service.signal((await req.json()) as Record<string, unknown>, req.headers.get('x-payway-hmac-sha512') ?? ''),
-          { status: 202 },
-        );
+        service.signal((await jsonBody(req)) as Record<string, unknown>, req.headers.get('x-payway-hmac-sha512') ?? '');
+        return new Response(ack.status === 204 || ack.status === 205 ? null : ack.body, {
+          status: ack.status,
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+        });
       } catch (error) {
         return failure(error);
       }
@@ -39,7 +80,7 @@ export function nextIntegration(
       try {
         const owner = await authenticatedUserId(req);
         if (!owner) throw new IntegrationError(401, 'Authentication required');
-        return Response.json(await service.reconcile(attemptId, owner));
+        return Response.json(service.status(attemptId, owner));
       } catch (error) {
         return failure(error);
       }

@@ -9,7 +9,7 @@ export function integrationConsumerSmoke(root, skill, env) {
   cpSync(path.join(skill, 'assets'), assets, { recursive: true });
   execFileSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'),
     '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--moduleResolution', 'NodeNext',
-    '--skipLibCheck', '--outDir', 'integration/build', ...['service', 'sqlite-store', 'payway-gateway', 'express', 'next']
+    '--skipLibCheck', '--outDir', 'integration/build', ...['service', 'sqlite-store', 'payway-gateway', 'express', 'next', 'money', 'customer-state', 'settlement', 'evidence']
       .map(name => 'integration/assets/' + name + '.ts')], { cwd: root, env, encoding: 'utf8', timeout: 30_000 });
   writeFileSync(path.join(root, 'integration-smoke.mjs'), `
 import assert from 'node:assert/strict';
@@ -52,9 +52,10 @@ for (const framework of ['express','next']) for (const route of ['qr','hosted','
     assert.ok(service.pending().includes(id)); // Missing callback is already queued.
     const body=route==='link'?{merchant_ref_no:id,tran_id:'unsigned-hint',status:0}:{tran_id:id,payment_status:'APPROVED'};
     if(route!=='link') assert.equal((await call('POST','/payments/callback',body,'','invalid')).status,401);
-    assert.equal((await call('POST','/payments/callback',body,'',signCallbackBody(body,'synthetic-smoke-key'))).status,202);
-    await call('GET','/payments/status/'+id); assert.equal(store.jobs().length,0);
-    proofStatus='APPROVED'; await Promise.all([call('GET','/payments/status/'+id),call('GET','/payments/status/'+id)]);
+    assert.equal((await call('POST','/payments/callback',body,'',signCallbackBody(body,'synthetic-smoke-key'))).status,200);
+    await service.reconcile(id); await call('GET','/payments/status/'+id); assert.equal(store.jobs().length,0);
+    proofStatus='APPROVED'; await Promise.all([service.reconcile(id),service.reconcile(id)]);
+    assert.equal((await (await call('GET','/payments/status/'+id)).json()).verified,true);
     assert.equal(store.jobs().length,1); assert.equal(creates,1);
   } finally { if(server) await new Promise(resolve=>server.close(resolve)); store.close(); }
 }

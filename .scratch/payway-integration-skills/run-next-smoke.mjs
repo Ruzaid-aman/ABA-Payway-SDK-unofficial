@@ -4,6 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:net';
 import {pathToFileURL} from 'node:url';
+import {DatabaseSync} from 'node:sqlite';
 const root=process.argv[2];
 const {signCallbackBody}=await import(pathToFileURL(path.join(root,'node_modules/aba-payway-ts/dist/index.js')).href);
 const socket=createServer(); await new Promise(resolve=>socket.listen(0,'127.0.0.1',resolve));
@@ -26,11 +27,13 @@ try {
     assert.equal((await call(status,'GET',undefined,'mallory')).status,404);
     const body=route==='link'?{merchant_ref_no:payment.attemptId,tran_id:'unsigned-hint',status:0}:{tran_id:payment.attemptId,payment_status:'APPROVED'};
     if(route!=='link')assert.equal((await call('/api/payments/callback','POST',body,'','bad')).status,401);
-    assert.equal((await call('/api/payments/callback','POST',body,'',signCallbackBody(body,'synthetic-key'))).status,202);
-    assert.equal((await (await call(status)).json()).fulfilled,false);
+    assert.equal((await call('/api/payments/callback','POST',body,'',signCallbackBody(body,'synthetic-key'))).status,200);
+    assert.equal((await (await call(status)).json()).verified,false);
     writeFileSync(marker,'SIMULATED approved inquiry');
-    assert.equal((await (await call(status)).json()).fulfilled,true);
-    assert.equal((await (await call(status)).json()).fulfilled,false);
+    const deadline=Date.now()+10000;
+    while(!(await (await call(status)).json()).verified){assert.ok(Date.now()<deadline,'worker verification timeout');await new Promise(r=>setTimeout(r,100));}
+    assert.equal((await (await call(status)).json()).verified,true);
+    const ledger=new DatabaseSync(db);assert.equal(ledger.prepare('SELECT count(*) AS n FROM outbox').get().n,['qr','hosted','link'].indexOf(route)+1);ledger.close();
   }
   console.log(JSON.stringify({passed:true,nextHttpRoutes:3,callbackVerification:true,uniqueFulfillment:true,simulated:true}));
 } finally {

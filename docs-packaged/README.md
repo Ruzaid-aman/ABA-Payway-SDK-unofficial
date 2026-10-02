@@ -45,6 +45,8 @@ Use [callbacks and webhooks](../knowledge/callbacks-webhooks.md), [webhook setup
 
 ## Go Production
 
+For project-level integration use [merchant integration](../knowledge/agent-integration.md), [profile/onboarding/gates](../knowledge/integration-onboarding.md), [contracts/callbacks](../knowledge/integration-contracts.md), [UI/mobile](../knowledge/integration-ui.md), [advanced operations](../knowledge/integration-operations.md) and [receipt-to-bank evidence](../knowledge/integration-finance.md). Load only the selected journey. Code, fixture, sandbox, production and settlement acceptance are separate stages.
+
 Follow the [deployment checklist](../knowledge/deployment-checklist.md) and [support scope](../knowledge/support.md). Keep credentials in a server secret manager. Saved CLI profiles store plaintext credentials and are intended for protected development machines.
 
 Use the [SDK and CLI reference](../knowledge/sdk-cli-reference.md) when you need additional options, [merchant scenarios](../knowledge/merchant-scenarios.md) for broader requirements, [account/token lifecycle](../knowledge/link-lifecycle.md) for recurring payments, and [settlement, payouts, FX, and disputes](../knowledge/settlement-disputes.md) for what happens after the payment is approved.

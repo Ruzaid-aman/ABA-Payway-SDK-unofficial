@@ -22,7 +22,7 @@ timestamps).
 
 Required pattern:
 
-- Fast handler: immediate 200, async processing, idempotent by `tran_id`.
+- Fast handler: validate and durably accept the receipt/hint before HTTP 200; process fulfillment asynchronously and idempotently under the confirmed service contract.
 - Recovery: Check Transaction / `get-transactions-by-mc-ref` polling for
   anything that did not produce a verified callback (poll only pending
   transactions; stop at final status or lifetime).
@@ -50,7 +50,9 @@ Per cycle:
 2. **Export the bank/settlement statement** for the expected settlement window.
 3. **Join on the PayWay purchase/reference** (store your order ID alongside
    `tran_id` from creation). When the direct reference is missing (card flows),
-   match on amount + date/time + masked PAN / APV.
+   use an ABA/Finance-approved receipt-to-report-to-batch-to-bank join. Amount,
+   date/time, masked PAN or APV similarity may identify investigation candidates;
+   it cannot automatically establish a settlement match or signoff.
 4. **Mismatches** — provide `tran_id`, date/time, amount (and bank evidence) to
    the Integration/Settlement team: they validate gateway/settlement logs and
    confirm correct status/date; incorrect rows may be excluded from the current

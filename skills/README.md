@@ -93,7 +93,7 @@ reference. Recursive parity is checked by the offline test suite.
 ## Platform & tooling
 
 - [aba-payway-sdk-configuration](./aba-payway-sdk-configuration/SKILL.md) — constructor options, every `PAYWAY_*` env var, `strictValidation`, the KHQR env set, and the machine-readable diagnostics (`doctor --json`, `status --json`, `agent config`).
-- [aba-payway-knowledge-base](./aba-payway-knowledge-base/SKILL.md) — the offline knowledge base: `docs list|<topic>|search` and the agent's `query_knowledge` tool over 30 packaged topics.
+- [aba-payway-knowledge-base](./aba-payway-knowledge-base/SKILL.md) — the offline knowledge base: `docs list|<topic>|search` and the agent's `query_knowledge` tool over 42 packaged topics.
 - [aba-payway-hash](./aba-payway-hash/SKILL.md) — webhook signature verification + the request-signing/verify/mock-callback tools.
 - [aba-payway-journal](./aba-payway-journal/SKILL.md) — query the local transaction journal: timelines, stats, reconcile, anomalies, RCA (`journal` CLI + agent `query_journal` tool).
 - [aba-payway-test-harness](./aba-payway-test-harness/SKILL.md) — the built-in mock PayWay server.

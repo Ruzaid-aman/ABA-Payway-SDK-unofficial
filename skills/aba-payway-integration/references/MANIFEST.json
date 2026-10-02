@@ -3,16 +3,46 @@
   "generator": "scripts/sync-knowledge.mjs",
   "resources": [
     {
+      "file": "references/integration-onboarding.md",
+      "source": "docs/guides/integration-onboarding.md",
+      "sourceSha256": "2c1034e3e151ef3b",
+      "sha256": "2c1034e3e151ef3b"
+    },
+    {
+      "file": "references/integration-contracts.md",
+      "source": "docs/guides/integration-contracts.md",
+      "sourceSha256": "ad95a2294c4a3eb8",
+      "sha256": "fb5a559003f7b318"
+    },
+    {
+      "file": "references/integration-finance.md",
+      "source": "docs/guides/integration-finance.md",
+      "sourceSha256": "144ca06b7c06caed",
+      "sha256": "144ca06b7c06caed"
+    },
+    {
+      "file": "references/integration-operations.md",
+      "source": "docs/guides/integration-operations.md",
+      "sourceSha256": "d78f2dfef34d16d1",
+      "sha256": "d78f2dfef34d16d1"
+    },
+    {
+      "file": "references/integration-ui.md",
+      "source": "docs/guides/integration-ui.md",
+      "sourceSha256": "b3748978193cda83",
+      "sha256": "b3748978193cda83"
+    },
+    {
       "file": "references/agent-integration.md",
       "source": "docs/guides/24-agent-integration.md",
-      "sourceSha256": "1eea3e43d319bb2d",
-      "sha256": "999a46669755d54b"
+      "sourceSha256": "8328d88396d6d69b",
+      "sha256": "2496c291e8bcbd79"
     },
     {
       "file": "references/integration-recipes.md",
       "source": "docs/guides/integration-recipes.md",
-      "sourceSha256": "18d8f4f37c88e6fb",
-      "sha256": "18d8f4f37c88e6fb"
+      "sourceSha256": "aaa8852b9b65c50a",
+      "sha256": "aaa8852b9b65c50a"
     },
     {
       "file": "references/support.md",
@@ -53,8 +83,8 @@
     {
       "file": "references/docs-index.md",
       "source": "docs/README.md",
-      "sourceSha256": "38f7c0ca1cc6951d",
-      "sha256": "8260cb30afc4602d"
+      "sourceSha256": "2bb56f0d2051871e",
+      "sha256": "908ce9355c4efa90"
     },
     {
       "file": "references/overview.md",
@@ -125,14 +155,14 @@
     {
       "file": "references/errors-and-debugging.md",
       "source": "docs/guides/12-error-handling-and-debugging.md",
-      "sourceSha256": "f66ede921dceabde",
-      "sha256": "fd61b436691abe7e"
+      "sourceSha256": "c057629e896b9687",
+      "sha256": "9cd8d270b0e2a64c"
     },
     {
       "file": "references/deployment-checklist.md",
       "source": "docs/guides/13-deployment-checklist.md",
-      "sourceSha256": "5d9405930af7d3e7",
-      "sha256": "253d8ec596a7d7dc"
+      "sourceSha256": "e58f731b147a75c6",
+      "sha256": "2f55c89bf9aa901f"
     },
     {
       "file": "references/code-snippets.md",
@@ -167,14 +197,14 @@
     {
       "file": "references/customer-module-qr.md",
       "source": "docs/guides/19-customer-module-qr.md",
-      "sourceSha256": "5be7d9010ce37297",
-      "sha256": "398ac850ba8086cc"
+      "sourceSha256": "e7e8686a9546c418",
+      "sha256": "04b35ef289a2fedb"
     },
     {
       "file": "references/settlement-disputes.md",
       "source": "docs/guides/20-settlement-and-disputes.md",
-      "sourceSha256": "a48bb5b9c551178c",
-      "sha256": "ebb4b9bf2307b3c4"
+      "sourceSha256": "4279c5e8964f9313",
+      "sha256": "b40292bdb9bb0e5d"
     },
     {
       "file": "references/api-datetime-timezones.md",
@@ -227,32 +257,56 @@
     {
       "file": "assets/service.ts",
       "source": "examples/integration-recipes/service.ts",
-      "sourceSha256": "3daa3799e102d22d",
-      "sha256": "3daa3799e102d22d"
+      "sourceSha256": "c5d87be7de04cc05",
+      "sha256": "c5d87be7de04cc05"
     },
     {
       "file": "assets/sqlite-store.ts",
       "source": "examples/integration-recipes/sqlite-store.ts",
-      "sourceSha256": "7dc208b247f2c4d9",
-      "sha256": "7dc208b247f2c4d9"
+      "sourceSha256": "1404585b5baf2e58",
+      "sha256": "1404585b5baf2e58"
     },
     {
       "file": "assets/payway-gateway.ts",
       "source": "examples/integration-recipes/payway-gateway.ts",
-      "sourceSha256": "1b5517c4954b6ac2",
-      "sha256": "1b5517c4954b6ac2"
+      "sourceSha256": "dd8f9f541b26a5d2",
+      "sha256": "dd8f9f541b26a5d2"
     },
     {
       "file": "assets/express.ts",
       "source": "examples/integration-recipes/express.ts",
-      "sourceSha256": "43a0171a556c76ea",
-      "sha256": "43a0171a556c76ea"
+      "sourceSha256": "ac892a8052d4ac03",
+      "sha256": "ac892a8052d4ac03"
     },
     {
       "file": "assets/next.ts",
       "source": "examples/integration-recipes/next.ts",
-      "sourceSha256": "5b667294e9597e82",
-      "sha256": "5b667294e9597e82"
+      "sourceSha256": "a18238f4f378fb5c",
+      "sha256": "a18238f4f378fb5c"
+    },
+    {
+      "file": "assets/money.ts",
+      "source": "examples/integration-recipes/money.ts",
+      "sourceSha256": "4d59f12cc93987c3",
+      "sha256": "4d59f12cc93987c3"
+    },
+    {
+      "file": "assets/customer-state.ts",
+      "source": "examples/integration-recipes/customer-state.ts",
+      "sourceSha256": "536b7bb90f5df41f",
+      "sha256": "536b7bb90f5df41f"
+    },
+    {
+      "file": "assets/settlement.ts",
+      "source": "examples/integration-recipes/settlement.ts",
+      "sourceSha256": "f4a639dfcea4a869",
+      "sha256": "f4a639dfcea4a869"
+    },
+    {
+      "file": "assets/evidence.ts",
+      "source": "examples/integration-recipes/evidence.ts",
+      "sourceSha256": "ef46bbc799c0828e",
+      "sha256": "ef46bbc799c0828e"
     }
   ]
 }

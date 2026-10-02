@@ -1,5 +1,7 @@
 # Integration skill candidate verification — 2026-10-01
 
+Later evidence: [2 October enhancements and whole-skill second pass](ENHANCEMENTS-2026-10-02.md). The October 1 counts and archive hashes below are historical; use the later record for the current local candidate.
+
 Decision: **Do Not Ship yet.** Implementation and local preparation are complete; Claude is explicitly deferred and existing publication dependencies remain open.
 
 ## Candidate identity

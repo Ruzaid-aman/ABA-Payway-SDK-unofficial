@@ -54,8 +54,8 @@ describe('skills installer (F09)', () => {
     // v2 envelope (second-pass audit R3/R4): schema + package version + files.
     expect(manifest.schemaVersion).toBe(2);
     expect(typeof manifest.packageVersion).toBe('string');
-    // 35 guides, 8 scripts, outbox reference, and 43 integration resources.
-    expect(Object.keys(manifest.files).length).toBe(87);
+    // 35 guides, 8 scripts, outbox reference, and 52 integration resources.
+    expect(Object.keys(manifest.files).length).toBe(96);
   });
 
   it('installs a selected skill bundle only (--only)', async () => {
@@ -127,7 +127,10 @@ describe('skills installer (F09)', () => {
     manifest.files['aba-payway-legacy-gone/SKILL.md'] = manifest.files['aba-payway-qr/SKILL.md'];
     writeFileSync(manifestPath, JSON.stringify(manifest));
     mkdirSync(path.join(dest, 'aba-payway-legacy-gone'), { recursive: true });
-    writeFileSync(path.join(dest, 'aba-payway-legacy-gone', 'SKILL.md'), readFileSync(path.join(dest, 'aba-payway-qr', 'SKILL.md')));
+    writeFileSync(
+      path.join(dest, 'aba-payway-legacy-gone', 'SKILL.md'),
+      readFileSync(path.join(dest, 'aba-payway-qr', 'SKILL.md')),
+    );
 
     // Re-install the FULL catalog: the forged legacy dir is pruned (it is
     // manifest-owned but no longer ships as a packaged skill).
@@ -165,7 +168,8 @@ describe('skills installer (F09)', () => {
     const dest = newDest();
     const source = mkdtempSync(path.join(os.tmpdir(), 'skills-r7-pkg-'));
     try {
-      const guide = (v: string) => `---\nname: aba-payway-a\ndescription: R7 fixture\nmetadata:\n  version: 1.0.0\n---\n${v}`;
+      const guide = (v: string) =>
+        `---\nname: aba-payway-a\ndescription: R7 fixture\nmetadata:\n  version: 1.0.0\n---\n${v}`;
       mkdirSync(path.join(source, 'aba-payway-a'), { recursive: true });
       writeFileSync(path.join(source, 'aba-payway-a', 'SKILL.md'), guide('old'));
 
