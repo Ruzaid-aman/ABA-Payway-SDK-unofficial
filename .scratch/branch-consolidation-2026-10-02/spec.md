@@ -298,3 +298,30 @@ Pre-merge working patch and generator copy are retained under ignored
 evidence backup has 611 archive entries, SHA-256
 b21946767e681cb6e7093ed16d4325b2c622bd1bdf41e58c768324e289f1ed35.
 Other worktrees and unrelated merged branches are outside this cleanup scope.
+
+Merged-candidate verification: additive conflicts in .gitignore, CHANGELOG and
+HANDOFF keep both branches' entries; knowledge/MANIFEST is regenerated, not manually
+merged. Four compatibility guides regenerated after the merge; subsequent generation
+rewrites zero files. The standalone skill receives current main's helper/configuration,
+diagnostic and redacted-hook guidance through the 42-topic generator. Catalog remains
+35 skills and nine integration assets. Main's dependency lockfile and SDK/CLI fixes
+are retained.
+
+Fresh merged checks pass: build, typecheck, lint (two existing warnings, six style
+infos), full offline suite 2,333 tests/160 files, package (210 files), public docs
+(239 generated files), repository (1,838 paths), secret-allowlist negative controls,
+and packed-consumer installation/ownership/runtime including all six simulated
+Express/Next route cases and typed ESM/CJS imports. Postman test:yaml passes from
+its actual _build package: 46 requests/127 variables, 37 simulated KHQR checks,
+34 callback trust checks and 16 distribution negative controls. These are local
+checks, not live paid/production/settlement or hosted CI evidence.
+
+Gitleaks 8.30.1 scans the exported staged files with real paths: zero findings.
+Scanning diff text via stdin loses path-based fixture allowlists and is not the
+final scan. The 32 outgoing pre-merge main commits have three reviewed findings:
+the clearly dummy CLI stdout-test key, an old YOUR_ADMIN_TOKEN documentation
+placeholder removed from the current generated package, and the project's existing
+owner-approved sandbox demo credential in the Postman distribution policy. The last
+is an intentional private-repository disposition, not a public redistribution
+clearance. No credential values are copied into this report. Public release gates
+and deferred Claude evidence remain open. No bank operations or public release.

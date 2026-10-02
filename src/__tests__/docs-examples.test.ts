@@ -276,7 +276,7 @@ describe('Documentation examples', () => {
   it('each skill individually avoids known drift classes (F05–F07/F10/F13)', () => {
     const skillsRoot = join(repoRoot, 'skills');
     const skillNames = readdirSync(skillsRoot).filter((name) => name.startsWith('aba-payway-'));
-    expect(skillNames.length).toBe(34); // 34 skills since the 2026-09-12 knowledge wave.
+    expect(skillNames.length).toBe(35); // Integration entrypoint added to the preserved catalog.
 
     const readSkill = (name: string) => readFileSync(join(skillsRoot, name, 'SKILL.md'), 'utf8');
 

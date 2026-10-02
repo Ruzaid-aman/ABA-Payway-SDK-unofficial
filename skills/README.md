@@ -1,6 +1,6 @@
 # ABA PayWay SDK Skills
 
-34 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
+35 packaged AI skill guides (`aba-payway-*`), one per PayWay workflow. Install
 them for a supported coding agent:
 
 ```sh
@@ -10,7 +10,7 @@ them for a supported coding agent:
 npx tsx src/cli.ts skills add claude        # or: codex | opencode  (or several at once)
 ```
 
-Start with [first payment](./aba-payway-first-payment/SKILL.md), then [webhook production](./aba-payway-webhook-production/SKILL.md). Choose only the QR, purchase, or payment-link guide you need. The shared journey is create, verify, and fulfill once.
+For a merchant project start with [integration](./aba-payway-integration/SKILL.md), a self-contained router with public references and Express/Next.js recipe assets. For one first payment use [first payment](./aba-payway-first-payment/SKILL.md), then [webhook production](./aba-payway-webhook-production/SKILL.md). Choose only the workflow you need. The shared journey is create, verify, and fulfill once.
 
 Each `aba-payway-*` directory is a self-contained AI guidance package. Five
 skills bundle dependency-free `.cjs` tools under their own `scripts/`
@@ -93,7 +93,7 @@ reference. Recursive parity is checked by the offline test suite.
 ## Platform & tooling
 
 - [aba-payway-sdk-configuration](./aba-payway-sdk-configuration/SKILL.md) — constructor options, every `PAYWAY_*` env var, `strictValidation`, the KHQR env set, and the machine-readable diagnostics (`doctor --json`, `status --json`, `agent config`).
-- [aba-payway-knowledge-base](./aba-payway-knowledge-base/SKILL.md) — the offline knowledge base: `docs list|<topic>|search` and the agent's `query_knowledge` tool over 30 packaged topics.
+- [aba-payway-knowledge-base](./aba-payway-knowledge-base/SKILL.md) — the offline knowledge base: `docs list|<topic>|search` and the agent's `query_knowledge` tool over 42 packaged topics.
 - [aba-payway-hash](./aba-payway-hash/SKILL.md) — webhook signature verification + the request-signing/verify/mock-callback tools.
 - [aba-payway-journal](./aba-payway-journal/SKILL.md) — query the local transaction journal: timelines, stats, reconcile, anomalies, RCA (`journal` CLI + agent `query_journal` tool).
 - [aba-payway-test-harness](./aba-payway-test-harness/SKILL.md) — the built-in mock PayWay server.

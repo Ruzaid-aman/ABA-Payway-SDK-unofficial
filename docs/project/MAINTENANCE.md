@@ -28,11 +28,11 @@ How this repo stays coherent day to day and release to release. For the one-off 
 
 | Count | Current (2026-09-14) | Pinned in — flip ALL |
 |---|---|---|
-| Packaged skills | 34 | `src/__tests__/skills.test.ts` (`toHaveLength(34)`), `skills/README.md`, root `AGENTS.md`, `.agents/AGENTS.md`, HANDOFF current-state, `llms.txt` (generated) |
+| Packaged skills | 35 | `src/__tests__/skills.test.ts` (`toHaveLength(35)`), `skills/README.md`, root `AGENTS.md`, `.agents/AGENTS.md`, HANDOFF current-state, `llms.txt` (generated) |
 | Agent tools (LLM REPL) | 14 | `agent-provider.test.ts` pin, `skills/aba-payway-agent/SKILL.md` + `.zcode` mirror, `skills/README.md`, `docs/AGENTIC-PAYWAY-CLI-USER-GUIDE.md`, `docs/SDK-AND-CLI-REFERENCE.md`, root `AGENTS.md`, HANDOFF when cited |
 | MCP catalog | 12 read-only / 17 with mutations | Compile-enforced via `AGENT_TOOL_NAMES` + catalog tests; prose pins in `docs/SDK-AND-CLI-REFERENCE.md` and root `AGENTS.md` |
-| Knowledge topics | 31 | `scripts/knowledge-sources.mjs` SOURCES, root `AGENTS.md`, corpus `MANIFEST.json` (generated) |
-| Test count | 2,012 passing | HANDOFF §6 gate line — refresh when you run the suite; avoid stale absolute counts anywhere else |
+| Knowledge topics | 42 (2026-10-02) | `scripts/knowledge-sources.mjs` SOURCES, root `AGENTS.md`, corpus `MANIFEST.json` (generated) |
+| Test count | See latest verification | HANDOFF current-state evidence — refresh when you run the suite; avoid stale absolute counts anywhere else |
 | Export count | check, don't hardcode | `npm run check:package` replaces a hardcoded number (RELEASE_CHECKLIST rule) |
 
 ## Cadences

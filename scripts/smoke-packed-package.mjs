@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizePackReport } from './lib/pack-report.mjs';
 import { navigationFailures } from './lib/public-navigation.mjs';
+import { integrationConsumerSmoke } from './lib/integration-consumer-smoke.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = mkdtempSync(path.join(tmpdir(), 'aba-payway-package-smoke-'));
@@ -49,7 +50,8 @@ try {
     JSON.stringify({ private: true, type: 'module' }),
     'utf8',
   );
-  runNpm(['install', tarball, '--ignore-scripts', '--no-audit', '--no-fund'], temporaryRoot, consumerNpmEnv());
+  runNpm(['install', tarball, 'express@5', '@types/express@5', 'typescript@5', '@types/node@24',
+    '--ignore-scripts', '--no-audit', '--no-fund'], temporaryRoot, consumerNpmEnv());
 
   writeFileSync(
     path.join(temporaryRoot, 'smoke.mjs'),
@@ -136,6 +138,7 @@ try {
   const dest = path.join(temporaryRoot, 'installed-skills');
   const runCli = (args) => execFileSync(process.execPath, [cli, ...args], { cwd: temporaryRoot, env: consumerEnv, encoding: 'utf8' });
   const packageRoot = path.join(temporaryRoot, 'node_modules', 'aba-payway-ts');
+  console.log(integrationConsumerSmoke(temporaryRoot, path.join(skillsRoot, 'aba-payway-integration'), consumerEnv));
   const packedFiles = new Set(packReport.files.map(({ path: file }) => file.replaceAll('\\', '/')));
   for (const file of packedFiles) {
     if (!/\.(md|txt)$/.test(file)) continue;

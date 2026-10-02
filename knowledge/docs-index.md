@@ -46,6 +46,8 @@ Use [callbacks and webhooks](callbacks-webhooks.md), [webhook setup](webhook-set
 
 ## Go Production
 
+For project-level integration use [merchant integration](agent-integration.md), [profile/onboarding/gates](integration-onboarding.md), [contracts/callbacks](integration-contracts.md), [UI/mobile](integration-ui.md), [advanced operations](integration-operations.md) and [receipt-to-bank evidence](integration-finance.md). Load only the selected journey. Code, fixture, sandbox, production and settlement acceptance are separate stages.
+
 Follow the [deployment checklist](deployment-checklist.md) and [support scope](support.md). Keep credentials in a server secret manager. Saved CLI profiles store plaintext credentials and are intended for protected development machines.
 
 Use the [SDK and CLI reference](sdk-cli-reference.md) when you need additional options, [merchant scenarios](merchant-scenarios.md) for broader requirements, [account/token lifecycle](link-lifecycle.md) for recurring payments, and [settlement, payouts, FX, and disputes](settlement-disputes.md) for what happens after the payment is approved.
@@ -70,6 +72,11 @@ Standalone, GitHub-rendered diagrams covering the flows every integrator needs:
 Each flow chapter also opens with an inline "Flow at a glance" sequence diagram (enforced by the docs acceptance bar, `src/__tests__/docs-acceptance-bar.test.ts`).
 
 ## Coding Agents
+
+For integration into an existing merchant project, start with the
+[integration journey and capability matrix](agent-integration.md)
+and [Express/Next.js recipes](integration-recipes.md), supported by the
+self-contained [integration skill](../skills/aba-payway-integration/SKILL.md).
 
 For a runnable local exercise covering artifacts, verification and recovery, use
 the [first-payment walkthrough](first-payment-walkthrough.md).

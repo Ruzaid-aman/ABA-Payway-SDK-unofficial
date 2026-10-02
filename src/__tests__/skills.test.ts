@@ -44,12 +44,12 @@ describe('packaged AI skills', () => {
       if (entry.isDirectory() && entry.name.startsWith('aba-payway-')) await compare(entry.name);
     }
   });
-  it('provides 34 discoverable skill guides with quick-start content', async () => {
+  it('provides 35 discoverable skill guides with quick-start content', async () => {
     const skillDirectories = (await readdir(skillsDirectory, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory() && entry.name.startsWith('aba-payway-'))
       .map((entry) => entry.name);
 
-    expect(skillDirectories).toHaveLength(34);
+    expect(skillDirectories).toHaveLength(35);
     expect(skillDirectories).toContain('aba-payway-transaction-by-merchant-ref');
     expect(skillDirectories).toContain('aba-payway-agent');
     expect(skillDirectories).toContain('aba-payway-first-payment');

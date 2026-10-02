@@ -91,3 +91,6 @@ reports/
 /.scratch/publishing-dx-audit-2026-09-29/profile-probe/
 /.scratch/publishing-dx-audit-2026-09-29/resume-cli-probe.mjs
 /.scratch/publishing-dx-audit-2026-09-29/resume-cli-evidence.json
+
+# Synthetic agent outputs/transcripts are local review evidence.
+/.scratch/payway-integration-skills/trials/codex-second-pass/

@@ -232,10 +232,10 @@ tail -f /var/log/your-app/error.log | grep -i payway
 
 ## Rollback Plan
 
-If issues arise after going live, revert to sandbox immediately:
+If issues arise after going live, disable new production initiation while keeping production callbacks, inquiry, ledger and recovery available for existing attempts. Use a separate sandbox deployment for debugging:
 
 ```typescript
-// Temporary: Switch back to sandbox while debugging
+// Separate debug deployment; do not apply this configuration to live callbacks/jobs.
 const payway = new PayWay({
   merchantId: process.env.PAYWAY_SANDBOX_MERCHANT_ID!,
   apiKey: process.env.PAYWAY_SANDBOX_API_KEY!,
@@ -244,10 +244,10 @@ const payway = new PayWay({
 ```
 
 **Rollback steps:**
-1. Deploy with `environment: 'sandbox'` and sandbox credentials
-2. Verify sandbox transactions work again
-3. Debug the production issue
-4. Re-deploy to production when fixed
+1. Stop new production payment initiation using the merchant's feature flag.
+2. Retain production credentials/version adapters and continue in-flight callback/inquiry/outbox recovery.
+3. Debug using an isolated sandbox deployment and preserve all existing receipt/operation evidence.
+4. Re-enable initiation only after reviewed checks and the applicable merchant/ABA approvals.
 
 ---
 

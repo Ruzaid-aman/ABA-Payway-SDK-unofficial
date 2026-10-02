@@ -719,12 +719,13 @@ FROM payway_callback_requests;
 
 ## 19. Retrieve callbacks through the protected API
 
-Use the administrative token created earlier:
+Set `PAYWAY_WEBHOOK_ADMIN_TOKEN` in your protected terminal environment to the
+administrative token created earlier. Keep its value out of source code and logs:
 
 ```bash
 curl \
   "https://aba-payway-callback-receiver.your-subdomain.workers.dev/admin/callbacks?limit=20&offset=0" \
-  --header "Authorization: Bearer YOUR_ADMIN_TOKEN"
+  --header "Authorization: Bearer ${PAYWAY_WEBHOOK_ADMIN_TOKEN}"
 ```
 
 Expected structure:

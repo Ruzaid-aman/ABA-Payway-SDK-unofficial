@@ -1,0 +1,172 @@
+# 22 — API Datetime and Timezone Reference
+
+PayWay does not use one datetime representation across every API. Treat each
+field according to its endpoint and the offset carried by the value; never
+assume that every response is UTC or that every response is Phnom Penh time.
+
+The operational default for confirmed naive gateway timestamps is the IANA
+zone `Asia/Phnom_Penh` (UTC+7). An explicit `+07:00` proves the offset, while
+the PayWay context makes `Asia/Phnom_Penh` the appropriate application zone.
+
+## 22.1 Evidence labels
+
+| Label | Meaning |
+| --- | --- |
+| **Explicit** | The value carries `Z`, `+07:00`, or another numeric offset. |
+| **Sandbox-confirmed** | A live response was compared with a UTC observation time. |
+| **Inferred** | Related PayWay endpoints use the same convention, but this field has no offset and lacks a direct clock comparison. |
+| **Unconfirmed** | The example has no offset and available evidence cannot establish its timezone. |
+
+Do not promote an inferred or unconfirmed value to a confirmed contract in
+application code or documentation.
+
+## 22.2 Response formats in the current public API set
+
+The [PayWay Developer Suite index](https://developer.payway.com.kh/llms.txt)
+currently lists 24 public API pages. Eleven contain a time-bearing field in a
+documented response example; the other thirteen do not.
+
+| API | Response field | Example representation | Timezone result |
+| --- | --- | --- | --- |
+| Get transaction details | `transaction_date`, including operation dates | `2025-02-13 13:55:25` | **Sandbox-confirmed UTC+7** |
+| Check transaction | `transaction_date` | `2025-02-13 13:55:25` | **Sandbox-confirmed UTC+7** |
+| Get transaction list | `transaction_date` | `2025-10-08 09:55:15` | **Sandbox-confirmed UTC+7** |
+| Get transactions by merchant reference | `transaction_date` | `2025-10-08 09:55:15` | **Inferred UTC+7** from the same transaction service |
+| Create payment link | `created_at`, `updated_at` | `2023-04-13 03:43:30` | **Sandbox-confirmed UTC+7** |
+| Get payment link details | `created_at`, `updated_at` | `2022-08-17 11:31:43` | **Sandbox-confirmed UTC+7** |
+| Create/detail payment link | `expired_date` | `1681357409`, `"0"`, or empty | Unix epoch seconds, or an absence sentinel |
+| Payout | `transaction_date` | `2024-09-10T15:53:27.2157019+07:00` | **Explicit UTC+7** |
+| Link Account | `expire_in` | `1627113926` | Unix epoch seconds |
+| Get Token Details | `expired_at` | `2019-08-24T14:15:22Z` | **Explicit UTC** |
+| Add/update beneficiary | `created_at` | `2022-09-19 07:52:51` | **Unconfirmed**; the example has no offset |
+
+The explicit UTC Get Token Details example and explicit UTC+7 Payout example
+prove that field handling must be endpoint-specific:
+
+- [Get Token Details](https://developer.payway.com.kh/get-token-details-19336824e0)
+- [Payout](https://developer.payway.com.kh/payout-14530816e0)
+- [Check transaction](https://developer.payway.com.kh/check-transaction-14530826e0)
+- [Get transaction list](https://developer.payway.com.kh/get-transaction-list-14530825e0)
+- [Create payment link](https://developer.payway.com.kh/create-payment-link-14530837e0)
+- [Get payment link details](https://developer.payway.com.kh/get-payment-link-details-14530838e0)
+- [Add a beneficiary](https://developer.payway.com.kh/add-a-beneficiary-to-whitelist-14530818e0)
+
+### Public API responses without a documented time field
+
+The documented response examples for these thirteen pages contain no datetime
+field to interpret:
+
+- Purchase
+- Close transaction
+- Refund API
+- Exchange rate
+- Link Card (HTML response)
+- Credentials-on-file Payment
+- Renew Token endpoint response
+- Remove Token
+- Subscription
+- QR API
+- Complete pre-auth transactions
+- Complete pre-auth with payout
+- Cancel pre-purchase transaction
+
+Do not infer a response timezone for an endpoint that does not return a time
+field merely because its request includes `req_time` or `request_time`.
+
+## 22.3 Callbacks are a separate contract
+
+Callback examples must not be described as synchronous API responses.
+
+| Callback | Field | Representation | Timezone result |
+| --- | --- | --- | --- |
+| Renew Token callback | `expired_at` | `2026-06-07T15:47:38.8884292+07:00` | **Explicit UTC+7** |
+| Link/subscription token callback | `expired_at` | `2025-10-20T08:20:03` | **Unconfirmed** because no offset is present |
+| KHQR payment notification | `transaction_date` | `2025-10-10 16:03:26` | **Inferred UTC+7**, not explicit in the value |
+| Online checkout callback | `transaction_date` | `YYYY-MM-DD HH:mm:ss` | Treat as unconfirmed until compared with a real delivery clock |
+
+See the official [Renew Token](https://developer.payway.com.kh/renew-token-19336823e0)
+and [KHQR](https://developer.payway.com.kh/khqr-guideline-3192101f0)
+examples. A field name does not define a timezone: `expired_at` appears with
+`Z`, `+07:00`, and no offset in different PayWay contexts.
+
+Synthetic webhook fixtures exercise payload handling and verification, not
+production timezone behaviour. Do not use them as timezone evidence.
+
+## 22.4 Request timestamps
+
+Where an endpoint accepts `req_time` or `request_time`, generate the compact
+value in UTC:
+
+```text
+YYYYMMDDHHmmss
+```
+
+For example, `20260914110530` represents
+`2026-09-14T11:05:30Z`. The SDK's `formatRequestTime()` already uses UTC.
+
+This is not universal across the API surface: some operations do not carry a
+request-time field, and the wire name varies between `req_time` and
+`request_time`. Sign the exact field name and value required by the endpoint.
+The HMAC covers the submitted value; freshness or timezone validation is a
+separate gateway rule. Therefore, do not describe a non-UTC value as a proven
+HMAC failure unless that behaviour has been tested directly.
+
+Transaction-list filters are `from_date` and `to_date` on the wire and
+`fromDate` and `toDate` in the SDK. Build these naive filter values in the
+gateway's UTC+7 day, not the host machine's local day.
+
+## 22.5 Safe parsing and normalization
+
+Apply the rules in this order:
+
+1. If an ISO value ends in `Z` or contains a numeric offset, parse that offset
+   exactly. Do not attach another timezone.
+2. For known epoch fields (`expire_in`, `expired_in`, `expired_date`), convert
+   seconds to milliseconds before constructing a JavaScript `Date`.
+3. Treat `"0"`, `0`, and an empty expiry value as “not supplied”, not as the
+   Unix epoch.
+4. Attach `Asia/Phnom_Penh` only to naive fields whose endpoint is confirmed
+   above.
+5. Preserve unconfirmed naive values as raw data, or use a configurable
+   explicitly recorded assumption until ABA confirms the timezone.
+6. Store the normalized UTC instant together with the original value,
+   endpoint, field name, and timezone basis (`explicit`, `confirmed`,
+   `inferred`, or `assumed`).
+
+```ts
+function parseEpochSeconds(value: unknown): Date | undefined {
+  if (value === '' || value === 0 || value === '0' || value == null) return undefined;
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds)) throw new Error('Invalid PayWay epoch value');
+  return new Date(seconds * 1000);
+}
+
+function parseConfirmedPhnomPenh(value: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    throw new Error('Invalid PayWay naive datetime');
+  }
+  return new Date(`${value.replace(' ', 'T')}+07:00`);
+}
+```
+
+Do not call `new Date(naiveValue)` directly. JavaScript interprets naive
+strings using environment-dependent rules. Also retain the original Payout
+timestamp if sub-millisecond precision matters: JavaScript `Date` preserves
+milliseconds, while the documented example carries seven fractional digits.
+
+## 22.6 Open questions for ABA
+
+Ask ABA PayWay to confirm these contracts before depending on them:
+
+1. What timezone applies to beneficiary `created_at`?
+2. What timezone applies to token callback `expired_at` values without `Z` or
+   a numeric offset?
+3. Is KHQR webhook `transaction_date` contractually Asia/Phnom_Penh, or is
+   UTC+7 only current implementation behaviour?
+4. Which endpoints validate `req_time`/`request_time` as UTC, and what
+   freshness window is enforced?
+5. Can all new response and callback fields adopt ISO 8601 with an explicit
+   offset?
+
+Until those questions are answered, label assumptions in code and logs rather
+than silently converting ambiguous values.

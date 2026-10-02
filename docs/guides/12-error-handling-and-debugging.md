@@ -494,7 +494,7 @@ Instead of searching this chapter for a code, ask the CLI — works offline, no 
 ```bash
 payway-sdk explain PTL36    # → Transaction not found: verify the original tran_id...
 payway-sdk explain 49       # → Invalid Request: list dates must be "YYYY-MM-DD HH:mm:ss"
-payway-sdk explain 104      # → CoF family: token not found / not usable (v1.3.6)
+payway-sdk explain 104      # → Merchant not enabled for token flag; confirm endpoint/profile
 payway-sdk explain          # list every known code
 ```
 
