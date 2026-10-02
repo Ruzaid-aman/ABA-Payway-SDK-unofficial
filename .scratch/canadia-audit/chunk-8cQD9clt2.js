@@ -1,1 +1,0 @@
-import{h as e}from"./BryYLRZK.js";import{t}from"./DoErv5yu2.js";function n(){let n=e();return{openDocs:()=>{let e=t[0],r=e?.path??`/category/${e?.id}`;n.push(r)}}}export{n as t};

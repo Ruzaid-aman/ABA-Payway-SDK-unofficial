@@ -1,4 +1,0 @@
-- `payway-sdk generate-checkout -a 5 -y --bogus-flag`
-- `payway-sdk frobnicate -t x`
-- `payway-sdk generate-qr -z 5`
-- `payway-sdk cof token renew --bogus x`
