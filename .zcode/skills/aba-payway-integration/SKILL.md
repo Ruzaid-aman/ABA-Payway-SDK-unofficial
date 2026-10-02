@@ -2,7 +2,7 @@
 name: aba-payway-integration
 description: Explain how to use this skill, select a PayWay flow, or integrate, test, review and troubleshoot ABA PayWay in a merchant project. Inspect existing orders, authentication and storage; implement server-side verification, fulfillment and recovery. TypeScript/JavaScript recipes cover Express and Next.js, with workflow references for COF, subscriptions, QR, refunds, payouts and partner capabilities.
 metadata:
-  version: 1.1.1
+  version: 1.1.2
 ---
 
 # ABA PayWay Merchant Integration
@@ -51,6 +51,7 @@ npm exec -- payway-sdk docs agent-integration
 - Keep SDK calls, signing keys and raw gateway responses on the server. Retrieve price/currency and authorize order ownership there. Return only the customer's QR, signed hosted form or hosted link.
 - Save a unique attempt before submission. Gateway transaction IDs are not idempotency keys. After a lost response, query the saved attempt; never blindly repeat a charge/create.
 - Use confirmed SDK symbols and endpoint-specific units/field shapes from the local reference. Do not invent APIs or port another provider's signing/retry rules.
+- For default checkout follow [UI requirements](references/integration-ui.md#default-e-commerce-checkout-requirements) and [branding configuration](references/ui-customization.md): expose all profile-enabled methods, use exact ABA KHQR wording/current assets, gate Pay with linked policies and consent, use the expected web plugin popup or full-screen app WebView with merchant header, and configure the supported success continuation/app return. Show merchant success and clear purchased cart contents only after backend verification. Record Integration Team screen approval before production credentials; supplied logos/design examples do not establish entitlement or public redistribution permission.
 - Signed online and confirmed Customer Printed QR callbacks use SDK verification. Payment-link and offline KHQR notifications are unsigned hints under their own contracts. Never downgrade a signed flow because a header is missing. Query PayWay and bind results to the immutable, scoped attempt; redirects and missing callbacks prove nothing.
 - Compare the original transaction currency and amount due with the stored order; payer debit can differ in currency. PRE-AUTH is not captured payment. Durably record acceptance and enqueue fulfillment atomically with a unique order/job constraint.
 - Reconcile missing callbacks and uncertain outcomes. Remote PENDING is not proof of a live QR; expiry/closure also need local order policy.

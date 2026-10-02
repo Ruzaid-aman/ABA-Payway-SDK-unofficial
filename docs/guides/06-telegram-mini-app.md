@@ -5,6 +5,8 @@
 
 ## Flow at a glance
 
+When using default PayWay checkout, follow [checkout UI requirements](integration-ui.md#default-e-commerce-checkout-requirements) for enabled methods, exact KHQR wording, policy consent, readable mobile presentation and Integration Team screen review. Telegram owns its host chrome; confirm supported embedded-browser/app handoff with ABA rather than promising toolbar suppression. Configure customer success continuation/app return separately from purchase `returnUrl`; show confirmation/clear purchased cart contents only after authenticated backend verification. Teaching examples are not evidence of Telegram or production UI approval.
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -380,7 +382,7 @@ This is a single HTML file served by your backend. It initializes the Telegram W
           form.submit();
 
           // After form submit, this page will be replaced by PayWay's checkout.
-          // When PayWay redirects back to your returnUrl, Telegram will show that page
+          // When PayWay continues to your continueSuccessUrl, Telegram shows that page
           // (still within the Mini App WebView).
           // The return URL page should include Telegram.WebApp.close() logic.
 

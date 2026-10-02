@@ -22,7 +22,7 @@ sequenceDiagram
         PayWay-->>WebView: result page calls postMessage ✅
         WebView-->>Host: script handler receives result
     else URL interception
-        PayWay-->>WebView: redirect to return_url prefix ✅
+        PayWay-->>WebView: configured continue_success_url ✅
         WebView-->>Host: navigation delegate intercepts
     else deeplink return (mobile apps)
         PayWay-->>Host: returnDeeplink opens the app ✅
@@ -67,7 +67,7 @@ In Flutter, `WebViewController.setNavigationDelegate` plays the role of the Andr
 
 ## JavaScript Bridge: Communicating Between WebView and Native App
 
-When PayWay completes a payment, it redirects to your `returnUrl`. In a WebView, you need to **intercept this redirect** to know the payment is done. There are two approaches:
+Configure `continueSuccessUrl` for the hosted customer continuation or the supported `returnDeeplink` for app return. Purchase `returnUrl` is the notification destination. Intercept the configured customer return and query the backend's verified status; navigation cannot establish that payment is done. There are two approaches:
 
 ### Approach 1: URL Interception (Recommended)
 
@@ -286,13 +286,19 @@ webView.settings.setSupportMultipleWindows(false)
 
 ## Testing WebView Integration
 
+Apply [default checkout UI requirements](../../knowledge/integration-ui.md#default-e-commerce-checkout-requirements): full-screen hosted payment, a static merchant header, and hidden app-owned address/browser toolbars. An external browser controls its own chrome. Display a supported `checkout_qr_url` readably without assuming every purchase returns one. Maintain provider-controlled authentication/card fields, cookie/session handling, safe destinations and same-attempt restoration. The merchant's method selection and policy-consent step precede payment; the generated form/WebView does not implement them automatically.
+
 ### Checklist
 
 - [ ] Cookies and local storage are enabled
 - [ ] JavaScript is enabled
 - [ ] PayWay's checkout page loads without errors
 - [ ] The customer can enter card details or select payment method
-- [ ] After payment, the return URL redirect is intercepted
+- [ ] The configured customer continuation/app return is validated and intercepted; purchase `returnUrl` stays the notification destination
+- [ ] Merchant header, readable full-screen QR and app-owned toolbar visibility match the approved UI
+- [ ] All enabled methods and policy links/checkbox are available before submission
+- [ ] Pending/unknown return restores the existing attempt; only verified backend acceptance clears purchased cart contents and shows merchant confirmation
+- [ ] Integration Team reviewed checkout/KHQR screenshots and flow before production credentials
 - [ ] The WebView is properly dismissed after payment
 - [ ] Back button behavior is handled (don't accidentally cancel payment)
 - [ ] TLS/SSL works correctly in production (HTTPS only)

@@ -19,7 +19,7 @@ Check whether each outlet requires its own profile, callback, account/report map
 
 ## Flow selection
 
-Evaluate a verified official plugin first for a supported e-commerce platform. For ordinary web/app checkout prefer the documented hosted, modal or bottom-sheet mode; custom styling does not authorize raw-card handling. Choose online QR for scan/second-screen, offline KHQR for approved local invoice batches, payment links for sharing, COF for consented saved-method charges, and pre-auth for holds. Payout/distribution requires an approved commercial model and funds source. POS/ECR, ABA Mini Apps, partner provisioning and BillZone need separate contracts.
+Evaluate a verified official plugin first for a supported e-commerce platform. For default web checkout use the expected plugin popup; merchant app WebViews use the approved full-screen hosted journey. Follow [checkout UI requirements](../../knowledge/integration-ui.md#default-e-commerce-checkout-requirements) for enabled methods, policy consent, branding, return and screen review. Bottom-sheet and hosted-QR availability require their own supported contract and entitlement; custom styling does not authorize raw-card handling. Choose online QR for scan/second-screen, offline KHQR for approved local invoice batches, payment links for sharing, COF for consented saved-method charges, and pre-auth for holds. Payout/distribution requires an approved commercial model and funds source. POS/ECR, ABA Mini Apps, partner provisioning and BillZone need separate contracts.
 
 ## Sandbox readiness
 
@@ -39,7 +39,7 @@ These are merchant acceptance stages, separate from package release checks.
 | G1 sandbox ready | Usable credentials/entitlements, current fixtures/simulator, reachable callback |
 | G2 implementation | Contract/signing checks, authorization, durable state/receipt/outbox, tested UI |
 | G3 sandbox accepted | Applicable real sandbox scenarios; API/callback/query/order/ledger/UI evidence agree |
-| G4 production ready | Business/product approvals, scoped production credentials/network/portal/report access and controlled test authorization |
+| G4 production ready | Business/product approvals, Integration Team checkout/KHQR screen approval before production credentials are released, scoped credentials/network/portal/report access and controlled test authorization |
 | G5 production acceptance | ABA's existing required transactions executed and verified in the deployed flow |
 | G6 settlement verified | Approved receipt/operation/report/bank joins, fee/FX/currency/account checks and authorized finance/ABA signoff |
 | G7 handover | Monitoring, reconciliation, support ownership, operator training and rollback accepted |

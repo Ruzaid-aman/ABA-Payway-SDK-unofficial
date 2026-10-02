@@ -61,6 +61,7 @@ Additional integration examples:
 
 - “Add PayWay online QR to my Express shop. Reuse our authenticated orders and database.”
 - “Add hosted checkout to this Next.js application and verify payments on the server.”
+- “Review our default checkout against PayWay's UI requirements: enabled methods, ABA KHQR wording, policy consent, logos, popup/mobile flow and verified return. List the screens ABA must approve.”
 - “Create invoice payment links and handle unsigned pushbacks safely.”
 - “Recover this timed-out create without submitting a second payment.”
 - “Our COF call returns 104. Confirm the contract and explain the enablement prerequisite.”
@@ -68,6 +69,8 @@ Additional integration examples:
 ## Integration journey
 
 Inspect the framework, order/pricing source, authorization, persistence, jobs and tests. Select the payment flow and confirm required capabilities. Implement create → customer interaction → verify → fulfill → recover using the existing application architecture.
+
+For default checkout load [UI requirements](integration-ui.md#default-e-commerce-checkout-requirements) and [branding configuration](10-ui-customization.md). Implement the merchant's complete enabled-method selector and policy consent before the signed transport; the teaching recipes do not supply a production-approved UI. Record Integration Team checkout/KHQR screen review before production credentials, separately from local/sandbox checks.
 
 Credentials stay in server-side environment/secret storage. The browser sends an order identifier, never an authoritative price. Persist an attempt and its unique identifier before PayWay submission; keep it after a timeout. Atomically accept verified payment evidence and insert a uniquely keyed fulfillment job. Make the worker's downstream effects idempotent too.
 

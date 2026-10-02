@@ -2,7 +2,7 @@
 name: aba-payway-first-payment
 description: Start an ABA PayWay payment, choose QR or hosted checkout or payment link, verify it, and fulfill once.
 metadata:
-  version: 1.4.4
+  version: 1.4.5
 ---
 
 # ABA PayWay First Payment
@@ -34,6 +34,8 @@ Follow the quickstart's shell-specific creation commands, which retain a unique 
 | Shareable link | `payment-link create`; also needs an RSA key | [Payment link](../aba-payway-payment-link/SKILL.md) |
 
 Load only the selected route. Subscription, COF, payout, and offline KHQR are separate workflows.
+
+For a merchant's default checkout, read the installed `integration-ui` guide (`npm exec -- payway-sdk docs integration-ui`): expose all profile-enabled methods, use **ABA KHQR** / **Scan to pay with any banking app**, require linked policies and checkbox acceptance above Pay, and use the expected web plugin popup or approved full-screen app presentation. The signed-form helper and teaching demo do not supply complete policy/brand UI or Integration Team screen approval. Configure the web success continuation/app return, and clear purchased cart contents/show confirmation only after backend verification. Obtain ABA's checkout/KHQR screen review before production credentials.
 
 ## SDK Entry
 

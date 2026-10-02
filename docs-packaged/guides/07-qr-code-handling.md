@@ -34,6 +34,8 @@ sequenceDiagram
 
 ## QR String vs. QR Image — Understanding the Difference
 
+For default e-commerce checkout use the exact method title **ABA KHQR** and subtitle **Scan to pay with any banking app**, current official assets and all enabled methods in the selection UI. Preserve QR proportions, contrast and quiet zone; a supported returned `checkout_qr_url` should be readable in a full-screen view/WebView. Follow [checkout UI requirements](../../knowledge/integration-ui.md#default-e-commerce-checkout-requirements) for policy consent, mobile merchant header, distinct merchant/vendor logo sizes and Integration Team KHQR screen review before production credentials. These presentation requirements do not add a signature to unsigned offline-KHQR notifications or make hosted QR URLs available for every endpoint.
+
 When using the PayWay QR API, you get two related but distinct pieces of data:
 
 | Field | Format | Purpose |

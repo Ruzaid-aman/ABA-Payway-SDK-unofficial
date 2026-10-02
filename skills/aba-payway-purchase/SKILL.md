@@ -2,7 +2,7 @@
 name: aba-payway-purchase
 description: Create a signed ABA PayWay checkout purchase with aba-payway-ts.
 metadata:
-  version: 1.4.0
+  version: 1.4.1
 ---
 
 # ABA PayWay Purchase
@@ -24,6 +24,12 @@ const payload = payway.checkout.createTransaction({ transactionId: 'order-123', 
 ```
 
 Post the returned signed payload from your server-rendered checkout form. Keep API credentials server-side.
+
+## Default checkout presentation
+
+Follow the installed public guides `integration-ui` and `ui-customization` (`npm exec -- payway-sdk docs <topic>`). Show **Select payment method** with all profile-enabled methods and current official assets; KHQR must read **ABA KHQR** / **Scan to pay with any banking app**. Above Pay, link Terms & Conditions / Refund Policy and require the acceptance checkbox before any frontend submission. For the expected web popup use `checkout2-0.js` and `AbaPayway.checkout()`; `viewType` alone is insufficient. Mobile app WebViews use full-screen hosted checkout, a static merchant header and no browser toolbar; ordinary browsers own their address bars.
+
+Configure `continueSuccessUrl` for the customer web return or `returnDeeplink` for the app. Purchase `returnUrl` is the notification destination. Clear purchased cart contents, update the order and show merchant confirmation only after verified backend acceptance, with fulfillment tracked separately. Obtain Integration Team review of checkout/KHQR screens before production credentials. Request current approved logo files; design examples do not enable methods or authorize redistributing assets.
 
 > **Local vs. network:** `createTransaction()` (and `createCheckoutPayload()`) only **builds a LOCAL signed payload** — it performs no network request. By contrast, `purchase()` (and the agentic `create_checkout_purchase` tool) performs the actual **NETWORK request** to PayWay. Use the local builder when you want to render your own checkout form; use `purchase()` when you want the SDK to submit the payment.
 
@@ -54,7 +60,8 @@ Route B — hosted HTML, typed:
 ```ts
 const page = await payway.checkout.purchaseHosted({
   transactionId: 'order-123', amount: 15, currency: 'USD', paymentOption: 'cards',
-  returnUrl: 'https://example.com/payment-result',
+  returnUrl: 'https://merchant.com/api/payway/callback',
+  continueSuccessUrl: 'https://merchant.com/orders/result',
 }); // PurchaseHostedHtmlResult { hosted_checkout: true, content_type, html }
 res.type(page.content_type).send(page.html); // Express — but see the CORS warning below
 ```

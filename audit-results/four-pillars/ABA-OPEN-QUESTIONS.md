@@ -900,3 +900,20 @@ Provide official platform/plugin/source/version/feature/upgrade/rollback support
 ### Q56 — Public/internal distribution and maintenance approvals (P2)
 Owner: Product / Developer Relations / Security / Support.
 Confirm approved brand/license/source redistribution, API/fact reviewers, public contact, maintainers, review cadence, compatibility/retirement and internal-companion access. Confirm current portal/go-live/support/VIP policies before restricted publication; internal staffing/Jira/SLA details stay outside the public skill. Repository destination/version/history decisions remain the existing release-owner decisions.
+
+## Default checkout UI update — received 2026-10-03 (Q50/Q56 partial answer)
+
+Source: project-owner relay of PayWay Integration Team guidance and supplied Figma exports. Receipt date is not a confirmed authoring/effective date. Evidence and SHA-256 file identities: [checkout UI source record](../../.scratch/payway-integration-skills/CHECKOUT-UI-SOURCES-2026-10-03.md). No request was sent externally, and the linked live Figma designs could not be inspected.
+
+**Q50 partially answered — preserve these supplied requirements:** all profile-enabled methods visible/selectable under Select payment method; exact ABA KHQR / Scan to pay with any banking app wording; current official assets; expected web popup via checkout2-0.js/AbaPayway.checkout(); full-screen mobile WebView with hidden app-owned browser chrome and static merchant header; readable full-screen/WebView hosted QR where returned; linked policies and mandatory frontend checkbox above Pay, with refund/cancellation policy at final order step; web continue_success_url/app return_deeplink; merchant confirmation/cart cleanup after verified backend success. Integration Team reviews checkout/KHQR logos, wording, labels, currency formatting and behavior before production credentials. Backend verification, payload response shape and merchant enablement remain separate contracts.
+
+The supplied logo export adds: merchant checkout upload 300 × 300 px JPG/PNG ≤3 MB; displayed logo minimum height 40 px, width auto and 10 px protection space; separate vendor circle PNG 315 × 315 px ≤3 MB with primary-color background; primary-color checkout theme and configurable continuation label. Illustrated method order and 40 × 40 exported SVG size are not established universal layout/touch-target requirements.
+
+**Remaining Q50 inputs (do not re-ask the confirmed presentation rules):**
+
+1. Confirm the current approved guideline/version/effective date (the design link is titled 2.11), canonical public source and full supported device/embedded-browser matrix. Do Telegram, external browsers and native wrappers have different header/navigation requirements?
+2. Confirm vendor-logo applicability, profile configuration procedure for logo/theme/continuation label, supported label/locales, and any required method order/spacing/currency typography absent from the exports. Resolve any registered-versus-enabled method discrepancy before defining footer logos.
+3. Supply the screen-review channel, required screenshot/recording/device cases, approver and durable sign-off artifact before production credentials. Is a merchant/profile change subject to re-review?
+4. Confirm bottom-sheet availability and per-environment/profile hosted-QR response/expiry/entitlement rules. Presentation intent does not make checkout_qr_url universal. Simulator/test fixture questions in Q50 remain open.
+
+**Remaining Q56 inputs:** confirm public redistribution/license/version/update permission for the SVGs, composite logo strip and design exports (including third-party payment network marks), approved public wording for the relayed requirements and canonical asset download/source. Supplying files for this implementation review is not explicit permission to bundle them in a public package. Original assets remain outside skills/knowledge/docs-packaged; only scoped textual guidance was propagated. Other Q56 maintenance/publication decisions remain open.

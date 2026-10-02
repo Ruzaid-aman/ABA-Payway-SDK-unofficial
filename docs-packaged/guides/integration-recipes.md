@@ -2,6 +2,8 @@
 
 Nine installed TypeScript assets provide service, scoped SQLite store, PayWay adapter, Express/Next handlers, exact money conversion, customer state, synthetic settlement matching and profile/gate evidence types. Copy only the needed server assets into the existing project; keep credentials and SDK code out of client bundles.
 
+These assets implement the server payment boundary, not a complete approved merchant checkout UI. Adapt the merchant frontend using [default checkout requirements](../../knowledge/integration-ui.md#default-e-commerce-checkout-requirements): enabled-method selection, linked policies/checkbox above Pay, exact KHQR copy/current assets, expected popup or app full-screen journey and verified return. Obtain Integration Team checkout/KHQR screen review before production credentials; backend recipe tests do not supply it.
+
 ## Runtime and scope
 
 Node >=22.12 is supported; built-in node:sqlite needs --experimental-sqlite on 22.12. SQLite is a one-host teaching adapter. Distributed/serverless merchants implement Store using their existing transactional DB, shared worker leases/endpoint budgets, migrations, backups and retention.

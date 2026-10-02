@@ -11,6 +11,17 @@
 
 Go through **every** item before switching from sandbox to production. A missed checkbox is a potential production incident.
 
+### Checkout UI and Integration Team approval
+
+- [ ] **All profile-enabled methods are visible and selectable** under Select payment method; enabled card-network branding and current We accept footer logos agree with the merchant profile.
+- [ ] **KHQR wording and current assets are correct**: ABA KHQR / Scan to pay with any banking app. Merchant checkout logo upload is 300 × 300 px JPG/PNG, at most 3 MB; displayed logo has minimum 40 px height, auto width and 10 px protection space. The separate 315 × 315 px circular vendor PNG applies only where requested.
+- [ ] **Policies and consent precede submission**: Terms & Conditions / Refund Policy links and checkbox above Pay; unchecked consent blocks all frontend payment entry paths. Refund/cancellation policy is visible at the final order step.
+- [ ] **Presentation matches the reviewed journey**: expected web popup uses checkout2-0.js and AbaPayway.checkout(); app-owned WebViews are full-screen with static merchant header and hidden browser/address toolbars. Ordinary browser chrome remains browser-owned.
+- [ ] **Customer return is configured and verified**: continueSuccessUrl / returnDeeplink is validated; purchase returnUrl is the notification endpoint. Pending/unknown restores the original attempt. Only verified backend acceptance updates paid status, clears purchased cart contents and shows merchant confirmation.
+- [ ] **Integration Team screen review is recorded before production credentials are released**, including checkout/KHQR logos, wording, currency formatting and flow. Record profile/methods, guideline version, screenshots/device evidence and approval reference; automated checks do not grant this approval.
+
+See [default checkout requirements](integration-ui.md#default-e-commerce-checkout-requirements) and [branding configuration](10-ui-customization.md). Confirm current assets, configuration and review procedure with ABA.
+
 ### Environment & Credentials
 
 - [ ] **Environment set to `'production'`**  

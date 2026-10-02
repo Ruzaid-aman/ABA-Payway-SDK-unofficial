@@ -19,15 +19,15 @@ sequenceDiagram
     Browser->>PayWay: POST purchase form (payment_gate=0 → hosted page)
     Customer->>PayWay: completes payment on hosted page
 
-    par return-URL hop (unverified, UX only)
-        PayWay-->>Browser: redirect to return_url ✅
-        Browser->>Backend: GET return_url → show "processing"
+    par customer continuation (unverified, UX only)
+        PayWay-->>Browser: continue_success_url navigation
+        Browser->>Backend: GET merchant result → show "processing"
     and trusted server callback
         PayWay-->>Backend: POST callback + X-PAYWAY-HMAC-SHA512
         Backend->>Backend: verifyCallbackDetailed → dedupe → ✅ fulfill once
     end
 
-    Note over Backend,PayWay: The callback is the only trusted source of truth — the redirect is not.
+    Note over Backend,PayWay: Verify signed callbacks and recover by inquiry; navigation is not payment evidence.
 ```
 
 Full diagram: Payment Lifecycle · Callback details: [Chapter 11](callbacks-webhooks.md).
@@ -116,9 +116,8 @@ router.post('/create', (req, res) => {
       // - 'pre-auth'   → Hold funds without capturing
       type: 'purchase',
 
-      // Where the customer is redirected after payment
-      // ⚠️ This should be a page on YOUR website, not PayWay
-      returnUrl: `${process.env.BASE_URL}/payment-result?tran_id=${transactionId}`,
+      // Purchase notification endpoint; not the customer success page
+      returnUrl: `${process.env.BASE_URL}/api/payway/callback`,
 
       // Where the customer goes if they click "Cancel" on PayWay
       cancelUrl: `${process.env.BASE_URL}/payment-cancelled`,
@@ -126,7 +125,7 @@ router.post('/create', (req, res) => {
       // Optional: Skip PayWay's intermediate success page
       skipSuccessPage: 0,
 
-      // Optional: Additional redirect after success page
+      // Customer continuation from the hosted success page
       continueSuccessUrl: `${process.env.BASE_URL}/order-confirmation?tran_id=${transactionId}`,
     });
 
@@ -180,8 +179,10 @@ There are **two approaches** for the frontend checkout:
 
 | Approach | Description | When to Use |
 |---|---|---|
-| **Full-page Redirect** (default) | Auto-submit a hidden form that redirects the user to PayWay's hosted checkout page | Simple integration, best mobile UX |
-| **Popup Modal** | Open PayWay's checkout in a popup overlay using `checkout2-0.js` | Desktop-focused, feels more "in-app" |
+| **Popup Modal** | Open PayWay's checkout in an overlay using `checkout2-0.js` and `AbaPayway.checkout()` | Expected default web popup journey in the supplied Integration Team guidance |
+| **Full-page hosted form POST** | Navigate to PayWay's hosted page through the signed form | Selected supported hosted journey; do not replace the popup when the reviewed flow expects one |
+
+Follow [default checkout requirements](integration-ui.md#default-e-commerce-checkout-requirements): all profile-enabled methods visible/selectable, exact ABA KHQR title/subtitle, current assets, and Terms & Conditions / Refund Policy links plus an acceptance checkbox above Pay. Block frontend submission until checked. The examples below illustrate transport, not a complete approved merchant UI; fixed demo amounts/methods must be adapted to authorized, server-priced orders and the enabled profile. Complete the consent step before any automatic form POST.
 
 ### Skip the boilerplate: `getCheckoutFormHtml()`
 
@@ -194,7 +195,8 @@ app.get('/checkout/:orderId', (req, res) => {
     transactionId: req.params.orderId,
     amount: 15.0,
     currency: 'USD',
-    returnUrl: 'https://mywebsite.com/payment-result',
+    returnUrl: 'https://mywebsite.com/api/payway/callback',
+    continueSuccessUrl: 'https://mywebsite.com/order-confirmation',
   }, { autoSubmit: true }); // same-tab navigation to the hosted page
   res.type('html').send(html);
 });
@@ -211,9 +213,9 @@ The manual markup below is what the helper generates — kept for reference and 
 
 ---
 
-### Option A: Full-Page Redirect (Default)
+### Option A: Full-Page Hosted Form POST
 
-The form auto-submits to PayWay, redirecting the user's browser to the hosted checkout page.
+The form auto-submits to PayWay, navigating the browser to hosted checkout. Invoke this transport only after the merchant's final order review and policy acceptance. It is not the replacement for a required web popup.
 
 ```html
 <!-- checkout.html -->
@@ -356,7 +358,7 @@ The form auto-submits to PayWay, redirecting the user's browser to the hosted ch
 
 For a more "in-app" feel on desktop, use PayWay's `checkout2-0.js` library to open the checkout in a popup overlay. This approach keeps the customer on your page while they complete payment.
 
-> ⚠️ **Mobile note:** Popups may not work well on mobile. For mobile checkouts, use the full-page redirect (Option A) or a deep link approach.
+> **Mobile note:** For a merchant app WebView, use full-screen hosted checkout with a static merchant header and no app-owned address/browser toolbar. Mobile websites cannot hide the user's browser address bar. Confirm device/handoff support for the selected flow; see [WebViews](webviews.md).
 
 **How the popup flow works:**
 
@@ -448,6 +450,12 @@ For a more "in-app" feel on desktop, use PayWay's `checkout2-0.js` library to op
       <input type="tel" id="phone" value="012345678">
     </div>
 
+    <label>
+      <input type="checkbox" id="policyAccepted" required>
+      I accept the <a href="/terms">Terms &amp; Conditions</a> and
+      <a href="/refund-policy">Refund / Cancellation Policy</a>.
+    </label>
+
     <!-- CHECKOUT BUTTON — ID must match $('#checkout_button') -->
     <button class="btn" id="checkout_button">
       <span id="btnText">Pay Now</span>
@@ -482,7 +490,14 @@ For a more "in-app" feel on desktop, use PayWay's `checkout2-0.js` library to op
     document.addEventListener('DOMContentLoaded', function() {
 
       // jQuery syntax used in PayWay's official docs:
-      $('#checkout_button').click(async function() {
+      $('#checkout_button').click(async function(event) {
+        event.preventDefault();
+        var policy = document.getElementById('policyAccepted');
+        if (!policy.checked) {
+          policy.reportValidity();
+          policy.focus();
+          return;
+        }
         var btn      = document.getElementById('checkout_button');
         var btnText  = document.getElementById('btnText');
         var btnSpinner = document.getElementById('btnSpinner');
@@ -552,17 +567,19 @@ For a more "in-app" feel on desktop, use PayWay's `checkout2-0.js` library to op
 </html>
 ```
 
-> 📎 **Full runnable example:** See `docs/examples/web/checkout-popup.html` for the complete implementation with payment method selection and error handling.
+> **Teaching transport example:** `checkout-popup.html` demonstrates payment method selection and error handling. Adapt it to the confirmed enabled methods, policy consent, server-owned orders and [UI acceptance requirements](integration-ui.md); it is not evidence of production screen approval.
 
 ---
 
 ## Step 3: Handle the Return URL (Payment Result Page)
 
-After the customer completes or cancels payment on PayWay, they're redirected back to your `returnUrl`. This page should:
+Configure `continueSuccessUrl` for the hosted customer success continuation and `cancelUrl` for the supported cancel navigation. Purchase `returnUrl` is the server notification destination; it is not the hosted success continuation. The merchant result page should:
 
-1. **Show the result to the customer** (thank you, error, or pending message)
-2. **Optionally** confirm the status by calling `checkTransaction()` on your backend
-3. **⚠️ Never** mark the order as paid based solely on this redirect
+1. Read the authenticated backend's verified persisted receipt; recover the original attempt with inquiry when needed.
+2. Show pending/unknown until verified; preserve the same attempt and do not initiate another payment automatically.
+3. After matching verified transaction identity, amount and currency, update the order, clear only purchased cart contents and show Thank You / Order confirmed. Keep fulfillment processing distinct from payment acceptance.
+
+Never mark paid or clear the cart based solely on navigation, query parameters or a provider success screen. Obtain Integration Team review of checkout and KHQR screens before production credentials are released.
 
 ```typescript
 // routes/payment-result.ts

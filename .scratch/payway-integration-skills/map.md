@@ -13,6 +13,7 @@
 - [09 enhanced validation](issues/09-enhancement-validation.md): nine installed assets, 42 topics and fresh candidate evidence.
 - [10 second pass](issues/10-second-pass.md): whole-skill review and seven local fixes with regressions.
 - [11 usage help](issues/11-skill-usage.md): built-in usage routing, task/context prompts and a fresh guidance-only Codex trial; standalone 1.1.1 resources pass.
+- [12 checkout UI](issues/12-checkout-ui-guidance.md): supplied team/design requirements propagated to four skills and public guides; 40 focused tests and packed-consumer checks pass. Q50/Q56 retain narrowly scoped version/device/sign-off/asset permission questions; no original bank assets are bundled.
 
 ## Fog / next work
 

@@ -450,3 +450,7 @@ and the packaged knowledge corpus are synced to the same content.
 ## Integration-skill enhancement — 2026-10-02
 
 The approved additional-requirements work records new owner inputs in the canonical [ABA open questions register](../../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md), Q44–Q56. These extend existing questions without erasing answered relay/campaign evidence: production acceptance, settlement sources/joins, callback versions/ACK/vectors, current-query proof/recovery, money/IDs, onboarding/network, simulator/UI, endpoint/method entitlement, COF scheduling/consent, pre-auth/refund, payout, plugins/adjacent products and public/internal maintenance. Answers must carry owner/version/date/environment/profile and publication permission before propagation.
+
+## Default checkout UI — 2026-10-03
+
+The owner's PayWay Integration Team relay and supplied design exports partially answer Q50's default checkout presentation/branding requirements. Canonical public UI/customization, web/native/WebView/QR, onboarding/deployment and relevant skills now carry the scoped requirements. See the dated Q50/Q56 update in the [existing ABA register](../../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md) for exact source limits and remaining version, device/entitlement, sign-off and asset-redistribution questions. Textual guidance is propagated; original bank/design assets are not included in the package. Receipt of guidance is not live screen approval or verification of every Figma frame.

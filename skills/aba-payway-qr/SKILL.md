@@ -2,7 +2,7 @@
 name: aba-payway-qr
 description: Generate an online ABA PayWay KHQR payment QR code.
 metadata:
-  version: 1.5.1
+  version: 1.5.2
 ---
 
 # ABA PayWay QR
@@ -24,6 +24,8 @@ const qr = await payway.qr.generateQr({ transactionId: 'order-123', amount: 10, 
 ```
 
 Use an HTTPS callback URL and save the transaction ID before displaying the returned QR data.
+
+For default checkout label this option **ABA KHQR** with **Scan to pay with any banking app**. Use current official PayWay assets, preserve readable QR contrast/proportion/quiet zone and keep every profile-enabled method selectable. A supported returned `checkout_qr_url` belongs in a readable full-screen view/WebView; it is not a universal response field. See the installed `integration-ui` and `ui-customization` guides for policies/consent above Pay, merchant/vendor logo scopes, mobile headers and Integration Team KHQR screen review before production credentials. These online-checkout presentation rules do not change offline QR payload/signature contracts.
 
 > **Mutation retry policy (F01):** `generateQr` is a side-effecting create —
 > the SDK submits it exactly ONCE by default. A network failure after the send

@@ -17,11 +17,11 @@ sequenceDiagram
     Backend-->>App: checkout URL / hosted form target
     App->>PayWay: load payment UI in WebView
     Customer->>PayWay: completes payment
-    PayWay-->>App: redirect to return_url (intercepted by the WebView)
+    PayWay-->>App: configured success continuation / return_deeplink
     App->>Backend: ask for verified status (do not trust the redirect)
     Backend->>PayWay: check-transaction / callback already received
     Backend-->>App: APPROVED ✅ → show success, fulfill server-side
-    Note over App,Backend: Intercept the return-URL prefix in the WebView delegate; the redirect itself proves nothing.
+    Note over App,Backend: Validate the configured return destination; navigation itself proves nothing.
 ```
 
 Runnable examples: [Android `PaymentActivity.kt`](../examples/android/PaymentActivity.kt) · [iOS `PaymentViewController.swift`](../examples/ios/PaymentViewController.swift).
@@ -33,6 +33,8 @@ Runnable examples: [Android `PaymentActivity.kt`](../examples/android/PaymentAct
 ---
 
 ## Architecture
+
+Follow [default checkout UI requirements](integration-ui.md#default-e-commerce-checkout-requirements): all enabled methods selectable, exact KHQR copy/current assets, and policy links/acceptance above Pay. Merchant-controlled WebViews use full-screen hosted checkout with a static merchant header and hidden app-owned browser/address toolbars; ordinary browsers own their chrome. Configure supported customer continuation/app return separately from purchase returnUrl. Only verified backend acceptance updates paid state, clears purchased cart contents and shows merchant confirmation. Keep PIN/card entry in provider-controlled surfaces; record Integration Team checkout/KHQR screen review before production credentials.
 
 ```
 ┌──────────────────────────────┐     ┌──────────────────────────────┐     ┌──────────────────────┐
@@ -47,8 +49,8 @@ Runnable examples: [Android `PaymentActivity.kt`](../examples/android/PaymentAct
 2. Your backend responds with the signed form data
 3. Your app opens a **WebView** pointing to PayWay's checkout URL with the signed fields
 4. The customer completes payment inside the WebView
-5. PayWay redirects to your return URL — the WebView intercepts this to determine success/cancel/failure
-6. Your backend receives the webhook callback (the trusted source of truth, see Chapter 11)
+5. Intercept the configured customer continuation/app return, then ask the backend for verified status; navigation alone does not determine success/cancel/failure.
+6. Your backend verifies the signed callback or recovers through inquiry (see Chapter 11).
 
 ---
 
