@@ -1,7 +1,7 @@
 # Branch consolidation & `codex/payway-integration-skills` merge plan
 
-**STATUS (2026-10-02):** COMPLETE — integration merged into current main, pushed
-to the existing private origin and its worktree/local branch removed.
+**STATUS (2026-10-02):** MERGE/PUSH COMPLETE — integration is on private origin/main.
+Git worktree and local branch removed; residual filesystem cleanup is policy-blocked.
 The original no-push execution plan below is historical and superseded for this
 private-development push; public package/release publication remains separate.
 
@@ -331,9 +331,11 @@ advanced private origin/main from f4de67c to d59dc3d; ls-remote confirmed that e
 SHA. Final outgoing scan reviews the same three findings, with no new finding.
 After checking clean worktree status, merged ancestry, exact resolved cleanup path
 and backup hash, git worktree remove succeeded without force; the merged local
-codex/payway-integration-skills branch was deleted. The empty parent folder remains:
-automatic approval review rejected its cleanup command with "blocked by policy";
-no alternative filesystem deletion was attempted. The two unrelated detached Kilo
+codex/payway-integration-skills branch was deleted. Final filesystem inspection found a remaining node_modules junction targeting main's
+dependency directory and a .codex-worktree-name marker under the old worktree parent.
+Automatic approval review rejected both the parent cleanup command and a narrower,
+non-recursive junction-only unlink with "blocked by policy". No further deletion or
+alternative mechanism was attempted; those remnants are retained. The two unrelated detached Kilo
 worktrees and existing docs branches remain. Evidence archive and pre-merge patch
 remain in ignored .release-audit/. This completion record is a later
 documentation-only commit on main.
