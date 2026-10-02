@@ -107,8 +107,12 @@ scaffold-templates 11, starter-e2e 4, init 8, knowledge/docs 21); full offline s
    other credential-shaped value.
 2. **PARTIALLY CLOSED — owner decision recorded 2026-10-01:** use a fresh public history
    from a curated tree and retain this checkout as the private development line. The
-   curated public-tree list, native-SDK treatment, repository destination and remaining
-   publication decisions are still owner-controlled and pending.
+   curated public-tree list, repository destination and remaining publication
+   decisions are still owner-controlled and pending. **Native/PHP scope decided
+   2026-10-03:** the owner requested removal of Android/iOS companion projects and
+   PHP examples. Implementations are removed from the candidate; mobile backend
+   architecture guidance remains. Historical native audit findings are retained as
+   evidence of the earlier tree, not outstanding build gates for removed projects.
 
 ### Inspection evidence (exact artifacts, not source settings)
 

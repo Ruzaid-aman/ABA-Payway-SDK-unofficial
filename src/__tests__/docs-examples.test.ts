@@ -236,7 +236,7 @@ describe('Documentation examples', () => {
   });
 
   it('keeps the payment-link pushback receivers on the live no-hash contract (C7)', () => {
-    for (const file of ['payment-link-pushback-receiver.js', 'payment-link-pushback-receiver.php']) {
+    for (const file of ['payment-link-pushback-receiver.js']) {
       const example = readFileSync(join(currentDir, '../../docs/examples/backend', file), 'utf-8');
       // The contract: no hash, notification-only, verify via check-transaction.
       expect(example).toContain('NO `hash` field');

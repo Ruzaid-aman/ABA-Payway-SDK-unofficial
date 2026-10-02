@@ -8,7 +8,7 @@ A modern, stylish web application for testing PayWay payment link creation and m
 - **Interactive Forms**: Modify all payment link parameters with real-time validation
 - **Hash Calculation Display**: See exactly how hashes are calculated before API calls
 - **Real-time Testing**: Test both payment link creation and detail retrieval
-- **KHQR Generator**: New JavaScript version of the PHP QR sample with live QR preview at `/qr`
+- **KHQR Generator**: Server-side JavaScript QR generation with live QR preview at `/qr`
 - **TypeScript Support**: Full type safety with TypeScript
 
 ## Getting Started
@@ -45,7 +45,7 @@ A modern, stylish web application for testing PayWay payment link creation and m
 2. Click **"Calculate Hash"** to preview the hash
 3. Click **"Get Details"** to retrieve payment link information
 
-### Generating KHQR (JS version of PHP sample)
+### Generating KHQR
 
 1. Open `/qr` in the app
 2. Fill in amount, currency, payment option, purchase type, QR template, and callback URL (we base64-encode this for you)
@@ -58,7 +58,7 @@ A modern, stylish web application for testing PayWay payment link creation and m
 - `POST /api/create-payment-link` - Create a new payment link
 - `POST /api/calculate-detail-hash` - Calculate hash for detail retrieval
 - `POST /api/detail-payment-link` - Get payment link details
-- `POST /api/generate-qr` - Generate KHQR (JavaScript conversion of the PHP sample)
+- `POST /api/generate-qr` - Generate KHQR using server-side JavaScript
 
 ## Configuration
 
@@ -107,9 +107,9 @@ src/
    └── utils.ts            # Utility functions
 ```
 
-## Migration from PHP
+## Example scope
 
-This application is a modern JavaScript conversion of the original PHP payment link API tester, featuring:
+This application contains JavaScript/TypeScript payment-link and QR examples. The legacy PHP copies were removed by owner decision on 2026-10-03. Features include:
 
 - ✅ Same encryption logic and API calls
 - ✅ Interactive form-based testing

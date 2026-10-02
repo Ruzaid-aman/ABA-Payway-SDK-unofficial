@@ -74,7 +74,7 @@ We make developers assemble this timeline from QUICKSTART.md, docs/02, and SANDB
 
 The Sample Code page advertises Android, iOS, Web, and Flutter samples; the SDKs page covers Java (GitHub Packages/Maven), Android (GitHub Packages/Gradle), and iOS (SPM + CocoaPods) with step-by-step install instructions. Flutter support — absent from both ABA's official portal and our `docs/examples/` — is a first-class citizen. The Figma-based UI/UX guidelines page gives merchants visual rules (spacing, color, responsive, typography, form validation states) for payment UI.
 
-**Learning:** Flutter is a cheap reach win — a `docs/examples/flutter/` deeplink+webview sample mirroring our existing `PaymentActivity.kt`/`PaymentViewController.swift` docs examples would close a visible platform gap vs a bank that treats cross-platform as a selling point. The Figma-embed pattern (design tokens for payment UI) is worth considering for our VISUAL-GUIDE.md evolution.
+**Learning:** The [Flutter deeplink/WebView sample](../examples/flutter/payment_screen.dart) demonstrates the mobile backend architecture. Standalone Android/iOS examples were removed by owner decision on 2026-10-03; platform build and device verification remain separate from TypeScript checks. The Figma-embed pattern (design tokens for payment UI) is worth considering for our VISUAL-GUIDE.md evolution.
 
 ### 6. QR template gallery with use-case prose
 

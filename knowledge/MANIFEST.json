@@ -178,9 +178,9 @@
       "description": "Android/iOS integration: deeplinks, webviews, return handling.",
       "source": "docs/guides/04-native-app-implementation.md",
       "file": "native-apps.md",
-      "bytes": 24448,
-      "sha256": "e615aa8c2e626838",
-      "sourceSha256": "4b94be13f56df63d"
+      "bytes": 5855,
+      "sha256": "bca34cfbd620036e",
+      "sourceSha256": "d073a7c5690e2b2c"
     },
     {
       "topic": "webviews",
@@ -188,9 +188,9 @@
       "description": "Mobile webview checkout patterns and deeplink return legs.",
       "source": "docs/guides/05-webview-implementation.md",
       "file": "webviews.md",
-      "bytes": 13229,
-      "sha256": "b2d55331c35edf0b",
-      "sourceSha256": "689ba63a9b8339a2"
+      "bytes": 13260,
+      "sha256": "806c820cabc3d288",
+      "sourceSha256": "e39bd7b64302ebae"
     },
     {
       "topic": "telegram-mini-app",
@@ -278,9 +278,9 @@
       "description": "Copy-paste hash signing, callback verification, and polling snippets.",
       "source": "docs/guides/14-appendix-code-snippets.md",
       "file": "code-snippets.md",
-      "bytes": 22510,
-      "sha256": "2f4cee6365991b21",
-      "sourceSha256": "c4df09af2db66084"
+      "bytes": 20168,
+      "sha256": "954345b1d5e12f76",
+      "sourceSha256": "84569ebf5f725f54"
     },
     {
       "topic": "merchant-scenarios",
@@ -482,11 +482,11 @@
     },
     {
       "file": "docs-packaged/guides/04-native-app-implementation.md",
-      "sha256": "f53fab2c19476be9"
+      "sha256": "bc57867f7e837762"
     },
     {
       "file": "docs-packaged/guides/05-webview-implementation.md",
-      "sha256": "6c923a951f23654d"
+      "sha256": "820359cca2d7efce"
     },
     {
       "file": "docs-packaged/guides/06-telegram-mini-app.md",
@@ -522,7 +522,7 @@
     },
     {
       "file": "docs-packaged/guides/14-appendix-code-snippets.md",
-      "sha256": "9785317b6f77034e"
+      "sha256": "1ff64dda6435be9c"
     },
     {
       "file": "docs-packaged/guides/15-merchant-scenario-requirements.md",
@@ -711,14 +711,14 @@
     {
       "file": "skills/aba-payway-integration/references/native-apps.md",
       "source": "docs/guides/04-native-app-implementation.md",
-      "sourceSha256": "4b94be13f56df63d",
-      "sha256": "e615aa8c2e626838"
+      "sourceSha256": "d073a7c5690e2b2c",
+      "sha256": "baef2c16c7101acd"
     },
     {
       "file": "skills/aba-payway-integration/references/webviews.md",
       "source": "docs/guides/05-webview-implementation.md",
-      "sourceSha256": "689ba63a9b8339a2",
-      "sha256": "b2d55331c35edf0b"
+      "sourceSha256": "e39bd7b64302ebae",
+      "sha256": "806c820cabc3d288"
     },
     {
       "file": "skills/aba-payway-integration/references/telegram-mini-app.md",
@@ -771,8 +771,8 @@
     {
       "file": "skills/aba-payway-integration/references/code-snippets.md",
       "source": "docs/guides/14-appendix-code-snippets.md",
-      "sourceSha256": "c4df09af2db66084",
-      "sha256": "11f8b4b36c549da2"
+      "sourceSha256": "84569ebf5f725f54",
+      "sha256": "882dac5b9f13aa90"
     },
     {
       "file": "skills/aba-payway-integration/references/merchant-scenarios.md",
@@ -914,7 +914,7 @@
     },
     {
       "file": "skills/aba-payway-integration/references/MANIFEST.json",
-      "sha256": "5b13c6b8c0772d21"
+      "sha256": "6146f39f79b63a57"
     }
   ]
 }

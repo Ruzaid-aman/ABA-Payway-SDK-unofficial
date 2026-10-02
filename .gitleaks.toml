@@ -30,7 +30,7 @@ regexTarget = "secret"
 regexes = ['''^AKIA-1234567890-canary$''']
 
 [[allowlists]]
-description = "Android local HMAC test fixture"
+description = "Historical Android local HMAC test fixture (project removed 2026-10-03)"
 targetRules = ['generic-api-key']
 condition = "AND"
 paths = ['''(?:^|/)sdk/android/sdk/src/test/java/com/ababank/payway/SignatureVerifierTest\.kt$''']

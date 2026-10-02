@@ -14,6 +14,7 @@ const fixtures = [
   ['src/__tests__/cli.test.ts', cli, loopback],
   ['src/__tests__/per-call-options.test.ts', loopback, cli],
   ['src/__tests__/agent-privacy-session.test.ts', ['AKIA', '1234567890', 'canary'].join('-'), cli],
+  // Retained for scans of private history after the Android project was removed.
   ['sdk/android/sdk/src/test/java/com/ababank/payway/SignatureVerifierTest.kt', ['test', 'api', 'key', '12345'].join('_'), cli],
 ];
 const expected = new Set(fixtures.map(([file]) => `${file}:2`));

@@ -8,7 +8,7 @@
 
 CutLuy is not beating this project on payment-domain breadth. It is beating us on the first-use experience: one resource (`payment`), one authentication concept (Bearer API key), one short create-and-pay path, a hosted checkout URL, explicit payment states, first-class webhooks, and copy-ready examples. Its documentation also teaches the user what to build around the API: QR rendering, countdowns, terminal states, polling boundaries, signature verification, and redirect behavior.
 
-Our project is stronger as a PayWay platform toolkit: it exposes multiple PayWay domains, typed TypeScript APIs, native iOS/Android material, offline KHQR generation, sandbox probes, retry and rate-limit controls, credential profiles, a webhook development server, a test harness, and task-focused agent skills. Those capabilities are real advantages, but they are distributed across a large README, 15+ guide chapters, CLI commands, domain objects, examples, and skills. The result is capability-rich but decision-heavy.
+Our project is stronger as a PayWay platform toolkit: it exposes multiple PayWay domains, typed TypeScript APIs, mobile integration guidance, offline KHQR generation, sandbox probes, retry and rate-limit controls, credential profiles, a webhook development server, a test harness, and task-focused agent skills. Those capabilities are real advantages, but they are distributed across a large README, 15+ guide chapters, CLI commands, domain objects, examples, and skills. The result is capability-rich but decision-heavy.
 
 **Strategic implication:** adopt CutLuy's opinionated entry path and documentation/product packaging without collapsing our broader PayWay coverage. The highest-return improvement is a thin “first successful payment” layer that sits above the existing SDK, CLI, and Skills.
 
@@ -58,7 +58,7 @@ Our project has deeper operational material—retry configuration, rate-limit th
 
 CutLuy supplies language tabs for cURL, Node.js, PHP/Laravel, and Python, and gives users a directly usable QR image URL. This reduces the amount of setup needed before a developer can see a result.
 
-Our package is TypeScript-first, with backend and frontend examples plus native SDK folders, but the CLI is primarily an operational/development tool rather than a “generate an integration artifact” tool. It has strong commands such as `init`, `doctor`, profiles, QR generation, test/demo, and webhook setup; the opportunity is to connect those commands into a single guided flow. See [README.md](../../README.md#cli-commands) and [src/cli.ts](../../src/cli.ts).
+Our package is TypeScript-first, with backend and frontend examples plus mobile architecture guidance. The standalone native and PHP examples were removed by owner decision on 2026-10-03. The CLI has strong commands such as `init`, `doctor`, profiles, QR generation, test/demo, and webhook setup; the opportunity is to connect those commands into a single guided flow. See [README.md](../../README.md#cli-commands) and [src/cli.ts](../../src/cli.ts).
 
 ## Where our project is stronger
 
@@ -70,7 +70,7 @@ Our package is TypeScript-first, with backend and frontend examples plus native 
 | Local/offline capability | Offline EMVCo KHQR generation without a PayWay call | [src/khqr-offline.ts](../../src/khqr-offline.ts), [skills/aba-payway-offline-qr/SKILL.md](../../skills/aba-payway-offline-qr/SKILL.md) |
 | CLI operations | Init, doctor, config, profiles, QR/checkout flows, validation, status references, webhook setup, and skill management | [src/cli.ts](../../src/cli.ts) |
 | Agent assistance | A broad set of task-focused skills with quick starts, error handling, constraints, and related skills | [skills/README.md](../../skills/README.md), [skills/](../../skills) |
-| Mobile/platform reach | iOS and Android SDK material plus web, WebView, and Telegram guidance | [sdk/ios/](../../sdk/ios), [sdk/android/](../../sdk/android), [docs/README.md](../README.md) |
+| Mobile/platform reach | Mobile backend integration, web, WebView, and Telegram guidance | [Native app architecture](../guides/04-native-app-implementation.md), [docs/README.md](../README.md) |
 | Verification depth | Sandbox probes, contract tests, webhook tests, coverage artifacts, and release checklists | [scripts/](../../scripts), [src/__tests__/](../../src/__tests__), [docs/RELEASE_CHECKLIST.md](../project/RELEASE_CHECKLIST.md) |
 
 CutLuy's simplicity is partly enabled by a narrower product: USD-only documented amounts, one store/payment-link model, one primary payment resource, and a smaller set of documented operations. We should copy the packaging and defaults, not assume that reducing PayWay's real breadth is acceptable.

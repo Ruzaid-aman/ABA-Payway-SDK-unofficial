@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native and PHP example scope reduced (2026-10-03)
+
+- Removed the Android/iOS companion source projects, platform example files,
+  PHP checkout examples, and PHP copies in payment-link and webhook examples.
+- Mobile guidance now describes the app-to-TypeScript-backend boundary.
+  Public links, generated references and documentation checks follow the
+  retained JavaScript/TypeScript examples. Platform builds and device journeys
+  remain the merchant application's responsibility.
+
 ### Dependency advisories resolved in the production graph (R04, 2026-10-01)
 
 - **`npm audit --omit=dev` is now clean: 0 findings.** `fast-uri` 3.1.6 →

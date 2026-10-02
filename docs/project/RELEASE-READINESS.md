@@ -44,8 +44,13 @@ DoD: written choice recorded here; if (1), the curated-tree file list is agreed;
 `ec476910` and its demo key) is authorized for public redistribution. The
 Postman distribution policy may retain that exact allowlisted demo identity.
 
-The third-party-material, public author/security-mailbox, native-SDK scope,
-repository-destination, version, and publishing decisions remain pending.
+**Owner decision (2026-10-03):** Remove the Android/iOS companion projects and PHP
+examples from this development repository. Public guidance retains the mobile
+app-to-TypeScript-backend architecture; native companion distribution is outside
+the candidate scope.
+
+The third-party-material, public author/security-mailbox, repository-destination,
+version, and publishing decisions remain pending.
 
 MIT on this project does not license third-party material. Before public visibility: confirm rights or exclude `payway-openapi/` (ABA's shared spec — ask ABA), `docs/archive/` official-doc copies, quotes/screenshots inside competitive analyses, and `payway-boilerplate/` remnants if any survive in the chosen tree. Also confirm the `Antigravity <info@antigravity.dev>` author identity and `security@antigravity.dev` domain are intended for the public package. DoD: per-item disposition (publish / exclude / permission on file).
 

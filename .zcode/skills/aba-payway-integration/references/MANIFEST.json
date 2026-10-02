@@ -107,14 +107,14 @@
     {
       "file": "references/native-apps.md",
       "source": "docs/guides/04-native-app-implementation.md",
-      "sourceSha256": "4b94be13f56df63d",
-      "sha256": "e615aa8c2e626838"
+      "sourceSha256": "d073a7c5690e2b2c",
+      "sha256": "baef2c16c7101acd"
     },
     {
       "file": "references/webviews.md",
       "source": "docs/guides/05-webview-implementation.md",
-      "sourceSha256": "689ba63a9b8339a2",
-      "sha256": "b2d55331c35edf0b"
+      "sourceSha256": "e39bd7b64302ebae",
+      "sha256": "806c820cabc3d288"
     },
     {
       "file": "references/telegram-mini-app.md",
@@ -167,8 +167,8 @@
     {
       "file": "references/code-snippets.md",
       "source": "docs/guides/14-appendix-code-snippets.md",
-      "sourceSha256": "c4df09af2db66084",
-      "sha256": "11f8b4b36c549da2"
+      "sourceSha256": "84569ebf5f725f54",
+      "sha256": "882dac5b9f13aa90"
     },
     {
       "file": "references/merchant-scenarios.md",

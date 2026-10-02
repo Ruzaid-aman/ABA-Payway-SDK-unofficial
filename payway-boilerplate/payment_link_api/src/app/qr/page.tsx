@@ -91,7 +91,7 @@ export default function QrCheckout() {
             </div>
             <h1 className="text-3xl font-semibold tracking-tight">Generate KHQR with JavaScript</h1>
             <p className="text-sm text-muted-foreground">
-              Modern JS version of the PHP sample. Build the hash on the server, send to PayWay sandbox, and preview the QR.
+              Build the request on the server, send to PayWay sandbox, and preview the QR.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -186,7 +186,7 @@ export default function QrCheckout() {
                     onChange={(e) => updateField('callback_url', e.target.value)}
                     placeholder="https://your-site.com/notify"
                   />
-                  <p className="text-xs text-muted-foreground">We base64-encode this before hashing, matching the PHP sample.</p>
+                  <p className="text-xs text-muted-foreground">The server base64-encodes this URL before signing the request.</p>
                 </div>
               </div>
 
