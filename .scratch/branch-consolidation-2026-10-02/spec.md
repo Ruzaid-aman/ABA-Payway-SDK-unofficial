@@ -1,7 +1,7 @@
 # Branch consolidation & `codex/payway-integration-skills` merge plan
 
-**STATUS (2026-10-02):** EXECUTING — user authorized merging the integration branch
-into current main, pushing to the existing origin and cleaning up its worktree.
+**STATUS (2026-10-02):** COMPLETE — integration merged into current main, pushed
+to the existing private origin and its worktree/local branch removed.
 The original no-push execution plan below is historical and superseded for this
 private-development push; public package/release publication remains separate.
 
@@ -325,3 +325,15 @@ owner-approved sandbox demo credential in the Postman distribution policy. The l
 is an intentional private-repository disposition, not a public redistribution
 clearance. No credential values are copied into this report. Public release gates
 and deferred Claude evidence remain open. No bank operations or public release.
+
+Completion: merge d59dc3d has parents ed703a9 and 62afa12. Normal non-force push
+advanced private origin/main from f4de67c to d59dc3d; ls-remote confirmed that exact
+SHA. Final outgoing scan reviews the same three findings, with no new finding.
+After checking clean worktree status, merged ancestry, exact resolved cleanup path
+and backup hash, git worktree remove succeeded without force; the merged local
+codex/payway-integration-skills branch was deleted. The empty parent folder remains:
+automatic approval review rejected its cleanup command with "blocked by policy";
+no alternative filesystem deletion was attempted. The two unrelated detached Kilo
+worktrees and existing docs branches remain. Evidence archive and pre-merge patch
+remain in ignored .release-audit/. This completion record is a later
+documentation-only commit on main.
