@@ -351,6 +351,60 @@ try {
 >
 > ℹ️ **CLI operator note:** `--no-preflight` skips only the detail lookup; `-y/--force` skips only the confirmation prompt (the balance pre-flight still runs unless `--no-preflight` is passed). The pre-flight is currency-aware: it hard-stops (exit 1) when the refund currency differs from the order's `original_currency` — re-run with `-c <order currency>`. Under `--json`, pre-flight diagnostics go to stderr and local rejections emit the `{ error: … }` envelope on stdout.
 
+**Refund policy facts (ABA-bot relay 2026-10-03, doc-derived):**
+
+- **Multiple partial refunds are explicitly allowed** — "Partial Refunds: Multiple partial refunds can
+  be issued until the total amount paid is refunded." Track cumulative refunded amounts per original
+  transaction; stop issuing at the refundable remainder (PTL37 guards the over-refund case).
+- **Below-minimum refunds answer `PTL187` "Amount is below the minimum allowed"** — the numeric
+  per-currency floor (e.g. whether a sub-100-KHR refund passes) is NOT documented; treat PTL187 as
+  the authoritative rejection signal and keep the local `0.01 USD / 1 KHR` advisory.
+- The **online refund window is ~30 days from the original transaction date (configurable)**; after
+  it, refunds go through a manual/offline signed-form process via the bank. ABA-to-ABA refunds carry
+  no processing fee.
+- **Concurrent refunds for the same transaction are not documented as deduplicated** — the gateway
+  reports `PTL168` "another request already in progress" in some races, but do not rely on gateway
+  serialization: serialize refund submissions per transaction_id on the merchant side.
+- A refund can appear in settlement reports **before the original purchase fully settles**
+  (T+5/T+7 timing trap) — reconciliation must not assume chronological settlement order.
+
+### Rate limiting — the two 429 surfaces (updated 2026-10-03)
+
+PayWay signals rate limiting in TWO distinct shapes; handle both:
+
+1. **Business-level 429 (HTTP 200 + JSON body):** `{"status": {"code": 429, "message": "Too many
+   request, please try again in 1min."}}` — documented, with an explicit one-minute cooldown hint in
+   the message. The SDK surfaces this as `PayWayRateLimitError`.
+2. **Transport-level HTTP 429 Too Many Requests:** documented as the rate-limit signal, but the body
+   is NOT documented (may be empty/generic) and **no `Retry-After` header exists or is planned**.
+   Back off with your own capped exponential strategy (the 3–5 s / 15 s polling intervals from the
+   guidelines are the documented pacing baseline).
+
+Documented numeric limits remain sparse: **KHQR generation = 10 requests/second per Merchant ID**
+(the only explicit published number); Check Transaction guidance ≈ 20 req/s (50 req/s negotiable
+with operations); other endpoints' working numbers (detail 10/min, list 50/min, mc-ref 10/min) are
+local measurements, unconfirmed by ABA. Penalty model: KHQR limited per MID; other abuse may trigger
+IP blocking (the portal shows "Access denied Error code 1020" for abnormal automated access).
+
+### Credential rotation codes (added 2026-10-03)
+
+| Code | Meaning | Handling |
+|---|---|---|
+| `PTL171` / `PTL175` | Credentials rejected — stale API key / wrong encryption after the Integration Team issued replacements | There is **no dual-key overlap window**: once new credentials are enforced, old-key traffic dies immediately with these codes (HTTP 403). Plan a zero-overlap cut-over, update all services to the new key promptly, then re-verify with a test transaction. |
+
+### Amount contract details (added 2026-10-03)
+
+- **`amount` must be the final payable (Total_Amount)** — the post-discount value the customer
+  actually pays (documented rule: "Use Total_Amount as the final amount that the user must pay to
+  the `amount` parameter"). Undiscounted prices belong in separate fields (`Original_Amount`);
+  there is no separate discount field, and the hash covers the `amount` exactly as sent.
+- **No zero/omitted-amount exception is documented on any endpoint** — assume positive, non-zero
+  amounts everywhere (refunds ≥ 0.01 USD / ≥ 1 KHR).
+- `tran_id`: **≤ 20 characters enforced** (longer rejected). No formal production charset: spaces
+  and punctuation are disallowed, `_` is problematic, `-` appears in documented examples
+  (`[A-Za-z0-9-]{1,20}` is the safe pattern). Uniqueness scope (per-merchant vs global) is still
+  unconfirmed — keep generating IDs inside your own merchant namespace.
+
 ### Payout-Specific Error Codes
 
 Payouts (`payway.payout.payout`) go through the direct payout API and have their own failure modes. The single most common mistake is a **currency mismatch**: the payout `currency` must match both the beneficiary account currency and the merchant credential currency — a KHR payout to a USD account is rejected. The SDK enforces the beneficiary-currency match client-side in sandbox (throws `PayWayConfigError`), so it fails fast before the network round-trip.

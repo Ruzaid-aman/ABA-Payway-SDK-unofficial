@@ -10,6 +10,9 @@ export function paymentLifecycle(paymentStatus: unknown): PaymentLifecycle {
     case 'APPROVED': return 'approved';
     case 'PENDING': return 'pending';
     case 'DECLINED':
+    // The gateway emits the typo "DECLINDED" in transaction-list output (acknowledged
+    // by ABA 2026-09-12; still observed live) — treat it as DECLINED, not unknown.
+    case 'DECLINDED':
     case 'CANCELLED': return 'failed';
     default: return 'unknown';
   }

@@ -35,6 +35,42 @@ export const PAYMENT_LINK_EXPIRY_MIN_SECONDS = 300;
 const PAYMENT_LINK_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
 /** `image/jpg` is the common misspelling of `image/jpeg` — allowed. */
 const PAYMENT_LINK_IMAGE_CONTENT_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/jpg', 'image/png']);
+/** Documented image width cap (ABA-bot relay 2026-10-03). */
+export const PAYMENT_LINK_IMAGE_MAX_WIDTH_PX = 2000;
+
+/**
+ * Read the pixel width out of a PNG or JPEG buffer (header parse only — no
+ * image dependency). Returns null when the format is unrecognized or the
+ * header is truncated; callers treat null as "cannot advise".
+ *
+ * PNG: bytes 16–19 of the IHDR chunk (big-endian uint32) after the 8-byte
+ * signature + 4-byte length + "IHDR". JPEG: the first SOFn marker
+ * (C0–CF excluding C4/C8/CC — DHT/JPG/DAC) carries height/length after its
+ * 2-byte length + 1-byte precision; width follows height.
+ */
+export function imageWidthFromBytes(data: Uint8Array): number | null {
+  if (data.length >= 24 && data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47) {
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    return view.getUint32(16);
+  }
+  if (data.length >= 4 && data[0] === 0xff && data[1] === 0xd8) {
+    let offset = 2;
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    while (offset + 9 < view.byteLength) {
+      if (data[offset] !== 0xff) { offset += 1; continue; }
+      const marker = data[offset + 1];
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { offset += 2; continue; }
+      const length = view.getUint16(offset + 2);
+      const isStartOfFrame = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+      if (isStartOfFrame) {
+        if (offset + 7 >= view.byteLength) return null;
+        return view.getUint16(offset + 7);
+      }
+      offset += 2 + length;
+    }
+  }
+  return null;
+}
 
 export interface PaymentLinkDomain {
   create: (
@@ -153,6 +189,23 @@ export function createPaymentLinkDomain(
           warnAdvisory(
             config,
             `image contentType "${contentType}" is outside the documented JPG/JPEG/PNG set (image/jpeg, image/jpg, image/png) — the gateway may reject the upload`,
+          );
+        }
+        // ABA-bot relay 2026-10-03: image WIDTH must not exceed 2,000 pixels
+        // and the FILENAME must not contain special characters such as
+        // parentheses. Both advisory here (strictValidation escalates); the
+        // CLI loader hard-rejects.
+        const width = imageWidthFromBytes(image.data);
+        if (width !== null && width > PAYMENT_LINK_IMAGE_MAX_WIDTH_PX) {
+          warnAdvisory(
+            config,
+            `image width ${width}px exceeds the documented ${PAYMENT_LINK_IMAGE_MAX_WIDTH_PX}px maximum — the gateway may reject the upload`,
+          );
+        }
+        if (!/^[A-Za-z0-9._-]+$/.test(filename)) {
+          warnAdvisory(
+            config,
+            `image filename "${filename}" contains special characters — the documented rule forbids them (e.g. parentheses); use letters, digits, dots, hyphens, underscores`,
           );
         }
         multipartFile = {

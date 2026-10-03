@@ -167,3 +167,39 @@ export function signCallbackBody(body: Record<string, unknown>, apiKey: string):
 
   return crypto.createHmac('sha512', apiKey).update(concatenated).digest('base64');
 }
+
+/**
+ * Verify a callback signature over the RAW HTTP request body, exactly as
+ * received — the documented Customer Module (Customer Dedicated KHQR)
+ * contract (ABA-bot relay 2026-10-03): "Compute HMAC-SHA512 (Base64) over
+ * the exact raw HTTP request body bytes as received. Do not parse and
+ * re-serialize JSON, and do not reorder keys." The sorted-key model exposed
+ * by {@link verifyCallbackDetailed} describes how ABA internally constructs
+ * the body; when your framework still holds the original bytes (e.g. Express
+ * `express.raw`), prefer this verifier — re-serialization can silently break
+ * key order or number formatting. Both verifiers agree on a byte-identical,
+ * canonically-keyed body.
+ *
+ * @example Express with raw body capture:
+ * ```ts
+ * import { verifyCallbackSignatureRaw } from 'aba-payway-ts';
+ * app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+ *   const ok = verifyCallbackSignatureRaw(req.body, req.header('X-PAYWAY-HMAC-SHA512') ?? '', process.env.PAYWAY_API_KEY!);
+ *   if (!ok) { res.status(403).send('invalid signature'); return; } // log & discard
+ *   res.sendStatus(200);
+ *   // handle JSON.parse(req.body.toString()) asynchronously…
+ * });
+ * ```
+ */
+export function verifyCallbackSignatureRaw(
+  rawBody: string | Buffer,
+  receivedSignature: string,
+  apiKey: string,
+): boolean {
+  if (typeof receivedSignature !== 'string' || receivedSignature.length === 0) return false;
+  if (rawBody === undefined || rawBody === null) return false;
+  const expected = crypto.createHmac('sha512', apiKey).update(rawBody).digest('base64');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(receivedSignature);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}

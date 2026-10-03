@@ -539,6 +539,30 @@ User-Agent: PayWayApp/3.0
   sample shows — accept both. One pushback per completed payment.
 - Receiver requirements: accept `POST` + `application/json`, answer 200 fast.
 
+**Pushback delivery contract (ABA-bot relay 2026-10-03, doc-derived):**
+
+- **Pushbacks fire only for successful payments.** For failed/declined/cancelled
+  attempts, silence is the expected contract — confirm outcome via
+  `check-transaction` (for webview flows the documented pattern is: wait ~15
+  seconds after the user leaves, then treat no-pushback as failed and confirm).
+- **Multiple pushbacks per payment are possible** (the gateway may re-push the
+  same `tran_id` when the status changes) — process idempotently: update when
+  the status changed, ignore no-ops. The one-pushback-per-payment line above
+  describes the single-approval case; build the receiver to tolerate re-pushes.
+- **ACK contract:** any HTTP 2xx is success (202 technically acceptable), `200
+  OK` recommended, empty body accepted. Exact-body acknowledgements (e.g.
+  `RECEIVEOK`) apply only where a per-profile contract explicitly requires
+  them. PayWay's delivery timeout is ~5 seconds — acknowledge fast, verify
+  asynchronously (durable-acceptance pattern above).
+- **Callback URL routing:** for self-registered **production** merchants the
+  Integration Team cannot update callback URLs — the per-request
+  `return_url`/`callback_url` parameter is the documented contract (payment
+  links push to the link's `return_url`; Link Account to its per-request
+  callback). Profile-level static webhooks are a sandbox/test concept, and the
+  Customer Module uses exactly ONE team-configured profile URL (see guide 19).
+  Precedence when both are configured is not documented — do not rely on dual
+  delivery.
+
 Receiver setup (tunnel, storage, routes) is covered in
 [16. Webhook Setup](webhook-setup.md); the full payment-link
 lifecycle in [17. Payment Link API](payment-link.md) §17.7.

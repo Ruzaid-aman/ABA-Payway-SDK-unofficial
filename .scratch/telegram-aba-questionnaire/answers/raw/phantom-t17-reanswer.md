@@ -1,0 +1,8 @@
+  - **A (2026-10-03):** Hello Bong @Ruzaid, Based on the current spec for get-transactions-by-mc-ref and the shared transaction-listing pattern: 1) Canonical response envelope in production
+  - The documented pattern for transaction inquiry/list APIs is:
+  - { "data": [ /* transaction objects */ ], "status": { "code": "00", "message": "Success!", "merchant_ref": "..." // for this endpoint }
+  - } So the data array + status object envelope you see in production is the canonical contract. The docs I have do not define a top-level transactions array for this API. The documentation does not explicitly talk about future schema changes, but this data+status envelope is the same pattern used across the newer transaction-listing APIs and is the structure integrators should implement against. 2) Success code format ("00" vs 0)
+  - For transaction listing/inquiry APIs, success is documented as:
+  - - status.code = "00" (string) meaning Success. That same "00" string code is used consistently in the examples for these APIs; there’s no environment-specific difference documented. So you can treat "00" as the success code in both sandbox and production for this endpoint. 3) Production support and throttle (10 per minute)
+  - From the spec:
+  - - POST api/payment-gateway/v1/payments/get-transactions-by-mc-ref - Supports online and in-store purchase transactions. - Returns up to the latest 50 matching transactions for a given merchant_ref. - Is limited to 10 requests per minute. This is described as a standard inquiry tool for invoice investigation, callback recovery, etc., i.e. it is supported for production use, and the 10-requests-per-minute limit is the documented current limit (no separate sandbox vs production value is given).

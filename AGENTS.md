@@ -162,6 +162,21 @@ Consult `docs/internal/` for internal findings and `docs/guides/` for public-fac
   agent's `query_knowledge` tool (14 tools) reads the same corpus, and the strict-JSON planning prompt embeds a
   sandbox-verified DOMAIN CONSTRAINTS digest. Internal dossiers (SANDBOX-FINDINGS, INTEGRATION-GAPS, …) are
   deliberately NOT packaged; never add them to the corpus.
+- Telegram AI-bot relay (2026-10-03, three rounds: 43 + 15 + 10 questions — dossiers in
+  `.scratch/telegram-aba-questionnaire/`, registers updated append-only): doc-derived answers, conflicts flagged.
+  Headline facts now codified in docs/guides: check-transaction = 7-day cache (history via detail/mc-ref);
+  repeat payments get a NEW tran_id (never dedupe on merchant_ref; OVERPAID classification); multiple partial
+  refunds EXPLICIT (PTL37 over-refund, PTL187 below-min); pushback fires ONLY on success + multi-pushback
+  idempotency + any-2xx ACK; rolling 90-day CoF token expiry (latest of link/renew/last-successful-charge);
+  charge flags MITU_FLEX/MITR_FIX documented (our MITU_FIX/MITR_FLEX probes were invalid — Q41 re-probe
+  pending); Customer Module HMAC = RAW request body (sorted-key = ABA's internal construction); callback
+  source IPs 103.108.218.76/.2 (+ optional /24); no wildcard domains (403 code 6); production callback URLs
+  are per-request only for self-registered merchants; KHQR web/deeplink windows 5/10 min + KHQR 10 req/s per
+  MID; `?lang=en|km|zh`; amount = Total_Amount post-discount; tran_id ≤ 20 chars; one profile = one settlement
+  currency; simulator accounts max 2/merchant, 90-day hard expiry, no declines; key rotation = zero-overlap
+  (PTL171/175); CONFLICTS kept open: close-transaction CANCELLED visibility (docs say observable, sandbox
+  never shows it — keep local `closed` flag), generate-qr lifetime unit (bot: minutes; sandbox floor 180 s =
+  seconds — keep the coded two-domain split), `return_url`-base64 claim (live plain URLs work).
 - COF (v1.3.6, live-docs parity): `cof link-account`/`link-card` require `--request-id`, `--ctid`, `--token-flag` (CITI_FLEX|CITO_FLEX); the token result (`pwt`) arrives via `callback_url`. `cof token details` takes `--request-id` ONLY (no ctid/pwt); `cof token remove` takes `--ctid` + `--token` (no request-id) — these per-endpoint shapes are gateway-verified (SANDBOX-FINDINGS §16). `link-card` always answers with an HTML hosted form — `cof link-card` saves it to `payway-output/link-card-<request-id>.html` and exits 0 (that IS the success signal); the CLI also decodes the hosted outcome from the `302 → /add-card/<base64>` redirect (SANDBOX-FINDINGS §24): an error page (code 104 "Merchant not enabled token flag" on this profile, wrong-hash 01) prints `Hosted page reports an error` + hint and adds `hostedPage` + `correlationId`/`traceId` to the `--json` envelope; SDK-side the thrown `PayWayBusinessError` carries `responseUrl`/`hostedPage` too; `cof link-card-form` (SDK: `credentialsOnFile.getLinkCardFormHtml()`) renders the same signed request as a local browser form, no API call. `beneficiary` commands need `PAYWAY_RSA_PUBLIC_KEY`. JSON-or-string flags (`--items`, `--payout`, `--custom-fields`, `--additional-params`, `--return-deeplink`) accept inline JSON or plain strings. Payout keys are per-endpoint: `generate-qr --payout` and the standalone payout domain use `{account, amount}`; `generate-checkout --payout`, `cof charge --payout`, pre-auth complete-payout, and `payment-link create --payout` use `{acc, amt}` (total must equal the link/transaction amount on payment-link; wrong keys now throw `PayWayConfigError` locally on the purchase path too — W1-5). `generate-checkout --payment-gate 0` returns hosted HTML; use `checkout-form --payment-gate 0` for browser navigation or SDK `checkout.purchaseHosted()` / `purchase({ paymentGate: 0 })` for the hosted response object.
 
 ## Current state & handoff

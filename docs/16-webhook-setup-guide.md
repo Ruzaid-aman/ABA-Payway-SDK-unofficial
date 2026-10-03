@@ -96,6 +96,27 @@ POST https://your-public-host/aba-payway-khqr-webhook
 
 Publish a stable HTTPS URL, then ask ABA to configure and whitelist that exact route for your merchant. The CLI and SDK cannot perform or prove this external ABA operation. Declare the result in the optional KHQR callback configuration only after your merchant has confirmed it, and use `payway.khqr.validateCallbackSetup()` as a local readiness check—not as evidence of provisioning.
 
+### Merchant endpoint & whitelist rules (ABA-bot relay 2026-10-03, doc-derived)
+
+- **Callback source IPs (for ingress allowlisting):** DC1 `103.108.218.76`, DC2 `103.108.218.2`.
+  Optionally allowlist the whole `103.108.218.0/24` subnet — stricter (two exact IPs) is safer,
+  the /24 is resilient to infra changes within the subnet.
+- **Merchant callback endpoint requirements:** HTTPS over TCP **443** with a valid (CA-trusted)
+  certificate, publicly reachable (no VPN/office-only), correct public DNS, accepts `POST`, and
+  returns HTTP 200 within ~5 seconds. Custom external ports (`:8080`/`:8443`) are NOT supported —
+  terminate with a reverse proxy on 443. WAF/CDN/gateways are allowed in front but must not block
+  the PayWay source IPs. Hosting merchant backends **outside Cambodia is allowed**.
+- **Hosted-checkout domain whitelist:** the Integration Team maintains it per merchant profile per
+  environment — send the exact domains/IPs + environment and await confirmation. **Wildcards are
+  not supported** (every subdomain must be listed individually); a page loaded from a
+  non-whitelisted domain fails with HTTP 403 `{"status": {"code": 6, "message": "Requested Domain
+  is not in whitelist."}}`. Whitelisting is verified by absence of the 403 plus callbacks arriving
+  from the documented IPs with HTTP 200 in your logs.
+- **Production callback URLs:** for self-registered production merchants the team does not edit
+  callback URLs — pass the per-transaction `return_url`/`callback_url` instead. Static
+  profile-level webhooks are a sandbox/test concept; the Customer Module's single profile URL is
+  the one production exception (always team-configured).
+
 ---
 
 ## Storage Backends

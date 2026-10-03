@@ -158,9 +158,9 @@
       "description": "Merchant portal, sandbox credentials, ABA Mobile simulator, environment variables.",
       "source": "docs/guides/02-prerequisites-and-setup.md",
       "file": "setup.md",
-      "bytes": 23391,
-      "sha256": "264f03943f292636",
-      "sourceSha256": "cabb1754e2793891"
+      "bytes": 24377,
+      "sha256": "370d2de40296a626",
+      "sourceSha256": "eb6c847c0065f921"
     },
     {
       "topic": "web-implementation",
@@ -208,9 +208,9 @@
       "description": "Online vs offline KHQR, scan-time validity windows, rendering and expiry semantics.",
       "source": "docs/guides/07-qr-code-handling.md",
       "file": "qr-handling.md",
-      "bytes": 40354,
-      "sha256": "6c7a8a122a00a48d",
-      "sourceSha256": "7ec2389859efd393"
+      "bytes": 42067,
+      "sha256": "d6cee7264283ace9",
+      "sourceSha256": "a1a083f3dbb2422a"
     },
     {
       "topic": "deep-linking",
@@ -228,9 +228,9 @@
       "description": "Credentials-on-file account/card lifecycle and token renewal.",
       "source": "docs/guides/09-link-unlink-renew-lifecycle.md",
       "file": "link-lifecycle.md",
-      "bytes": 28951,
-      "sha256": "c41a8937943618ef",
-      "sourceSha256": "e7bcbc62cecda1ab"
+      "bytes": 30668,
+      "sha256": "0baebe87a644bb6e",
+      "sourceSha256": "14b78e584d1efabc"
     },
     {
       "topic": "ui-customization",
@@ -238,9 +238,9 @@
       "description": "Hosted checkout branding and view customization options.",
       "source": "docs/guides/10-ui-customization.md",
       "file": "ui-customization.md",
-      "bytes": 9504,
-      "sha256": "2911c5285bc9a511",
-      "sourceSha256": "9230e20968ea6ff0"
+      "bytes": 10886,
+      "sha256": "5d8e58458a87310d",
+      "sourceSha256": "08bab4723dc4bd4a"
     },
     {
       "topic": "callbacks-webhooks",
@@ -248,9 +248,9 @@
       "description": "Single best-effort callback delivery, HMAC verification, webhook workbench.",
       "source": "docs/guides/11-callbacks-and-webhooks.md",
       "file": "callbacks-webhooks.md",
-      "bytes": 25923,
-      "sha256": "f6108d8226800f99",
-      "sourceSha256": "2e6296eca5571c76"
+      "bytes": 27521,
+      "sha256": "e6647dfb0d85bee9",
+      "sourceSha256": "fd47a3475a71af39"
     },
     {
       "topic": "errors-and-debugging",
@@ -258,9 +258,9 @@
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
       "source": "docs/guides/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
-      "bytes": 62099,
-      "sha256": "7069ca250f782ea1",
-      "sourceSha256": "90bec3668c152b37"
+      "bytes": 66104,
+      "sha256": "7bc15e0cf1b6792a",
+      "sourceSha256": "3304d363c0d5b9c0"
     },
     {
       "topic": "deployment-checklist",
@@ -298,9 +298,9 @@
       "description": "Local listener, tunnels, forwarding, and production webhook configuration.",
       "source": "docs/guides/16-webhook-setup-guide.md",
       "file": "webhook-setup.md",
-      "bytes": 23230,
-      "sha256": "f583617b2578b5ce",
-      "sourceSha256": "b542f35f08e333e0"
+      "bytes": 24914,
+      "sha256": "29e1590b468058c1",
+      "sourceSha256": "2d3691a93beecb7e"
     },
     {
       "topic": "payment-link",
@@ -308,9 +308,9 @@
       "description": "Payment-link create/detail/void contract incl. pushbacks and VOIDED semantics.",
       "source": "docs/guides/17-payment-link.md",
       "file": "payment-link.md",
-      "bytes": 20577,
-      "sha256": "b4f9bd75aff11da7",
-      "sourceSha256": "5d168d17a35c80d9"
+      "bytes": 21237,
+      "sha256": "7ad3515cd2a3b066",
+      "sourceSha256": "3b0c2a1f4d2d6003"
     },
     {
       "topic": "transaction-journal",
@@ -318,9 +318,9 @@
       "description": "CLI default recording, SDK opt-in, unified data root, timeline/stats/reconcile/anomalies.",
       "source": "docs/guides/18-transaction-journal.md",
       "file": "transaction-journal.md",
-      "bytes": 13681,
-      "sha256": "a5b70b2982ec9261",
-      "sourceSha256": "a5b70b2982ec9261"
+      "bytes": 15029,
+      "sha256": "2d6d37ee20f6ea3e",
+      "sourceSha256": "2d6d37ee20f6ea3e"
     },
     {
       "topic": "customer-module-qr",
@@ -328,9 +328,9 @@
       "description": "Portal Customer-ID keyed QR generation and merchant-reference reconciliation.",
       "source": "docs/guides/19-customer-module-qr.md",
       "file": "customer-module-qr.md",
-      "bytes": 11670,
-      "sha256": "8290a9f949c5cd87",
-      "sourceSha256": "1b8a424f8bb60386"
+      "bytes": 12196,
+      "sha256": "a616ddea510d756a",
+      "sourceSha256": "f2f88634ac9b284c"
     },
     {
       "topic": "settlement-disputes",
@@ -338,9 +338,9 @@
       "description": "Settlement timing, chargebacks, and refund boundaries per payment method.",
       "source": "docs/guides/20-settlement-and-disputes.md",
       "file": "settlement-disputes.md",
-      "bytes": 8411,
-      "sha256": "b40292bdb9bb0e5d",
-      "sourceSha256": "4279c5e8964f9313"
+      "bytes": 9503,
+      "sha256": "e25fc7acbb388cbb",
+      "sourceSha256": "06d5f22840140ed4"
     },
     {
       "topic": "api-datetime-timezones",
@@ -474,7 +474,7 @@
     },
     {
       "file": "docs-packaged/guides/02-prerequisites-and-setup.md",
-      "sha256": "eadbe4935de9e45e"
+      "sha256": "6d0d93c8aaf9c224"
     },
     {
       "file": "docs-packaged/guides/03-web-implementation.md",
@@ -494,7 +494,7 @@
     },
     {
       "file": "docs-packaged/guides/07-qr-code-handling.md",
-      "sha256": "321b8505123e40f3"
+      "sha256": "dd4e8bec4d587ea2"
     },
     {
       "file": "docs-packaged/guides/08-deep-linking.md",
@@ -502,19 +502,19 @@
     },
     {
       "file": "docs-packaged/guides/09-link-unlink-renew-lifecycle.md",
-      "sha256": "a0e85714b593025f"
+      "sha256": "0285fc26dc856597"
     },
     {
       "file": "docs-packaged/guides/10-ui-customization.md",
-      "sha256": "5918bed2f477a390"
+      "sha256": "a63460d4f3888050"
     },
     {
       "file": "docs-packaged/guides/11-callbacks-and-webhooks.md",
-      "sha256": "d5c8270e2064298e"
+      "sha256": "499769fbe95e8e29"
     },
     {
       "file": "docs-packaged/guides/12-error-handling-and-debugging.md",
-      "sha256": "8809bf2ab258b532"
+      "sha256": "6b6c5266794ca88e"
     },
     {
       "file": "docs-packaged/guides/13-deployment-checklist.md",
@@ -530,23 +530,23 @@
     },
     {
       "file": "docs-packaged/guides/16-webhook-setup-guide.md",
-      "sha256": "b612d97a841b1512"
+      "sha256": "860dd99a3c53f712"
     },
     {
       "file": "docs-packaged/guides/17-payment-link.md",
-      "sha256": "9f8ee8644e6a1d29"
+      "sha256": "68ad3d021f4d2821"
     },
     {
       "file": "docs-packaged/guides/18-transaction-journal.md",
-      "sha256": "a5b70b2982ec9261"
+      "sha256": "2d6d37ee20f6ea3e"
     },
     {
       "file": "docs-packaged/guides/19-customer-module-qr.md",
-      "sha256": "1b8a424f8bb60386"
+      "sha256": "f2f88634ac9b284c"
     },
     {
       "file": "docs-packaged/guides/20-settlement-and-disputes.md",
-      "sha256": "2ce542a8e3d029b5"
+      "sha256": "5b45a6f489b4bf21"
     },
     {
       "file": "docs-packaged/guides/22-api-datetime-and-timezones.md",
@@ -699,8 +699,8 @@
     {
       "file": "skills/aba-payway-integration/references/setup.md",
       "source": "docs/guides/02-prerequisites-and-setup.md",
-      "sourceSha256": "cabb1754e2793891",
-      "sha256": "a7231ea1ec35b501"
+      "sourceSha256": "eb6c847c0065f921",
+      "sha256": "d41104851ae91dce"
     },
     {
       "file": "skills/aba-payway-integration/references/web-implementation.md",
@@ -729,8 +729,8 @@
     {
       "file": "skills/aba-payway-integration/references/qr-handling.md",
       "source": "docs/guides/07-qr-code-handling.md",
-      "sourceSha256": "7ec2389859efd393",
-      "sha256": "6c7a8a122a00a48d"
+      "sourceSha256": "a1a083f3dbb2422a",
+      "sha256": "d6cee7264283ace9"
     },
     {
       "file": "skills/aba-payway-integration/references/deep-linking.md",
@@ -741,26 +741,26 @@
     {
       "file": "skills/aba-payway-integration/references/link-lifecycle.md",
       "source": "docs/guides/09-link-unlink-renew-lifecycle.md",
-      "sourceSha256": "e7bcbc62cecda1ab",
-      "sha256": "c41a8937943618ef"
+      "sourceSha256": "14b78e584d1efabc",
+      "sha256": "0baebe87a644bb6e"
     },
     {
       "file": "skills/aba-payway-integration/references/ui-customization.md",
       "source": "docs/guides/10-ui-customization.md",
-      "sourceSha256": "9230e20968ea6ff0",
-      "sha256": "2911c5285bc9a511"
+      "sourceSha256": "08bab4723dc4bd4a",
+      "sha256": "5d8e58458a87310d"
     },
     {
       "file": "skills/aba-payway-integration/references/callbacks-webhooks.md",
       "source": "docs/guides/11-callbacks-and-webhooks.md",
-      "sourceSha256": "2e6296eca5571c76",
-      "sha256": "f6108d8226800f99"
+      "sourceSha256": "fd47a3475a71af39",
+      "sha256": "e6647dfb0d85bee9"
     },
     {
       "file": "skills/aba-payway-integration/references/errors-and-debugging.md",
       "source": "docs/guides/12-error-handling-and-debugging.md",
-      "sourceSha256": "90bec3668c152b37",
-      "sha256": "7069ca250f782ea1"
+      "sourceSha256": "3304d363c0d5b9c0",
+      "sha256": "7bc15e0cf1b6792a"
     },
     {
       "file": "skills/aba-payway-integration/references/deployment-checklist.md",
@@ -783,32 +783,32 @@
     {
       "file": "skills/aba-payway-integration/references/webhook-setup.md",
       "source": "docs/guides/16-webhook-setup-guide.md",
-      "sourceSha256": "b542f35f08e333e0",
-      "sha256": "f583617b2578b5ce"
+      "sourceSha256": "2d3691a93beecb7e",
+      "sha256": "29e1590b468058c1"
     },
     {
       "file": "skills/aba-payway-integration/references/payment-link.md",
       "source": "docs/guides/17-payment-link.md",
-      "sourceSha256": "5d168d17a35c80d9",
-      "sha256": "b4f9bd75aff11da7"
+      "sourceSha256": "3b0c2a1f4d2d6003",
+      "sha256": "7ad3515cd2a3b066"
     },
     {
       "file": "skills/aba-payway-integration/references/transaction-journal.md",
       "source": "docs/guides/18-transaction-journal.md",
-      "sourceSha256": "a5b70b2982ec9261",
-      "sha256": "a5b70b2982ec9261"
+      "sourceSha256": "2d6d37ee20f6ea3e",
+      "sha256": "2d6d37ee20f6ea3e"
     },
     {
       "file": "skills/aba-payway-integration/references/customer-module-qr.md",
       "source": "docs/guides/19-customer-module-qr.md",
-      "sourceSha256": "1b8a424f8bb60386",
-      "sha256": "ffb8b5e0a123e280"
+      "sourceSha256": "f2f88634ac9b284c",
+      "sha256": "8d3d089e2214c8fb"
     },
     {
       "file": "skills/aba-payway-integration/references/settlement-disputes.md",
       "source": "docs/guides/20-settlement-and-disputes.md",
-      "sourceSha256": "4279c5e8964f9313",
-      "sha256": "b40292bdb9bb0e5d"
+      "sourceSha256": "06d5f22840140ed4",
+      "sha256": "e25fc7acbb388cbb"
     },
     {
       "file": "skills/aba-payway-integration/references/api-datetime-timezones.md",
@@ -914,7 +914,7 @@
     },
     {
       "file": "skills/aba-payway-integration/references/MANIFEST.json",
-      "sha256": "6146f39f79b63a57"
+      "sha256": "b9742dbf48104a61"
     }
   ]
 }

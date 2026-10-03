@@ -100,9 +100,21 @@ Mechanics: [Chapter 12 — Payout error codes](12-error-handling-and-debugging.m
 - **Dual-currency merchant** (USD + KHR): the customer picks the currency;
   settlement goes to the matching merchant currency account — no FX on the
   merchant side. (confirmed)
+- **One profile = one settlement currency (ABA-bot relay 2026-10-03, quoted rule):** "A merchant
+  profile supports only a single defined currency tied to the merchant's settlement account."
+  Payers may always pay from any-currency accounts; what is fixed is the settlement side. True
+  dual-currency settlement requires **separate MIDs/profiles per currency, or a specially enabled
+  dual-currency setup** arranged with the Integration/Commercial team — it is not a default.
+- **Refund window (2026-10-03 relay):** the online refund window is ~30 days from the original
+  transaction date (configurable); after it, refunds go through a manual/offline signed-form
+  process. ABA-to-ABA refunds carry no processing fee. Multiple partial refunds are explicitly
+  allowed until the total paid amount is refunded (error codes: see
+  [guide 12](12-error-handling-and-debugging.md) — PTL37 over-refund, PTL187 below-minimum). A
+  refund can post **before** the original purchase fully settles (T+5/T+7 timing trap) —
+  reconciliation must not assume chronological order.
 - Open items: partial-refund rounding scale (original-currency minor units vs
   KHR integers) and whether the 100-KHR amount floor applies to refunds —
-  SANDBOX-FINDINGS §8c-4 / N2, still awaiting ABA.
+  SANDBOX-FINDINGS §8c-4 / N2, still awaiting ABA (PTL187 is the runtime signal).
 
 ## 20.6 Chargebacks and disputes
 

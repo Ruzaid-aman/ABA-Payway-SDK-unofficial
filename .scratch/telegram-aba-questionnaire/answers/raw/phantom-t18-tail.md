@@ -1,0 +1,10 @@
+  - **A (2026-10-03):** Part 2/2 ---
+  - 4) Maximum historical window per query API
+  - Docs only give explicit history limits for some endpoints:
+  - - Check Transaction: - “Supports transactions created within the previous seven days”. - Used for recent payment‑status verification; not intended as a long‑history API.
+  - - get-transactions-by-mc-ref: - Described as supporting “past transactions” with no explicit max age; returns the latest 50 matching transactions and is limited to 10 requests per minute.
+  - - transaction-detail: - Also described as supporting past transactions (historical detail), with 10 requests per minute documented. - No explicit max age/window is given. So from the docs you can rely on:
+  - - Per‑endpoint behavior: - Check Transaction: ~7‑day lookback window, high throughput, for recent status. - get-transactions-by-mc-ref / transaction-detail: for historical lookup and reconciliation; they “can retrieve details for past transactions” but the maximum historical horizon is not formally specified. If you need guarantees beyond:
+  - - 7 days for Check Transaction, and
+  - - “past transactions” with unspecified horizon for the list/detail APIs,
+  - then this would need explicit confirmation from the PayWay team / operations for retention policy and any long‑term archival limits.

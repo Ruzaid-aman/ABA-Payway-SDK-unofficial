@@ -39,6 +39,7 @@ import type { JournalContext, JournalEmitterInput, JournalMode } from '../journa
 import { readSqliteJournalEvents, pruneSqliteJournal, SqliteJournalSink, type SqliteDb } from '../journal/sink-sqlite.js';
 import {
   loadLinkedTokens,
+  markTokenCharged,
   markTokenRenewed,
   removeLinkedTokens,
   saveLinkedToken,
@@ -92,6 +93,8 @@ export interface StorageService {
     remove(ctid: string, pwt?: string): number;
     /** Record a renewal on the stored (ctid,pwt) record — restarts the ~90-day docs/09 window. Preserves other fields; undefined when the store does not hold that token. */
     markRenewed(ctid: string, pwt: string, renewedAt?: string): LinkedTokenRecord | undefined;
+    /** Record a successful charge — the rolling window counts from the latest of link/renewal/last charge (ABA-bot relay 2026-10-03). Preserves other fields; undefined when absent. */
+    markCharged(ctid: string, pwt: string, chargedAt?: string): LinkedTokenRecord | undefined;
   };
   readonly webhooks: WebhookStorage;
   /** Release backend resources (closes the shared sqlite handle; json = no-op). */
@@ -179,6 +182,7 @@ export async function createStorageService(options: StorageServiceOptions = {}):
       },
       remove: (ctid, pwt) => removeLinkedTokens(ctid, pwt, dataRoot, env),
       markRenewed: (ctid, pwt, renewedAt) => markTokenRenewed(ctid, pwt, renewedAt, dataRoot, env),
+      markCharged: (ctid, pwt, chargedAt) => markTokenCharged(ctid, pwt, chargedAt, dataRoot, env),
     },
     webhooks: new JsonWebhookStorage(webhookFile),
     close: () => undefined,

@@ -40,6 +40,7 @@ export {
   REFUND_ERROR_CODES,
   PRE_AUTH_ERROR_CODES,
   PAYOUT_ERROR_CODES,
+  CREDENTIAL_ERROR_CODES,
   GATEWAY_CODE_HINTS,
 } from './constants.js';
 export type { CheckoutDomain, CheckoutFormOptions } from './domains/checkout.js';
@@ -144,8 +145,11 @@ export {
   REQUEST_ID_PATTERN,
   TOKEN_FLAG_CHARGING,
   TOKEN_FLAG_LINKING,
+  TOKEN_FLAG_CHARGING_PRODUCTION,
+  TOKEN_FLAG_LINKING_PRODUCTION,
   TOKEN_VALIDITY_DAYS,
 } from './constants.js';
+export { imageWidthFromBytes, PAYMENT_LINK_IMAGE_MAX_WIDTH_PX } from './domains/payment-link.js';
 export type { WebhookServerOptions, WebhookServerResult } from './webhook/server.js';
 export { createWebhookServer } from './webhook/server.js';
 export type { ForwardOutcome, ForwardStats, WebhookForwarderOptions } from './webhook/forwarder.js';
@@ -156,7 +160,7 @@ export type {
   WebhookFixtureOverrides,
 } from './webhook/fixtures.js';
 export { buildWebhookFixture, WEBHOOK_FIXTURE_EVENTS } from './webhook/fixtures.js';
-export { signCallbackBody } from './auth.js';
+export { signCallbackBody, verifyCallbackSignatureRaw } from './auth.js';
 export type {
   KhqrCallbackConfiguration,
   KhqrCallbackEnrollment,
@@ -240,6 +244,7 @@ export type { LinkedTokenRecord } from './webhook/token-store.js';
 export {
   latestTokenForCtid,
   loadLinkedTokens,
+  markTokenCharged,
   markTokenRenewed,
   maskPwt,
   resolveTokenStoreDir,

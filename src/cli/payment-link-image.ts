@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { PaymentLinkImage } from '../client.js';
+import { imageWidthFromBytes, PAYMENT_LINK_IMAGE_MAX_WIDTH_PX } from '../domains/payment-link.js';
 
 /**
  * Spec (payway-openapi/paths/payment-link.yaml:33–37): payment-link images
@@ -71,9 +72,24 @@ export function loadPaymentLinkImage(filePath: string): PaymentLinkImage {
       `--image file is ${(data.byteLength / 1024 / 1024).toFixed(2)}MB, exceeding the documented 3MB payment-link image limit`,
     );
   }
+  // ABA-bot relay 2026-10-03: image width must not exceed 2,000 pixels and the
+  // filename must not contain special characters such as parentheses. Both are
+  // caller errors known at the CLI boundary — hard-reject like the size check.
+  const width = imageWidthFromBytes(data);
+  if (width !== null && width > PAYMENT_LINK_IMAGE_MAX_WIDTH_PX) {
+    throw new Error(
+      `--image width is ${width}px, exceeding the documented ${PAYMENT_LINK_IMAGE_MAX_WIDTH_PX}px payment-link image maximum — resize before upload`,
+    );
+  }
+  const filename = path.basename(filePath);
+  if (!/^[A-Za-z0-9._-]+$/.test(filename)) {
+    throw new Error(
+      `--image filename "${filename}" contains special characters — the documented rule forbids them (e.g. parentheses); rename to letters, digits, dots, hyphens, underscores only`,
+    );
+  }
   return {
     data,
-    filename: path.basename(filePath),
+    filename,
     contentType: CONTENT_TYPE_BY_EXTENSION[path.extname(filePath).toLowerCase()],
   };
 }

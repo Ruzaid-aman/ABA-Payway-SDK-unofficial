@@ -4,6 +4,7 @@
  * trivially testable and usable by agents without spawning the CLI.
  */
 import {
+  CREDENTIAL_ERROR_CODES,
   GATEWAY_CODE_HINTS,
   PAYMENT_LINK_HINTS,
   PAYMENT_LINK_TITLES,
@@ -14,7 +15,7 @@ import {
 
 export interface CodeExplanation {
   readonly code: string;
-  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr' | 'cda' | 'payment-link';
+  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr' | 'cda' | 'payment-link' | 'credential';
   readonly title: string;
   readonly hint: string;
   /** True when the code's meaning was reproduced against the live sandbox. */
@@ -145,6 +146,7 @@ const REFUND_LABELS: Record<string, string> = {
   [REFUND_ERROR_CODES.REFUND_FAILED]: 'Refund failed',
   [REFUND_ERROR_CODES.CONCURRENT_REJECTED]: 'Concurrent request rejected',
   [REFUND_ERROR_CODES.INSUFFICIENT_BALANCE]: 'Insufficient merchant balance',
+  [REFUND_ERROR_CODES.BELOW_MINIMUM]: 'Refund amount below the minimum allowed',
 };
 
 const REFUND_HINTS: Record<string, string> = {
@@ -160,6 +162,23 @@ const REFUND_HINTS: Record<string, string> = {
   [REFUND_ERROR_CODES.CONCURRENT_REJECTED]:
     'Another request for this transaction is in flight — retry after it settles. Shared by refund AND pre-auth completion/cancellation ("Another request is already in progress. Please wait a few seconds and try again.").',
   [REFUND_ERROR_CODES.INSUFFICIENT_BALANCE]: 'Top up the merchant account before retrying.',
+  [REFUND_ERROR_CODES.BELOW_MINIMUM]:
+    'The refund amount is below the gateway minimum — the numeric per-currency floor is undocumented (ABA-bot relay 2026-10-03); raise the amount above the local advisory (≥ $0.01 USD / ≥ 1 KHR) or refund via the offline/manual process.',
+};
+
+// Credential/rotation rejections (ABA-bot relay 2026-10-03, doc-derived):
+// no dual-key overlap window exists — old-credential traffic dies with these
+// codes once replacements are enforced.
+const CREDENTIAL_TITLES: Record<string, string> = {
+  [CREDENTIAL_ERROR_CODES.STALE_CREDENTIALS]: 'Credentials rejected (stale after rotation)',
+  [CREDENTIAL_ERROR_CODES.WRONG_ENCRYPTION]: 'Wrong encryption (credential/RSA mismatch)',
+};
+
+const CREDENTIAL_HINTS: Record<string, string> = {
+  [CREDENTIAL_ERROR_CODES.STALE_CREDENTIALS]:
+    'Requests are still signed with credentials the Integration Team already replaced. There is NO dual-key overlap window — cut over every service to the new key promptly, then re-verify with a test transaction.',
+  [CREDENTIAL_ERROR_CODES.WRONG_ENCRYPTION]:
+    'The credential/RSA pairing no longer matches (e.g. a rotated key paired with the old RSA public key, or vice versa). Re-issue/align both through the Integration Team; no self-service rotation exists.',
 };
 
 const PRE_AUTH_TITLES: Record<string, string> = {
@@ -305,6 +324,9 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
   }
   if (code in PAYOUT_TITLES) {
     return withProvenance({ code, family: 'payout', title: PAYOUT_TITLES[code], hint: PAYOUT_HINTS[code] ?? '' });
+  }
+  if (code in CREDENTIAL_TITLES) {
+    return withProvenance({ code, family: 'credential', title: CREDENTIAL_TITLES[code], hint: CREDENTIAL_HINTS[code] ?? '' });
   }
 
   // Payment-link family (2026-09-06): PTL05/PTL99/PTL132 — PTL02/PTL04 are

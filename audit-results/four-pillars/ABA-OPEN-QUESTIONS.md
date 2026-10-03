@@ -917,3 +917,172 @@ The supplied logo export adds: merchant checkout upload 300 × 300 px JPG/PNG �
 4. Confirm bottom-sheet availability and per-environment/profile hosted-QR response/expiry/entitlement rules. Presentation intent does not make checkout_qr_url universal. Simulator/test fixture questions in Q50 remain open.
 
 **Remaining Q56 inputs:** confirm public redistribution/license/version/update permission for the SVGs, composite logo strip and design exports (including third-party payment network marks), approved public wording for the relayed requirements and canonical asset download/source. Supplying files for this implementation review is not explicit permission to bundle them in a public package. Original assets remain outside skills/knowledge/docs-packaged; only scoped textual guidance was propagated. Other Q56 maintenance/publication decisions remain open.
+
+## Telegram AI-bot relay batch — 2026-10-03: 43-question questionnaire answered (append-only)
+
+**Method:** the open items of this register (plus the skills-audit draft Q-A–Q-G and the
+INTEGRATION-GAPS unfiled items) were distilled into 43 self-contained Telegram messages
+(T-00 context primer + T-01..T-42, ordered P0→P1→P2) and posted to the PayWay integration
+AI bot (`@payway_Integration_AI_bot`, AGENT_test_Sohail group) in 16 batches on 2026-10-03,
+05:14–06:07 chat clock, via the telegram-desktop-control rig. All 43 groups were answered.
+Questionnaire: `.scratch/telegram-aba-questionnaire/QUESTIONNAIRE.md`; extracted facts and
+per-item register proposals: `answers/ANSWERS.md` in the same folder; verbatim transcripts:
+`answers/raw/batch-01..16-*.json` (committed `c7df043`). The T-id → Q-number crosswalk is
+the ANSWERS.md status board. No new Q-numbers were filed — every finding folds into an
+existing item.
+
+**Evidence-quality caveat (stricter than the 2026-09-12 relay):** the responder is an AI
+assistant answering from its indexed PayWay documentation — NOT the Integration Team.
+Answers are doc-derived summaries, usually without document IDs/URLs. Everything below is
+"doc-derived per bot relay": actionable design guidance, not written contract confirmation.
+Answers that contradict our sandbox evidence are flagged as **conflict** and listed in the
+re-test subsection; production-parity asks stay formally open. Statuses used below:
+**answered (bot)** = doc-derived answer captured · **partial (bot)** = some sub-items
+answered · **negative (bot)** = explicit "not documented" + named human-channel owner ·
+**conflict** = doc-claim vs our live evidence.
+
+### Status updates to existing questions
+
+| # | New status | What came back |
+|---|---|---|
+| Q3 | partial (bot) | 3.1 ANSWERED: validity is ROLLING — "90 days after their initial linking, renewal, or the last successful transaction—whichever is most recent" (CITI_FLEX/CITO_FLEX account tokens). 3.2 (boundary timezone) open; 3.4 (expired-but-not-removed error code) open — declined + ABA Mobile notification, no code documented. |
+| Q4 | conflict | Doc-claims: close prevents further payment; Check Transaction expected to show CANCELLED plus an intermediate pending-closed state; paid-after-close → backend reversal observable as REFUNDED/CANCELLED; re-close response unspecified. CONTRADICTS sandbox (no CLOSED status in any read API, close dossier) — needs live reconciliation before codifying. |
+| Q5 | partial (bot) | Only documented numeric limit: KHQR generation 10 req/s per MID. Check Transaction guidance 20 rps (50 rps negotiable with ops). No published limits for transaction-detail/list/refund/mc-ref — our working numbers unconfirmed. HTTP 429 documented as the rate-limit signal but NO Retry-After today and no roadmap; penalty model mixed (KHQR per-MID; IP blocking, portal "Access denied Error code 1020"); no canonical 429 body documented. |
+| Q6.1 | re-confirmed (bot) | Single best-effort delivery; one push attempted, no retry on timeout/unreachable; observed 1 extra attempt ~10 s (15–20 s total window) explicitly not to be relied on; recovery = Check Transaction (3–5 attempts with delays recommended). |
+| Q7 | partial (bot) | 7.2 ANSWERED: callback source IPs DC1 103.108.218.76, DC2 103.108.218.2 (optionally the whole 103.108.218.0/24). 7.3 confirmed (CITR_FIX invalid on linking). 7.1 sandbox TLS chain: absent from bot docs → infra/ops (Q39). Merchant callback endpoint rules: HTTPS over 443, valid cert, public DNS, POST→HTTP 200; custom external ports unsupported (reverse proxy); WAF/CDN allowed if PayWay IPs unblocked; hosting outside Cambodia allowed. |
+| Q8 | answered (bot) | No self-service key rotation — the Integration Team issues/renews all credentials; old/new-key overlap undocumented (confirm when planning); API-key rotation is INDEPENDENT of the RSA key pair and callback registration; production keys carry temporary expirations during onboarding (~72 h activation windows, removed after go-live verification); exposed-key incident path = Integration Team channel and/or digitalsupport@ababank.com (no dedicated compliance address). |
+| Q9 | answered (bot) | 9.1: production rejects duplicate tran_id with a duplicate-transaction error (exact numeric code undocumented); purchase is NOT idempotent — lost-response recovery = Check Transaction on the SAME tran_id, else a NEW payment with a NEW tran_id. 9.2/9.3: no documented SLA; Check Transaction is a 7-day cache window vs transaction-detail's persistent store; documented poll pattern: wait ~3 s, poll every 3–5 s until Approved or lifetime expiry. |
+| Q10 | partial (bot) | 10.1/10.2 open (Integration Team). 10.3: the 3-minute minimum is documented as enforced; no documented maximum ("120 days" unconfirmed). TENSION: the bot reads lifetime's unit as MINUTES; our sandbox pinned a 180-SECOND generate-qr rejection floor — arbitrate against the sandbox before codifying. |
+| Q11 | answered (bot) | Unpaid QR-only invisibility is the expected contract (docs never promise open QRs in the list); no unpaid-inclusive filter/variant exists; the 3-day per-request cap is a general rule across environments and not overridable — use pagination across windows or portal exports. |
+| Q12 | negative (bot) | No freeze guarantee and no changelog/spec-versioning policy for HMAC field orders; the same order applies to sandbox and production per endpoint/version; gateway-vs-spec divergence = bank-side escalation. |
+| Q13 | partial (bot) | Beneficiaries = MIDs (card split supports MID only) or whitelisted ABA accounts; SANDBOX must not use real bank accounts — team-provided sandbox whitelist accounts (validates our 500000001 fixture); exact payee field format still not spelled out (generic PTL04); PTL147 "Payment currency is not allowed" named for beneficiary-currency mismatch. |
+| Q14 | partial (bot) | NEW documented image constraints: width ≤ 2000 px; filename without special characters such as parentheses. size:0 defect, filename renaming, CDN-URL stability remain open. |
+| Q15 | answered (bot) | No dedicated cancel/pause/resume subscription API: the merchant provides an unsubscribe UI and stops its own scheduled job; token freeze/remove blocks charges (status 0/1/2). Renewal charges are MERCHANT-initiated (Payment API with MITR_FIX) and each fires the STANDARD pushback ({tran_id, apv, status:"0", return_params}) — no recurring-specific schema. frequency governs the billing schedule only, NOT token expiry; scheduled-token expiry policy unspecified. No documented sandbox cycle accelerator (sandbox MAY support token-expiry manipulation). |
+| Q16 | answered (bot) | 16.1: production base URL CONFIRMED as https://checkout.payway.com.kh (per-path parity still belongs to PRODUCTION-VERIFICATION-PLAN). 16.2 ANSWERED NEGATIVE: "UAT environment is no longer supported; use sandbox instead. Old UAT API credentials can be reused to call the sandbox API endpoint." Sandbox base named: https://checkout-sandbox.payway.com.kh. |
+| Q18.5 | negative (bot) | CoF token-notification canonicalization NOT documented (general rules only: HMAC-SHA512, Base64, shared secret, X-PAYWAY-HMAC-SHA512); bot defers to the Integration Team — corroborates our 19 failed offline orderings; transitive-auth via get-token-details(request_id) stands. |
+| Q18.6 | conflict | Doc-claims: removal/freeze/unfreeze/renew status-change callbacks CAN fire — to the PROFILE-level CoF callback_url (Merchant Portal → Outlet Profile → Services → Credential on File), same payment_credential structure; get-token-details documented status map 0 removed / 1 active / 2 frozen. CONTRADICTS live AOF-14 (zero callbacks on the per-request URL; status stayed 1 for removed tokens). RE-TEST with a receiver on the portal-configured URL before treating AOF-14 as final. |
+| Q19 | partial (bot) | Team-enablement procedure re-confirmed; canonical payout placement in payment-link create/detail responses still open (no schema in the bot KB). |
+| Q20 | answered (bot) | No hash/HMAC in pushbacks confirmed (payload {tranid, apv?, status, returnparams?}); NEW: MULTIPLE pushbacks per payment are possible (status changes) → idempotent processing required; the full status-value matrix is still open. |
+| Q21 | open | PTL132 vs 96 not resolvable from the bot KB (neither code defined there). |
+| Q22 | unchanged (corroborated) | The bot's docs contain only generic purchase HMAC orders (no ctid/token_flag/frequency; no 26- vs 27-field CITR_FIX variant) — cannot confirm the ctid position; doc + Wrong-Hash-hint fix = bank-side escalation. Profile enablement (22.1) needs the human channel. |
+| Q24 | partial (bot) | 24.3 ANSWERED: production-supported; returns the latest 50 matches per merchant_ref; 10 req/min documented (no sandbox/prod difference). 24.1–2 (sandbox 404 classification) unexplained in the bot docs → Integration Team. |
+| Q25.1–2 | answered (bot) | Full production domain map: linking = CITI_FLEX, CITO_FLEX; charging = CITU_FLEX, MITU_FLEX, MITR_FIX; subscription registration = CITR_FIX (frequency 1W/1M/2M). CITO_FIX / CITR_FLEX / MITU_FIX / MITR_FLEX appear nowhere in the spec → out-of-contract; clients should reject them. CITR_FIX intentionally invalid on linking (closes Q7.3). |
+| Q26 | answered (bot) | Two-clocks model with DOCUMENTED numbers: ABA KHQR web-QR timeout 5 minutes; KHQR deeplink timeout 10 minutes — gateway-enforced, independent of transaction lifetime; QR images may expire even earlier (~2 min example); no per-merchant overrides; production identical; long-lived QRs belong to the QR-on-invoice / QR-on-API products (~30 days). Matches W5-1 and the 2026-09-12 session-timeout numbers. |
+| Q27 | answered (bot) | See Q9.1: production rejects duplicates; sandbox acceptance = invalid usage (root cause unexplained); documented exception: QR retries may reuse the same tran_id for the SAME payment flow. |
+| Q28 | doc-claim (bot) | Only successfully created transactions can be closed; a non-existent tran_id should return a not-found error — the sandbox's code-00-for-never-existing is NOT documented as intentional; production parity unconfirmed. |
+| Q29.1–2, 29.4 | answered (bot) | payment_gate=0 → E-commerce Checkout (hosted HTML/redirect) vs QR-API response (qr_string/qr_img) — decisive when BOTH services are enabled on the profile; payment_gate still supported on /v1/payments/purchase (set explicitly on dual-service profiles); view_type=hosted_view is the mobile/H5/WebView full-screen mechanism; desktop popup = JS plugin + iframe without view_type. |
+| Q31 | largely answered (bot) | Whitelisting: merchant sends exact domains/IPs + environment → Integration Team updates per profile per environment; wildcards undocumented (case-by-case); no self-service whitelist UI. Sandbox reactivation: expired activation → team resends; expired keys → Digital Support (digitalsupport@ababank.com); verify with one test transaction. Sign-off evidence checklist captured (tran_id/APV/order IDs, full-flow screenshots/recordings incl. POS/web/KIOSK/mobile, callback + network logs, executed scenarios incl. pre-auth and offline-KHQR callback-vs-polling); whitelisting verified by absence of 403 + callbacks from the documented IPs. |
+| Q33 | partial (bot) | Request-side amount/payment_limit/expired_date = STRINGS; tran_id — model as string, accept numeric-or-string; pushback amount/totalAmount numeric; status numeric-or-enum (0 = success). Doc-claim: server-side expiry enforcement ("requests after expiry must be rejected") — TENSION with sandbox §22 (expired links read OPEN + hosted page 200) — re-verify. EXPIRED status field, pushback_url presence rules, minimum expiry offset, PTL04/05/99/132 mappings: undocumented in the bot KB. |
+| Q34 | answered (bot) | Canonical envelope = { data: [...], status: { code: "00", message, merchant_ref } } — the data array + nested status OBJECT; string "00" in both environments; no top-level transactions array. |
+| Q35 | partial + conflict | 35.1 ANSWERED: ONE callback URL per profile for ALL channels (change = support ticket; team-configured in both environments). 35.3 ANSWERED: HMAC-SHA512 + Base64; SHA256 mentions are legacy. 35.2 CONFLICT: one bot answer says raw-body HMAC (no re-serialization), another says sorted-key concatenation — arbitrate against our 2026-08-18 Customer-Module capture before codifying. |
+| Q36 | answered (bot) | Sandbox CAN be provisioned with the Customer Module (enable Invoicing Tool / Payment Links + KHQR services + domains — team-done, no self-service toggle); reconciliation via get-transactions-by-mc-ref with the Customer ID as merchant_ref. |
+| Q37 | partial (bot) | Void exists via portal AND API and is irreversible (docs); exact production path/signing, docs page, PAID-link voidability, in-flight behavior, PTL188 finality: undocumented — our §23 live mapping remains the only contract evidence; the refund-instead-of-void advice stands. |
+| Q38 | confirmed (bot) | Docs repeat "Google Pay for online transactions was not available at the time of the discussion"; no env matrix or enablement flow → keep the SDK advisory; Sales confirms current status. |
+| Q39 | unchanged (bot negative) | Sandbox TLS chain absent from the bot docs → infrastructure/operations team (the contradiction with the 2026-09-12 "no self-signed certs" claim still stands). |
+| Q41 | CORRECTION | The 105-error probes used MITU_FIX / MITR_FLEX — NEITHER is a documented value. Documented MIT flags: MITU_FLEX (unscheduled) and MITR_FIX (scheduled). RE-PROBE with valid flags before treating code 105 as a profile-enablement blocker. |
+| Q42 | partial (bot) | expire_in semantics CONFIRMED = absolute epoch-seconds expiry instant (doc sample 1627113926), not a TTL; the intended Link-Account QR window (~90 s observed vs the "10 minutes" doc phrase) still needs the Integration/Product team. |
+| Q43 | unchanged | Card-leg enablement needs the human channel (T-10 procedure). |
+| Q44 | partial (bot) | Documented floor: ≥1 low-value production transaction (card if in scope) + transaction ID + evidence for settlement/callback verification; per-method/issuer counts and mandatory-case matrices are internal policy; multi-outlet deployments may need ≥1 transaction per outlet; soft-launch before first-settlement verification not codified (case-by-case with Integration/Commercial/Compliance). |
+| Q45 | largely answered (bot) | Join model: PayWay portal export (order ID/purchase#/tranid, APV, amount, date/time, masked PAN) ↔ bank iBanking/settlement reports (purchase/reference = PayWay order ID; fallback masked-PAN + amount + time window; a custom ABA export with orderID + bank reference is available on request). APV not guaranteed on bank statements; fees = separate debits per agreement; refund-before-settlement timing trap; T+N bank working days, weekends/holidays shift to the next working day; adjustment playbook (exclude wrong portal records / ABA back-fills with correct date / refund-to-avoid-delay); escalation = time-based (beyond the agreed window), no numeric tolerance. |
+| Q46 | partial (bot) | Customer Module is the ONLY fully specified callback: X-PAYWAY-HMAC-SHA512, HMAC-SHA512 Base64, plaintext = raw request body (BUT see the Q35.2 conflict); reject-and-discard on failed validation; ACK: specific-ack endpoints = HTTP 2xx + exact expected body (RECEIVEOK example); generic pushback = quick HTTP 200 with a short optional body; 202 NOT documented as accepted; ~5 s response timeout and failed callbacks are NOT re-sent; per-product canonical strings for generic callbacks undocumented; sample payloads captured (incl. the nested customer object). |
+| Q47 | largely answered (bot) | Proof = verified callback (ledger) + Check Transaction (recent status only, 7-day window); original amount/currency fields live on mc-ref and transaction-detail — no callback+check-transaction-only full-proof pattern exists. Recovery keys: tran_id → Check Transaction/detail (detail carries refund_amount + operations history), merchant_ref → mc-ref. REPEAT PAYMENTS: the same QR/link can be paid multiple times — each approval gets a NEW transaction_id; dedupe on transaction_id, reconcile on merchant_ref, never dedupe on merchant_ref alone; classify UNPAID/PARTIALLY_PAID/PAID/OVERPAID/EXCEPTION. Windows: check 7 days; mc-ref latest-50 at 10/min (no max age); detail 10/min (no max age). |
+| Q48 | largely answered (bot) | GLOBAL amount format (purchase/QR/refund): USD decimal string with exactly 2 dp ("0.01"…"2500.00"); KHR integer-only ("16000"); no symbols/commas/spaces in amount. Only documented numeric limit: USD refunds ≥ 0.01 and ≤ remaining refundable. tran_id ≤ 20 chars alphanumeric (hyphen allowed in some integrations); uniqueness scope unspecified. return_params excluded from the hash, no charset/length limits; req_time = 14-digit YYYYMMDDhhmmss, timezone unspecified (treat as opaque). Sub-100-KHR refunds: unconfirmed. TENSION: one bot answer read lifetime as minutes, another left the unit unspecified — the sandbox 180-second floor arbitrates. |
+| Q49 | partial (bot) | Credentials team-issued (API key + RSA per profile per environment) with temporary expirations on production onboarding; callback egress = HTTPS 443/public; hosting outside Cambodia allowed; no WAF/TLS-version/cipher matrix documented. Claim "a single settlement currency per profile" TENSION with the 2026-09-12 dual-currency relay — verify. |
+| Q50 remainder | largely answered (bot) | No public spec version/effective date/canonical URL — team-supplied design assets ARE the canonical source; no device/browser matrix (universal webview rules: hide URL bar + menu, static merchant header, whitelisted referer, back closes when there is no history); bottom-sheet NOT allowed for card forms (global rule; view_type=hosted_view for fullscreen; card forms load in a webview/full page, never an iframe); canonical labels ("ABA KHQR", subtitle exactly "Scan to pay with any banking app"), method order ABA PAY → KHQR → cards, single enabled method = single-action UI; dot-decimal currency typography ("1,000.00 USD"); screen review = full-flow sandbox evidence (screenshots/recordings + APK/TestFlight builds + test accounts) → UI sign-off package → production credentials; EXPLICIT re-review rule ("must not be modified from the version approved during UI review without re-approval"); hosted-QR via checkout_qr_url (never replace with custom KHQR) with deeplink-first fallback; countdown + replace-on-expiry (~180 s example); template entitlements = profile config. Locale list + config mechanism still open. |
+| Q51 | negative (bot) | No capability-discovery API/schema exists; authoritative source = Integration/Commercial confirmation per profile per environment; runtime signal = "Selected Payment Option is not enabled for this Merchant Profile" or the method missing from the hosted page; pattern = design-time configuration + runtime hard-fail handling. |
+| Q52 | largely answered (bot) | Consent: scheduled = CITR_FIX subscribe (fixed amount + frequency) → PWT via callback_url; unscheduled = CITI_FLEX/CITO_FLEX link → CITU_FLEX/MITU_FLEX charges. Merchants MUST provide subscribe/view/unsubscribe UI; customers control tokens in ABA Mobile. Retention split: PayWay stores token + masked source_of_fund + metadata; merchant stores pwt + internal ctid + plan config; raw PAN/CVV storage forbidden (hosted UI only). SCHEDULE OWNERSHIP: the merchant's daily job drives charges — PayWay never auto-bills; retries are merchant-owned (revoked/expired tokens simply decline; no grace period, no queuing); in-flight charges at revocation resolve per normal rules. CITI_FLEX tokens cannot be used for MIT. 3DS: enrolled cards require OTP challenges surfaced by the integration; manual key-in / CNP without authentication forbidden; hosted UI mandatory absent a separate product with PCI-DSS evidence. |
+| Q53 | largely answered (bot) | Completion: partial and equal supported; up to ~10% ABOVE the hold for supported card pre-auth (config/scheme-dependent); remainder auto-released after partial completion; uncompleted holds auto-reverse within the window (~30 days). Capture/cancel race: undefined — avoid by design. NO incremental-auth or re-auth API (use the ~10% tolerance, or CoF + a new authorisation). Auto-release detection: poll check-transaction-2 / portal — no webhook. Refund recovery: stored tran_id/pre-auth references + Check Transaction/detail; offline fallback via bank forms + the settlement team. |
+| Q54 | partial (bot) | Source = the merchant's settlement/platform sub-account, same currency (no cross-currency funding documented); PTL147 on beneficiary-currency mismatch; fees/limits/rounding = commercial configuration (the {acc,amt} sum must match); visibility via Merchant Portal + ABA Merchant app; sandbox whitelist accounts team-provided. |
+| Q55 | partial (bot) | Officially documented plugins: Shopify (ABA-maintained app), WooCommerce, PrestaShop, Odoo; plugin versioning/feature matrices/upgrade paths undocumented. POS/ECR hardware contract, ABA Mini Apps rules, and per-product ownership/UAT frameworks: not in the KB → product owners (Integration/Product/Legal-Commercial). |
+| Q56 remainder | negative (bot) | No documented redistribution license/version/terms for PayWay or third-party marks in a public SDK; no canonical public download source — needs an explicit go/no-go from ABA Integration + Legal/Branding. The keep-assets-out-of-the-package rule stands. |
+
+### Contradictions and re-tests filed by this batch
+
+1. **Q18.6 re-test (removal callbacks):** the bot says status-change callbacks target the
+   PROFILE-level CoF callback_url (Merchant Portal → Outlet Profile → Services → Credential
+   on File) — our AOF-14 receiver watched the per-request callback_url only. Re-run the
+   unlink cycle with a receiver on the portal-configured URL, and re-check the
+   get-token-details status map (doc: 0 removed / 1 active / 2 frozen; observed: stayed 1).
+2. **Q35.2 arbitration (Customer Module canonicalization):** raw-body HMAC (T-07) vs
+   sorted-key concatenation (T-34) — verify both offline against the captured 2026-08-18
+   Customer-Module callback before changing any verification code.
+3. **Q41 re-probe (MIT flags):** re-run the MIT charge leg with MITU_FLEX / MITR_FIX only;
+   MITU_FIX / MITR_FLEX are out-of-contract values and their 105 answers prove nothing
+   about enablement.
+4. **Lifetime unit tension (Q10 vs Q48):** one bot answer reads lifetime as minutes, another
+   leaves the unit unspecified; our sandbox pinned a 180-SECOND generate-qr floor. Keep
+   validateLifetime's seconds-for-QR / minutes-for-checkout split (anti-checklist: do NOT
+   "fix" it to 180 s everywhere) until re-confirmed.
+5. **Settlement-currency tension (Q49/Q51 vs the 2026-09-12 relay):** the bot claims one
+   settlement currency per profile; the relay described dual-currency merchants (settlement
+   to the matching account). Treat the relay as more specific until clarified.
+6. **Server-side link expiry (Q33 vs §22):** doc-claim "requests after expiry must be
+   rejected" vs sandbox OPEN + HTTP 200 — re-verify before softening the local
+   expiry-enforcement guidance.
+7. **Callback-URL model tension (T-34 vs live evidence):** the bot says ONE callback URL
+   exists per merchant profile for ALL channels (support-ticket to change), yet daily
+   evidence shows per-request callback_url / return_url working (link-account callbacks
+   §26, payment-link pushbacks §22). Probable resolution: the profile-level CoF URL serves
+   CoF status changes while per-request URLs serve their own requests — confirm before
+   relying on either reading.
+
+### Updated answer log (this batch)
+
+| # | Date | Response | Resolution |
+|---|---|---|---|
+| Q3.1, Q7.2, Q7.3, Q8, Q9, Q11, Q15, Q16, Q25.1–2, Q26, Q29.1–2/29.4, Q34, Q36, Q38, Q40, Q45, Q47, Q48, Q50 remainder, Q51, Q52, Q53, Q54, Q55, Q56 remainder | 2026-10-03 | PayWay integration AI bot (doc-derived relay — see caveat above) | See the status table above; per-item extracted facts + proposals in `.scratch/telegram-aba-questionnaire/answers/ANSWERS.md` |
+| Q4, Q18.6, Q35.2, Q41, Q33 (expiry enforcement), Q49/Q51 (settlement currency) | 2026-10-03 | same | CONFLICTS/tensions filed under "Contradictions and re-tests" above |
+| Q21, Q22, Q24.1–2, Q39, Q18.5, Q14 remainder, Q19 (payout placement), Q20 (status matrix), Q33 (PTL codes), Q37 (protocol details), Q42 (window value), Q3.2/3.4 | 2026-10-03 | same | Confirmed OPEN — human-channel owners named (Integration Team / Product / Infra / Legal-Branding / Sales) |
+
+## Telegram AI-bot follow-up + third rounds — 2026-10-03 (append-only addendum)
+
+**Method:** the post-run review of the 43-question batch distilled 15 pointed follow-ups
+(FU-01…FU-15 — the bot's own contradictions, evidence conflicts, and rephrased open items) and a
+second pass over this whole register surfaced 10 more (TR-01…TR-10 — never-asked sub-items plus
+doc-shaped new contradictions). Both rounds went to the same bot the same day; verbatim captures:
+`.scratch/telegram-aba-questionnaire/FOLLOW-UPS.md` + `THIRD-ROUND.md`; curated addenda:
+`answers/ANSWERS.md` (FU-01…15 + TR-01…10 sections); contradiction scorecard:
+`SECOND-PASS.md`. Evidence caveat identical to the main batch above.
+
+### FU round — status changes
+
+| Item | Status | What came back |
+|---|---|---|
+| Q35.2 | RESOLVED (doc level) | The bot reconciled its own T-07/T-34 contradiction: the RAW HTTP request body is the integrator contract; sorted-key concatenation describes how ABA internally constructs that body — both statements live in the same Customer Module hash section. Final arbiter = offline replay vs the 2026-08-18 capture (still runnable). |
+| Q35.1 | CORRECTED | The ONE-callback-URL-per-profile rule is Customer Module-only. Purchase = profile-level static webhook OR per-request `return_url`; Link Account = per-request documented; payment-link/CoF routing and the both-configured precedence rule remain undocumented. |
+| Q46 (ACK) | partial→largely answered | Generic pushback: any HTTP 2xx is success (202 technically OK), 200 recommended, empty body accepted. RECEIVEOK-style exact-body ACKs apply only where a per-profile contract explicitly requires them. |
+| Q20 (status matrix) | answered + NEW conflict | Pushback fires ONLY for successful transactions — silence is the expected failure contract (confirm via check-transaction; ~15 s webview wait-then-treat-as-failed pattern). No non-success status list exists. NEW: one doc says success = string "Completed" (plugin/order-status mapping) vs numeric 0 in examples — TR-02 resolved this (see below). |
+| Q49/Q51 (settlement currency) | RESOLVED | Single settlement currency per profile is the documented default; dual-currency = separate MIDs/profiles or a specially enabled setup. Reconciles the 2026-09-12 relay. |
+| Q33 (expiry enforcement) | RESOLVED directionally | Docs = production intent ("requests after expiry must be rejected"; no code/UI/status documented); sandbox OPEN+working-form = sandbox-defective. Keep merchant-side enforcement. |
+| Q15/Q3 (scheduled tokens) | answered | CITR_FIX/MITR_FIX tokens carry an explicit `expired_at`; NO inactivity auto-expiry documented; expired → unusable until user re-authorizes; no sandbox cycle accelerator. |
+| Q8 (rotation overlap) | answered (negative) | No dual-key overlap window documented — old-key traffic dies with PTL171/PTL175 (HTTP 403); plan zero-overlap cut-overs. |
+| Q9/Q48 (refund + ID details) | advanced | Multiple partial refunds EXPLICIT ("until the total amount paid is refunded"); over-refund = PTL37; below-minimum = PTL187 (numeric floor still undocumented); tran_id ≤ 20 chars enforced, hyphen tolerated not guaranteed, uniqueness scope still open. |
+| Q5 (429 shape) | advanced | TWO rate-limit surfaces: business-level `status.code=429` inside HTTP 200 ("Too many request, please try again in 1min.") vs transport HTTP 429 (body undocumented, no Retry-After). |
+| Q31 (wildcards) | answered (negative) | No wildcard subdomains — every hostname explicit; non-whitelisted → HTTP 403 `{"status":{"code":6,"message":"Requested Domain is not in whitelist."}}`. |
+| Q10/Q48 (lifetime unit) | CONFLICT DOUBLED DOWN | Bot re-asserts MINUTES for generate-qr (calls our 180-second sandbox floor an "environment-specific validation/defect"), says NO 120-day figure exists in its docs, and its own docs mention both a ~30-day default and a gateway-short (~3 min) expiry for API-generated QRs. Our coded two-domain split (generate-qr seconds / checkout minutes) matches observed behavior — unchanged; escalate unit + max per product. QR-on-invoice = non-expiring until paid; Soundbox request-qr not in the bot KB. |
+| Q4 (CANCELLED) | SHARPER | TR-03 documents `payment_status_code = 7 → payment_status = 'CANCELLED'` as an observable check-transaction state — while our sandbox has never shown it (W4-1). Live reconciliation only; local `closed` flag stands. |
+
+### TR round — status changes (never-asked items + new contradictions)
+
+| Item | Status | What came back |
+|---|---|---|
+| Q20 wording | RESOLVED | Canonical webhook JSON success = numeric `status: 0`; "Completed" is plugin/order-status-mapping vocabulary; no per-product pushback status values documented. |
+| Q49 remainder (migration/rollback) | answered (negative) | Replacement pattern; one key set per profile per environment; NO parallel old/new, NO documented rollback; cut-over notification = share a production transaction ID for verification. |
+| Q48 remainder (amount basis) | advanced | `amount` = Total_Amount (final payable after discount; quoted rule); hash over the amount as sent; original price in `Original_Amount`; no separate discount field. Zero/omitted amounts: no documented exception anywhere. FX timing/rounding: still open (Integration Team). |
+| Q53 remainder | mostly open | Refund concurrency/dedup undocumented (serialize merchant-side); no per-scheme refund matrix (issuer blocks → offline fallback documented); NBC rules not in KB (Compliance channel). |
+| Q54 remainder | partial | Pre-debit validation is all-or-nothing (non-whitelisted blocked; amt sum must equal); post-debit partial failure, per-leg reference IDs, and the source-debit report are undocumented → Integration/ops. |
+| Q50 (simulator ops) | answered | Links are project/time-specific from the team; simulator accounts max 2/merchant, 90-day HARD expiry, not extendable; simulator does success flows + Completed/Pending/Expired only — NO declines/timeouts (use sandbox test cards); cancel-mid-flow = abandonment → pending → expired. |
+| Production webhook | RESOLVED | For self-registered production merchants the team cannot update callback URLs — per-transaction `return_url` is the production contract; static webhooks are a sandbox/test concept (resolves the FU-02-vs-relay tension). |
+| Status vocabulary | PARTIAL | check-transaction returns BOTH `payment_status_code` (numeric) AND `payment_status` (word); success = 0 AND 'APPROVED'; bare `status` fields documented as codes (0,1,2,3,4,5,6,11) — a third numeric vocabulary; a canonical per-endpoint map is a new formal ask. DECLINED is the bot-spec spelling; our sandbox observes DECLINDED — accept both. |
+| `return_url` base64 | CONFLICT | Bot re-asserts ("return_url … must be Base64-encoded before submission", Link Account rules) — contradicted by our live plain-URL callbacks (§26 AOF-7). Keep plain; escalate the doc sentence before ever encoding. |
+| N2 remainder | advanced | ~30-day configurable online refund window; offline signed-form process after; ABA-to-ABA refunds fee-free; multiple partials explicit (above). Refund rounding scale still open. |
+
+### Still open after three rounds (68 questions asked)
+
+Q4 + Q28 (live reconciliation), Q18.5/Q18.6 (CoF callback canonicalization; unlink re-test on the
+portal-configured CoF URL), Q41 (re-probe MIT with MITU_FLEX/MITR_FIX — old probes used invalid
+flags), Q10/Q48 lifetime QR-domain unit + 120d-vs-30d max, Q21 PTL132-vs-96, Q22/Q43 profile
+enablement, Q24.1–2 mc-ref 404 classification, Q42 expire_in window, Q37 void production parity,
+Q19 payout placement, Q14 size:0/CDN, Q39 sandbox TLS chain (infra), PCI/SLA (compliance), Google
+Pay status (Sales), asset redistribution (Legal), FX timing, refund concurrency, payout post-debit
+recovery, per-endpoint canonical status maps.

@@ -9,7 +9,7 @@ import type {
   RequestCallOptions,
 } from '../client.js';
 import { generateHmac } from '../auth.js';
-import { BASE_URLS, ENDPOINTS } from '../constants.js';
+import { BASE_URLS, ENDPOINTS, TOKEN_FLAG_CHARGING_PRODUCTION } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 import type { components } from '../types.js';
 import type { LinkCardResponse } from '../domain-types.js';
@@ -406,6 +406,15 @@ export function createCredentialsOnFileDomain(
       }
       if (params.tokenFlag !== undefined) {
         validateTokenFlag(params.tokenFlag, 'charging');
+        // ABA-bot relay 2026-10-03: the published spec lists only
+        // CITU_FLEX / MITU_FLEX / MITR_FIX for charging — MITU_FIX and
+        // MITR_FLEX are out-of-contract even though this sandbox accepts them.
+        if (!(TOKEN_FLAG_CHARGING_PRODUCTION as readonly string[]).includes(params.tokenFlag)) {
+          warnAdvisory(
+            config,
+            `tokenFlag "${params.tokenFlag}" is outside the production-documented charging set (CITU_FLEX, MITU_FLEX, MITR_FIX); sandbox acceptance of MITU_FIX/MITR_FLEX is not a production contract`,
+          );
+        }
       }
 
       validateTransactionId(params.transactionId);

@@ -247,3 +247,21 @@ const { removed, kept } = pruneJournal(new Date(Date.now() - 30 * 86_400_000));
 - Not synchronized with the gateway's clock: `ts` is local UTC ISO; gateway-side
   timestamps (`transaction_date`) use their own semantics — see SANDBOX-FINDINGS §21
   (W5-13).
+
+## Reconciliation identity rules (ABA-bot relay 2026-10-03, doc-derived)
+
+When you join journal/webhook records to gateway state (reconcile, timelines, invoice matching):
+
+- **Repeat payments are real.** The same QR or payment link can genuinely be paid multiple
+  times — each approval creates a **new `transaction_id`** and is a new payment, not a duplicate
+  webhook. Dedupe callbacks on `transaction_id`; reconcile to the invoice on `merchant_ref`;
+  **never dedupe merely because another payment exists for the same `merchant_ref`**. Classify
+  the invoice `UNPAID / PARTIALLY_PAID / PAID / OVERPAID / EXCEPTION` against your own balance.
+- **Check Transaction is a 7-day recent-status cache** — beyond it, use `transaction-detail`
+  (carries `refund_amount` + operations/history for lifecycle reconstruction) or
+  `get-transactions-by-mc-ref` (latest 50 matches per `merchant_ref`, 10/min, no documented max
+  age). Recovery keys: lost create/refund/capture responses → query by `tran_id`;
+  invoice-centric investigation → query by `merchant_ref`.
+- Proof model: the verified callback is the ledger's primary proof; the query APIs corroborate.
+  There is no callback+check-transaction-only pattern that yields full financial proof —
+  original amount/currency fields live on `get-transactions-by-mc-ref` and `transaction-detail`.

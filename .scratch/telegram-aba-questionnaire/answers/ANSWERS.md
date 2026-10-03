@@ -590,5 +590,212 @@
 - Confidence: medium-high — plugin list is concrete; POS/ECR + Mini Apps explicitly out of the KB
 - Proposed register update: Q55: partially ANSWERED — plugin list captured (Shopify/WooCommerce/PrestaShop/Odoo); POS/ECR contract, Mini Apps rules, and per-product UAT frameworks remain product-owner asks.
 
+## Follow-up round — 2026-10-03 (FU-01…FU-15)
+
+Second session same day, ~07:00–07:40 chat clock. Source: review of the main run above — the bot's own
+contradictions, evidence conflicts, and open items rephrased as direct doc-shaped asks. Questions verbatim
+WITH answers inline: `../FOLLOW-UPS.md` (checkbox capture via `runQuestionList`). Chat-tail sweep artifacts
+(verbatim): `raw/phantom-t14..t27-*.md` — the runner's burst collector repeatedly dragged the previous
+exchange's tail into each answer block; it also re-sent the morning's T-16 once (the bot re-answered it;
+new nuance: sandbox allows any 3-day window within a 30-day period, wider windows fail with code 11, and
+transaction-list-2 status filter values are APPROVED/PRE-AUTH/REFUNDED/PENDING/DECLINDED/CANCELLED).
+
+| ID | Topic | Verdict |
+|---|---|---|
+| FU-01 | Customer Module HMAC canonicalization (T-07 vs T-34 arbitration) | RESOLVED (doc-level) |
+| FU-02 | Per-request vs profile-level callback URL (T-34 correction) | ANSWERED + correction accepted; precedence undocumented |
+| FU-03 | Pushback ACK: 202 / RECEIVEOK / empty body | ANSWERED (any 2xx; specific-ack is per-profile contract) |
+| FU-04 | Pushback status matrix + failure silence | ANSWERED (success-only pushback; no status list) |
+| FU-05 | Lifetime unit (T-02 vs T-25 vs sandbox) | CONFLICT DOUBLED DOWN — stays open, do not codify |
+| FU-06 | Settlement currency per profile (T-37 vs relay) | RESOLVED (single-currency default; dual = separate MID or enabled config) |
+| FU-07 | Expired-token charge code + 90d boundary timezone | STILL OPEN (both undocumented) |
+| FU-08 | CITR_FIX/MITR_FIX token expiry policy | ANSWERED (explicit expired_at; no inactivity rule) |
+| FU-09 | Refund floor + multiple partials + over-refund error | ANSWERED (PTL187 / multiple-partial OK / PTL37) |
+| FU-10 | 429 body shape + Retry-After | ANSWERED (two surfaces; 1-min hint; no header) |
+| FU-11 | Wildcard domain whitelisting | ANSWERED (negative; code 6 403 shape) |
+| FU-12 | Key-rotation overlap | ANSWERED (no overlap; PTL171/PTL175) |
+| FU-13 | tran_id uniqueness scope + charset | PARTIAL (scope open; ≤20 enforced; hyphen tolerated-not-guaranteed) |
+| FU-14 | Payment-link expiry enforcement (T-20 tension) | RESOLVED directionally (docs = intent; sandbox = defective) |
+| FU-15 | Close-transaction CANCELLED visibility (T-04 vs W4-1) | NOT RESOLVED — doc re-claims CANCELLED; live reconciliation still required |
+
+### FU-01 — Customer Module HMAC canonicalization (arbitrates T-07 vs T-34)
+- The bot reconciled its own contradiction: **raw HTTP request body as received is the integrator
+  contract**; sorted-key concatenation describes how ABA internally *constructs* that body (canonical
+  JSON) — both statements live in the SAME Customer Module hash section; no newer contradicting spec.
+- Rule: HMAC-SHA512(secret, raw_body_bytes) → Base64 → compare X-PAYWAY-HMAC-SHA512; never
+  parse-and-re-serialize. Only if reconstructing, mimic ABA's canonicalization (sort keys ascending,
+  consistent nested-object encoding).
+- Confidence: medium-high (doc-derived, self-consistent now). **Action:** the 2026-08-18 capture test
+  should try RAW BODY first; sorted-key stays the fallback for regeneration only.
+- Register: Q35.2 arbitration inputs improved — test raw-body canonicalization offline (no rig needed).
+
+### FU-02 — Callback URL routing (corrects T-34's over-generalization)
+- The "ONE callback URL per profile" rule is **Customer Module-specific** ("You can configure only one
+  callback URL for the Customer Module…"), NOT global. Bot explicitly corrected itself.
+- Purchase: two documented options — profile-level static webhook (Integration-Team-configured) OR
+  per-request `return_url` (redirect/return, static or dynamic). Link Account: per-request `return_url`
+  (Base64-encoded, HTTPS 443) is the documented contract.
+- Payment-link create + CoF status-change routing: NOT in the KB. Precedence when both a profile webhook
+  and a per-request URL exist: NOT documented — Integration Team.
+- Confidence: medium-high. Register: Q35.1 answered narrowly (Customer Module only); NEW open item —
+  callback-URL precedence rule + CoF/payment-link routing matrix.
+
+### FU-03 — Pushback ACK contract
+- Generic JSON pushback: **any HTTP 2xx counts as success (202 technically OK)**; 200 recommended;
+  empty body accepted; no specific content required.
+- RECEIVEOK-style specific-ack (example path /v1/paywayservice/callback) is the merchant's OWN callback
+  URL with an explicitly AGREED per-profile contract — not a PayWay-owned endpoint, not a product-wide
+  rule; 2xx + wrong/empty body = failed delivery there.
+- Confidence: medium-high. Register: closes the FU-identified ACK questions; our receiver should keep
+  returning bare 200 fast.
+
+### FU-04 — Pushback status values + failure silence
+- **Pushback fires only for successful transactions** ("For Declined or other non-successful states,
+  Payway may not send pushback"); silence is the EXPECTED failure contract — confirm via check-transaction.
+- Success status: one doc says string **"Completed"** ("cannot be changed from gateway side"); examples
+  show numeric `0` — consistent with our live numeric-0 captures; no authoritative non-success list exists.
+- Webview pattern (new): wait ~15 seconds for pushback after the user leaves; none → treat as failed,
+  confirm via check-transaction.
+- Confidence: medium-high. Register: Q19 status-matrix closed as "success-only, no list"; add the ~15 s
+  webview guidance to pushback docs; note the Completed-vs-0 wording tension (live evidence = numeric 0).
+
+### FU-05 — Lifetime unit: bot doubles down on MINUTES — conflict stands
+- Quoted sentences: "The parameter unit is minutes."; "`lifetime=3` means 3 minutes. Do not send `180`
+  if you intend 3 minutes; `180` would mean 180 minutes."; min = 3 minutes enforced; max not formal
+  (example 30 days = 43,200 minutes).
+- INTERNALLY INCONSISTENT with our sandbox floor: <180 rejected with code 04 ⇒ numeric minimum 180 ⇒
+  under a minutes reading the minimum would be 180 minutes, not "3 minutes". Only the seconds reading
+  (180 s = 3 min) matches both the docs' 3-minute minimum AND our probes. Likely the quotes cover a
+  different QR product (QR-on-invoice/API) than purchase generate-qr.
+- Confidence: high that the conflict is real. Register: keep lifetime=seconds in the SDK/CLI; do NOT
+  codify minutes; escalate unit-per-product to the Integration Team (append to Q10).
+
+### FU-06 — Settlement currency per profile (resolves T-37 vs 2026-09-12 relay)
+- Documented default: "A merchant profile supports only a single defined currency tied to the merchant's
+  settlement account." Payers may pay from any-currency accounts; settlement stays single-currency.
+- Dual-currency acceptance = separate profiles/MIDs per currency OR a specially enabled dual-currency
+  setup via Integration/Commercial ("not enabled by default").
+- Confidence: medium-high (reconciles the relay's "dual-currency merchants" as separate-MID/enabled case).
+- Register: Q51 tension closed; codify "one MID = one settlement currency; dual via separate MID or
+  enablement" in docs/20.
+
+### FU-07 — Expired-token charge code + 90-day boundary timezone (still open)
+- Docs only: "Expired tokens cannot be used to process payments… the transaction will be declined" —
+  no exact code (105-reuse unconfirmed, no dedicated code documented).
+- request_time must be UTC (documented); the timezone used to compute the 90-day cutoff: NOT documented.
+- Bot endorsed our mitigation: treat expired_at-past tokens as unusable locally.
+- Register: Q3.2/Q3.4 remain open (Integration Team); keep local expired_at gate.
+
+### FU-08 — Scheduled (CITR_FIX/MITR_FIX) token expiry
+- Scheduled tokens carry an explicit `expired_at`; past it → expired, unusable until the user
+  re-authorizes (ABA Mobile / Manage Payment Methods). Freeze/unfreeze/remove + callbacks as usual.
+- **No inactivity-based auto-expiry** documented for scheduled tokens (unlike the 90-day rolling rule for
+  CITI_FLEX/CITO_FLEX). Also (sweep artifact, row FU-10 capture): no documented sandbox mechanism to
+  fast-forward 1M cycles.
+- Confidence: medium-high. Register: Q15's expiry sub-question answered — expired_at-driven, no
+  frequency/inactivity rule; Q2 remains the relay-covered path.
+
+### FU-09 — Refund floor, multiple partials, over-refund (resolves T-26 leftovers)
+- Minimum refund: error **PTL187 "Amount is below the minimum allowed"** exists; numeric per-currency
+  floor (incl. sub-100-KHR) NOT documented — expect PTL187 on too-small refunds.
+- **Multiple partial refunds explicitly documented: "Partial Refunds: Multiple partial refunds can be
+  issued until the total amount paid is refunded."**
+- Over-refund: **PTL37 "Refund amount cannot exceed the original purchase amount."**
+- Confidence: medium-high. Register: N2 partially-answerable items closed (multiple-partial YES;
+  over-refund code PTL37; floor = PTL187-gated, value open).
+
+### FU-10 — 429 shape + backoff
+- TWO rate-limit surfaces: (a) business-level `status.code = 429` inside HTTP 200 JSON with message
+  "Too many request, please try again in 1min." (documented); (b) transport HTTP 429 — body NOT
+  documented (may be empty/generic), no Retry-After header.
+- Guidance: back off, longer poll intervals (3–5 s / 15 s, limited attempts); treat the 1-minute message
+  as the cooldown hint; no roadmap for Retry-After (matches T-15).
+- Confidence: medium-high. Register: Q5 remainder — codify the dual 429 shapes in docs/12 rate-limit
+  section; our client throttling + backoff stays.
+
+### FU-11 — Domain whitelisting: no wildcards
+- Wildcards (*.myshop.com) NOT supported — every subdomain whitelisted explicitly.
+- Non-whitelisted domain → HTTP 403 with `{"status":{"code":6,"message":"Requested Domain is not in
+  whitelist."}}` (or "wrong domain").
+- Confidence: medium-high (closes Q31's wildcard item with a named error shape). Register: Q31 wildcard
+  item closed; add code 6 to the error registry.
+
+### FU-12 — Key rotation: no overlap window
+- No documented dual-key overlap; once new credentials are enforced, old-key requests are rejected with
+  **PTL171/PTL175** (HTTP 403) — those codes = stale credentials/encryption.
+- Planning: single-active-key cut-over, update all services promptly, re-test.
+- Confidence: medium-high (doc-derived; new named codes). Register: Q8/N10 overlap item closed —
+  plan zero-overlap cut-overs; PTL171/175 → error registry as stale-credential signals.
+
+### FU-13 — tran_id scope + charset (partial)
+- Uniqueness scope (per-merchant vs global): NOT explicitly stated — still open. Docs treat tran_id as a
+  gateway-unique primary key; merchants generate their own.
+- ≤20 chars enforced (longer rejected). No formal production charset statement: spaces/punctuation
+  disallowed, `_` problematic, `-` shown accepted in some examples; recommended validation
+  `^[A-Za-z0-9-]{1,20}$`.
+- Confidence: medium. Register: Q48 charset item closed as "hyphen tolerated, not guaranteed"; uniqueness
+  scope stays open (append to Q9.1 ask).
+
+### FU-14 — Payment-link expiry enforcement (T-20 tension resolved directionally)
+- Docs: "requests after expiry must be rejected" — but NO error code, NO hosted-page UI spec, NO
+  detail-status value for the expired state.
+- The bot classifies our sandbox observation (expired link still OPEN + working form) as
+  **sandbox-specific/defective behavior**, not intended contract; production expected to enforce.
+- Confidence: medium (directional — consistent with §22's "enforce expiry merchant-side" advice; the
+  production enforcement claim remains live-verification-gated). Register: Q33 expiry item — keep
+  merchant-side enforcement as the coded contract; note sandbox defect.
+
+### FU-15 — Close-transaction CANCELLED visibility: contradiction NOT resolved
+- The bot re-claimed the doc position: after close expect **CANCELLED** (possibly via pending-closed),
+  "verify reversal/refund outcomes through appropriate transaction/query APIs"; scans against closed
+  transactions will not complete.
+- Card-session race (open-before-close): NOT documented; intended contract = closed ⇒ not payable; exact
+  behavior (hard reject vs allow+auto-reversal) unknown. Auto-reversal on paid-after-close: documented as
+  possible; who initiates / timeframe / SLA unspecified.
+- Confidence: medium — this directly re-contradicts W4-1 (no CLOSED/CANCELLED status in any sandbox read
+  API). Register: Q4 stays live-reconciliation-gated; keep local `closed` flag as the coded contract;
+  treat the CANCELLED claim as production-intent until a production check proves it.
+
+## Third round — 2026-10-03 (TR-01…TR-10)
+
+Third bot session same day. Source: SECOND-PASS.md — the sub-items never asked of anyone plus the
+doc-shaped contradictions the FU round created. Questions verbatim WITH answers inline:
+`../THIRD-ROUND.md`. No chat-tail sweeps occurred in this round (file clean as captured).
+
+| ID | Topic | Verdict |
+|---|---|---|
+| TR-01 | Per-product QR lifetime table | PARTIAL — bot re-asserts minutes for generate-qr, calls our sandbox floor an "environment-specific validation/defect"; QR-on-invoice = non-expiring until paid; Soundbox not in KB; 120-day max "not in the docs" |
+| TR-02 | Pushback "Completed" vs numeric 0 | RESOLVED — numeric 0 is the canonical webhook JSON success; "Completed" is plugin/order-status-mapping vocabulary |
+| TR-03 | Status enum split | PARTIAL + SHARPER Q4 CONFLICT — check-transaction returns BOTH `payment_status_code` (numeric) and `payment_status` (word); success = code 0 AND 'APPROVED'; **7 → 'CANCELLED' documented as observable**; DECLINED spelled correctly in the bot's specs (our sandbox shows DECLINDED) |
+| TR-04 | Production static webhook | RESOLVED — for self-registered production merchants the team cannot update callback URLs; per-transaction return_url is the contract; static webhook = sandbox/test concept; precedence: "return_url may override the profile default if allowed by gateway settings" (still not fully specified) |
+| TR-05 | Zero/omitted amounts + discount basis + FX | PARTIAL — no documented zero/omitted-amount exception (assume positive non-zero); **`amount` = Total_Amount (final payable after discount), hash over the amount sent, original in Original_Amount** (quoted rule); FX timing/rounding still open (Integration Team) |
+| TR-06 | Credential migration/rollback | ANSWERED (negative) — one key set per profile per environment; replacement pattern; NO parallel old/new; NO documented rollback (Integration Team handles); cut-over "notification" = share a production transaction ID for verification |
+| TR-07 | Concurrent refunds / issuer / NBC | MOSTLY OPEN — refund concurrency/dedup undocumented (design defensively, serialize merchant-side); no per-scheme refund matrix (issuer blocks → offline fallback documented); NBC rules not in KB (Compliance channel) |
+| TR-08 | Payout partial failure + per-leg IDs + debit report | PARTIAL — pre-debit validation is all-or-nothing (non-whitelisted blocked; amt sum must equal); post-debit partial failure, per-leg reference IDs, and the source-debit report are all undocumented → Integration/ops |
+| TR-09 | Simulator/test-card freshness | ANSWERED — links are project/time-specific from the team (no permanent public source); **simulator accounts: max 2 per merchant, 90-day validity, NOT extendable, permanently disabled at expiry**; test-card sets rotate; simulator does SUCCESS flows + Completed/Pending/Expired transitions only — no declines/timeouts (negative cases = sandbox test cards); cancel-mid-flow = abandonment → pending → expired |
+| TR-10 | return_url base64 claim | BOT RE-ASSERTS WITH QUOTE ("When specifying return_url in API requests, the value must be Base64-encoded before submission" — Link Account rules) — contradicted by our live plain-URL callbacks (§26 AOF-7); keep plain, escalate the doc sentence to the Integration Team before ever encoding |
+
+### Register notes from this round
+
+- **Q4 conflict sharpened:** TR-03 documents `payment_status_code = 7 → payment_status = 'CANCELLED'`
+  as an observable check-transaction state for "cancelled/closed transactions" — the doc position is
+  now explicit and quoted; our sandbox has never shown it (W4-1). Live reconciliation is the only
+  arbiter; the local `closed` flag contract stands.
+- **Lifetime (Q10/Q48):** the bot now explicitly classifies our sandbox 180-second floor as
+  environment-specific defect vs minutes-in-spec, and says **no 120-day figure exists in its docs**
+  (our OpenAPI-derived `QR_LIFETIME_MAX_SECONDS` stays but is flagged spec-derived). Our coded
+  two-domain split (generate-qr seconds / checkout minutes) matches observed behavior — unchanged.
+  New nuance: docs also mention a gateway-configured SHORT expiry (~3 min) for API-generated QRs,
+  contradicting the ~30-day default — bot advises never relying on the default (codify that advice).
+- **Status maps:** a third numeric vocabulary surfaced — bare `status` fields documented as codes
+  (0,1,2,3,4,5,6,11) — alongside payment_status_code (0/2/3/4/7) and the mc-ref status object. File
+  a canonical per-endpoint status-map ask with the Integration Team.
+- **DECLINDED:** bot's specs say DECLINED; our sandbox observed DECLINDED (relay acknowledged the
+  typo 2026-09-12). Keep accepting both spellings in parsers.
+- **Simulator ops (docs/02 candidates):** 2 accounts/merchant, 90-day hard expiry, re-provisioning
+  via tester details; simulator cannot produce declines (use sandbox test cards for negative legs).
+- **Refund concurrency:** undocumented → serialize refund submissions merchant-side by default;
+  don't rely on gateway dedup.
+
 <!-- Append one section per ID using the template in ../QUESTIONNAIRE.md §6.
      Never paraphrase numbers/codes in extracted facts; keep raw replies verbatim in raw/. -->

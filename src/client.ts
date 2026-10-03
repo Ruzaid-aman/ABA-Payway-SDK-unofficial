@@ -259,6 +259,14 @@ export interface RequestCallOptions {
 export interface CreateTransactionParams {
   transactionId: string;
   amount: number;
+  /**
+   * Hosted-checkout locale for the browser form (`getCheckoutFormHtml` /
+   * CLI `checkout-form`): appended to the purchase URL as `?lang=`
+   * (ABA-bot relay 2026-10-03). en = default when omitted; some KHQR
+   * screens ignore it (known product issue). Query param only — never
+   * hashed, never sent in the POST body.
+   */
+  lang?: 'en' | 'km' | 'zh';
   firstname?: string;
   lastname?: string;
   email?: string;
@@ -1242,6 +1250,9 @@ export class PayWay {
       [ENDPOINTS.getTransactionList]: { limit: 50, intervalMs: 60_000 },
       [ENDPOINTS.getTransactionsByMerchantRef]: { limit: 10, intervalMs: 60_000 },
       [ENDPOINTS.refund]: { limit: 500, intervalMs: 1000 },
+      // KHQR generation: 10 requests/second per Merchant ID — the only explicitly
+      // published numeric limit (ABA-bot relay 2026-10-03).
+      [ENDPOINTS.generateQr]: { limit: 10, intervalMs: 1000 },
     };
 
     this.rateLimitRules = {

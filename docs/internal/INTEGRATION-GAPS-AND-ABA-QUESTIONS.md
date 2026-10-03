@@ -454,3 +454,69 @@ The approved additional-requirements work records new owner inputs in the canoni
 ## Default checkout UI — 2026-10-03
 
 The owner's PayWay Integration Team relay and supplied design exports partially answer Q50's default checkout presentation/branding requirements. Canonical public UI/customization, web/native/WebView/QR, onboarding/deployment and relevant skills now carry the scoped requirements. See the dated Q50/Q56 update in the [existing ABA register](../../audit-results/four-pillars/ABA-OPEN-QUESTIONS.md) for exact source limits and remaining version, device/entitlement, sign-off and asset-redistribution questions. Textual guidance is propagated; original bank/design assets are not included in the package. Receipt of guidance is not live screen approval or verification of every Figma frame.
+
+## Telegram AI-bot relay — 2026-10-03: gap-register impact
+
+Source: the 43-question questionnaire (T-00..T-42) answered by the PayWay integration AI
+bot in the AGENT_test_Sohail group. Method and the evidence-quality caveat (doc-derived
+relay, NOT written contract confirmation; conflicts flagged) are recorded in the canonical
+register's 2026-10-03 relay-batch section. Extracted facts + per-item proposals:
+`.scratch/telegram-aba-questionnaire/answers/ANSWERS.md` (verbatim transcripts in the same
+folder under `answers/raw/`). Impact on Part 1's gap register:
+
+| Gap | Impact |
+|---|---|
+| G1 production unverified | Advanced: production base URL confirmed in docs (checkout.payway.com.kh); UAT DISCONTINUED ("use sandbox instead; old UAT credentials can be reused against sandbox"); sandbox base named checkout-sandbox.payway.com.kh. Per-path live verification still pending (PRODUCTION-VERIFICATION-PLAN). |
+| G3 close-transaction contradictions | Doc-claims now on record (Check Transaction expected to show CANCELLED + intermediate pending-closed; paid-after-close auto-reverses) — but they CONTRADICT our sandbox evidence (no CLOSED status anywhere); needs live reconciliation before codifying. |
+| G5 settlement/reports | Substantially narrowed: report fields/grain, join keys (PayWay order ID ↔ bank purchase/reference; fallback masked-PAN + amount + time window; custom ABA export with the mapping fields on request), fee/refund timing traps, holiday shift, later-batch adjustment playbook, time-based escalation trigger (no numeric tolerance). A report-download API still does not exist — portal export + bank statements remain the path. |
+| G6 refund policy | Narrowed: ~30-day configurable online refund window (offline signed-form process after); ABA-to-ABA refunds fee-free; multiple-partials up to the total + rounding rules still open. |
+| G8 duplicate tran_id semantics | Narrowed: production rejects duplicates (duplicate-transaction error, exact numeric code undocumented); documented retry pattern = Check Transaction on the same tran_id, else a NEW payment with a NEW tran_id (purchase is NOT idempotent); sandbox acceptance = invalid usage, root cause still unexplained. |
+| G10 KHQR scan validity | RESOLVED (doc-derived): product-level timeouts — ABA KHQR web QR 5 minutes, KHQR deeplink 10 minutes — gateway-enforced and independent of `lifetime`; long-lived QRs belong to the QR-on-invoice/QR-on-API products (~30 days). Matches the W5-1 observation. |
+| G11 profile-gated features | Unchanged in substance (human enablement), but Q41 RE-SCOPED: the 105-error MIT probes used MITU_FIX/MITR_FLEX, which are not documented values at all — re-probe with MITU_FLEX/MITR_FIX before treating MIT as an enablement blocker. |
+| G12 payment-link docs | Narrowed: request-side amount/payment_limit/expired_date are STRINGS; tran_id should be string-modeled (accept either); MULTIPLE pushbacks per payment are possible → idempotent handling; doc-claim of server-side expiry enforcement (TENSION with §22 sandbox evidence — re-verify). PTL code map, EXPIRED status field, pushback_url presence rules still open. |
+| G13 error registry | Slightly advanced: PTL147 "Payment currency is not allowed" named; the production 429 body remains undocumented; PTL04/05/99/132/188 are absent from the bot's KB (only our live mappings exist). |
+| G14 transaction-list blind spots | RESOLVED (doc-derived): unpaid-QR invisibility IS the contract; no unpaid-inclusive variant exists; the 3-day per-request cap is general and non-overridable (pagination across windows / portal exports instead). |
+| G15 CoF token lifecycle | Narrowed: ROLLING 90-day validity ANSWERED ("initial linking, renewal, or the last successful transaction—whichever is most recent", unscheduled CITI_FLEX/CITO_FLEX tokens); boundary timezone, the expired-but-not-removed error code, and scheduled-token (CITR_FIX/MITR_FIX) expiry policy remain open. |
+| G16 PCI / key rotation / privacy | Key half ANSWERED: team-mediated rotation, no self-service; API-key rotation independent of RSA keys and callback registration; ~72 h temporary expirations on production onboarding credentials; incident channel = Integration Team / digitalsupport@ababank.com. PCI/SAQ scope still open (compliance channel only). |
+| G17 SLA / status page | Unchanged negative — nothing in the bot's references; commercial/ops channel. |
+| G18 onboarding / portal self-service | Narrowed: domain-whitelisting procedure (team-mediated, per profile per environment; wildcards undocumented), sandbox reactivation path (Digital Support), sign-off evidence checklist, and whitelisting verification method captured. Still no self-service whitelist or key UI. |
+| G19 checkout UI unknowns | language RESOLVED: ?lang=en\|km\|zh on the purchase URL (some KHQR screens ignore it — known product issue); label/branding change-request flow documented; spec version/canonical source = team-supplied design assets; locale list still open. |
+| G20 FX | Unchanged: the per-method currency matrix and fee schedule are confirmed commercial-only (agreement / paywaysales@ababank.com). |
+
+No change: G2, G4, G7, G9 (all resolved by the 2026-09-12 relay; this batch only
+corroborates them).
+
+New cross-cutting facts worth codifying (docs/09, docs/12, docs/16, docs/18, docs/20,
+docs/10, skills, knowledge corpus): Check Transaction is a 7-day cache window — use
+mc-ref/detail for history (mc-ref returns the latest 50 matches at 10/min); multi-pushback
+idempotency; repeat payments get a NEW transaction_id per approval (never dedupe on
+merchant_ref alone); global amount formats (USD 2-dp string / KHR integer) + tran_id ≤ 20
+alphanumeric + req_time YYYYMMDDhhmmss; callback source IPs 103.108.218.76 / 103.108.218.2
+(optional /24); ACK contract = HTTP 200 within ~5 s (202 never documented; exact-body ACKs
+like RECEIVEOK only where a product defines them); the merchant owns the subscription
+billing schedule and retries (PayWay never auto-bills); KHQR generation limited to 10
+req/s per MID; no capability-discovery API exists (design-time config + runtime hard-fail
+on "Selected Payment Option is not enabled").
+
+## Telegram AI-bot follow-up + third rounds — 2026-10-03: gap-register impact (append-only)
+
+Same method/caveat as the main batch above. Sources: `.scratch/telegram-aba-questionnaire/`
+(`FOLLOW-UPS.md`, `THIRD-ROUND.md`, `SECOND-PASS.md`, `answers/ANSWERS.md` FU-01…15 + TR-01…10).
+
+| Gap | Impact of FU + TR rounds |
+|---|---|
+| G6 refund policy | Narrowed further: multiple partial refunds EXPLICIT ("until the total amount paid is refunded"); over-refund = PTL37; below-minimum = PTL187 (floor value open); ~30-day configurable online window + offline form + ABA-to-ABA no-fee; concurrent-refund dedup undocumented → serialize merchant-side. Rounding scale still open. |
+| G12 payment-link | Server-side expiry enforcement = production intent (sandbox behavior classified defective by the bot); keep merchant-side enforcement. Image constraints: width ≤ 2000 px, filename without parentheses. Multiple pushbacks per payment possible → idempotent handling. |
+| G13 error registry | New named codes: PTL37 (refund > original), PTL187 (refund below minimum), PTL171/PTL175 (stale credentials after rotation), `status.code 6` (domain not whitelisted, HTTP 403), code 11 (sandbox >30-day list window), portal 1020. Business-level 429 (HTTP 200 + status.code 429, "try again in 1min") vs transport 429 documented separately. |
+| G15 CoF lifecycle | Scheduled (CITR_FIX/MITR_FIX) tokens: explicit `expired_at`, NO inactivity auto-expiry, unusable past expiry until user re-authorizes; frequency does not govern expiry; no sandbox cycle accelerator. Charge-flag domain: CITU_FLEX / MITU_FLEX / MITR_FIX (MITU_FIX/MITR_FLEX out of contract — Q41 re-probe pending). |
+| G16 key rotation | Zero-overlap cut-over: old-key traffic rejected with PTL171/PTL175 once new credentials are enforced; replacement pattern only (no parallel keys, no documented rollback); cut-over sign-off = share a production transaction ID. |
+| G18 onboarding/simulator | Simulator accounts: max 2 per merchant, 90-day HARD expiry (not extendable; re-provision via tester details); distribution links project/time-specific; simulator cannot simulate declines/timeouts (use sandbox test cards); cancel-mid-flow = abandonment → pending → expired. Production self-registered merchants: team cannot update callback URLs — per-transaction return_url is the contract. |
+| G19 checkout UI | `?lang=en|km|zh` on the purchase URL (some KHQR screens ignore it); `view_type=hosted_view` = mobile/H5/WebView full-screen mechanism; bottom-sheet NOT allowed for card forms; card forms must not load in an iframe; UI re-review rule (no modification post-approval without re-approval). |
+| G20 FX | `amount` = Total_Amount (post-discount payable; quoted rule); hash over the amount as sent; zero/omitted amounts undocumented; FX rate-fix timing + rounding still open (Integration Team). |
+
+Resolved this pass: settlement currency (one profile = one settlement currency; dual via separate
+MIDs or enabled config — G20-adjacent), Customer Module HMAC canonicalization (raw body = contract),
+production callback-URL model (per-request for self-registered merchants; Customer Module single
+profile URL), pushback success value (numeric 0; "Completed" = plugin vocabulary), status vocab
+(check-transaction returns payment_status_code + payment_status word; 7 → 'CANCELLED' documented —
+never observed in sandbox; DECLINED vs DECLINDED — accept both).

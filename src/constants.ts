@@ -136,8 +136,24 @@ export const REFUND_ERROR_CODES = {
   CONCURRENT_REJECTED: 'PTL168',
   /** Insufficient available balance */
   INSUFFICIENT_BALANCE: 'PTL181',
+  /** Refund amount below the minimum allowed (ABA-bot relay 2026-10-03; the numeric per-currency floor is undocumented — ≥ $0.01 USD / ≥ 1 KHR stays the advisory) */
+  BELOW_MINIMUM: 'PTL187',
   /** Transaction not found or is invalid (refund target does not exist) */
   REFUND_TARGET_NOT_FOUND: 'PTL36',
+} as const;
+
+/**
+ * Credential/rotation rejection codes (ABA-bot relay 2026-10-03, doc-derived).
+ * Key rotation has NO dual-key overlap window: once the Integration Team enforces
+ * replacements, traffic signed with the old credentials is rejected with these
+ * codes (HTTP 403). Plan a zero-overlap cut-over and re-verify with a test
+ * transaction afterwards.
+ */
+export const CREDENTIAL_ERROR_CODES = {
+  /** Requests signed with stale/old credentials after a rotation */
+  STALE_CREDENTIALS: 'PTL171',
+  /** Wrong encryption — credential/RSA mismatch after a rotation */
+  WRONG_ENCRYPTION: 'PTL175',
 } as const;
 
 /**
@@ -283,6 +299,17 @@ export const PAYMENT_LINK_HINTS: Record<string, string> = {
 export const TOKEN_FLAG_LINKING = ['CITI_FLEX', 'CITO_FLEX', 'CITO_FIX', 'CITR_FLEX'] as const;
 export const TOKEN_FLAG_CHARGING = ['CITU_FLEX', 'MITU_FLEX', 'MITU_FIX', 'MITR_FLEX', 'MITR_FIX'] as const;
 
+/**
+ * Production-valid token_flag subsets (ABA-bot relay 2026-10-03, doc-derived —
+ * the FULL enums above keep the extra values this sandbox accepts). The
+ * published spec lists ONLY these; `CITO_FIX`/`CITR_FLEX` (linking) and
+ * `MITU_FIX`/`MITR_FLEX` (charging) appear nowhere in it — treat them as
+ * out-of-contract for production. Subscription registration uses `CITR_FIX`
+ * (with frequency 1W|1M|2M); subsequent scheduled charges use `MITR_FIX`.
+ */
+export const TOKEN_FLAG_LINKING_PRODUCTION = ['CITI_FLEX', 'CITO_FLEX'] as const;
+export const TOKEN_FLAG_CHARGING_PRODUCTION = ['CITU_FLEX', 'MITU_FLEX', 'MITR_FIX'] as const;
+
 /** Server-enforced identifier rule observed in sandbox campaigns (`[a-zA-Z0-9]{5,24}`). */
 export const REQUEST_ID_PATTERN = /^[a-zA-Z0-9]{5,24}$/;
 
@@ -304,7 +331,14 @@ export const QR_LIFETIME_MAX_SECONDS = 120 * 24 * 60 * 60;
  */
 export const PURCHASE_LIFETIME_MIN_MINUTES = 3;
 
-/** ABA grants linked account/card tokens a documented ~90-day validity window; renewal resets it. */
+/**
+ * ABA grants linked account/card tokens a documented ~90-day validity window
+ * (ROLLING, ABA-bot relay 2026-10-03: "90 days after their initial linking,
+ * renewal, or the last successful transaction — whichever is most recent");
+ * renewal or any successful charge restarts it. Applies to unscheduled
+ * account tokens (CITI_FLEX/CITO_FLEX); scheduled tokens carry an explicit
+ * `expired_at` instead.
+ */
 export const TOKEN_VALIDITY_DAYS = 90;
 
 /**

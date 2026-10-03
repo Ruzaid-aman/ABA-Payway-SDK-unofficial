@@ -1,0 +1,23 @@
+  - **A (2026-10-03):** Me
+  - hi @payway_Integration_AI_bot [T-16] Questions about the transaction list API: 1) In sandbox it returns only paid and checkout-created transactions — unpaid QR-only transactions never appear, although check-transaction sees them in under a second. Is that the intended production contract? 2) Is there a filter or variant that includes unpaid open QR transactions (needed to reconcile abandoned-but-still-scannable QRs)? 3) The date window is capped at 3 days ("Maximum date rang is allowed only 3 days") — is the cap the same in production, and can it be raised per merchant?
+    - **A (2026-10-03):** Me
+    - hi @payway_Integration_AI_bot [T-18] Questions about proving payments and recovering lost responses: 1) check-transaction responses do not include the original currency. For final proof of an approved payment, is there a recommended combination of the signed callback plus a current query that avoids extra transaction-detail calls (or must approval use paced transaction-detail requests)? 2) If a create/refund/capture/payout response was lost (network drop), what is the reliable recovery — query by tran_id, by merchant reference, or something else? 3) Can a QR or payment link genuinely be paid more than once (repeat payments)? What duplicate-payment identity rules apply per QR/link type? 4) What is the maximum historical window for the query APIs (7 days?), and does it differ per endpoint?
+    - Hello Bong @Ruzaid, 1) Sandbox showing only paid / checkout-created, not unpaid QR-only — is that the production contract?
+    - The documentation for transaction-list / transaction-list-2 describes a general transaction-reconciliation API (both in-store and online) that returns transactions with various payment_status values (including PENDING). It does not state a rule that only paid or only checkout-created transactions are returned, nor does it define special handling for “QR-only” vs “checkout” transactions. For offline / high-volume KHQR invoice scenarios, the guidance for reconciliation focuses on these inquiry patterns instead of transaction-list:
+    - - get-transactions-by-mc-ref (by merchantref),
+    - - `check-transaction` (for recent transactionid),
+    - - transaction-detail (single transaction detail). The KB does not explicitly specify whether “unpaid open QR-only” transactions must appear in transaction-list in production, or explain the sandbox behavior you’re seeing. So I cannot confirm that the sandbox behavior (excluding unpaid QR-only) is the intended production contract — that needs backend confirmation. 2) Filter/variant that includes unpaid open QR transactions?
+    - The documented filters for transaction-list-2 are:
+    - - from_date, to_date (max 3-day window),
+    - - from_amount, to_amount,
+    - - status (values like APPROVED, PRE-AUTH, REFUNDED, PENDING, DECLINDED, CANCELLED),
+    - - page, pagination, plus merchant_id, req_time, hash. There is no separate variant or flag documented that specifically says “include unpaid open QR transactions that are still scannable but not yet paid”. The only way to target “not yet paid” that is visible in docs is using status filters such as PENDING. For offline KHQR/invoice use-cases, the recommended approach for investigating/reconciling open or partial/duplicate payments is to use:
+    - - get-transactions-by-mc-ref,
+    - - check-transaction, and
+    - - transaction-detail,
+    - not a special transaction-list variant for open QRs. 3) 3-day date-window cap — same in production, can it be raised per merchant?
+    - The documented rules are:
+    - - For transaction-list / transaction-list-2, the API supports a date-range filter of up to 3 calendar days per request. Requests exceeding this range are rejected (403 or API error).
+    - - The sandbox environment adds an extra constraint: allowed query is any 3-day range within a 30-day period; wider windows in sandbox can fail with errors (observed code 11). This 3-day-per-request cap applies to all environments, including production, per the docs. There is no mention of raising this limit per merchant. Instead, guidance is to:
+    - - split reconciliation into multiple 3-day windows with pagination, or
+    - - use the PayWay web portal export / other reporting endpoints for larger ranges. So from the KB: 3-day is the designed request-level limit; increasing it per merchant is not documented as an available option.

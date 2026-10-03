@@ -135,7 +135,7 @@ describe('cof charge token resolution', () => {
       'cof', 'charge', '-t', 'ord-dead', '-a', '1.00', '--ctid', 'custdead',
     ]);
     expect(text).toContain('expired');
-    expect(text).toContain('docs/09: ~90-day validity');
+    expect(text).toContain('docs/09: rolling ~90-day validity');
     expect(text).toContain('charge with an explicit --token');
     expect(exitCode).toBe(1);
   });

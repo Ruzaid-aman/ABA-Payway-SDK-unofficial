@@ -80,6 +80,25 @@ The exported 40 × 40 payment-method icons do not prescribe tap-target sizes. Us
 | Custom CSS/JS in hosted checkout | Not supported by the existing confirmed contract; do not modify the provider plugin or hosted page |
 | Hosted locale/labels | Portal/Integration Team profile configuration; no documented SDK language field |
 
+**Presentation & language rules (ABA-bot relay 2026-10-03, doc-derived):**
+
+- **Language:** the purchase API accepts `?lang=<code>` on the purchase URL — documented locales
+  are `en` (default), `km` (Khmer), `zh` (Chinese). Known product-side issue: some KHQR screens
+  ignore `lang` and render English. There is no SDK-level language field; custom CSS/JS remains
+  unsupported.
+- **`view_type=hosted_view`** is the documented mechanism for mobile browser / H5 / in-app
+  WebView flows (full-screen hosted checkout URL loaded in a WebView). The desktop popup uses the
+  JS plugin + iframe **without** `view_type`; the docs only specify `hosted_view` for
+  mobile/H5/WebView, not desktop.
+- **Card forms: fullscreen only.** Bottom-sheet/swipeable presentations are NOT allowed for card
+  payment forms (global rule, not a feature flag), and card forms must load in a WebView or full
+  page — **never an iframe**. Violations may be flagged by ABA's UI review.
+- **UI re-review rule:** "The UI that goes live must not be modified from the version that was
+  approved during UI review without re-approval." Screen review = full-flow sandbox evidence
+  (checkout with options/logos, QR/hosted display, ABA Mobile success screen, merchant receipt;
+  screenshots/recordings + test builds + test accounts) submitted to the Integration Team before
+  production credentials are issued.
+
 The QR API permits a merchant payment page around the QR; it still requires correct official branding, policies, readable QR and screen review. Custom styling does not remove the default checkout requirements.
 
 ## Return, success and production acceptance

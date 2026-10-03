@@ -44,7 +44,14 @@ Operational warnings worth knowing before print:
 The payment notification POSTs to the merchant profile's **single configured callback URL** (configured by the ABA integration team against your Merchant Profile ID; changes in production require a formal support ticket). Expect:
 
 - **Body:** KHQR-notification fields (`transaction_id`, `payment_status`, `payment_status_code`, `original_amount/currency`, `payment_amount/currency`, `payment_type`, `transaction_date`, `bank_ref`, `apv`, `payer_account`, `payer_name`, `bank_name`, `merchant_ref`) **plus a nested `customer` object** (`type`, `customer_id`, `customer_name`, `vat_tin`, `email`, `phone`, `address`, `remark`) and optional portal custom fields.
-- **Signature:** `X-PAYWAY-HMAC-SHA512` header (HMAC-SHA512, Base64) — same scheme as the online checkout contract, so `payway.verifyCallback()` applies. The one captured sample's canonicalization matches the SDK verifier.
+- **Signature:** `X-PAYWAY-HMAC-SHA512` header (HMAC-SHA512, Base64) — the Customer Module is the
+  only callback whose HMAC contract is fully specified in ABA's docs. **Canonicalization
+  (ABA-bot relay 2026-10-03): compute the HMAC over the RAW HTTP request body exactly as
+  received** — never parse and re-serialize JSON or reorder keys. (The "sorted-key concatenation"
+  phrasing in other material describes how ABA internally *constructs* that body; the integrator
+  contract is raw bytes. Our single captured sample happened to verify under the SDK's sorted-key
+  verifier too — replay BOTH canonicalizations against any capture before changing verification
+  code.) Reject-and-discard on failed validation (MITM/fake-notification risk).
 - **Money:** `original_amount/original_currency` is the merchant-side obligation; `payment_amount/payment_currency` is the payer's debit and may differ (currency or FX). Match obligations against `original_*`, never `payment_amount`.
 - **Timing:** respond HTTP 200 within 5 seconds; **ABA does not retry** — a missed callback is recovered only by the reconciliation fallback (§4).
 - **The Customer ID is NOT in the QR payload.** PayWay binds the QR to the customer record server-side (proprietary routing tags `62·68` + `99`); your join key is `merchant_ref` in the callback and API.

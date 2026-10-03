@@ -1,0 +1,10 @@
+  - **A (2026-10-03):** Hello Bong @Ruzaid, Based on the generic pushback/returnurl rules (Payment Link uses the same pushback mechanism): 1) **Hash/HMAC in pushback** In the documented pushback payload, only `tranid, status, optional apv, and optional returnparams` are mentioned. Example:
+  - ```json
+  - {"tranid":"<TRANID>","apv":"<APPROVAL>","status":0}
+  - ```
+  - There is **no hash/HMAC field described at all** for pushbacks (including Payment Link) and no requirement to verify a signature on the pushback body. So, per spec, you should **not expect a hash/HMAC field in production pushbacks** unless something custom is explicitly arranged per profile. 2) **Pushback status values** The pushback docs only show `status: 0` in examples and describe it as the success case, but **do not provide a full status code matrix** (failed/cancelled/etc.) for Payment Link pushbacks. From this context I can only say:
+  - - `status` is numeric in the canonical example (`status: 0`).
+  - - `0` represents success in the pushback examples.
+  - - Other concrete numeric values and meanings are **not documented** here; you’ll need Integration/Ops to confirm the full set for Payment Link. 3) **Multiple pushbacks per payment** Yes. The generic pushback rule explicitly states:
+  - - Gateway **may send multiple pushback events for the same `tranid** (e.g. when status changes).
+  - - Integrators must design **idempotent** handling (update if status changed, ignore no‑ops). So for Payment Links as well, you should **assume more than one pushback per payment is possible** and build idempotent processing on tranid`. 4) **Error for invalid/unknown link id (PTL132 vs 96)** The available pushback/returnurl and inquiry docs in this context do not define PTL132 or the sandbox’s HTTP 403 code 96 "Invalid merchant data" for Payment Links, nor do they state which of these is the canonical production response. That specific error‑code mapping is not specified here and would need confirmation from the PayWay team.

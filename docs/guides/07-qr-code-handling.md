@@ -453,6 +453,28 @@ QR codes generated via the API have a limited lifetime:
 - **No signature on the offline-KHQR notification — by design.** ABA confirmed no separate HMAC/signature scheme exists for that callback; integrity comes from HTTPS, dedupe on `transaction_id`, `merchant_ref` reconciliation, and treating transaction inquiry (Check Transaction / `get-transactions-by-mc-ref`) as the source of truth. ABA configures/whitelists the merchant callback URL on the profile.
 - **Status enum confirmed**: `payment_status_code` 0 APPROVED, 2 PENDING (may persist up to ~24 h), 3 DECLINED, 4 REFUNDED, 7 CANCELLED (pre-auth). There is **no EXPIRED/CLOSED code** — long-PENDING is the gateway's terminal representation; expiry is merchant-side. (`DECLINDED` spellings in list output are the gateway's own typo — handle it.)
 
+### Confirmed by the ABA-bot relay (2026-10-03, doc-derived)
+
+- **KHQR product timeouts have documented numbers**: the ABA KHQR **web QR** window is **5
+  minutes** and the KHQR **deeplink** window is **10 minutes** — gateway-enforced and independent
+  of the transaction `lifetime` (a 1440-minute lifetime does NOT extend scanability). QR images
+  may expire even earlier (~2 minutes is the documented example). Same values apply in production;
+  no per-merchant overrides are documented. Design short-lived QR checkout UX: countdown, scan
+  immediately, regenerate a NEW transaction/QR after expiry.
+- **KHQR generation is rate-limited to 10 requests/second per Merchant ID** — the only explicitly
+  published numeric API limit.
+- **Never rely on the `lifetime` default** — the docs describe both a long default (~30 days for
+  some QR APIs) and a gateway-configured short expiry (~3 minutes) for API-generated QR codes.
+  Always send an explicit `lifetime` and align polling/expiry with it. Note the bot relay also
+  insists the QR-domain unit is minutes and calls our sandbox 180-second floor an environment
+  defect — our coded split (generate-qr = seconds, min 180 s; checkout = minutes, min 3 / max
+  43,200 = 30 days) matches observed gateway behavior and stays; the official QR-domain unit and
+  the 120-vs-30-day max remain open asks.
+- **QR-on-invoice is non-expiring**: invoice QR codes stay valid for unlimited scans until the
+  payment completes (the product overrides generic expiry). For long-lived billing, prefer it over
+  checkout QRs; the Soundbox/`request-qr` product's lifetime semantics are not covered in the
+  bot's KB (spec-derived only — live-verify before relying on them).
+
 ---
 
 ## CLI Transaction Lifecycle Commands

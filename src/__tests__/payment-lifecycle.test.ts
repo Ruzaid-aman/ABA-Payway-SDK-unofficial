@@ -14,6 +14,9 @@ describe('first-payment boundary', () => {
   it('distinguishes pending and rejected payments', () => {
     expect(paymentLifecycle('PENDING')).toBe('pending');
     expect(paymentLifecycle('DECLINED')).toBe('failed');
+    // Gateway typo (acknowledged by ABA 2026-09-12, still observed live in
+    // transaction-list output) must classify as failed, not unknown.
+    expect(paymentLifecycle('DECLINDED')).toBe('failed');
     expect(paymentLifecycle('CANCELLED')).toBe('failed');
     expect(paymentNextStep('unknown')).toContain('existing transaction');
     expect(paymentNextStep('approved')).toContain('fulfill once atomically');

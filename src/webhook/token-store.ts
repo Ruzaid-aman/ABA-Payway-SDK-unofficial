@@ -44,6 +44,13 @@ export interface LinkedTokenRecord {
   readonly capturedAt: string;
   /** ISO-8601 of the last successful `cof token renew` — restarts the ~90-day window (docs/09 §4a). */
   readonly renewedAt?: string;
+  /**
+   * ISO-8601 of the last successful charge with this token. The 90-day window
+   * is ROLLING (ABA-bot relay 2026-10-03): expiry counts from the latest of
+   * link, renewal, or last successful transaction — a successful charge
+   * pushes expiry out ~90 more days.
+   */
+  readonly lastChargedAt?: string;
   /** Webhook record id of the capture (joins into webhook_data). */
   readonly sourceRecordId?: string;
 }
@@ -135,18 +142,22 @@ export type TokenExpiryStatus = 'valid' | 'expiring-soon' | 'expired' | 'unknown
 export const TOKEN_EXPIRING_SOON_DAYS = 7;
 
 /**
- * Bucket a stored token against the ~90-day docs/09 §4a validity window
- * (grant/renewal based — the gateway returns no per-token expiresAt). The
- * anchor is `renewedAt ?? capturedAt` so a renewal restarts the window.
- * The gateway stays authoritative: callers may warn or refuse locally, but
- * docs say expired tokens cannot be charged.
+ * Bucket a stored token against the ~90-day docs/09 §4a validity window.
+ * The window is ROLLING (ABA-bot relay 2026-10-03): the anchor is the LATEST
+ * of `lastChargedAt`, `renewedAt`, `capturedAt` — a successful charge or a
+ * renewal restarts it. The gateway stays authoritative: callers may warn or
+ * refuse locally, but docs say expired tokens cannot be charged.
  */
 export function tokenExpiryStatus(
-  record: Pick<LinkedTokenRecord, 'capturedAt'> & { renewedAt?: string },
+  record: Pick<LinkedTokenRecord, 'capturedAt'> & { renewedAt?: string; lastChargedAt?: string },
   now: Date = new Date(),
 ): { status: TokenExpiryStatus; daysLeft: number | null; expiresAt: Date | null } {
-  const anchor = record.renewedAt ?? record.capturedAt;
-  if (!anchor) return { status: 'unknown', daysLeft: null, expiresAt: null };
+  const candidates = [record.lastChargedAt, record.renewedAt, record.capturedAt]
+    .filter((v): v is string => typeof v === 'string' && v.length > 0)
+    .map((v) => new Date(v).getTime())
+    .filter((t) => !Number.isNaN(t));
+  if (candidates.length === 0) return { status: 'unknown', daysLeft: null, expiresAt: null };
+  const anchor = new Date(Math.max(...candidates));
   const expiresAt = computeTokenExpiry(anchor);
   const daysLeft = daysUntilTokenExpiry(expiresAt, now);
   if (daysLeft <= 0) return { status: 'expired', daysLeft, expiresAt };
@@ -175,6 +186,35 @@ export function markTokenRenewed(
   if (idx < 0) return undefined;
   const kept = existing.slice();
   kept[idx] = { ...existing[idx], renewedAt: renewedAt ?? new Date().toISOString() };
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}
+`, 'utf8');
+  renameSync(tmp, file);
+  return kept[idx];
+}
+
+/**
+ * Record a successful charge on the stored (ctid, pwt) record — the 90-day
+ * window is ROLLING (ABA-bot relay 2026-10-03: expiry counts from the latest
+ * of link, renewal, or last successful transaction), so a successful charge
+ * extends local validity. Preserves every other field; unknown (ctid, pwt)
+ * pairs return undefined and write nothing. Atomic rewrite.
+ */
+export function markTokenCharged(
+  ctid: string,
+  pwt: string,
+  chargedAt?: string,
+  dir?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): LinkedTokenRecord | undefined {
+  const storeDir = resolveTokenStoreDir(dir, env);
+  const file = tokensFilePath(storeDir);
+  if (!existsSync(file)) return undefined;
+  const existing = loadLinkedTokens(storeDir, env);
+  const idx = existing.findIndex((t) => t.ctid === ctid && t.pwt === pwt);
+  if (idx < 0) return undefined;
+  const kept = existing.slice();
+  kept[idx] = { ...existing[idx], lastChargedAt: chargedAt ?? new Date().toISOString() };
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}
 `, 'utf8');

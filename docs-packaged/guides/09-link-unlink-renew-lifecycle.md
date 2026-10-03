@@ -251,6 +251,13 @@ npx tsx src/cli.ts cof link-card -r link67890 --ctid customerabc123 --token-flag
   - Linking (`link-account`, `link-card`): `CITI_FLEX | CITO_FLEX` (live-documented set; other values warn)
   - Charging (`payment-credential`): `CITU_FLEX | MITU_FLEX | MITU_FIX | MITR_FLEX | MITR_FIX`
   - (C = customer-initiated, M = merchant-initiated; IT/TR ≈ initial transaction / recurring; FLEX/FIX = flexible or fixed amount.)
+  - **Production domain correction (ABA-bot relay 2026-10-03, doc-derived):** the documented
+    production charging set is `CITU_FLEX` (customer-initiated unscheduled), `MITU_FLEX`
+    (merchant-initiated unscheduled), and `MITR_FIX` (merchant-initiated recurring fixed — the flag
+    for subsequent scheduled/subscription charges; `CITR_FIX` appears only in subscription-token
+    *metadata*, the charge itself uses `MITR_FIX`). `MITU_FIX` and `MITR_FLEX` appear nowhere in the
+    published spec — treat them as out-of-contract (the SDK enum keeps them pending the Q41 re-probe,
+    which must use the valid flags before code `105` counts as an enablement blocker).
 - **Token management trio — param shapes (live-documented, sandbox-verified 2026-08-31):**
   - `renewToken()` takes `{ requestId, ctid, paymentToken }` — hash order `ctid.request_time.pwt.merchant_id.request_id`.
   - `getTokenDetails()` takes **`{ requestId }` only** — no `ctid`, no `pwt` (hash order `merchant_id.request_time.request_id`).
@@ -341,6 +348,18 @@ async function checkTokenStatus() {
 The gateway does not return a per-token `expiresAt`; validity is calendar-based
 (~90 days from grant/renewal). The SDK ships small helpers so every merchant
 tracks it consistently:
+
+> **The 90-day window is ROLLING (ABA-bot relay 2026-10-03, doc-derived):** account tokens
+> (CITI_FLEX / CITO_FLEX) expire "90 days after their initial linking, renewal, **or the last
+> successful transaction — whichever is most recent**." Every renewal *or successful charge*
+> pushes expiry out ~90 more days, so compute `expiresAt` from the latest of those three events,
+> not from the grant alone. The boundary timezone is not documented (request_time must be UTC;
+> the 90-day cutoff timezone is unconfirmed) — keep a ≥7-day renewal buffer to absorb it.
+> Scheduled subscription tokens (CITR_FIX registration → MITR_FIX charges) are different: they
+> carry an explicit `expired_at`, have **no** documented inactivity rule, and frequency governs
+> the billing schedule only — never the token's expiry. Charging an expired, frozen, or removed
+> token is simply declined (expired-token charges decline without a distinct documented code;
+> the 105-reuse question is still open), so keep the local expired-`expired_at` gate below.
 
 ```typescript
 import { computeTokenExpiry, daysUntilTokenExpiry, TOKEN_VALIDITY_DAYS } from 'aba-payway-ts';

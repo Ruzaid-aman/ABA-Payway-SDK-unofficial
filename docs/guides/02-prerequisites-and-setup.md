@@ -42,6 +42,19 @@ ABA PAY / KHQR / deeplink testing uses the **ABA Mobile Simulator app** (the pro
 3. The team provisions the accounts and shares: account ID / registered mobile, **PIN `1234`** and secret word **`TEST1`** (current defaults), and install links — iOS: [TestFlight](https://testflight.apple.com/join/HNyq7UCm), Android: APK via the team's shared drive.
 4. Install, log in with the OTP + PIN + secret word, then scan/pay sandbox KHQR and ABA PAY QRs and exercise `ABA_PAY_DEEPLINK`; callbacks (`return_url`, `return_deeplink`) and status land in your system and the sandbox merchant portal.
 
+**Simulator account rules (ABA-bot relay 2026-10-03, doc-derived):**
+
+- A merchant may hold **at most two simulator accounts**, each **valid for 90 days**. Accounts
+  **cannot be extended** — at expiry they are permanently disabled, and you request fresh ones from
+  the Integration Team (tester details as above). Plan re-provisioning into long test campaigns.
+- Distribution links are **project/time-specific** — there is no permanent public URL; always treat
+  the latest link shared by the Integration Team as the source of truth (the ones above are dated
+  2026-09-12). Test-card sets can rotate the same way.
+- The simulator covers **success flows and status transitions (Completed / Pending / Expired)** —
+  it has **no way to force declines or timeouts**. Negative paths (declined cards, failed 3DS) use
+  the [sandbox test cards](#hosted-card-checkout-sandbox-test-cards); an abandoned flow behaves as
+  a customer walking away (pending → expired on session timeout).
+
 No real money moves. For live merchants there is a separate [ABA Merchant app](https://play.google.com/store/apps/details?id=com.ababank.payway) (not a simulator).
 
 Return to [quickstart callback setup](../../QUICKSTART.md#4-prepare-a-callback-and-check-your-route), then create and verify one payment.

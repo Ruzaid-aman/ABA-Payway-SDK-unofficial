@@ -95,8 +95,8 @@
     {
       "file": "references/setup.md",
       "source": "docs/guides/02-prerequisites-and-setup.md",
-      "sourceSha256": "cabb1754e2793891",
-      "sha256": "a7231ea1ec35b501"
+      "sourceSha256": "eb6c847c0065f921",
+      "sha256": "d41104851ae91dce"
     },
     {
       "file": "references/web-implementation.md",
@@ -125,8 +125,8 @@
     {
       "file": "references/qr-handling.md",
       "source": "docs/guides/07-qr-code-handling.md",
-      "sourceSha256": "7ec2389859efd393",
-      "sha256": "6c7a8a122a00a48d"
+      "sourceSha256": "a1a083f3dbb2422a",
+      "sha256": "d6cee7264283ace9"
     },
     {
       "file": "references/deep-linking.md",
@@ -137,26 +137,26 @@
     {
       "file": "references/link-lifecycle.md",
       "source": "docs/guides/09-link-unlink-renew-lifecycle.md",
-      "sourceSha256": "e7bcbc62cecda1ab",
-      "sha256": "c41a8937943618ef"
+      "sourceSha256": "14b78e584d1efabc",
+      "sha256": "0baebe87a644bb6e"
     },
     {
       "file": "references/ui-customization.md",
       "source": "docs/guides/10-ui-customization.md",
-      "sourceSha256": "9230e20968ea6ff0",
-      "sha256": "2911c5285bc9a511"
+      "sourceSha256": "08bab4723dc4bd4a",
+      "sha256": "5d8e58458a87310d"
     },
     {
       "file": "references/callbacks-webhooks.md",
       "source": "docs/guides/11-callbacks-and-webhooks.md",
-      "sourceSha256": "2e6296eca5571c76",
-      "sha256": "f6108d8226800f99"
+      "sourceSha256": "fd47a3475a71af39",
+      "sha256": "e6647dfb0d85bee9"
     },
     {
       "file": "references/errors-and-debugging.md",
       "source": "docs/guides/12-error-handling-and-debugging.md",
-      "sourceSha256": "90bec3668c152b37",
-      "sha256": "7069ca250f782ea1"
+      "sourceSha256": "3304d363c0d5b9c0",
+      "sha256": "7bc15e0cf1b6792a"
     },
     {
       "file": "references/deployment-checklist.md",
@@ -179,32 +179,32 @@
     {
       "file": "references/webhook-setup.md",
       "source": "docs/guides/16-webhook-setup-guide.md",
-      "sourceSha256": "b542f35f08e333e0",
-      "sha256": "f583617b2578b5ce"
+      "sourceSha256": "2d3691a93beecb7e",
+      "sha256": "29e1590b468058c1"
     },
     {
       "file": "references/payment-link.md",
       "source": "docs/guides/17-payment-link.md",
-      "sourceSha256": "5d168d17a35c80d9",
-      "sha256": "b4f9bd75aff11da7"
+      "sourceSha256": "3b0c2a1f4d2d6003",
+      "sha256": "7ad3515cd2a3b066"
     },
     {
       "file": "references/transaction-journal.md",
       "source": "docs/guides/18-transaction-journal.md",
-      "sourceSha256": "a5b70b2982ec9261",
-      "sha256": "a5b70b2982ec9261"
+      "sourceSha256": "2d6d37ee20f6ea3e",
+      "sha256": "2d6d37ee20f6ea3e"
     },
     {
       "file": "references/customer-module-qr.md",
       "source": "docs/guides/19-customer-module-qr.md",
-      "sourceSha256": "1b8a424f8bb60386",
-      "sha256": "ffb8b5e0a123e280"
+      "sourceSha256": "f2f88634ac9b284c",
+      "sha256": "8d3d089e2214c8fb"
     },
     {
       "file": "references/settlement-disputes.md",
       "source": "docs/guides/20-settlement-and-disputes.md",
-      "sourceSha256": "4279c5e8964f9313",
-      "sha256": "b40292bdb9bb0e5d"
+      "sourceSha256": "06d5f22840140ed4",
+      "sha256": "e25fc7acbb388cbb"
     },
     {
       "file": "references/api-datetime-timezones.md",

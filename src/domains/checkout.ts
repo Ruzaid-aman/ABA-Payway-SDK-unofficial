@@ -461,7 +461,14 @@ export function createCheckoutDomain(
       }
 
       const payload = buildPurchasePayload(params);
-      const actionUrl = `${resolvedBaseUrl}${ENDPOINTS.purchase}`;
+      // Hosted-checkout locale (ABA-bot relay 2026-10-03): the purchase URL
+      // accepts ?lang=en|km|zh (en = default when omitted; some KHQR screens
+      // ignore it — known product issue). Query param only — never hashed.
+      const lang = params.lang;
+      if (lang !== undefined && !['en', 'km', 'zh'].includes(lang)) {
+        throw new PayWayConfigError(`lang must be one of en|km|zh, received: ${JSON.stringify(lang)}`);
+      }
+      const actionUrl = `${resolvedBaseUrl}${ENDPOINTS.purchase}${lang ? `?lang=${encodeURIComponent(lang)}` : ''}`;
       const hiddenInputs = Object.entries(payload)
         .map(
           ([key, value]) =>

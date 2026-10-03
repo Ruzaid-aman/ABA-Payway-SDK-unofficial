@@ -44,7 +44,7 @@ import { runInit } from './cli/commands/init.js';
 import { runSetupWebhook } from './cli/commands/setup-webhook.js';
 import { addSkills, doctorSkills, listSkills, removeSkills } from './cli/commands/skills.js';
 import { registerWebhookCommands } from './cli/commands/webhook.js';
-import { latestTokenForCtid, loadLinkedTokens, markTokenRenewed, maskPwt, removeLinkedTokens, tokenExpiryStatus } from './webhook/token-store.js';
+import { latestTokenForCtid, loadLinkedTokens, markTokenCharged, markTokenRenewed, maskPwt, removeLinkedTokens, tokenExpiryStatus } from './webhook/token-store.js';
 import { readMaskedInput } from './cli/masked-input.js';
 import { loadPaymentLinkImage } from './cli/payment-link-image.js';
 import { PayWay } from './client.js';
@@ -2356,6 +2356,7 @@ program
   .option('--phone <phone>', 'Customer phone')
   .option('--auto-submit', 'Submit the form on page load (same-tab navigation)')
   .option('--popup', 'Use the official AbaPayway popup plugin (checkout2-0.js)')
+  .option('--lang <code>', 'Hosted-checkout locale on the purchase URL: en (default) | km | zh')
   .option('-o, --out <path>', 'Write the HTML document to a file instead of stdout')
   .action((opts: Record<string, string | undefined>) => {
     const say = opts.out ? console.log : console.error;
@@ -2388,6 +2389,11 @@ program
       process.exitCode = EXIT_VALIDATION;
       return;
     }
+    if (opts.lang !== undefined && !['en', 'km', 'zh'].includes(opts.lang)) {
+      say(`  ${c.red('✗')} --lang must be en, km, or zh, received: ${c.red(opts.lang)}`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
     if (!assertCredentialsPresent()) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -2400,6 +2406,7 @@ program
           transactionId,
           amount,
           currency,
+          ...(opts.lang ? ({ lang: opts.lang } as { lang: 'en' | 'km' | 'zh' }) : {}),
           ...(opts.paymentOption ? { paymentOption: opts.paymentOption } : {}),
           ...(paymentGate === undefined ? {} : { paymentGate }),
           ...(opts.returnUrl ? { returnUrl: opts.returnUrl } : {}),
@@ -4527,6 +4534,11 @@ cofCmd
       }
     }
     let paymentToken = opts.token as string | undefined;
+    // Set when the charge resolved its token from the local store — a
+    // successful charge then extends the ROLLING 90-day window locally
+    // (ABA-bot relay 2026-10-03: expiry counts from the latest of
+    // link/renewal/last-successful-transaction).
+    let chargedStoreKey: { ctid: string; pwt: string } | undefined;
     if (!paymentToken) {
       if (!opts.ctid) {
         console.log(`  ${c.red('✗')} Provide --token <pwt> or --ctid <ctid> (resolves the latest captured token from the local store).`);
@@ -4546,13 +4558,14 @@ cofCmd
       const expiry = tokenExpiryStatus(stored);
       if (expiry.status === 'expired') {
         console.log(
-          `  ${c.red('✗')} Captured token for ${c.cyan(String(opts.ctid))} expired ${Math.abs(expiry.daysLeft ?? 0)}d ago — docs/09: ~90-day validity from grant/renewal.`,
+          `  ${c.red('✗')} Captured token for ${c.cyan(String(opts.ctid))} expired ${Math.abs(expiry.daysLeft ?? 0)}d ago — docs/09: rolling ~90-day validity (latest of link, renewal, or last successful charge).`,
         );
         console.log(`  ${c.dim('Renew it (cof token renew) or re-link the account, or charge with an explicit --token.')}`);
         process.exitCode = EXIT_VALIDATION;
         return;
       }
       paymentToken = stored.pwt;
+      chargedStoreKey = { ctid: opts.ctid as string, pwt: stored.pwt };
       const validityNote =
         expiry.status === 'expiring-soon'
           ? c.yellow(`⚠ expiring in ${expiry.daysLeft}d — renew soon (cof token renew)`)
@@ -4595,6 +4608,17 @@ cofCmd
           if (saved) chargeQrPath = saved;
         } catch (saveErr) {
           console.log(`  ${c.yellow('⚠')} Could not save the charge QR PNG: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+        }
+      }
+      // Rolling 90-day window: an accepted charge WITHOUT an approval QR is a
+      // completed transaction — anchor the local expiry on it (fail-open; a
+      // QR-bearing charge still awaits customer approval and stays unmarked,
+      // the conservative direction).
+      if (chargedStoreKey && !chargeQrPath) {
+        try {
+          markTokenCharged(chargedStoreKey.ctid, chargedStoreKey.pwt);
+        } catch {
+          // local-store bookkeeping must never fail the reported charge
         }
       }
       if (opts.json) {
