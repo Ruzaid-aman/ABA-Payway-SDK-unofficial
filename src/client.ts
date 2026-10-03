@@ -704,6 +704,21 @@ function classifyBusinessCode(
   statusCode = 200,
   errorsMap?: unknown,
 ): PayWayAPIError | undefined {
+  // FU-10 (2026-10-03): the documented business-level rate-limit surface is
+  // `status.code = 429` inside an HTTP-200 JSON body ("Too many request,
+  // please try again in 1min."). Classify it exactly like the transport
+  // surface so callers matching on PayWayRateLimitError and the retry
+  // engine's pacing (paywayCode 429) treat both shapes identically.
+  if (code === '429') {
+    return new PayWayRateLimitError(message, {
+      statusCode,
+      paywayCode: code,
+      rawBody,
+      endpoint,
+      retryable: true,
+    });
+  }
+
   if (SIGNATURE_ERROR_CODES.has(code) || code === 'PTL02') {
     const hashHint = endpoint ? HASH_ORDER_HINTS[endpoint] : undefined;
     const hint = hashHint
@@ -795,6 +810,17 @@ function checkResponseError(body: unknown, endpoint?: string): void {
   // that shape, so it resolves as success).
   if (typeof resp.status === 'number' && resp.status !== 0) {
     const message = String(resp.description ?? resp.message ?? 'Unknown PayWay API Error');
+    if (resp.status === 429) {
+      // Legacy flat envelope carrying the rate-limit code — same typed
+      // classification as the other two 429 surfaces (FU-10).
+      throw new PayWayRateLimitError(message, {
+        statusCode: 200,
+        paywayCode: '429',
+        rawBody: body,
+        endpoint,
+        retryable: true,
+      });
+    }
     throw new PayWayBusinessError(message, {
       statusCode: 200,
       paywayCode: String(resp.status),

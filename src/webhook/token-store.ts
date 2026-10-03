@@ -51,6 +51,15 @@ export interface LinkedTokenRecord {
    * pushes expiry out ~90 more days.
    */
   readonly lastChargedAt?: string;
+  /**
+   * Delivered token expiry (`expired_at` from the link delivery), when
+   * present. Authoritative ONLY for scheduled subscription tokens
+   * (CITR_FIX/MITR_FIX — ABA-bot relay FU-08: explicit `expired_at`, no
+   * inactivity rule). Unscheduled account tokens (CITI_FLEX/CITO_FLEX)
+   * ignore it: the delivery's value is a link-time snapshot, and the rolling
+   * window (renewal/charge anchors) governs their real lifecycle (T-13).
+   */
+  readonly expiredAt?: string;
   /** Webhook record id of the capture (joins into webhook_data). */
   readonly sourceRecordId?: string;
 }
@@ -142,27 +151,73 @@ export type TokenExpiryStatus = 'valid' | 'expiring-soon' | 'expired' | 'unknown
 export const TOKEN_EXPIRING_SOON_DAYS = 7;
 
 /**
- * Bucket a stored token against the ~90-day docs/09 §4a validity window.
- * The window is ROLLING (ABA-bot relay 2026-10-03): the anchor is the LATEST
- * of `lastChargedAt`, `renewedAt`, `capturedAt` — a successful charge or a
- * renewal restarts it. The gateway stays authoritative: callers may warn or
- * refuse locally, but docs say expired tokens cannot be charged.
+ * Scheduled subscription token flags (ABA-bot relay T-14/FU-08). Their
+ * lifecycle is the delivered `expired_at` — there is NO inactivity/rolling
+ * rule documented for them, unlike unscheduled account tokens.
+ */
+const SCHEDULED_TOKEN_FLAGS = new Set(['CITR_FIX', 'MITR_FIX']);
+
+/**
+ * Parse a delivered expiry value. The live capture is an ISO-8601 instant
+ * (§26 AOF-7); some flows carry an absolute epoch instead (§26 AOF-5 —
+ * `expire_in` is epoch-SECONDS, not a TTL). Returns null when absent or
+ * unparseable.
+ */
+function parseDeliveredExpiry(raw: string | undefined): Date | null {
+  if (raw === undefined || raw.length === 0) return null;
+  if (/^\d+$/.test(raw)) {
+    const numeric = Number(raw);
+    const ms = numeric > 1e12 ? numeric : numeric * 1000; // epoch-s vs epoch-ms
+    const fromEpoch = new Date(ms);
+    return Number.isNaN(fromEpoch.getTime()) ? null : fromEpoch;
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Bucket a stored token against its expiry.
+ *
+ * Scheduled subscription tokens (CITR_FIX/MITR_FIX, FU-08): the delivered
+ * `expired_at` is the whole contract — past it the token is expired, and no
+ * charge anchor moves it. Without a parseable delivered expiry we refuse to
+ * guess (`unknown`) — the gateway stays authoritative.
+ *
+ * Unscheduled account tokens (CITI_FLEX/CITO_FLEX, T-13): the ~90-day window
+ * is ROLLING — the anchor is the LATEST of `lastChargedAt`, `renewedAt`,
+ * `capturedAt` — a successful charge or a renewal restarts it. The gateway
+ * stays authoritative: callers may warn or refuse locally, but docs say
+ * expired tokens cannot be charged.
  */
 export function tokenExpiryStatus(
-  record: Pick<LinkedTokenRecord, 'capturedAt'> & { renewedAt?: string; lastChargedAt?: string },
+  record: Pick<LinkedTokenRecord, 'capturedAt'> & {
+    renewedAt?: string;
+    lastChargedAt?: string;
+    tokenFlag?: string;
+    expiredAt?: string;
+  },
   now: Date = new Date(),
 ): { status: TokenExpiryStatus; daysLeft: number | null; expiresAt: Date | null } {
+  const bucket = (expiresAt: Date) => {
+    const daysLeft = daysUntilTokenExpiry(expiresAt, now);
+    if (daysLeft <= 0) return { status: 'expired' as const, daysLeft, expiresAt };
+    if (daysLeft <= TOKEN_EXPIRING_SOON_DAYS) return { status: 'expiring-soon' as const, daysLeft, expiresAt };
+    return { status: 'valid' as const, daysLeft, expiresAt };
+  };
+
+  if (record.tokenFlag !== undefined && SCHEDULED_TOKEN_FLAGS.has(record.tokenFlag)) {
+    const delivered = parseDeliveredExpiry(record.expiredAt);
+    if (delivered) return bucket(delivered);
+    return { status: 'unknown', daysLeft: null, expiresAt: null };
+  }
+
   const candidates = [record.lastChargedAt, record.renewedAt, record.capturedAt]
     .filter((v): v is string => typeof v === 'string' && v.length > 0)
     .map((v) => new Date(v).getTime())
     .filter((t) => !Number.isNaN(t));
   if (candidates.length === 0) return { status: 'unknown', daysLeft: null, expiresAt: null };
   const anchor = new Date(Math.max(...candidates));
-  const expiresAt = computeTokenExpiry(anchor);
-  const daysLeft = daysUntilTokenExpiry(expiresAt, now);
-  if (daysLeft <= 0) return { status: 'expired', daysLeft, expiresAt };
-  if (daysLeft <= TOKEN_EXPIRING_SOON_DAYS) return { status: 'expiring-soon', daysLeft, expiresAt };
-  return { status: 'valid', daysLeft, expiresAt };
+  return bucket(computeTokenExpiry(anchor));
 }
 
 /**

@@ -124,7 +124,19 @@ export function reconcileTransactions(options: ReconcileOptions = {}): Reconcile
   }
 
   const byTransaction = new Map<string, ReconcileEntry>();
-  const callbackSeenPerTransaction = new Map<string, number>();
+  // T-19/FU-04 (2026-10-03): the gateway MAY legitimately send multiple
+  // pushbacks for one tran_id when the status changes — "integrators must
+  // design idempotent handling (update if status changed, ignore no-ops)".
+  // So a second callback is a replay/no-op-repeat signal ONLY when the
+  // (transactionId, status) PAIR repeats; a status CHANGE is the documented
+  // multi-pushback pattern and must never be flagged.
+  const callbackPairsSeen = new Map<string, number>();
+  const markCallbackPairSeen = (transactionId: string, status: string | undefined): boolean => {
+    const key = `${transactionId}\u0000${status ?? ''}`;
+    const seen = (callbackPairsSeen.get(key) ?? 0) + 1;
+    callbackPairsSeen.set(key, seen);
+    return seen > 1;
+  };
   const entryFor = (transactionId: string): ReconcileEntry => {
     let entry = byTransaction.get(transactionId);
     if (!entry) {
@@ -148,11 +160,7 @@ export function reconcileTransactions(options: ReconcileOptions = {}): Reconcile
     entry.firstSeen ??= event.ts;
     entry.lastEventAt = entry.lastEventAt && entry.lastEventAt > event.ts ? entry.lastEventAt : event.ts;
     if (event.kind === 'callback.received') {
-      // A SECOND callback.received for one transaction is itself a replay
-      // signal (ABA is not supposed to re-deliver).
-      const seen = (callbackSeenPerTransaction.get(event.transactionId) ?? 0) + 1;
-      callbackSeenPerTransaction.set(event.transactionId, seen);
-      if (seen > 1) entry.callbackReplaySeen = true;
+      if (markCallbackPairSeen(event.transactionId, event.status)) entry.callbackReplaySeen = true;
       entry.callbackReceived = true;
       entry.callbackAt ??= event.ts;
       entry.callbackRoute ??= event.endpoint;
@@ -167,9 +175,7 @@ export function reconcileTransactions(options: ReconcileOptions = {}): Reconcile
     entry.sources = entry.sources.includes('webhook-store')
       ? entry.sources
       : [...entry.sources, 'webhook-store'];
-    const seen = (callbackSeenPerTransaction.get(delivery.transactionId) ?? 0) + 1;
-    callbackSeenPerTransaction.set(delivery.transactionId, seen);
-    if (seen > 1) entry.callbackReplaySeen = true;
+    if (markCallbackPairSeen(delivery.transactionId, delivery.status)) entry.callbackReplaySeen = true;
     if (delivery.replay) entry.callbackReplaySeen = true;
     if (!entry.callbackReceived) {
       entry.callbackReceived = true;

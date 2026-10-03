@@ -52,7 +52,7 @@ ABA PAY / KHQR / deeplink testing uses the **ABA Mobile Simulator app** (the pro
   2026-09-12). Test-card sets can rotate the same way.
 - The simulator covers **success flows and status transitions (Completed / Pending / Expired)** —
   it has **no way to force declines or timeouts**. Negative paths (declined cards, failed 3DS) use
-  the [sandbox test cards](#hosted-card-checkout-sandbox-test-cards); an abandoned flow behaves as
+  the [sandbox test cards](01-overview-and-concepts.md#test-card-numbers); an abandoned flow behaves as
   a customer walking away (pending → expired on session timeout).
 
 No real money moves. For live merchants there is a separate [ABA Merchant app](https://play.google.com/store/apps/details?id=com.ababank.payway) (not a simulator).

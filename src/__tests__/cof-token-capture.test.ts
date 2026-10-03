@@ -67,11 +67,14 @@ describe('CoF link-callback parsing', () => {
     expect(parsed.requestId).toBe('aoflink001');
     expect(parsed.status).toBe('1');
     expect(parsed.tokenFlag).toBe('CITI_FLEX');
+    // FU-08 wave: the delivered `expired_at` is surfaced as the first-class
+    // `expiredAt` field (drives the scheduled-token expiry gate) and no
+    // longer duplicates into extraFields.
+    expect(parsed.expiredAt).toBe('2026-12-14T16:41:13.8919367+07:00');
     // Numeric + string credential metadata survives stringified in extraFields.
     expect(parsed.extraFields).toEqual({
       source_of_fund: '*****0003',
       type: 'ABA ACCOUNT',
-      expired_at: '2026-12-14T16:41:13.8919367+07:00',
       frequency: '',
       subscribed_amount: '0',
       amount_limit_per_tran: '50',

@@ -58,10 +58,18 @@ export interface ParsedCofLinkCallback {
   /** Token flag echoed back (CITI_FLEX / CITO_FLEX), when present. */
   readonly tokenFlag?: string;
   /**
+   * Delivered token expiry (`expired_at`), when present — an ISO-8601 instant
+   * on the live capture (§26 AOF-7). Authoritative for scheduled subscription
+   * tokens (CITR_FIX/MITR_FIX — FU-08: explicit `expired_at`, no inactivity
+   * rule); unscheduled account tokens stay governed by the 90-day rolling
+   * window regardless (T-13), so this field never overrides those.
+   */
+  readonly expiredAt?: string;
+  /**
    * Every other scalar field on the delivery (minus the `hash` signature),
-   * stringified and preserved verbatim — source_of_fund, type, expired_at,
-   * frequency, subscribed_amount, amount_limit_per_tran, currency on the
-   * live shape.
+   * stringified and preserved verbatim — source_of_fund, type, frequency,
+   * subscribed_amount, amount_limit_per_tran, currency on the live shape.
+   * (`expired_at` is surfaced as the first-class `expiredAt` field above.)
    */
   readonly extraFields: Record<string, string>;
 }
@@ -139,7 +147,7 @@ export function parseCofLinkCallback(payload: unknown): ParsedCofLinkCallback {
       : top
   ) as Record<string, unknown>;
 
-  const known = new Set(['pwt', 'ctid', 'cust_id', 'request_id', 'req_id', 'status', 'token_flag']);
+  const known = new Set(['pwt', 'ctid', 'cust_id', 'request_id', 'req_id', 'status', 'token_flag', 'expired_at']);
   const extraFields: Record<string, string> = {};
   collectExtraFields(extraFields, top, known);
   if (credential !== top) collectExtraFields(extraFields, credential, known);
@@ -150,6 +158,7 @@ export function parseCofLinkCallback(payload: unknown): ParsedCofLinkCallback {
     requestId: firstString(top, 'request_id', 'req_id'),
     status: firstScalar(credential, 'status') ?? firstScalar(top, 'status'),
     tokenFlag: firstString(credential, 'token_flag') ?? firstString(top, 'token_flag'),
+    expiredAt: firstString(credential, 'expired_at') ?? firstString(top, 'expired_at'),
     extraFields,
   };
 }

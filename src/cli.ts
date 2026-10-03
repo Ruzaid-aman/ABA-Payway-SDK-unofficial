@@ -4557,10 +4557,16 @@ cofCmd
       // --token bypasses this store and this guard entirely).
       const expiry = tokenExpiryStatus(stored);
       if (expiry.status === 'expired') {
+        // FU-08: scheduled subscription tokens (CITR_FIX/MITR_FIX) expire by
+        // their delivered `expired_at` only; account tokens ride the rolling
+        // ~90-day window. Surface whichever model fired.
+        const reason = stored.expiredAt
+          ? `delivered expired_at ${stored.expiredAt} has passed (subscription tokens carry an explicit expiry — no inactivity rule)`
+          : 'docs/09: rolling ~90-day validity (latest of link, renewal, or last successful charge)';
         console.log(
-          `  ${c.red('✗')} Captured token for ${c.cyan(String(opts.ctid))} expired ${Math.abs(expiry.daysLeft ?? 0)}d ago — docs/09: rolling ~90-day validity (latest of link, renewal, or last successful charge).`,
+          `  ${c.red('✗')} Captured token for ${c.cyan(String(opts.ctid))} expired ${Math.abs(expiry.daysLeft ?? 0)}d ago — ${reason}.`,
         );
-        console.log(`  ${c.dim('Renew it (cof token renew) or re-link the account, or charge with an explicit --token.')}`);
+        console.log(`  ${c.dim('Re-link the account (or renew: cof token renew), or charge with an explicit --token.')}`);
         process.exitCode = EXIT_VALIDATION;
         return;
       }

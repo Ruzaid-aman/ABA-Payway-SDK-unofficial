@@ -30,12 +30,14 @@ export function prepareLinkedTokensSchema(db: SqliteDb): void {
       captured_at TEXT NOT NULL,
       renewed_at TEXT,
       last_charged_at TEXT,
+      expired_at TEXT,
       source_record_id TEXT,
       PRIMARY KEY (ctid, pwt)
     )
   `);
   ensureRenewedAtColumn(db);
   ensureLastChargedAtColumn(db);
+  ensureExpiredAtColumn(db);
 }
 
 /** Add the renewal anchor to wave-3 databases (duplicate-tolerant in-place migration). */
@@ -60,6 +62,21 @@ export function ensureLastChargedAtColumn(db: SqliteDb): void {
   }
 }
 
+/**
+ * Add the delivered explicit expiry (FU-08 scheduled-token wave,
+ * 2026-10-03; duplicate-tolerant). Authoritative for CITR_FIX/MITR_FIX
+ * records; advisory-only for account tokens.
+ */
+export function ensureExpiredAtColumn(db: SqliteDb): void {
+  try {
+    db.exec('ALTER TABLE linked_tokens ADD COLUMN expired_at TEXT');
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    if (message.includes('duplicate column name') && message.includes('expired_at')) return;
+    throw error;
+  }
+}
+
 interface TokenRow {
   ctid: string;
   pwt: string;
@@ -72,6 +89,7 @@ interface TokenRow {
   captured_at: string;
   renewed_at: string | null;
   last_charged_at: string | null;
+  expired_at: string | null;
   source_record_id: string | null;
 }
 
@@ -99,6 +117,7 @@ function rowToRecord(row: TokenRow): LinkedTokenRecord {
     capturedAt: row.captured_at,
     ...(row.renewed_at ? { renewedAt: row.renewed_at } : {}),
     ...(row.last_charged_at ? { lastChargedAt: row.last_charged_at } : {}),
+    ...(row.expired_at ? { expiredAt: row.expired_at } : {}),
     ...(row.source_record_id ? { sourceRecordId: row.source_record_id } : {}),
   };
 }
@@ -121,8 +140,8 @@ export class SqliteLinkedTokenStore {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO linked_tokens
-           (ctid, pwt, link_type, token_flag, frequency, currency, request_id, extra_fields, captured_at, renewed_at, last_charged_at, source_record_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (ctid, pwt, link_type, token_flag, frequency, currency, request_id, extra_fields, captured_at, renewed_at, last_charged_at, expired_at, source_record_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         full.ctid,
@@ -136,6 +155,7 @@ export class SqliteLinkedTokenStore {
         full.capturedAt,
         full.renewedAt ?? null,
         full.lastChargedAt ?? null,
+        full.expiredAt ?? null,
         full.sourceRecordId ?? null,
       );
     return full;

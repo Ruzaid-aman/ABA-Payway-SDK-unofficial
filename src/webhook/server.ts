@@ -441,6 +441,9 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           pwt: parsed.pwt,
           tokenFlag: parsed.tokenFlag,
           requestId: parsed.requestId,
+          // FU-08: scheduled subscription tokens carry an explicit `expired_at`
+          // — persist it so the local expiry gate honors the delivered value.
+          ...(parsed.expiredAt ? { expiredAt: parsed.expiredAt } : {}),
           extraFields: Object.keys(parsed.extraFields).length > 0 ? parsed.extraFields : undefined,
           sourceRecordId: recordId,
         },

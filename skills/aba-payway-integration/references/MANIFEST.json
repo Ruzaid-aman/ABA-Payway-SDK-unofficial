@@ -95,8 +95,8 @@
     {
       "file": "references/setup.md",
       "source": "docs/guides/02-prerequisites-and-setup.md",
-      "sourceSha256": "eb6c847c0065f921",
-      "sha256": "d41104851ae91dce"
+      "sourceSha256": "1ac4d92f37f309c1",
+      "sha256": "2db418f9b3dba400"
     },
     {
       "file": "references/web-implementation.md",
@@ -191,8 +191,8 @@
     {
       "file": "references/transaction-journal.md",
       "source": "docs/guides/18-transaction-journal.md",
-      "sourceSha256": "2d6d37ee20f6ea3e",
-      "sha256": "2d6d37ee20f6ea3e"
+      "sourceSha256": "618e5379c5593d11",
+      "sha256": "618e5379c5593d11"
     },
     {
       "file": "references/customer-module-qr.md",
@@ -251,8 +251,8 @@
     {
       "file": "references/error-codes.json",
       "source": "docs/error-codes.json",
-      "sourceSha256": "a84e49e61964fa1b",
-      "sha256": "ad6429e1c58dbc0a"
+      "sourceSha256": "c269b690af673eba",
+      "sha256": "14980490236b5de0"
     },
     {
       "file": "assets/service.ts",

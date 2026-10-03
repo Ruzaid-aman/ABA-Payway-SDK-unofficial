@@ -77,7 +77,10 @@ The webhook sink (`setup-webhook`) now persists what it used to compute-and-drop
 **Reconciliation** — `payway-sdk journal reconcile [--dir] [--webhook-dir] [--json]`
 joins the two stores per transaction id and reports: with callback, **without
 callback** (the "created but never called back" query), and webhook-only (callback
-arrived while journaling was off), plus duplicate-delivery flags. A missing callback
+arrived while journaling was off), plus duplicate-delivery flags. A duplicate flag
+fires only when the same **(`transaction_id`, status) pair** repeats — the gateway
+may legitimately send several pushbacks per `tran_id` as the status changes
+(update-if-changed, ignore no-ops). A missing callback
 is **not** proof of non-payment — PayWay never retries missed deliveries; re-check
 with `check-transaction` before acting.
 

@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### ABA-bot-relay conformance wave 2 (2026-10-03)
+
+- **Business-level 429 now classified on every documented shape.** The nested
+  `{"status":{"code":429}}` HTTP-200 body and the legacy flat `{"status":429}`
+  envelope both throw the typed, retryable `PayWayRateLimitError` — previously
+  only the flat `{"code":"429"}` shape did, so the documented rate-limit surface
+  (docs/12) surfaced as an opaque business error. Pinned in
+  `knowledge-conformance.test.ts`.
+- **Reconcile replay detection keys on the (`transaction_id`, status) pair.**
+  `journal reconcile` no longer flags status-CHANGING pushback sequences as
+  replays — the gateway may legitimately send several pushbacks per `tran_id`
+  as the status changes (ABA-bot relay T-19/FU-04: idempotent handling is the
+  documented integrator contract). Only a repeated (id, status) pair — or an
+  explicit `replay` marker — raises `callbackReplaySeen`.
+- **Scheduled subscription tokens expire by their delivered `expired_at`.**
+  `tokenExpiryStatus` now treats CITR_FIX/MITR_FIX records as
+  `expired_at`-driven (FU-08: explicit expiry, no inactivity rule — charges do
+  NOT extend the window); unscheduled account tokens (CITI_FLEX/CITO_FLEX)
+  keep the rolling 90-day window (latest of link/renew/last charge). The CoF
+  callback parser surfaces `expired_at` as a first-class `expiredAt` field, the
+  webhook receiver persists it (JSON + SQLite migration), and
+  `cof charge --ctid` names whichever expiry model fired on refusal.
+- Pins added for the KHQR 10 req/s-per-MID throttle (rule + `onThrottle`
+  pacing), the `payment_status_code` map (incl. 7 → CANCELLED), DECLINDED
+  tolerance in transaction-list status filters, tran_id ≤20/charset +
+  `REQUEST_ID_PATTERN`, wire amount formats (USD 2dp / KHR integer), and the
+  `abamobilebank://` deeplink scheme. Dossier:
+  `.scratch/telegram-aba-questionnaire/SDK-AUDIT-2026-10-03.md` (wave 2).
+
 ### Native and PHP example scope reduced (2026-10-03)
 
 - Removed the Android/iOS companion source projects, platform example files,

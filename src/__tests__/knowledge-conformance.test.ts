@@ -15,10 +15,12 @@ import {
   verifyCallbackDetailed,
   verifyCallbackSignatureRaw,
 } from '../auth.js';
-import type { PayWayConfig } from '../client.js';
+import { PayWay, type PayWayConfig } from '../client.js';
 import {
   CREDENTIAL_ERROR_CODES,
-  REFUND_ERROR_CODES,
+  ENDPOINTS,
+  PAYMENT_STATUS_LABELS,
+  REQUEST_ID_PATTERN,
   TOKEN_FLAG_CHARGING,
   TOKEN_FLAG_CHARGING_PRODUCTION,
   TOKEN_FLAG_LINKING_PRODUCTION,
@@ -32,8 +34,21 @@ import {
 } from '../domains/payment-link.js';
 import { explainPayWayCode } from '../cli/explain-code.js';
 import { loadPaymentLinkImage } from '../cli/payment-link-image.js';
-import { markTokenCharged, saveLinkedToken, tokenExpiryStatus } from '../webhook/token-store.js';
-import { PayWayConfigError } from '../errors.js';
+import {
+  latestTokenForCtid,
+  markTokenCharged,
+  saveLinkedToken,
+  tokenExpiryStatus,
+} from '../webhook/token-store.js';
+import { parseCofLinkCallback } from '../webhook/cof-callback.js';
+import { reconcileTransactions } from '../journal/reconcile.js';
+import { mockJsonResponse } from '../test/test-utils.js';
+import {
+  buildAbaPayDeeplink,
+  formatAmount,
+  validateTransactionId,
+} from '../utils.js';
+import { PayWayConfigError, PayWayRateLimitError } from '../errors.js';
 import * as utilsModule from '../utils.js';
 
 // ---------------------------------------------------------------------------
@@ -342,5 +357,288 @@ describe('relay-wave image constraints', () => {
     const loaded = loadPaymentLinkImage(file);
     expect(loaded.filename).toBe('brand_final.png');
     expect(loaded.contentType).toBe('image/png');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 2 (2026-10-03, continuation) — extended pins from the captured relay
+// answers: FU-04/T-19 multi-pushback idempotency, FU-08 scheduled-token
+// expiry, FU-10 rate-limit surfaces, TR-03 status vocabulary, T-15 KHQR
+// rate rule, T-25/FU-13 identifier + money formats.
+// ---------------------------------------------------------------------------
+
+const RELAY_CONFIG = {
+  merchantId: 'relay-merchant-002',
+  apiKey: 'relay-api-key-secret',
+  environment: 'sandbox' as const,
+  // Business-429 pins classify on the FIRST response — no retry pacing.
+  maxRetries: 0,
+};
+
+function clientWithResponse(body: unknown, status = 200): { payway: PayWay; fetchSpy: ReturnType<typeof vi.spyOn> } {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockJsonResponse(body, status));
+  return { payway: new PayWay(RELAY_CONFIG as unknown as PayWayConfig), fetchSpy };
+}
+
+describe('relay-wave 429 surfaces (FU-10)', () => {
+  it('classifies a 200-wrapped {status:{code:429}} body as PayWayRateLimitError', async () => {
+    const { payway, fetchSpy } = clientWithResponse({
+      status: { code: 429, message: 'Too many request, please try again in 1min.' },
+    });
+    try {
+      const error = await payway.checkout.checkTransaction('TX-429-NESTED').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(PayWayRateLimitError);
+      expect((error as PayWayRateLimitError).paywayCode).toBe('429');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('keeps classifying the flat 200-wrapped {code:"429"} body (existing contract, now pinned)', async () => {
+    const { payway, fetchSpy } = clientWithResponse({
+      code: '429',
+      message: 'Too many request, please try again in 1min.',
+    });
+    try {
+      await expect(payway.checkout.checkTransaction('TX-429-FLAT')).rejects.toThrow(PayWayRateLimitError);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('classifies the legacy flat numeric {status:429} envelope as PayWayRateLimitError', async () => {
+    const { payway, fetchSpy } = clientWithResponse({ status: 429, description: 'Too many requests' });
+    try {
+      await expect(payway.checkout.checkTransaction('TX-429-LEGACY')).rejects.toThrow(PayWayRateLimitError);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+});
+
+describe('payment_status vocabulary (TR-03)', () => {
+  it('carries the documented payment_status_code map incl. 7 → CANCELLED', () => {
+    expect(PAYMENT_STATUS_LABELS).toEqual({
+      0: 'APPROVED',
+      2: 'PENDING',
+      3: 'DECLINED',
+      4: 'REFUNDED',
+      7: 'CANCELLED',
+    });
+  });
+
+  it('tolerates the sandbox DECLINDED spelling in transaction-list status filters', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { payway, fetchSpy } = clientWithResponse({ data: [], status: { code: '00', message: 'Success!' } });
+    try {
+      await payway.checkout.getTransactionList({ status: 'DECLINDED' });
+      expect(warnSpy).not.toHaveBeenCalledWith(expect.stringMatching(/DECLINDED.*outside the documented set/));
+      await payway.checkout.getTransactionList({ status: 'BOGUS' });
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/BOGUS.*outside the documented set/));
+    } finally {
+      fetchSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+describe('KHQR generation rate rule (T-15)', () => {
+  it('pins generateQr to the published 10 requests/second per MID', () => {
+    const payway = new PayWay(RELAY_CONFIG as unknown as PayWayConfig);
+    const rule = (
+      payway as unknown as {
+        _getRateLimitRule: (endpoint: string) => { limit: number; intervalMs: number } | undefined;
+      }
+    )._getRateLimitRule(ENDPOINTS.generateQr);
+    expect(rule).toEqual({ limit: 10, intervalMs: 1000 });
+  });
+
+  it('paces the 11th concurrent generation through onThrottle', async () => {
+    const onThrottle = vi.fn();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(mockJsonResponse({ status: { code: '00', message: 'Success!' } }, 200));
+    const payway = new PayWay({ ...RELAY_CONFIG, onThrottle } as unknown as PayWayConfig);
+    try {
+      await Promise.all(
+        Array.from({ length: 11 }, (_, i) =>
+          payway.qr.generateQr({
+            transactionId: `QR-RL-${i}`,
+            amount: 1,
+            currency: 'USD',
+            callbackUrl: 'https://example.com/webhooks/aba',
+          }),
+        ),
+      );
+      expect(onThrottle).toHaveBeenCalledWith({ endpoint: ENDPOINTS.generateQr, waitMs: expect.any(Number) });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+});
+
+describe('identifier + money format contract (T-25, FU-13)', () => {
+  it('rejects tran_id over 20 chars, spaces, or bad punctuation; hyphen tolerated', () => {
+    expect(() => validateTransactionId('a'.repeat(21))).toThrow(PayWayConfigError);
+    expect(() => validateTransactionId('ORDER 12345')).toThrow(PayWayConfigError);
+    expect(() => validateTransactionId('ORDER_12345')).toThrow(PayWayConfigError);
+    expect(() => validateTransactionId('ORDER-12345')).not.toThrow();
+    expect(REQUEST_ID_PATTERN.source).toBe('^[a-zA-Z0-9]{5,24}$');
+  });
+
+  it('formats amounts as the documented wire strings (USD 2dp, KHR integer)', () => {
+    expect(formatAmount(5, 'USD')).toBe('5.00');
+    expect(formatAmount(1.46, 'USD')).toBe('1.46');
+    expect(formatAmount(16000.4, 'KHR')).toBe('16000');
+  });
+
+  it('builds the documented ABA Mobile deeplink scheme', () => {
+    expect(buildAbaPayDeeplink('  QR123 ')).toBe('abamobilebank://ababank.com?type=payway&qrcode=QR123');
+  });
+});
+
+describe('scheduled-token explicit expiry (FU-08)', () => {
+  const now = new Date('2026-10-03T00:00:00.000Z');
+
+  it('expired_at is authoritative for scheduled tokens — charges do NOT extend it', () => {
+    const status = tokenExpiryStatus(
+      {
+        capturedAt: '2026-06-01T00:00:00.000Z',
+        lastChargedAt: '2026-09-20T00:00:00.000Z',
+        tokenFlag: 'MITR_FIX',
+        expiredAt: '2026-09-30T00:00:00.000Z',
+      },
+      now,
+    );
+    expect(status.status).toBe('expired');
+  });
+
+  it('a future expired_at keeps a scheduled token valid past the rolling window', () => {
+    const status = tokenExpiryStatus(
+      {
+        capturedAt: '2026-06-01T00:00:00.000Z',
+        tokenFlag: 'CITR_FIX',
+        expiredAt: '2026-12-31T00:00:00.000Z',
+      },
+      now,
+    );
+    expect(status.status).toBe('valid');
+  });
+
+  it('scheduled tokens without a parseable expiry are unknown (never guessed)', () => {
+    const status = tokenExpiryStatus(
+      { capturedAt: '2026-06-01T00:00:00.000Z', tokenFlag: 'MITR_FIX' },
+      now,
+    );
+    expect(status.status).toBe('unknown');
+    expect(status.expiresAt).toBeNull();
+  });
+
+  it('parses epoch-second expiry values (absolute instant, §26 AOF-5)', () => {
+    const epoch = String(Math.floor(new Date('2026-12-31T00:00:00.000Z').getTime() / 1000));
+    const status = tokenExpiryStatus(
+      { capturedAt: '2026-06-01T00:00:00.000Z', tokenFlag: 'CITR_FIX', expiredAt: epoch },
+      now,
+    );
+    expect(status.status).toBe('valid');
+  });
+
+  it('account tokens ignore the delivered snapshot — the rolling rule governs (T-13)', () => {
+    const status = tokenExpiryStatus(
+      {
+        capturedAt: '2026-06-01T00:00:00.000Z',
+        lastChargedAt: '2026-09-20T00:00:00.000Z',
+        tokenFlag: 'CITI_FLEX',
+        expiredAt: '2026-09-01T00:00:00.000Z',
+      },
+      now,
+    );
+    expect(status.status).toBe('valid');
+  });
+
+  it('surfaces expired_at as a first-class parser field (out of extraFields)', () => {
+    const parsed = parseCofLinkCallback({
+      payment_credential: {
+        pwt: 'pwt-sched-1',
+        ctid: 'ctid-sched',
+        token_flag: 'MITR_FIX',
+        expired_at: '2026-12-31T00:00:00.000Z',
+        source_of_fund: '*****0003',
+      },
+    });
+    expect(parsed.expiredAt).toBe('2026-12-31T00:00:00.000Z');
+    expect(parsed.extraFields.expired_at).toBeUndefined();
+    expect(parsed.extraFields.source_of_fund).toBe('*****0003');
+  });
+
+  it('persists expiredAt through the json store and honors it locally', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'payway-tok-exp-'));
+    try {
+      const env = { PAYWAY_TOKEN_STORE_DIR: dir } as NodeJS.ProcessEnv;
+      saveLinkedToken(
+        {
+          ctid: 'ctid-sched',
+          pwt: 'pwt-sched',
+          tokenFlag: 'MITR_FIX',
+          expiredAt: '2026-09-30T00:00:00.000Z',
+        },
+        dir,
+        env,
+      );
+      const stored = latestTokenForCtid('ctid-sched', dir, env);
+      expect(stored?.expiredAt).toBe('2026-09-30T00:00:00.000Z');
+      expect(tokenExpiryStatus(stored as never, now).status).toBe('expired');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('reconcile replay detection (FU-04/T-19 multi-pushback rule)', () => {
+  let journalDir: string;
+  let webhookDir: string;
+
+  beforeEach(() => {
+    journalDir = mkdtempSync(path.join(tmpdir(), 'payway-rc-j-'));
+    webhookDir = mkdtempSync(path.join(tmpdir(), 'payway-rc-w-'));
+  });
+
+  afterEach(() => {
+    rmSync(journalDir, { recursive: true, force: true });
+    rmSync(webhookDir, { recursive: true, force: true });
+  });
+
+  const writeJournal = (lines: Array<Record<string, unknown>>): void => {
+    writeFileSync(
+      path.join(journalDir, 'journal.jsonl'),
+      `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`,
+      'utf8',
+    );
+  };
+  const writeDeliveries = (deliveries: Array<Record<string, unknown>>): void => {
+    writeFileSync(
+      path.join(webhookDir, 'callbacks.jsonl'),
+      `${deliveries.map((d) => JSON.stringify(d)).join('\n')}\n`,
+      'utf8',
+    );
+  };
+
+  it('flags a repeated (tran_id, status) pair as a replay', () => {
+    writeJournal([
+      { ts: '2026-10-03T00:00:00.000Z', kind: 'callback.received', transactionId: 'T-DUP', status: 'APPROVED' },
+      { ts: '2026-10-03T00:00:10.000Z', kind: 'callback.received', transactionId: 'T-DUP', status: 'APPROVED' },
+    ]);
+    const report = reconcileTransactions({ journalDir, webhookDir });
+    expect(report.transactions[0].callbackReplaySeen).toBe(true);
+  });
+
+  it('does NOT flag status-CHANGING pushbacks (the documented multi-pushback contract)', () => {
+    writeDeliveries([
+      { body: JSON.stringify({ tran_id: 'T-MULTI', status: 'APPROVED' }), receivedAt: '2026-10-03T00:00:00.000Z' },
+      { body: JSON.stringify({ tran_id: 'T-MULTI', status: 'REFUNDED' }), receivedAt: '2026-10-03T00:01:00.000Z' },
+    ]);
+    const report = reconcileTransactions({ journalDir, webhookDir });
+    expect(report.summary.withCallback).toBe(1);
+    expect(report.transactions[0].callbackReplaySeen).toBe(false);
   });
 });
