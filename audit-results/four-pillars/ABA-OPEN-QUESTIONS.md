@@ -1074,7 +1074,7 @@ doc-shaped new contradictions). Both rounds went to the same bot the same day; v
 | Q50 (simulator ops) | answered | Links are project/time-specific from the team; simulator accounts max 2/merchant, 90-day HARD expiry, not extendable; simulator does success flows + Completed/Pending/Expired only — NO declines/timeouts (use sandbox test cards); cancel-mid-flow = abandonment → pending → expired. |
 | Production webhook | RESOLVED | For self-registered production merchants the team cannot update callback URLs — per-transaction `return_url` is the production contract; static webhooks are a sandbox/test concept (resolves the FU-02-vs-relay tension). |
 | Status vocabulary | PARTIAL | check-transaction returns BOTH `payment_status_code` (numeric) AND `payment_status` (word); success = 0 AND 'APPROVED'; bare `status` fields documented as codes (0,1,2,3,4,5,6,11) — a third numeric vocabulary; a canonical per-endpoint map is a new formal ask. DECLINED is the bot-spec spelling; our sandbox observes DECLINDED — accept both. |
-| `return_url` base64 | CONFLICT | Bot re-asserts ("return_url … must be Base64-encoded before submission", Link Account rules) — contradicted by our live plain-URL callbacks (§26 AOF-7). Keep plain; escalate the doc sentence before ever encoding. |
+| `return_url` base64 | **RESOLVED (2026-10-03 conflicts session)** | The bot's doc quote AGREES with our wire behavior — the "conflict" was a register-wording error. The SDK base64-encodes EVERY URL field on the wire (`encodeBase64IfNeeded`: purchase `return_url`/`continue_success_url`, QR `callback_url`, payment-link `return_url`, CoF `callback_url`); journal-proven (2026-09-15 link-account `requestDigest` carries `callback_url: aHR0cHM6Ly…` = base64 of the plain URL). What was live-observed "plain" is the URL the gateway POSTs AFTER decoding — delivery-side, not wire-side. SDK unchanged; no escalation needed. Untested and moot: whether the gateway also accepts literally-plain URL fields. |
 | N2 remainder | advanced | ~30-day configurable online refund window; offline signed-form process after; ABA-to-ABA refunds fee-free; multiple partials explicit (above). Refund rounding scale still open. |
 
 ### Still open after three rounds (68 questions asked)
@@ -1086,3 +1086,44 @@ enablement, Q24.1–2 mc-ref 404 classification, Q42 expire_in window, Q37 void 
 Q19 payout placement, Q14 size:0/CDN, Q39 sandbox TLS chain (infra), PCI/SLA (compliance), Google
 Pay status (Sales), asset redistribution (Legal), FX timing, refund concurrency, payout post-debit
 recovery, per-endpoint canonical status maps.
+
+## Conflicts-session probes — 2026-10-03 (post-conformance-wave)
+
+Empirical session against the four deliberately-uncoded conflicts; local evidence only, no team input:
+
+- **Q35.2 (Customer Module canonicalization) — empirical arbitration IMPOSSIBLE, data lost.** The
+  2026-08-18 capture's `X-PAYWAY-HMAC-SHA512` header value was never recorded anywhere (repo, git
+  history, webhook stores checked); only the body survives (archive doc + docs/19 + the fixture).
+  The customer-module e2e "verified" sample is our OWN `webhook trigger` fixture
+  (`user-agent: aba-payway-sdk-trigger/1`, signed by our sorted-key `signCallbackBody`) —
+  self-verifying, zero evidence about the gateway. The ABA-doc raw-body statement (FU-01) stands as
+  the sole authority; `verifyCallbackSignatureRaw` (wave 1) implements it. docs/19's "our single
+  captured sample happened to verify under the SDK's sorted-key verifier" wording corrected — it
+  described the trigger fixture, not a gateway capture.
+- **Q18.5 (CoF PaymentNotification canonicalization) — NEW hard negative.** Raw-body
+  HMAC-SHA512(secret, raw-body)→Base64 does NOT verify any of the four REAL 2026-09-15 gateway CoF
+  captures (webhook_data/callbacks.db ids 3/9/10/11; stored verdicts "invalid"). Combined with the
+  19 failed sorted-key orderings (§26 AOF-8): the CoF callback signature is neither canonicalization
+  constructible from the merchant API key — different key material or a different construction.
+  FU-01's raw-body doc resolution is Customer-Module-scoped and does NOT generalize to CoF. Stays
+  Integration-Team-only, now with a decisive candidate eliminated.
+- **Q4 (close-transaction CANCELLED visibility) — fresh sandbox reinforcement (2026-10-03).** Live
+  unpaid QR `qrmus3eilnfc449a`: close accepted (code 00); check-transaction-2 AND transaction-detail
+  read `payment_status_code: 2 / "PENDING"` immediately AND 45s after close. No CANCELLED (7)
+  observable. Same capture live-confirms the TR-03 dual vocabulary (numeric + word fields in one
+  response). Local `closed` flag contract stands; production reconciliation still the only arbiter.
+- **Q10/Q48 (generate-qr lifetime unit) — floor re-confirmed live; minutes-min-3 FALSIFIED.**
+  `--lifetime 3` → rejected (gateway code 04; local preflight cites the 180s floor);
+  `--lifetime 180` → accepted, QR created. Under a minutes reading with the documented 3-minute
+  minimum, lifetime=3 would be ACCEPTED — it is not. Remaining ambiguity (seconds-floor-180 vs
+  minutes-floor-180) is empirically unresolvable: no read API returns an expiry field (detail/check
+  carry none; W4-1: no EXPIRED status anywhere). Coded two-domain split stands; the escalation ask
+  sharpens to "confirm the QR-domain unit and whether the 180 numeric floor is seconds or minutes".
+- **Q41 (MIT valid-flag re-probe) — token-existence precedes flag validation.** Synthetic-pwt
+  charges return IDENTICAL code 105 for valid `MITU_FLEX` and out-of-spec `MITU_FIX` (HTTP 403
+  "Invalid payment credential token"): flag validation never reaches the router while the token is
+  unknown. The true re-probe needs a REAL linked token, which requires a simulator approval (link
+  QR scan in ABA Mobile) — a user-gated manual step. Runbook: receiver up (`setup-webhook --tunnel`)
+  → `cof link-account -r <req> -c <ctid> -f CITI_FLEX --callback-url <tunnel>/webhooks/aba` →
+  approve in simulator → read pwt from the capture (store skips unverified signatures) → charge
+  with `MITU_FLEX` vs `MITU_FIX` vs `MITR_FIX` and compare codes.

@@ -328,9 +328,9 @@
       "description": "Portal Customer-ID keyed QR generation and merchant-reference reconciliation.",
       "source": "docs/guides/19-customer-module-qr.md",
       "file": "customer-module-qr.md",
-      "bytes": 12196,
-      "sha256": "a616ddea510d756a",
-      "sourceSha256": "f2f88634ac9b284c"
+      "bytes": 12301,
+      "sha256": "f16c912f5f472e5e",
+      "sourceSha256": "57a29d685dcbd37a"
     },
     {
       "topic": "settlement-disputes",
@@ -542,7 +542,7 @@
     },
     {
       "file": "docs-packaged/guides/19-customer-module-qr.md",
-      "sha256": "f2f88634ac9b284c"
+      "sha256": "57a29d685dcbd37a"
     },
     {
       "file": "docs-packaged/guides/20-settlement-and-disputes.md",
@@ -801,8 +801,8 @@
     {
       "file": "skills/aba-payway-integration/references/customer-module-qr.md",
       "source": "docs/guides/19-customer-module-qr.md",
-      "sourceSha256": "f2f88634ac9b284c",
-      "sha256": "8d3d089e2214c8fb"
+      "sourceSha256": "57a29d685dcbd37a",
+      "sha256": "bc4ba1d3f14d3dcb"
     },
     {
       "file": "skills/aba-payway-integration/references/settlement-disputes.md",
@@ -914,7 +914,7 @@
     },
     {
       "file": "skills/aba-payway-integration/references/MANIFEST.json",
-      "sha256": "d4142c7e87835518"
+      "sha256": "bb72e9f4dd9d07a2"
     }
   ]
 }

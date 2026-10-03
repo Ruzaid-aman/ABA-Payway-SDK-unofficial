@@ -49,9 +49,10 @@ The payment notification POSTs to the merchant profile's **single configured cal
   (ABA-bot relay 2026-10-03): compute the HMAC over the RAW HTTP request body exactly as
   received** — never parse and re-serialize JSON or reorder keys. (The "sorted-key concatenation"
   phrasing in other material describes how ABA internally *constructs* that body; the integrator
-  contract is raw bytes. Our single captured sample happened to verify under the SDK's sorted-key
-  verifier too — replay BOTH canonicalizations against any capture before changing verification
-  code.) Reject-and-discard on failed validation (MITM/fake-notification risk).
+  contract is raw bytes. Evidence note: the 2026-08-18 capture's signature header was never
+  recorded — only the body survives — so the raw-body rule rests on ABA's own documentation, not
+  on a replayed capture. Replay BOTH canonicalizations against any NEW capture before changing
+  verification code.) Reject-and-discard on failed validation (MITM/fake-notification risk).
 - **Money:** `original_amount/original_currency` is the merchant-side obligation; `payment_amount/payment_currency` is the payer's debit and may differ (currency or FX). Match obligations against `original_*`, never `payment_amount`.
 - **Timing:** respond HTTP 200 within 5 seconds; **ABA does not retry** — a missed callback is recovered only by the reconciliation fallback (§4).
 - **The Customer ID is NOT in the QR payload.** PayWay binds the QR to the customer record server-side (proprietary routing tags `62·68` + `99`); your join key is `merchant_ref` in the callback and API.

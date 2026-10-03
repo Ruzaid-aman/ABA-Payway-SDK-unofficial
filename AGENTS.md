@@ -174,9 +174,17 @@ Consult `docs/internal/` for internal findings and `docs/guides/` for public-fac
   are per-request only for self-registered merchants; KHQR web/deeplink windows 5/10 min + KHQR 10 req/s per
   MID; `?lang=en|km|zh`; amount = Total_Amount post-discount; tran_id ≤ 20 chars; one profile = one settlement
   currency; simulator accounts max 2/merchant, 90-day hard expiry, no declines; key rotation = zero-overlap
-  (PTL171/175); CONFLICTS kept open: close-transaction CANCELLED visibility (docs say observable, sandbox
-  never shows it — keep local `closed` flag), generate-qr lifetime unit (bot: minutes; sandbox floor 180 s =
-  seconds — keep the coded two-domain split), `return_url`-base64 claim (live plain URLs work).
+  (PTL171/175); CONFLICTS status after the 2026-10-03 conflicts-session probes (ABA-OPEN-QUESTIONS §Conflicts-session):
+  close-transaction CANCELLED visibility stays open (fresh reinforcement: close→check-transaction-2/detail both PENDING
+  immediately + 45s after; keep local `closed` flag), generate-qr lifetime unit partially resolved (minutes-reading-with-min-3
+  FALSIFIED live — lifetime 3 rejected / 180 accepted; residual seconds-vs-minutes-180-floor ambiguity unresolvable: no read
+  API returns expiry; keep the coded two-domain split), `return_url`-base64 conflict DISSOLVED (register wording was wrong —
+  the SDK base64-encodes every URL field via encodeBase64IfNeeded, journal-proven; the gateway decodes and POSTs the plain
+  URL; the bot's doc quote agrees with our wire), Q18.5 sharpened (raw-body with the API key does NOT verify the real CoF
+  captures — neither constructible canonicalization fits; Integration-Team-only), Q35.2 empirical arbitration impossible
+  (the 2026-08-18 signature header was never recorded; the e2e "verified" sample was our own trigger fixture), Q41 true
+  re-probe is user-gated (token-existence precedes flag validation — synthetic pwt gives identical 105 for valid and invalid
+  flags; a real linked token needs a simulator approval).
 - COF (v1.3.6, live-docs parity): `cof link-account`/`link-card` require `--request-id`, `--ctid`, `--token-flag` (CITI_FLEX|CITO_FLEX); the token result (`pwt`) arrives via `callback_url`. `cof token details` takes `--request-id` ONLY (no ctid/pwt); `cof token remove` takes `--ctid` + `--token` (no request-id) — these per-endpoint shapes are gateway-verified (SANDBOX-FINDINGS §16). `link-card` always answers with an HTML hosted form — `cof link-card` saves it to `payway-output/link-card-<request-id>.html` and exits 0 (that IS the success signal); the CLI also decodes the hosted outcome from the `302 → /add-card/<base64>` redirect (SANDBOX-FINDINGS §24): an error page (code 104 "Merchant not enabled token flag" on this profile, wrong-hash 01) prints `Hosted page reports an error` + hint and adds `hostedPage` + `correlationId`/`traceId` to the `--json` envelope; SDK-side the thrown `PayWayBusinessError` carries `responseUrl`/`hostedPage` too; `cof link-card-form` (SDK: `credentialsOnFile.getLinkCardFormHtml()`) renders the same signed request as a local browser form, no API call. `beneficiary` commands need `PAYWAY_RSA_PUBLIC_KEY`. JSON-or-string flags (`--items`, `--payout`, `--custom-fields`, `--additional-params`, `--return-deeplink`) accept inline JSON or plain strings. Payout keys are per-endpoint: `generate-qr --payout` and the standalone payout domain use `{account, amount}`; `generate-checkout --payout`, `cof charge --payout`, pre-auth complete-payout, and `payment-link create --payout` use `{acc, amt}` (total must equal the link/transaction amount on payment-link; wrong keys now throw `PayWayConfigError` locally on the purchase path too — W1-5). `generate-checkout --payment-gate 0` returns hosted HTML; use `checkout-form --payment-gate 0` for browser navigation or SDK `checkout.purchaseHosted()` / `purchase({ paymentGate: 0 })` for the hosted response object.
 
 ## Current state & handoff
