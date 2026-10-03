@@ -1,6 +1,6 @@
 # ABA PayWay TypeScript SDK
 
-A community-maintained, typed server-side SDK and CLI for ABA PayWay: online QR, hosted checkout, payment links, transaction management, and optional coding-agent skills.
+A community-maintained, typed server-side SDK for ABA PayWay — with a companion CLI, coding-agent skills, an MCP server, a Postman collection, an offline knowledge base, and a local webhook workbench. The SDK covers online and offline QR, hosted checkout, payment links, subscriptions, credentials-on-file (saved accounts and cards), refunds, payouts, pre-authorization, and transaction management.
 
 This is not an official gateway-provider SDK. ABA and PayWay names identify the gateway being integrated; no endorsement is claimed.
 
@@ -9,11 +9,16 @@ Use it to accept payments in your application and verify their outcome before de
 | You want to… | Use |
 |---|---|
 | Add payments to your application | The TypeScript/JavaScript **SDK**, running on your server |
-| Try payments and inspect transactions from a terminal | The **CLI** included with the SDK package |
-| Guide a coding assistant through an integration | Optional **agent skills**, alongside the SDK and CLI |
-| Drive the SDK from an AI agent over MCP | The built-in **MCP server** (`payway-sdk mcp`), read-only by default |
+| Create and inspect payments from a terminal | The **CLI** (`payway-sdk`, included with the SDK package): QR, checkout, payment links, credentials-on-file, refunds, payouts, pre-auth, transaction reads, batch operations, plus profiles, shell completions, and a transaction journal |
+| Guide a coding assistant through an integration | 35 packaged **agent skills** (`aba-payway-*`), one per PayWay workflow |
+| Drive the SDK from an AI agent over MCP | The built-in **MCP server** (`payway-sdk mcp`): 12 read-only tools by default, 17 with `--allow-mutations` |
+| Build and test webhook handling without the gateway | The **webhook workbench**: `setup-webhook` captures/forwards callbacks, `webhook trigger` sends signed fixtures, `webhook verify-callback` checks HMACs, `webhook resend` replays captures |
+| Look up guides, sandbox learnings, and error codes offline | The **knowledge base** (`payway-sdk docs`): 42 curated topics; machine-readable index at [llms.txt](llms.txt) |
+| Audit what the CLI did, locally | The **transaction journal** (`journal timeline`, `stats`, `reconcile`) — recorded by default for API commands |
+| Exercise the API in Postman before writing code | The **Postman collection** in `payway-boilerplate/` — 46 ready-signed requests across 10 folders |
+| See a full payment journey with zero credentials | The built-in **demo** (`payway-sdk demo`) — a simulated checkout on localhost |
 
-You can explore the simulated demo without an ABA account. Gateway testing requires sandbox credentials issued by ABA.
+Gateway testing requires sandbox credentials issued by ABA.
 
 **Runtime:** Node.js 22.12 or later. CI targets the minimum runtime and Node 22/24 on Linux and Windows. Keep merchant credentials on your server.
 
@@ -48,9 +53,9 @@ The [first-payment reference app](docs-packaged/guides/FIRST-PAYMENT-WALKTHROUGH
 
 ## For AI coding agents
 
-- **Skills:** install the portable merchant integration skill with `npm exec -- payway-sdk skills add claude --only aba-payway-integration` (also `codex`, `opencode`, `cursor`, `copilot`) — see [skills/README.md](skills/README.md). Omit --only for all workflow guides.
-- **MCP server:** expose the SDK to any MCP host with `npm exec -- payway-sdk mcp` (stdio; 12 read-only tools by default, `--allow-mutations` adds the create tools; preview with `mcp --list-tools`) — see the [reference](docs-packaged/reference/SDK-AND-CLI-REFERENCE.md#mcp-server).
-- **Offline knowledge base:** `npm exec -- payway-sdk docs list` / `docs <topic>` / `docs search "<terms>"` serves the curated integration and support topics without network access; the machine-readable index is [llms.txt](llms.txt).
+- **Skills:** 35 packaged workflow guides (`aba-payway-*`); install the merchant-integration router with `npm exec -- payway-sdk skills add claude --only aba-payway-integration` (also `codex`, `opencode`, `cursor`, `copilot`) — see [skills/README.md](skills/README.md). Omit `--only` for all 35; `skills list` and `skills doctor` inspect an installation.
+- **MCP server:** expose the SDK to any MCP host with `npm exec -- payway-sdk mcp` (stdio; 12 read-only tools by default, 17 with `--allow-mutations`; preview with `mcp --list-tools`) — see the [reference](docs-packaged/reference/SDK-AND-CLI-REFERENCE.md#mcp-server).
+- **Offline knowledge base:** `npm exec -- payway-sdk docs list` / `docs <topic>` / `docs search "<terms>"` serves 42 curated integration, sandbox, and error-registry topics without network access; the machine-readable index is [llms.txt](llms.txt).
 
 ## Explore the SDK
 
@@ -59,7 +64,7 @@ The [first-payment reference app](docs-packaged/guides/FIRST-PAYMENT-WALKTHROUGH
 | Set up your first payment | [Quickstart](QUICKSTART.md) |
 | Browse commands and SDK examples | [SDK and CLI reference](docs-packaged/reference/SDK-AND-CLI-REFERENCE.md) |
 | Choose an integration path | [Documentation index](docs-packaged/README.md) |
-| Test the API in Postman | `payway-boilerplate/Postman Collection API Testing/postman/documents/postman-guide.md` — import the workspace's ready-made `dist/PayWay API — Complete Collection.postman_collection.json` (source repository; not distributed in the npm package) |
+| Test the API in Postman | `payway-boilerplate/Postman Collection API Testing/postman/documents/postman-guide.md` — import the workspace's ready-made `dist/PayWay API — Complete Collection.postman_collection.json` (46 requests in 10 folders, embedded signing/test scripts; source repository, not distributed in the npm package) |
 | Understand verification limits | `payway-sdk docs support` |
 | Install coding-agent guides | [Skills](skills/README.md) |
 | Review changes | [Changelog](CHANGELOG.md) |
