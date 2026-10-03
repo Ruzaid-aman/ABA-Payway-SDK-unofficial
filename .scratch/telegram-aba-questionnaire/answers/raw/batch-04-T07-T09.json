@@ -1,0 +1,365 @@
+{
+  "capturedAt": "2026-10-02T22:25:19.790Z",
+  "messages": [
+    {
+      "message": "Hello Bong @Ruzaid,\nFrom the current token/CoF specs:\n1) N…",
+      "text": "Hello Bong @Ruzaid, From the current token/CoF specs: 1) Notification for customer‑initiated removal Yes. When a user freezes, unfreezes, renews, or removes a token in ABA Mobile, PayWay can send a real‑time callback for each status change. This is controlled via your Credentials on File configuration:\n- PayWay uses the callback_url configured under Merchant Portal → Outlet Profile → Services → Credential on File (CoF). - That same callback_url is used for link/renew callbacks and for subsequent status changes (including removal), using the same payment_credential structure. 2) Should get-token-details show removed tokens differently? Yes. get-token-details explicitly defines:\n- status = 0 → Token has been removed - status = 1 → Active - status = 2 → Frozen So after a successful removal on PayWay’s side, get-token-details is expected to return status: 0 for that token. 3) Recommended way to detect removal proactively Officially recommended pattern is:\n- Primary: rely on the CoF callback on your callback_url and update your token store from payment_credential.status whenever you receive a status change (freeze/unfreeze/renew/remove). - Fallback / reconciliation: if you suspect a missed callback or for periodic sync, call get-token-details (with the corresponding request_id) to retrieve the latest token state (status, expired_at, token_flag, etc.) and align your records. For customer‑initiated removals specifically, the intended proactive signal is the CoF status‑change callback, with get-token-details as the recovery/reconciliation mechanism when a callback is not received.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:22 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid,\nFrom the docs I have, the only callback…",
+      "text": "Hello Bong @Ruzaid, From the docs I have, the only callback HMAC that is fully specified (canonicalization, key, encoding) is for the Customer Module / dedicated KHQR, where:\n- Header: X-PAYWAY-HMAC-SHA512\n- Algorithm: HMAC‑SHA512, Base64\n- Plaintext: the raw HTTP request body (no re‑serialization) For the credentials‑on‑file token notification specifically (x-payway-topic: PaymentNotification with {request_id, payment_credential:{...}}): 1) Canonicalization / field order for THIS callback The documentation available to me does not define any canonicalization or field order for this particular callback type (no statement whether it is raw‑body HMAC, sorted‑keys concatenation, or something else). So I cannot give a definitive canonical string or ordering for the HMAC plaintext here. 2) Different scheme (key / encoding)? Beyond the general rules — HMAC‑SHA512, Base64, shared secret, header name X-PAYWAY-HMAC-SHA512 — there is no explicit statement that the COF token notification uses a different key or encoding, but there is also no product‑specific spec confirming it reuses the Customer Module rules. So I cannot reliably confirm the exact scheme for this callback from the docs alone. Your current mitigation — treating the callback as an untrusted hint and authenticating it via get-token-details using request_id — is consistent with the general guidance that callbacks should not be the sole source of truth and that status/check APIs should be used to confirm. For precise canonicalization of the COF token callback signature, this will need confirmation from the Integration Team / gateway configuration rather than the published rules I can see.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:22 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Part 3/3\nSo, for flows where a signature is part of the doc…",
+      "text": "Part 3/3 So, for flows where a signature is part of the documented contract, the guidance is reject (or at least treat as non‑authoritative) rather than silently downgrade. The only product where this is spelled out in strong language is the Customer Module, but the same principle is implied for any signed PayWay callback.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:22 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Part 2/3\nSo, from the docs: assume HTTP 200 (not 202) and r…",
+      "text": "Part 2/3 So, from the docs: assume HTTP 200 (not 202) and respond within 5 seconds. Where a specific acknowledgement body (e.g. RECEIVEOK) is defined for that product, you must echo it exactly. ---\n3) Sample callback payloads (including nested objects, extra fields) The docs include a few canonical examples: a) Customer Module dedicated‑KHQR callback (signed)\n{ \"payment_status_code\": 0, \"transaction_id\": \"178702944869996\", \"payment_status\": \"APPROVED\", \"apv\": \"118954\", \"original_amount\": 0.38, \"original_currency\": \"USD\", \"payment_amount\": 0.38, \"payment_currency\": \"USD\", \"payment_type\": \"ABA Pay\", \"transaction_date\": \"2026-08-18 12:04:08\", \"bank_ref\": \"100SB1787029448\", \"payer_account\": \"*001\", \"payer_name\": \"Payer Name\", \"bank_name\": \"ABA Bank\", \"merchant_ref\": \"dt-one-8989\", \"customer\": { \"type\": \"individual\", \"customer_id\": \"dt-one-8989\", \"customer_name\": \"dhitraj\", \"vat_tin\": \"Test organization\", \"email\": \"ruzaid0101+alavps@gmail.com\", \"phone\": \"+85596 407 4052\", \"address\": \"2740 Barnes Avenue Bronx,\", \"remark\": \"\" }\n} Features here:\n- Nested object (customer).\n- Mixed types (numbers, strings).\n- This is the payload over which HMAC‑SHA512 is computed for the Customer Module, using the raw JSON body. b) Generic PayWay pushback example (online checkout / payment link style)\n{ \"tran_id\": \"<TRANSACTION_ID>\", \"apv\": \"<APPROVAL_CODE>\", \"status\": 0\n} - Minimal structure used in the pushback documentation. c) Offline KHQR / invoice guidance\n- The offline‑KHQR guide discusses callback handling in terms of transaction_id (for deduplication) and merchant_ref (for reconciliation), but does not provide a separate concrete JSON, beyond the Customer Module example above. The docs do not include official samples with:\n- Explicit null values, - Boolean fields, - Unicode beyond typical Latin/extended email/name/address. For testing signature verification and parsing robustness, the safe documented approach is:\n- Use the exact structures above as canonical samples. - Locally construct variants that add extra fields / nested structures / nulls / booleans for your own parser tests, and when testing signatures, always compute the HMAC over exactly the raw body that you send to your verifier (no reformatting between signing and verifying). ---\n4) If a signature is missing, should the merchant downgrade to unverified, or reject? Customer Module (HMAC signed) — explicit rule:\n- The FAQ clearly states: “The callback header includes a Hash/Signature — `X-PAYWAY-HMAC-SHA512`… Your backend must compute its own hash… and compare… Failure to validate this hash exposes your system to MITM attacks and fake notification spoofing. Do not process any callback that fails hash validation; log and discard it immediately.\n- That implies: if the expected HMAC header is missing or invalid, you must reject / discard the callback and rely on reconciliation (e.g. Check Transaction), not silently downgrade to an “unverified but accepted” path. Other signed flows (where a signature is defined):\n- General rules: “Callback requests should be verifiable (signed or contain an HMAC/signature)… Integrator must validate callback signatures … before accepting the callback as verified.” - Consistent with the Customer Module requirement, the security guidance is: - Treat callbacks without the expected signature or with failed validation as untrusted. - Recommended behavior is to not mark the payment as completed based solely on such a callback; log it and resolve via Check Transaction / reconciliation instead.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:22 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Part 1/3\nHello Bong @Ruzaid,\nBelow is what is explicitly d…",
+      "text": "Part 1/3 Hello Bong @Ruzaid, Below is what is explicitly documented about callbacks, signatures, and acknowledgements. Where the docs are silent, I’ll mark it as not specified. ---\n1) Is an HMAC signature always present for each notification type, and what is the canonical string? • Customer Module (\"signed printed-QR\" / Customer Dedicated KHQR) - Explicitly documented as HMAC‑signed. - Header: X-PAYWAY-HMAC-SHA512. - Algorithm: HMAC‑SHA512, Base64‑encoded. - Canonical string: “raw payload body” — i.e. compute the HMAC over the exact raw HTTP request body bytes, without re‑serializing JSON, changing field order, or modifying whitespace. - Merchant must recompute the hash from the shared secret + raw body and compare to the header; callbacks that fail validation must be rejected (see Q4). • Generic PayWay callbacks (online checkout, online QR, payment-link, token/credentials-on-file, offline KHQR webhook, etc.) - The rules state callbacks \"should be verifiable (signed or contain an HMAC/signature)\" and that integrators must validate callback signatures using the exchanged public key / RSA key or provided HMAC method. - However, the docs do not break this down per product (online checkout vs online QR vs payment link vs COF), and they do not define a canonical string for those other signature schemes (no explicit field order / concatenation / encoding rules beyond the Customer Module case above). - So the only fully specified canonical form in the retrieved docs is for the Customer Module HMAC (raw request body). For other notification types, presence/format of a signature and exact canonical string are not specified here and need to be taken from the product‑specific onboarding notes. So: HMAC is guaranteed and fully specified only for the Customer Module in these docs. For other notification types, callbacks are documented as verifiable but no per‑type, per‑product canonical string is defined in the material I see. ---\n2) Expected HTTP response: status, body, and timeout Two distinct patterns are documented: 1. Callback that expects a specific acknowledgement body (e.g. /v1/paywayservice/callback) - Endpoint must accept HTTP POST and return HTTP 2xx on success. - Docs state: “The merchant callback endpoint must respond with the expected acknowledgement body exactly (example acknowledgement used in conversations: `RECEIVEOK`) so the payment system marks the callback delivered.” - If endpoint returns 403 or another error status, the callback is considered failed and merchant will not receive the transaction notification. 2. Generic pushback URL (online checkout / standard PayWay pushback) - Expose reachable HTTPS endpoint (port 443) that accepts POST. - “The merchant endpoint should respond quickly with an HTTP 200 OK; a short text body is optional (e.g., `payment success` or `SUCCESS`). No special acknowledgement payload is required beyond a standard HTTP 200 unless PayWay specifies otherwise.” - Non‑200 is treated as failed delivery. Status codes and timeout:\n- The safest contract across docs is: HTTP 200 OK within PayWay’s timeout window. - For the Customer Module, it is explicitly: HTTP 200 with the exact text body required (e.g. RECEIVEOK). - For generic pushback, 200 with any short body is fine; no statement that 202 or other 2xx are accepted, so they should not be relied on. - Timeout: callbacks are considered failed if your endpoint does not respond with HTTP 200 within ~5 seconds. The Customer Module FAQ states explicitly: “If your endpoint is down or does not respond with HTTP 200 within 5 seconds, the callback is considered failed and will not be re‑sent.”",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:22 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-09] Questions about credent…",
+      "text": "hi @payway_Integration_AI_bot [T-09] Questions about credentials-on-file tokens removed by the customer in the ABA Mobile app: we captured ZERO callbacks when a customer unlinked two accounts (while link-approval callbacks worked fine on the same URL), and get-token-details keeps returning status=1 (active) for the removed tokens — charges only fail later with code 105. Please: 1) Does ANY notification exist for customer-initiated removal (per-request callback or profile-level webhook)? If yes, where is it configured? 2) Should get-token-details report removed tokens differently (e.g., status 0)? 3) What is the recommended way for merchants to detect removal proactively?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:21 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-08] Question about the cred…",
+      "text": "hi @payway_Integration_AI_bot [T-08] Question about the credentials-on-file token notification callback: it arrives as JSON with header \"x-payway-topic: PaymentNotification\" and body {request_id, payment_credential:{ctid, pwt, status, expired_at, token_flag, ...}}. Its \"x-payway-hmac-sha512\" header does NOT verify using the request-signing canonicalization (sorted keys concatenated), and 19 alternative orderings also failed. Please: 1) What is the exact canonicalization / field order of the HMAC plaintext on THIS callback? 2) Or does this callback use a different signature scheme (key, encoding)? Until we can verify the signature we authenticate link deliveries indirectly via get-token-details using the request_id.",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:21 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-07] Questions about callbac…",
+      "text": "hi @payway_Integration_AI_bot [T-07] Questions about callback signatures and acknowledgement, per notification type (online checkout, online QR, signed printed-QR \"Customer Module\", unsigned offline KHQR, payment-link pushback, credentials-on-file token notification): 1) Is an HMAC signature always present for each type, and what is the exact canonical string that is signed (field order, encoding)? 2) What HTTP response does PayWay expect from the merchant server — status 200, any specific body like \"RECEIVEOK\", is 202 accepted, and what is the response timeout? 3) Please share approved sample callback payloads that include nested objects, null/boolean/Unicode values and unknown extra fields, so we can test signature verification and parsing. 4) If a signature is missing, should the merchant silently downgrade to unverified processing, or reject the delivery?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:21 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid,\nBased on the callback/pushback rules in…",
+      "text": "Hello Bong @Ruzaid, Based on the callback/pushback rules in the integration docs: 1) Published document for “single delivery” contract The behavior is described in the callback/pushback integration rules (callback delivery policy + pushback reliability sections), which state that PayWay will attempt a pushback and that merchants must not rely on retries and must use Check Transaction for recovery. In the material I have, this is not packaged as a named public document with a URL/version that I can quote (it’s described as part of the general callback/pushback API rules), so I cannot give you a specific external link or version number. 2) Retries after failed delivery in production The documented contract is:\n- Treat pushback as unreliable / at-most-once.\n- If the callback times out or returns non‑2xx, the merchant must recover via Check Transaction. On retries specifically:\n- One rule says the Integration Team will attempt a single push and does not retry if the endpoint times out or is unreachable.\n- Another rule notes that some gateways/flows may perform a very limited retry (observed cases: 1 extra attempt after ~10 seconds, total window around 15–20 seconds), but clearly states that retries are not guaranteed and must not be relied on. So for production design you should assume: no guaranteed retry (i.e. design as if there is only one attempt). Any extra attempt you sometimes see is an implementation detail, not a contract. 3) Is polling Check Transaction the officially recommended recovery? Yes. Multiple rules explicitly say:\n- Merchants must implement the Check Transaction (or check-transaction-2) API on their backend.\n- When pushback fails (timeout, non‑200, unreachable), you must call Check Transaction to obtain the authoritative status and reconcile.\n- Recommended patterns include a short retry window (3–5 attempts with delays) and treating Check Transaction as the authoritative source of truth versus potentially delayed/missing callbacks. So the model you described — best-effort callback within a short timeout window, and official recovery via Check Transaction polling — is exactly what is documented.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:20 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid,\nBased on the documented KHQR rules:\n1)…",
+      "text": "Hello Bong @Ruzaid, Based on the documented KHQR rules: 1) What governs how long a purchase‑API KHQR stays scannable? There are two separate concepts:\n- Product‑level KHQR timeout (scan window): - ABA KHQR for website (web QR) has a timeout of 5 minutes. - ABA KHQR deeplink has a timeout of 10 minutes. - These are enforced on the gateway side; after this window the KHQR will be treated as expired even if the transaction itself has a longer lifetime.\n- lifetime field (transaction lifetime): - lifetime is documented as being in minutes and controls how long the transaction remains valid/back‑end‑open. - The docs also state that QR images may expire earlier (examples mention around 2 minutes) and that you must regenerate a new transaction/QR when the image/scan window has expired. For purchase‑API KHQR, the practical scan validity is therefore governed by the product KHQR timeout (5 minutes web / 10 minutes deeplink). A very large lifetime (e.g. 1440 minutes) does not imply the QR will remain scannable for that entire period; the image/checkout KHQR has its own shorter timeout. Per‑profile/per‑merchant overrides are not documented; timeouts are described at the payment‑product level (KHQR web/deeplink), not per merchant. 2) Should merchants instruct customers to scan promptly even with a long lifetime? Yes. The guidelines explicitly say:\n- ABA KHQR web QR and deeplink have short timeouts (5 and 10 minutes), and\n- Integrators must display an expiration timer and handle expiry by generating a new transaction/QR. So even if you set a long lifetime on the transaction, you should design the UX as a short‑lived QR checkout:\n- Show a clear countdown matching the intended QR validity window (e.g. 3–5 minutes).\n- Tell users to scan immediately; if they are late and get \"Transaction expired\", create a new transaction and show a fresh QR.\n- For truly long‑lived QRs, use the QR‑on‑invoice / QR‑on‑API products that are documented as supporting long validity (up to ~30 days) instead of purchase‑API checkout KHQR. 3) Is behavior the same in production? The timeouts:\n- “ABA KHQR for website (web QR) has a timeout of 5 minutes” and\n- “ABA KHQR deeplink has a timeout of 10 minutes”\nare documented as general KHQR rules, with no separate sandbox vs production values. So you should assume the same short KHQR scan window applies in production for purchase‑API KHQR checkout. Sandbox anomalies around much longer actual behavior should be treated as environment quirks, not as a contract; the contract is the short KHQR timeout + need to regenerate a new transaction/QR after expiry.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:20 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid,\nHere’s what is defined in the current Cl…",
+      "text": "Hello Bong @Ruzaid,\nHere’s what is defined in the current Close Transaction rules and where things are not specified: 1) Can a hosted-card session still pay after a successful close (production)? - Close Transaction is defined to cancel the transaction and prevent further payment attempts from the payer side. - It should be used only on incomplete / pending transactions; closing may also trigger a reversal/refund if the transaction was already settled. - There is no explicit separate rule for hosted card vs KHQR; the intended behavior is that once a transaction is closed, further attempts should not complete successfully (or should be reversed). - Your sandbox observation (card still being approved after close) is not described as expected behavior in the guidelines; production‑specific behavior for that exact card scenario is not documented. 2) Is there any API way to see that a transaction was closed? Yes — via status in the read APIs:\n- After calling Close Transaction, you are expected to see the transaction go to CANCELLED (or an equivalent cancelled status) when you call Check Transaction (and then reflect the same in any transaction/query APIs). - Guidelines also mention an intermediate pending‑closed state, so you should not rely on the Close response alone; always re‑check with Check Transaction to observe the final status. 3) If a closed transaction is paid anyway, what is the final state and who refunds? - Close Transaction is documented as potentially triggering reversal/refund operations at the backend: closing a previously settled or pending transaction can result in the payment being rejected or reversed. - Final observable states for you are standard status codes such as APPROVED → REFUNDED or CANCELLED, visible via Check Transaction / detail queries. - The refund/reversal itself is handled by the payment backend / banks; you see it as a refund/refunded status on the transaction (and, for cards, the actual funds back to the cardholder may take a few business days per normal refund timing). 4) Code 00 for a never-existing tranid — intentional idempotency? Does production match?** Guidelines say:\n- **Only transactions that were successfully created** can be closed. - If the transaction ID does **not exist**, Close Transaction should return a **“Transaction not found”–type error**, *not* success. So a **code 00 “Success!” for a non‑existent tranid is not documented as intentional idempotent behavior, and there is no statement that production should behave that way. The documented expectation is an explicit not found error. 5) Re‑closing an already‑closed transaction — 00 again or a dedicated code? - The guidelines instruct merchants to close only when you intend to cancel and to verify status via Check Transaction after closing. - They do not define what should be returned on a second Close call against an already‑closed transaction (no explicit rule on idempotent 00 vs a dedicated “already closed”/“not found” code). - So the expected integration pattern is: call Close once, then rely on Check Transaction for subsequent logic; the exact response for repeated Close attempts is not specified and should be clarified with the Integration Team if you need to treat it specially.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:19 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-06] Questions about PayWay …",
+      "text": "hi @payway_Integration_AI_bot [T-06] Questions about PayWay callbacks (notifications POSTed to the merchant server): we understand delivery is a single best-effort attempt with no guaranteed retry (about a 5-second window; a one-off ~10-second retry is sometimes observed but must not be designed for), and recovery is polling Check Transaction. Please: 1) Is there a published document (name, URL, version) that states this single-delivery contract? 2) In production, after a failed delivery (server down, non-200, timeout), is there ANY retry, and after how long? 3) Is polling Check Transaction the officially recommended recovery?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:19 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-05] Question about KHQR cre…",
+      "text": "hi @payway_Integration_AI_bot [T-05] Question about KHQR created via the Purchase API (not offline KHQR): the QR payload contains no expiry timestamp, but scan validity seems much shorter than the transaction lifetime. In sandbox, a QR whose transaction had lifetime 1440 minutes was scan-refused \"Transaction expired\" at age 2h15m, while a seconds-old QR paid fine. Please: 1) What exactly governs how long a purchase-API KHQR stays scannable — a fixed window (what length?), the lifetime field (in which unit?), or a per-profile rule? 2) Should merchants always instruct customers to scan promptly even when a long lifetime was set? 3) Is the behavior the same in production?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:19 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-04] Questions about the clo…",
+      "text": "hi @payway_Integration_AI_bot [T-04] Questions about the close-transaction API (closes an open transaction/QR): in sandbox, KHQR scans are refused after close (\"transaction expired\"), but a hosted CARD checkout session was still approved twice after a successful close, and no read API (check-transaction, transaction-detail) ever shows a CLOSED status. Also, closing a tran_id that never existed returns code 00 \"Success!\". Please: 1) In PRODUCTION, can a hosted-card session still pay after a successful close? 2) Is there any API way to see that a transaction was closed? 3) If a closed transaction is paid anyway, what is the final state — auto-reversal? Who refunds the customer? 4) Is the code-00 answer for a never-existing tran_id intentional idempotent behavior, and does production match it? 5) Should re-closing an already-closed transaction return 00 again or a dedicated code?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:19 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid,\nFrom the docs I see, there’s no explici…",
+      "text": "Hello Bong @Ruzaid, From the docs I see, there’s no explicit SLA in seconds for when a newly created transaction becomes visible on each endpoint, but we can say the following: 1) Expected visibility delay (production)\n- Documentation does not define a precise delay (e.g. “<1s” or “5s”) for either check-transaction or get-transaction-details after creation.\n- What is stated is that check-transaction is intended for rapid, short‑term confirmation shortly after creation, while get-transaction-details is designed for older transactions and longer‑term reconciliation.\n- So in production, you should assume there can be a small propagation delay on both and rely on retries rather than a fixed visibility time. 2) Difference between the two endpoints — guaranteed or incidental?\n- The docs clarify that status inquiry / check-transaction works only within a short retention window (effectively 7 days) and that once a transaction is removed from this cache, you must use get-transaction-details, which still returns the record from a persistent store.\n- This means there is an architectural distinction (cache vs. persistent store), but there is no documented guarantee that check-transaction will always see the transaction earlier than get-transaction-details, nor any specified time skew you can rely on.\n- For poller tuning, the guidance is to: - Wait about 3 seconds after initiating a transaction, then - Call check-transaction every 3–5 seconds until status is Approved or the transaction lifetime expires, - Use get-transaction-details primarily for older transactions or reconciliation beyond the status‑inquiry retention window. So your observed “<1s vs ~5s” in sandbox should be treated as an implementation detail, not as a documented contract for production behavior.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:17 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid,\nBased on the docs I have, I can only pa…",
+      "text": "Hello Bong @Ruzaid, Based on the docs I have, I can only partially answer T‑02: 1) Duplicate tran_id on generate‑qr — is it intentional? The only explicit statement about reuse of tran_id in QR contexts is for QR‑on‑invoice: regenerating a QR for the same tran_id “may update the existing transaction (amount/expiry)” and “should be supported by the API.” There is no documented statement that two concurrent, different‑amount QRs for the same tran_id is an intended behavior. The docs only indicate a single logical transaction per `tran_id` that may be updated, not multiple independent QRs. So I can’t confirm your sandbox observation as “intentional behavior” from documentation. 2) Production behavior on reuse of tran_id for generate‑qr The retrieved docs do not specify what production does if generate-qr is called multiple times with the same tran_id (reject vs overwrite vs allow concurrent QRs), nor do they give an exact error code for that case. The only related text is the QR‑on‑invoice note that a regenerated QR may update the existing transaction. Anything more specific about production behavior and codes would need to come from the Integration Team. 3) Lifetime bounds (min/max) in production From the docs:\n- lifetime is in minutes; omitting it defaults to a long validity (observed ~30 days) for QR‑on‑API / QR‑on‑invoice. - A separate rule explicitly says: default lifetime is 3 minutes and this is enforced as the minimum, and cannot be set below that in their environment. However, there is no explicit documented maximum lifetime value per environment in the material I see (no confirmation of “120 days” as a hard cap for production or sandbox). So:\n- I can confirm the 3‑minute minimum is described as enforced. - I cannot confirm from docs that “120 days” is the official maximum or that the exact numeric bounds are identical between sandbox and production. For exact behaviors on: (a) how duplicate tran_id is handled for generate-qr in production, and (b) the precise accepted lifetime max bound, this needs confirmation from the PayWay Integration Team beyond what’s written in the available docs.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:17 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, based on the documented gateway rules ar…",
+      "text": "Hello Bong @Ruzaid, based on the documented gateway rules around tran_id and duplicates: 1) Prod behavior for duplicate tran_id - The gateway expects a unique tran_id per payment initiation. - Requests that reuse an existing tran_id are described as being rejected with a duplicate‑transaction type error (e.g. \"Duplicate Transaction\" or \"Duplicate Transaction ID\"). - The docs do not specify an exact numeric error code for production (only the duplicate‑transaction wording), so I can’t confirm the numeric code 4 or any other. 2) Why sandbox “accepts” them but QR is not payable - The documented rule is: do not reuse tran_id; each payment request must have a unique transaction identifier and deeplink/QR. - If the same <TRANSACTION_ID> is submitted twice, ABA Pay mobile may show errors like \"Code already use\" or \"Transaction not found\". - The documentation does not explain why sandbox sometimes returns code 00 while producing an unpayable QR — but this is still considered invalid usage per the rules. The guidance is to treat tran_id as unique and never rely on sandbox’s permissive behavior. 3) Lost create response (network drop) — can we safely retry purchase with the SAME tran_id? - The rules explicitly say: - Use a unique tran_id for each payment initiation and do not re‑use IDs for retries. - For retries, use the gateway’s Check‑Transaction API to re‑check status of the existing tran_id rather than re‑initiating a new charge with the same tran_id. - So the recommended pattern in production is: 1) If the purchase response is lost, call check-transaction with that tran_id. 2) If it returns a completed payment, treat that attempt as final. 3) If it returns not found / unpaid and you want the customer to try again, start a new payment with a new tran_id. - In other words, do not rely on purchase being idempotent on the same tran_id; use check‑transaction for uncertainty and generate a new tran_id for any new attempt. The above comes from the documented rules on tran_id uniqueness, duplicate‑transaction handling, and using Check‑Transaction for status verification.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:16 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-03] Question about how quic…",
+      "text": "hi @payway_Integration_AI_bot [T-03] Question about how quickly newly created transactions appear in the query APIs: in sandbox, check-transaction sees a fresh transaction in under 1 second, while transaction-detail needs about 5 seconds. Please: 1) In production, what is the expected visibility delay for check-transaction and for transaction-detail after creation? 2) Is the difference between the two endpoints an architectural guarantee we can rely on when tuning a poller, or incidental?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:16 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-02] Question about the QR-g…",
+      "text": "hi @payway_Integration_AI_bot [T-02] Question about the QR-generation API (generate-qr / merchant-initiated QR): in sandbox the SAME tran_id was submitted twice with different amounts and both times code 00 returned with two live QR payloads. Also, a lifetime below exactly 180 seconds is rejected with HTTP 400 code \"04\", and values up to ~27 hours are accepted (docs say minimum 3 minutes, maximum 120 days). Please: 1) Is duplicate tran_id on generate-qr intentional? 2) What does production do on reuse — reject, overwrite, or allow two concurrent QRs — and with which code? 3) Are the lifetime bounds identical in production (minimum 3 minutes, maximum 120 days)?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:16 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-01] Question about the Purc…",
+      "text": "hi @payway_Integration_AI_bot [T-01] Question about the Purchase API (/api/payment-gateway/v1/payments/purchase) and duplicate transaction IDs (tran_id): in sandbox, creating a transaction with a tran_id that already exists silently succeeds (code 00 again), but the resulting KHQR cannot be paid — scanning says \"Transaction not found\". A hosted-page re-POST for a closed duplicate first says code 4 \"Duplicated Transaction ID\". Please: 1) Does PRODUCTION reject duplicate tran_ids per merchant, and with which exact error code? 2) Why does sandbox accept them if the QR is unpayable? 3) If the create response is lost (network drop), is retrying with the SAME tran_id safe in production, or must a new ID be generated?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:16 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, I’m ready — you can send the numbered qu…",
+      "text": "Hello Bong @Ruzaid, I’m ready — you can send the numbered questions anytime. I’ll answer based only on documented PayWay behavior and, where possible, include the exact public doc URLs (e.g. from https://developer.payway.com.kh). If something isn’t covered in the available docs, I’ll say so and leave it for the Integration Team to confirm.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:14 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-00] Hello! We build develop…",
+      "text": "hi @payway_Integration_AI_bot [T-00] Hello! We build developer tooling (an SDK and CLI) on top of the ABA PayWay payment gateway APIs. We work in the PayWay sandbox with merchant profile ec476910 and use these API families: 1) purchase/checkout under /api/payment-gateway/v1/payments/ (purchase, generate-qr, check-transaction, transaction-detail, transaction-list, refund, pre-auth complete/cancel, close-transaction); 2) Payment Link APIs (create/detail/void); 3) Credentials-on-File tokenization (link-account, link-card, charge with a token, renew/details/remove — v3 token management); 4) payout and beneficiary whitelist APIs; 5) exchange rate. Requests are HMAC-SHA512 signed with per-endpoint field orders. We will send a series of short numbered questions about production behavior and sandbox observations. Partial answers are fine — please answer what you know, say so when you don't, and point us to the exact public doc page whenever something is documented.",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:14 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Yes Bong @Ruzaid, this question arrived here in the chat fro…",
+      "text": "Yes Bong @Ruzaid, this question arrived here in the chat from the questionnaire runner side.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:01 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot (quiz test) Did this question …",
+      "text": "hi @payway_Integration_AI_bot (quiz test) Did this question arrive from the questionnaire runner?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:01 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, you can self-register for ABA PayWay San…",
+      "text": "Hello Bong @Ruzaid, you can self-register for ABA PayWay Sandbox as follows: 1. Go to the sandbox/developer portal: - https://sandbox.payway.com.kh/register-sandbox/ or https://developer.payway.com.kh/\n2. Register using your email address (or Google login where supported).\n3. Check your email for the 6‑digit OTP / confirmation code and enter it.\n4. Create your username and password and complete the registration.\n5. Wait for approval — you’ll receive an email “ABA PayWay Sandbox Account is Approved”.\n6. That email includes a text file with your sandbox Merchant ID, API credentials, and keys for testing. After that you can log in at https://sandbox.payway.com.kh/login and start testing.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 4:06 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot how do i register for ABA payw…",
+      "text": "hi @payway_Integration_AI_bot how do i register for ABA payway sandbox",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 4:06 AM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, hi! I’m here and available 24/7 — let me…",
+      "text": "Hello Bong @Ruzaid, hi! I’m here and available 24/7 — let me know any PayWay integration questions or errors you’d like help with.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 4:04 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, noted — I’m online and on standby if you…",
+      "text": "Hello Bong @Ruzaid, noted — I’m online and on standby if you need any PayWay integration help.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 4:04 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot hi",
+      "text": "hi @payway_Integration_AI_bot hi",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 4:04 AM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot (test) skill upgrade smoke tes…",
+      "text": "hi @payway_Integration_AI_bot (test) skill upgrade smoke test — no action needed",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 4:04 AM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "hi",
+      "text": "hi",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:12 AM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Bong @Ruzaid, I can’t attach files directly from here.\nThe …",
+      "text": "Bong @Ruzaid, I can’t attach files directly from here. The official ABA PayWay assets (payment logos, KHQR/ABA PAY, card brands, etc.) are provided in the latest ABA PayWay merchant UI guideline / design file that the Integration Team shares (Figma/asset pack). Please grab them from the internal asset repository or ask the team here to share the latest UI guideline & logo pack in this group. Per requirement, please always use the most recent assets from that guideline and replace any old/legacy logos.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 11:57 PM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "@payway_Integration_AI_bot please share the assets",
+      "text": "@payway_Integration_AI_bot please share the assets",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 11:56 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Bong @Ruzaid, for ABA PayWay default (E‑Commerce) checkout, …",
+      "text": "Bong @Ruzaid, for ABA PayWay default (E‑Commerce) checkout, key UI requirements from integration side are: 1. Payment method selection UI\n- Show a clear Select payment method section (e.g. ABA KHQR, Card, WeChat, Alipay, etc. as enabled for the merchant).\n- All enabled methods in the merchant profile must be visible and selectable.\n- Label for QR option: title \"ABA KHQR\", subtitle \"Scan to pay with any banking app\". 2. Checkout layout & behavior\n- Use ABA official logos/assets as provided by PayWay (no old/incorrect ABA logos).\n- For web, use the checkout popup/modal pattern with checkout2-0.js and AbaPayway.checkout() (not a full page redirect when popup is expected).\n- For mobile/webview, show hosted checkout full‑screen; hide the URL/address bar and browser controls; add a static merchant header in the webview.\n- For QR (checkout_qr_url), render it in a webview (or full‑screen view) so QR is clearly visible and readable. 3. Terms & Conditions and policies\n- Show a Terms & Conditions / Refund Policy link and a checkbox above the Pay button.\n- Block payment submission until the checkbox is ticked (frontend validation).\n- Refund/cancellation policy must be visible on the final step before placing the order. 4. Success / return flow\n- Provide and configure continue_success_url (web) or return_deeplink (app) so users return to the merchant after payment.\n- After success, clear the cart and update order status, and show your own Thank You / Order confirmed screen. 5. Review & sign‑off\n- Integration Team must review sample checkout / payment screens (including KHQR flow) for logo usage, wording, labels, currency formatting, and flow behavior before production credentials are released. If you need the more detailed UI guideline (Figma/pdf), the Integration Team usually shares that directly.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 11:51 PM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "@payway_Integration_AI_bot  What are the UI requiremetns of …",
+      "text": "@payway_Integration_AI_bot What are the UI requiremetns of ABA PAyWay Defatlt checkout",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 11:50 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "@payway_Integration_AI_bot  who is the manager ?",
+      "text": "@payway_Integration_AI_bot who is the manager ?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:28 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "@MiniAppAssistantBot  can you guide how to develope mini-app",
+      "text": "@MiniAppAssistantBot can you guide how to develope mini-app",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:23 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "@MiniAppAssistantBot  can you guide how to develope mini-app",
+      "text": "@MiniAppAssistantBot can you guide how to develope mini-app",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:22 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, to launch your PayWay website as a mini‑…",
+      "text": "Hello Bong @Ruzaid, to launch your PayWay website as a mini‑app inside ABA Mobile, you need these main steps: 1️⃣ Prepare a mini‑app version of your site\n- Create a separate staging/UAT URL just for the mini‑app (no site header/footer, simplified flow).\n- This is the URL that will be registered inside ABA Mobile. 2️⃣ Include the PayWay checkout plugin + mini‑app bridge\n- Load the PayWay script early on the page, e.g.: https://checkout.payway.com.kh/plugins/checkout2-0.js\n- Implement the mini‑app bridge handlers on that page: - AbaPayway.miniApp(...) (set navbar color/title, handle close button, etc.) - AbaPayway.miniAppGetProfile(...) (auto‑fill name/phone if needed)\n- Use AbaPayway.checkout(...) to initiate payment; when running inside ABA Mobile with ABA PAY, it will trigger native account selection. 3️⃣ Server‑side setup\n- Implement your callback URL to receive payment results.\n- Use the Transaction Status API on your server to verify each payment. 4️⃣ Register your mini‑app URL with ABA\n- Provide the staging mini‑app URL and vendor profile info (logo, banner, display name, contact, T&C URL, etc.) to the Integration Team.\n- They will add this URL into the mini‑app registry/simulator so ABA Mobile can open your site as a mini‑app. Once the URL is registered and your page loads with the plugin + bridge, ABA Mobile can launch it as a mini‑app entry point.\nReceived edited at 3:13 PM",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 3:13 PM",
+      "seen": false,
+      "edited": true
+    },
+    {
+      "message": "@payway_Integration_AI_bot  how to lauch my payway website a…",
+      "text": "@payway_Integration_AI_bot how to lauch my payway website as mini-app in abamobile",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:13 PM",
+      "seen": true,
+      "edited": false
+    }
+  ]
+}

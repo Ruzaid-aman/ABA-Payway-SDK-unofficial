@@ -1,0 +1,212 @@
+{
+  "capturedAt": "2026-10-02T22:15:02.810Z",
+  "messages": [
+    {
+      "message": "Hello Bong @Ruzaid, I’m ready — you can send the numbered qu…",
+      "text": "Hello Bong @Ruzaid, I’m ready — you can send the numbered questions anytime. I’ll answer based only on documented PayWay behavior and, where possible, include the exact public doc URLs (e.g. from https://developer.payway.com.kh). If something isn’t covered in the available docs, I’ll say so and leave it for the Integration Team to confirm.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:14 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot [T-00] Hello! We build develop…",
+      "text": "hi @payway_Integration_AI_bot [T-00] Hello! We build developer tooling (an SDK and CLI) on top of the ABA PayWay payment gateway APIs. We work in the PayWay sandbox with merchant profile ec476910 and use these API families: 1) purchase/checkout under /api/payment-gateway/v1/payments/ (purchase, generate-qr, check-transaction, transaction-detail, transaction-list, refund, pre-auth complete/cancel, close-transaction); 2) Payment Link APIs (create/detail/void); 3) Credentials-on-File tokenization (link-account, link-card, charge with a token, renew/details/remove — v3 token management); 4) payout and beneficiary whitelist APIs; 5) exchange rate. Requests are HMAC-SHA512 signed with per-endpoint field orders. We will send a series of short numbered questions about production behavior and sandbox observations. Partial answers are fine — please answer what you know, say so when you don't, and point us to the exact public doc page whenever something is documented.",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:14 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Yes Bong @Ruzaid, this question arrived here in the chat fro…",
+      "text": "Yes Bong @Ruzaid, this question arrived here in the chat from the questionnaire runner side.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 5:01 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot (quiz test) Did this question …",
+      "text": "hi @payway_Integration_AI_bot (quiz test) Did this question arrive from the questionnaire runner?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:01 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, you can self-register for ABA PayWay San…",
+      "text": "Hello Bong @Ruzaid, you can self-register for ABA PayWay Sandbox as follows: 1. Go to the sandbox/developer portal: - https://sandbox.payway.com.kh/register-sandbox/ or https://developer.payway.com.kh/\n2. Register using your email address (or Google login where supported).\n3. Check your email for the 6‑digit OTP / confirmation code and enter it.\n4. Create your username and password and complete the registration.\n5. Wait for approval — you’ll receive an email “ABA PayWay Sandbox Account is Approved”.\n6. That email includes a text file with your sandbox Merchant ID, API credentials, and keys for testing. After that you can log in at https://sandbox.payway.com.kh/login and start testing.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 4:06 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot how do i register for ABA payw…",
+      "text": "hi @payway_Integration_AI_bot how do i register for ABA payway sandbox",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 4:06 AM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, hi! I’m here and available 24/7 — let me…",
+      "text": "Hello Bong @Ruzaid, hi! I’m here and available 24/7 — let me know any PayWay integration questions or errors you’d like help with.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 4:04 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, noted — I’m online and on standby if you…",
+      "text": "Hello Bong @Ruzaid, noted — I’m online and on standby if you need any PayWay integration help.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 4:04 AM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot hi",
+      "text": "hi @payway_Integration_AI_bot hi",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 4:04 AM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "hi @payway_Integration_AI_bot (test) skill upgrade smoke tes…",
+      "text": "hi @payway_Integration_AI_bot (test) skill upgrade smoke test — no action needed",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 4:04 AM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "hi",
+      "text": "hi",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:12 AM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Bong @Ruzaid, I can’t attach files directly from here.\nThe …",
+      "text": "Bong @Ruzaid, I can’t attach files directly from here. The official ABA PayWay assets (payment logos, KHQR/ABA PAY, card brands, etc.) are provided in the latest ABA PayWay merchant UI guideline / design file that the Integration Team shares (Figma/asset pack). Please grab them from the internal asset repository or ask the team here to share the latest UI guideline & logo pack in this group. Per requirement, please always use the most recent assets from that guideline and replace any old/legacy logos.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 11:57 PM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "@payway_Integration_AI_bot please share the assets",
+      "text": "@payway_Integration_AI_bot please share the assets",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 11:56 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Bong @Ruzaid, for ABA PayWay default (E‑Commerce) checkout, …",
+      "text": "Bong @Ruzaid, for ABA PayWay default (E‑Commerce) checkout, key UI requirements from integration side are: 1. Payment method selection UI\n- Show a clear Select payment method section (e.g. ABA KHQR, Card, WeChat, Alipay, etc. as enabled for the merchant).\n- All enabled methods in the merchant profile must be visible and selectable.\n- Label for QR option: title \"ABA KHQR\", subtitle \"Scan to pay with any banking app\". 2. Checkout layout & behavior\n- Use ABA official logos/assets as provided by PayWay (no old/incorrect ABA logos).\n- For web, use the checkout popup/modal pattern with checkout2-0.js and AbaPayway.checkout() (not a full page redirect when popup is expected).\n- For mobile/webview, show hosted checkout full‑screen; hide the URL/address bar and browser controls; add a static merchant header in the webview.\n- For QR (checkout_qr_url), render it in a webview (or full‑screen view) so QR is clearly visible and readable. 3. Terms & Conditions and policies\n- Show a Terms & Conditions / Refund Policy link and a checkbox above the Pay button.\n- Block payment submission until the checkbox is ticked (frontend validation).\n- Refund/cancellation policy must be visible on the final step before placing the order. 4. Success / return flow\n- Provide and configure continue_success_url (web) or return_deeplink (app) so users return to the merchant after payment.\n- After success, clear the cart and update order status, and show your own Thank You / Order confirmed screen. 5. Review & sign‑off\n- Integration Team must review sample checkout / payment screens (including KHQR flow) for logo usage, wording, labels, currency formatting, and flow behavior before production credentials are released. If you need the more detailed UI guideline (Figma/pdf), the Integration Team usually shares that directly.",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 11:51 PM",
+      "seen": false,
+      "edited": false
+    },
+    {
+      "message": "@payway_Integration_AI_bot  What are the UI requiremetns of …",
+      "text": "@payway_Integration_AI_bot What are the UI requiremetns of ABA PAyWay Defatlt checkout",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 11:50 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "@payway_Integration_AI_bot  who is the manager ?",
+      "text": "@payway_Integration_AI_bot who is the manager ?",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 5:28 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "@MiniAppAssistantBot  can you guide how to develope mini-app",
+      "text": "@MiniAppAssistantBot can you guide how to develope mini-app",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:23 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "@MiniAppAssistantBot  can you guide how to develope mini-app",
+      "text": "@MiniAppAssistantBot can you guide how to develope mini-app",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:22 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid, to launch your PayWay website as a mini‑…",
+      "text": "Hello Bong @Ruzaid, to launch your PayWay website as a mini‑app inside ABA Mobile, you need these main steps: 1️⃣ Prepare a mini‑app version of your site\n- Create a separate staging/UAT URL just for the mini‑app (no site header/footer, simplified flow).\n- This is the URL that will be registered inside ABA Mobile. 2️⃣ Include the PayWay checkout plugin + mini‑app bridge\n- Load the PayWay script early on the page, e.g.: https://checkout.payway.com.kh/plugins/checkout2-0.js\n- Implement the mini‑app bridge handlers on that page: - AbaPayway.miniApp(...) (set navbar color/title, handle close button, etc.) - AbaPayway.miniAppGetProfile(...) (auto‑fill name/phone if needed)\n- Use AbaPayway.checkout(...) to initiate payment; when running inside ABA Mobile with ABA PAY, it will trigger native account selection. 3️⃣ Server‑side setup\n- Implement your callback URL to receive payment results.\n- Use the Transaction Status API on your server to verify each payment. 4️⃣ Register your mini‑app URL with ABA\n- Provide the staging mini‑app URL and vendor profile info (logo, banner, display name, contact, T&C URL, etc.) to the Integration Team.\n- They will add this URL into the mini‑app registry/simulator so ABA Mobile can open your site as a mini‑app. Once the URL is registered and your page loads with the plugin + bridge, ABA Mobile can launch it as a mini‑app entry point.\nReceived edited at 3:13 PM",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 3:13 PM",
+      "seen": false,
+      "edited": true
+    },
+    {
+      "message": "@payway_Integration_AI_bot  how to lauch my payway website a…",
+      "text": "@payway_Integration_AI_bot how to lauch my payway website as mini-app in abamobile",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:13 PM",
+      "seen": true,
+      "edited": false
+    },
+    {
+      "message": "Hello Bong @Ruzaid,\nTo launch your PayWay site as a mini‑ap…",
+      "text": "Hello Bong @Ruzaid, To launch your PayWay site as a mini‑app inside ABA Mobile/ABA PayWay you basically need: 1️⃣ Separate mini‑app URL (staging/uat first) - Create a separate project or path just for the mini‑app (no header/footer, simplified flow). - This URL is what the Integration Team will register in the ABA container/simulator. 2️⃣ Include PayWay checkout plugin + mini‑app bridge - Load the checkout plugin early, e.g.: https://checkout.payway.com.kh/plugins/checkout2-0.js (use env‑specific URL). - Initialize and use the mini‑app bridge handlers on that page: - AbaPayway.miniApp(...) to set nav bar, close button, etc. - AbaPayway.miniAppGetProfile(...) to prefill name/phone if needed. - Use AbaPayway.checkout(...) to start the payment (usually with ABA PAY as default option inside the app). 3️⃣ Mini‑app UX adjustments - Remove your own site header/footer and logo link. - Keep flow simple, avoid login/complex nav. - Default to ABA PAY and hide other options if the mini‑app is ABA‑only. - Provide a dedicated thank‑you page and configure redirect back there after payment. 4️⃣ Server‑side pieces - Implement <CALLBACK_URL> to receive PayWay payment result. - Call Transaction Status API server‑side to verify the order before finalizing. 5️⃣ Registration with ABA Mobile - Share the staging mini‑app URL and required vendor profile info (logo, banner, name, contacts, T&C URL, etc.) with the Integration Team. - They will register your mini‑app URL in the internal simulator/mini‑app registry and confirm it loads correctly inside ABA Mobile. Once the URL is registered and your page loads with the plugin + bridge, it will open as a mini‑app from the ABA Mobile entry point.\nReceived edited at 3:10 PM",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 3:10 PM",
+      "seen": false,
+      "edited": true
+    },
+    {
+      "message": "Hello Bong @Ruzaid, I’m here.\nFor *mini‑app* with PayWay we…",
+      "text": "Hello Bong @Ruzaid, I’m here. For *mini‑app* with PayWay we mainly support:\n- Mini‑app inside **ABA Mobile / ABA PayWay container** (using `checkout2-0.js` + `AbaPayway.miniApp*` bridge, profile, file upload, etc.)\n- Telegram **webview / Mini App** using **hosted_view + deeplink + KHQR** (no JS plugin inside Telegram). Could you share what you want to do with the mini‑app (ABA in‑app mini‑app vs Telegram mini‑app, and which part you need help on: setup, JS bridge, or payment initiation)?\nReceived edited at 3:09 PM",
+      "sender": "PayWay integration Agent",
+      "delivery": "Received",
+      "time": "at 3:09 PM",
+      "seen": false,
+      "edited": true
+    },
+    {
+      "message": "#miniapp",
+      "text": "#miniapp",
+      "sender": "Me",
+      "delivery": "Sent",
+      "time": "at 3:05 PM",
+      "seen": true,
+      "edited": false
+    }
+  ]
+}

@@ -1,0 +1,303 @@
+[
+  {
+    "id": "T-00",
+    "priority": "P0",
+    "topic": "Context primer",
+    "register": "",
+    "text": "Hello! We build developer tooling (an SDK and CLI) on top of the ABA PayWay payment gateway APIs. We work in the PayWay sandbox with merchant profile ec476910 and use these API families: 1) purchase/checkout under /api/payment-gateway/v1/payments/ (purchase, generate-qr, check-transaction, transaction-detail, transaction-list, refund, pre-auth complete/cancel, close-transaction); 2) Payment Link APIs (create/detail/void); 3) Credentials-on-File tokenization (link-account, link-card, charge with a token, renew/details/remove — v3 token management); 4) payout and beneficiary whitelist APIs; 5) exchange rate. Requests are HMAC-SHA512 signed with per-endpoint field orders. We will send a series of short numbered questions about production behavior and sandbox observations. Partial answers are fine — please answer what you know, say so when you don't, and point us to the exact public doc page whenever something is documented."
+  },
+  {
+    "id": "T-01",
+    "priority": "P0",
+    "topic": "Purchase API: duplicate tran_id",
+    "register": "Q9.1, Q27; skills-audit Q-F",
+    "text": "Question about the Purchase API (/api/payment-gateway/v1/payments/purchase) and duplicate transaction IDs (tran_id): in sandbox, creating a transaction with a tran_id that already exists silently succeeds (code 00 again), but the resulting KHQR cannot be paid — scanning says \"Transaction not found\". A hosted-page re-POST for a closed duplicate first says code 4 \"Duplicated Transaction ID\". Please: 1) Does PRODUCTION reject duplicate tran_ids per merchant, and with which exact error code? 2) Why does sandbox accept them if the QR is unpayable? 3) If the create response is lost (network drop), is retrying with the SAME tran_id safe in production, or must a new ID be generated?"
+  },
+  {
+    "id": "T-02",
+    "priority": "P0",
+    "topic": "generate-qr: duplicate tran_id + lifetime bounds",
+    "register": "Q10",
+    "text": "Question about the QR-generation API (generate-qr / merchant-initiated QR): in sandbox the SAME tran_id was submitted twice with different amounts and both times code 00 returned with two live QR payloads. Also, a lifetime below exactly 180 seconds is rejected with HTTP 400 code \"04\", and values up to ~27 hours are accepted (docs say minimum 3 minutes, maximum 120 days). Please: 1) Is duplicate tran_id on generate-qr intentional? 2) What does production do on reuse — reject, overwrite, or allow two concurrent QRs — and with which code? 3) Are the lifetime bounds identical in production (minimum 3 minutes, maximum 120 days)?"
+  },
+  {
+    "id": "T-03",
+    "priority": "P0",
+    "topic": "Query APIs: visibility delay",
+    "register": "Q9.2–3",
+    "text": "Question about how quickly newly created transactions appear in the query APIs: in sandbox, check-transaction sees a fresh transaction in under 1 second, while transaction-detail needs about 5 seconds. Please: 1) In production, what is the expected visibility delay for check-transaction and for transaction-detail after creation? 2) Is the difference between the two endpoints an architectural guarantee we can rely on when tuning a poller, or incidental?"
+  },
+  {
+    "id": "T-04",
+    "priority": "P0",
+    "topic": "Close Transaction: production contract",
+    "register": "Q4, Q28; skills-audit Q-G",
+    "text": "Questions about the close-transaction API (closes an open transaction/QR): in sandbox, KHQR scans are refused after close (\"transaction expired\"), but a hosted CARD checkout session was still approved twice after a successful close, and no read API (check-transaction, transaction-detail) ever shows a CLOSED status. Also, closing a tran_id that never existed returns code 00 \"Success!\". Please: 1) In PRODUCTION, can a hosted-card session still pay after a successful close? 2) Is there any API way to see that a transaction was closed? 3) If a closed transaction is paid anyway, what is the final state — auto-reversal? Who refunds the customer? 4) Is the code-00 answer for a never-existing tran_id intentional idempotent behavior, and does production match it? 5) Should re-closing an already-closed transaction return 00 again or a dedicated code?"
+  },
+  {
+    "id": "T-05",
+    "priority": "P0",
+    "topic": "Purchase KHQR: scan validity window",
+    "register": "Q26; skills-audit Q-E",
+    "text": "Question about KHQR created via the Purchase API (not offline KHQR): the QR payload contains no expiry timestamp, but scan validity seems much shorter than the transaction lifetime. In sandbox, a QR whose transaction had lifetime 1440 minutes was scan-refused \"Transaction expired\" at age 2h15m, while a seconds-old QR paid fine. Please: 1) What exactly governs how long a purchase-API KHQR stays scannable — a fixed window (what length?), the lifetime field (in which unit?), or a per-profile rule? 2) Should merchants always instruct customers to scan promptly even when a long lifetime was set? 3) Is the behavior the same in production?"
+  },
+  {
+    "id": "T-06",
+    "priority": "P0",
+    "topic": "Callbacks: retry contract + citable doc",
+    "register": "Q6.1, Q40",
+    "text": "Questions about PayWay callbacks (notifications POSTed to the merchant server): we understand delivery is a single best-effort attempt with no guaranteed retry (about a 5-second window; a one-off ~10-second retry is sometimes observed but must not be designed for), and recovery is polling Check Transaction. Please: 1) Is there a published document (name, URL, version) that states this single-delivery contract? 2) In production, after a failed delivery (server down, non-200, timeout), is there ANY retry, and after how long? 3) Is polling Check Transaction the officially recommended recovery?"
+  },
+  {
+    "id": "T-07",
+    "priority": "P0",
+    "topic": "Callbacks: signature, ACK and sample vectors per service",
+    "register": "Q46",
+    "text": "Questions about callback signatures and acknowledgement, per notification type (online checkout, online QR, signed printed-QR \"Customer Module\", unsigned offline KHQR, payment-link pushback, credentials-on-file token notification): 1) Is an HMAC signature always present for each type, and what is the exact canonical string that is signed (field order, encoding)? 2) What HTTP response does PayWay expect from the merchant server — status 200, any specific body like \"RECEIVEOK\", is 202 accepted, and what is the response timeout? 3) Please share approved sample callback payloads that include nested objects, null/boolean/Unicode values and unknown extra fields, so we can test signature verification and parsing. 4) If a signature is missing, should the merchant silently downgrade to unverified processing, or reject the delivery?"
+  },
+  {
+    "id": "T-08",
+    "priority": "P0",
+    "topic": "CoF token callback: HMAC canonicalization",
+    "register": "Q18.5",
+    "text": "Question about the credentials-on-file token notification callback: it arrives as JSON with header \"x-payway-topic: PaymentNotification\" and body {request_id, payment_credential:{ctid, pwt, status, expired_at, token_flag, ...}}. Its \"x-payway-hmac-sha512\" header does NOT verify using the request-signing canonicalization (sorted keys concatenated), and 19 alternative orderings also failed. Please: 1) What is the exact canonicalization / field order of the HMAC plaintext on THIS callback? 2) Or does this callback use a different signature scheme (key, encoding)? Until we can verify the signature we authenticate link deliveries indirectly via get-token-details using the request_id."
+  },
+  {
+    "id": "T-09",
+    "priority": "P0",
+    "topic": "CoF: customer-initiated removal notification",
+    "register": "Q18.6",
+    "text": "Questions about credentials-on-file tokens removed by the customer in the ABA Mobile app: we captured ZERO callbacks when a customer unlinked two accounts (while link-approval callbacks worked fine on the same URL), and get-token-details keeps returning status=1 (active) for the removed tokens — charges only fail later with code 105. Please: 1) Does ANY notification exist for customer-initiated removal (per-request callback or profile-level webhook)? If yes, where is it configured? 2) Should get-token-details report removed tokens differently (e.g., status 0)? 3) What is the recommended way for merchants to detect removal proactively?"
+  },
+  {
+    "id": "T-10",
+    "priority": "P0",
+    "topic": "Sandbox ec476910: enablement batch",
+    "register": "Q22.1, Q41, Q43, Q19.1, Q24.1–2",
+    "text": "Our sandbox merchant profile is ec476910. Several features answer profile-level blockers; could you check or enable them for this profile (or provide a pre-enabled test profile)? 1) Card tokenization: hosted link-card answers HTTP 403 code 104 \"Merchant not enabled token flag\" (the account-linking leg already works). 2) Merchant-initiated tokenization charge flags MITU_FLEX / MITU_FIX / MITR_FLEX answer 403 code 105 on charges with a valid active token (CITU_FLEX charges fine). 3) Payout: beneficiary add answers code 32 \"Service is not enable\", and payment-link create with payout answers \"Payout accounts are not in whitelist\". 4) get-transactions-by-mc-ref answers HTTP 404 with an empty body while sibling endpoints work (it worked in earlier tests) — is that a regression, profile gating, or retirement? 5) What is the procedure for a merchant to request these enablements in sandbox?"
+  },
+  {
+    "id": "T-11",
+    "priority": "P0",
+    "topic": "Subscription hash order, doc fix, hash freeze, expire_in",
+    "register": "Q22.2–3, Q12, Q42",
+    "text": "Three related items: 1) Subscription purchase (purchase API with ctid + token_flag=CITR_FIX + frequency 1W/1M/2M): the published docs list a 26-field HMAC order WITHOUT ctid, but the gateway enforces ctid signed between items and shipping (27 fields), and the \"Wrong Hash\" error hint prints the documented (wrong) list. Please confirm the authoritative field order and fix the docs page and the error hint. 2) Are the published per-endpoint HMAC field orders now frozen, and how would future changes be announced (changelog, spec version)? Do the same orders apply unchanged in PRODUCTION? 3) On the account-linking response, expire_in arrives as an absolute epoch-seconds timestamp equal to creation + ~90 seconds, while the docs say \"10 minutes\". Please confirm expire_in is the epoch instant of the link-QR expiry and what the intended validity window is."
+  },
+  {
+    "id": "T-12",
+    "priority": "P0",
+    "topic": "Production base URL + UAT environment",
+    "register": "Q16",
+    "text": "Two questions about PayWay environments: 1) Please confirm the PRODUCTION base URL is https://checkout.payway.com.kh and that all current endpoint paths exist identically there, including the -2 suffixed versions and the v3 token-management paths. 2) Is there a separate UAT or certification environment between sandbox and production, with its own base URL?"
+  },
+  {
+    "id": "T-13",
+    "priority": "P1",
+    "topic": "CoF: token expiry semantics + expired-charge error",
+    "register": "Q3",
+    "text": "Questions about credentials-on-file token expiry (tokens expire after about 90 days): 1) Is validity exactly 90 calendar days from grant/renewal, or rolling/usage-based? 2) Which timezone governs the boundary day? 3) What error code does a charge return when the token is expired but not yet removed? (Charges on REMOVED tokens decline with code 105 — is expired the same or a different code?)"
+  },
+  {
+    "id": "T-14",
+    "priority": "P1",
+    "topic": "token_flag: production-valid domains",
+    "register": "Q25.1–2, Q7.3",
+    "text": "Question about the token_flag field used in credentials-on-file and subscription calls: please publish the PRODUCTION-valid values at each place it is used: 1) account/card linking, 2) charging with a token, 3) subscription registration. In sandbox, some probes accepted values outside the documented set (e.g., CITO_FIX, CITR_FLEX on certain calls) — are those sandbox-only, and should clients reject them? Also please confirm that CITR_FIX is intentionally invalid on the linking endpoints (linking uses CITI_FLEX / CITO_FLEX only)."
+  },
+  {
+    "id": "T-15",
+    "priority": "P1",
+    "topic": "Rate limits + 429 shape",
+    "register": "Q5, Q47 partial; skills-audit Q-D",
+    "text": "Questions about API rate limits: the sandbox enforces undocumented limits as HTTP 403 with a numeric body code 429 and no headers. Our working numbers to confirm or correct: check-transaction 600/min, transaction-detail 10/min, transaction-list 50/min, refund 500 per second, get-transactions-by-mc-ref 10/min. Please: 1) Confirm or correct these for production. 2) Is standard HTTP 429 with a Retry-After header planned? 3) What is the penalty model — throttled per API key, per merchant profile, or per source IP — and how long does a block last? 4) What does the production 429 response body look like?"
+  },
+  {
+    "id": "T-16",
+    "priority": "P1",
+    "topic": "Transaction list: unpaid QR visibility + window cap",
+    "register": "Q11",
+    "text": "Questions about the transaction list API: 1) In sandbox it returns only paid and checkout-created transactions — unpaid QR-only transactions never appear, although check-transaction sees them in under a second. Is that the intended production contract? 2) Is there a filter or variant that includes unpaid open QR transactions (needed to reconcile abandoned-but-still-scannable QRs)? 3) The date window is capped at 3 days (\"Maximum date rang is allowed only 3 days\") — is the cap the same in production, and can it be raised per merchant?"
+  },
+  {
+    "id": "T-17",
+    "priority": "P1",
+    "topic": "get-transactions-by-mc-ref: canonical envelope",
+    "register": "Q34, Q24.3",
+    "text": "Question about get-transactions-by-mc-ref (query transactions by merchant reference): production response captures wrap the rows under a \"data\" field with a nested status OBJECT like {code:\"00\", message:\"Success!\", merchant_ref:...}, while the documentation describes a numeric status (0 = success) and a \"transactions\" array. Please: 1) Which envelope is canonical in production, and will it stay stable? 2) Is the string \"00\" the success code in both sandbox and production? 3) Is this endpoint supported in production, and is the documented 10-per-minute throttle current?"
+  },
+  {
+    "id": "T-18",
+    "priority": "P1",
+    "topic": "Query proof + lost-response recovery + repeat payments",
+    "register": "Q47",
+    "text": "Questions about proving payments and recovering lost responses: 1) check-transaction responses do not include the original currency. For final proof of an approved payment, is there a recommended combination of the signed callback plus a current query that avoids extra transaction-detail calls (or must approval use paced transaction-detail requests)? 2) If a create/refund/capture/payout response was lost (network drop), what is the reliable recovery — query by tran_id, by merchant reference, or something else? 3) Can a QR or payment link genuinely be paid more than once (repeat payments)? What duplicate-payment identity rules apply per QR/link type? 4) What is the maximum historical window for the query APIs (7 days?), and does it differ per endpoint?"
+  },
+  {
+    "id": "T-19",
+    "priority": "P1",
+    "topic": "Payment link: pushback parity + invalid-id code",
+    "register": "Q20, Q21",
+    "text": "Questions about Payment Link pushbacks (POST to the link's return_url): we captured {tran_id, status:0, merchant_ref_no} as application/json with NO hash field; status is numeric 0, while the official sample shows \"status\": \"00\". Please: 1) Does the production pushback also carry no HMAC/hash? 2) Can pushback status take values other than 0 (failed, cancelled?) and what do they mean? 3) Can more than one pushback arrive per payment? 4) For an invalid or unknown link id, the docs say PTL132 \"Invalid payment link\" but sandbox answers HTTP 403 code 96 \"Invalid merchant data\" — which code does production return?"
+  },
+  {
+    "id": "T-20",
+    "priority": "P1",
+    "topic": "Payment link: lifecycle + datatype parity",
+    "register": "Q33",
+    "text": "Questions about Payment Link lifecycle and data types: 1) Is there a terminal EXPIRED status for payment links in production, or must merchants enforce expiry locally? (Sandbox: links past expired_date still read OPEN and the hosted page still answers HTTP 200.) 2) What are the canonical production types of tran_id, amount, total_refund and expired_date in create/detail responses and pushbacks? (Sandbox: tran_id numeric in create/detail but string in pushbacks; unset expired_date echoes the string \"0\"; create/detail disagree on total_refund.) 3) When is pushback_url present in the detail response, and when is it omitted? 4) What is the minimum future expired_date offset, and which error code applies for past or too-soon values? (Sandbox PTL04 seems to be a catch-all.) 5) Are PTL04, PTL05, PTL99 and PTL132 all active production codes, and which condition maps to each?"
+  },
+  {
+    "id": "T-21",
+    "priority": "P1",
+    "topic": "Payment link: void endpoint parity",
+    "register": "Q37",
+    "text": "Questions about the payment-link void endpoint (POST /api/merchant-portal/merchant-access/payment-link/void — it has no published docs page). We mapped it on sandbox: RSA-encrypted merchant_auth {mc_id, id}, HMAC over request_time + merchant_id + merchant_auth; success answers {status:{code:\"00\"}, tran_id} with a numeric tran_id; the link then reads VOIDED in detail; the hosted page renders an invalid-data shell (code 07); a second void answers HTTP 403 PTL188 \"The payment link is already voided.\". Please: 1) Is void available in PRODUCTION with the same path, signing and responses, and is an official docs page planned? 2) Can a PAID or partially-paid multi-payment link be voided, or is it rejected — with which code? 3) Do in-flight payments on a link survive a void (does the pushback still fire, does check-transaction still approve)? 4) Is PTL188 final in production for a double void? 5) Should merchants refund paid links instead of voiding them?"
+  },
+  {
+    "id": "T-22",
+    "priority": "P1",
+    "topic": "Payment link: image upload",
+    "register": "Q14",
+    "text": "Questions about payment-link create with an image (multipart upload, JPG/PNG up to 3MB): 1) The stored image \"size\" is reported as 0 even on success — is that a known defect? 2) Are there server-side constraints beyond the 3MB JPG/PNG rule (dimensions, aspect ratio, content sniffing)? 3) The original filename is not preserved (renamed to payment_link_image_<epoch-ms>.<ext>) — is that intended? 4) Is the hosted CDN URL stable and public enough to embed in merchant-facing receipts?"
+  },
+  {
+    "id": "T-23",
+    "priority": "P1",
+    "topic": "Subscription lifecycle management",
+    "register": "Q15",
+    "text": "Questions about subscription (recurring) payments via credentials-on-file — initiation works via the purchase API with ctid + token_flag=CITR_FIX + frequency (1W/1M/2M): 1) How does a merchant cancel, pause or resume a subscription — is remove-token the only documented mechanism, or do dedicated endpoints exist? 2) How does the merchant learn that a renewal charge happened — is there a callback per recurring charge, and how does it differ from a one-off charge callback? 3) Does frequency also govern the token's ~90-day renewal deadline, or can a CITR_FIX token expire mid-cycle? 4) How can we simulate a full recurring cycle in sandbox without waiting 7/30/60 days?"
+  },
+  {
+    "id": "T-24",
+    "priority": "P1",
+    "topic": "Hosted checkout routing",
+    "register": "Q29.1–2, Q29.4",
+    "text": "Questions about the hosted checkout on the purchase API: 1) Does payment_gate=0 make the purchase endpoint return hosted checkout HTML instead of QR JSON, and is that routing profile-specific? 2) Is payment_gate still supported on /api/payment-gateway/v1/payments/purchase at all? 3) Is the hosted_view parameter mobile-only, or also supported for desktop browsers?"
+  },
+  {
+    "id": "T-25",
+    "priority": "P1",
+    "topic": "Money + identifier contract",
+    "register": "Q48, N2 KHR-floor, N6 remainder",
+    "text": "Questions about amounts and identifiers across the PayWay APIs: 1) Please confirm USD uses 2 decimal places and KHR whole numbers for every operation (create, refund, payout), any per-method minimum/maximum, and whether the API accepts sub-100-KHR refunds. 2) What are the allowed characters and maximum length of tran_id and other merchant references, and what is the uniqueness scope (per merchant? global?)? 3) Which timezone do gateway timestamps use, and in which units are lifetime/expiry fields expressed (seconds? minutes?)? Concrete example values would help."
+  },
+  {
+    "id": "T-26",
+    "priority": "P1",
+    "topic": "Refund policy",
+    "register": "N2 remainder",
+    "text": "Questions about refund policy (the refund API mechanics work; the policy is undocumented): 1) What is the refund window after capture? 2) Are multiple partial refunds allowed up to the original total? 3) Are there refund fees, and who is authorized to trigger refunds? 4) Do partial refund amounts round to the original currency's scale (0.01 USD / 1 KHR), or always to whole KHR, and is there a minimum refund amount? 5) We understand there is no standard refund after a payout/split — is a manual refund the only path in that case?"
+  },
+  {
+    "id": "T-27",
+    "priority": "P1",
+    "topic": "Payout: mechanics + sandbox provisioning",
+    "register": "Q13, Q19.2, Q54",
+    "text": "Questions about payout and split-payout: 1) Which source accounts/currencies can fund a payout — the settlement account only, or others? 2) What fees, daily limits and rounding rules apply, and how are fees allocated across beneficiaries? 3) What reports or records show the source-account debit and each beneficiary credit? 4) What payee account format does add-whitelist-payout expect — ABA account number, customer ID? Must it be a real, existing account even in sandbox? (Invalid accounts only return the generic PTL04 \"Parameter validation required\".) 5) Can complete-with-payout (pre-auth completion with split payout) be provisioned on our sandbox profile ec476910 — it answers PTL62 \"Merchant information is invalid\"? 6) Is there a list of seeded sandbox beneficiary accounts we can whitelist against? 7) In payment-link create/detail responses, is the payout array top-level [{acc, amt, acc_name}] or nested under data? The official sample and overview disagree."
+  },
+  {
+    "id": "T-28",
+    "priority": "P1",
+    "topic": "Pre-auth mechanics",
+    "register": "Q53, N3 remainder",
+    "text": "Questions about card pre-authorization: 1) Can the completion amount be lower than, equal to, or higher than the original hold? 2) When is the un-captured remainder released? 3) What happens if capture and cancel are submitted at the same time (race)? 4) Is incremental auth / re-auth supported? 5) We know the default capture window is 30 days (per-merchant configurable) with auto-release and NO webhook — is polling check-transaction the intended way to detect auto-release? 6) How do issuer or central-bank constraints affect refund timing, and how do we recover the original pre-auth operation for a refund via inquiry?"
+  },
+  {
+    "id": "T-29",
+    "priority": "P1",
+    "topic": "PCI scope + service levels",
+    "register": "N9, N11",
+    "text": "Two commercial/operations questions: 1) PCI-DSS: which SAQ applies per integration mode — fully hosted page, popup (checkout2-0.js on the merchant page), or card entry in a merchant-controlled WebView? What is PayWay's own PCI-DSS certification level/attestation? 2) Service levels: is there an SLA, an uptime status page, or an incident communication channel for the PayWay API? What are the support hours and escalation path?"
+  },
+  {
+    "id": "T-30",
+    "priority": "P1",
+    "topic": "Checkout callback schema + language param",
+    "register": "N12 remainder",
+    "text": "Questions about the hosted checkout page: 1) Is there a field-by-field reference schema for the online-checkout CALLBACK payload (all fields and types, beyond the examples in the docs)? 2) Does the purchase API support a \"language\" parameter for the hosted page, and which locales? 3) We understand custom CSS/JS is not supported and branding/labels are configured per profile by your team — please confirm, and describe how a merchant requests label or theme changes."
+  },
+  {
+    "id": "T-31",
+    "priority": "P1",
+    "topic": "TLS chain + network rules",
+    "register": "Q7.1–2, Q17, Q39, Q49.3",
+    "text": "Questions about network security: 1) The PayWay SANDBOX presents a self-signed TLS certificate chain, so integrators must disable certificate verification — a dangerous habit. (Guidance received in September said no PayWay environment uses self-signed certs, but we can reproduce the chain.) Was this intended, and will sandbox get a publicly trusted certificate — or can you publish the chain so we can pin it? 2) Are PayWay callback source IPs available as an allowlist range for ingress filtering? 3) For production: are there WAF/TLS-version/port requirements for merchant callback endpoints, and is hosting the merchant server outside Cambodia allowed?"
+  },
+  {
+    "id": "T-32",
+    "priority": "P1",
+    "topic": "Key rotation + incident procedure",
+    "register": "Q8, Q49.2, N10 remainder",
+    "text": "Questions about API key management: 1) A sandbox API key was once accidentally committed to a repository (since removed). What is the procedure to rotate or reissue the API key for a sandbox merchant — self-service in the portal, or a support ticket? 2) Can old and new keys overlap during rotation? 3) Does rotating the API key invalidate the RSA key pair or the webhook/callback registration, or are those independent? 4) Are production keys ever issued with temporary expirations (we were told they may be, until go-live verification completes)? 5) Is there a compliance channel to notify ABA about an exposed key?"
+  },
+  {
+    "id": "T-33",
+    "priority": "P1",
+    "topic": "Domain whitelisting + sandbox operations",
+    "register": "Q31 remainder",
+    "text": "Questions about domain whitelisting and sandbox operations: 1) What is the exact procedure for a merchant to add or change API-request root domains and callback root domains? Do wildcard subdomains apply, and are they profile-specific? 2) How can an expired sandbox profile be extended or reactivated? 3) For compliance sign-offs (pre-auth approval, POS checkout sign-off, production onboarding, optional phone verification, offline-KHQR callback whitelisting): what evidence should merchants retain or submit, and how do they confirm the whitelisting was actually configured on their profile?"
+  },
+  {
+    "id": "T-34",
+    "priority": "P1",
+    "topic": "Customer Module (printed QR) callbacks + provisioning",
+    "register": "Q35, Q36",
+    "text": "Questions about the \"Customer Module\" (printed static QR / invoicing tool) callbacks: 1) Do they arrive at the SAME single profile callback URL as online-checkout callbacks (mixed channels, told apart only by body shape), or can a separate URL be provisioned per channel? 2) Is the signature canonicalization identical to the online-checkout callback (sorted keys concatenated, nested objects JSON-encoded)? 3) Please confirm it is HMAC-SHA512 (one legacy guide mentions HMAC-SHA256). 4) Can the sandbox profile's Customer Module callback URL be self-configured in the merchant portal, or is it always configured by your team? 5) Can a sandbox profile be provisioned with the Customer Module (invoicing/payment links with a mandatory Customer ID) plus the KHQR query domain, so the full printed-QR flow can be rehearsed end to end?"
+  },
+  {
+    "id": "T-35",
+    "priority": "P1",
+    "topic": "Google Pay + per-method matrix",
+    "register": "Q38, N7 remainder",
+    "text": "Questions about payment methods: 1) Is Google Pay available ONLINE via PayWay? Our documentation and SDK expose a google_pay payment option and a Google Pay token parameter, but integration guidance from September 2026 said Google Pay online was \"not available at the time of the guidance\". Which is current, per environment, and what is the enablement procedure? 2) Is there a current per-method currency matrix and fee schedule (ABA PAY, KHQR, cards incl. UnionPay/JCB/UPI, Alipay, WeChat)? 3) How can a merchant verify which methods are actually enabled on their profile?"
+  },
+  {
+    "id": "T-36",
+    "priority": "P2",
+    "topic": "CoF governance: consent, schedules, revocation",
+    "register": "Q52",
+    "text": "Questions about credentials-on-file governance: 1) What are the approved consent, audit and retention rules for stored payment tokens, and who owns the charge schedule — the merchant or the provider? 2) How are cancelled consent, in-flight charges at revocation time, and retries or grace periods handled after consent is revoked? 3) Is there documentation of CIT vs MIT rules and when 3-D Secure is required that we can follow?"
+  },
+  {
+    "id": "T-37",
+    "priority": "P2",
+    "topic": "Profile capability discovery",
+    "register": "Q51",
+    "text": "Question about merchant profile capabilities: for each payment method (ABA PAY, KHQR, cards incl. UnionPay/JCB/UPI, Alipay, WeChat, Google Pay), is there a versioned schema, API or portal view that tells a merchant WHICH methods, currencies, and capabilities (refund, pre-auth, tokenization) are enabled on THEIR profile? How can enablement be verified programmatically instead of inferring it from logos, enum values, or error codes?"
+  },
+  {
+    "id": "T-38",
+    "priority": "P2",
+    "topic": "Go-live acceptance rule",
+    "register": "Q44",
+    "text": "Questions about production go-live acceptance for a new merchant: 1) What is the current acceptance rule — required transaction counts, amount caps, and required test cases per payment method/scheme/issuer? 2) Which cases are mandatory (refund, capture, credentials-on-file, payout)? 3) Can restricted customer traffic begin before the first settlement verification, and under what documented conditions?"
+  },
+  {
+    "id": "T-39",
+    "priority": "P2",
+    "topic": "Settlement report sources + joins",
+    "register": "Q45, N4 remainder",
+    "text": "Questions about settlement reconciliation sources: 1) Which exact portal reports and bank statements do merchants join for reconciliation, with which fields and grain? 2) How do order IDs (APV) in the portal export join to aggregated bank bookings, and where are fees, refunds, FX, reserves and taxes shown? 3) How are later-batch adjustments and cut-offs/holidays handled, and what tolerance applies before a mismatch must be escalated?"
+  },
+  {
+    "id": "T-40",
+    "priority": "P2",
+    "topic": "Checkout UI spec version + review process",
+    "register": "Q50 remainder",
+    "text": "Questions about the default checkout UI requirements (we received design exports titled 2.11 via the integration team): 1) Which guideline version is current, what is its effective date, and where is the canonical public source? 2) What is the supported device/embedded-browser matrix — do Telegram in-app browsers, external browsers, and native wrappers have different header/navigation requirements? 3) How are the vendor logo, checkout theme and continuation label configured per profile, which locales/labels are supported, and is there a required method order/spacing/currency typography? 4) What is the screen-review process before production credentials — review channel, required screenshots/recordings, approver, durable sign-off artifact — and is re-review required after profile changes? 5) Is the bottom-sheet presentation available to all profiles, and what rules govern the hosted-QR response (expiry, entitlement)?"
+  },
+  {
+    "id": "T-41",
+    "priority": "P2",
+    "topic": "Checkout UI asset redistribution",
+    "register": "Q56 remainder",
+    "text": "Question about redistributing checkout UI assets: may the checkout UI SVG assets, the composite payment-method logo strip, and the design exports (including third-party card-network marks) be redistributed inside a public SDK package? If yes, under which license, version and update terms, and what is the canonical download source? Supplying the files for an implementation review is not the same as permission to bundle them publicly."
+  },
+  {
+    "id": "T-42",
+    "priority": "P2",
+    "topic": "Adjacent products: plugins, POS, Mini Apps",
+    "register": "Q55",
+    "text": "Questions about adjacent PayWay products: 1) Which commerce-platform plugins (e.g., WooCommerce, Magento, Shopify or others) are officially supported, and which plugin versions/features/upgrade paths? 2) Is there an official POS/ECR hardware integration contract (transport/protocol/firmware)? 3) What are the rules for ABA Mini Apps (app/profile/environment/domain/method/return rules)? 4) Who owns each of these contracts, and is there separate UAT acceptance for them (ordinary PayWay sandbox checks cannot certify these products)?"
+  }
+]
