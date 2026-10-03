@@ -4572,11 +4572,18 @@ cofCmd
       }
       paymentToken = stored.pwt;
       chargedStoreKey = { ctid: opts.ctid as string, pwt: stored.pwt };
+      // FU-08: scheduled tokens expire by delivered expired_at — "renew"
+      // doesn't move it, so the advice differs from account tokens.
+      const scheduled = Boolean(stored.tokenFlag && ['CITR_FIX', 'MITR_FIX'].includes(stored.tokenFlag));
       const validityNote =
         expiry.status === 'expiring-soon'
-          ? c.yellow(`⚠ expiring in ${expiry.daysLeft}d — renew soon (cof token renew)`)
+          ? c.yellow(
+              scheduled
+                ? `⚠ expires in ${expiry.daysLeft}d (delivered expired_at) — user re-authorization in ABA Mobile moves it`
+                : `⚠ expiring in ${expiry.daysLeft}d — renew soon (cof token renew)`,
+            )
           : expiry.status === 'valid'
-            ? c.dim(`(${expiry.daysLeft}d of ~90d validity left)`)
+            ? c.dim(scheduled ? `(${expiry.daysLeft}d left until the delivered expiry)` : `(${expiry.daysLeft}d of ~90d validity left)`)
             : '';
       console.log(`  Using captured token ${c.cyan(maskPwt(stored.pwt))} ${c.dim(`(captured ${stored.capturedAt})`)} ${validityNote}`.trimEnd());
     }
@@ -4671,13 +4678,21 @@ cofTokenCmd
       });
       // Storage wave 4: a successful renewal restarts the ~90-day window —
       // update the local store record (fail-open; note to stderr under --json
-      // so stdout stays one JSON document).
+      // so stdout stays one JSON document). Scheduled subscription tokens
+      // (CITR_FIX/MITR_FIX) are exempt (FU-08): their delivered `expired_at`
+      // governs and NO local anchor moves it — renewal means user
+      // re-authorization in ABA Mobile, which arrives as a fresh delivery.
       let localNote: string;
       try {
         const renewedRecord = markTokenRenewed(opts.ctid as string, opts.token as string);
-        localNote = renewedRecord
-          ? 'local store: expiry window restarted'
-          : 'local store: token not tracked locally — nothing to update';
+        if (renewedRecord?.tokenFlag && ['CITR_FIX', 'MITR_FIX'].includes(renewedRecord.tokenFlag)) {
+          localNote =
+            'local store: scheduled subscription token — the delivered expired_at governs; this renew does NOT move its local expiry (re-authorization delivers a fresh expired_at)';
+        } else {
+          localNote = renewedRecord
+            ? 'local store: expiry window restarted'
+            : 'local store: token not tracked locally — nothing to update';
+        }
       } catch (error) {
         localNote = `local store update failed: ${error instanceof Error ? error.message : String(error)}`;
       }
@@ -4799,22 +4814,32 @@ cofTokenCmd
     for (const t of filtered) {
       const shown = opts.showToken ? t.pwt : maskPwt(t.pwt);
       console.log(`  ${c.bold('CTID:')} ${c.cyan(t.ctid)}  ${c.bold('pwt:')} ${c.cyan(shown)}`);
-      // Storage wave 4: surface the ~90-day docs/09 validity window.
+      // Storage wave 4: surface the ~90-day docs/09 validity window (or the
+      // delivered expired_at for scheduled subscription tokens, FU-08).
       const expiry = tokenExpiryStatus(t);
+      const scheduled = Boolean(t.tokenFlag && ['CITR_FIX', 'MITR_FIX'].includes(t.tokenFlag));
       const expiresOn = expiry.expiresAt ? expiry.expiresAt.toISOString().slice(0, 10) : null;
       let expiryBit: string;
-      if (expiry.status === 'valid') expiryBit = `✓ valid (${expiry.daysLeft}d left, expires ${expiresOn})`;
+      if (expiry.status === 'valid')
+        expiryBit = scheduled
+          ? `✓ valid (${expiry.daysLeft}d left until delivered expired_at ${expiresOn})`
+          : `✓ valid (${expiry.daysLeft}d left, expires ${expiresOn})`;
       else if (expiry.status === 'expiring-soon')
-        expiryBit = `⚠ expiring soon (${expiry.daysLeft}d left, expires ${expiresOn}) — renew with: cof token renew`;
+        expiryBit = scheduled
+          ? `⚠ expiring soon (${expiry.daysLeft}d left, delivered expired_at ${expiresOn}) — user re-authorization moves it`
+          : `⚠ expiring soon (${expiry.daysLeft}d left, expires ${expiresOn}) — renew with: cof token renew`;
       else if (expiry.status === 'expired')
-        expiryBit = `✗ EXPIRED (${Math.abs(expiry.daysLeft ?? 0)}d ago) — re-link the account or renew`;
-      else expiryBit = '– unknown (no capture timestamp)';
+        expiryBit = scheduled
+          ? `✗ EXPIRED (${Math.abs(expiry.daysLeft ?? 0)}d past delivered expired_at) — user re-authorization (ABA Mobile) or re-link`
+          : `✗ EXPIRED (${Math.abs(expiry.daysLeft ?? 0)}d ago) — re-link the account or renew`;
+      else expiryBit = scheduled ? '– unknown (scheduled token without a parseable delivered expired_at)' : '– unknown (no capture timestamp)';
       console.log(`    ${c.bold('expiry:')} ${expiryBit}`);
       const bits = [
         t.tokenFlag ? `flag=${t.tokenFlag}` : undefined,
         t.frequency ? `frequency=${t.frequency}` : undefined,
         `captured=${t.capturedAt}`,
         t.renewedAt ? `renewed=${t.renewedAt}` : undefined,
+        t.expiredAt ? `expired_at=${t.expiredAt}` : undefined,
         t.sourceRecordId ? `record=${t.sourceRecordId}` : undefined,
       ].filter(Boolean) as string[];
       console.log(`    ${c.dim(bits.join(' · '))}`);

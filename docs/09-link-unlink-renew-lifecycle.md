@@ -361,7 +361,11 @@ tracks it consistently:
 > carry an explicit `expired_at`, have **no** documented inactivity rule, and frequency governs
 > the billing schedule only — never the token's expiry. Charging an expired, frozen, or removed
 > token is simply declined (expired-token charges decline without a distinct documented code;
-> the 105-reuse question is still open), so keep the local expired-`expired_at` gate below.
+> the 105-reuse question is still open), so keep the local expired-`expired_at` gate below. The
+> SDK honors this split: for scheduled-flag records the local expiry buckets read the delivered
+> `expired_at` only — `cof token renew` restarts the rolling window for ACCOUNT tokens, but it
+> does **not** move a scheduled token's local expiry (only user re-authorization in ABA Mobile
+> does, delivered as a fresh capture).
 
 ```typescript
 import { computeTokenExpiry, daysUntilTokenExpiry, TOKEN_VALIDITY_DAYS } from 'aba-payway-ts';

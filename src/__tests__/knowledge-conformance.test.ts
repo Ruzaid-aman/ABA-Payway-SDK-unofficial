@@ -84,7 +84,7 @@ describe('production token_flag subsets', () => {
     expect(TOKEN_FLAG_LINKING_PRODUCTION).toEqual(['CITI_FLEX', 'CITO_FLEX']);
     expect(TOKEN_FLAG_CHARGING_PRODUCTION).toEqual(['CITU_FLEX', 'MITU_FLEX', 'MITR_FIX']);
     // The full enums stay supersets (sandbox accepts the extra variants).
-    expect(TOKEN_FLAG_CHARGING).toEqual(expect.arrayContaining(TOKEN_FLAG_CHARGING_PRODUCTION));
+    expect(TOKEN_FLAG_CHARGING).toEqual(expect.arrayContaining([...TOKEN_FLAG_CHARGING_PRODUCTION]));
   });
 
   it('advises (does not throw) when charging with out-of-spec flags', async () => {
@@ -466,6 +466,7 @@ describe('KHQR generation rate rule (T-15)', () => {
             transactionId: `QR-RL-${i}`,
             amount: 1,
             currency: 'USD',
+            paymentOption: 'abapay_khqr',
             callbackUrl: 'https://example.com/webhooks/aba',
           }),
         ),
