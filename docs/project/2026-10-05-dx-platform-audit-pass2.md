@@ -3574,3 +3574,41 @@ Estimated diff: **~1,200 lines of substance + one 181-file formatting commit.**
 - **Consequence of this addendum for the report.** §46's P0 order gains one step before item 1: verify the secret-scan gate locally. §48.4's expected-repository-changes table gains `.gitleaks.toml`. §47 gains `DX-BUILD-007` (complexity S, risk Low, acceptance: a local `gitleaks detect` run is recorded with its result, and if it flags the authorized credential, an allowlist entry exists whose `paths` and `regexes` match exactly that file and that value and nothing else).
 
 **Housekeeping applied to this committed copy.** The owner-authorized sandbox `secret_key` is **redacted** in both committed report files (`0508••••…cd29`), even though it is authorized for redistribution in the Postman collection. Reason: duplicating a credential into additional tracked paths widens the exposure surface and would place it at a path no `.gitleaks.toml` allowlist covers — the exact defect this addendum describes. The finding that documents it (pass-1 §24 S2) is unchanged and still names the file and field. The unredacted originals remain outside the repository.
+
+---
+
+## Addendum A-1 — verification result (2026-10-05, same session)
+
+`DX-BUILD-007` is **implemented and verified**. The gitleaks binary could not be executed here (release-asset download is blocked by sandbox egress), so the gate was reproduced instead by applying **gitleaks v8.30.1's actual `generic-api-key` rule definition** — fetched from `api.github.com/repos/gitleaks/gitleaks/contents/config/gitleaks.toml?ref=v8.30.1` — to every tracked file: the rule's regex, its `entropy = 3.5` floor, its four rule-level allowlists (path / stopword / regex, with `regexTarget` honoured as `secret` | `match` | `line`), the global allowlist, and this repository's `.gitleaks.toml` entries via `[extend] useDefault = true`.
+
+**The pass-1 statement was wrong and Addendum A-1's suspicion was right: gitleaks does flag the credential.**
+
+| Scan | Unsuppressed `generic-api-key` findings |
+|---|---|
+| Default rule only | 315 regex+entropy hits → **9** survive the rule's own allowlists |
+| + this repository's five pre-existing `.gitleaks.toml` entries | **7** — all in `payway-boilerplate/**`; the five entries cover only the four test fixtures and one doc placeholder |
+| + the two entries added by `DX-BUILD-007` | **0** |
+
+The 7 pre-existing findings, by value:
+
+| Value | Files | Nature |
+|---|---|---|
+| `0508…cd29` (40-hex, entropy 3.79) | `_build/distribution-scan.js:42`, `postman/collections/…/definition.yaml:118`, `Refrence-copy-…/definition.yaml:102` | The authorized `ec476910` sandbox `secret_key`, flagged **only where `secret_key:` shares the line** — the `dist/*.json` and `postman/environments/*.yaml` copies put the value on a bare `"value":` line with no keyword, so the rule does not reach them. A reformat of either file would newly expose it; the added entry covers all five paths for exactly this reason |
+| `9dc49b…ff6a` (36 ch, entropy 3.70) | `_build/smoketest.js:28`, `_build/fix_round1.js:63` | **A second authorized public sandbox demo identity, `sonitatest`, from ABA's own example collections** — explicitly commented as such in both files, and not previously accounted for anywhere in the audit |
+| `74633d…e3f8` (36 ch, entropy 3.79) | `_build/smoketest.js:29` | **A third: `sonitatestinstore`**, same origin, same status |
+| `cof_continue_b64` (16 ch, entropy exactly 3.50) | `dist/…postman_collection.json:455` | **False positive** — a Postman *variable name* on a `"key":` line, not a credential. It clears the entropy floor by exactly enough to be reported |
+
+Two negative controls confirm the added entries are scoped rather than blanket:
+- Substituting an **unauthorized** value into an allowlisted file → **still detected** (the `condition = "AND"` path+value pairing holds).
+- Placing an **authorized** value at a non-allowlisted path → **still detected** (path scoping holds).
+
+`scripts/check-secret-allowlists.mjs` was simulated against the new configuration and still yields exactly its expected **6** negative controls, so the change does not regress that script. (Separate observation: `check:secret-allowlists` is defined in `package.json` but **not invoked by any workflow** — a self-test of the allowlist that never runs. Add it to `quality-gates` as part of WP-03.)
+
+### Two further consequences, both correcting earlier statements
+
+1. **The workflow's stated intent is not achieved.** `ci.yml:23` comments *"full history so gitleaks also scans past commits"*, but `gitleaks-action@v2` scans the event's commit range (a PR diff or a push's commits), not `--log-opts=--all`. So these 7 pre-existing findings are **invisible to CI today** and would only surface on a full-tree or full-history scan. The gate is weaker than its own comment claims. Consequence for the immediate question: **a PR from this branch scans a clean two-file diff and would pass.** The allowlist entries are still correct and still needed — they are what makes a deliberate full-tree scan (`gitleaks detect --source .`) green, which is the check a maintainer or a future history-scanning configuration would run.
+2. **Addendum A-1's severity is revised from P1 to P2.** The blocking-gate risk is real but latent rather than imminent, because the action does not scan history. The finding that *replaces* it at P1 is the one this verification surfaced: **two additional public sandbox demo identities (`sonitatest`, `sonitatestinstore`) are committed in `payway-boilerplate/_build/` and are not covered by any owner disposition record.** `docs/project/RELEASE-READINESS.md` item B authorizes "the ABA sandbox demo identity" (singular, the `ec476910` one). Whether that authorization extends to the other two is **unrecorded** — a `REPOSITORY QUESTION` (R7) requiring owner confirmation, and the reason the allowlist entry cites the disposition rather than asserting it.
+
+### Added to §45.2 as R7
+
+> **R7 — Does the 2026-10-01 owner disposition covering "the ABA sandbox demo identity" extend to the `sonitatest` and `sonitatestinstore` demo credentials in `payway-boilerplate/…/_build/`?** *Why it matters:* they are committed, published, and now allowlisted on the strength of a disposition that names one identity. *Depends on it:* whether `.gitleaks.toml` may allowlist all three values, or only the one authorized. *Best current assumption:* yes — all three are ABA-published sandbox demo credentials with the same risk profile, and `smoketest.js` describes them as coming from `developer.payway.com.kh` example collections. *Risk if wrong:* two unauthorized sandbox identities remain published and scanner-suppressed. *Verification:* owner confirmation, recorded by extending `RELEASE-READINESS.md` item B to name all three merchant ids.
