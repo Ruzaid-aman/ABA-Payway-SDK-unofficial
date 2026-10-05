@@ -11,7 +11,12 @@
 <li><a href="" aria-current="page">TOKEN_VALIDITY_DAYS</a></li></ul>
 <h1>Variable TOKEN_VALIDITY_DAYS<code class="tsd-tag">Const</code></h1></div>
 <div class="tsd-signature"><span class="tsd-kind-variable">TOKEN_VALIDITY_DAYS</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">90</span></div>
-<div class="tsd-comment tsd-typography"><p>ABA grants linked account/card tokens a documented ~90-day validity window; renewal resets it.</p>
+<div class="tsd-comment tsd-typography"><p>ABA grants linked account/card tokens a documented ~90-day validity window
+(ROLLING, ABA-bot relay 2026-10-03: &quot;90 days after their initial linking,
+renewal, or the last successful transaction — whichever is most recent&quot;);
+renewal or any successful charge restarts it. Applies to unscheduled
+account tokens (CITI_FLEX/CITO_FLEX); scheduled tokens carry an explicit
+<code>expired_at</code> instead.</p>
 </div></div>
 <div class="col-sidebar">
 <div class="page-menu">

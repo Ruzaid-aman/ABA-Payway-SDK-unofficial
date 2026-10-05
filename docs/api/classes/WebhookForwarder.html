@@ -60,7 +60,7 @@
 <li>
 <div class="tsd-signature" id="statisticsstatistics"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">statistics</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/ForwardStats.html" class="tsd-signature-type tsd-kind-interface">ForwardStats</a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Total deliveries accepted by the receiver vs failed.</p>
+<div class="tsd-comment tsd-typography"><p>Total deliveries accepted by the receiver vs failed/aborted.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/ForwardStats.html" class="tsd-signature-type tsd-kind-interface">ForwardStats</a></h4></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -73,7 +73,8 @@
 <div class="tsd-signature tsd-anchor-link" id="forward-1"><span class="tsd-kind-call-signature">forward</span><span class="tsd-signature-symbol">(</span><br/>    <span class="tsd-kind-parameter">body</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">context</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span><br/>        <span class="tsd-kind-property">headers</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-kind-property">label</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-kind-property">sourceRequest</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">IncomingMessage</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">,</span><br/><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/ForwardOutcome.html" class="tsd-signature-type tsd-kind-interface">ForwardOutcome</a><span class="tsd-signature-symbol">&gt;</span><a href="#forward-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Forward one captured callback body. Never throws — capture must survive
-receiver downtime. Returns the delivery outcome for logging/callers.</p>
+receiver downtime. Bounded by the timeout budget (audit WP03). Returns
+the delivery outcome for logging/callers.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>

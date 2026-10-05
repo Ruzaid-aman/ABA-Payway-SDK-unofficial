@@ -79,6 +79,13 @@ export const TLS_BYPASS_ALLOW_LIST: readonly AllowListEntry[] = [
     reason: 'intentional defensive mention: transport TLS-failure error names the fix and forbids the bypass',
   },
   {
+    // Generated TypeDoc HTML mirrors the allow-listed defensive JSDoc in
+    // src/client.ts; CI regenerates docs/api before the test step runs, so
+    // the committed copy must stay a fresh regeneration (keep in sync).
+    pattern: 'docs/api/',
+    reason: 'generated TypeDoc output mirroring allow-listed defensive JSDoc in src/client.ts',
+  },
+  {
     // This scanner module itself: the forbidden-string constant + allow-list.
     pattern: 'src/cli/tls-bypass-scan.ts',
     reason: 'the scanner itself: forbidden-string constant + allow-list enforcement',

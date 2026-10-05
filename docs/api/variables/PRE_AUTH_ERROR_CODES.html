@@ -10,7 +10,7 @@
 <ul class="tsd-breadcrumb" aria-label="Breadcrumb">
 <li><a href="" aria-current="page">PRE_AUTH_ERROR_CODES</a></li></ul>
 <h1>Variable PRE_AUTH_ERROR_CODES<code class="tsd-tag">Const</code></h1></div>
-<div class="tsd-signature"><span class="tsd-kind-variable">PRE_AUTH_ERROR_CODES</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span><br/>    <span class="tsd-kind-property">MERCHANT_INVALID</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;PTL62&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">UNABLE_TO_CANCEL</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;PTL170&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">UNABLE_TO_COMPLETE</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;PTL59&quot;</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol"> = ...</span></div>
+<div class="tsd-signature"><span class="tsd-kind-variable">PRE_AUTH_ERROR_CODES</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span><br/>    <span class="tsd-kind-property">COMPLETION_FAILED</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;PTL172&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">MERCHANT_INVALID</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;PTL62&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">UNABLE_TO_CANCEL</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;PTL170&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">UNABLE_TO_COMPLETE</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">&quot;PTL59&quot;</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol"> = ...</span></div>
 <div class="tsd-comment tsd-typography"><p>Pre-auth (hold payments) error codes discovered via sandbox testing
 (2026-08-25 scope campaign). Returned on the pre-auth completion and
 cancellation endpoints.</p>
@@ -18,6 +18,10 @@ cancellation endpoints.</p>
 <div class="tsd-type-declaration">
 <h4>Type Declaration</h4>
 <ul class="tsd-parameters">
+<li class="tsd-parameter">
+<h5 id="completion_failed"><code class="tsd-tag">Readonly</code><span class="tsd-kind-property">COMPLETION_FAILED</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;PTL172&quot;</span></h5>
+<div class="tsd-comment tsd-typography"><p>Completion failed — the payment service provider returned an unexpected response (production telemetry 2026-09)</p>
+</div></li>
 <li class="tsd-parameter">
 <h5 id="merchant_invalid"><code class="tsd-tag">Readonly</code><span class="tsd-kind-property">MERCHANT_INVALID</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;PTL62&quot;</span></h5>
 <div class="tsd-comment tsd-typography"><p>Merchant information invalid (e.g. profile lacks payout permission)</p>
