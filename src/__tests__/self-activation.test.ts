@@ -172,16 +172,30 @@ describe('partner-auth wire shape (client level)', () => {
     expect(body.merchant_id).toBeUndefined();
     // request_data is the chunked-RSA encryption of the JSON payload —
     // PKCS1 is randomized, so decrypt block-by-block and compare plaintext.
+    // RSA_NO_PADDING + manual unpad (mirrors auth.test.ts): newer Node
+    // hardening rejects RSA_PKCS1_PADDING for PRIVATE decryption, which
+    // broke this test on some CI runners while passing on Node 24 locally.
     const encrypted = Buffer.from(body.request_data, 'base64');
     const blockCount = Math.ceil(encrypted.length / 128);
     expect(encrypted.length % 128).toBe(0);
     const decrypted = Buffer.concat(
-      Array.from({ length: blockCount }, (_, i) =>
-        crypto.privateDecrypt(
-          { key: TEST_RSA.privateKey, padding: crypto.constants.RSA_PKCS1_PADDING },
+      Array.from({ length: blockCount }, (_, i) => {
+        const raw = crypto.privateDecrypt(
+          { key: TEST_RSA.privateKey, padding: crypto.constants.RSA_NO_PADDING },
           encrypted.subarray(i * 128, (i + 1) * 128),
-        ),
-      ),
+        );
+        if (raw.length < 11 || raw[0] !== 0x00 || raw[1] !== 0x02) {
+          throw new Error('Invalid PKCS#1 padding');
+        }
+        let index = 2;
+        while (index < raw.length && raw[index] !== 0x00) {
+          index += 1;
+        }
+        if (index >= raw.length - 1) {
+          throw new Error('Invalid PKCS#1 padding');
+        }
+        return raw.subarray(index + 1);
+      }),
     ).toString('utf8');
     expect(decrypted).toBe(
       JSON.stringify({
