@@ -44,3 +44,53 @@ condition = "AND"
 paths = ['''(?:^|/)docs/cloudflare-free-webhook\.md$''']
 regexTarget = "secret"
 regexes = ['''^YOUR_ADMIN_TOKEN$''']
+
+# ---------------------------------------------------------------------------
+# Authorized ABA *sandbox* demo identities.
+#
+# Owner disposition 2026-10-01 — docs/project/RELEASE-READINESS.md item B:
+# "The ABA sandbox demo identity … is authorized for public redistribution."
+# This exact ec476910 secret_key is the ABA sandbox demo identity authorized
+# by the owner disposition in RELEASE-READINESS.md item B (2026-10-01).
+# The `sonitatest` and `sonitatestinstore` demo values also present in _build/
+# are intentionally NOT allowlisted here; their authorization is unconfirmed
+# (audit pass 2, question R7). Resolve R7 before adding either value.
+#
+# Scoped exactly like the fixtures above: BOTH the path and this exact value
+# must match, so any other credential in these files stays detectable.
+# The five paths are only locations where this authorized value is present.
+#
+# Verified 2026-10-05 against gitleaks v8.30.1's `generic-api-key` rule
+# definition (regex + entropy 3.5 + rule/global allowlists, applied to tracked
+# text files). The binary could not be run in this sandbox; see the pass-2
+# report's verification addendum for the reproduced rule results and limits.
+#
+# NOTE: the Refrence-copy-… tree is a duplicate slated for removal (DX-REPO-001).
+# Delete its path line here when that tree goes.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Authorized ec476910 ABA sandbox demo credential (owner disposition 2026-10-01)"
+targetRules = ['generic-api-key']
+condition = "AND"
+paths = [
+  '''(?:^|/)payway-boilerplate/Postman Collection API Testing/_build/distribution-scan\.js$''',
+  '''(?:^|/)payway-boilerplate/Postman Collection API Testing/dist/PayWay API — Complete Collection\.postman_collection\.json$''',
+  '''(?:^|/)payway-boilerplate/Postman Collection API Testing/postman/environments/PayWay - Sandbox\.environment\.yaml$''',
+  '''(?:^|/)payway-boilerplate/Postman Collection API Testing/postman/collections/PayWay API — Complete Collection/\.resources/definition\.yaml$''',
+  '''(?:^|/)payway-boilerplate/Postman Collection API Testing/Refrence-copy-PayWay API — Complete Collection-1/\.resources/definition\.yaml$''',
+]
+regexTarget = "secret"
+regexes = [
+  '''^05082504b76df71e468f8c0ff36f863e19e4cd29$''',
+]
+
+# False positive: `cof_continue_b64` is a Postman *variable name* on a `"key":`
+# line, not a credential. It clears generic-api-key's entropy floor (3.5) by
+# exactly enough to be reported. Allowlisted by value at this one path.
+[[allowlists]]
+description = "Postman variable identifier, not a credential"
+targetRules = ['generic-api-key']
+condition = "AND"
+paths = ['''(?:^|/)payway-boilerplate/Postman Collection API Testing/dist/PayWay API — Complete Collection\.postman_collection\.json$''']
+regexTarget = "secret"
+regexes = ['''^cof_continue_b64$''']
