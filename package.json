@@ -62,6 +62,8 @@
     "typecheck:dist": "tsc --noEmit -p tsconfig.dist.json",
     "format:check": "biome format src",
     "gen:rules": "tsx scripts/generate/gen-rules.ts",
+    "gen:env-vars": "tsx scripts/generate/gen-env-vars.ts",
+    "gen:vectors": "tsx scripts/generate/gen-golden-vectors.ts",
     "lint": "biome lint src skills",
     "lint:fix": "biome lint src --write",
     "format": "biome format src --write",

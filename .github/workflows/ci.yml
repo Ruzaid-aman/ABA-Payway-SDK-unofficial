@@ -100,6 +100,10 @@ jobs:
         run: npm run check:secret-allowlists
       - name: Rules registry generated-module check (DX-KNOW-001)
         run: npm run gen:rules -- --check
+      - name: Env-var registry check (DX-KNOW-005)
+        run: npm run gen:env-vars -- --check
+      - name: Golden-vector fixture check (DX-TEST-001)
+        run: npm run gen:vectors -- --check
       - name: Public package and documentation boundaries
         run: |
           npm run check:package
