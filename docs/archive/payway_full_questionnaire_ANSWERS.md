@@ -1,0 +1,3565 @@
+# ABA PayWay Questionnaire v2 — Bot Answer Register
+
+- **Source:** answers collected live from the **@payway_Integration_AI_bot** Telegram Q&A bot on **2026-10-03** (group AGENT_test_Sohail).
+- **Method:** one question per message, keyed by ID; the bot was instructed to tag each reply with the question ID and to answer ` UNKNOWN — not documented` when its docs do not cover the topic. Untagged/mismatched replies were discarded and retried automatically.
+- **Status:** 557 of 576 questions answered (266 of them explicitly UNKNOWN — the topic is not in the bot's documentation corpus); 2 parked as bot-side silent refusals (S26-Q002, S27-Q014); 19 unanswered (all of section S28) — the bot stopped responding before that section ran.
+- **Verbatim:** answers below are the bot's words, unedited. They are DOC-derived bot claims, not sandbox-verified facts — cross-check anything load-bearing against docs/internal findings.
+
+---
+
+## S1. Platform, Onboarding & Merchant Profile
+
+### S1-Q001 — Which PayWay products/features can be enabled independently on a merchant profile, and which are only available as a bundle?
+
+**A (2026-10-03):** Hello Bong @Ruzaid, the materials I have only list the available PayWay products/features (Ecommerce Checkout, ABA QR API, Credentials on File, Payment Link, Invoicing Tool, Virtual Terminal, Payout, ABA Merchant App, Printed ABA KHQR, POS Terminal, etc.), but they do not document which of these can be enabled à la carte vs only as part of a bundle on a merchant profile. I don’t have an authoritative matrix of "individually enable‑able" vs "bundled only" features. For an accurate answer you’d need to confirm with the PayWay Integration / Sales team who manage merchant profile configuration and contracts.
+
+### S1-Q002 — What is the canonical list of features (online checkout, online KHQR, offline KHQR, Customer Module / Printed QR, Virtual Terminal, Invoicing Tool, Payment Link, CoF account, CoF card, Pre-Auth, Payout / split, Subscription, Self-Activation / partner) and what is the recommended order to enable them?
+
+**A (2026-10-03):** Hello Bong @Ruzaid, From the docs available here I can see the feature set, but there is no single canonical list or recommended enablement order documented in the way you’re asking. What is explicitly listed:
+- Online / checkout‑type features: Ecommerce Checkout, Payment QR API, Credentials on File, Payment Link, Invoicing Tool, Virtual Terminal, Payout.
+- In‑store / QR features: POS Terminal, Printed ABA KHQR, ABA Merchant App, Payment QR API.
+- Social commerce: ABA Merchant App, Invoicing Tool, Payment Link.
+- Customer Module / Printed QR: requires either Invoicing Tool or Payment Links to be enabled.
+- KHQR / “offline KHQR” patterns: built on KHQR + webhook + transaction lookup (QR API is optional in the offline architecture doc). However, the docs here do not define:
+- A canonical taxonomy that exactly matches your list (e.g. separate flags for “online KHQR” vs “offline KHQR”, “CoF account vs CoF card”, “Subscription”, “Self‑Activation/partner”), nor
+- A bank‑recommended sequence like “enable A, then B, then C”. Only a few dependencies are clearly stated (e.g. Customer Module depends on Invoicing Tool/Payment Link; Offline KHQR uses KHQR + webhook + transaction APIs). So I can’t give you an authoritative S1‑Q002 matrix or order from this KB alone — that needs to come from the internal product/profile configuration view.
+
+### S1-Q003 — For a merchant that runs both eCommerce and in-store, is it one Merchant ID with multiple outlets, or separate merchant profiles per channel? What is the practical constraint that decides this?
+
+**A (2026-10-03):** Hello Bong @ruzaid, From the docs, both patterns exist, but there is a default rule plus a key constraint: 1) One MID vs multiple MIDs
+- Each merchant profile / merchant_id is meant for a specific usage context / sales platform: - “A production key (merchant profile / MID) is tied to a single merchant profile and intended usage context. A single production key should not be used simultaneously across two separate sales platforms (for example, a booking engine and a separate e-commerce channel).” - “One merchant profile (MID) per website or sales channel by default; do not re-use the same production key across unrelated platforms.”
+- Multi‑outlet is for branches of the same business under one profile (same context/settlement), not for fundamentally different channels. 2) Where eCommerce + in‑store can share one profile
+- The merchant_type rule allows a single profile to support both online checkout and QR: - “merchant_type = 0 => Instore / QR-on-API usage.” - “merchant_type = 1 => Website / Default checkout usage… When set to 1, responses may include deeplink fields and checkout_qr_url.” - “If a merchant needs both services (QR API + default checkout), register the merchant as merchant_type = 1 (online) so both can be supported from a single profile.”
+- So technically, one merchant profile (MID) with merchant_type = 1 can cover both online checkout + QR/in‑store if they are treated as the same processing context. 3) Practical constraint that decides
+From the above, the deciding factor is:
+- Do eCommerce and in‑store need to be treated as separate sales channels / processing contexts (different platforms, flows, or settlement/risk setup)? - If yes → docs say: “If multiple sales channels require separate processing contexts, create an additional merchant profile/MID or use separate Payway accounts for each channel.” - If no (same context, same settlement, shared reporting acceptable) → they can be combined under one merchant profile (with the correct merchant_type, typically 1) and use outlets for physical branches if needed. So: by default it’s one MID per sales channel, and you only combine eCommerce + in‑store under a single MID when they are explicitly treated as the same processing context and configured that way (merchant_type = 1, optional multi‑outlet under that profile).
+
+### S1-Q004 — Which features require a profile-level "enablement" by ABA (and therefore a support ticket or lead time), versus self-service in the Merchant Portal?
+
+**A (2026-10-03):** Hello Bong @Ruzaid, From what is documented, the split is: 1) Features that require ABA profile‑level enablement (ticket / lead time)
+These are clearly described as needing configuration in PayWay admin by ABA / Integration Team: - KHQR / ABAQR / QR API on the merchant profile Guideline: “KHQR/ABAQR services must be enabled on the correct merchant profile.” and “If API returns an error code indicating the service is not enabled (e.g., code 32), request the ABA PayWay Integration Team to enable the service on the correct merchant profile.” - Specific payment options and additional payment methods (KHQR, card, Alipay, WeChat, etc.) When these are missing you see messages like “Selected Payment Option is not enabled for this Merchant Profile” (status.code = 23). Resolution is: “Verify that the merchant profile used for the request has the QR API (or the requested payment option) enabled in ABA PayWay admin.” and “If the option is not enabled, request ABA PayWay (or your integration team) to enable the desired option (e.g., QR payment) for that merchant profile in the backend configuration.” The dedicated enablement flow for KHQR and other methods states: “ABA Payway enables the requested payment options on the merchant profile in the appropriate environment(s) (often enabled on sandbox/staging first for testing, then enabled in production after successful validation).” - Any PayWay product/service that is not already present on the sandbox profile For self‑registered sandbox merchants: “If you need to test a PayWay product or service that is not enabled on your sandbox account, contact the ABA PayWay Integration Team. The team can confirm whether the service is available in sandbox … [and] must be enabled for your Merchant ID.” In practice, this means core services and payment methods/payment_option flags on the merchant profile are ABA‑controlled and require a request (and sometimes forms/lead time) when they’re not already enabled. 2) Features that are self‑service in the Merchant Portal
+The only feature explicitly documented as merchant‑configurable in the PayWay Merchant Portal is the Discount Program: - “To configure or manage the ABA Merchant discount program in the PayWay Merchant Portal, merchants must log into their PayWay account and use the following steps: Go to the Discount Programs section … Click on ‘+ New Campaign’ … Enter campaign details … Choose the card type and specify payment method … Review the summary and click Start or Save as Draft.” So discount campaign setup and management is self‑service inside the Portal once the underlying capability is available on the profile. 3) Not documented as self‑service
+Beyond the Discount Program configuration, the docs here do not state that other profile‑level features (e.g., KHQR, card, Alipay, WeChat, QR API, Payout, etc.) can be toggled by the merchant in the Portal. Their availability is treated as profile configuration done by ABA, and if a needed product/service is missing you’re instructed to contact the Integration Team. So the documented rule of thumb is:
+- Profile‑level service and payment‑method enablement → ABA / Integration Team. - Within‑feature configuration (discount campaigns) → self‑service in Merchant Portal.
+
+### S1-Q005 — How many outlets can one merchant profile have, and can each outlet have its own settlement account and its own QR branding?
+
+**A (2026-10-03):** Hello Bong @Ruzaid, the current documentation only defines how the official UI/logo assets must be used in merchant checkouts (correct variants, placement, no modification, etc.) and that they come from the Integration Team / design guideline. It does not specify:
+- Whether PayWay and third‑party marks (card schemes, wallets) may be redistributed inside a public SDK,
+- Any license type or version for such redistribution,
+- The canonical public download source or update terms for SDK bundling. Given that, I can’t confirm redistribution rights or licensing for including these assets in a public SDK. This needs a decision from ABA PayWay (Integration + Legal/Branding). Please align with the Integration Team so they can check the branding/IP and card‑scheme requirements and give you an explicit go/no‑go and terms.
+Hello Bong @Ruzaid, From the docs we have: 1) How many outlets per merchant profile? - Multi‑outlet under one merchant profile is supported. - The number of outlets is treated as a deployable configuration: merchants declare how many outlets they want, and Integration configures accordingly. Example wording: “Declare the number of outlets to be integrated (e.g., 1 outlet) so the integration team can configure accounts/outlets appropriately. Outlet count is a deployable configuration.” - There is no documented hard maximum number of outlets per profile in this KB — just that outlet count is configurable. 2) Settlement accounts per outlet - In the Merchant Portal Invoicing Tool, outlet‑level settlement is explicitly mentioned: > “The currency selector is only visible when your outlet is configured for multiple currencies with separate settlement accounts (sub‑settlement accounts).” > “Amounts are settled to the corresponding currency's settlement account.” - This shows that each outlet can have its own sub‑settlement accounts per currency within the same merchant profile, and invoices created under that outlet settle into those accounts. - In the ABA Merchant App, dual currency is described at business level (business linked to KHR and USD accounts, with each payment routed to the matching account), but the outlet‑specific settlement mapping detail is given in the Invoicing‑Tool description above. - So, per this KB, outlet‑specific settlement configuration is supported via sub‑settlement accounts, but exact patterns (e.g., fully different accounts per outlet vs shared) are not exhaustively documented here and depend on how Integration configures that profile. 3) QR branding per outlet - For outlets in the Merchant App: > “Each outlet has its own QR code, so every payment is recorded against the branch where it happened.” - The docs confirm per‑outlet QR codes and reporting, but they do not describe a configurable “QR branding” option at outlet level (e.g., different logos/themes per outlet) in this KB set. Only that each outlet’s QR is distinct for tracking and reporting. So based on the current docs: - Outlet count: configurable by Integration per merchant profile, no hard limit stated. - Settlement: outlet‑level sub‑settlement accounts per currency are supported (at least in the Invoicing Tool context). - QR: each outlet has its own QR code; per‑outlet visual branding is not documented here.
+
+### S1-Q006 — What are the required merchant registration documents for a Cambodian business (certificate of registration, tax number / TIN, bank account, beneficial-owner IDs), and what is the expected KYB turnaround?
+
+**A (2026-10-03):** Hello Bong @Ruzaid, From the docs, the standard Cambodian merchant onboarding/KYB package for PayWay includes: 1) Company / registration documents
+- Certificate of commercial registration / certificate of incorporation
+- Memorandum & Articles (MAA) or board resolution (where applicable)
+- Tax registration / TIN
+- Any required operating / business licenses requested by regulator or bank (e.g., sector‑specific licenses) 2) Bank & settlement details
+- Valid business bank account with ABA in the required settlement currency(ies)
+- Settlement account number(s) for each outlet/settlement profile 3) Beneficial owner / authorized person IDs
+- Identity documents for owner/authorized signer (e.g. national ID or passport) as requested 4) Contacts
+- Business/commercial contact: full name, position, email, phone
+- Technical contact: full name, position, email, phone
+- (If available) Accounting/finance contact: full name, position, email, phone
+- Company email and phone reachable for activation links/OTPs 5) Branding, UI & operational evidence
+- Company logo (PNG, square recommended, within gateway UI size guidance)
+- Website/app URL or demo, with checkout flow or user‑journey PDF
+- Office/shop photos if requested
+- Terms & Conditions, including cancellation/refund policy (ideally one Word file)
+- Sample invoice/receipt template for PayWay receipts
+- Outlet address(es) and expected monthly sales estimate where requested 6) Process / turnaround noted in docs
+- Merchant submits the above documents and assets to the PayWay Integration Team.
+- Integration Team reviews, may request missing items or clarifications, and if required may schedule an on‑site visit.
+- After receiving the full required documents and signed agreement, the team issues sandbox credentials and activation links; production follows after successful sandbox integration. The KB does not specify a fixed KYB/onboarding turnaround time (e.g., X business days); it only describes the sequence (submission → review/clarifications → agreement → credential issuance) and notes explicit timing only for some maintenance changes (e.g., settlement‑currency change ~2–3 days), not initial KYB.
+
+### S1-Q007 — Can a non-Cambodian / foreign entity become a PayWay merchant, and what is the required local structure (local entity, permanent establishment, or an acquiring partner)?
+
+**A (2026-10-03):** S1-Q007 UNKNOWN — not documented
+
+### S1-Q008 — What merchant categories / MCCs are supported, and which categories are restricted or require additional approval?
+
+**A (2026-10-03):** S1-Q008 UNKNOWN — not documented
+
+### S1-Q009 — Which features are not supported in the sandbox at all (so we cannot test them before go-live)?
+
+**A (2026-10-03):** S1-Q009 From the docs, the following cannot be fully tested or are effectively not supported in sandbox and only work as real flows in production: 1) Real funds movement / settlement / balance changes - Sandbox uses virtual amounts — you cannot verify real settlement, real account balance changes, or real refunds/settlements in sandbox. 2) Scanning sandbox QR with real banking apps / cross‑bank KHQR in production apps - Production mobile banking/payment apps generally will not accept sandbox QR tokens and must not be used to test sandbox QR. - Cross‑bank scanning cannot be fully simulated in sandbox — only partner/simulator-specific flows are supported. 3) Certain provider mobile‑app flows where no sandbox app exists - For some Alipay/WeChat and other providers, there is no real sandbox mobile app; instead, PayWay shows a simulated “Approve” screen or completes transactions manually on request. - That means the real production user app experience for those methods cannot be fully reproduced in sandbox. 4) Production card-network and issuer behaviors - Sandbox often uses deterministic simulations and does not call real card networks. - You cannot fully test real issuer declines, live saved‑card/network behaviors, or all production rejection scenarios in sandbox. - Sandbox does not send OTP for test cards; real 3‑D Secure/issuer OTP behavior is only in production. 5) Some negative/edge-case scenarios - Docs note that not every production rejection/blocked‑card scenario is simulated. Some negative tests may need to be planned in a controlled production test with guidance from the team. Everything else (QR creation, callbacks, pushback, basic approve/decline simulations for cards and wallets) is supported in sandbox and should be tested there, but the above items either do not exist or cannot be fully exercised before go‑live.
+
+### S1-Q010 — Does a merchant profile support both USD and KHR settlement simultaneously ("dual currency"), and what changes if it is single-currency?
+
+**A (2026-10-03):** S1-Q010 From the docs, there are two models — single‑currency profile vs dual‑currency setup: 1) Single‑currency merchant profile (default)
+- Each PayWay merchant profile has one settlement currency, determined by its configured settlement account (e.g., USD or KHR).
+- Checkout will display and settle in that one currency. Even if the payer uses a different‑currency account, the merchant still receives funds in the profile’s settlement currency.
+- API requests must use the merchant’s configured currency (or omit currency if the default is assumed). If you need to change this currency, the docs say you must request a settlement‑currency change via maintenance form; this may create a new profile/MID and new credentials, followed by production test transactions. 2) Dual‑currency / multi‑currency setup
+- Supporting both USD and KHR settlement is possible but not the default. Docs describe two main patterns: - Separate merchant profiles/MIDs per currency (one USD, one KHR), or - A business configuration where a single merchant key can work with multiple currencies on the same business, backed by both USD and KHR settlement accounts.
+- When dual‑currency is enabled: - The UI must clearly show currency selection (USD vs KHR). - Your payment/QR API calls must include a currency field ("USD" or "KHR") or use the correct MID per currency. - You must perform go‑live verification in both currencies (at least one successful USD and one KHR transaction, with transaction IDs and screenshots) as part of enablement. Summary: A standard PayWay merchant profile is single‑currency (one settlement currency). Dual‑currency settlement (USD + KHR) is only available when the merchant is explicitly configured for it, usually via additional profile(s) and/or dual‑currency enablement, plus corresponding UI and API changes.
+
+### S1-Q011 — What is the settlement account format PayWay accepts (9-digit vs 11-digit), and can the settlement account differ from the registered bank account?
+
+**A (2026-10-03):** S1-Q011 UNKNOWN — not documented
+
+### S1-Q012 — What is the difference between the MMP (merchant management platform, ABA-side) and the MP (merchant portal), and which settings can the merchant change themselves?
+
+**A (2026-10-03):** S1-Q012 High-level difference
+- MMP (Merchant Management Portal): Internal ABA admin platform. Used by ABA staff to configure merchant profiles and outlets, enable/disable major features, and set some global behaviors.
+- MP (Merchant Portal): Merchant‑facing web portal. Used by merchants to operate their account day‑to‑day (view transactions, create invoices/discounts, etc.). Examples of what is done in MMP (ABA‑side only)
+- Enabling/disabling the Invoicing Tool for each outlet.
+- Turning on the “Accept Payment on Overdue Invoice” option for an outlet.
+- Managing VAT enablement at the merchant profile level. Examples of what merchants can change themselves in the Merchant Portal (MP)
+- In Invoicing Tool (once enabled by ABA via MMP): - Terms & Conditions text on invoices. - Which payment methods are enabled for invoices (ABA Pay, KHQR, Card, WeChat, Alipay) and their per‑method transaction limits. - Pre‑auth support on individual payment methods (where available in config). - Invoice numbering behavior (automatic vs manual), while respecting uniqueness and format rules.
+- In Discount Programs: - Create and manage discount campaigns (name, duration, limits, discount type, card type, payment method, etc.).
+- Portal access settings: - Use Forgot password to reset their own MP login password (to the registered contact email). What merchants cannot change directly
+- They cannot access MMP or directly change profile‑level items such as registered email/phone or core settlement details. For such changes, they must go through ABA (support/integration team + maintenance form process).
+
+### S1-Q013 — Does the Merchant Portal support sub-users with granular permissions (e.g. who can refund, who can view reports, who can configure payment methods)? What is the permission model?
+
+**A (2026-10-03):** S1-Q013 Yes, the Merchant Portal supports sub-users with granular, role-based permissions. Permission model (high level)
+- A primary admin account is created for the merchant; this admin can create sub-users and assign roles.
+- Access is controlled via Users & Roles in the Merchant Portal: - You can create custom roles (e.g. "Cashier", "Accountant", "Manager") and then configure which sections they can access. - By default there are roles like Manager and Staff, but merchants can add new roles and customize permissions.
+- Permissions are module- and action-based. Examples from the docs: - Payment Link module has separate permissions: View, Create, Edit, Copy, Cancel/Void, Download Receipt, Export Transactions (each can be granted/restricted per role). - Customer Module has a specific Customize Fields permission under the Update Customer role. - Virtual Terminal has separate rights for Virtual Terminal Payment Form Setting vs Add Transaction. Because roles are configurable per section and action, merchants can:
+- Create roles that only view reports (e.g., by granting report/view permissions but not edit/cancel/create).
+- Limit sensitive actions (such as refunds or payment/configuration functions) to specific roles by only granting those permissions to trusted roles. Sub-users can perform only the actions allowed by their assigned role; all key actions (e.g., Payment Link operations) are also recorded in an audit trail with user and timestamp.
+
+### S1-Q014 — What is the production cutover process — do we need explicit ABA approval before switching from sandbox to live URLs, and how long does it take?
+
+**A (2026-10-03):** S1-Q014 The **production cutover** is a controlled process and *does* require ABA review/approval steps before you operate fully on live URLs. **Required steps before/at cutover**
+1. **Complete sandbox integration & UI review** - Implement and test in sandbox (including Check Transaction API / webhook where required). - Integration Team reviews your UI/flow and internal teams approve it. 2. **ABA issues production credentials & whitelist** - Only *after* UI + sandbox are approved, the Integration Team issues **production Merchant ID/API key (and RSA key where applicable)** and applies **production domain/IP whitelisting**. - Without this, production endpoints will reject your calls (e.g. invalid profile / wrong domain). 3. **Merchant switches config to production** - Replace sandbox Merchant ID/API key and sandbox URLs with **production** ones. - Ensure callback/return URLs match what ABA whitelisted. 4. **Mandatory production verification transaction** - Perform at least **one small real production transaction** (often one per enabled payment method if requested). - Share the **production transaction ID** (and, if asked, screenshots) with the Integration Team. 5. **ABA verification & go‑live confirmation** - Integration Team verifies the production transaction/settlement and then **marks the merchant as live** and may remove any temporary expiry on credentials. - After that, you are in a normal **live** state, with a short VIP support window, then handover to standard digital support. **Do you need explicit ABA approval before switching?** - You **must** wait for ABA to: - Approve sandbox/UI and - Issue **production credentials + whitelisting**. - Once you have production credentials, you may technically point to live URLs, but the process **requires** you to run the ABA‑requested **production test transaction and share the tran_id for final verification/sign‑off**. Full go‑live status is only after this ABA verification. **How long does it take?** - The documents do **not specify a fixed SLA/number of days**. They state that: - UI and sandbox must be reviewed/approved internally before production keys are issued. - Domain/IP changes and production whitelisting **“may require processing time”** and formal maintenance/change approval. - Actual timing therefore **depends on internal review and maintenance processing** and must be confirmed with the Integration Team per case.
+
+### S1-Q015 — Are sandbox merchant settings (payment methods, outlets, fees) copied into production at cutover, or must production be configured from scratch?
+
+**A (2026-10-03):** S1-Q015 UNKNOWN — not documented
+
+### S1-Q016 — How are production credentials issued and rotated, and is key rotation supported without downtime?
+
+**A (2026-10-03):** S1-Q016 Issuance
+- Production credentials (Merchant ID, API key, RSA key, portal access) are issued by the ABA PayWay Integration Team after sandbox integration and UI review are approved.
+- They are sent to the designated contact email (often in a protected ZIP, with password shared in the same or a separate message), and a separate portal activation link is sent to the company email.
+- Initial production keys/links may be time‑limited (e.g. ~72 hours) and/or marked with temporary expiry until you: - Replace sandbox with production credentials, and - Perform at least one real production verification transaction and share the transaction ID for final activation. Rotation / renewal / expiry extension
+- If a production API key/credential expires, is about to expire, or must be changed/rotated: 1) Confirm you are using the latest credential provided by the Integration Team. 2) Contact the ABA PayWay / Integration Team or Digital Support to request: - Extension of the existing key’s expiry, or - Issuance of a new production key/credential (rotation/re‑issue). 3) The new/extended credential is sent via secure channel (email) to the merchant contact. 4) You update the key in your system configuration and then run end‑to‑end production tests, including a small live transaction, and share the transaction ID for verification. 5) If compromise is suspected, you should request credential rotation and stop using the exposed key. Downtime / zero‑downtime aspect
+- The documents state that the Integration Team can either extend the current key’s expiry or issue a new key and ask how many days you need for production validation.
+- This means rotation is explicitly supported and can be planned while the existing key is still valid, so you can: - Keep using the old key while deploying the new configuration, then - Switch over and validate with a test transaction.
+- However, the docs do not promise a formal “zero‑downtime” guarantee; avoiding downtime depends on: - Requesting extension/rotation before expiry, and - Updating your configuration smoothly once the new/extended key is provided.
+
+### S1-Q017 — Is there a formal merchant agreement / commercial schedule that enumerates the enabled features, and where does the merchant obtain it?
+
+**A (2026-10-03):** S1-Q017 UNKNOWN — not documented
+
+### S1-Q018 — Does PayWay offer partner/aggregator onboarding (self-activation API) so a platform can provision sub-merchants programmatically? What is required to become a partner?
+
+**A (2026-10-03):** S1-Q018 Yes, PayWay supports **partner/aggregator onboarding** via a **self-activation (self-onboarding) API**, so a platform can provision sub‑merchants programmatically — but it is a **controlled/partner-only capability**, not a public/open API. **What the partner self-onboarding API does**
+- Partner (platform) calls the **Partner Self-Onboarding / Online Self-Activation** endpoint (e.g. `new-merchant`) with: - Encrypted `request_data` (merchant details, merchant_type, currency, etc.) - **Partner credentials** (partner_id / partner_key) - **pushback/callback URL** for credential delivery - `register_ref` and other required params.
+- PayWay returns a **self-register URL / register_ref**; the platform redirects the merchant to complete onboarding.
+- After successful onboarding, PayWay sends a **server-to-server pushback** with encrypted merchant credentials (e.g. merchant_id, merchant_key/api_key, public_key, currency, register_ref), or the partner can call **Get Merchant Credential Info** to pull them.
+- The partner stores these credentials per sub‑merchant and then uses them to create transactions (QR/checkout) on behalf of each sub‑merchant. **What is required to become a partner / use this?**
+From the documented partner flow:
+1. **Commercial / partnership setup** - A **signed partner agreement / commercial paperwork** may be required before production partner API access is granted. 2. **Technical & UI preparation** - Prepare your **platform UI flows** for merchant onboarding and payment (Figma/PDF/screens, demo videos). - Discuss requirements with the **PayWay Integration Team/PM** and request the **Partner API spec** (it is *not* public in the docs). 3. **Sandbox partner credentials & whitelisting** - Provide required **partner information** (company/platform details, contact, expected flows) to obtain **sandbox partner credentials**: - Partner ID, Partner Key, RSA/public key. - Provide your **partner/onboarding domain(s)** and any checkout domains so ABA can **whitelist** them (sandbox and production whitelists are separate). 4. **Sandbox implementation & testing** - Implement in sandbox: - Partner self-onboarding (`new-merchant`, `get-mc-credential-info`). - Payment APIs (generate-qr / purchase) per sub‑merchant. - **Pushback/webhook endpoint** over HTTPS (port 443). - Complete end‑to‑end tests: self-register merchant → receive credentials → create transaction → complete payment → verify via pushback or Check Transaction API. - Share **tran_id(s) and demo artifacts** (screenshots/videos) for review. 5. **Review & production enablement** - After sandbox & UI are **verified and signed off** by the PayWay Integration Team, ABA issues **production partner credentials** and production whitelisting. - You then repeat merchant self-onboarding in **production**, run live verification transaction(s), and share tran_id(s) for final confirmation. So: **yes**, partner/aggregator self-activation is supported via the Partner Self-Onboarding APIs, but you must go through **partner onboarding with ABA (commercial + technical) and receive dedicated partner credentials and whitelisting** from the Integration Team before using it.
+
+### S1-Q019 — If we act as a partner and provision sub-merchants, whose KYC/AML liability sits with us vs PayWay?
+
+**A (2026-10-03):** S1-Q019 UNKNOWN — not documented
+
+### S1-Q020 — What is the expected volume/ticket profile that determines which features are commercially sensible for a small merchant?
+
+**A (2026-10-03):** S1-Q020 UNKNOWN — not documented
+
+### S1-Q021 — Is there a minimum monthly volume or minimum annual processing to keep a merchant profile (or a feature) active?
+
+**A (2026-10-03):** S1-Q021 UNKNOWN — not documented
+
+### S1-Q022 — What happens to a merchant profile if it is inactive for a defined period — suspension, deactivation, or profile closure?
+
+**A (2026-10-03):** S1-Q022 For inactivity, PayWay does not automatically close a merchant profile just because there are no transactions for a period. Documented behavior:
+- The support team monitors live profiles and flags those with no transactions for a defined period (e.g. several months).
+- They then contact the merchant (email/chat) to ask whether the merchant has stopped using the service, has technical issues, or has seasonal reasons for inactivity.
+- Based on the merchant’s feedback, the team may: - Provide troubleshooting if there are technical issues, or - Plan deactivation/termination if the merchant confirms they no longer want to use the service, or - Simply record that inactivity is expected and keep the profile as is. Full termination/closure of a PayWay service/profile follows a separate, explicit termination process and requires a merchant request + formal offboarding steps; it is not triggered solely by inactivity.
+---
+## S2. Environments, Credentials & Base URLs
+
+## S2. Environments, Credentials & Base URLs
+
+### S2-Q001 — List the exact production base URLs for every PayWay domain (checkout/purchase, QR, transaction detail, transaction list, exchange rate, refund, close, payment link, CoF, pre-auth, payout, beneficiary, self-activation)?
+
+**A (2026-10-03):** S2-Q001 UNKNOWN — not documented
+
+### S2-Q002 — List the exact sandbox base URLs and confirm they are structurally identical (same paths) to production?
+
+**A (2026-10-03):** S2-Q002 Documented sandbox/uat base URLs:
+- Sandbox checkout base URL: https://checkout-sandbox.payway.com.kh
+- UAT/staging checkout base URL (where applicable): https://checkout-uat.payway.com.kh For the v2 purchase API, the path is structurally identical to production — only the host changes:
+- Production purchase endpoint: https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase
+- Sandbox purchase endpoint: https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase No other sandbox base URLs are explicitly documented in the materials I have.
+
+### S2-Q003 — Are base URLs versioned (`/v1`), and is the version pinned in the path or in a header? Will a breaking change require a new path?
+
+**A (2026-10-03):** S2-Q003 In the available docs, API versioning is encoded in the URL path, not via headers. Example:
+- .../api/payment-gateway/v1/payments/purchase There is no documentation that any version is selected or overridden via HTTP headers. The migration notes state that moving from API v1 to v2 requires updating the endpoint URLs (different paths/domains plus payload rules). That implies that any breaking change (new major version) comes with a new path/endpoint, rather than reusing the same path with a header-based version switch.
+
+### S2-Q004 — Which credentials are required for a standard merchant (`merchant_id`, `api_key`), and which additional credentials or keys are needed for RSA-encrypted endpoints (payment link, pre-auth, payout, beneficiary, partner self-activation)?
+
+**A (2026-10-03):** S2-Q004 For a standard PayWay integration the required credentials are: 1. Core merchant credentials (all standard merchants) - merchant_id / Merchant Code - api_key / merchant_key (secret key used for hashing/signing) - These are separate per environment (sandbox vs production) and are used to authenticate requests and generate HMAC/SHA‑512 hashes. 2. Additional credentials/keys for RSA-encrypted endpoints For endpoints that require encrypted merchant_auth or encrypted payloads (e.g. pre-auth complete/cancel, refund, merchant-portal payout/beneficiary, merchant self-/partner-activation flows): - Gateway-provided RSA Public Key for the specific environment (sandbox or production) - Used to encrypt merchant_auth or other sensitive payloads before sending to PayWay. - Different RSA public keys are used for sandbox vs production; do not reuse across environments. - Merchant-side RSA Private Key (where applicable in the sample implementations) - Held only on the merchant server, never shared; used to decrypt/verify where the flow requires it. So in summary:
+- Standard calls: merchant_id + api_key.
+- RSA endpoints (payment link if documented as RSA, pre-auth, payout/beneficiary, refund, self-/partner-activation via merchant-portal): merchant_id + api_key plus the environment-specific RSA public key (and matching private key on merchant side where needed) to build the encrypted merchant_auth / payload.
+
+### S2-Q005 — Where do we obtain the RSA public key, and does it rotate? How do we know a key we hold is current?
+
+**A (2026-10-03):** S2-Q005 - Where to obtain it: The RSA public key is generated and provided by ABA PayWay / Integration Team for each merchant and environment (sandbox and production). It is shared via a secure channel (email/portal) together with or alongside your API credentials. If your existing public key has expired, you must request a new one from ABA Digital Support / Integration Team. - Does it rotate: Yes. RSA public keys can be rotated/replaced when ABA makes system/security changes or when keys expire. After successful sandbox tests and integration review, a separate production RSA key is issued; sandbox and production keys are never reused across environments. - How to know a key is current: The "current" key is always the latest rsapublickey sent to you by ABA PayWay for that specific merchant profile and environment. If ABA notifies you about credential/key changes, or you start seeing RSA/credential errors (e.g. 403 with PTL171/PTL175 or PTL‑RSA‑NOTFOUND / "Merchant have no security config" / "Invalid merchant information" on RSA flows), you should assume the key may be outdated/mismatched and reconfirm with the Integration Team / Digital Support and obtain the updated RSA public key.
+
+### S2-Q006 — Must our server IP address or callback domain be allow-listed before API calls or callbacks succeed? If yes, what is the exact procedure and turnaround?
+
+**A (2026-10-03):** S2-Q006 Yes, for many integrations your server IP and/or callback domain must be allow‑listed for API calls and callbacks to work reliably. 1) When whitelisting is required
+- Server‑side API calls / hosted checkout: your server public IP(s) and sometimes origin domain must be whitelisted so PayWay accepts the requests and the hosted checkout renders without 403 / "wrong domain" / "Requested Domain is not in whitelist" errors.
+- Callbacks / pushbacks: your callback domain/URL must be registered and often whitelisted in your merchant profile so PayWay can deliver notifications to it.
+- Whitelisting is environment‑specific (sandbox/UAT vs production). 2) Exact procedure (merchant → ABA)
+Provide to the ABA PayWay Integration Team:
+- The public IP address(es) of the server(s) that will: - Make PayWay API calls (merchant → PayWay), and/or - Receive callbacks (PayWay → merchant), if your firewall restricts sources.
+- The callback URL(s) (HTTPS, publicly reachable, usually on port 443), e.g.: - https://your-domain.com/payway/callback
+- The domain(s) used as origins/callback hosts for sandbox and for production separately. The Integration Team will:
+- Configure these IPs/domains in the PayWay whitelist for the correct environment.
+- Confirm once whitelisting is applied. After confirmation you should:
+- Run test transactions and verify: - API calls succeed without 403 / domain/IP errors. - Callbacks reach your endpoint and you return HTTP 200 OK. 3) Turnaround time
+- The documentation states that the Integration Team will perform the whitelisting and then you should test, but it does not define an exact SLA/turnaround time in hours or days.
+- Practically, you should submit all required IPs/domains early (for both sandbox and production) to avoid delays.
+
+### S2-Q007 — What exactly is returned when a request comes from a non-allow-listed IP or domain? Give the exact HTTP status, `status.code`, and message text?
+
+**A (2026-10-03):** S2-Q007 For a request coming from a non-allow‑listed domain/IP, the documented gateway response is: - HTTP status: 403 Forbidden
+- status.code: 6
+- status.message: "Requested Domain is not in whitelist" Docs also mention a separate code PTL175 for “request origin is not whitelisted”, but the exact message text/body for PTL175 is not fully specified.
+
+### S2-Q008 — Are the authentication headers identical across every endpoint, or do some endpoints use a different scheme? List per-endpoint header names?
+
+**A (2026-10-03):** S2-Q008 UNKNOWN — not documented
+
+### S2-Q009 — Which endpoints require `Content-Type: application/json` and which require `application/x-www-form-urlencoded`, and what happens if the wrong one is sent?
+
+**A (2026-10-03):** S2-Q009 Based on the docs, the Content-Type requirements are: Requires Content-Type: application/json (request)
+- POST /api/payment-gateway/v1/payments/generate-qr - Must send JSON body with Content-Type: application/json. Requires form-data (non‑JSON) request
+- POST /api/payment-gateway/v1/payments/purchase - Expected as multipart/form-data with form-data fields (e.g. req_time, merchant_id, tran_id, amount, payment_option, hash, etc.). - Not a JSON (application/json) endpoint. What happens if you send the wrong Content-Type
+- For JSON endpoints (e.g. generate-qr) sending form-data or missing Content-Type: application/json can cause: - HTTP 415 Unsupported Media Type, or - Validation / parsing errors, or - HTML/error page instead of JSON. - For form-data endpoints (e.g. purchase) sending JSON instead of multipart/form-data can cause: - Gateway treating the body as empty/null, - Missing-field / authentication errors (e.g. Invalid Merchant profile because merchant_id isn’t seen), or - Request effectively ignored (no proper log/processing). - General rule from the docs: always match the Content-Type to what the API doc for that endpoint specifies; wrong type typically results in 4xx errors or the request body not being parsed.
+
+### S2-Q010 — What is the sandbox signup process and what credentials does it issue? Are sandbox and production merchant IDs different in format?
+
+**A (2026-10-03):** S2-Q010 Sandbox signup process
+- You (or the merchant) request sandbox access either via the PayWay developer/sandbox portal or via the ABA PayWay Integration Team.
+- Provide a contact email (for API credentials) and a company email (for portal activation link).
+- Integration Team then: - Creates a sandbox merchant account. - Sends sandbox API credentials and activation link for the sandbox/merchant portal to those emails.
+- Merchant follows the activation link to activate the sandbox portal account (links can be time‑limited; if expired or not received, you request a resend).
+- Optionally, Integration Team may also provide: - Sample code/ZIP or Postman collection. - Simulator/mobile test accounts and app links if QR/mobile simulator testing is needed. What credentials sandbox issues
+From the docs, sandbox can issue:
+- Merchant portal login (sandbox portal credentials).
+- Sandbox API credentials, typically including: - merchant_id - API key - RSA public key (optional, where applicable)
+- For some products (e.g., invoicing/virtual terminal): - Product key(s) and generic sandbox portal credentials.
+- Sandbox test card details and, if needed, mobile test/simulator accounts (account id, mobile, PIN, secret word). Merchant ID format: sandbox vs production
+- Documentation states that sandbox and production credentials are separate and not reused between environments, and that production credentials are issued only after review/approval.
+- However, it does not document any difference in the format of sandbox vs production merchant_id — only that they are distinct credential sets.
+
+### S2-Q011 — Can one set of credentials be used from multiple servers / multiple environments (e.g. a web app and a POS backend) simultaneously?
+
+**A (2026-10-03):** S2-Q011 Yes, **one set of credentials can be used from multiple servers/applications simultaneously** as long as they all belong to the **same merchant profile**. From the credential policy:
+- A **single credential set is issued per merchant profile**, and it should be used consistently across that merchant’s services (e.g. QR API, purchase API) for that profile.
+- **Do NOT** reuse credentials across **different merchant profiles** (e.g. one merchant using another merchant’s key, or in-store profile vs online profile if they are set up separately).
+- If you have multiple profiles (e.g. in-store vs online), confirm **which merchant_key belongs to which profile** and use the correct one per integration.
+- If IP/domain whitelisting is enabled, make sure **each server/environment’s IP/domain** that will use the shared credentials is properly registered. Sandbox and production remain separate: you can use the sandbox key across multiple sandbox servers, and the production key across multiple production servers, but **never mix sandbox keys with production endpoints or vice versa**.
+
+### S2-Q012 — What is the minimum and maximum TLS version, and are there cipher-suite or certificate requirements?
+
+**A (2026-10-03):** S2-Q012 UNKNOWN — not documented
+
+### S2-Q013 — Are there any production-only parameters, headers, or flags that must be set?
+
+**A (2026-10-03):** S2-Q013 UNKNOWN — not documented
+
+### S2-Q014 — Is there an environment-selection mechanism (a sandbox flag/URL) that can be accidentally left on in production? How do we assert the active environment programmatically?
+
+**A (2026-10-03):** S2-Q014 From the docs, **environment selection is done entirely by which base URL/endpoints and keys you use**, not by a special sandbox header/flag. **1) Environment-selection mechanism & common pitfall**
+- Sandbox/dev: use `https://checkout-sandbox.payway.com.kh/...` (and any other sandbox/UAT endpoints provided) **with sandbox keys**.
+- Production: use `https://checkout.payway.com.kh/...` **with production keys**.
+- For frontend assets, sandbox often uses a dev variant (e.g. `checkout2-0-dev.js` on sandbox hosts), and production uses the production JS on the production domain.
+- The main “gotcha” is **forgetting to switch**: - leaving sandbox base URLs or dev JS (`*-dev.js`) in production, - or using sandbox keys against production endpoints (or vice versa), which leads to errors like `invalid merchant_id`, `Wrong Hash`, `Invalid Merchant Profile`, or domain-whitelist errors. **2) How to assert the active environment programmatically**
+Docs imply you should validate via:
+- **Endpoint host**: check that your configured base URL is the expected one (`checkout-sandbox.payway.com.kh` vs `checkout.payway.com.kh`).
+- **Credential set**: ensure the key/merchant_id you loaded is the sandbox set when calling sandbox URLs, and the production set when calling production URLs.
+- **Observed behavior/errors**: mismatched host+key typically produces authentication/whitelist errors, which is a signal of a configuration mismatch. So: there is no documented hidden sandbox flag; the environment is effectively determined by the **URL + credential pair**, and you "assert" it by checking those values in your app configuration/runtime.
+
+### S2-Q015 — What are the security requirements for storing the API key and RSA key (rotation, KMS/secret-manager usage, whether they may be held by a POS terminal or mobile app)?
+
+**A (2026-10-03):** S2-Q015 **API key / merchant_key**
+- Must be treated as a **private credential**.
+- Use it **only on server-side** for hash/signature generation.
+- Docs explicitly say: *"Use the provided merchant_id and merchant_key only on server-side hash generation; do not expose keys in browser JS or mobile apps."*
+- So API keys **must not be stored in, or directly accessible from, POS/mobile/client apps or any merchant-facing UI**. Those apps should call your backend, which holds the key. **RSA public key**
+- Provided by the Integration Team, environment-specific (sandbox vs production).
+- Not a secret like a private key, but: - Should be configured on **backend systems** that perform cryptographic operations. - Docs say not to expose it directly in merchant-facing UI and to avoid unnecessary exposure.
+- Do not reuse sandbox RSA key in production; use the correct key per environment. **RSA private key (merchant side)**
+- Must be kept **secure on the merchant side** and **never shared** with ABA/PayWay.
+- Only merchant backend services should hold and use the private key where required (e.g., for refund/pre-auth flows as per samples). **Rotation / changes**
+- When ABA PayWay communicates system changes, you must: - **Replace old API credentials** and - **Update the RSA public key** used for encryption/signing as provided.
+- Do not continue using deprecated credentials/keys.
+- After key replacement or provisioning, update the configuration for the relevant environment and **re-test (typically in sandbox) before production**.
+
+### S2-Q016 — Does PayWay provide an official Postman collection, OpenAPI/Swagger spec, or SDK for each supported language (PHP, Node/TypeScript, Java, Python, .NET, Go)? Which are official and which are community?
+
+**A (2026-10-03):** S2-Q016 - Postman collection: Yes. An official Postman collection is provided by the ABA PayWay Integration Team (includes sample checkout/create-transaction, check-transaction, headers, and pre-request scripts). You can request it directly from the Integration Team. - OpenAPI/Swagger spec: No. ABA PayWay does not publish an official public OpenAPI/Swagger (openapi.yaml/openapi.json) file. Any OpenAPI specs are internally or partner-generated and unofficial, and must be validated against the official PayWay docs and sandbox behavior. - SDKs for PHP / Node/TS / Java / Python / .NET / Go: - The docs mention sample source code (e.g. PHP example) and that teams may use supported SDKs or integration libraries where available, but they do not document an official SDK set per language. - The docs also note you can generate SDKs via OpenAPI Generator once you have an OpenAPI spec, but those generated SDKs are developer/community artifacts, not official PayWay SDKs. So, based on the docs: Postman collection is official; there is no official public OpenAPI/Swagger spec; and no officially documented per-language SDK catalog — any other specs/SDKs are developer- or community-generated and not official.
+---
+## S3. Request Signing, Hashing & Encryption
+
+## S3. Request Signing, Hashing & Encryption
+
+### S3-Q001 — What is the canonical hash algorithm per endpoint family (SHA-512 vs SHA-256) and the output encoding (Base64 vs hex)? Confirm that payout uses hex while checkout/callback use Base64?
+
+**A (2026-10-03):** S3-Q001 UNKNOWN — not documented
+
+### S3-Q002 — Give the exact field order for the checkout/purchase hash. Confirm whether `ctid` is signed (and its position) when a subscription is registered, and confirm the documented 26-field vs actual 27-field discrepancy?
+
+**A (2026-10-03):** S3-Q002 UNKNOWN — not documented
+
+### S3-Q003 — Give the exact field order for `generate-qr`?
+
+**A (2026-10-03):** S3-Q003 UNKNOWN — not documented
+
+### S3-Q004 — Give the exact field order for `check-transaction`?
+
+**A (2026-10-03):** S3-Q004 UNKNOWN — not documented
+
+### S3-Q005 — Give the exact field order for `transaction-detail` and for `transaction-list` (do they differ?)?
+
+**A (2026-10-03):** S3-Q005 UNKNOWN — not documented
+
+### S3-Q006 — Give the exact field order for `refund`?
+
+**A (2026-10-03):** S3-Q006 UNKNOWN — not documented
+
+### S3-Q007 — Give the exact field order for `close-transaction`?
+
+**A (2026-10-03):** S3-Q007 UNKNOWN — not documented
+
+### S3-Q008 — Give the exact field order for the exchange-rate call?
+
+**A (2026-10-03):** S3-Q008 — For the exchange-rate API, the exact field order used to build the hash is: 1\. req_time
+2\. merchant_id So the string before HMAC is: req_time + merchant_id. The JSON body contains exactly these fields:
+- req_time
+- merchant_id
+- hash (JSON key order does not matter, but the HMAC concatenation order must be req_time then merchant_id.)
+
+### S3-Q009 — Confirm that when an optional field is omitted it hashes as an empty string (and not as the field name being skipped). Is this true on every endpoint?
+
+**A (2026-10-03):** S3-Q009 — No, the docs do not say that an omitted optional field is hashed as an empty string. What they state instead is:
+- Optional / empty fields must be omitted from both the payload and the before-hash string (do not send them as empty strings).
+- The hash must be built only from the actual fields used for that endpoint, in the exact order defined for that endpoint. So there is no global rule "omitted = empty string in hash" across all endpoints. For each endpoint you must follow its documented field list and omit optional fields when they are not populated, rather than inserting empty placeholders into the hash.
+
+### S3-Q010 — Confirm which multi-value/structured fields are Base64-encoded before hashing (`items`, `custom_fields`, `return_params`, `return_deeplink`, `payout`, `additional_params`) and confirm whether `additional_params` and `return_deeplink` are Base64-encoded once or twice?
+
+**A (2026-10-03):** S3-Q010 — From the docs you have: Base64-encoded structured fields (before hashing, where they participate in the hash):
+- custom_fields: JSON → Base64-encoded string. If included in hash, you must hash the Base64 value. Encoded once.
+- return_params: Treated like custom_fields when used — JSON → Base64; if hashed, use the Base64 value. Encoded once.
+- items: JSON array of item objects → Base64 into items; if included in hash, use the Base64 value. Encoded once.
+- return_deeplink: JSON { "android_scheme": ..., "ios_scheme": ... } → Base64; the hash must use this Base64-encoded JSON string. Docs explicitly imply encoding once ("base64-encode the compact JSON string exactly once"). Other fields in your list:
+- payout: No encoding or hashing rules documented in the provided material.
+- additional_params: Not documented at all in the provided material, so no stated rule on encoding or hashing. The docs also generally warn to avoid double-encoding unless explicitly required, and there is no endpoint in this material that requires double Base64 for return_deeplink or additional_params.
+
+### S3-Q011 — Confirm the hash order for CoF `link-account`?
+
+**A (2026-10-03):** S3-Q011 UNKNOWN — not documented
+
+### S3-Q012 — Confirm the hash order for CoF `link-card`, including that `amount` is a hash position with **no** body field and always hashes as `''`?
+
+**A (2026-10-03):** S3-Q012 UNKNOWN — not documented
+
+### S3-Q013 — Confirm the hash order for the CoF charge (`payment-credential`) call, and confirm `request_id` is no longer sent/signed?
+
+**A (2026-10-03):** S3-Q013 UNKNOWN — not documented
+
+### S3-Q014 — Confirm the hash orders for the token-management trio (renew / get-details / remove) — they differ from each other and none of them takes `request_id`?
+
+**A (2026-10-03):** S3-Q014 UNKNOWN — not documented
+
+### S3-Q015 — Confirm the hash order for `get-transactions-by-mc-ref`?
+
+**A (2026-10-03):** S3-Q015 UNKNOWN — not documented
+
+### S3-Q016 — Which endpoints require an RSA-encrypted `merchant_auth` blob, and what is the exact JSON shape of that blob per endpoint?
+
+**A (2026-10-03):** S3-Q016 From the docs, the endpoints that **explicitly** require an RSA-encrypted `merchant_auth` blob are: 1) **Pre-Auth Completion** **Endpoint(s):** - `/merchant-portal/merchant-access/online-transaction/pre-auth-completion` - `/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion` **merchant_auth JSON shape:** ```json { "mc_id": "<merchant_id>", "tran_id": "<pre_auth_tran_id>", "complete_amount": "<amount_to_complete>", // optionally: payout payload when doing paysplit (base64-encoded JSON, then encrypted as per payout rules) } ``` 2) **Refund API** **Endpoint(s):** - `/api/merchant-portal/merchant-access/online-transaction/refund` - (docs also generically reference `/api/.../refund` under merchant-portal/merchant-access) **merchant_auth JSON shape:** ```json { "mc_id": "<merchant_id>", "tran_id": "<original_tran_id>", "refund_amount": "<refund_amount>" } ``` 3) **Generic merchant-portal/merchant-access pre-auth ops** **Endpoint family:** - "Complete Pre-Auth / Cancel Pre-Auth; `/api/merchant-portal/merchant-access/*`" is called out as using RSA-encrypted `merchant_auth`. **JSON shape:** - For **Complete Pre-Auth**, the exact shape is as in (1) above. - For **Cancel Pre-Auth** and any other `merchant-portal/merchant-access/*` endpoints, the docs only say `merchant_auth` contains merchant info (e.g. merchant id, request_time, payout info, etc.) and must be RSA-encrypted, but they **do not** specify an exact key-by-key JSON schema. So: only **Pre-Auth Completion** and **Refund** have a clearly defined `merchant_auth` JSON structure in the current docs; other `merchant-portal/merchant-access/*` endpoints are documented as using encrypted `merchant_auth` but without an exact JSON schema.
+
+### S3-Q017 — Confirm the RSA algorithm, padding mode, and key size PayWay expects, and whether the payload must be encrypted in one block or is chunked for large beneficiaries lists?
+
+**A (2026-10-03):** S3-Q017 From the docs we have: - Algorithm & padding: Standard RSA with PKCS#1 v1.5 padding (explicitly referenced via the 117‑byte limit "for 1024-bit with PKCS#1 v1.5 padding").
+- Key size: Implementations must use the exact public key provided per merchant/environment. Docs reference: - 1024‑bit keys → max plaintext 117 bytes per chunk. - 2048‑bit keys → max plaintext 245 bytes per chunk ("if applicable").
+- Block vs chunked encryption: - If the plaintext fits in one block (≤ limit for that key size), it can be encrypted in a single block. - If it exceeds that size (e.g., large merchant_auth or big beneficiaries/payout list), it must be split into chunks within the per‑chunk limit and each chunk encrypted separately, then concatenated as required by the spec. - Docs explicitly say do not truncate the base64 output; you may chunk at plaintext level, but you must not cut the encrypted/base64 string. So: PayWay expects RSA with PKCS#1 v1.5 using the provided key (commonly 1024‑bit, 2048‑bit where given), and large payloads such as big beneficiaries lists are handled by chunked RSA encryption, not by forcing a single block.
+
+### S3-Q018 — Confirm the exact `token_flag` values accepted on each endpoint — linking (`CITI_FLEX`, `CITO_FLEX`), charging (`CITU_FLEX`, `MITU_FLEX`, `MITU_FIX`, `MITR_FLEX`, `MITR_FIX`), subscription (`CITR_FIX`) — and confirm that the linking flags are rejected on charge and vice versa?
+
+**A (2026-10-03):** S3-Q018 UNKNOWN — not documented
+
+### S3-Q019 — Confirm `frequency` allowed values (`1W`, `1M`, `2M`) and on which endpoints it is required vs optional?
+
+**A (2026-10-03):** S3-Q019 UNKNOWN — not documented
+
+### S3-Q020 — What are the ID format rules for `tran_id`, `ctid`, and `request_id` (allowed characters, min/max length, uniqueness requirement)?
+
+**A (2026-10-03):** S3-Q020 UNKNOWN — not documented
+
+### S3-Q021 — What is the exact error returned for a hash mismatch (`status.code 1` / `01` / `PTL02`), and is there any diagnostic that names the offending field?
+
+**A (2026-10-03):** S3-Q021 For a hash mismatch:
+- The common gateway response is status.code = 1 with status.message = "Wrong Hash.".
+- On some endpoints you may instead see a body like { "status": 5, "description": "wrong hash" } or an HTTP 403 authorization error. There is no diagnostic that pinpoints a specific offending field. For troubleshooting, you compare the server-provided before_hash (when available) and your client before_hash / client_hash to see which parameter or formatting differs.
+
+### S3-Q022 — Which endpoints enforce the hash server-side, and are there any where it is optional or not yet enforced?
+
+**A (2026-10-03):** S3-Q022 UNKNOWN — not documented
+---
+## S4. Callbacks / Webhooks — Delivery & Verification
+
+## S4. Callbacks / Webhooks — Delivery & Verification
+
+### S4-Q001 — How many distinct callback contracts exist, and how do we tell them apart in one receiver? (a) signed online checkout/KHQR callback, (b) payment-link pushback, (c) offline KHQR notification, (d) Customer Module / Printed QR callback, (e) CoF `pwt` callback?
+
+**A (2026-10-03):** S4-Q001 UNKNOWN — not documented
+
+### S4-Q002 — Is the online callback signature carried in the `X-PAYWAY-HMAC-SHA512` header or in a `hash` body field? Which is authoritative, and what is the canonicalization (sorted keys? nested objects? array handling?) used to verify it?
+
+**A (2026-10-03):** S4-Q002 For the online callback: - The signature is carried in the HTTP header X-PAYWAY-HMAC-SHA512 (case-insensitive) as a Base64-encoded HMAC-SHA512 value.
+- The header value is authoritative. There is no separate body hash field used for verification in this contract. Canonicalization used for verification
+1. Read the JSON body and parse it.
+2. Sort all top-level keys in ascending order by key name.
+3. Build a string by concatenating only the values in that sorted-key order: - If a value is an object or array, JSON-encode it first, then append that JSON string.
+4. Compute HMAC-SHA512 over this concatenated string using the shared secret.
+5. Base64-encode the raw HMAC output and compare it to the X-PAYWAY-HMAC-SHA512 header (timing-safe comparison). If they differ, treat the callback as invalid.
+
+### S4-Q003 — Confirm that `verifyCallback`/HMAC verification applies to the online checkout and KHQR callbacks but **not** to payment-link pushbacks. What exactly does a payment-link pushback body contain?
+
+**A (2026-10-03):** S4-Q003 UNKNOWN — not documented
+
+### S4-Q004 — Confirm that the offline KHQR notification has **no documented authentication contract**. If it is unsigned, what is the officially recommended way to treat it?
+
+**A (2026-10-03):** S4-Q004 UNKNOWN — not documented
+
+### S4-Q005 — Confirm that the CoF `pwt` callback's `X-PAYWAY-HMAC-SHA512` header does **not** verify under the documented canonicalization, and state the officially recommended verification path?
+
+**A (2026-10-03):** S4-Q005 UNKNOWN — not documented
+
+### S4-Q006 — Give the full body schema of each callback type, field by field, including which fields are strings vs numbers?
+
+**A (2026-10-03):** S4-Q006 UNKNOWN — not documented
+
+### S4-Q007 — Is delivery retried if our endpoint returns a non-2xx, or if it does not respond within the timeout? State the exact timeout, the retry count, and the backoff — or confirm there is **no** guaranteed retry?
+
+**A (2026-10-03):** S4-Q007 For ABA PayWay callbacks, there is no guaranteed retry contract if your endpoint returns a non‑2xx status or does not respond within the timeout. - General pushback/callbacks (online flows): - The gateway waits only a short time for your response: documented as roughly ~5–15 seconds, with some configurations observed up to ~20 seconds total. - Retry behavior varies by flow and environment. Some setups have been observed to do at most one extra attempt with ~10s spacing, but this is not guaranteed and must not be relied on. - Customer Module webhooks (offline KHQR Customer Module): - Documented explicitly as a single attempt only. - If your endpoint does not return HTTP 200 within 5 seconds, the callback is considered failed and will not be re‑sent. So there is no fixed, guaranteed timeout + retry + backoff you can depend on across flows. You should design as if there is effectively one best‑effort push only, and use the Check Transaction / Get‑Transaction‑by‑Ref APIs as the authoritative recovery path when callbacks fail or are missing.
+
+### S4-Q008 — Confirm that callbacks are single best-effort delivery with no guaranteed redelivery, and state what officially supported mechanism exists to recover a missed notification?
+
+**A (2026-10-03):** S4-Q008 Callbacks should be treated as single best‑effort delivery with no guaranteed redelivery:
+- For the Customer Module/offline KHQR, it is explicitly stated that no retries are done — if your endpoint does not return HTTP 200 within ~5 seconds, the webhook is considered failed and will not be re‑sent.
+- For other pushbacks, limited retries may occur in some environments, but they are not guaranteed and must not be relied on. The officially supported mechanism to recover a missed notification is to use the PayWay query APIs, specifically:
+- Check Transaction / Check Transaction‑Details APIs as the authoritative fallback for online flows.
+- Get Transaction‑by‑Ref (get-transactions-by-mc-ref) for Customer Module/offline KHQR, typically via a scheduled background job. Design your integration assuming callbacks may be delivered at most once and rely on these APIs for reconciliation when a pushback is missing or uncertain.
+
+### S4-Q009 — Is there any merchant-facing callback delivery log, replay API, or dashboard to inspect past deliveries? If not, what is the escalation path and what must we provide?
+
+**A (2026-10-03):** S4-Q009 There is no merchant-facing callback delivery log, replay API, or dashboard documented. The documented path is to:
+- Use PayWay APIs (e.g., Check Transaction, Transaction List / Get-Transactions-by-Ref) for reconciliation.
+- For delivery inspection, escalate to ABA PayWay support / Integration Team and request pushback logs. When escalating, you should provide at least:
+- tran_id(s) and, if applicable, merchant_ref / customer ID.
+- Channel/payment details and timestamps.
+- Any server/callback logs on your side (HTTP status, errors, timeouts).
+- Screenshots or evidence showing money deducted / status mismatch. Support can then pull pushback log snippets and payloads for those transaction IDs to help you inspect past deliveries.
+
+### S4-Q010 — Does a callback fire for a transaction that is closed/voided before payment? Does a callback fire when a transaction expires?
+
+**A (2026-10-03):** S4-Q010 Callbacks/webhooks are sent only for successful payments:
+- If a transaction is closed/voided before payment (i.e., it never becomes a successful payment), no callback is fired.
+- When a transaction expires (QR/card session timeout, etc.), this is a non-success status, so no callback is fired. For these non-success cases (voided/closed/expired), the officially recommended path is to use the check-transaction API to determine the final status.
+
+### S4-Q011 — Does a callback fire for a failed/expired CoF link attempt? Confirm expected "silence"?
+
+**A (2026-10-03):** S4-Q011 UNKNOWN — not documented
+
+### S4-Q012 — Can one callback URL serve every channel for a profile, or must each channel have its own? Who is allowed to change it, and how?
+
+**A (2026-10-03):** S4-Q012 For PayWay, the callback is configured per merchant profile/environment, not per channel:
+- The docs describe a single pushback/callback URL per profile (and per environment) that can handle all payments under that profile. For the Customer Module it is explicitly “only one callback URL”; there is no requirement to split by KHQR/card/other channels. Who can change it, and how?
+- Model 1 – Via Integration Team / maintenance request - You provide a new HTTPS callback URL to the ABA PayWay Integration Team. - They update the callback URL in your merchant profile (sandbox and, for Customer Module, also production) as a configuration/maintenance change. - For production Customer Module, changes must go through a formal support/maintenance ticket. - Model 2 – Via PayWay integration portal - If your profile uses the PayWay integration portal, a merchant user with portal access can log in, go to Settings → Push Back Notification URL, update the URL, save, then inform the Integration Team so they can verify callbacks in logs. - Self‑registered production profiles (general PayWay) - For some self‑registered production setups, the docs state the Integration Team does not update the production callback URL; instead, the integrator must supply a return_url per transaction to control where the browser is redirected. Pushback/webhook behavior for those profiles should be confirmed per case with the Integration Team.
+
+### S4-Q013 — What is the officially recommended callback URL structure (path, HTTPS requirement, query-string allowance, max length)? Are private/loopback hosts rejected?
+
+**A (2026-10-03):** S4-Q013 Bong @Ruzaid Official callback URL structure (what is documented):
+- Scheme & port: Must be HTTPS on the standard port 443. Custom ports (e.g. :8080, :8443, :40000) are not supported.
+- Host: Must be a publicly reachable host, with valid public DNS and a CA‑signed TLS certificate. Examples: - https://merchant.example.com/payway/callback - https://<merchant-domain>/abapayway/pushback
+- Path: Any path under the merchant’s domain is acceptable as long as: - It matches what was used/whitelisted during sandbox testing, and - It is the same path configured in the merchant profile for production. Query‑string & max length:
+- Use of query‑string parameters and any maximum URL length are not documented in the available materials. Private / loopback / internal hosts:
+- Docs require the endpoint to be publicly reachable, resolve via public DNS, and not be localhost or internal‑only: - Endpoints accessible only via VPN, office network, or localhost are not acceptable.
+- In practice this means private/loopback/internal hosts are effectively rejected because PayWay cannot reach them: - You must expose a public HTTPS endpoint on port 443; sandbox may allow temporary public tunnels (e.g. ngrok), but still not pure private IPs or loopback.
+
+### S4-Q014 — Do callback deliveries include a replay/idempotency key we can deduplicate on? If not, what field should we use as the deduplication key?
+
+**A (2026-10-03):** S4-Q014 Callback payloads do not include a special replay/idempotency key. The officially recommended deduplication key is the PayWay transaction identifier:
+- For standard PayWay gateway callbacks: use the tran_id you sent in the request (gateway echoes it back).
+- For Offline KHQR / invoice-style flows: use the PayWay transaction_id from the callback. Implementation rule:
+- On callback receipt, check if that transactionid/tranid already exists in your DB. - If already stored/processed → do not create another payment. - If new → store and process it. Do not deduplicate on merchant_ref, merchant_ref+amount, or other business references (they can appear in multiple legitimate payments).
+
+### S4-Q015 — Do callbacks include the amount and currency, and which amount fields (`original_amount` vs `payment_amount`) must we trust to decide fulfilment?
+
+**A (2026-10-03):** S4-Q015 - Presence of amount & currency: Callback design explicitly requires that PayWay callbacks include the paid amount, and they are used in examples together with currency-based business rules (e.g., “verify currency and expected business rules”). You should therefore expect both amount and currency in the payload and use them when reconciling/deciding fulfilment. - Which amount to trust: The final payable/charged amount is the one to trust: - Documentation states that Total_Amount is the final amount the user must pay and is the value that should map to the amount parameter. - Other fields like Original_Amount or Payment Amount may represent pre‑discount/pre‑fee or intermediate values and must not drive fulfilment decisions. - Recommended fulfilment rule: 1. From the callback, read the final amount field (the amount/Total_Amount equivalent) and currency. 2. Compare that to your stored order total and expected currency for the same tran_id/reference. 3. If they match, and status/signature are valid, you may auto‑fulfil. 4. If they do not match, place the order in an exception/manual review state and investigate before delivering goods/services.
+
+### S4-Q016 — Confirm that a valid signature proves authenticity only — not approval, not amount match, not replay-freedom. What are the official mandatory guards before fulfilling an order?
+
+**A (2026-10-03):** S4-Q016 UNKNOWN — not documented
+
+### S4-Q017 — What HTTP status and body should we return to acknowledge a callback, and does the acknowledgement timing affect PayWay's retry behaviour?
+
+**A (2026-10-03):** S4-Q017 Bong @Ruzaid HTTP status to acknowledge
+- Return HTTP 200 OK (or at least a 2xx status) when your system has successfully received and processed the callback.
+- For some profiles, PayWay expects a specific acknowledgement body — e.g. exactly RECEIVEOK — so the gateway marks the callback as delivered.
+- Where no fixed keyword is required, a simple success text/JSON (e.g. "Success", "Completed", or a small JSON with success: true) is acceptable as long as it comes with HTTP 200. Does timing affect retry behaviour?
+- Yes. The acknowledgement must arrive within PayWay’s timeout window: - If your endpoint does not respond with HTTP 200 in time (timeout/unreachable) or responds with non‑200, PayWay marks the callback as failed. - For production callback policy, docs state PayWay attempts a single push and does not retry if the endpoint times out or is unreachable. - For the Customer Module specifically, if no HTTP 200 is received within 5 seconds, the webhook is considered failed and is not re‑sent. So: fast HTTP 200 + expected body is required; a late success after PayWay’s timeout window will not trigger another attempt, and you must fall back to the Check‑Transaction/reconciliation flow.
+
+### S4-Q018 — Are callbacks signed per-merchant or with a platform-level key? If a partner provisions many sub-merchants, do all share one callback URL?
+
+**A (2026-10-03):** S4-Q018 UNKNOWN — not documented
+
+### S4-Q019 — Do the payment-link pushback and the CoF callback carry a numeric `status` (`0`) rather than the string status used elsewhere? Confirm the value mapping?
+
+**A (2026-10-03):** S4-Q019 Bong @Ruzaid Yes — callbacks use a numeric status value, not a string, including for payment-link pushback and CoF-style callbacks: - The gateway sends status as an integer, e.g. status: 0.
+- status = 0 indicates success.
+- Non‑zero status means non‑success / error, and must be interpreted with the accompanying payment status fields. For the canonical payment status fields you may also see:
+- payment_status / payment_status_code mapping: - 0 → APPROVED (successful payment) - 2 → PENDING - 3 → DECLINED - 4 → REFUNDED - 7 → CANCELLED (pre‑auth) Note: any examples that show status as a string are illustrative only; implementation must treat status as numeric and validate accordingly.
+
+### S4-Q020 — Are callbacks emitted for refund events, payout/split results, beneficiary status changes, and pre-auth auto-cancellation? For each, yes or no?
+
+**A (2026-10-03):** S4-Q020 UNKNOWN — not documented
+
+### S4-Q021 — When a customer removes a token in ABA Mobile, is any callback delivered to the merchant? If not, what is the officially supported detection mechanism?
+
+**A (2026-10-03):** S4-Q021 Bong @Ruzaid Yes. When a customer removes a token in ABA Mobile and Credentials on File callbacks are enabled/configured, PayWay will send a real‑time callback to the merchant using the standard payment_credential payload, with:
+- status = 0 → token has been removed. If the callback is not received or CoF callback is not enabled, the official detection mechanisms are:
+1. Get token details API – query the token to see its current status (removed/frozen/active) as documented.
+2. Payment attempt using that token – any transaction with a removed token will be declined, and the merchant receives a failure response (and the user gets an ABA Mobile notification).
+
+### S4-Q022 — What must we never log from a callback payload (token, PAN, CVV, account number), and what is the official data-handling expectation?
+
+**A (2026-10-03):** S4-Q022 Bong @Ruzaid **Must never be logged from callbacks**
+- **Full PAN (card number)** and **CVV** — these must never be captured or stored by the merchant at all in standard PayWay flows, so they must not appear in logs.
+- **Full ABA account numbers** — per policy, full account numbers are confidential and must not be displayed; only masked forms (e.g. `****5312`) are allowed, including in logs.
+- Any **secrets/keys** used to validate callbacks (e.g. the HMAC shared secret) must also never be logged. For **tokens (PWT/payment_credential)**: they are credential‑on‑file data used to complete purchases, so they must be treated as **sensitive** — store them securely for processing, avoid printing them in plain‑text application logs, and never expose them in frontend URLs. **Official data‑handling expectation**
+- UIs and logs may only contain **masked account/card representations** and non‑sensitive fields (customer name, timestamps, refs, statuses).
+- Do **not** log “sensitive payment information” in cancellation/return or callback handling.
+- Store any CoF token data securely according to PayWay’s Credential on File guidelines; use it only for payment and token‑management logic, not for user‑facing display or verbose logging.
+---
+## S5. Transaction Status Model & Lifecycle
+
+## S5. Transaction Status Model & Lifecycle
+
+### S5-Q001 — List every payment status and its numeric code exactly as documented (e.g. `0` APPROVED, `2` PENDING, `3` DECLINED, `4` REFUNDED, `7` CANCELLED). Are there any undocumented statuses?
+
+**A (2026-10-03):** S5-Q001 Bong @Ruzaid Documented payment_status_code mapping:
+- 0 → APPROVED
+- 2 → PENDING
+- 3 → DECLINED
+- 4 → REFUNDED
+- 7 → CANCELLED (pre-auth) The docs also note that other gateway-specific numeric codes can appear (examples mentioned: 21, 32) whose exact meanings are not fully documented here and must be confirmed with gateway docs/support. So yes, there are additional/undocumented status codes beyond the list above.
+
+### S5-Q002 — Is there a CLOSED / CANCELLED-remote state? Confirm that a closed-but-unpaid transaction continues to report `PENDING` and that no `CLOSED` status is exposed by the API?
+
+**A (2026-10-03):** S5-Q002 According to the docs, there is no separate CLOSED status exposed by the APIs. - The public statuses documented are: APPROVED, PENDING, DECLINED, REFUNDED, CANCELLED; no CLOSED state is listed.
+- The Close Transaction API can leave the transaction in a PENDING “closed” state internally, and the docs note that Close may still return PENDING and that you must confirm via Check Transaction.
+- Another section states that after Close you should expect the status to move to CANCELLED, but again this is via the existing status codes, not a new CLOSED code. So: a closed-but-unpaid transaction may still report PENDING, and no separate CLOSED status is exposed by the API; closure is reflected via the existing PENDING/CANCELLED semantics, not a new status value.
+
+### S5-Q003 — Confirm `payment_status` is a coarse flag: after a partial refund the status still reads `REFUNDED`. Which field is authoritative for "how much was refunded"?
+
+**A (2026-10-03):** S5-Q003 Yes Bong @Ruzaid, payment_status (and status code 4) is only a coarse flag that “one or more refunds happened” — it does not distinguish full vs partial. The authoritative field for “how much was refunded” is:
+- total_refunded — from the Refund API response (alongside grand_total). This gives the cumulative refunded amount. Current check‑transaction does not reliably expose total_refunded; it only shows status/payment_status = REFUNDED. For detailed refund amounts/history, rely on:
+- total_refunded in the Refund API response now, and
+- the dedicated transaction‑details API once it is delivered.
+
+### S5-Q004 — How long can a transaction remain `PENDING` before PayWay expires it? State the documented value and the observed value if they differ?
+
+**A (2026-10-03):** S5-Q004 Bong @Ruzaid Documented behavior
+- Docs state that pending transactions remain in the gateway system indefinitely — they are not automatically reset by PayWay: the transaction "will remain in a pending state until the user completes the payment". There is no documented hard timeout where PENDING is flipped to another status by the API. Documented/observed expiry windows (user can no longer complete payment)
+- ABA PAY / cards / Alipay / WeChat: ≈3 minutes.
+- Web ABA KHQR (QR on website): 5 minutes.
+- ABA KHQR deeplink / KHQR transactions: effective expiry ≈10 minutes.
+- A general PayWay expiry window observed ≈15 minutes is mentioned for transactions initiated via PayWay. So: there is no exposed “PENDING auto-expiry” timeout — PENDING can remain indefinitely in the gateway. Merchants are instructed to treat transactions that are still PENDING after the relevant expiry window (≈3–10 minutes, up to ≈15 minutes observed) as expired on the merchant side, even though PayWay may continue to report them as PENDING.
+
+### S5-Q005 — What does PayWay do with a payment that arrives after the transaction was closed — reject, reverse, or accept? Is behaviour channel-dependent (QR vs hosted checkout)?
+
+**A (2026-10-03):** S5-Q005 UNKNOWN — not documented
+
+### S5-Q006 — Can a payment land after `close-transaction` returned success? If so, what is the official reconciliation/refund path?
+
+**A (2026-10-03):** S5-Q006 UNKNOWN — not documented
+
+### S5-Q007 — Does the status flow differ per payment method (card, ABA PAY, KHQR, wallet)?
+
+**A (2026-10-03):** S5-Q007 UNKNOWN — not documented
+
+### S5-Q008 — Is `payment_status_code` always present, and does it ever disagree with `payment_status`?
+
+**A (2026-10-03):** S5-Q008 UNKNOWN — not documented
+
+### S5-Q009 — What is the officially recommended amount of time to wait before treating `PENDING` as failed, per payment method?
+
+**A (2026-10-03):** S5-Q009 Bong @Ruzaid Short "PENDING → treat as failed" window (post‑checkout, per method)
+From the guidance on detecting cancelled/failed payments:
+- ABA Pay (deeplink): when user returns to the app, check for pushback and poll Check Transaction for up to ~15 seconds. If there is no pushback and status is still PENDING, treat it as failed/cancelled and allow retry.
+- KHQR (hosted checkout / webview): when the webview is closed, poll for up to ~15 seconds. If still PENDING, treat as failed/cancelled and allow retry.
+- Card payments: use Check Transaction; if status remains PENDING after ~15 seconds of polling when the user returns/closes webview, treat as failed/cancelled and prompt retry (handling Transaction not found vs PENDING as documented). Longer expiry windows (when you should stop expecting completion)
+These are the documented/observed lifetimes of the payment flows; once exceeded, PENDING should be treated as effectively expired even if the gateway still shows PENDING:
+- KHQR web (website QR): QR timeout ~5 minutes.
+- KHQR deeplink / KHQR transactions: effective expiry ~10 minutes.
+- Card (and similar hosted flows like Alipay/WeChat): timeout ~3 minutes.
+- General PayWay transactions: merchant‑observed expiry window ~15 minutes; beyond this, treat long‑PENDING as incomplete/expired on the merchant side. No separate, different timeout is documented for "wallet" beyond the above patterns; the same ~15s post‑return polling plus flow‑specific 3–10 minute expiry windows are the recommended basis for treating PENDING as failed/expired.
+
+### S5-Q010 — Can a transaction move from a terminal status back to a non-terminal one (e.g. DECLINED then APPROVED after a retry with the same `tran_id`)?
+
+**A (2026-10-03):** S5-Q010 UNKNOWN — not documented
+
+### S5-Q011 — Is `payment_status` present in the callback body, in `check-transaction`, and in `transaction-detail`? Confirm field naming is consistent across all three?
+
+**A (2026-10-03):** S5-Q011 Bong @Ruzaid From the docs:
+- Callback body (pushback/webhook): payment_status is not present. The callback is documented to contain only a small set of fields such as tran_id, apv, and status.
+- Check-transaction (incl. v2): payment_status is present, alongside payment_status_code, and these two are meant to be used together to determine outcome.
+- Transaction-detail / list APIs: documentation focuses on status / payment_status_code mappings and additional fields, but does not explicitly guarantee a payment_status string field in all transaction-detail endpoints. So, payment_status is not present in all three and field naming is not fully consistent across callback vs check-transaction vs transaction-detail in the available documentation.
+
+### S5-Q012 — Does PayWay ever emit an intermediate status such as "processing" or "authorizing"?
+
+**A (2026-10-03):** S5-Q012 UNKNOWN — not documented
+
+### S5-Q013 — For pre-auth, what are the status values and how do `PRE-AUTH` states differ from a normal purchase?
+
+**A (2026-10-03):** S5-Q013 Bong @Ruzaid Documented status / paymentstatuscode values relevant to Pre-Auth
+- 0 – APPROVED - Used for both successful normal payments and approved pre-auth holds (funds successfully blocked).
+- 2 – PENDING - Payment / pre-auth not completed yet (e.g. customer still paying or result not finalised).
+- 3 – DECLINED - Authorisation attempt failed.
+- 4 – REFUNDED - Refund processed after a completed payment.
+- 7 – CANCELLED (pre-auth service) - Specifically documented as the pre-auth cancellation status (hold released), including auto-cancel after the validity period (e.g. 30 days) or explicit cancel-preauth. How Pre-Auth states differ from a normal purchase
+- Normal purchase - PENDING (2) while user is paying / result not final. - APPROVED (0) once payment is completed and funds are captured/settled; this is a final charge from the customer’s perspective. - May later move to REFUNDED (4) if a refund is processed. - Pre-Auth - Created with type = 'pre-auth' on the purchase API. - Initially PENDING (2) during the payment attempt. - When the hold succeeds, it goes to APPROVED (0) but this means “pre-auth approved / funds blocked”, not yet captured. - Merchant can then: - Call Complete Pre-Auth → funds are captured (still represented as an approved transaction in PayWay; docs do not introduce a separate code beyond 0). - Call Cancel Pre-Auth or let it auto-expire → status becomes CANCELLED (7) and the blocked funds are released. So, the codes themselves are mostly shared with normal purchase (0/2/3/4), but:
+- For Pre-Auth, 0 explicitly covers “pre-auth approved (hold)” as well as a completed charge after capture.
+- 7 is documented specifically as “CANCELLED (pre-auth service)”, representing the release of a pre-auth hold, which is a state that normal one-step purchases do not go through.
+
+### S5-Q014 — What is the terminal-state definition we should code against, per endpoint?
+
+**A (2026-10-03):** S5-Q014 Bong @Ruzaid **General terminal vs non‑terminal definition**
+- **Non‑terminal (keep waiting/polling):** `Created`, `Pending`
+- **Terminal (do *not* expect further state changes):** `Approved/Completed`, `Declined`, `Refunded`, `Cancelled`, `Expired` **1) Check-transaction API**
+Code your logic so that:
+- **Non‑terminal:** - `payment_status = Created` - `payment_status = Pending` (or `PENDING` / code `2`)
+- **Terminal:** - `payment_status = Approved` (or code `0`) → **only this means "paid"** - `payment_status = Declined` → final failure - `payment_status = Refunded` (e.g. code `4`) → final "reversed" state - `payment_status = Cancelled` → user/merchant cancelled, no service - `payment_status = Expired` → session timed out; treat as final failed Stop polling when status moves out of `Created/Pending` into any of the above terminal values; only `Approved` should mark the order as paid. **2) Callback / pushback (return_url notifications)**
+- Gateway **sends pushback only once the payment is completed.**
+- Practically, treat **receipt of a pushback with success indicators (e.g. status `0` / `Approved`) as a terminal-success event** for that `tran_id`.
+- You should *not* expect further callbacks that change a successful payment into another state; exceptions (manual adjustments, incident handling) are handled out of band, not via more callbacks. **3) Transaction-detail / portal-style APIs**
+- Use the same canonical semantics as check-transaction: - Non‑terminal: `Created`, `Pending` - Terminal: `Approved/Completed`, `Declined`, `Refunded`, `Cancelled`, `Expired`
+- These endpoints are primarily for **lookup/reconciliation**, not active polling, but your status mapping should be identical: only `Approved/Completed` is treated as paid; all other terminal values are final non‑paid or reversed outcomes.
+---
+## S6. Idempotency, Retries & Unknown Outcomes
+
+## S6. Idempotency, Retries & Unknown Outcomes
+
+### S6-Q001 — Does PayWay provide an idempotency key on any create endpoint (purchase, QR, payment link, payout, CoF charge)? If not, confirm which field we should use as our own idempotency key?
+
+**A (2026-10-03):** S6-Q001 Bong @Ruzaid From the docs, PayWay does **not** expose a dedicated idempotency key field/header on the create endpoints. The field to use as your own idempotency key is:
+- **`tran_id` (transaction_id)** — generated by the merchant and required to be **unique per payment attempt** for `/payments/purchase` / create-transaction and QR flows. Notes from the rules:
+- Gateway expects a **unique `tran_id`** per request; reusing it is treated as a duplicate and can trigger errors.
+- For complex cases (e.g. also having an external settlement hash), the docs recommend **server-side deduplication using a composite key** such as `tran_id + external_txn_hash` in your own system. So: **no built-in idempotency key**, and you should treat **`tran_id` (or a composite built around it) as your idempotency key** across create calls.
+
+### S6-Q002 — What happens if two purchase/QR calls use the same `tran_id`? Is the second accepted, rejected, or silently deduplicated?
+
+**A (2026-10-03):** S6-Q002 Bong @Ruzaid From the docs, reusing the same tran_id is not supported as an idempotent pattern, and behavior depends on the state of the first transaction: 1. If the first tran_id is already approved/completed - A second purchase/QR call with the same tran_id is rejected by the gateway with a duplicate transaction / duplicate transaction ID indication, and no second charge is made. 2. If multiple purchase/QR requests with the same tran_id arrive close together before payment is completed - The gateway can accept the later request and generate a new QR string, with the latest QR superseding the previous one. The older QR becomes obsolete and payment attempts on it may fail. 3. No doc indicates any "silent deduplication" where the second create call is simply ignored while keeping the first. So: the second call is either rejected as a duplicate (when the prior is already approved) or accepted but replaces the earlier QR (before payment) — it is not treated as a silent idempotent dedup.
+
+### S6-Q003 — On a network timeout while creating a transaction, confirm the correct recovery procedure (query the existing `tran_id` before creating a replacement) and confirm that blind retry risks an unpayable duplicate?
+
+**A (2026-10-03):** S6-Q003 Bong @Ruzaid Recovery on create-timeout
+- If the purchase/QR call times out, you must assume the original tran_id might already exist.
+- First step: call Check Transaction with the same tran_id: - If it returns Pending / Approved → treat that as the live transaction, do not create a replacement and do not allow another payment for that order. - If it returns tran_id not found / expired / failed (and you are within the normal TTL and using the correct environment) → you can safely create a new transaction (with a new tran_id). Risk of blind retry
+- If you blindly retry the create call with the same tran_id, the gateway can return a duplicate‑transaction error once the first one is already in progress/approved, making the retried transaction unpayable.
+- If you blindly retry with a new tran_id without checking the first, docs warn that PayWay cannot correlate them and there is a double‑charge risk if the first transaction later becomes Approved. So the documented safe pattern is: always query the existing tran_id via Check Transaction before deciding to create any replacement transaction.
+
+### S6-Q004 — Confirm that transaction IDs are our idempotency key and are **not** gateway-side idempotency — i.e. the gateway will not dedupe for us?
+
+**A (2026-10-03):** S6-Q004 Bong @Ruzaid Yes — per docs: - PayWay does not provide a dedicated gateway-side idempotency mechanism (no idempotency header/key that guarantees safe, silent dedupe of retries).
+- tran_id is a merchant-generated key that you must use as your own idempotency key for create operations (purchase/QR, etc.), combined with your own server-side dedup logic.
+- If you reuse the same tran_id, the gateway may: - Reject it as a Duplicate Transaction / Duplicate Transaction ID once one attempt is already successfully paid, or - Replace the prior QR/transaction version if duplicate create calls arrive close together. So: transaction IDs are for merchant-side idempotency control; the gateway will not reliably dedupe duplicate create requests for you.
+
+### S6-Q005 — For refunds, what is the officially safe retry procedure, and what happens if we retry a refund that already succeeded?
+
+**A (2026-10-03):** S6-Q005 Bong @Ruzaid Officially safe retry procedure for Refund API
+1. Always log full request/response, timestamps, and error codes.
+2. If you get timeout / 408 / 5xx or your client times out: - First, call Check Transaction API (or check portal) for that tran_id. - If status is REFUNDED → stop, do not retry. - If status is not refunded → you may retry the refund once after a short backoff.
+3. If the refund API returns a PTLxx / issuer-decline / validation error, do not retry until the underlying cause is fixed (wrong params, not refundable, issuer rejected, etc.).
+4. Do not implement aggressive or infinite retries; refunds are treated as sensitive operations. If we retry a refund that already succeeded
+- The gateway validates that refund_amount does not exceed the remaining refundable amount.
+- After a full refund, the remaining refundable amount is 0, so a new refund attempt for that tran_id will be rejected with a PTL/validation error (no additional refund is processed).
+- Practically: no double refund, but your system must handle the error and stop retrying once the transaction is in REFUNDED state.
+
+### S6-Q006 — Is `refund` idempotent server-side? How do we detect that a refund was already processed?
+
+**A (2026-10-03):** S6-Q006 Bong @Ruzaid From the docs, refunds are not described as having a dedicated idempotency key on the gateway side, so they are not documented as idempotent operations in the same way as an idempotency-key API. What is documented is:
+- On a successful refund, the gateway updates the transaction to: - transaction_status = "REFUNDED" - Returns grand_total and total_refunded.
+- The gateway validates that refund_amount does not exceed the remaining refundable amount; after a full refund, remaining refundable amount is 0, so further refund attempts are rejected (no extra refund processed). How to detect that a refund was already processed (per docs):
+- Call Check Transaction API or use the portal and check: - transaction_status is REFUNDED, and - total_refunded is equal to grand_total (full refund) or already covers the amount you intended to refund (partial-case logic on your side).
+- In timeout/error scenarios, the recommended pattern is to check transaction status first; if it is already REFUNDED or there is no remaining refundable amount, do not retry the refund.
+
+### S6-Q007 — Is `close-transaction` idempotent? Confirm the observed behaviour when re-closing an already-closed transaction, and the error when closing an unknown ID?
+
+**A (2026-10-03):** S6-Q007 Bong @Ruzaid From the docs:
+- **Idempotency / re-closing an already-closed transaction:** behaviour is *not documented* — there is no explicit statement that `close-transaction` is idempotent or how the gateway responds when you call it again on an already closed transaction.
+- **Closing an unknown/nonexistent transaction ID:** if the transaction was never successfully created (no valid tran_id), the Close Transaction API will return **`Transaction not found`**.
+
+### S6-Q008 — Is payment-link `void` idempotent? Confirm the error code returned on a second void?
+
+**A (2026-10-03):** S6-Q008 UNKNOWN — not documented
+
+### S6-Q009 — Confirm that `removeToken` returns success even for a non-existent token, and state the officially supported way to confirm token existence?
+
+**A (2026-10-03):** S6-Q009 UNKNOWN — not documented
+
+### S6-Q010 — For payout, is there any deduplication? What is the safe retry procedure if a payout times out?
+
+**A (2026-10-03):** S6-Q010 UNKNOWN — not documented
+
+### S6-Q011 — Can duplicate callbacks cause duplicate fulfilment? What is the official guidance for exactly-once fulfilment?
+
+**A (2026-10-03):** S6-Q011 Bong @Ruzaid Yes, duplicate callbacks can cause duplicate fulfilment if the merchant does not implement idempotency, because your system might create the same payment/order fulfilment twice. Official guidance for exactly-once fulfilment:
+- Treat callbacks as potentially repeatable events and make your handler idempotent.
+- Use transaction_id as the deduplication key: - On callback: check if this transaction_id has already been processed. - If already processed → do not create another payment / do not fulfil again. - If new → store it and run fulfilment once.
+- Do not deduplicate purely by merchant_ref, because multiple legitimate payments can share the same reference (e.g. repeated/partial payments).
+- Keep the webhook handler lightweight and quick (HTTP 200 fast), and offload heavy fulfilment to background jobs keyed by transaction_id.
+- Optionally, use Check Transaction API as the authoritative source if in doubt, but still gate fulfilment on “have we already fulfilled this transaction_id?”. Following this pattern gives exactly-once fulfilment per PayWay transaction_id, even if the same callback is delivered or processed more than once.
+
+### S6-Q012 — For offline/printed QR where the same QR can legitimately be paid more than once, how should we model multiple payments against one invoice?
+
+**A (2026-10-03):** S6-Q012 Bong @Ruzaid For offline/printed KHQR where **one QR can be paid many times**, the docs recommend modelling **invoice, payment, and allocation as separate objects**, not "one invoice = one payment". **1️⃣ QR / reference
+- Encode the **invoice reference** in KHQR field `62.01` (`merchant_ref`).
+- The same `merchant_ref` may appear on **many PayWay transactions**. **2️⃣ Data model**
+- **INVOICE** (what is owed) - `invoice_id` - `customer_id` - `original_amount` - `amount_paid` - `balance_due` - `status` (UNPAID / PARTIALLY_PAID / PAID / OVERPAID) - **PAYMENT** (each PayWay transaction) - `payment_id` - `transaction_id` - `merchant_ref` (links back to invoice) - `payment_amount`, `payment_currency` - `payment_status`, `transaction_date` - `raw_callback` etc. - **PAYMENT ALLOCATION** (how payments apply to invoices) - e.g. `TX123 = $500` → `$300 → INV-001`, `$200 → INV-002` For a **single invoice-specific QR**:
+- You may get: - TX001 = $100 - TX002 = $300 - TX003 = $600
+- All three create separate **Payment** rows linked to the same invoice via `merchant_ref`.
+- The sum of allocations updates the invoice state: - $0 → UNPAID - $1–$999 → PARTIALLY_PAID - = $1,000 → PAID - > $1,000 → OVERPAID (goes to exception/refund/credit workflow, but you **do not discard** the extra payment). So: **model "multiple payments against one invoice" by keeping every PayWay transaction as its own Payment record and using an allocation layer to roll them up into invoice totals and status.**
+
+### S6-Q013 — Is a "creation grace period" real — i.e. can `check-transaction` report not-found for a few seconds after creation? How long should integrators tolerate this?
+
+**A (2026-10-03):** S6-Q013 UNKNOWN — not documented
+
+### S6-Q014 — What is the officially recommended reconciliation job cadence, and how should we avoid re-processing historical rows?
+
+**A (2026-10-03):** S6-Q014 Bong @Ruzaid Reconciliation job cadence (official guidance)
+- Run a scheduled reconciliation job every 5–10 minutes as a fallback, using: - get-transactions-by-mc-ref for missed callbacks in customer‑style flows, and/or - status/list APIs (e.g. Check Transaction / Get Transaction List) over a recent time window (e.g. last 1 day) for queued/pending transactions. Avoiding re‑processing historical rows
+- Make the job idempotent: - Use transaction_id as the deduplication key in your database. - On reconciliation, insert/update only if transaction_id has not been processed yet; if it already exists, skip fulfilment.
+- Limit the scope of the job by time/retention window (e.g. only keep and recheck pending/problematic transactions for up to ~1 day, then drop them from the queue). This gives a 5–10 minute recovery loop without double‑processing old or already‑fulfilled payments.
+
+### S6-Q015 — If a transaction is created but never paid, what is our cleanup obligation, and does leaving many unpaid transactions affect merchant risk scoring?
+
+**A (2026-10-03):** S6-Q015 Bong @Ruzaid 1) Cleanup obligation for created-but-never-paid transactions
+- In the gateway, pending/unpaid transactions remain indefinitely; they are not auto-reset or deleted.
+- Merchants cannot delete transactions (paid or unpaid) from PayWay.
+- Integrator obligations are on the merchant side: - Define a transaction lifetime using PayWay’s expiry behaviour (≈5 min KHQR, ≈3 min card, merchant‑observed ≈15 min window). - After that window, treat the transaction as expired / incomplete in your system and allow the user to retry with a new tran_id. - Use a queue + polling or periodic reconciliation (Check Transaction / Get Transaction List) to update any pending ones, then stop polling once your own expiry is reached. - For your own DB, you may archive or purge old unpaid/expired records according to your retention policy; this does not remove them from PayWay, but that’s expected. 2) Impact of many unpaid transactions on merchant risk scoring
+- The documentation does not state that a high count of unpaid/pending transactions affects merchant risk scoring or similar metrics.
+- Only the handling rules above (expiry, retry, no deletion) are documented.
+
+### S6-Q016 — Are there any requests that are safe to retry automatically versus requests that must never be auto-retried? Please enumerate per endpoint?
+
+**A (2026-10-03):** S6-Q016 UNKNOWN — not documented
+---
+## S7. Rate Limits, Timeouts & Performance
+
+## S7. Rate Limits, Timeouts & Performance
+
+### S7-Q001 — Provide the documented rate limit for every endpoint, as a number and unit (e.g. per second, per minute)?
+
+**A (2026-10-03):** S7-Q001 Documented rate limits in the materials are: 1) KHQR generation (QR API) - Limit: 10 requests per second per Merchant ID 2) Check Transaction (status/inquiry API) - Limit (capacity): up to 600 requests per second - Additional guidance: separate guidance recommends staying around 20 requests/second by default and negotiating higher (e.g. 50/sec) if truly needed, to avoid rate limiting/IP blocking. 3) Get Transactions by Merchant Reference - Endpoint: POST api/payment-gateway/v1/payments/get-transactions-by-mc-ref - Limit: 10 requests per minute 4) Get Transaction Details - Endpoint: POST api/payment-gateway/v1/payments/transaction-detail - Limit: 10 requests per minute No other endpoint-specific numeric limits are stated in the provided documents.
+
+### S7-Q002 — Confirm the rate limits for `transaction-detail` (per minute), `check-transaction` (per second), `transaction-list` (per minute), `get-transactions-by-mc-ref` (per minute), and `refund` (per second)?
+
+**A (2026-10-03):** S7-Q002 Bong @Ruzaid, the documents state the following rate limits: - transaction-detail (/api/payment-gateway/v1/payments/transaction-detail) - 10 requests per minute - check-transaction (status/inquiry APIs, e.g. /api/payment-gateway/v1/payments/check-transaction[-2]) - Documentation for offline KHQR notes support for up to 600 requests per second. - Separate API‑rules guidance recommends an "acceptable default" of ~20 requests/second, with possibility to negotiate around 50 requests/second if needed, and says to confirm exact limits with operations. - transaction-list / transaction-list-2 (/api/payment-gateway/v1/payments/transaction-list[-2]) - 50 requests per minute (plus 3‑day max date range per request). - get-transactions-by-mc-ref (/api/payment-gateway/v1/payments/get-transactions-by-mc-ref) - 10 requests per minute - refund - No explicit numeric rate limit (per second or per minute) is stated in the provided materials; only that merchants must follow the limits defined in the official API docs.
+
+### S7-Q003 — Are rate limits scoped per merchant, per API key, per IP, or per endpoint? Can a limit be raised?
+
+**A (2026-10-03):** S7-Q003 Bong @Ruzaid Scope of rate limits (per docs)
+- KHQR (QR generation) API: explicitly per Merchant ID – default 10 calls/second per merchant.
+- Inquiry/status APIs (e.g., Check Transaction, get-transactions-by-mc-ref, transaction-detail): docs give per-endpoint numeric limits (e.g., X req/min or req/sec) and additionally say PayWay can configure per‑merchant limits for high-load scenarios.
+- IP: there is IP-based protection – excessive polling or very high-volume calls from a single client IP can trigger rate limiting or IP blocking.
+- API key: no document explicitly states a distinct per‑API‑key limit; limits are described per merchant and per endpoint, with IP-based safeguards. Can limits be raised?
+- Yes. The docs state that for high legitimate loads you can negotiate required rate limits with PayWay, and PayWay can set per‑merchant limits higher than default on request (subject to ops/approval).
+
+### S7-Q004 — What exactly is returned when a rate limit is hit? Confirm the HTTP status, the numeric body code, and whether any rate-limit headers are sent?
+
+**A (2026-10-03):** S7-Q004 UNKNOWN — not documented
+
+### S7-Q005 — Do rate-limit responses include a `Retry-After` value or any backoff hint? If not, what backoff should integrators implement?
+
+**A (2026-10-03):** S7-Q005 Bong @Ruzaid - The documents do not state that rate‑limit responses include Retry-After or any explicit backoff hint.
+- Recommended behavior from the docs is to implement your own exponential backoff and reduced polling when you see 429/rate‑limit patterns or timeouts: - Slow down from any tight loops (per‑second polling) to every 3–5 seconds where feasible. - On repeated errors, increase the delay progressively (e.g., 5s → 10s → 20s …) and cap overall request rate around the documented guidance (e.g., ~20 req/s unless a higher limit is agreed). - Stop aggressive retries and treat persistent rate‑limit errors as a signal to back off further and/or escalate.
+
+### S7-Q006 — Are the rate limits enforced with a fixed window or a sliding/rolling window?
+
+**A (2026-10-03):** S7-Q006 UNKNOWN — not documented
+
+### S7-Q007 — What is the expected (p50/p95) response time per endpoint, so we can set sensible client timeouts?
+
+**A (2026-10-03):** S7-Q007 UNKNOWN — not documented
+
+### S7-Q008 — What is the gateway's own upstream timeout, and what should we assume if we exceed it?
+
+**A (2026-10-03):** S7-Q008 UNKNOWN — not documented
+
+### S7-Q009 — Is there a documented concurrency limit per merchant?
+
+**A (2026-10-03):** S7-Q009 For documented per‑merchant concurrency/throughput, the only explicit value in the docs is for KHQR generation:
+- KHQR API: 10 requests per second per Merchant ID. Other APIs have documented rate limits (e.g. 10 req/min for get-transactions-by-mc-ref, 10 req/min for transaction-detail, ~600 req/s for Check Transaction), but these are described as endpoint limits, not explicitly as per‑merchant concurrency caps.
+
+### S7-Q010 — Is there any bulk/batch endpoint, or must we loop client-side?
+
+**A (2026-10-03):** S7-Q010 For the documented flows, there is no bulk/batch API endpoint:
+- The standard QR API generate-qr is per-transaction.
+- For high-volume invoice/billing, the recommended approach is direct/local KHQR generation in your own ERP/billing system, plus webhook + inquiry APIs. So for large volumes you handle batching client-side/ERP-side rather than via a PayWay batch endpoint.
+
+### S7-Q011 — Is there a limit on the number of beneficiaries per payout request, and on the number of items per transaction?
+
+**A (2026-10-03):** S7-Q011 UNKNOWN — not documented
+
+### S7-Q012 — Are there cost implications for high-volume read APIs (list, detail, exchange rate)?
+
+**A (2026-10-03):** S7-Q012 UNKNOWN — not documented
+
+### S7-Q013 — What is the maximum page size for `transaction-list`, and what is the maximum date range?
+
+**A (2026-10-03):** S7-Q013 - Maximum page size for transaction-list/transaction-list-2: pagination max is 1000 records per page.
+- Maximum date range per request: 3 calendar days (inclusive of today). In sandbox, the docs note a 3‑day window that must fall within the last ~30 days.
+
+### S7-Q014 — Is there any sandbox-specific throttle distinct from production?
+
+**A (2026-10-03):** S7-Q014 UNKNOWN — not documented
+---
+## S8. Errors & Error Codes
+
+## S8. Errors & Error Codes
+
+### S8-Q001 — Provide the canonical, complete error-code registry: numeric gateway codes and `PTL*` codes, with meaning, affected endpoint, retryability, and HTTP status mapping?
+
+**A (2026-10-03):** S8-Q001 UNKNOWN — not documented
+
+### S8-Q002 — Explain the code namespaces (`status.code` numeric vs `PTLxxx` vs HTTP status) and how they relate for a single failure?
+
+**A (2026-10-03):** S8-Q002 There are three main code “namespaces” mentioned in the docs, and they describe different layers of the same failure: 1) **HTTP status codes (transport layer)** Examples from docs: - `403 Forbidden` — usually invalid credentials or incorrect request format/method. - `408` — observed on refund calls when the gateway considered the request invalid/expired or timed out at the gateway layer. - Other 4xx on pushback (e.g. schema mismatch) indicate the merchant endpoint rejected the callback. These indicate whether the HTTP call itself was accepted and broadly what went wrong at the protocol level. 2) **Gateway numeric / short status codes (application-level)** These appear inside the JSON payload (e.g. `code`, `status_code`) and describe business/validation errors. Docs examples: - `9999` — "Something went wrong. Please reach out to our digital support team for assistance" on `generate-qr`. - `32` — seen in sandbox as "Service is not enable" for a given endpoint. - `21` — observed as production key expired. - `6` — used in some contexts for "tran_id not found" or domain-not-whitelisted. - `USD-NOT-ALLOW` — invalid USD amount format (wrong decimal precision). 3) **PTL* codes (provider / gateway validation namespace)** Also returned in responses as application-level codes, with more specific meanings. Examples: - `PTL06` — The request is expired (invalid/expired `request_time` or token). - `PTL62` — Invalid merchant information (credentials / wrong testing key). - `PTL63` — internal gateway error indicator. - `PTL141` — Redirect URL cannot be empty. - `PTL157` — Generic transient error ("Something went wrong"; treat as retryable). - `PTL168` — Concurrency validation error (duplicate concurrent request for same operation/tran_id). - `PTL175` — Requested domain is not in whitelist. - `PTL-PAYOUT-*` — payout-related validation (e.g. payout amounts vs `complete_amount`, payout account whitelisting). **How they relate for a single failure** For a given failed operation you can see **both**:
+- An **HTTP status** (e.g. `403`, `408`, or even `200` with an error payload), and - An **application-level code** inside the response body, which may be either a **numeric/short code** (e.g. `9999`, `32`, `21`, `USD-NOT-ALLOW`) or a **PTL*** code (e.g. `PTL06`, `PTL157`, `PTL175`). They are complementary: HTTP codes tell you whether the HTTP request was accepted at a protocol level; PTL*/numeric codes tell you the **business/validation reason**. The docs recommend:
+- For PTL codes (e.g. `PTL06`, `PTL157`, `PTL168`, `PTL175`) and numeric codes (`9999`), always **log the code plus `tran_id`/`trace_id`** and escalate with these details if needed.
+- Treat specific codes like `PTL157`, `PTL168`, and `9999` as **transient/retryable** (retry with backoff). - For HTTP `403`/`408`, first **fix request format/credentials/timestamps** before assuming network issues.
+
+### S8-Q003 — Which errors are retryable, which are terminal, and which require a customer-facing message? Give the mapping per code family?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q004 — Provide the exact meaning of `status.code 1` / `01` (Wrong Hash) and how to distinguish it from a genuinely bad parameter?
+
+**A (2026-10-03):** **Meaning of status.code 1 / 01 (Wrong Hash)**
+status.code `1` / `01` with message *“Wrong Hash”* means:
+- The gateway **recomputed the hash/signature** from the request parameters and the configured secret/key, and
+- That server-side hash **does not match** the `hash`/`client_hash` value you sent. So the failure is specifically an **integrity / authentication mismatch**, not a general validation of business fields. Typical causes documented:
+- Wrong **before_hash string**: parameters missing/extra, wrong order, or including empty/optional fields that should be omitted.
+- **Value mismatch** between what you hash and what you send (e.g., `amount=2` vs `2.00`, whitespace, changed `payment_option`, different `req_time` format).
+- **Environment/credential mismatch** (sandbox key against production endpoint, wrong merchant profile’s key).
+- Wrong **algorithm/encoding** (e.g., not using HMAC-SHA512 where required, not Base64‑encoding the raw HMAC bytes, character encoding differences, `+` in Base64 turning into space during form/URL encoding). You may see this as:
+- JSON body with `status.code = 1` / "Wrong Hash", or
+- HTTP `403` where docs state it maps to a hash/signature issue. ---
+**How to distinguish Wrong Hash from a genuinely bad parameter**
+Use these checks: 1) **Error message & code family** - If the response explicitly says **`Wrong Hash`** (code `1` or similar wrong-hash status) or returns `403` in a context where hash is required, it is treated as a **hash/signature problem**. - Genuine bad parameters (invalid amount, format, out-of-range, etc.) are documented to return **other business/validation codes/messages**, *not* “Wrong Hash”. 2) **Rebuild and compare the before_hash string** - Log the **exact before_hash string** and your computed hash for the same request. - Ensure it is built with: - Only required and non-empty fields, - In the **exact order** defined in the API spec, - With the exact values you actually send on the wire (same decimals, same Base64‑encoded URL, etc.). - If fixing order/omitted fields/encoding makes the same parameters succeed, it confirms the issue was **hashing**, not data validity. 3) **Environment & credential sanity check** - If switching from sandbox→production or changing keys immediately triggers `Wrong Hash`, that points to **key/environment mismatch**, not bad business data. 4) **Behavior when values are corrected vs when hash logic is corrected** - If you change only the **hash-generation logic** (ordering, encoding, correct key) and the request starts working **without changing business fields**, the original failure was purely **Wrong Hash**. - If, even with a known-good hash implementation and correct key, the gateway then returns a **different non–Wrong‑Hash validation error** about a field (e.g., length/format), that later error indicates a **genuinely bad parameter**. In short, status.code `1`/`01` is strictly the gateway saying: *“The signature for this payload is not what I expect with your key.”* To separate it from bad parameters, you:
+- Look for the literal `Wrong Hash` / corresponding 403, and
+- Verify that once your hash string, order, encoding, and key are fixed, the same logical payload is accepted or then fails with a **different, business‑level validation code**.
+
+### S8-Q005 — Provide the exact meaning of `status.code 2`, `5`, `6`, `9`, `12`, `24`, `37`, `49`, `87`, `98`, `104`, `105`?
+
+**A (2026-10-03):** Bong @Ruzaid, based on the documented mappings, the meanings are: - status.code 2 — Invalid transaction ID
+- status.code 5 — Transaction not found
+- status.code 6 — Requested domain is not in whitelist
+- status.code 9 — Generic error mapping to insufficient funds or invalid card status
+- status.code 12 — Payment currency is not allowed
+- status.code 24 — Cannot decrypt data
+- status.code 37 — Payout accounts are not in whitelist
+- status.code 49 — Invalid start date
+- status.code 87 — Payment credential is removed For these three, there is no definition in the retrieved documents:
+- status.code 98 — not documented
+- status.code 104 — not documented
+- status.code 105 — not documented
+
+### S8-Q006 — What does error code `6` mean, on which endpoints, and with which HTTP status? Confirm it is returned as HTTP 200 rather than 4xx?
+
+**A (2026-10-03):** From the docs: Meaning of error code 6
+- Error code 6 means: “Requested Domain is not in whitelist.”
+- It indicates the domain or IP address from which you are calling the gateway is not whitelisted. Where it can appear (endpoints / flows)
+- Returned by the payment gateway for requests coming from non‑whitelisted origins, including (per docs): - Registration-related endpoints - QR / generate-QR or similar QR/payment operations - More generally, checkout/payment calls where the calling domain/referrer or backend IP is not in the whitelist. HTTP status code / 200 vs 4xx
+- The retrieved documents do not state which HTTP status code is used for error code 6.
+- They do not explicitly confirm whether this error is carried in a 200 response or any specific 4xx. So, based on current documentation, we can define the meaning and affected flows, but cannot confirm from docs whether error code 6 is always returned with HTTP 200 rather than 4xx.
+
+### S8-Q007 — What does error code `104` ("Merchant not enabled token flag") mean precisely — is it scoped to a specific flag/channel, or does it mean the whole profile is blocked?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q008 — What does error code `105` mean and enumerate every documented cause (unknown token, expired token, wrong flag for the token type, customer-removed token)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q009 — What does error code `09` mean and on which endpoints?
+
+**A (2026-10-03):** Error code 09 is documented as a generic error code mapping to “insufficient funds” or “invalid card status” (i.e., a payment declined due to funding/card-status issues, not a formatting/hash problem). The current documents do not specify which exact endpoints return error code 09 — endpoint scope is not documented.
+
+### S8-Q010 — What does code `04` mean, and what is the `errors{}` per-field map? Give an example response body?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q011 — List all refund-specific codes (`PTL04`, `PTL36`, `PTL37`, `PTL58`, `PTL181`, …) with exact meanings?
+
+**A (2026-10-03):** Refund‑related PTL codes documented for the Refund API and their exact meanings: - PTL04 – "Parameter Validation Required"
+- PTL05 – "INVALID_FORMAT"
+- PTL06 – "Request expired" (requesttime missing or outside allowed window)
+- **PTL37** – *"Refund over amount"* (refund amount exceeds allowed limits)
+- **PTL57** – *"Unable to refunded"* (transaction status does not allow refund: not successful, already refunded, or similar constraints)
+- **PTL58** – *"Fail to refunded"*
+- **PTL62** – *"Invalid merchant information"* (wrong/mismatched merchantauth or merchant info)
+- PTL63 – "Merchant have no security config file" (no security configuration for refund in production)
+- PTL168 – "Concurrent requests are not allowed for this operation; retry after a short delay."
+- PTL169 – "The merchant profile cannot accept payment because its settlement account is closed."
+- PTL181 – "The available balance is not enough to refund the customer."
+- PTL186 – "Invalid amount format."
+- PTL187 – "Amount is below the minimum allowed."
+- SYS-ERR – "System error – internal issue; may include additional details like io_status and error codes." PTL36 is not documented in the available refund-API materials.
+
+### S8-Q012 — List all payout-specific codes (`12`/`PTL147`, `37`/`PTL146`, `PTL-PAYOUT-36`, `24`, `415`) with exact meanings?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q013 — List all payment-link-specific codes (`PTL02`, `PTL04`, `PTL188`, `96`, `37`/`PTL146`/`PTL46`, `PTL132`) with exact meanings?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q014 — List all pre-auth-specific codes (`PTL59`, `PTL62`, `PTL170`) with exact meanings?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q015 — List all transaction-list/date-filter codes (`49`, and the >3-day range rejection) with exact meanings and messages?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q016 — Provide the exact customer-facing message text PayWay recommends for each top failure mode (insufficient funds, invalid CVV, 3-D Secure failure, expired card, timeout)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S8-Q017 — Is there a machine-readable error-code lookup (API or SDK) we can call at runtime, and how do we handle a code we have never seen?
+
+**A (2026-10-03):** Bong @Ruzaid, current docs only state that ABA PayWay maintains an error‑code list that you can request from the Integration Team; there is no machine‑readable lookup API/SDK documented for runtime use. For any code you haven’t mapped yet, recommended handling based on the docs:
+- Log full response (code, message, transaction ID, timestamps) for support.
+- Show a generic, user‑friendly failure message (e.g., that the payment could not be processed and they may retry or use another method) rather than exposing a raw/unmapped code.
+- Escalate to the PayWay Integration Team with the transaction identifier and response so the code can be clarified and incorporated into your mapping table.
+
+### S8-Q018 — Which errors indicate a merchant-configuration problem (ours to fix) versus a customer/issuer problem (not ours)?
+
+**A (2026-10-03):** Bong @Ruzaid, from the documented behaviours you can roughly split as: **Merchant‑configuration / integration problems (ours to fix):**
+- **PTL06 – “The Request is Expired”** → wrong `request_time` / timezone handling on our side.
+- **PTL62 – “Invalid merchant information.”** → bad/mismatched `merchant_id` / `merchant_auth` / wrong key.
+- **PTL175 – request origin not whitelisted** → domain/IP/referer not configured for the merchant.
+- **PTL‑PAYOUT‑*** and **Error Code 37 – “Payout accounts are not in whitelist.”** → payout account list/whitelisting or amount≠`complete_amount` config.
+- **“Merchant have no security config file.”** → missing production security config (RSA/permissions) for that merchant.
+- **“QR API is not enabled” / “Selected Payment Option is not enabled for this Merchant Profile” (status.code=23)** → requested option (e.g. QR API, specific `payment_option`) not enabled on merchant profile, or wrong merchant_id/profile used.
+- **“Merchant Profile's MID is missing”** → bad merchant_id in request or misconfigured profile.
+- **“Purchase with zero amount is not allowed” (Code 45)** → integration bug sending amount 0.
+- **“Purchase amount has reached transaction limit”** → per‑transaction limit on merchant profile; needs config change if business requires higher limit.
+- **HTTP 403 / “Forbidden” when calling gateway** (and variants tied to whitelisting) → origin/permissions/security config on our/gateway side. **Customer/issuer‑side problems (not ours to fix, beyond normal guidance):**
+- **Insufficient funds / insufficient balance** (incl. mapped to generic **Error 9**) → cardholder needs funds or another card.
+- **3‑D Secure / OTP authentication failed or timed out** → customer didn’t complete or failed ACS/OTP.
+- **Incorrect CVV or PIN** → data entry error by cardholder.
+- **Expired card** → card details invalid; customer must use a valid card.
+- **Issuer/“external” decline** (incl. Code 201‑type generic declines) → issuer fraud/velocity/daily‑limit rules.
+- **“Card is not allowed for purchase” / ineligible transaction (e.g. “55 – Ineligible transaction”), BIN not allowed, VCC/OTA limitations** → card/product restrictions at issuer/acquirer level; typically resolved by cardholder contacting issuer or using a different card, possibly with BIN whitelisting by bank. Everything else generally falls into:
+- **Gateway/system issues** (e.g. `SYS-ERR`, gateway unavailable) → raise with PayWay.
+- Or needs case‑by‑case classification based on the returned message + logs.
+---
+## S9. Checkout / Purchase API
+
+## S9. Checkout / Purchase API
+
+### S9-Q001 — List every field of the purchase request, marking mandatory vs optional, with type, max length, and format constraints?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S9-Q002 — What are the accepted `payment_option` values, and which are documented for which channel?
+
+**A (2026-10-03):** Bong @Ruzaid, documented payment_option values and their intended channels/usages are: Card payments
+- cards - Channel: Card (credit/debit) checkout. - Usage: Web or app when you want hosted card UI or a hosted card URL (often with view_type=hosted_view for mobile WebView). ABA PAY / KHQR (web QR flows)
+- abapay - Channel: ABA PAY / QR-style web checkout. - Usage: Web-hosted ABA Pay/QR experiences.
+- abapay_khqr - Channel: KHQR on website/desktop browser. - Usage: Web/browser plugin & website popup QR flows (desktop or mobile browser). Recommended for KHQR on web; do not use deeplink-only values here. Deeplink / mobile-app flows
+- abapay_deeplink - Channel: ABA Mobile app deeplink. - Usage: Native mobile apps only (open ABA Mobile via deeplink). Not for desktop/web.
+- abapay_khqr_deeplink - Channel: Mobile/native KHQR deeplink + QR fallback. - Usage: Native mobile apps. API returns JSON including abapay_deeplink and checkout_qr_url (plus QR data) so app opens ABA if installed, otherwise shows QR/webpage. Other QR rails (environment/profile dependent)
+- bakong (and similar aliases noted in docs) - Channel: KHQR/Bakong QR flows. - Usage: QR payment; exact behavior/token can vary by environment/config, to be confirmed per merchant profile.
+- wechat, alipay - Channel: WeChat Pay / Alipay QR flows. - Usage: QR-based payment flows where those rails are enabled on the merchant profile. Channel guidance from docs
+- Website / browser: use web-specific values like abapay_khqr (KHQR) and cards. Avoid app-only deeplink values (abapay_deeplink, abapay_khqr_deeplink).
+- Native mobile app: use deeplink variants (abapay_deeplink or abapay_khqr_deeplink) and handle JSON response (abapay_deeplink, checkout_qr_url, QR fields).
+- If payment_option is omitted, the hosted page shows all payment methods enabled for that merchant profile. Docs also note that the exact allowed set per merchant depends on their PayWay profile/config; unsupported tokens will be rejected or won’t show the intended method.
+
+### S9-Q003 — What does `payment_gate` do, what are its values, and what is the correct integration for each?
+
+**A (2026-10-03):** What payment_gate does
+payment_gate tells PayWay which gateway behaviour/response type to use when a merchant profile has more than one service (Default/E‑commerce Checkout vs QR/API). It mainly switches between:
+- Hosted/E‑commerce Checkout (HTML/webpage/deeplink)
+- QR/API response (JSON with qr_string, qr_img, abapay_deeplink, checkout_qr_url, etc.) Documented values & behaviours
+From the docs, the only explicitly defined value is 0; the other behaviour is when the parameter is omitted. 1. payment_gate = 0 - Behaviour: - Forces Default / E‑commerce Checkout behaviour when the profile also has QR/API enabled. - Response is the hosted checkout flow (HTML page / checkout URL or deeplink suitable for rendering in webview/browser). - Correct usage: - Web or mobile hosted checkout integrations where you want PayWay to render the UI (cards / ABA PAY / KHQR on checkout page). - When checkout.js or the purchase API is returning QR JSON by default but you need the E‑commerce Checkout page instead, include payment_gate=0. - For some KHQR setups, docs note that payment_gate=0 may be used to obtain QR URL + deeplink within the checkout-style response. - Typing: - Can be sent as string or integer depending on implementation (examples show both '0' and 0); follow the expectation of your integration stack. 2. payment_gate omitted - Behaviour: - When the merchant profile has QR/API enabled, omission makes the API return QR/API JSON by default, e.g.: - qr_string, qr_img / qrImage, abapay_deeplink, checkout_qr_url, etc. - Commonly used for QR on invoice / kiosk / server-side QR generation. - Correct usage: - Back‑office, kiosk, or invoice flows where you want to receive QR data in JSON, not a hosted payment page. Undocumented values
+- Aside from 0, the docs do not specify other valid numeric values or meanings. The recommended patterns are: - Use payment_gate = 0 when you need hosted/E‑commerce Checkout. - Omit payment_gate when you want QR/API JSON behaviour.
+
+### S9-Q004 — Confirm the three documented response shapes: (a) hosted URL JSON containing `checkout_qr_url`, (b) hosted HTML page returned as the body, (c) local signed form POST. Which is recommended for card checkout, and why?
+
+**A (2026-10-03):** Bong @Ruzaid, Confirmed response shapes
+1. (a) Hosted URL JSON containing checkout_qr_url - Purchase/checkout API can return structured JSON including fields like checkout_qr_url, abapay_deeplink, qr_string, etc. - Client then opens checkout_qr_url in a browser/webview or popup to show the hosted checkout. 2. (b) Hosted HTML page returned as the body - For some configurations (especially card/KHQR when called from tools like Postman/terminal), the API returns HTML for the hosted checkout in the response body. - That HTML must be loaded in a browser/webview; tools just show it as raw HTML. 3. (c) Local signed form POST - Web e‑commerce integration builds an HTML form on the merchant page (fields like merchant_id, tran_id, amount, payment_option, return_url, hash, etc.) and submits it via POST to the PayWay purchase endpoint. - Often targets an iframe/popup (e.g. target="aba_webservice") and/or uses the checkout JS plugin to open a modal overlay. Recommended for card checkout, and why
+For card checkout, the recommended pattern is the hosted checkout with popup/iframe via the local signed form POST (c) (or equivalently loading the hosted checkout URL in a webview for apps), because:
+- Card flows are documented as web/hosted flows that must be rendered in a browser/webview to support the full card UI and 3‑D Secure/ACS pages.
+- The checkout JS + form‑POST/iframe pattern is the standard e‑commerce integration: user stays on the merchant page, the gateway handles card entry and ACS securely, and no card data is handled by the merchant.
+- The raw HTML body (b) is mainly what you see in tools; docs say to open that in a browser/webview or use the checkout URL, not to process the HTML directly. JSON with checkout_qr_url (a) is primarily described around QR/deeplink/KHQR usage rather than core card-only flows. So for card: use the hosted checkout (popup/iframe or redirect) driven by the signed form POST / checkout URL, not a custom JSON‑only flow.
+
+### S9-Q005 — Confirm that the hosted HTML page returned by the API cannot be re-served from our own origin (relative `/_nuxt/*` assets) and state the officially supported alternative?
+
+**A (2026-10-03):** Bong @Ruzaid, yes — the hosted HTML returned by PayWay must not be re-served from the merchant’s own origin. The docs state you must: - Render the full hosted checkout URL from the PayWay domain in a browser/WebView.
+- Not rewrite or proxy PayWay assets (including relative /_nuxt/* JS/CSS/etc.) to your own origin, and not embed/rehydrate the HTML as if it were your own page, to avoid CORS/resource and cookie issues. Officially supported alternatives:
+- Web: use the PayWay JS plugin + form POST (e.g. target="aba_webservice") so the PayWay-hosted checkout runs in the iframe/popup on the PayWay domain.
+- Mobile apps: open the PayWay hosted checkout URL directly in an in-app WebView (or external browser) and let it load its own assets from the PayWay domain. In all supported patterns you load the PayWay page from PayWay’s own origin, not by re-serving the HTML from the merchant site.
+
+### S9-Q006 — What JS snippet/plugin must a card checkout page load, and what is the exact `AbaPayway.checkout()` invocation?
+
+**A (2026-10-03):** Bong @Ruzaid, JS snippet/plugin to load on the card checkout page
+<script src="https://checkout.payway.com.kh/plugins/checkout2-0.js"></script> Exact AbaPayway.checkout() invocation (popup flow)
+$('#checkout_button').click(function(){ $('#aba_merchant_request').append($(".payment_option:checked")); AbaPayway.checkout();
+});
+
+### S9-Q007 — Confirm the unit of `lifetime` on the purchase path (minutes, min 3, max 43200) and contrast it with the QR path (seconds). Confirm that a below-minimum value is rejected?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S9-Q008 — What is the maximum length and allowed character set for `merchant_ref` / `tran_id` on the purchase path, and is uniqueness enforced by PayWay?
+
+**A (2026-10-03):** Bong @Ruzaid, **tran_id (purchase path)**
+- **Maximum length:** documented as **≤ 20 characters**. Requests with longer `tran_id` are rejected / treated as invalid.
+- **Allowed character set:** - Use **alphanumeric characters** only. - Some examples show **hyphen (`-`) permitted**. - **Underscore and other punctuation / spaces are not allowed** and can cause hash/format errors. - Recommended practical rule: restrict to `[A–Z a–z 0–9-]`, no spaces.
+- **Uniqueness:** - PayWay **expects merchant-generated unique `tran_id` per transaction**. - Docs state merchants must ensure uniqueness; duplicate use can cause issues (e.g. QR errors like *“Code already use”* and reconciliation ambiguity). - Treat `tran_id` uniqueness as a **merchant-side responsibility**, not something you rely on a strict DB constraint in PayWay to manage. **merchant_ref (purchase / KHQR flows)**
+- **Role:** identifies the **business reference** (e.g. invoice number), not the payment transaction.
+- **Maximum length:** docs do **not** define a hard limit for `merchant_ref`; examples use invoice-like strings such as `INV-2026-001582`.
+- **Allowed character set:** examples show **alphanumeric + hyphen (`-`)**, no spaces; no broader character set is formally specified.
+- **Uniqueness:** explicitly **not a unique payment ID**. Multiple PayWay `transaction_id` values can share the same `merchant_ref` for repeat/partial/multiple payments. Use `transaction_id` as the primary deduplication key; use `merchant_ref` only for matching/reconciliation.
+
+### S9-Q009 — Which optional fields can we use to pass our own data (`custom_fields`, `return_params`, `additional_params`), what are their size limits, and do they appear in callbacks and reports?
+
+**A (2026-10-03):** Bong @Ruzaid, Fields you can use to pass your own data
+1. custom_fields - Usage: Base64‑encoded JSON object carrying your own metadata (e.g. branch codes) in the create-transaction request. - Size limit: The docs do not specify a hard maximum length for custom_fields. - Callbacks: Not included in pushback/callback or check-transaction responses. - Reports: Shown in the merchant portal and included in CSV exports for reconciliation. 2. return_params / return_param - Usage: Optional string used as a pass-through value (e.g. your internal ID/token). You send it on purchase/QR creation; PayWay echoes it back. - Size limit (as documented): - Must be a string, avoid special characters. - Docs mention default limits like 255 characters and elsewhere "< 500 characters" as an integration note. The exact hard production limit is not formally fixed in the docs, only that it must stay under the gateway’s limit. - Callbacks: Returned unchanged in pushback/callback payloads and also in check-transaction responses when supplied. - Reports: No explicit statement that return_params appears in CSV/other reports — not documented. 3. additional_params - Current docs do not describe additional_params as a supported merchant-defined data field on the purchase path. Its behavior, limits, and presence in callbacks/reports are not documented.
+
+### S9-Q010 — What is `items` — exact schema, max entries, max encoded length, and encoding rules?
+
+**A (2026-10-03):** Bong @Ruzaid, Schema (items)
+- Must be a JSON array of objects, e.g. [ { "name": "Item A", "quantity": "1", "price": "3.00", "discount": "10", "discount_type": "2" } ] - Each item object: - name: non‑empty string (item name). - quantity: numeric/integer (positive). - price: numeric (currency amount). Use key price, not amount. - Optional: discount (numeric) and discount_type where 1 = flat, 2 = percentage.
+- Must be a single-level array: [{...}, {...}] — no nested arrays like [[{...}]].
+- Avoid extra/undocumented fields; these can break invoice/PDF download. Encoding rules
+- Build the items as valid JSON with double quotes for keys and string values.
+- Then send as Base64-encoded JSON in the items parameter: - items = base64( json_encode(items_array) ).
+- If sent in a form body, ensure the JSON string is correctly escaped/encoded.
+- Use supported character sets for name if you need correct display on receipts (Chinese characters are not supported in receipts). Max entries & max encoded length
+- The current docs only say to stay within generic payload length limits for items, but do not specify: - a numeric maximum number of entries in the array, nor - an explicit maximum encoded length for the items field. So: schema + encoding are documented as above; hard limits for count and length are not specified in the available docs.
+
+### S9-Q011 — What are the rules for `return_url`, `cancel_url`, `continue_success_url`, and `return_deeplink`? Which are mandatory, and what happens if the customer's browser never reaches them?
+
+**A (2026-10-03):** Bong @Ruzaid, 1) Purpose & rules per field return_url (server pushback / webhook)
+- Type: Merchant backend HTTPS URL (port 443) that PayWay calls via POST after payment.
+- Usage: Carry authoritative result (tran_id, apv, status, optional return_params).
+- Rules: - Must be reachable from PayWay network and often whitelisted on the merchant profile. - Must accept POST and return HTTP 200 on success. - For certain endpoints/environments it must be Base64‑encoded in the request and included correctly in the hash.
+- Mandatory? - Docs state: “Provide a web address as `return_url`… When calling Purchase API, supply `return_url` as part of the POST payload.” and “Provide `return_url` or `return_deeplink` in the purchase request so PayWay can push payment result notifications or trigger mobile deeplink callbacks.” - Practically: treated as required for proper integration (at least one of return_url / return_deeplink must be present), and return_url is the recommended/authoritative path. continue_success_url (frontend/web success redirect)
+- Type: HTTPS web URL only (no app scheme), on a whitelisted merchant domain.
+- Usage: - Hosted checkout / WebView loads this URL when: - customer clicks “Continue / Continue Shopping”, or - auto‑redirect/skip‑success is configured. - Mobile app WebView should listen for navigation to this URL and then close the WebView and show the app’s own success screen.
+- Rules: - Must be a valid, reachable HTTPS URL. - Must be registered/whitelisted; otherwise gateway can return “invalid continue success url”. - Used only for frontend navigation; not a proof of payment.
+- Mandatory? - Not strictly required by the API, but required if you want a working Continue/auto‑close behavior. If omitted, the Continue button may have no action. cancel_url (frontend cancel/close return)
+- Type: Merchant‑controlled HTTPS URL; can be a web page or (if allowed by config/security) a deep link/universal link.
+- Usage: Intended target when the customer cancels or closes the popup/checkout (if supported by the provider).
+- Rules & limitations: - Some providers do not support cancel_url; in those cases, passing it has no effect. - Even when used, it is purely frontend navigation and does not prove the transaction failed or was cancelled. - Merchant must verify latest status server‑side (Check Transaction / webhook) before finalising the order.
+- Mandatory? - Optional; availability and effect are gateway‑dependent. return_deeplink (mobile app return)
+- Type: Base64‑encoded JSON with platform schemes, e.g. { "android_scheme": "yourapp://...", "ios_scheme": "https://your.domain/..." }.
+- Usage: - Used by ABA/other payment apps to return user to the merchant app when the user taps “Done” / final action in the bank app.
+- Rules: - Must contain valid deeplink / universal link URIs that the merchant app handles. - Should be supplied when a native app‑to‑app journey is required. - Docs warn not to rely on it as the only callback because user may not tap "Done".
+- Mandatory? - Optional, but required if you want automatic jump back into the native app. Otherwise user may stay in browser or need manual navigation. --- 2) What if the customer’s browser/app never reaches these URLs? - continue_success_url not reached (user closes tab/app, network issue, misconfig, slow URL): - Gateway may fall back to a default page or show no redirect. - You cannot infer status from missing redirect. - Final state must be confirmed via return_url pushback and/or Check Transaction API.
+
+### S9-Q012 — What is `skip_success_page` and when should it be used?
+
+**A (2026-10-03):** Bong @Ruzaid, What is skip_success_page / skip_success?
+- It is a Checkout/Purchase API parameter (skip_success_page or skip_success) that skips the PayWay‑hosted success/thank‑you page after payment.
+- When set to 1 and a valid continue_success_url is provided, PayWay does not show its own success page and instead automatically redirects the customer to the merchant’s success/thank‑you URL.
+- When 0 or omitted, the standard PayWay success page is shown, and the customer must tap Continue to go back to the merchant. When should it be used?
+Use skip_success_page / skip_success = 1 when:
+- You want to show your own success/receipt screen (web or in‑app) instead of PayWay’s default success UI.
+- You want a seamless/branded flow where, after payment, the user is returned directly to your site/app without an extra “Continue” tap.
+- Typical cases: self‑onboarded e‑commerce sites, booking engines, and mobile apps that already have an internal order‑confirmation page. Notes from docs:
+- This only changes UI/navigation; you must still verify final payment status via return_url pushback and/or the Check Transaction API before marking the order as successful.
+
+### S9-Q013 — Can we restrict or pre-select payment methods per transaction? Give the exact parameter and accepted values?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes. You can restrict or pre‑select payment methods per transaction using the payment_option parameter on the purchase/checkout request. Parameter
+- payment_option Behavior
+- If you set payment_option to a specific value, the hosted page starts only that payment flow (effectively pre‑selecting/restricting to that method for that transaction).
+- If you omit payment_option (or send it null), PayWay shows all payment methods enabled on that merchant profile. Documented accepted values (examples)
+- cards – card payment flow (hosted card checkout).
+- abapay_khqr – web KHQR flow; returns QR/hosted checkout for website.
+- abapay_khqr_deeplink – mobile KHQR deeplink flow; returns JSON incl. abapay_deeplink and checkout_qr_url.
+- abapay_deeplink (or equivalent) – app deeplink ABA Pay flow.
+- abapay – mobile QR/ABA Pay option (per older/alternative flows).
+- bakong (or similar) – local QR method when enabled in that profile. Rules from docs:
+- Values are case‑sensitive and must be one of the supported, documented options for that merchant profile.
+- If you pass an unsupported/invalid payment_option, the gateway returns a parameter error.
+- ABA recommends selecting the payment method in your own UI (e.g., customer chooses Card vs ABA KHQR) and then sending the chosen payment_option in that transaction’s request.
+
+### S9-Q014 — Can a purchase request carry a `payout` (split payout) block? If yes, what are the key names (`acc`/`amt` vs `account`/`amount`) and the validation rules?
+
+**A (2026-10-03):** Bong @Ruzaid, Can a purchase request carry payout?
+- Yes, a normal purchase/checkout request (/payments/purchase and PayWay checkout endpoint) can include a payout block to do split payout.
+- Exception (per docs): for pre-auth flow, the initial pre-auth purchase request SHOULD NOT include payout. In pre-auth, payout is supplied only in the pre-auth completion call inside merchant_auth. Key names / structure
+- Payout is a payload listing beneficiaries; entries use the short keys: - acc – beneficiary identifier - must be numeric ABA account number or MID (depending on profile config; some are MID-only for card payouts). - amt – amount allocated to that beneficiary.
+- Docs explicitly use acc / amt (not account / amount).
+- For multiple beneficiaries, include them all in the payout array; payload is typically base64(JSON(...)) as per standard payout encoding. Core validation rules (purchase with payout)
+- Whitelisting - Every acc used must be whitelisted for that merchant/profile before use. - Non-whitelisted accounts cause errors such as payout contains non-whitelist account (e.g. PTL-PAYOUT-37, PTL146, PTL46). - Amount consistency - For a normal payout: the sum of amt values must equal the intended distributed total. - For pre-auth completion with payout: sum of amt must exactly equal complete_amount inside merchant_auth; otherwise error like PTL-PAYOUT-36 (payout-amount-mismatch). - Do not rely on any implicit "remainder" to main account; you must explicitly allocate everything. - Amount formatting - All amt values must follow amount precision rules: - Max 2 decimal places (format x.xx). - No long floating-point values (e.g. 49.000001 is invalid). - The exact values used in payout must match the values used in hash/signature computation. - Beneficiary type rules - acc must be numeric ABA account or MID, not merchant_id string or API credential ID. - If profile is configured as MID-only, sending ABA account numbers will fail with a beneficiary type / whitelist error. - Stage rules (pre-auth vs direct sale) - Direct sale/purchase: payout can be included on the purchase request (if payout service is enabled and accounts are whitelisted). - Pre-auth flow: docs state do NOT include payout in the initial pre-auth purchase; instead, include payout only in pre-auth completion (merchant_auth), where: - payout blob is RSA-encrypted as part of merchant_auth. - whitelisting and amount-equals-complete_amount rules are enforced. - Hash/signature - When payout is present, it must be part of the data used to generate the request hash/signature; mismatch or omission can cause hash validation errors. - Other constraints - All payout accounts for production must be pre-onboarded/whitelisted and merchant must be commercially enabled for payout. - Do not send an empty payout array when payout is required; that yields errors like "Payout Info is invalid". - Payout transactions cannot be refunded via the standard refund API according to docs. - Sandbox must use the provided test/whitelist accounts, not real production accounts. So: Yes, purchase can carry a payout block (except initial pre-auth purchase); entries use acc and amt, and are subject to whitelisting, amount-sum, decimal precision, and hash/signature validation rules above.
+
+### S9-Q015 — What currencies are accepted per payment option, and what are the minimum amounts per currency?
+
+**A (2026-10-03):** Bong @Ruzaid, 1) Currencies accepted per payment option (from documented products) PayWay Payment Link (and same behaviour referenced in Invoicing Tool docs):
+- ABA Pay / KHQR - Accepted currencies to denominate the transaction: USD, KHR.
+- Card (Visa / Mastercard / UPI / JCB) - Accepted currencies to denominate the transaction: USD, KHR. - Payer can use other card currencies, but those are FX–converted by issuer; merchant still sends USD or KHR only.
+- KHQR (Invoicing Tool table) - Currency: USD, KHR.
+- Alipay - Currency: USD only. - Hidden for KHR‑denominated payment links/invoices.
+- WeChat Pay - Currency: USD only. - Hidden for KHR‑denominated payment links/invoices. Cross‑border / foreign currency notes (cards & QR)
+- Via cards, you can accept payments in foreign currencies (e.g. EUR, etc.) from the customer’s issuing bank/card; settlement to merchant is still KHR or USD, depending on merchant setup.
+- Cross‑border QR (Thai PromptPay, DuitNow, VietQR, etc.) is supported when the ABA merchant KHQR shows Bakong logo; again, settlement to merchant is KHR or USD per profile. 2) Minimum amounts per currency (what’s documented) Global minimum for PayWay APIs
+- Documented minimum transaction amount: 0.01 (in the configured currency). - Amount must be > 0; zero or negative amounts are invalid and must be blocked before calling the gateway. KHR‑specific rule
+- For KHR currency amounts, docs state an extra floor enforced on KHR flows: - “KHR currency amounts have a minimum limit — transaction amount must be greater than the minimum threshold enforced by the portal (explicitly referenced as >100 KHR) and/or must be >=100 KHR where applicable.”
+- Practically: you must ensure KHR transactions respect the portal‑enforced KHR minimum (around 100 KHR or above, depending on config). Exact per‑product KHR min beyond that reference is not further broken down by payment method in the docs. So from available documentation: - Currencies per option: - ABA Pay/KHQR/KHQR (invoice): USD, KHR - Card: USD, KHR (payer may use other currencies via FX) - Alipay: USD only - WeChat Pay: USD only
+- Minimums: - General API min: >= 0.01 in the transaction currency. - KHR must also respect a higher portal KHR minimum (referenced as >100 / ≥100 KHR); docs do not specify different minimums per payment option beyond that.
+
+### S9-Q016 — Can we pass shopper identity (`firstname`, `lastname`, `email`, `phone`) and are there length limits or formatting rules (especially `+855` phone numbers)?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes, a purchase/create-transaction request can carry shopper identity fields like firstname, lastname, email, and phone. They are used as customer metadata and shown in the PayWay / merchant portal if provided. 1) Name fields (firstname, lastname)
+- Optional from gateway side (you may omit them if needed).
+- Should contain alphabetic characters only (no digits or special characters) unless explicitly allowed in the merchant profile.
+- Trim leading/trailing spaces before sending.
+- There is a maximum length enforced by the gateway; implementations reference around 20 characters per field. If exceeded, the request may be rejected or cause UI issues. - Recommended: validate and keep each of firstname and lastname ≤ ~20 characters, or omit the field if the real name is longer. 2) Email
+- Can be passed and may be required in production depending on setup.
+- Trim leading/trailing spaces before sending.
+- Use a standard email format; avoid sending malformed values that could be rejected by validation. 3) Phone (including +855 numbers)
+- Can be passed and may be required in production and/or certain payment flows (e.g. KHQR/notifications).
+- Should be in a valid international format, e.g. +CCCNNNNNNNN. - For Cambodia: use +855 followed by the subscriber number, e.g. +85512345678.
+- Do not include spaces in the phone number (e.g. avoid +855 12 345 678). Spaces have been observed to cause bad request/validation errors.
+- Trim all spaces before sending; incorrect formats are rejected by the gateway and must be corrected and retried. 4) General notes
+- If these fields are omitted, the transaction still works, but the PayWay/merchant portal will show blank customer info.
+- When these fields participate in hashing, always use the final trimmed values in the hash string.
+
+### S9-Q017 — Is 3-D Secure supported on card checkout, and who bears liability for a failed/challenged 3-D Secure flow?
+
+**A (2026-10-03):** Bong @Ruzaid, Is 3‑D Secure supported on card checkout?
+- Yes. PayWay supports and enforces 3‑D Secure (3DS/OTP) for online card payments.
+- Cards must be 3DS‑enabled; if 3DS data is not received from the issuer, the transaction is declined and cannot be completed without OTP/challenge.
+- 3DS/OTP cannot be disabled on PayWay card checkout. Who bears liability/responsibility when 3DS fails/challenge issues occur?
+- The issuer bank and its ACS control the 3DS challenge and OTP delivery/validation.
+- If 3DS data is missing, rejected, or times out on issuer side, PayWay sets the transaction to declined; merchants cannot override this.
+- In these cases, the cardholder must retry or contact their issuing bank, or use a different 3DS‑enabled card. Resolution of failed/challenged 3DS flows is therefore on the issuer/cardholder side, not something the merchant or PayWay gateway can force to succeed.
+
+### S9-Q018 — What is the officially recommended UX when the shopper closes the tab or presses back on the hosted page?
+
+**A (2026-10-03):** Bong @Ruzaid, **Official UX recommendation when shopper closes tab or presses Back on hosted page** 1) **Treat it as “payment not completed yet” (not guaranteed failed)**
+- Browser Back/closing the tab is outside PayWay’s control.
+- PayWay **cannot guarantee a redirect to `cancel_url`** in this case.
+- You must **not assume failure** purely from the user leaving the hosted page. 2) **On return to your app/site, show a clear “not completed” state**
+- When the user comes back to your flow (e.g. via your own navigation or cancel_url when it is triggered), show a dedicated page/screen that: - Reads the order/transaction reference from session. - Calls your backend, which **checks the latest status** via webhook data / Check Transaction API. - Waits for the result and then shows the appropriate message.
+- Recommended cancellation/incomplete message: - **Title:** `Payment not completed` - **Message:** `You returned before the payment was completed. Please check the payment status or try again.` - Actions such as: **Try Again**, **Return to Cart**, **View Order**, **Return to Home**. 3) **Mobile webview specific**
+- If the user closes the in‑app WebView (back/close/swipe down), your app should: - Detect the dismissal event (or lack of navigation). - **Treat it as a non‑successful payment until verified**. - Refresh transaction status from backend and then show either success or a “payment not completed” UI with retry/other options. In short: closing/back from the hosted page should lead your UX to a **verified-status screen** that initially treats the payment as *not completed yet*, then updates to success/failure based on server‑side status.
+
+### S9-Q019 — Are there any UI/branding requirements on our checkout page (PayWay logo, wording, disclosure text)?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes — there are specific UI/branding requirements on the merchant checkout page and site. Main ones: 1) PayWay branding & payment logos
+- Use only the official PayWay / ABA PayWay assets provided by the Integration Team (no custom/redrawn logos).
+- Show only payment methods actually enabled for that merchant (e.g. ABA KHQR, cards, Alipay/WeChat if approved). Remove any unsupported wallet/card logos from checkout and footer.
+- Add a "We accept" area with the approved logos: - Typically in the site footer (recommended across all pages) and/or - On the checkout/payment page if agreed instead of footer.
+- Use logo variants that are clearly visible against the page background (white vs dark variants as provided). 2) Checkout payment option wording
+- Use the canonical labels for payment methods, e.g.: - "ABA KHQR" as the method name where requested. - Required KHQR subtitle: "Scan to pay with any banking app" (exact wording).
+- Avoid generic/misleading labels such as just "Bank"; list the correct names (ABA KHQR, Visa, Mastercard, etc.).
+- Button/CTA text on your own pages can be business‑specific (e.g. "Complete Purchase", "Continue Booking"), but should be clear about the action. 3) Footer / branding placement rules
+- Website should include a visible "We accept" strip in the footer or checkout with the approved set of logos in the order requested by the Integration Team.
+- For multi‑country or design‑constrained sites, placement may be checkout‑only, but this must be agreed with Integration Team. 4) Disclosure / policy text & amounts
+- On the final step before placing an order, the refund/cancellation policy must be visible, so the shopper sees terms before confirming payment.
+- Amounts must be shown clearly with correct currency & format (e.g. 200.00 USD, correct decimal separator) and consistent with what PayWay will charge. 5) Review/sign‑off expectation
+- These branding and wording elements (logos, labels, "We accept" strip, refund policy visibility, currency format) are checked by Integration Team during UI sign‑off before production activation; they may request adjustments. So: checkout must use official PayWay assets, display a "We accept" + correct logos, use required method labels (notably ABA KHQR + its subtitle), show refund policy before payment, and ensure only supported methods are presented.
+
+### S9-Q020 — Does the purchase API support `google_pay`, and what token is required to enable it?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S9-Q021 — Is there an official server-side (non-browser) card-payment flow, or must card entry always happen on a PayWay-hosted page?
+
+**A (2026-10-03):** Bong @Ruzaid, For standard PayWay:
+- There is no pure server-side (non-browser) card-payment flow where you POST raw card data to PayWay.
+- Card entry must happen on a PayWay-hosted page/UI — either: - Redirect/popup in a browser (web), or - Hosted HTML rendered in an in-app webview (mobile), where the PayWay form + 3DS/OTP run. Merchants are not allowed to collect or store raw card details on their own server/pages for the normal PayWay product. If a merchant needs to control card entry/storage themselves, that is a different product (PayWay Plus / card-on-merchant) which requires separate approval and PCI-DSS evidence.
+
+### S9-Q022 — What is the `type` / `purchase_type` field, what values does it accept, and where does it sit in the hash?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S9-Q023 — How do we correlate a purchase with our order across channels using a single `merchant_ref` convention?
+
+**A (2026-10-03):** Bong @Ruzaid, Use a **single business key (your order/invoice ID)** as `merchant_ref` and apply it consistently in every PayWay entry point: 1) **Choose the convention** e.g. `merchant_ref = invoice_number` / `order_number`: ```text INV-2026-001582 ``` 2) **Send the same merchant_ref across all channels** - Offline / KHQR: put it in KHQR field **62.01 – Merchant Reference Number**. - Online APIs (purchase / generate-qr / etc.): send the *same* value in the `merchant_ref` (or equivalent reference) field. - Payment links / other channels: follow the same convention so every channel carries that same invoice/order code. 3) **Use merchant_ref for reconciliation, not as payment ID** - When PayWay sends callbacks/webhooks, it returns this `merchant_ref`, letting your backend look up the **same order** regardless of channel. - A single `merchant_ref` can legitimately have **multiple PayWay transactions**, each with its own `transaction_id` (e.g. repeat/partial/duplicate payments), so: ```text merchant_ref = INV-10001 (your order) transaction_id = TX001, TX002, ... (individual payments) ``` - Use `merchant_ref` to **find the order**, and **`transaction_id` to deduplicate** and store each payment. So one stable `merchant_ref` value (your order/invoice ID) across all PayWay channels is the cross-channel correlation key; `transaction_id` remains the unique payment identifier.
+
+### S9-Q024 — Does the purchase endpoint return a `tran_id` immediately, and is that ID stable for the life of the transaction?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes:
+- For /api/payment-gateway/v1/payments/purchase, you supply the tran_id in the request, and the gateway uses that same value as the transaction’s primary identifier. The response will include this tran_id so you can log/map it immediately.
+- That tran_id is stable for the life of the transaction: it is the key for all later operations and troubleshooting (check‑transaction, portal lookup, reconciliation). PayWay asserts tran_id is unique in their system and shows only one paid record per tran_id. So: you get the tran_id at purchase-creation time (your own ID echoed back) and it does not change for that transaction.
+
+### S9-Q025 — Are there any purchase limits (per transaction, per day, per merchant)?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes — PayWay enforces purchase limits at multiple levels: - Per transaction: There is a configurable max amount per transaction. Examples in the docs include defaults like 1,000–5,000 (currency units) depending on product (e.g., general per-transaction capture limit, payment-link limit, invoicing tool, virtual card/virtual terminal, etc.). Amounts above the configured cap are rejected.
+- Per day / volume: Merchants can also have per-day total amount and max transactions per day limits, and some tools (e.g., Invoicing Tool, payment links, Shopify) are subject to such volume limits.
+- Per merchant & per payment method: Limits are configured per merchant profile and often per payment method (ABA Pay, KHQR, card, etc.), and can differ between sandbox and production. If a merchant needs higher limits (per-transaction or daily/volume), they must coordinate with PayWay/ABA (commercial or support team) and, where required, submit a maintenance/update request for approval.
+
+### S9-Q026 — What happens if the same `merchant_ref` is reused by accident? Does PayWay reject it?
+
+**A (2026-10-03):** Bong @Ruzaid, Reusing the same merchant_ref does not cause PayWay to reject the transaction. From PayWay’s side:
+- merchant_ref is treated as a business reference (e.g. invoice/order ID), not as a unique payment ID.
+- The same merchant_ref can legitimately have multiple transactions, each with its own unique transaction_id. Example from the documented behavior:
+merchant_ref = INV-10001 TX001 → $100
+TX002 → $300
+TX003 → $600 All are valid and not rejected by PayWay. So if merchant_ref is reused by accident, PayWay will still accept the payments; the duplicate/overpayment handling must be done in the merchant system, using transaction_id for deduplication and merchant_ref for reconciliation.
+---
+## S10. QR — Online KHQR (`generate-qr`)
+
+## S10. QR — Online KHQR (`generate-qr`)
+
+### S10-Q001 — List every field of `generate-qr`, marking mandatory vs optional, with types and limits?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S10-Q002 — Which `payment_option` values are supported for online QR, and which methods (ABA PAY, KHQR, WeChat, Alipay, cards) can be enabled per merchant?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S10-Q003 — What does the response contain — `qr_string`, `abapay_deeplink`, an image, or all three?
+
+**A (2026-10-03):** Bong @Ruzaid, For /api/payment-gateway/v1/payments/generate-qr, a successful response contains all three plus some extras: - qrString (string) – EMV QR payload.
+- qrImage (string) – base64-encoded QR image.
+- abapay_deeplink (string) – deeplink to open ABA Mobile.
+- app_store (string) – iOS App Store URL for ABA Mobile.
+- play_store (string) – Google Play Store URL for ABA Mobile.
+- amount (number) – transaction amount.
+- currency (string) – transaction currency.
+- status (object) – includes at least: - code (string) – result code (e.g. 0, 1, 6, etc.). - message (string) – description for the code. - trace_id (string) – unique request identifier. So: qrString + qrImage + abapay_deeplink are all returned together for this generate-qr API when the call succeeds.
+
+### S10-Q004 — Confirm `lifetime` is in **seconds** here (min 180 after minute conversion) and state the maximum?
+
+**A (2026-10-03):** Bong @Ruzaid, - Unit: lifetime is in minutes, not seconds, for generate-qr / purchase APIs. So you send lifetime = 3, and on your side you may show that as 180 seconds in the UI, but the API parameter itself remains 3 (minutes).
+- Minimum: Integration guidance enforces a minimum of 3 minutes for short‑lived QR flows; you should not set a value lower than 3.
+- Maximum: A hard max is not formally documented. The guidance notes that systems may cap the value and uses 30 days ≈ 43,200 minutes as an example upper range; larger values may be rejected or ignored and should be confirmed with the product/dev team.
+
+### S10-Q005 — What is the actual scan/session window per payment option (hosted checkout `abapay_khqr` vs deeplink/cards/alipay/wechat)? Confirm it is independent of `lifetime`?
+
+**A (2026-10-03):** Bong @Ruzaid, For the hosted checkout session window per payment option:
+- abapay_khqr (web KHQR): ~5 minutes
+- abapay_khqr_deeplink: ~3 minutes
+- cards: ~3 minutes
+- alipay: ~3 minutes
+- wechat Pay: ~3 minutes After this window, the hosted checkout session expires and the user must click “Try Again” to continue. These internal checkout session timeouts are controlled by PayWay and are independent of the lifetime parameter:
+- lifetime defines how long the transaction itself remains valid and how long the user is allowed to keep retrying.
+- It cannot extend or disable the per‑attempt session timer above; it only caps the overall validity window in which those retries (and sessions) can occur.
+
+### S10-Q006 — Confirm that a long `lifetime` does **not** keep a QR scannable, and state the recommended refresh strategy?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes — a long lifetime does not keep a specific QR image/checkout QR scannable:
+- QR image / checkoutqrurl has its own short expiry (examples mention ~2 minutes for the scannable image),
+- Transaction lifetime (TTL) is separate; after the image/URL expires, scans are rejected as expired even if TTL is still open. Recommended refresh strategy:
+- Treat each displayed QR as short‑lived (e.g. a few minutes) regardless of longer backend lifetime.
+- While the QR is active, poll Check Transaction; stop polling when you get a terminal status or when the visible QR window ends.
+- When the QR image/checkoutqrurl expires or you hit QR‑expired errors: - Do not reuse the old response. - Create a new transaction and render a fresh QR / checkoutqrurl for the next attempt.
+- Align the on‑screen countdown with this visible window and, when it reaches zero, remove the QR and offer a “Get new QR / Try again” action that creates a new transaction.
+
+### S10-Q007 — Confirm that a QR can stop scanning before the transaction lifetime expires — what is the practical scan window we should design for?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes — a QR can stop being scannable before the transaction lifetime ends. The QR image/checkout session has its own short expiry, which is separate from the longer transaction lifetime:
+- The scannable QR image may expire after a short time (example: around 2 minutes), even if the transaction itself is still within its lifetime. Practical scan window to design for:
+- For on‑screen checkout / kiosk‑style flows, design the visible scan window to be short — about 3–5 minutes maximum.
+- Within that window, show a countdown and, when it ends, remove the QR and offer a “Get new QR / Try again” that creates a new transaction. So: treat the usable scan window as a few minutes (≈2–5 minutes) and do not assume a long lifetime will keep a specific QR image scannable.
+
+### S10-Q008 — Which fields are hash positions on this endpoint, and how must `items`, `custom_fields`, `return_params`, `return_deeplink` and `payout` be encoded before hashing?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S10-Q009 — On this endpoint, what are the exact key names inside `payout`, and how do they differ from the purchase path?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S10-Q010 — What are the advisory length caps (names, email, phone, items count/length) and what happens if we exceed them?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S10-Q011 — Are WeChat/Alipay USD-only? What currencies do they support?
+
+**A (2026-10-03):** Bong @Ruzaid, For PayWay Payment Link, the documentation states:
+- Alipay and WeChat Pay are USD-only.
+- They are shown only for USD-denominated payment links and are hidden for KHR-denominated links. No additional supported settlement/display currencies for WeChat/Alipay are documented beyond this USD-only behavior in the Payment Link context.
+
+### S10-Q012 — Is a callback URL mandatory, and which callback contract does this endpoint use?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S10-Q013 — If the QR is never scanned and the transaction expires, is any callback emitted? How do we detect expiry?
+
+**A (2026-10-03):** Hello Bong @Ruzaid, If the QR is never scanned and the transaction simply expires no callback/webhook is emitted, because the gateway only pushes webhooks for successful payments. To detect expiry you need to:
+- Poll Check Transaction API while the QR/transaction is within its lifetime, and
+- Stop polling and treat it as expired when: - Check-transaction returns an expired/timeout status, or - Your own lifetime/timeout window (e.g. KHQR ~5 minutes, or your configured lifetime) has elapsed with no success. There is no separate event or callback for "QR not scanned" or "QR expired without payment" — this must be inferred from check-transaction responses plus your own timer logic.
+
+### S10-Q014 — Is there a cancel/expire endpoint for an online QR, or is `close-transaction` the only mechanism?
+
+**A (2026-10-03):** Bong @Ruzaid, There is no dedicated “cancel/expire QR” endpoint. For an online QR, the documented mechanisms are:
+- Let the QR/transaction expire naturally via its configured lifetime/default KHQR expiry, and handle it in your own logic.
+- Use Close Transaction on the corresponding tran_id when you explicitly want to invalidate that transaction and stop further retries. So, in terms of APIs, close-transaction is the only explicit “cancel-like” mechanism; everything else is managed via QR/transaction lifetime and your own UI/session logic.
+
+### S10-Q015 — Are duplicate `tran_id` values accepted, and what is the consequence for the resulting QR?
+
+**A (2026-10-03):** Bong @Ruzaid, By design, duplicate tran_id values are not accepted — each payment initiation must use a unique tran_id. However, if the same tran_id is mistakenly submitted multiple times:
+- The gateway can treat the latest request as the current version, and a new QR string may be generated.
+- The previous QR becomes obsolete, and payment attempts using that older QR may fail, while the latest QR remains valid.
+- If the tran_id has already been successfully paid, reusing it can be rejected with a Duplicate Transaction / code already used–type error. So: duplicates are not allowed as a pattern, and if they occur, the latest request’s QR effectively replaces the earlier one, with older QRs becoming invalid for payment.
+
+### S10-Q016 — What are the image/printing requirements (size, error-correction level, contrast, quiet zone) for a QR we generate ourselves?
+
+**A (2026-10-03):** Bong @Ruzaid, For QR images you generate yourself, the documented requirements are: 1) Size (screen vs print)
+- On-screen (POS/kiosk/app): use at least 65px width as a minimum for reliable scanning; larger is better.
+- Printed invoices/receipts: use at least 140px width as a minimum when printed; again, larger is preferred for low‑resolution thermal printers. 2) Quiet zone / border
+- Keep the full quiet zone/border around the QR; do not crop the edges.
+- Do not overlay logos, currency icons, or other graphics on top of the QR modules; place logos outside the protected QR outline. 3) Contrast & quality
+- Ensure high contrast (dark QR on a light background) and avoid decorations that reduce readability.
+- Generate a high‑resolution PNG/base64 and ensure it’s not blurry when rendered/printed.
+- Test scanning from both screens and printed receipts with real devices. 4) Error‑correction level
+- No specific error‑correction level value is mandated; the key requirement is that the final QR is easily scannable in practice, so size/quiet‑zone/contrast and real‑device testing are the focus. If you stay above those size minima, preserve the quiet zone, keep contrast high, and test on target printers/devices, you’ll be within the documented requirements.
+
+### S10-Q017 — Can one QR accept multiple payments, or is it strictly one payment per generated QR?
+
+**A (2026-10-03):** Bong @Ruzaid, One QR can technically be paid multiple times. Per the current KHQR/PayWay behavior:
+- The guideline explicitly states: “QR can be paid multiple times.”
+- A unique QR per invoice/customer ≠ a guarantee of only one payment.
+- You must handle duplicate, partial, repeat, and over-payments in your own ledger logic (e.g., detect that INV-10001 is already PAID and classify later payments as duplicate/overpayment or installments, depending on your model). If the requirement is “strictly single-use QR that becomes impossible to pay again at network level”, that is not automatically guaranteed by standard KHQR and needs a separate, server-controlled/single-use mechanism confirmed by Product/Integration, not assumed from the offline/local KHQR model.
+
+### S10-Q018 — For POS, is online QR suitable, and what device/network requirements apply?
+
+**A (2026-10-03):** Bong @Ruzaid, 1) Suitability for POS Yes — online QR via the QR Payment API is explicitly intended for cashier POS use-cases:
+- Cashier POS calls the QR Payment API per bill, - QR is shown on a customer-facing screen/second display or printed on the invoice, - POS uses callback or check-transaction to confirm payment, - Completed QR payments can be linked to the ABA POS terminal for tracking and receipt printing. 2) Device & network requirements
+- The cashier POS (or backend) must have a reliable internet connection to call the QR Payment API and to poll/check status.
+- The ABA POS terminal must also be online for QR transactions to appear in its history and for receipt printing (same connectivity requirement as for Alipay/WeChat, etc.).
+- A customer-facing display or printer is needed to show/print the QR; printer/device must be correctly paired with the POS and able to render a clear, scannable QR. So: online QR is suitable and recommended for POS, provided the POS/backend and ABA POS terminal have stable internet and the merchant has appropriate customer-facing display/printing hardware.
+
+### S10-Q019 — What are the QR-specific fees, settlement currency and settlement timing versus card?
+
+**A (2026-10-03):** Bong @Ruzaid, Fees (QR vs card)
+- No fixed public QR-specific fee is documented.
+- Fees for both KHQR and cards are defined in the merchant agreement with ABA (PayWay / Sales). Merchants must confirm their exact rates with Sales/contract. Settlement currency (QR vs card)
+- QR (KHQR / ABA Pay): - Display/settlement currency is the merchant profile’s settlement account currency (one currency per profile, e.g. USD or KHR). - KHQR itself supports USD and KHR display, but the actual settlement currency is the one configured on the merchant profile.
+- Cards (Visa/Master/etc.): - Also settle in the currency defined in the merchant agreement/merchant profile (often USD). If QR and card share the same merchant profile, they share the same settlement currency. Settlement timing (QR vs card)
+- KHQR / ABA Pay / same‑bank mobile: - Documented as immediate / instant settlement to the merchant account.
+- Cards (online gateway / virtual terminal, including OTA virtual cards): - Use a delayed settlement model, typically multi‑day. - Examples in the docs: 5 working days, 7 working days (T+7) for many online/virtual terminal flows; exact window depends on the merchant’s acquiring/settlement setup and contract. So: QR is generally instant into the configured settlement currency; card is multi‑day (e.g. 5–7 working days) into the merchant’s agreed settlement currency, with exact fees and timing defined in the merchant agreement.
+
+### S10-Q020 — Are there regulatory limits (per transaction, per day) on QR payments for certain merchant categories?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S11. QR — Offline KHQR & Customer Module (Printed) QR
+
+## S11. QR — Offline KHQR & Customer Module (Printed) QR
+
+### S11-Q001 — What is the authoritative distinction between (a) online KHQR via `generate-qr`, (b) offline/self-generated KHQR, and (c) Customer Module / Printed QR from the Merchant Portal?
+
+**A (2026-10-03):** Bong @Ruzaid, Authoritative distinctions: (a) Online KHQR via generate-qr (API-generated Online QR)
+- Generated by: PayWay QR/Payment API (request_transaction / generate-qr).
+- Nature: Dynamic, transaction‑specific QR; an online transaction/session is created in PayWay when the API is called.
+- Amount: Fixed in the payload (API request defines amount, currency, etc.).
+- Use: Intended for interactive/online flows (web/app/POS) where you create a QR per bill/order.
+- PayWay routing tags: Yes (online session routing).
+- Notification & reconciliation: Webhook/callback supported, transaction inquiry via Check Transaction / Transaction Details (the standard online QR flow). (b) Offline / self‑generated KHQR (Direct KHQR generation)
+- Generated by: Your own system (ERP/billing/POS) using the KHQR guideline, not via the generate-qr API.
+- Nature: KHQR is built locally in batch; you can use: - Dynamic KHQR (Model A) for fixed invoice amount (01 = 12, field 54 = amount), or - Static KHQR (Model B) for open/flexible amount (01 = 11, omit field 54).
+- Amount: Either fixed (Model A) or payer‑entered (Model B).
+- Key fields: - ABA‑provided Merchant Account Info (30), - Merchant Reference in 62.01 (links payment to invoice/customer), - ABA‑provided PayWay data (62.68, 99).
+- Use: High‑volume/batch invoicing where you want to avoid a per‑QR API call.
+- Behavior: Current guideline: “QR can be paid multiple times” → uniqueness of QR ≠ single payment; duplicates/partials handled in your ledger and reconciliation logic.
+- PayWay services: PayWay KHQR Webhook + Get Transactions by Merchant Reference (+ Check Transaction / Transaction Details when needed). (c) Customer Module / Printed QR from Merchant Portal (Customer Module QR)
+- Generated by: PayWay Merchant Portal (Customer Module UI), not by your API/backend.
+- Nature: Static, customer‑specific KHQR printed or shown to the customer (e.g., on ID card, statement, sticker).
+- Amount: Open amount — payer enters amount in their banking app; there is no fixed amount in the QR.
+- Use: Long‑lived multi‑use QR tied to a customer record, suitable for recurring/flexible payments (tuition, memberships, account balance, etc.).
+- PayWay routing tags: Yes (62·68, 99) binding the QR to the merchant profile and specific Customer Module customer.
+- Identifier mapping: Customer ID is not inside the standard KHQR fields; it is resolved server‑side and returned as merchant_ref in callbacks and get-transactions-by-mc-ref.
+- Notification & reconciliation: - Webhook/callback supported (same pattern as online KHQR), - Fallback/search via get-transactions-by-mc-ref (using Customer ID as merchant_ref).
+- Integration effort: No API for QR creation; integration focuses on callback handling + get-transactions-by-mc-ref cron/fallback, reusing the online QR reconciliation logic.
+
+### S11-Q002 — For offline KHQR, what merchant-identity fields must we configure, and does PayWay or ABA perform the enrolment?
+
+**A (2026-10-03):** Bong @Ruzaid, 1) Merchant-identity fields for offline KHQR For self-generated/offline KHQR, the QR payload must match the merchant configuration in PayWay/Bakong. Key merchant-identity–related fields are:
+- 30 – Merchant Account Information → provided by ABA (must not be invented). - 52 – Merchant Category Code (MCC) → aligned with the merchant profile. - 53 – Transaction Currency → 116 = KHR, 840 = USD (must match the merchant’s configured currency). - 58 – Country Code → e.g. KH. - 59 – Merchant Name → must match ABA’s merchant configuration. - 60 – Merchant City → consistent with the merchant profile. - 62.68 – PayWay Data Field → provided by ABA (PayWay-specific routing/identification, must not be invented). - 99 – Additional information used by Bakong → if provided as part of the KHQR setup, also must match ABA’s configuration. 62.01 (Merchant Reference Number) is primarily business reference, not identity, but is central for reconciliation (invoice/customer mapping) in the offline KHQR model. 2) Who performs the enrolment / provides these values? - The merchant must not self-define 30 (Merchant Account Info) or 62.68 (PayWay data field). - These KHQR identity values are configured and issued by ABA/PayWay as part of the KHQR / offline KHQR setup. - The integrator must contact the ABA PayWay Integration Team to obtain/confirm the exact values before implementing offline generation. So: PayWay/ABA perform the KHQR enrolment and provide the authoritative merchant-identity tags; the merchant system’s job is to embed those exact values in every locally generated KHQR and manage 62.01 for reconciliation.
+
+### S11-Q003 — Confirm that generating an offline KHQR locally makes **no** API call and enrols **no** callback. What must ABA configure before we receive payment notifications?
+
+**A (2026-10-03):** Bong @ruzaid, **1) Confirmation about API call & callback enrolment**
+- **Yes** – in the offline/self‑generated KHQR model, **QR creation is 100% local** in the merchant system.
+- There is **no `generate-qr` / QR‑creation API call** to PayWay when building the KHQR payload/image.
+- QR generation itself **does not enrol or open any callback session**; callbacks are not tied to a per‑QR API request but to the **merchant’s KHQR profile + webhook configuration**. **2) What ABA must configure before notifications can be received**
+Before the merchant can receive payment webhooks for offline KHQR, ABA/PayWay must: 1. **KHQR merchant identity configuration** - Issue and configure the merchant’s **KHQR identity fields** bound to the correct merchant profile, including at minimum: - `30` – **Merchant Account Information** (ABA‑provided), - `62.68` – **PayWay Data Field** (ABA‑provided), - `99` – **Additional info used by Bakong`** where applicable. - These values must be used *as‑issued* in every locally generated KHQR. 2. **Webhook / callback configuration** - Configure on the merchant’s PayWay profile an **HTTPS webhook URL** that the merchant provides. - Enable KHQR **payment notification via POST webhook** so that, once a KHQR payment is successful, PayWay sends payloads like: ```json { "transaction_id": "...", "transaction_date": "...", "merchant_ref": "...", "payment_status": "APPROVED", "payment_amount": ..., "payment_currency": "KHR|USD", ... } ``` - Apply any required **security/auth settings** for that webhook according to the merchant’s implementation (per PayWay configuration rules). Once these are in place, locally generated KHQRs (offline) will still result in **online KHQR payments** and PayWay will deliver **webhook notifications** for those transactions, even though no QR‑generation API was called.
+
+### S11-Q004 — When is a static QR (`01=11`, no amount) appropriate versus a dynamic QR (`01=12`, tag `54`)? Confirm the KHQR standard rules?
+
+**A (2026-10-03):** Bong @Ruzaid, When to use Static vs Dynamic KHQR Static KHQR — 01 = 11, no tag 54 (no amount):
+Use when the payer should decide the amount:
+- Open / flexible payments (installments, partial invoice payments, tuition, donations, account‑balance, membership dues, etc.).
+- You issue one QR per invoice/customer/reference but allow multiple or partial payments against that reference.
+- Config example (Offline Model B): - 01 = 11 (static) - omit 54 (no transaction amount) - 62.01 = invoice/customer/reference
+The customer scans the QR and enters the amount in their app; the webhook tells you merchant_ref and payment_amount actually paid. Dynamic KHQR — 01 = 12, with tag 54 (amount present):
+Use when the customer must pay exactly the stated amount:
+- Fixed‑amount invoices/bills where the amount must not be changed by the payer.
+- Online checkout or QR‑on‑invoice where the order/invoice amount is predetermined.
+- Config example (Offline Model A or API‑generated QR): - 01 = 12 (dynamic) - 54 = invoice/order amount - 62.01 = unique invoice reference
+The amount is pre‑filled and enforced by the banking app when scanning. KHQR standard rules (as per current guideline)
+- 01 = 11 → Static QR without amount (payer enters amount; 54 normally omitted).
+- 01 = 12 → Dynamic QR with amount (54 present and carries the transaction amount).
+- Tag 54 is the Transaction Amount field; when present, it encodes the amount that should be paid.
+
+### S11-Q005 — Confirm the maximum length of the merchant reference in tag `62.01` (25 UTF-8 bytes for generation vs a 20-character gateway cap for inquiry) and state the safe policy?
+
+**A (2026-10-03):** Bong @Ruzaid, Length limits:
+- KHQR / Tag 62.01 (Merchant Reference Number): current KHQR guideline allows up to 25 characters in 62.01.
+- Gateway / inquiry side (invoice/bill identifier): PayWay enforces a 20-character maximum for the bill/invoice identifier used for lookups (same limit applies when using merchant_ref as the invoice ID for inquiry/reconciliation). Safe policy:
+- Even though 62.01 can hold 25 chars, treat the effective limit as 20 characters to stay within the gateway’s inquiry cap.
+- Use merchant_ref ≤ 20 simple characters (ASCII; avoid multi‑byte/special characters that might push byte-length over the cap).
+- If your internal invoice/customer IDs are longer, map or truncate them to a ≤20‑character external merchant_ref and keep a local mapping for reconciliation. This way the QR remains valid per KHQR (25-char field) and all PayWay-side inquiry and reconciliation APIs work reliably with the 20-character identifier.
+
+### S11-Q006 — Confirm the expiry semantics in tag `99` — are creation/expiry timestamps mandatory, and what is the default validity?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S11-Q007 — Can the same offline KHQR be paid more than once within its validity? What is the officially approved validity window for invoice batches?
+
+**A (2026-10-03):** Bong @Ruzaid, 1) Can the same offline KHQR be paid more than once within its validity? Yes. The current PayWay KHQR guideline explicitly states that a QR can be paid multiple times. That applies also to offline‑generated KHQR: the same invoice QR may produce multiple PayWay transactions within its applicable validity. Single‑use must not be assumed; duplicate/over/partial payments must be handled in the merchant’s ledger and reconciliation logic. 2) Officially approved validity window for invoice batches These documents do not define a specific default validity window (e.g. X days/months) for invoice‑batch KHQR. They state only that:
+"A QR may support multiple payment transactions during its applicable validity."
+and that creation/expiry rules must follow the current ABA/KHQR specification provided for the merchant. So: multiple payments are explicitly allowed; the exact validity window for invoice batches is not specified here and depends on the KHQR specification ABA provides for that setup.
+
+### S11-Q008 — Confirm that CRC-16 is only a payload integrity check and is not an authenticity control?
+
+**A (2026-10-03):** Bong @Ruzaid, The docs describe tag 63 as a CRC‑16 checksum for payload integrity only:
+- It is used as a payload integrity check (QR apps reject QRs whose checksum fails).
+- The documents do not describe CRC‑16 as an authenticity or security control. So per documentation: CRC‑16 in tag 63 is an integrity checksum, not an authenticity mechanism.
+
+### S11-Q009 — Is there an ABA certification or validation tool for KHQR payloads we should use before printing?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S11-Q010 — What is the official notification contract for offline KHQR payments, and is it signed?
+
+**A (2026-10-03):** Bong @Ruzaid, Official notification contract (offline KHQR):
+Offline‑generated KHQR uses the same PayWay KHQR webhook contract as online KHQR. After a successful payment, PayWay sends an HTTPS POST with a JSON body containing (fields as documented, not limited to): { "transaction_id": "3309DCD5BCB94CBD820046CE9", "transaction_date": "2025-10-10 16:03:26", "original_currency": "KHR", "original_amount": 100, "bank_ref": "100FT30153179430", "apv": "341136", "payment_status_code": 0, "payment_status": "APPROVED", "payment_currency": "KHR", "payment_amount": 100.0, "payment_type": "ABA Pay", "payer_account": "*898", "bank_name": "ABA Bank", "merchant_ref": "3309DCD5BCB94CBD820046CE9"
+} - Transport: POST over HTTPS to the merchant’s configured webhook URL.
+- Key identifiers: transaction_id (for deduplication) and merchant_ref (from tag 62.01, for reconciliation). Is it signed?
+The documentation only specifies HTTPS transport and does not define any additional cryptographic signature (e.g., HMAC) in headers or body. It explicitly says webhook security/authentication should follow the PayWay configuration/docs for that merchant but does not document a standard signing scheme here. So, based on these docs:
+- Contract = HTTPS JSON webhook as above.
+- No signed payload format is documented beyond HTTPS transport and any per‑merchant security configuration.
+
+### S11-Q011 — How is the Customer ID carried for Customer Module QRs, given the customer ID is not in the payload? Confirm the callback/`merchant_ref` join key?
+
+**A (2026-10-03):** Bong @Ruzaid, For Customer Module QRs the Customer ID is not inside the KHQR payload; attribution is done server-side: 1. How the Customer ID is carried The QR’s PayWay routing tags (62·68, 99) bind the code to a specific Customer Module record in PayWay. When a payment hits, PayWay uses those routing tags + its internal mapping to resolve the customer, then injects the Customer ID into the webhook as merchant_ref and also in the customer.customer_id field. 2. Callback / reconciliation join key - Webhook: merchant_ref = Customer ID (e.g. dt-one-8989). - Fallback API (get-transactions-by-mc-ref): you query with that same value; the docs explicitly define Customer ID = merchant_ref for this module. So the join key is the Customer ID carried as merchant_ref in both the callback and get-transactions-by-mc-ref responses/queries; your system should treat this as the foreign key to your customer record.
+
+### S11-Q012 — What are the PayWay routing tags in a Customer Module QR, and what do they mean?
+
+**A (2026-10-03):** Bong @Ruzaid, For a Customer Module QR, PayWay adds proprietary routing tags on top of standard KHQR: 1) Tag 62·68 — PayWay routing template
+This lives under Additional Data (62) and carries the core routing info:
+- 62·68·00 = PAYWAY@ABA → PayWay scheme / routing identifier
+- 62·68·01 = 6930 (example) → PayWay outlet / merchant short code
+- 62·68·02 = 1620916 (example) → PayWay merchant ID
+- 62·68·05 = 1 → QR type/flag (PayWay‑internal) 2) Tag 99 — PayWay root extension
+A non‑EMVCo extension block with PayWay metadata:
+- 99·00 = 1787124763825 (example) → PayWay Merchant Profile ID
+- 99·68 = mmp → MMP membership marker These routing tags (62·68 + 99) are how PayWay binds the KHQR to the correct merchant profile, outlet, and Customer Module record while still keeping the QR fully KHQR‑interoperable.
+
+### S11-Q013 — What happens to payments on an existing printed QR if the customer regenerates/downloads a new QR in the portal?
+
+**A (2026-10-03):** Bong @Ruzaid, For Customer Module QRs:
+- Each customer QR is static, multi‑use, and does not expire.
+- The portal allows you to re‑download or regenerate the QR later if it’s lost or damaged, and the docs state that the QR remains valid as long as the customer exists and no blocking conditions apply. Implication: downloading/regenerating a new QR image from the portal does not invalidate existing printed QRs. All copies (old printed and newly downloaded) continue to be payable and route to the same customer record until that customer is blocked/removed.
+
+### S11-Q014 — Confirm the reconciliation limits of `get-transactions-by-mc-ref`: max 50 matches, no pagination, 10 requests/minute?
+
+**A (2026-10-03):** Yes Bong @Ruzaid, the documented limits for get-transactions-by-mc-ref are: - Max results: returns the latest 50 matching transactions.
+- Pagination: no pagination documented/supported — anything beyond the latest 50 is not returned.
+- Rate limit: 10 requests per minute. It’s explicitly positioned for investigation/reconciliation (invoice inquiry, callback recovery, duplicate/partial payment checks), not as a high-volume polling API.
+
+### S11-Q015 — How do we distinguish a legitimate second payment from a duplicate notification for one payment?
+
+**A (2026-10-03):** Bong @Ruzaid, Use transactionid** vs **merchantref/invoice state: 1) Detect duplicate notification (same payment, same webhook re‑delivered)
+- Key rule: deduplicate on transaction_id.
+- If a callback arrives and its transaction_id is already stored/processed, do not create another payment — just treat it as a retry/duplicate delivery. 2) Detect a legitimate second payment on the same QR/invoice
+- The same QR can be paid multiple times.
+- A genuine second payment will have a different transaction_id but usually the same merchant_ref (e.g. same invoice or customer reference).
+- In this case, store it as a new payment transaction and classify at business level using your ledger: - Recalculate total paid vs due. - Mark invoice as PARTIALLY_PAID, PAID, or OVERPAID. - If overpaid/duplicate, send to your exception/refund/credit workflow. So:
+- Same transaction_id → duplicate notification, no new payment record.
+- New transaction_id (even with same merchant_ref) → legitimate second payment to be recorded and then classified by invoice rules.
+
+### S11-Q016 — What is the official guidance for high-volume offline QR batches (manifest fields, duplicate-reference rejection, dedupe strategy)?
+
+**A (2026-10-03):** Bong @Ruzaid, **Official guidance for high-volume offline KHQR batches** **1) Batch/manifest contents (per QR/invoice record)** For direct KHQR generation the system must have, at minimum, per-record data sufficient to build a valid KHQR according to the spec:
+- **Business reference → `merchant_ref` (62.01)** - Typically the **invoice/customer/reference ID** (e.g. `INV-2026-001582`). - Must obey KHQR rules: max 25 chars, uniquely meaningful for the merchant’s process.
+- **Currency → `53`** - KHQR values: **`116` = KHR**, **`840` = USD`**.
+- **Amount → `54` (when using fixed-amount model)** - Present for **Dynamic QR with amount** (`01 = 12`). - Omitted for **Static open-amount** (`01 = 11`).
+- Other KHQR fields come from configuration, not per-invoice data (but are required in the generated payload): - `30` Merchant Account Information (provided by ABA, not invented). - `52` MCC, `58` Country, `59` Name, `60` City. - `62.68` PayWay Data Field (provided by ABA). - `99` Bakong/additional info as per ABA spec. - `63` CRC. **2) Duplicate-reference rejection at QR-generation level** Documentation expects **“one unique QR per invoice/customer/bill/reference”** and:
+- Each generated QR **“should carry a unique merchant reference”** (`62.01`).
+- `merchant_ref` must be **“uniquely meaningful to the merchant’s business process”**. Implication for high-volume batches:
+- The offline batch/manifest **should not generate multiple different QRs with the same `merchant_ref` for a use case that expects 1 QR per invoice/customer**. - Practically, your batch tool should **reject or flag duplicate `merchant_ref` entries** when those references are supposed to uniquely identify an invoice/customer. **3) Runtime dedupe & reconciliation strategy** Once payments start coming in, the guidance is: - **Deduplication key (avoid double-posting one payment):** - Use **`transaction_id`** from PayWay. - If a callback arrives with a `transaction_id` that already exists in your ledger, **do not create another Payment record** (duplicate/ retry delivery). - **Reconciliation key (link payment to business object):** - Use **`merchant_ref`** from the webhook (`62.01` from the QR). - Find the matching invoice/customer and **allocate the payment amount** there. - **Multiple/partial/over payments on same reference:** - A KHQR **can be paid multiple times**; several valid PayWay transactions may share the same `merchant_ref`. - Do **not** dedupe just because another transaction exists with the same `merchant_ref`. - Instead, store each new `transaction_id` and update invoice state: `UNPAID`, `PARTIALLY_PAID`, `PAID`, `OVERPAID`, `CANCELLED`, `EXCEPTION`. - **Recovery path:** - Do not rely on callbacks alone; use **Get Transactions by Merchant Reference** for reconciliation / missing-callback recovery, comparing PayWay’s records to your **PAYMENT** + **PAYMENT ALLOCATION** ledger. So, in summary: - **Manifest/batch:** ensure each QR line has a unique `merchant_ref` (per the business rule), correct currency, and amount/QR mode. - **Generation-time dedupe:** reject/flag duplicate `merchant_ref` where a 1‑QR‑per‑invoice/customer rule applies. - **Runtime dedupe:** strictly on `transaction_id`, not on `merchant_ref`; treat repeated `merchant_ref` with new `transaction_id` as additional (partial/duplicate/over) payments handled via your ledger and invoice state model.
+
+### S11-Q017 — Are there branding/co-branding rules for printed QRs (logo size, colour inheritance, fallback to merchant icon)?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes, there are documented branding/co‑branding rules for printed Customer Module QRs: - Who controls co‑branding - Co‑branding (logo + colour) is configured only by an MMP admin in MMP; merchants cannot configure it themselves from the portal. - Logo fallback behaviour - If a co‑branding logo is not uploaded but a merchant icon is set, the system uses the merchant icon as the co‑branding logo. - If neither co‑branding logo nor merchant icon is uploaded, the printed QR shows no co‑branding logo. - Colour inheritance - The co‑branding colour automatically inherits from the logo if one exists. - Logo size/asset rules - Co‑branding logo must have a minimum height of 300px (width is auto). - Use official PayWay assets and keep logos outside the QR’s protected/quiet zone; do not overlay graphics on top of the QR matrix. - General branding guidance also recommends square PNG logos (e.g., 315×315) and, for screens, a circular transparent logo with max width around 200px; printed QRs are expected to follow the same asset‑quality/clarity expectations.
+
+### S11-Q018 — Can printed QRs be downloaded in bulk, and what are the limits?
+
+**A (2026-10-03):** Bong @Ruzaid, Yes — Customer Module printed QRs can be downloaded in bulk. Batch download rules/limits:
+- You can select up to 100 customers at a time in Customers and click Batch Generate QR.
+- The system generates all selected customer QRs in one batch and lets you Download as: - a ZIP file (each QR as a separate JPG), or - a PDF.
+- Each QR image is a JPG with dimensions 1184 × 1770 px. So the key hard limit is max 100 customers per batch QR download.
+
+### S11-Q019 — Do vouchers or promotions apply to printed-QR transactions?
+
+**A (2026-10-03):** Bong @Ruzaid, No — vouchers or promotions do not apply to Customer Module printed‑QR transactions. - Customer Printed QRs explicitly do not support vouchers.
+- Previously, embedding voucher data in these QRs caused "invalid QR code" issues; this has been fixed by not applying vouchers at all to these printed QRs.
+
+### S11-Q020 — What settlement account do printed-QR payments settle to, and how does a customer-specific "override settlement account" interact with card/Alipay/WeChat payments for the same customer?
+
+**A (2026-10-03):** Bong @Ruzaid, 1) Where do printed‑QR payments settle? For Customer Module printed QRs:
+- If the customer has an override settlement account configured: - ABA Pay / KHQR payments via that customer QR settle to the customer’s override account (USD/KHR as configured).
+- If no override is configured (or override feature is later disabled): - Payments settle to the merchant’s default settlement account on the merchant/outlet profile. - When override is disabled after use, existing customer QRs are blocked from receiving payments, and new payments go to the merchant’s default account. 2) Interaction with Card / Alipay / WeChat
+- For a customer with override settlement: - Their customer QR supports only ABA Pay and KHQR. - Card, WeChat Pay, and Alipay are not available on that customer QR at all.
+- If the same customer pays via Card/Alipay/WeChat through other channels (e.g. card checkout / VT): - Those payments do not use the override settlement account. - They settle to the card settlement account configured in the card system (TWCM) for the merchant, as usual.
+---
+## S12. Payment Links
+
+## S12. Payment Links
+
+### S12-Q001 — List every field for creating a payment link, marking mandatory vs optional, with types and limits?
+
+**A (2026-10-03):** Bong @Ruzaid, below is **everything documented** for creating a Payment Link, with **mandatory vs optional, types, and limits**. ---
+**1) Core Payment Link fields (Portal & API)** **Title** - Mandatory: **Yes** (Portal & API) - Type: string - Limits: max **250 characters**; shown on payment page. **Amount** - Mandatory: No (can be empty to let customer input amount) - Type: - Portal: numeric currency amount - API: **string** (must send as string, e.g. "100.00") - Limits: - **USD**: min **0.01**, up to **2 decimal places** - **KHR**: min **100**, **no decimals** **Description** - Mandatory: No - Type: string - Limits: max **250 characters**; **cannot start with** `=`, `+`, `-`, or `@`. **Image / Banner** - Mandatory: No - Type: image file (JPEG/PNG, etc.) - Limits: width **≤ 2,000 px**; filename must **not contain special characters** such as parentheses. **Expiry Date / expired_date** - Mandatory: No - Type: - Portal: date - API: string (datetime in required format) - Limits / behavior: - If set to **today** → valid until **23:59** that day. - If empty → link **does not expire**. - API: must be **future** time and in **exact expected format**, else request fails. **Link Validity / Number of Payments (Portal)** - Field name (Portal): *Link Validity / Number of Payments* - Mandatory: No - Type: enum / number - Options: **One‑time** / **Specific number** / **Unlimited**. **payment_limit (API)** - Mandatory: No - Type: **string** (not integer) - Limits: max number of allowed payments for that link; link deactivates after limit reached. **Reference Number (Portal)** / **merchant_ref_no (API)** - Mandatory: No - Type: string - Limits: not specified; used as merchant-side reference (order/invoice). Returned in webhooks/reports where supported. **Return URL (Portal)** / **return_url (API)** - Portal – *Return URL (Pushback URL)*: - Mandatory: No (but **required if you want pushback**) - Type: URL - Behavior: PayWay posts payment completion details to this URL.
+- API – `return_url`: - Mandatory: No (but **required if you need tran_id / callback**) - Type: string (URL), must be **base64‑encoded** before sending - Limits: must be valid & reachable; used so PayWay can return `tran_id` after payment. **Outlet Selection (Portal)** / **outlet_id (API)** - Mandatory: - Effectively **yes** when multiple outlets exist (one must be chosen). - If only one outlet → auto‑selected. - Type: string / outlet selector - Limits / behavior: - If outlet is **deactivated/terminated**, customers **cannot pay** on links tied to it. - If outlet has both EN & KH names, you choose which to display; affects merchant name on page and QR. **currency (API)** - Mandatory: Functionally **required** for API Payment Link creation - Type: string - Limits: must **match accepted currency** for that merchant account (e.g. sending KHR to a USD‑only account is rejected). **payout (API)** - Mandatory: No - Type: string/structured (per configuration; details not fully specified) - Limits / rule: **Do not send with null value**; if unused, **omit field entirely**. ---
+**2) API security/envelope fields for Payment Link create**
+(Required for the API call itself, in addition to the link fields above.) **merchant_id** - Mandatory: **Yes** - Type: string - Limits: must be the testing/production `merchant_id` issued by PayWay; wrong ID → errors like `Invalid merchant information`. **request_time** - Mandatory: **Yes** - Type: string (timestamp) - Limits: must be in the **exact format** required; expired/invalid timestamps are rejected. **merchant_auth** - Mandatory: **Yes** - Type: string (RSA‑encrypted payload) - Limits: must be encrypted with the **RSA public key** supplied by PayWay.
+Part 2/2 hash (where required) - Mandatory: Yes - Type: string - Limits: must be computed as per spec over the correct parameter set; incorrect hash → request rejected. ---
+3) Extra customer-information fields on Payment Link page (Portal configuration)
+(These are not part of the core create payload, but configurable as fields the payer must fill.) - Full Name (Given/Family name) – can be set mandatory or optional. - Email – can be mandatory or optional. - Phone Number – can be mandatory or optional. - Remark – enabled by default; can be disabled, or set mandatory/optional. Data entered in these fields is stored with the transaction and shown in Merchant Portal.
+
+### S12-Q002 — Confirm that `currency` is mandatory (omitting it yields `PTL04`) and state the supported currencies?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q003 — Confirm `merchantRefNo` requirements and its max length; is it mandatory?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q004 — Confirm `description` max length (250) and the `title` limits?
+
+**A (2026-10-03):** Description on Payment Link is documented with a maximum length of 250 characters, and it must not start with =, +, -, or @. Title is also documented as having a maximum length of 250 characters (for both Portal and API), displayed on the payment page.
+
+### S12-Q005 — What is `expiredDate` format, and what happens when it is in the past or less than ~5 minutes ahead?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q006 — What is `payment_limit`, and how does it interact with the link status?
+
+**A (2026-10-03):** Bong @Ruzaid, What is payment_limit? For Payment Link API, payment_limit is an optional string field you send when creating the link. It is used “to limit the maximum number of transactions allowed for that link.” Interaction with link status The documents only state that payment_limit limits how many transactions a link can take; they do not further specify how this is reflected in the link’s status (e.g., exact status value or error code once the limit is reached).
+
+### S12-Q007 — Confirm the link statuses (`OPEN`, `PAID`, `VOIDED`) and confirm that **no `EXPIRED` status exists** — expired links still read `OPEN`?
+
+**A (2026-10-03):** Bong @Ruzaid, Documented link statuses
+- API sample shows status: "OPEN" for an active link.
+- Portal docs describe links as: - Paid (one-time) / Paid (multi-use/unlimited) - Unpaid - Open (only OPEN links can be edited) - Voided / deactivated (cannot accept further payments; irreversible) EXPIRED status
+The documents do not mention any separate EXPIRED status value for Payment Links. They only state that if an expired_date is set, requests after expiry must be rejected. They do not specify whether an expired link’s status field remains OPEN or changes to another value.
+
+### S12-Q008 — Confirm that after `expired_date` passes the hosted page still returns HTTP 200 and still accepts input, so expiry must be enforced merchant-side. What is the official guidance?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q009 — Does the hosted page stop accepting payment once `total_trxn` reaches `payment_limit`?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q010 — What does the create response contain — the share URL, a link ID, a QR, and all the running totals?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q011 — What are `total_amount_org`, `total_amount`, `total_refund`, `total_trxn` exactly, and how do they differ?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q012 — What identifier do we use to query a link later — the opaque base64 Link ID or the merchant reference? Can we query by either?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q013 — Can we void a link, is void irreversible, and is void idempotent? Give the exact code for a second void?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q014 — What happens if we void a link that has already been paid? Is that supported, and what is the correct action (refund)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q015 — Can a link carry a `payout` / split block? Confirm the key names (`acc`/`amt`) and the rule that the payout total must equal the link amount?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q016 — Confirm that after a payment-link split payout the standard refund API is unavailable — what are the officially supported refund paths?
+
+**A (2026-10-03):** — For transactions where a payment-link uses Payout or Split & Payout, the standard Refund API/portal refund is not available. Officially supported paths:
+- No online/automated refund via PayWay (Refund API or portal) for Payout / Split & Payout flows.
+- If a refund is required operationally, it must be handled offline/manual via ABA PayWay Merchant Support / Integration Team under their refund/cancellation procedures (case‑by‑case). So after a payment-link split payout, you should not rely on the Refund API; coordinate with Merchant Support/Integration Team for any exceptional manual handling.
+
+### S12-Q017 — Confirm that link beneficiaries are paid at completion rather than T+N?
+
+**A (2026-10-03):** — Yes, when Split & Payout is configured with immediate split, beneficiaries are paid at completion of the transaction, not on a T+N settlement cycle. The system splits and settles to each beneficiary account at completion time. If instead you use a hold + scheduled payout model, funds first land in the platform/round account and you then pay beneficiaries later via your own payout schedule (which can follow T+N or another cadence).
+
+### S12-Q018 — Can an open-amount (customer-entered) link be created, and which merchant categories are restricted from it?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q019 — Can we attach an image/logo to a link? Give format, size limit, and any gateway-side transformation (re-hosting, renaming, echoed size)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q020 — Can the hosted page language/locale be set per link?
+
+**A (2026-10-03):** — For Payment Link, the hosted page is inherently multi‑language (EN, KM, ZH) and the language is chosen at runtime by the customer’s selected language on the page/browser. The documented create-payment-link inputs do not include any field to lock/set a specific locale per link, so there is no per‑link locale flag — language is user/session-driven rather than configured per link.
+
+### S12-Q021 — What exactly does the payment-link pushback body contain, and how should we treat it as an untrusted lookup hint?
+
+**A (2026-10-03):** — For Payment Link, the pushback body is a transaction-level JSON payload, not a link-definition payload. In practice it contains at least the core transaction fields, and may include some optional ones: Core fields you should expect and parse
+- tran_id — the transaction-specific ID generated when the link is paid (different from the link-level tran_id). Use this as your primary correlation key.
+- status — numeric/enum payment status.
+- apv — approval code (string, may be empty).
+- Common additional fields seen with Payment Link flows: description, amount, totalAmount. Optional / profile-dependent fields
+- bank_ref — not guaranteed; only present if configured on the merchant profile. Canonical source is Check Transaction API.
+- payment_type, datetime — may appear in some environments; must be treated as optional.
+- return_params — only present if you sent return_params in the original purchase/create request; echoed back as nested JSON.
+- No custom_fields from the portal are included in pushback by default. Format notes:
+- Delivered as JSON either in the HTTP body or as a POST param response containing a JSON string; you must support both. How to treat it as an untrusted lookup hint
+- Treat pushback as an asynchronous hint that a transaction changed state, not as the sole source of truth.
+- On receiving pushback: 1. Safely parse the JSON (defensively handle missing/nullable fields). 2. Use the tran_id from pushback to call the check-transaction-2 API, and 3. Decide success/failure based on payment_status_code and data.payment_status from the check-transaction response.
+- Design processing to be idempotent (multiple pushbacks for the same tran_id must not break your logic). So: parse/log the pushback body, but always reconcile and finalize status via Check Transaction API, using the pushback only as an untrusted trigger + key for that lookup.
+
+### S12-Q022 — Are there limits on active links per merchant, on link amount, and on link expiry length?
+
+**A (2026-10-03):** — From the docs: - Max active links per merchant: No explicit hard limit is documented on how many links a merchant can have active at the same time.
+- Link amount limits: Yes, there are caps. A maximum amount per payment link is enforced (e.g. a default like 5,000). Above that, the system blocks the charge. Higher limits require a formal maintenance/update request and internal approval. General per-transaction / per-day merchant limits also apply.
+- Link expiry length: The API supports an expired_date field and PayWay honors the full date/time. The docs do not state a maximum allowable lifetime for a link; the 24‑hour example is presented as a recommended lifecycle pattern, not as a technical ceiling.
+
+### S12-Q023 — Is there any webhook for link lifecycle events (created, viewed, paid, expired, voided)?
+
+**A (2026-10-03):** — For Payment Link there is no webhook for link-lifecycle events such as created, viewed, expired, or voided. The only documented callback is the payment notification for a successful transaction on that link (pushback to your configured return/webhook URL). This is a transaction-level success event, not a generic link-lifecycle webhook. So:
+- Created / Viewed / Expired / Voided: no webhooks.
+- Paid: only via the standard successful payment pushback + optional Check Transaction API, not a separate "link-paid" lifecycle event.
+
+### S12-Q024 — Are payment-link transactions priced identically to standard checkout transactions?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S12-Q025 — Is `payment-link create` safe to retry on timeout, and what is the duplicate-link risk?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S13. Query & Reconciliation APIs
+*(covers `check-transaction`, `transaction-detail`, `transaction-list`, `get-transactions-by-mc-ref`)*
+
+## S13. Query & Reconciliation APIs
+
+### S13-Q001 — For each of the four query endpoints, give the exact parameters and whether they are mandatory?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q002 — Which identifier does each endpoint accept — `tran_id` or `merchant_ref`? Can any endpoint look up by both?
+
+**A (2026-10-03):** — From the docs on the query/inquiry side: 1. **Get Transactions by Merchant Reference** `POST api/payment-gateway/v1/payments/get-transactions-by-mc-ref` • **Identifier:** `merchant_ref` (merchant reference / mc_ref) • It is designed specifically to look up by **merchant_ref**, not by `tran_id`. 2. **Check Transaction** • **Identifier:** PayWay `transaction_id` / `tran_id` • Used when you already know the PayWay transaction ID; there is **no merchant_ref lookup** on this endpoint. 3. **Transaction Detail** `POST api/payment-gateway/v1/payments/transaction-detail` • **Identifier:** PayWay `transaction_id` • Used to retrieve historical details for a known transaction; docs only describe lookup by transaction ID, not by merchant_ref. Across these documented endpoints, **none support querying by both `tran_id` and `merchant_ref` in a single call** — you choose either the *merchant_ref path* (`get-transactions-by-mc-ref`) or the *transaction_id / tran_id path* (Check Transaction / Transaction Detail).
+
+### S13-Q003 — Confirm the differences in data richness between `check-transaction` and `transaction-detail`, and state which fields only `transaction-detail` returns (`apv`, `bank_ref`, `payer_account`, `transaction_operations`)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q004 — Confirm the indexing/propagation lag: a fresh transaction appears in `check-transaction` quickly but takes longer in `transaction-detail`. What are the documented lag values?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q005 — For `transaction-detail`, confirm the response is wrapped in `.data` and `status.code` is `"00"` on success. List every field with its meaning and type?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q006 — Confirm `original_amount`/`original_currency` (merchant obligation) versus `payment_amount`/`payment_currency` (payer debit) and that these can differ. What causes a currency mismatch?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q007 — Confirm that amounts arrive as strings and must be coerced — is this true on every endpoint?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q008 — For `transaction-list`, confirm the exact accepted date format (`YYYY-MM-DD HH:mm:ss` only) and that other formats are rejected?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q009 — Confirm the maximum date range for `transaction-list` (3 days) and the maximum page size, and the exact error for exceeding each?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q010 — What timezone is `transaction-list` filtering in, and what timezone is the returned `transaction_date`? Confirm the UTC+7 (Asia/Phnom_Penh) behaviour and the risk of deriving the window from a UTC clock?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q011 — Provide a complete timezone table per endpoint: which are UTC, which are UTC+7, which are epoch seconds, which are naive datetimes?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q012 — Which status filter values does `transaction-list` accept — string enums or numeric codes?
+
+**A (2026-10-03):** Transaction-list status filter accepts string enum values, not numeric codes. Accepted values (case-insensitive, comma-separated for multiple):
+- APPROVED
+- PRE-AUTH
+- REFUNDED
+- PENDING
+- DECLINDED
+- CANCELLED
+
+### S13-Q013 — Confirm that unpaid QR-only transactions are **not** returned by `transaction-list` while they are visible to `check-transaction`. What is the official reconciliation path for unpaid QRs?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q014 — Is there a channel/outlet/payment-method filter on `transaction-list`, or must we filter client-side?
+
+**A (2026-10-03):** - **Channel filter**: Not documented on the transaction-list APIs. There is a *Channel* column and filter in the Merchant Portal UI only. For API usage, assume **no channel filter** — you’d need to derive/filter by channel client-side (if available in your data model). - **Outlet filter**: The API is **scoped by outlet**, not via a separate outlet filter: - Each request is for a single outlet only — *“Allow only by outlet, cannot get all transaction from all outlet which is under one business profile”*. - You **cannot** query multiple outlets in one call; you must call per-outlet (via the outlet’s merchant_id/credentials). - **Payment-method filter**: The transaction-list-2 description explicitly states it can filter by **payment type**. So payment-method filtering is supported server-side via `payment_type` (per the docs), and you can additionally filter client-side if needed.
+
+### S13-Q015 — Is `transaction-list` sorted deterministically, and what is the pagination model?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q016 — For `get-transactions-by-mc-ref`, confirm the 20-character reference cap, the 50-row cap with no pagination, and the 10 requests/minute cap?
+
+**A (2026-10-03):** For get-transactions-by-mc-ref the docs state:
+- Row limit & pagination: Returns the latest 50 matching transactions; no pagination is documented → effectively a 50-row cap with no pagination controls.
+- Rate limit: Limited to 10 requests per minute.
+- 20-character reference cap: Not documented — there is no mention of a 20-character limit on merchant_ref in the available docs.
+
+### S13-Q017 — What is the officially recommended daily reconciliation procedure, and what is the documented safe batching window for pulling data?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q018 — How far back can each query endpoint retrieve data? What is archived, and what is the data-retention period?
+
+**A (2026-10-03):** From the docs we have: Check Transaction API
+- Designed only for short-term status checks after creation.
+- Effective, documented validity window is ~7 days; beyond this it may return "tran_id not found" even for successful payments.
+- Separate notes mention that archival behavior around ~30 days can also cause Not Found for older transactions, but this 30‑day value is described as observed behavior, not a formal guarantee. Transaction Detail API (transaction-detail)
+- Explicitly described as for historical / past transactions and as the fallback when Check Transaction can no longer see a transaction.
+- No explicit maximum look‑back period is documented; only that it is intended to work after the status‑inquiry/cache window and is rate‑limited (e.g. 10 req/min). Get Transactions by Merchant Reference (get-transactions-by-mc-ref)
+- Documented as supporting past transactions (for invoice/investigation/reconciliation use cases).
+- No explicit retention limit is given; only functional limits (latest 50 transactions, 10 req/min). List / transaction‑listing APIs
+- You query by date range (e.g. fromdate / todate, often with a short per‑request window like 3 days).
+- Docs state that archived transactions (older than the system retention window, with an observed value of ~30 days) may not be returned and may show as Not Found.
+- Exact long‑term data‑retention period beyond this is not formally specified in the API description; guidance is to use merchant portal exports and settlement reports for long‑term history. Summary:
+- Formally documented: Check Transaction ≈ 7 days validity window.
+- Observed but not guaranteed: archival threshold around ~30 days affecting Check/List visibility.
+- Not explicitly bounded: Transaction Detail and Get‑by‑MC‑Ref are documented to work for past transactions without a stated maximum age; overall data‑retention duration is not formally documented in the materials provided.
+
+### S13-Q019 — Are POS, Virtual Terminal, Invoicing Tool, Printed QR and online transactions all returned by `transaction-list`, and is the channel identifiable per row?
+
+**A (2026-10-03):** From the docs:
+- Virtual Terminal — Yes, shown in the transaction list with Channel = "Virtual Terminal".
+- Invoicing Tool — Yes, shown in the transaction list with Channel = "Inv. Tool".
+- Printed QR (Customer QR) — Yes, shown in the transaction list with Channel = "Printed QR" and included in exports.
+- Online transactions — Default/hosted checkout appears with Channel = "Checkout"; QR created via API appears as Channel = "API QR".
+- Channel per row — Yes, each transaction row has a Channel column identifying the source, and you can filter by channel.
+- POS — Not explicitly documented as a separate channel value on the transaction list in the materials available.
+
+### S13-Q020 — Is there any endpoint that returns the *settlement/batch* view, or is settlement only visible in the Merchant Portal?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S13-Q021 — Can we reconcile API data to a bank statement 1:1, and which fields are authoritative for the money amounts?
+
+**A (2026-10-03):** You can reconcile on a 1:1 basis, but you must use the shared identifiers and be aware of fees/settlement effects: - 1:1 mapping feasibility - PayWay exposes a purchase/order identifier (purchase# / order ID / tran_id). - Docs state this corresponds to the identifier shown on the bank statement / settlement export and that this mapping should be used for reconciliation. - When that reference isn’t visible on the bank side, you fall back to PAN (masked), amount, and date/time to match entries. - Authoritative fields for money amounts - On the PayWay/API side, the authoritative transaction amount is the PayWay transaction amount + currency (the same values you send in the request and receive in transaction/check‑transaction responses/exports). - On the banking side, the bank statement/settlement report is authoritative for actual cash movement, including: - The settled amount per entry (credit to merchant). - Card/network fees, which may appear as separate small debits. - For reconciliation, use: order ID / tran_id + amount + currency + date/time (and where available APV, masked PAN, and any bank reference) to tie API/PayWay data to the bank entries. In practice: 1:1 matching is done via tran_id/purchase number where present; amounts are taken from the PayWay transaction data, then confirmed against the net/fee‑adjusted figures on the bank statement per your merchant agreement.
+
+### S13-Q022 — Which endpoints must never be used as the primary fulfilment signal, and which are safe for it?
+
+**A (2026-10-03):** From the docs: Must not be used as the sole fulfilment signal
+- Webhook / pushback callbacks to your <CALLBACK_URL>. - Delivery can be delayed, timeout, or fail; retries are limited and not guaranteed. - Docs state you must not rely solely on pushbacks to determine final status — missing pushback ≠ failed payment. Safe basis for fulfilment
+- Check Transaction API (check-transaction / check-transaction-2). - Described as the authoritative fallback for final transaction status. - Recommended pattern: - Payment → Callback received → Optionally use it to trigger a check → Check Transaction API → fulfil. - Payment → No/uncertain callback → Check Transaction API → fulfil or mark failed. So: callbacks should be treated as a notification trigger only; final fulfilment should be based on a terminal status from the Check Transaction API.
+
+### S13-Q023 — What fields must we mask in logs (masked PAN, account number, payer identity)?
+
+**A (2026-10-03):** From the docs, the mandatory masking/omission rules are: Must be masked/omitted
+- Full customer account numbers (e.g. ABA account numbers shown in merchant UIs or logs that may be exposed). UIs should only show limited/masked representations, not full account numbers. Must never appear in logs or shared artifacts (treat as secrets)
+- RSA Private Keys
+- Secret keys / API keys
+- Passwords / PIN / secret words
+- Authentication tokens and similar credentials Card data
+- Card entry must be done via PayWay’s secure iframe/hosted checkout; merchants must not capture raw card numbers on their own servers, which implies PAN/CVV must not end up in application logs at all. Payer identity (name/phone/email)
+- Docs allow these fields in payloads and in the portal; there is no explicit requirement to mask them in back‑end logs. They should be handled per your own data‑protection policy, especially when exporting or sharing logs externally.
+
+### S13-Q024 — Is there a CSV/Excel export via API, or must we build reporting on top of the list endpoints?
+
+**A (2026-10-03):** Docs only describe JSON list APIs (/payments/transaction-list and …-list-2) plus Excel exports via the Merchant Portal / Merchant App UI. There is no documented API that returns CSV/Excel files directly, so for system-to-system reporting you need to build your own reports on top of the transaction-list endpoints (with pagination and ≤3‑day date ranges) and use the Portal/App exports only for manual/ops use.
+---
+## S14. Close, Refund & Pre-Auth
+### Close transaction
+
+## S14. Close, Refund & Pre-Auth
+
+### S14-Q001 — From which statuses may `close-transaction` be called, and what happens if called on an approved transaction?
+
+**A (2026-10-03):** Docs say: When should close-transaction be called?
+- Only on transactions that exist and are not yet completed — i.e. Created / Pending checkout sessions that you want to cancel or replace.
+- It is explicitly recommended to use Close only for incomplete (Pending) transactions to stop further payment attempts. What if it’s called on an Approved transaction?
+- Behaviour is payment‑state dependent: - Close "may result in the payment being rejected or reversed" when used on a previously settled (Approved) or Pending transaction. - In sandbox, there is a known issue: Close can return success even for completed transactions. You must not trust that alone; always re‑check with Check Transaction API to see the real final status.
+- After Close, you should expect the status to move towards CANCELLED (paymentstatuscode 7), but you must confirm via check‑transaction (and your own reconciliation) whether a reversal/refund actually occurred. So: intended usage is only from Pending/open states; calling it on Approved is allowed by the gateway but should be treated as a reversal/refund operation and always verified via Check Transaction.
+
+### S14-Q002 — Confirm that closing is not reversible and that closed-but-unpaid transactions still report `PENDING`. What is the officially recommended local bookkeeping?
+
+**A (2026-10-03):** Docs say: 1) Closing is effectively not reversible
+- Close Transaction is described as a way to finalize a transaction and prevent retries.
+- After close, "do not attempt to complete a scan against a transaction that was already closed (the scan will not complete)."
+- There is no documented API to re-open a closed transaction, so integration guidance treats Close as final / one‑way. 2) Closed‑but‑unpaid will still report PENDING at gateway level
+- Close Transaction "will typically transition the transaction to a pending closed state."
+- You are required to "call the check-transaction API after close to confirm the final status" and to "design merchant logic to present the correct UI (e.g., disallow retry after a Close) even if Check Transaction returns PENDING briefly."
+- So yes: a closed, never-paid transaction can continue to show PENDING in Check Transaction, while being closed for user retries. 3) Officially recommended local bookkeeping
+- After you call Close on a tran_id, your own system should immediately mark that transaction as closed/invalid for further payment, regardless of the PayWay PENDING status.
+- Recommended pattern from docs: - Identify which tran_id to close for a given invoice. - Call Close Transaction for that tran_id. - In your system, flag that transaction as CLOSED (no further retries allowed) and update your UI/business logic so the user cannot retry on that QR/checkout. - Create a new transaction (new tran_id) if you need a replacement QR/checkout and associate that new tran_id with the invoice. - Use Check Transaction only for reconciliation (to see if the closed one ever got paid/refunded, and to confirm the new one’s final status), not to decide whether the user may retry. So: Close is one‑way in practice; PayWay may still show PENDING, but your local ledger/state must treat that tran_id as definitively closed and route all future attempts through a new transaction.
+
+### S14-Q003 — Confirm that enforcement is channel-dependent: QR/KHQR scans are refused, but a hosted-card session may still pay after close. What is PayWay's official position and planned fix?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q004 — Confirm no callback is sent when a transaction is closed. What is the officially recommended verification step after a successful close?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q005 — Is closing free of charge, and does it affect fees or merchant risk scoring?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q006 — Is there an auto-close feature, or must the merchant implement expiry locally?
+
+**A (2026-10-03):** UNKNOWN — not documented
+### Refund
+
+### S14-Q007 — Which statuses permit a refund, and which identifier is primary (`tran_id` or `merchant_ref`)?
+
+**A (2026-10-03):** Official docs say: 1) Statuses that permit refund
+- Only transactions with status COMPLETED are eligible for refund across all supported channels (Refund API, Merchant Portal, Merchant App, Merchant Lite).
+- Refund requests must also be within 30 days of the payment creation date; otherwise online refund is not allowed and may require offline/manual processing.
+- Non‑COMPLETED transactions (e.g. pending/failed/cancelled/expired) are not refundable via the Refund API and will return error codes such as PTL57 (Unable to refund) / other validation errors. 2) Primary identifier for refund
+- The Refund API uses tran_id as the primary identifier.
+- merchant_auth must contain: mc_id, tran_id, and refund_amount. There is no merchant_ref field in the refund request spec.
+- Separate API rules state that tran_id is the primary key for transaction operations; merchant_ref (or your own order/invoice ID) is for your local mapping only. So officially: Refunds are only allowed for `COMPLETED` transactions, and `tran_id` is the primary identifier for refund operations (not `merchant_ref`).
+
+### S14-Q008 — Are partial refunds supported, how many times, and what is the minimum refund amount per currency?
+
+**A (2026-10-03):** - Are partial refunds supported? Yes — docs state that both full and partial refunds are supported via Refund API and merchant platforms.
+- How many times can we refund? Docs do not specify a numeric limit per transaction; the stated rule is that the cumulative refund amount must not exceed the original transaction amount and must be within the refund window (e.g. 30 days).
+- Minimum refund amount per currency? No explicit minimum refund amount per currency is documented; only standard amount-format rules apply (e.g. USD with 2 decimals, KHR without decimals).
+
+### S14-Q009 — Confirm that refunds are requested against the **original** order currency, and what error we get for a currency mismatch?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q010 — Is the refund synchronous, or is there a final callback? How do we know a refund truly completed?
+
+**A (2026-10-03):** - Is the refund synchronous? The Refund API returns an immediate success/failure response indicating whether the refund request was accepted or rejected, but the actual refund settlement is asynchronous (especially for cards; it can take several business days to reach the cardholder). - Is there a final callback? Refund callbacks/webhooks are not enabled by default. A callback (pushback) URL for payment/refund notifications can be configured per merchant profile by the Integration Team, but it is an explicit setup step. - How do we know a refund truly completed? After receiving an API success response, merchants should verify final refund status via Check Transaction API or the Merchant Portal. If a webhook is configured, it can be used as an additional signal, but the portal/Check Transaction API is the authoritative source.
+
+### S14-Q011 — What is the refund time window per payment method, and is a 30-day window documented?
+
+**A (2026-10-03):** - Refund time window (online/API & portal) - Docs consistently state that online refunds via PayWay portal / Refund API are only available within ~30 days of the original transaction date. - This 30‑day window applies to all payment methods that support online refunds (e.g. ABA PAY, cards, ABA KHQR, wallets) when refunded via Merchant Portal / Merchant App / POS / Refund API. - After 30 days / methods without online refund - For transactions older than the online window or payment methods that don’t support portal/API refund (e.g. many KHQR cross‑bank payments), refunds must be done via offline/manual process with PayWay Merchant Support using a signed cancellation/refund form. - Docs explicitly say there is no explicit time limit for offline refunds; they can be processed even after 30 days. - Is a 30‑day window documented? - Yes. Multiple documents explicitly mention a 30‑day (≈1 month) refund window for online/dashboard/API refunds.
+
+### S14-Q012 — What is the refundable balance formula, and which fields are authoritative once a partial refund exists?
+
+**A (2026-10-03):** Refundable balance formula
+From the Refund API perspective, once partial refunds exist the remaining refundable amount is: refundable_balance = grand_total − total_refunded Where (from the Refund API response):
+- grand_total = original transaction amount
+- total_refunded = cumulative amount already refunded for that transaction Authoritative fields once partial refunds exist
+- For amounts (original, refunded, remaining): the authoritative gateway fields are the Refund API response values grand_total and total_refunded.
+- For overall state (whether a refund has occurred / completed): use transaction status fields (transaction_status / payment_status, e.g. REFUNDED or status 4 via check‑transaction). Docs also note that current check-transaction does not reliably expose total_refunded, so you should not rely on it for the remaining-refundable-amount calculation; instead, use the Refund API response (and/or your own ledger) as the source of truth for partial-refund math.
+
+### S14-Q013 — What happens if we refund more than the captured amount — give the exact error code?
+
+**A (2026-10-03):** If you submit a refund where the refund_amount exceeds the captured/original purchase amount, the Refund API returns: - **Code:** `PTL37`
+- **Meaning:** Refund amount cannot exceed the original purchase amount.
+
+### S14-Q014 — Is the standard refund API available after a split payout? What are the officially supported alternatives?
+
+**A (2026-10-03):** - Standard refund API after split/payout: Not available. Transactions that use Payout or Split & Payout cannot be refunded via the standard Refund API — refund functionality is not supported for these transactions. - Officially supported alternatives: - There is no gateway-level refund for Payout/Split & Payout transactions (API or normal online refund). - Any compensation/refund to end customers must be handled outside the PayWay payout flow (e.g., merchant’s own transfer/credit process) and outlet‑specific arrangements should be confirmed with PayWay Merchant Support/Commercial Team.
+
+### S14-Q015 — Are refunds free, or is part of the acquiring fee retained? Are refund fees charged?
+
+**A (2026-10-03):** From the available docs, there is no single global rule documented for refund fees or acquiring-fee handling. What is explicitly stated: - For ABA-to-ABA refunds (same-bank ABA PAY / bank-app payments): docs say there is no refund processing fee for these refunds when done via the merchant portal.
+- For offline/manual refunds (e.g., KHQR via refund form): docs state that offline refunds incur no fee.
+- For test environments: docs say there is typically no integration/gateway fee for refunds in test. However, the documentation does not specify:
+- Whether the original acquiring/processing fee is reversed or partially retained when a refund is issued.
+- Any general refund fee policy for all payment methods in production. So beyond the above special cases (no extra fee for ABA-to-ABA and offline refunds), the treatment of acquiring fees and any refund fees is not documented and must be confirmed with the PayWay commercial/merchant support team.
+
+### S14-Q016 — How long until the customer sees the funds, per payment method?
+
+**A (2026-10-03):** Refund visibility for customer, by payment method (what’s documented): - Card payments (Visa/Master/JCB/UPI) • Customer typically sees the refund on their card in about 3 working days. • Docs note it can take around 3–7 business days depending on card network and issuing bank. - ABA PAY / linked ABA account payments • Refunds can be immediate once processed (via portal/API) — reversal is effectively real‑time on the gateway/bank side. - Bank QR / instant bank / KHQR methods managed by PayWay • Refunds are applied at the time the merchant initiates the refund via the portal (i.e. treated as immediate from the gateway side). - Alipay, WeChat Pay and other wallets • The exact customer‑side posting time for wallet refunds is not explicitly documented in the available materials.
+
+### S14-Q017 — Are there limits on refund frequency/ratio per merchant, and are merchants monitored for refund abuse?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q018 — Is there a refund reason code or description field, and does it appear in reports and callbacks?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q019 — Is `refund` idempotent? What is the safe retry procedure after a timeout?
+
+**A (2026-10-03):** **Idempotency behavior**
+- The Refund API is **synchronous** and there is **no separate refund transaction ID** to query later.
+- Docs do **not** state that the gateway enforces strong idempotency for refunds (e.g., via a refund reference).
+- Practically, once a transaction is successfully refunded, **subsequent refund attempts on the same tran_id** will usually fail with business errors such as **PTL57 (Unable to refunded)** or similar (already refunded / not refundable).
+- So idempotency must be handled **mainly by the merchant system**: track which tran_id has already been successfully refunded and avoid issuing another refund for it unless you intentionally do a partial refund and your own logic allows it. **Safe retry procedure after timeout**
+When a refund call times out (HTTP timeout, 408/502/504, or client‑side timeout): 1. **Log everything** - Log request body, timestamp, HTTP status / client error, and any response you received. 2. **Check the original transaction status before retrying** - Call **check‑transaction** for the original **tran_id**. - If status shows **REFUNDED** (or `total_refunded` > 0 in refund response you already received), **treat it as successful** and **do not retry** the refund. 3. **If still not refunded, retry conservatively** - You may **retry the refund once** after a short backoff. - Use the **same tran_id and refund_amount**, and ensure no concurrent duplicate refund requests for the same transaction (to avoid PTL168 "Concurrent requests are not allowed"). - Do **not** implement aggressive or repeated retries for refunds. 4. **If second attempt also times out or returns unclear errors** - Stop retrying automatically. - Share logs, request payload, timestamps, and the **tran_id** with the PayWay Integration Team so they can trace the backend and confirm whether the refund went through or must be handled offline. This pattern ensures you avoid duplicate refunds while still recovering from transient timeouts.
+
+### S14-Q020 — Can a POS/Virtual-Terminal transaction be refunded, and via the same API?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q021 — Are there cases where a refund must be performed manually in the Merchant Portal instead of via API?
+
+**A (2026-10-03):** Yes. Docs state that Refund API access is optional and must be enabled/provisioned. If a merchant does not have Refund API enabled, refunds must be done manually via the Merchant Portal (or via the offline/manual form process), not via API. No specific payment method is documented as “portal-only while API is available”; the main documented case is simply when the Refund API hasn’t been provisioned for that merchant.
+### Pre-auth
+
+### S14-Q022 — Which payment methods support pre-auth (cards only, or also ABA PAY / KHQR)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q023 — What is the maximum pre-auth hold window (documented 30 days?), and is it per-merchant configurable?
+
+**A (2026-10-03):** • Maximum pre-auth hold window: Documented as up to 30 days. If the merchant does not cancel or complete the pre-auth within 30 days, it will automatically cancel and funds are released.
+• Per-merchant configurability: The documents only mention 30 days as the default value and do not specify whether this window can be configured per merchant — configurability is not documented.
+
+### S14-Q024 — Confirm that an expired uncaptured pre-auth auto-cancels/reverses **with no webhook**, and state the officially required detection method?
+
+**A (2026-10-03):** • Auto-cancel / auto-reverse: Docs state that if a pre-auth is not completed or cancelled within 30 days (default), it will automatically cancel and the funds are returned to the payer. • Webhook on expiry: Webhook rules specify that PayWay only sends pushback/webhook notifications for successful payments. Auto-expired / auto-cancelled pre-auths are not successful payments, so there is no webhook documented for that expiry event. • Official detection method: Merchants are required to detect non-success states (including expiry/timeout) via the Check Transaction API and/or their own polling/reconciliation logic: - Track open pre-auths (by tran_id). - Use check-transaction to verify status when business logic needs it (e.g., before capture, near the expected hold window, or in scheduled background jobs). - Treat a pre-auth that has moved from active/held state to cancelled/expired (via check-transaction) as auto-reversed, with funds released.
+
+### S14-Q025 — Can we capture partially, and multiple times? Can we capture more than the authorized amount, and by what tolerance?
+
+**A (2026-10-03):** • Partial capture: Docs state that PayWay supports applicable Pre-Auth completion/capture functionality (including partial capture), but the exact behaviour depends on the merchant’s enabled configuration and API docs. Multiple partial captures against the same Pre-Auth are not explicitly documented. • Capture above authorised amount: For supported card Pre-Auth transactions, PayWay can allow capture above the original authorised amount within an over-capture tolerance of approximately +10% (e.g. USD 100 pre-auth → up to about USD 110 capture).
+
+### S14-Q026 — What identifier references the original pre-auth for complete/cancel, and can we query pre-auth state via `check-transaction`?
+
+**A (2026-10-03):** • Identifier for complete/cancel: The APIs require you to use the tran_id returned from the original purchase with type='pre-auth' as the reference when calling complete-preauth or cancel-preauth. The rules explicitly say to use tran_id as the authoritative identifier (not hash). • Querying pre-auth state: Yes. Docs state you should monitor pre-auth status using the Check Transaction API (v2) to confirm whether it is pre-authorized, completed, cancelled, or auto-cancelled/expired.
+
+### S14-Q027 — Is completion synchronous or callback-confirmed? What is the safe retry procedure if completion times out?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q028 — Are pre-auth fees charged on the authorized amount or the captured amount, and what is the settlement timing?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q029 — Which identifier cancels a pre-auth, from which statuses, and is cancellation idempotent?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q030 — How does a pre-auth appear on the customer's card statement before and after capture/cancellation?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q031 — Which verticals/industries is pre-auth intended for, and are any restricted?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S14-Q032 — Are there regulatory constraints on pre-auth holds in Cambodia?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S15. Pre-Auth Completion with Payout
+
+## S15. Pre-Auth Completion with Payout
+
+### S15-Q001 — How does "complete with payout" differ technically from plain pre-auth completion and from a standalone payout?
+
+**A (2026-10-03):** *Pre-auth completion (plain)*
+- You call the **pre-auth completion** endpoint **without payout info**.
+- `merchant_auth` contains only the fields needed to complete the original pre-auth (e.g. `mc_id`, `tran_id`, `complete_amount`).
+- On success, **100% of the captured amount settles to your main merchant account** configured on the gateway.
+- No payout/split validation is done. *Pre-auth completion **with payout***
+- You call the **same pre-auth-completion endpoint**, but `merchant_auth` additionally includes a **payout payload** (beneficiary list, amounts, accounts/MIDs).
+- `merchant_auth` (including payout section) is **RSA-encrypted**, and `hash` is computed over `(encrypted_merchant_auth + request_time + merchant_id)`.
+- Gateway validates: - `tran_id` is a valid **PRE-AUTH** in pre-auth status. - **All payout accounts are whitelisted**. - **Sum of payout amounts == complete_amount**; otherwise you get payout-amount-mismatch style errors.
+- On success, the captured amount is **split and settled directly to the beneficiary accounts/MIDs** according to the payout list instead of all going to the main merchant account. *Standalone payout*
+- Uses the separate **Payout API** (not the pre-auth completion endpoint).
+- Triggered **after funds are already settled** into a platform/merchant sub‑account (e.g. you first receive full or split settlement, then later move funds out).
+- You call payout per beneficiary, typically **on a schedule (e.g. weekly)** or by business rules, and it is **not tied to a specific pre-auth transaction id** in the request the same way completion is.
+- Functionally, it moves money from your platform/sub‑account to whitelisted beneficiary accounts, instead of splitting at the moment of pre-auth completion.
+
+### S15-Q002 — What extra fields does the request need, and what are the key names inside the payout array?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S15-Q003 — Must beneficiaries be pre-whitelisted, or can payout accounts be supplied dynamically?
+
+**A (2026-10-03):** All payout beneficiaries must be pre‑whitelisted. The gateway will reject payouts to accounts that are not already on the whitelist. You can add beneficiaries "dynamically" via:
+- Merchant Portal (Payout module), or
+- Whitelist/beneficiary APIs (add-whitelist-payout / add‑beneficiary), but they have to be successfully added/whitelisted before you use them in any payout or complete‑with‑payout request. You cannot introduce a brand‑new, non‑whitelisted account only inside the payout array and expect it to work.
+
+### S15-Q004 — What is the rule for payout total vs capture amount, and how is rounding handled across beneficiaries?
+
+**A (2026-10-03):** - Payout total vs capture amount: The sum of all amt values in the payout array must exactly equal the capture amount (e.g. complete_amount in merchant_auth). If they don’t match, the request fails with a payout-amount-mismatch error.
+- Rounding rule: - All amounts must use maximum 2 decimal places (e.g. 49.00, 5.50) — no extra precision. - The same formatted values must be used both in the request body and when computing the hash. - The merchant is responsible for handling any rounding across beneficiaries so that the 2-decimal payouts add up exactly to the capture amount; the gateway does not auto-round or push a remainder to a default account.
+
+### S15-Q005 — Are there callbacks or hooks for payout success/failure tied to a completion?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S15-Q006 — What happens if the capture succeeds but the payout fails — what is the officially supported compensation path?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S15-Q007 — What currencies are supported for combined pre-auth + payout, and what is the currency-matching rule?
+
+**A (2026-10-03):** Supported currencies
+- Combined pre‑auth + payout uses the same currencies that are enabled on the merchant profile and configured as RouteFunds/Payout Sources of Funds – typically USD and/or KHR.
+- If only USD is enabled, you can only run combined pre‑auth + payout in USD. To use KHR, KHR must be enabled for the merchant and a KHR Source of Funds configured. Currency‑matching rule
+- The payout currency must match the beneficiary account currency.
+- The payout request is routed to the Source of Funds for that same currency (USD SOF for USD payouts, KHR SOF for KHR payouts).
+- Cross‑currency is not supported (e.g. KHR payout to a USD beneficiary will be rejected with “Payment currency is not allowed.” / beneficiary‑currency mismatch).
+
+### S15-Q008 — What settlement timing applies when payout is triggered directly from a pre-auth completion?
+
+**A (2026-10-03):** When payout is triggered directly from a pre-auth completion and the merchant is configured for immediate split: - The split/payout is executed at completion time — there is no extra payout delay layer; funds are allocated to beneficiaries as part of completing the pre-auth.
+- The bank settlement timing for those funds then follows the normal settlement rules for the underlying payment method and merchant agreement: - ABA KHQR / ABA Pay: funds are settled instantly to the merchant account. - Card / wallet payments: settlement follows the agreed cycle in the merchant contract (examples in the docs show multi‑day windows such as 5–7 working days), and should be confirmed per merchant setup. So: payout is logically immediate at pre-auth completion, while the actual crediting to accounts still obeys the usual settlement window configured for that merchant and payment method.
+
+### S15-Q009 — What extra fees apply versus a standalone payout?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S15-Q010 — What are the KYC/AML implications of paying third parties from a captured pre-auth?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S15-Q011 — Is there a maximum number of beneficiaries or a minimum share per beneficiary?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S15-Q012 — Which target business models is this flow designed for (marketplace, booking platform, hotel)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S15-Q013 — How should the main captured transaction and downstream payouts be reconciled in accounting?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S15-Q014 — What is the error when the profile lacks permission for complete-with-payout?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S16. Payouts, Split & Beneficiaries
+### Standalone payout
+
+## S16. Payouts, Split & Beneficiaries
+
+### S16-Q001 — Are payouts funded from the merchant settlement balance, a wallet, or both? Is there a minimum available balance?
+
+**A (2026-10-03):** Payouts are funded from the configured Payout Source of Funds account(s) (one USD and/or one KHR account) which are separate from the merchant’s settlement account/balance. The documents do not specify funding from any wallet, nor do they define any minimum available balance requirement for payouts.
+
+### S16-Q002 — List the fields of a payout request and their constraints, including the `beneficiaries` array shape and key names (`account`/`amount`)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q003 — Confirm that the sum of beneficiary amounts must equal the payout total exactly, and give the error when it does not?
+
+**A (2026-10-03):** The documentation confirms that the sum of all beneficiary payout amounts must exactly equal the payout/complete amount for the transaction. If the amounts do not match, the capture/payout request fails with a payout-amount-mismatch error (e.g. code PTL-PAYOUT-36).
+
+### S16-Q004 — Confirm the currency-matching rule: payout currency must equal both the beneficiary account currency and the merchant credential currency. Give the exact error?
+
+**A (2026-10-03):** The payout currency must match both:
+- the beneficiary account currency, and
+- the merchant’s allowed/source-of-funds/settlement currency configured for that credential. Cross-currency payout is not supported. When the payout currency does not match the allowed currency configuration, the documented error is:
+- HTTP 403, code 12, message: "Payment currency is not allowed."
+
+### S16-Q005 — Confirm the beneficiary account format rules (digits only, length 9/11/15) and the validation performed client-side vs server-side?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q006 — Are payouts processed synchronously or asynchronously? What statuses are returned and how is the final outcome observed?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q007 — What are the payout failure reasons (invalid account, closed account, limit exceeded), and what is the retry/reroute procedure?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q008 — Is there bulk payout in a single call, and what is the maximum beneficiaries per request?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q009 — Are cut-off times, weekends and public holidays defined, and what is the payout processing calendar?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q010 — What are the per-payout, daily, weekly and monthly limits?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q011 — Which payout destinations are supported — ABA accounts only, other Cambodian banks, wallets, international?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q012 — Are cross-border or non-resident beneficiaries supported, and what KYC do they need?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q013 — What are the payout fees — per transaction, per batch, and do they differ by destination?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q014 — Can the merchant deduct its own fee from the beneficiary amount?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q015 — Are payouts permitted for payroll, and are there sector restrictions?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q016 — What metadata can be attached to a payout for reconciliation, and where does it surface?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q017 — Is there an idempotency mechanism for payouts? What is the safe retry procedure?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q018 — What are the differences between the payout key shapes across endpoints — standalone payout vs `generate-qr` vs `generate-checkout`/CoF charge vs pre-auth complete vs payment link?
+
+**A (2026-10-03):** UNKNOWN — not documented
+### Beneficiary whitelist
+
+### S16-Q019 — What fields are required to add a beneficiary, and what validations run at add time versus at payout time?
+
+**A (2026-10-03):** For ABA PayWay Payout: 1) Required fields to add a beneficiary
+- Beneficiary type: ABA Account or Other ABA Merchant (MID).
+- Beneficiary identifier: the ABA account number or Merchant ID (MID) for that beneficiary (numeric).
+- When using API, this beneficiary payload must be RSA‑encrypted with the provided RSA public key and sent with the merchant’s credentials (MerchantId, etc.). 2) Validations at add time (whitelisting/onboarding)
+When you add/whitelist a beneficiary, the platform can validate that:
+- The account/MID exists and is a valid ABA Account or registered ABA Merchant.
+- The account class and currency are valid (errors can include invalid account class, invalid currency, account not found, payee not valid, wrong hash parameter, validation required). 3) Validations at payout time
+When executing a payout using those beneficiaries, additional checks apply:
+- Beneficiary must already be whitelisted for that merchant; otherwise payout fails with a non‑whitelisted error (e.g. PTL‑PAYOUT‑37).
+- Beneficiary account currency must match the payout currency (e.g. USD payout → USD beneficiary; KHR payout → KHR beneficiary).
+- Request‑level validations: correct hash/signature, correct RSA encryption of the payout payload, correct placement of payout fields (e.g. only at complete‑pre‑auth when using pre‑auth), and payout amounts must sum exactly to the transaction amount, otherwise payout is rejected.
+
+### S16-Q020 — Does a newly added beneficiary become active immediately, or is there an approval step?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q021 — What is the beneficiary status model (`ACTIVE`/`INACTIVE`/other), how do we read it, and what are the allowed transitions?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q022 — How do we update a beneficiary's status, how quickly does the change take effect, and is there an audit trail?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q023 — What happens if we update a non-existent or already-deleted beneficiary?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q024 — Confirm that a non-whitelisted account is rejected with HTTP 403 and the exact code/message?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q025 — Are there limits on the number of whitelisted beneficiaries per merchant?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q026 — Can we bulk-create beneficiaries for migration, and is there a duplicate-account prevention mechanism?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q027 — How are beneficiaries uniquely identified in later calls — beneficiary ID, account number, or MID?
+
+**A (2026-10-03):** For payout-related calls, beneficiaries are identified by the acc field — this must be a numeric ABA account number or a MID (depending on how the merchant profile is configured and the channel). There is no separate beneficiary ID mentioned; the whitelisted account/MID itself is the identifier used again in later payout requests.
+
+### S16-Q028 — Must the merchant KYC the beneficiary, and what is the merchant's ongoing obligation to keep beneficiary data accurate?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q029 — Are there commercial consequences for repeatedly paying inactive or invalid beneficiaries?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q030 — Can a third party/partner manage beneficiaries on the merchant's behalf, and under what agreement?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q031 — What encryption/masking requirements apply to beneficiary data at rest in our systems?
+
+**A (2026-10-03):** The only explicit requirement documented is masking in merchant-facing UIs: - Full customer/beneficiary account numbers are confidential and must not be displayed in full in merchant-facing interfaces.
+- Merchant UIs should show only limited identifying information (e.g., customer name or a masked account representation). No additional encryption-at-rest requirements are specified in the available PayWay documentation.
+
+### S16-Q032 — What is the recommended policy for pruning dormant beneficiaries?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S16-Q033 — Is there a beneficiary expiry or re-verification cycle for compliance?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S17. Credentials on File (CoF) — Overview, Tokens & Charging
+
+## S17. Credentials on File (CoF) — Overview, Tokens & Charging
+
+### S17-Q001 — Confirm `CITI_FLEX` vs `CITO_FLEX` semantics (customer-initiated, flex vs one-off) and what behaviour each implies?
+
+**A (2026-10-03):** For unscheduled/CoF flows, `CITI_FLEX` and `CITO_FLEX` are both **token_flag** values used during the *linking* step, and they control who may trigger later payments and in what context: - **`CITI_FLEX` (Customer‑Initiated, flexible amount)** - Used when the **customer links an account/card for future purchases with variable amounts**. - Tokens created under `CITI_FLEX` are for **Customer‑Initiated Transactions (CIT)** only — the customer must be present and actively trigger each payment (e.g. one‑click checkout from your app/website). - Subsequent payments use that token as **CITU_FLEX** via the Payment API (unscheduled, customer‑initiated, variable amount). - **Behaviour implication:** Merchant **must not** use a `CITI_FLEX` token for merchant‑initiated charging. - **`CITO_FLEX` (Customer‑Initiated for future Merchant use, flexible amount)** - Used when the **customer links and explicitly authorizes the merchant to charge variable amounts later**, without a fixed schedule (e.g. auto‑recharge, usage‑based fees). - Tokens created under `CITO_FLEX` are for **Merchant‑Initiated Transactions (MIT)** — the merchant server can trigger charges **without the customer being present** at the moment of payment. - Subsequent unscheduled MIT payments use that token as **MITU_FLEX** via the Payment API. - **Behaviour implication:** Required whenever you want to perform MIT/unscheduled charges; `CITO_FLEX` is the only valid initiation type for those tokens. The docs explicitly state:
+- `CITI_FLEX` tokens are restricted to **CIT** use only.
+- `CITO_FLEX` tokens are required for **MIT** (merchant‑initiated) unscheduled charging and cannot be interchanged.
+
+### S17-Q002 — Confirm the charging flags `CITU_FLEX`, `MITU_FLEX`, `MITU_FIX`, `MITR_FLEX`, `MITR_FIX` and precisely what each means (who initiates, fixed vs variable amount)?
+
+**A (2026-10-03):** From the available documentation, the following charging token_flags are defined: - **CITU_FLEX** - **Who initiates:** Customer (CIT – Customer‑Initiated Transaction) - **Schedule:** Unscheduled / on‑demand - **Amount:** Variable (flex) - **Meaning:** Subsequent one‑off/unscheduled payments using an already saved token where the **customer is actively present and triggers the payment**. Used with the **Payment API**. - **MITU_FLEX** - **Who initiates:** Merchant (MIT – Merchant‑Initiated Transaction) - **Schedule:** Unscheduled / on‑demand (no fixed schedule) - **Amount:** Variable (flex) - **Meaning:** Merchant‑initiated, unscheduled charges (e.g. auto‑top‑ups, usage‑based fees) using a previously linked token created with `CITO_FLEX`. Used with the **Payment API**. - **MITR_FIX** - **Who initiates:** Merchant (MIT – Merchant‑Initiated Transaction) - **Schedule:** **Recurring / scheduled** (e.g. monthly, weekly) - **Amount:** Fixed - **Meaning:** Subsequent scheduled subscription billings after an initial `CITR_FIX` registration. Merchant’s server charges the same fixed amount at each billing cycle via the **Payment API**. The flags **MITU_FIX** and **MITR_FLEX** are **not described** in the current documentation set, so their exact semantics are **not documented** there.
+
+### S17-Q003 — Confirm that linking flags are rejected on the charge endpoint and charging flags are rejected on the link endpoints. Give the exact error?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q004 — Confirm which flag actually works when charging an account token linked with `CITI_FLEX` — is `CITU_FLEX` correct?
+
+**A (2026-10-03):** Yes, when you charge an account (or card) token that was linked with CITI_FLEX, you must call the Payment API with token_flag = CITU_FLEX. CITI_FLEX → linking (CIT, variable)
+CITU_FLEX → subsequent customer‑initiated unscheduled charge using that token.
+
+### S17-Q005 — What are the amount/amount-limit fields on a stored credential (`amount_limit_per_tran`, `subscribed_amount`), and can the merchant set them at link time?
+
+**A (2026-10-03):** For stored credentials, the docs define these fields as follows: - subscribed_amount - Scheduled / fixed (CITRFIX tokens)**: the **fixed monetary value authorized by the customer during registration**. It is the amount you pass in the subscription (CITRFIX) flow and that will be used for each scheduled MITRFIX charge. - **Unscheduled / flex (CITIFLEX, CITOFLEX tokens)**: always returned as **`0.0`** (no fixed amount is pre‑authorised). - **`amountlimitpertran** - **Scheduled / fixed (CITR_FIX tokens)**: for scheduled payments it is **automatically locked to subscribedamount`**. The user **cannot change this limit** in ABA Mobile, so the authorised fixed amount can always be processed. - **Unscheduled / flex (CITIFLEX, CITOFLEX tokens)**: documented as the **token payment amount limit per transaction**, returned in the token callback. **Can the merchant set these at link time?**
+- For **CITRFIX (subscription): you effectively set subscribed_amount by choosing the subscription amount in your registration request; amount_limit_per_tran is then locked to that value by PayWay.
+- For CITIFLEX / CITOFLEX: the docs only state that subscribed_amount is 0.0 and amount_limit_per_tran is the per‑transaction cap returned in the callback. There is no documented way for the merchant to pass parameters at link time to directly set or override these two fields for flex tokens.
+
+### S17-Q006 — Confirm account-token validity is 90 days from the most recent of linking, renewal, or last successful transaction. What event restarts the window?
+
+**A (2026-10-03):** Yes — for account tokens with CITI_FLEX or CITO_FLEX, validity is 90 days from the most recent of:
+- Initial linking of the token
+- Successful renewal (via ABA Mobile or your Renew Token API)
+- Last successful transaction performed with that token Any one of those three events restarts the 90‑day validity window.
+
+### S17-Q007 — Confirm card tokens cannot be renewed. What is the official path when a card token expires or the card is reissued?
+
+**A (2026-10-03):** Card tokens are not renewable via the Renew Token API — that endpoint is explicitly account-tokens only and does not apply to card tokens. When a card token expires (or the card is reissued):
+- The expired token cannot be used for payments.
+- The official path is that the user must re‑authorize the card (e.g., via ABA Mobile or via your platform’s “Manage Payment Methods” section), which results in a new payment token being issued for that card.
+
+### S17-Q008 — What is the exact CoF charge request schema, and which fields differ from a normal purchase request?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q009 — Confirm `request_id` is no longer sent on the CoF charge path and state the current `transactionId` format rules?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q010 — What is the minimum charge amount per currency (KHR floor?), and are there maximums?
+
+**A (2026-10-03):** Minimums
+- General API minimum (all currencies): documented minimum charge amount is 0.01 in the merchant’s configured currency.
+- KHR-specific floor: KHR has an additional local‑currency floor — amount must be greater than the portal’s KHR minimum (explicitly referenced as >100 KHR / ≥100 KHR). In practice, treat ≈100 KHR as the floor (i.e., do not send KHR amounts at or below that threshold). Maximums
+Yes, there are maximums, but they are defined per payment option and environment, not just per currency. Documented examples:
+- On‑Us limit: up to 50,000 (per configured currency unit).
+- Off‑Us limit: up to 100,000.
+- Sandbox example limit: up to 100,000 USD; another sandbox case mentioned 400,000,000 KHR.
+- Card payments (general): observed default per‑transaction limit of 5,000 USD.
+- Virtual card via virtual terminal: per‑transaction cap 2,000 (currency units).
+- Invoicing tool: one discussion cites a single‑invoice cap of 1,000 USD, and amounts above higher thresholds (e.g., 5,000) requiring documentation/approval. Docs also state that exact and current production limits must be confirmed with ABA PayWay per merchant, product, and payment option, as they can differ from sandbox and can change over time.
+
+### S17-Q011 — What is returned on a successful charge — is there a `tran_id`, and how do we reconcile it?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q012 — Confirm a successful charge returns only a status code and that `check-transaction` on our own `tran_id` is the reconciliation path?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q013 — What causes error `105`, exhaustively, and what is the correct recovery for each cause?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q014 — Confirm that when a customer unlinks in ABA Mobile, charging fails with `105` while token details still report active, and that no removal callback is delivered. What is the officially recommended detection and remediation?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q015 — What are the recommended retry rules for a failed CoF charge, differentiating insufficient funds from technical errors?
+
+**A (2026-10-03):** For CoF (card-on-file) charges, the retry rules in the docs are essentially split by business decline (insufficient funds) vs technical error: 1) Insufficient funds / issuer decline (e.g. CDA09, decline reason = "insufficient funds")
+- Treat as a hard decline, not a transient error.
+- Do not auto-retry immediately or in a tight loop.
+- Mark the attempt as failed, inform the customer that the issuer declined due to insufficient funds, and ask them to top up / increase limit / use another card.
+- Allow a future retry only after customer or business action (e.g. customer updates funding or picks a different card), rather than automatic rapid retries on the same balance. 2) Technical / gateway errors (timeouts 502/504/524, generic “Something went wrong”, PTL157, etc.)
+- Treat as transient and retryable.
+- Retry the same CoF charge with care (idempotent handling on your side) using a short retry loop with backoff rather than failing immediately.
+- After a create/charge timeout or generic error, do not assume failure: use Check Transaction on your tran_id to confirm the final state before deciding to retry or mark failed.
+- Recommended pattern from the docs: - Call Check Transaction several times (e.g. 3–5 attempts) with delays (first call after a short wait, then at increasing intervals) until you get a definitive success/failure. - If you still cannot get a clear result, mark the transaction Pending and reconcile later (background Check Transaction and/or daily/bulk reports). In summary: no aggressive auto-retries for insufficient-funds declines (they require customer action); controlled retries with backoff and Check Transaction for technical errors.
+
+### S17-Q016 — Are there limits on how often or how much a single token can be charged (daily/monthly caps, velocity controls)?
+
+**A (2026-10-03):** From the docs:
+- Per-token limit: Each token has an amount_limit_per_tran (token payment amount limit per transaction). - For scheduled payments (CITR_FIX → MITR_FIX), amount_limit_per_tran is automatically locked to the subscribed_amount, and the buyer cannot change this limit after subscription. - For unscheduled tokens (CITI_FLEX / CITO_FLEX), amount_limit_per_tran is also defined per token as the max allowed per transaction.
+- Frequency / daily–monthly caps per token: The docs do not describe any per-token daily/monthly or velocity caps.
+- Other limits: Separate rules mention per‑transaction and per‑day merchant limits configured on the PayWay side, but they are at merchant/profile level, not per-token. So: documented is a per-transaction cap per token via amount_limit_per_tran; any per-token daily/monthly/velocity controls are not documented.
+
+### S17-Q017 — Can metadata be attached per charge (invoice ID, subscription period) and does it appear in reports and callbacks?
+
+**A (2026-10-03):** Yes, you can attach metadata per charge, but it is handled differently for reports vs callbacks: 1) Per-charge metadata for reports (portal / CSV export)
+- Use custom_fields in the Create Transaction request for things like invoice ID, subscription period, etc.
+- These custom_fields: - are visible in the Merchant Portal UI, and - are included in CSV exports for reconciliation. 2) Per-charge metadata in callbacks (pushbacks)
+- custom_fields are not included in pushback (callback) payloads.
+- To get merchant-specific data back in callbacks, use return_params in the request (e.g. a base64-encoded token containing invoice ID / period).
+- PayWay will echo return_params back in pushback notifications. So: use custom_fields for reporting/exports, and return_params for data you need in callbacks.
+
+### S17-Q018 — Do CoF charges emit a callback, and is it signed?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q019 — Are CoF fees different from standard checkout fees?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q020 — Are there additional compliance, KYB, or risk-assessment requirements before CoF can be enabled?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q021 — Is re-linking the same customer/account after a removal guaranteed to return the same token value? Why does this matter for our storage?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q022 — What token storage and PCI requirements apply — can we ever see PAN/CVV, and what exactly must we protect?
+
+**A (2026-10-03):** Bong @Ruzaid For standard PayWay CoF / tokenized card flows: 1) Can the merchant ever see PAN/CVV?
+- With the normal PayWay integration, no: - Card entry must be done on PayWay’s hosted checkout / secure iframe / Virtual Terminal, not on merchant pages. - Merchant systems must not collect or store raw PAN or CVV. - For Virtual Terminal, card data is entered directly into PayWay’s secure portal and is tokenized and stored by PayWay under PCI DSS; staff are explicitly instructed to never write down CVV.
+- If a merchant wants to collect and store card data themselves (PAN/CVV on their own UI/servers), that is only via PayWay Plus / special card‑on‑merchant setups, which require separate approval and PCI‑DSS evidence (AoC, etc.). 2) What must the merchant protect on their side?
+- In the standard hosted/tokenized model: - You only store tokens / references returned by PayWay plus your own metadata (e.g., customer IDs, subscription references). - You must never display full account/card numbers in your UIs; any account/card representation must be masked. - You must not store CVV anywhere (paper or electronic).
+- If you move to a card‑on‑merchant (PayWay Plus) model, then full PCI‑DSS obligations apply for any environment where PAN/CVV is collected, processed, or stored — that requires separate review and approval before enabling. So: in the standard CoF setup you should only persist opaque tokens and masked identifiers; PAN/CVV must never be visible or stored in your systems, and any full account numbers must not be shown in clear in your UIs.
+
+### S17-Q023 — What customer consent text and consent-record obligations apply before storing a credential?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q024 — What is the recommended customer-facing UX for a failed stored-credential charge, and what notification duties exist?
+
+**A (2026-10-03):** Bong @Ruzaid For a failed stored‑credential charge, follow the same failure/cancellation UX and notification principles as other PayWay payments: 1) Failure screen content (if user is in-session)
+- Title: Payment unsuccessful
+- Message: We could not complete your payment. You can try again or return to the merchant application.
+- Primary action: Try Again
+- Secondary action: Cancel 2) Status-based messaging (after you verify via backend)
+- Failed: show Payment could not be completed and offer retry or another payment method.
+- Cancelled: show Payment was cancelled and offer retry or return to cart.
+- Pending/Unknown: say payment is still processing / status cannot be confirmed yet and ask user to wait and check again rather than declaring it definitively failed. 3) Notification duties / tone
+- Clearly notify the user that the payment has not been completed and what they can do next (retry, choose another method, or review order).
+- Use concise, non‑alarming wording (e.g. “You have not completed the payment yet. Please proceed to complete it or select another payment method.”).
+- Always determine final result server‑side (check‑transaction / webhook) before showing a final “failed” vs “pending” outcome.
+- Allow the user to return to the main flow (cart/orders) and avoid leaving them stuck on a failure screen.
+
+### S17-Q025 — Are chargeback rates higher for CoF, and what evidence reduces disputes?
+
+**A (2026-10-03):** Bong @Ruzaid - Are chargeback rates higher for CoF? - Not specifically documented in the PayWay materials — there is no comparative statistic for CoF vs non‑CoF chargeback rates. - What evidence reduces disputes (for any card‑not‑present / online flow, including CoF): - Booking / order records: booking or order details, OTA/agent voucher, service dates, amounts, customer name. - Invoices & receipts: formal invoice matching the charged amount, plus the PayWay transaction receipt; transaction date on merchant receipt should match PayWay receipt. - Terms, cancellation & refund policy: clearly disclosed T&Cs and cancellation/refund policy that applied to the transaction. - Proof of service / delivery: check‑in or registration forms (signed or electronic), service logs, tickets/itineraries, delivery notes or waybills, tracking numbers, usage logs, photos where relevant. - Customer identification & registration: guest registration/check‑in record and, where applicable, copy of passport/ID (can be redacted as needed when submitting). - Customer communications: emails, chat/WhatsApp or platform messages showing booking confirmation, acceptance of terms, changes, or acknowledgement of service received. - Refund evidence (if refunded): refund receipts/transaction references showing the amount has already been returned. Keeping this documentation consistent across systems and retaining it for at least ~4–6 months is recommended to strengthen chargeback defence for these transactions.
+
+### S17-Q026 — Can a CoF charge carry a `payout` block, and what are the key names and rules?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q027 — Can the merchant set or change token status/labels locally, and how should we name and version our stored token records?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S17-Q028 — Are stored credentials per merchant, per outlet, or per currency? Does a token work across outlets?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S18. CoF — Linking, Token Lifecycle & Removal
+### Link account
+
+## S18. CoF — Linking, Token Lifecycle & Removal
+
+### S18-Q001 — List the mandatory and optional fields for `link-account`, including `request_id`, `ctid`, `token_flag`, `currency`, `callback_url`, `return_deeplink`?
+
+**A (2026-10-03):** Bong @Ruzaid For link-account (/api/payment-credential/v3/aof/link-account), the fields are: Mandatory (body):
+- request_id — unique ID (5–24 chars, letters & numbers only)
+- request_time — YYYYMMDDHHmmss (UTC)
+- merchant_id — merchant key (≤ 20 chars)
+- ctid — customer identifier (5–24 chars, letters & numbers only)
+- token_flag — CITI_FLEX or CITO_FLEX
+- currency — currency allowed for merchant
+- hash — Base64(HMAC‑SHA512) over merchant_id . request_time . ctid . return_deeplink . callback_url . request_id . token_flag . currency Optional (body):
+- return_deeplink — Base64‑encoded JSON with ios_scheme and android_scheme
+- callback_url — Base64‑encoded URL for token pushback (if omitted, uses profile pushback_url) Mandatory (header):
+- Content-Type: application/json
+
+### S18-Q002 — Confirm the linking QR/deeplink format (`ABAAOF…`, `type=account_on_file`) and that we must use the gateway-supplied deeplink rather than constructing it?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q003 — What does `expire_in` represent — a TTL or an absolute expiry instant?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q004 — Confirm the documented QR validity (10 minutes) versus the observed live scan window (~90 seconds), and state which is officially correct?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q005 — What is the exact `pwt` callback body schema, and which fields describe the credential rather than a transaction?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q006 — Does the `pwt` callback fire for a failed linking attempt?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q007 — Are there device/OS constraints when handing off to ABA Mobile, and what happens if the user abandons the flow?
+
+**A (2026-10-03):** On device/OS constraints when handing off to ABA Mobile:
+- iOS - You must register the ABA scheme (e.g. abamobilebank) in Info.plist under LSApplicationQueriesSchemes so UIApplication.shared.canOpenURL(deeplinkURL) returns true. - Open the ABA app using UIApplication.shared.open(deeplinkURL, …) only after canOpenURL is true. - Behavior differs by iOS version/WebView: some builds may not show the open‑app popup; testing across target OS versions/devices is required. - iOS often does not reliably return to the merchant app after payment; users may remain in ABA Mobile and need to manually switch back. - Android - Use a standard Intent to open the deeplink URI. - Android usually returns to the merchant app after the user taps Done or via intent behavior, but this is not guaranteed and should not be your only success signal. On what happens if the user abandons the flow:
+- You must not rely on the user tapping Done or on the app automatically returning to decide success.
+- Treat completion purely as an asynchronous backend event: - Implement the PayWay callback/pushback endpoint and verify its payload. - Always confirm final status via the Check Transaction API (including when the user never returns or closes ABA Mobile).
+- Your app UI should be designed assuming the user may not come back (especially on iOS); when/if they return, the app should query your backend (which has reconciled via callback + Check Transaction) and show the correct order/payment state.
+
+### S18-Q008 — Can the same linking request be retried after failure, or must a new `request_id` be generated?
+
+**A (2026-10-03):** UNKNOWN — not documented
+### Link card
+
+### S18-Q009 — Confirm `link-card` always returns the hosted card-entry HTML page (success or error), and that the token arrives only via `callback_url`?
+
+**A (2026-10-03):** Yes. For link-card:
+- The endpoint always returns an HTML page in the response, both on success and error; this is the hosted card-entry/saved-card UI to show in a webview/iFrame.
+- The token and related credential details are sent only via callback_url (or the profile pushback_url if callback_url is omitted), not in the direct HTTP response.
+
+### S18-Q010 — Confirm the endpoint requires form-urlencoded, and confirm the browser-form integration pattern?
+
+**A (2026-10-03):** - The link-card endpoint does not use form‑urlencoded; it requires a POST with Content-Type: multipart/form-data and the fields request_id, request_time, merchant_id, ctid, token_flag, currency, callback_url, continue_success_url, hash.
+- Browser-form pattern: you can submit a standard HTML <form> with method="POST" and enctype="multipart/form-data" directly to https://checkout-sandbox.payway.com.kh/api/payment-credential/v3/cof/link-card. The response is HTML which you then display (e.g., in an iframe or webview) as the hosted card-entry page. Avoid calling this endpoint via AJAX/XHR from the browser due to CORS; use a normal form POST instead.
+
+### S18-Q011 — Confirm the real result travels in the `302 → /add-card/<base64>` redirect, and that the HTML shell alone proves nothing. How should an integrator read the outcome server-side?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q012 — Is `frequency` required for card linking, and what happens if it is omitted?
+
+**A (2026-10-03):** For card linking (Link Card API with CITIFLEX / CITOFLEX):
+- frequency is not required in the request for card linking.
+- For CITIFLEX / CITOFLEX tokens, PayWay always stores/returns frequency as an empty string in the token callback. So if frequency is omitted for card linking, the request is still valid; the token will be created as an unscheduled token and the callback’s payment_credential.frequency will simply be "" (empty).
+
+### S18-Q013 — Are `returnUrl`/`returnDeeplink` still accepted on link-card, or deprecated in favour of `continue_success_url`?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q014 — Can we restrict which card brands are offered, and can we control the hosted page appearance?
+
+**A (2026-10-03):** - Restricting card brands: Yes, but it’s done via configuration on the gateway/merchant profile, not by the integrator in the API/JS. Only card brands that are enabled in the merchant’s commercial setup (Visa, Mastercard, JCB, UnionPay/UPI, etc.) should be shown. If a brand is not part of the agreement, it should be disabled/hidden via merchant profile config and not presented in the UI. - Controlling hosted page appearance: The hosted checkout/JS UI (including logos, labels, and which payment-method tiles appear inside it) is controlled by PayWay. Integrators cannot directly modify checkout2-0.js or the hosted HTML/CSS. Any branding, label, or payment‑method display changes on the hosted page must be requested from the ABA PayWay Integration/Gateway team; merchants can only adjust what their own site shows around/leading into the hosted page.
+
+### S18-Q015 — Does card linking support 3-D Secure, and how does that affect the tokenisation flow?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q016 — What are the sandbox test cards for the card-linking flow specifically?
+
+**A (2026-10-03):** For sandbox, the card‑linking flow uses the same test cards as normal card payments. From the current sandbox test set: Successful cards
+- MasterCard — 5156 8399 3770 6777 Expiry: 01/30 CVV: 993 3DS enrolled: No - Visa — 4286 0900 0000 0206 Expiry: 04/30 CVV: 777 3DS enrolled: Yes Declined cards
+- MasterCard — 5156 8302 7256 1029 Expiry: 04/30 CVV: 777 3DS enrolled: Yes - Visa — 4156 8399 3770 6777 Expiry: 01/30 CVV: 993 3DS enrolled: No Use the success cards to test successful link creation and the declined cards to simulate failures in sandbox.
+
+### S18-Q017 — What are the linking error codes and their user-facing messages?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q018 — Confirm that `104` from the hosted page means card tokenisation is not enabled on the profile, and what the merchant should do?
+
+**A (2026-10-03):** UNKNOWN — not documented
+### Token lifecycle
+
+### S18-Q019 — Document the token-management trio: renew, get-details, remove — exact parameters for each and the fact that none of them shares the same parameter shape?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q020 — Confirm `get-details` takes only `request_id` and resolves the token from the linkage, and what `request_id` should be used for a renewed token?
+
+**A (2026-10-03):** From the current documentation for `get-token-details`: * The request body **must include 4 fields**: * `request_time` * `request_id` * `merchant_id` * `hash` So it **does not take only `request_id`** — the other three fields are required in the payload. The docs available do **not** describe:
+* How `request_id` is used to resolve the token from any prior linkage, or
+* Which `request_id` should be used specifically for a **renewed** token. Those behaviors are not documented in the materials I have.
+
+### S18-Q021 — What is the renewal callback contract, and how long should we wait for it before falling back to `get-details`?
+
+**A (2026-10-03):** For token renewal, the callback contract is:
+- PayWay sends an HTTP POST to the callback_url configured under Merchant Portal → Outlet Profile → Services → Card on File (CoF).
+- This endpoint is the primary listener for asynchronous token info (renewal result and updated token state) after the user approves the renewal in ABA Mobile. Wait window before fallback
+- You should receive the renewal callback within about 3 minutes.
+- If no callback is received within that window, you should fall back to calling the Get token details API to retrieve the current token information.
+
+### S18-Q022 — What is the required ID format for `request_id` and `ctid`, and is uniqueness enforced?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q023 — Is there an expiry field in the token details response, or must we compute the 90-day window ourselves?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q024 — How should we schedule renewal proactively, and what is the recommended renewal lead time?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q025 — Does removing a token notify the customer, and how?
+
+**A (2026-10-03):** Removing a token has the following documented customer‑facing notification behavior: - If a removed token is later used for a payment attempt, the transaction will be declined and a notification will be sent to the ABA Mobile user (for both ABA Account and ABA Card tokens). The documentation does not explicitly state that a separate customer notification is sent at the exact moment of removal—only for failed payment attempts using a removed token.
+
+### S18-Q026 — Confirm `removeToken` is the single endpoint for both account and card tokens, and whether it is truly irreversible?
+
+**A (2026-10-03):** Yes, Bong @Ruzaid:
+- Single endpoint: api/payment-credential/v3/token-management/remove-token is used to remove both linked ABA account tokens and card tokens from the merchant profile.
+- Irreversible: The docs state that once removed, the action is irreversible. The token will no longer be valid for any future transactions; if it is used, the transaction is declined and a notification is sent to the ABA Mobile user.
+
+### S18-Q027 — Is there any bulk token removal (e.g. GDPR/erasure request), and how do we enumerate all tokens for one customer?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q028 — Are we contractually or legally required to offer customer self-service unlinking, and does the API satisfy that obligation?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q029 — Are there audit-trail or reporting obligations for token removal that we must satisfy ourselves?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q030 — Can a removal race with an in-flight charge, and what is the expected outcome for both?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q031 — What error do we get if we charge a removed token, and how should the customer-facing flow recover?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S18-Q032 — Are there limits or penalties on frequent token removal?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S19. Subscriptions & Recurring
+
+## S19. Subscriptions & Recurring
+
+### S19-Q001 — Confirm there is no separate subscription endpoint and that subscriptions are a parameter set on the purchase path?
+
+**A (2026-10-03):** Yes — subscriptions use the same /api/payment-gateway/v1/payments/purchase endpoint. There is no separate subscription endpoint; subscription behavior is controlled via request parameters (such as token_flag, frequency, etc.) on the purchase path.
+
+### S19-Q002 — Confirm the subscription parameter trio (`ctid`, `token_flag = CITR_FIX`, `frequency`) and that all three are required together?
+
+**A (2026-10-03):** Yes — for scheduled subscriptions you must send the trio together on the purchase request:
+- ctid
+- token_flag = CITR_FIX
+- frequency (e.g. 1W, 1M, 2M) These three define the customer identity, subscription context, and billing interval. If you don’t send them as a set, the transaction is treated as a normal one‑off payment and no subscription token with schedule is created.
+
+### S19-Q003 — Which `payment_option` values are supported for subscriptions, and why does the default conflict?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S19-Q004 — Does registering a subscription require a profile-level enablement, and what error indicates a profile blocker?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S19-Q005 — Is `CITR_FIX` the only subscription flag? What do `CITO_FIX`/`CITR_FLEX` return?
+
+**A (2026-10-03):** CITRFIX is the only subscription tokenflag documented for scheduled (fixed) subscriptions. CITOFIX and CITRFLEX are not documented as valid flags, and their behavior/return values are not specified.
+
+### S19-Q006 — How is the recurring schedule enforced — is the merchant responsible for triggering each period's charge?
+
+**A (2026-10-03):** The recurring schedule is **merchant‑driven**, not auto‑charged by PayWay. After the initial CITR_FIX subscription (registration), your system must:
+- Run a scheduled job (e.g., daily) to find subscriptions that are due based on their `frequency` and next‑billing date.
+- For each due subscription, call the **Payment (purchase) API** using the stored token as an MITR_FIX transaction. PayWay then processes each MITR_FIX call like a normal charge and sends the webhook. PayWay does **not** automatically trigger future billing cycles; it only validates/executes the charges you initiate.
+
+### S19-Q007 — Which flag is used for the subsequent recurring charges (`MITR_FIX`?), and what is the difference between fixed and variable recurring?
+
+**A (2026-10-03):** For the subsequent recurring debits, you should send them as MITRFIX** transactions via the Payment (purchase) API, using the stored payment token (PWT) and setting `tokenflag=MITRFIX`. Difference between fixed vs variable recurring in the current docs:
+- **Fixed recurring (scheduled subscriptions):** - Registration uses `tokenflag = CITRFIX` (Customer‑Initiated Transaction for Registration). - Subsequent debits use `tokenflag = MITRFIX` (Merchant‑Initiated Transaction Recurring). - Both the **timing and the amount are fixed**. The token callback includes `tokenflag: "CITRFIX"`, `frequency`, `subscribedamount, and amountlimitpertran` is locked to the subscribedamount. The customer cannot change this limit.
+- Variable / flexible recurring: - Uses FLEX token types, with initiation restricted by type: - CITI_FLEX tokens can only be used for Customer‑Initiated payments (customer is actively present, e.g. one‑click checkout). - CITO_FLEX tokens are required for Merchant‑Initiated payments such as automated subscriptions or unscheduled utility billings. - This model is not tied to the fixed CITR_FIX/MITR_FIX schedule; instead, your system controls when to charge, within the allowed initiation type. So: MITRFIX** is the documented flag for each scheduled recurring charge in the fixed subscription model; FLEX tokens (CITIFLEX/CITOFLEX) are for flexible, non‑CITRFIX subscription scenarios governed by initiation type rather than a fixed schedule.
+
+### S19-Q008 — How do we detect a failed recurring payment and what is the dunning/retry policy?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S19-Q009 — Are subscription charges distinguishable in statements and reports from one-off charges?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S19-Q010 — What cancellation flow exists — merchant-side API, customer-side, or both?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S19-Q011 — Are there regulatory constraints on auto-charging a stored credential (frequency, amount, notification duties)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S19-Q012 — Can a subscription be combined with a split payout, and what are the rules?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S19-Q013 — Are free trials, discounts, and prorations supported, and how are they modelled?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S20. Currencies, FX & Settlement
+
+## S20. Currencies, FX & Settlement
+
+### S20-Q001 — Which currencies are supported, per endpoint and per payment method? Give the exact ISO codes?
+
+**A (2026-10-03):** — Documented currencies are KHR and USD only, with ISO codes KHR and USD. Per payment method (Payment Link):
+- ABA Pay (KHQR): USD, KHR
+- Card (Visa / Mastercard / UPI / JCB): USD, KHR
+- Alipay: USD only
+- WeChat Pay: USD only Per API / flow (where documented):
+- ABA QR API (QR generation): dual currency — supports KHR and USD.
+- QR / checkout-related APIs with currency parameter: required/allowed values are USD or KHR and must match the merchant profile’s configured settlement currency. No other currency ISO codes are documented as supported in the provided materials.
+
+### S20-Q002 — What does the exchange-rate endpoint return — full payload shape, which currencies, and how often are rates updated?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q003 — Are the published rates indicative or the actual settlement rates?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q004 — Do rate responses carry an effective timestamp, and what timezone?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q005 — What is the recommended caching policy for rates, and what is the maximum staleness we should accept?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q006 — What is the rounding/precision guidance for display and for charging in a converted currency?
+
+**A (2026-10-03):** — For rounding/precision, the guidelines are: 1) For charging (API request in the charged/converted currency)
+- Normalize and validate the final, converted amount before building the request and hash.
+- USD: - Always send exactly two decimal places in amount (e.g. "0.10", "12.60", "2500.00"). - Never send more than two decimals (e.g. "12.599", long float tails) — reject/round before calling the API. - Round/format server-side to 2 decimals before embedding in the request and computing the hash.
+- KHR: - Send as an integer only, no decimal point at all (e.g. "16000", "11300"). - Values like "11300.00" or "16000.50" must be normalized (e.g. 11300.00 → "11300") or rejected before sending.
+- amount must contain only the numeric value, with no currency symbols/text or formatting characters ($, ៛, USD, KHR, commas, spaces, etc.).
+- The value used in the hash/signature must exactly match the final normalized amount sent in the request. 2) For display (UI) in the charged/converted currency
+- Clearly indicate the currency code next to the amount (e.g. USD, KHR) and ensure it matches the currency actually submitted to PayWay.
+- Use thousand separators and two decimal places in the UI, e.g. 2,500.00 USD, 2,000,000.00.
+- For USD display, always show two decimal digits even when zero (e.g. 1.00 USD, 10.50 USD).
+- In multi-currency scenarios: if you convert from a local display currency to a settlement/charged currency, the checkout screen should clearly show the charged currency and its normalized amount (after conversion and rounding) so that what the user sees matches what is sent to PayWay. In short: do any FX conversion first, then normalize to USD → two decimals or KHR → integer, use that normalized value both for hash and API request, and mirror that normalized charged currency/amount in the UI.
+
+### S20-Q007 — Confirm that a payer may pay in a different currency from the order currency — what causes this, and how must we reconcile?
+
+**A (2026-10-03):** — Yes, a payer can effectively "pay" in a different currency from the order/checkout currency. What causes this?
+- Your PayWay transaction & settlement currency is defined by the merchant profile / settlement account (e.g. USD or KHR) and by the currency you send in the request (where applicable).
+- The payer’s own account/card may be in another currency. Their bank/issuer will convert from the transaction currency (e.g. USD) to the payer’s account currency (e.g. KHR, or vice‑versa).
+- For KHQR, the QR/order may show one currency, but the merchant’s settlement currency is still the one configured on the merchant profile. The payer can still use an account in another currency at their bank side; conversion happens bank‑side. How must we reconcile?
+- Always reconcile in the merchant settlement currency configured on the PayWay profile — that is the authoritative transaction currency.
+- Accounting and reconciliation should expect settlement only in that merchant currency, even if the payer’s bank debits them in another currency.
+- Any FX difference between what the payer sees/debits and the settled amount in your account is handled between the payer and their bank/issuer, not via PayWay. So: order/checkout → normalize to the merchant’s settlement currency, send that to PayWay; payer may use another currency account, but your reconciliation is always done in the configured settlement currency and PayWay transaction records.
+
+### S20-Q008 — Which amount is the merchant's obligation (`original_amount`) and which is the payer's debit (`payment_amount`)? Which governs settlement?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q009 — Does PayWay apply an FX markup, and how is it disclosed?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q010 — May a merchant add its own markup on top, and are there disclosure or Cambodian regulatory requirements for displaying FX rates?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q011 — How is a refund converted — historical rate or current rate?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q012 — Must receipts show both the order currency and the paid currency? What is the official receipt requirement?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q013 — What are the settlement timing and settlement currency per payment method (T+0, T+1, T+2, cross-currency)?
+
+**A (2026-10-03):** For settlement timing and currency, the docs describe it like this: 1) ABA PAY / ABA KHQR (same-bank mobile & KHQR)
+- Settlement timing: Effectively T+0 (instant) – funds are settled immediately to the merchant’s ABA account.
+- Settlement currency: The currency of the merchant’s settlement account/profile (one currency per profile, e.g., all settled in USD or all in KHR). 2) Card payments (Visa/Master/JCB/UPI, etc.) via PayWay gateway
+- Settlement timing: Delayed multi‑day settlement – depends on the merchant agreement and card scheme/acquirer setup. Examples in the docs mention: - 3–4 business days in some cases; - 5 working days in some product examples; - T+7 working days for some online/virtual terminal/virtual card flows. Exact T+N must be confirmed in the merchant’s contract.
+- Settlement currency: Same as above – the configured settlement account currency for that merchant profile. 3) Wallet-based payments (Alipay, WeChat Pay)
+- Settlement timing: Also multi‑day, typically several business days; one example in the docs is ~5 working days, but again this is agreement‑specific.
+- Settlement currency: Also into the merchant’s settlement account currency configured for the profile. 4) Virtual terminal / virtual card (e.g., OTA virtual cards)
+- Settlement timing: Documented as T+7 working days from transaction date (virtual terminal/virtual card charges).
+- Settlement currency: The merchant’s settlement account currency. Cross‑currency note:
+- Payers may pay from accounts in other currencies, but settlement to the merchant is always in the single currency configured for that merchant profile (e.g., USD or KHR). The bank/gateway handles any FX so that what reaches the merchant is in that settlement currency. So, in short: ABA PAY/KHQR are T+0 into the merchant’s settlement currency; cards and wallets are T+N (commonly between T+3 and T+7 working days, with virtual terminal/virtual card explicitly documented as T+7), all settled into the merchant’s configured settlement currency.
+
+### S20-Q014 — Does a dual-currency merchant profile need separate settlement accounts for USD and KHR, and what are the account-number format rules?
+
+**A (2026-10-03):** Bong @ruzaid Yes. For a dual-currency merchant setup you need two separate settlement accounts with ABA:
+- one KHR account for KHR receipts
+- one USD account for USD receipts Each payment is settled into the settlement account whose currency matches the payment currency (this is what enables a single QR to accept both KHR and USD with each going to the right account). The documentation only states that, when linking/updating settlement accounts, the system shows and allows accounts that match the required currency (KHR accounts for KHR, USD accounts for USD). It does not define any additional PayWay-specific account-number format rules beyond using valid ABA accounts in the correct currency.
+
+### S20-Q015 — Can a payout currency differ from the merchant credential currency, and what is the official rule?
+
+**A (2026-10-03):** Bong @ruzaid Yes — the payout currency can differ from the merchant’s settlement/credential currency. Official rule from docs:
+- Settlement configuration (merchant credential currency) and RouteFunds / Payout configuration are separate.
+- A merchant may have, for example, USD settlement but configure USD and KHR Payout Sources of Funds.
+- For each payout, the system uses the currency field in the Payout API request to choose the matching Source of Funds (USD or KHR).
+- The payout currency must match the beneficiary account currency (no cross‑currency payout). If they differ, the API returns an error such as "Payment currency is not allowed". So: payout currency is not tied to the merchant credential/settlement currency; it’s determined by the Payout configuration and must match the beneficiary account’s currency.
+
+### S20-Q016 — What is the merchant's exposure if the FX rate moves between order creation and payment — who bears it?
+
+**A (2026-10-03):** Bong @ruzaid From the docs:
+- PayWay always charges/settles the exact numeric amount you submit in the merchant’s settlement currency. The gateway does not reprice based on later FX movements.
+- Exchange‑rate handling is primarily the merchant’s responsibility when you display another/local currency and convert it before calling PayWay.
+- For KHQR where the merchant account is USD‑only, the QR is USD and any FX cost is borne by the customer at their bank if they pay from a non‑USD account. So if FX moves between order creation and payment:
+- On the merchant‑side conversion (local currency → settlement currency), any gap between your quoted local price and the actual settled amount is merchant exposure, not PayWay’s.
+- On the payer side (they pay from an account in a different currency than the QR/settlement currency), the customer bears the FX cost via their issuing bank. ABA/PayWay simply settles the submitted settlement‑currency amount and does not absorb FX movement.
+
+### S20-Q017 — If a KHR order is paid in USD, on which amount is our fee calculated and on which amount are we settled?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q018 — Can a customer partially pay an invoice in a different currency from the invoiced currency, and how is the residual handled?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q019 — Are there any FX-related fields in the transaction record we must store to reproduce the conversion later during reconciliation or dispute?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S20-Q020 — Does PayWay provide a historical rate lookup for a past transaction date, or must we snapshot rates ourselves?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S21. Fees, Pricing & Commercial Terms
+
+## S21. Fees, Pricing & Commercial Terms
+
+### S21-Q001 — Provide the complete merchant fee schedule: MDR by payment method, by currency, by channel, and any fixed component?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S21-Q002 — Do online, POS/Virtual Terminal, printed QR, and payment-link transactions carry the same MDR?
+
+**A (2026-10-03):** — Online, POS/virtual terminal, printed QR, and payment‑link transactions do not have a single unified MDR by default. From the documented cases:
+- Online PayWay (gateway/invoicing/payment link) fees are handled separately from in‑store POS fees. The two services are distinct and their MDR can differ, and online rates are often negotiated independently.
+- Virtual terminal (card‑not‑present via portal) typically has a higher commission than in‑person POS transactions.
+- Printed QR / QR Payment API linked to POS is tied to POS/terminal configuration and can follow its own fee setup.
+- A merchant observed that payment‑link fees did not clearly match their PayWay e‑commerce schedule; any alignment needs to be confirmed case‑by‑case in the commercial agreement. So, MDR levels are channel‑ and product‑specific and must be confirmed in the merchant’s contract/onboarding documents rather than assumed to be the same across all channels.
+
+### S21-Q003 — What are the fees for payout, per beneficiary and per batch?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S21-Q004 — What are the fees for refunds, chargebacks, and pre-auth?
+
+**A (2026-10-03):** — From the available documents: Refund fees
+- For ABA-to-ABA refunds (same-bank account refunds): no refund processing fee is charged.
+- For KHQR offline/manual refunds via PayWay/Bank merchant support: explicitly stated as no fee.
+- For cross‑bank refunds and other methods, only operational process is described; no specific fee amount or formula is documented. Chargeback fees
+- ABA PayWay may recover the full chargeback amount plus any chargeback assessment costs from the merchant.
+- The exact fee levels/percentages for chargebacks are not documented in the materials. Pre-auth fees
+- The documents describe the flows for pre‑auth, complete‑pre‑auth, cancel‑pre‑auth and refund after capture, but no explicit fee schedule or pricing for pre‑auth transactions is documented.
+
+### S21-Q005 — Are there monthly, setup, integration, or gateway fees?
+
+**A (2026-10-03):** — From the available docs: - Setup / registration / integration fees: Registration and integration are free; there is no setup or integration fee for PayWay. For Shopify specifically, there are no setup or maintenance fees. PayWay QR API is free to use. ABA Merchant Lite and the ABA Merchant App are also free to use, with no subscription, activation, or monthly charges. - Monthly / gateway fees: No separate monthly subscription or standalone "gateway fee" is documented. Charging is described only as per‑transaction fees (MDR/processing fees), which vary by service and merchant agreement. So, as per the documents: setup/registration/integration/monthly fees are 0; only transaction‑based fees may apply according to the merchant’s commercial agreement.
+
+### S21-Q006 — Are there volume tiers or thresholds that change pricing?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S21-Q007 — Are there incentives for QR adoption, CoF/recurring volume, or referral volume?
+
+**A (2026-10-03):** — For the areas you listed: - QR adoption volume incentives: not documented.
+- CoF / recurring volume incentives: not documented.
+- Referral volume incentives (merchant side): documents explicitly state there is no ABA Merchant referral program; referral rewards apply only to personal ABA Instant Account openings during promo periods, not to merchant/business accounts.
+
+### S21-Q008 — Who bears the chargeback fee in a dispute, and what is the process?
+
+**A (2026-10-03):** — Who bears the fee & liability?
+- For card transactions, the merchant ultimately bears the chargeback amount and any assessment/handling costs. ABA PayWay/acquirer is entitled to recover the disputed amount and related chargeback costs from the merchant, even if the merchant later terminates the service.
+- QR payments (ABA PAY, KHQR, WeChat Pay) are final/irrevocable and not subject to chargebacks. Process (card chargebacks only):
+1. Notification – ABA PayWay Merchant Support/acquiring bank sends a formal chargeback notice to the merchant’s registered contact (amount, date/time, PAN partial, approval code, Purchase ID, reason code, deadline).
+2. Merchant decision – Merchant reviews and decides whether to accept/refund (agree chargeback) or dispute it.
+3. Evidence collection – If disputing, merchant gathers supporting documents: PayWay receipt and transaction ID, order/booking records, invoices, guest/customer ID, proof of delivery/service, backend screenshots, logs, customer communications, CSV/XLSX exports if requested.
+4. Submission – Merchant submits decision and documents via the requested channel (email/portal) within the deadline.
+5. Representment & review – ABA PayWay forwards evidence to the acquirer/card scheme and monitors the case.
+6. Outcome – - If the merchant accepts or does not respond in time, the chargeback is treated as accepted and the disputed amount is reversed/debited from the merchant, plus any assessment costs. - If the merchant wins the dispute, the amount may be re-credited to the merchant account. If documents are incomplete or late, the bank may accept the chargeback and debit the amount, and may temporarily hold or block related funds.
+
+### S21-Q009 — What is the chargeback/dispute fee per case, and what is the representment fee?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S21-Q010 — Are there commercial terms specific to split payouts (commission, marketplace rates)?
+
+**A (2026-10-03):** — Yes, split/payout is treated as an additional service with its own commercial setup: - It requires a specific payout agreement / commercial onboarding separate from standard e‑commerce.
+- Usage is also subject to agreed daily payout limits with the bank. However, any exact commission percentages, marketplace rates, or special pricing tiers for payout are not documented in the materials I have and must be confirmed case‑by‑case with the PayWay team.
+
+### S21-Q011 — Is there a formal pricing schedule document we can rely on for budgeting, and how often is it revised?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S21-Q012 — Are taxes applied to PayWay fees, and how are they invoiced?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S21-Q013 — What is the contractual commercial commitment (minimum term, notice period) for enabling payouts, pre-auth, or CoF?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S21-Q014 — Where do fees appear — API response, Merchant Portal report, or settlement file only?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S22. Channels: POS, Virtual Terminal, Invoicing & Merchant Portal
+
+## S22. Channels: POS, Virtual Terminal, Invoicing & Merchant Portal
+
+### S22-Q001 — Enumerate the PayWay acceptance channels and their identifiers (online checkout, online QR, offline KHQR, printed/customer QR, Virtual Terminal, Invoicing Tool, Payment Link)?
+
+**A (2026-10-03):** Based on current docs, PayWay acceptance channels and their product identifiers are: 1. Online Checkout (Website & App) • Identifier: PayWay Ecommerce Checkout • Variants: Website Checkout, Mobile App Checkout 2. Online QR Checkout • Identifier: Payment QR API (QR API / ABA QR API) • Used for: ABA KHQR and other QR-based payments in websites/apps or POS/kiosk screens. 3. Offline KHQR – Printed Merchant QR • Identifier: Printed ABA KHQR • Category: In-store sales 4. Customer-Presented / Offline QR via App • Identifier: ABA Merchant Lite in ABA Mobile (Offline QR / customer-presented QR) • Channel type: In-store / pay-on-delivery 5. Virtual Terminal (Card-Not-Present) • Identifier: Virtual Terminal • Category: Online sales (remote card payments) 6. Invoicing Tool • Identifier: Invoicing Tool • Channels: Online sales & social commerce (send invoice links for payment) 7. Payment Link • Identifier: Payment Link • Channels: Online sales, in-store, social commerce • Creatable via: PayWay Merchant Portal (Web), ABA Merchant App, ABA Merchant Lite, and Payment Link API.
+
+### S22-Q002 — Which channels have a public API, and which are portal/UI-only?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q003 — What is the Virtual Terminal: which payment methods does it support, and how does it differ from card-present POS integration?
+
+**A (2026-10-03):** Hello Bong @Ruzaid, What is the Virtual Terminal? A web-based tool inside the PayWay Merchant Portal that lets merchants manually process card‑not‑present payments by typing card details in a browser — no physical POS hardware or card reader is needed. Supported payment methods Virtual Terminal supports card payments only:
+- Visa
+- Mastercard
+- JCB
+- UnionPay (UPI) It does not support QR or wallet payments (e.g. KHQR, ABA PAY, WeChat Pay, Alipay). How it differs from card-present POS integration
+- Channel / presence - Virtual Terminal: card‑not‑present (remote, OTA/MOTO, phone/email orders). - POS: card‑present, used at the physical outlet where the customer and card are present. - Interface & hardware - Virtual Terminal: browser-based in the PayWay Merchant Portal; staff type card number/expiry/CVV. No physical POS device. - POS: uses a physical POS terminal for swipe/insert/tap of the card. - Usage & commercial profile - Virtual Terminal: typically used for OTA virtual cards/vouchers and remote bookings; usually has higher commission than POS. - POS: used for walk‑in/on‑site payments; typically lower commission than Virtual Terminal.
+
+### S22-Q004 — Can the Virtual Terminal accept a saved customer profile, and what data is mandatory when customer capture is enabled?
+
+**A (2026-10-03):** When Customer Information is enabled, the Virtual Terminal does work with saved customer profiles:
+- You must select an existing customer (from the Customer Module) or create a new one during Virtual Terminal transaction creation.
+- The Virtual Terminal uses the same customer form configuration as the main Customer Module (no separate VT-specific customer config). Mandatory data when customer capture is enabled:
+- Customer Name is always mandatory and cannot be removed or made optional.
+- Any additional fields you configured as mandatory in the Customer Module (e.g., Phone, Email, VAT TIN, custom fields) are also required when creating or selecting a customer.
+- If the customer info toggle is ON, attaching a customer to the VT transaction itself is mandatory for every transaction.
+
+### S22-Q005 — How does the Invoicing Tool issue an invoice QR, and is it the same payload as an offline KHQR?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q006 — Can invoices be sent by email, and can they be paid by multiple customers?
+
+**A (2026-10-03):** Invoices in the ABA PayWay Invoicing Tool can be sent by email — the system emails the invoice to the customer with a "Pay Now" button and option to download the PDF. Whether a single invoice can be paid by multiple customers is not documented in the available materials.
+
+### S22-Q007 — What is the difference between a "single-use invoice QR" and a "static/customer-specific QR" for reconciliation?
+
+**A (2026-10-03):** Bong @Ruzaid, the key differences are about what merchant_ref represents and how you treat multiple payments: 1. Single-use invoice QR
+- Business intent: One QR is issued for one invoice with an expected single settlement of that invoice.
+- KHQR reality: Per guideline, “QR can be paid multiple times” — so even an “invoice QR” can technically generate TX001, TX002, TX003 all with the same merchant_ref (invoice number).
+- Reconciliation: - merchant_ref = invoice ID (e.g. INV-10001). - You use PayWay transaction_id as the unique payment key. - First APPROVED payment that satisfies your rules (amount/currency) closes the invoice. - Any further payments with the same merchant_ref are stored as duplicate/over‑payment/exception, not ignored. - So “single‑use” is enforced in your ledger, not by the QR itself. 2. Static / customer-specific QR
+- Business intent: One QR is issued per customer/entity and is expected to be used many times (installments, tuition, top‑ups, etc.).
+- QR properties: Static, open or flexible amount; multi‑use by design.
+- Reconciliation: - merchant_ref = customer identifier (or similar long‑lived key), not an invoice ID. - Every APPROVED transaction with that merchant_ref is a legitimate new payment and contributes to that customer’s balance/history. - You then allocate those payments across one or more invoices/charges internally. Summary for reconciliation:
+- Invoice QR: merchant_ref = invoice; multiple transactions with same ref usually mean “one main payment + duplicates/partials” to classify.
+- Customer-static QR: merchant_ref = customer; multiple transactions with same ref are normal, and you reconcile them against the customer’s account rather than a single invoice.
+
+### S22-Q008 — How is a transaction's channel identifiable via the API — is there a channel field in the transaction record?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q009 — Do POS and eCommerce transactions share one Merchant ID and one fee schedule?
+
+**A (2026-10-03):** POS (in‑store terminal) and online PayWay (e‑commerce / invoicing / virtual terminal) are treated as separate services, and their fees/commissions are not the same — online transactions typically have a higher MDR than POS, so they do not share one unified fee schedule. Whether they technically share the same Merchant ID is not documented in the available materials.
+
+### S22-Q010 — For POS, what are the requirements for devices — static IP, device registration, `device_id`, app signature, or attestation?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q011 — What is the official offline/degraded-mode behaviour when a POS terminal cannot reach PayWay?
+
+**A (2026-10-03):** Bong @Ruzaid, when a POS terminal cannot reach PayWay (loss of internet or gateway outage), the official behaviour is effectively “no offline mode”: - The ABA POS requires an active internet connection to generate QR codes and process payments (cards, Alipay/WeChat, etc.). If it’s offline, charge attempts simply fail and QR/payment will not be processed.
+- Recovery is by restoring connectivity (check power/network, TID, restart terminal if needed). Once back online, it resumes normal operation; there’s no special store‑and‑forward/offline authorisation mode documented.
+- If the issue is a broader PayWay gateway incident, merchants are advised to avoid repeated retries, temporarily use alternate payment methods, and reconcile any attempted transactions once PayWay confirms services are restored.
+
+### S22-Q012 — Which fields are mandatory on a POS receipt, and do requirements differ per payment method?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q013 — Are there specific Merchant Portal permissions for POS staff versus finance staff?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q014 — Which merchant-portal reports exist (transaction list, settlement, fees, refunds, chargebacks, exports), and what date/filters do they support?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q015 — Can the Merchant Portal export data to CSV/Excel, and what is the row limit?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q016 — How are merchant-portal-generated static QRs (printed) audited and reissued when the Bakong account or profile changes?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q017 — Is there a "virtual terminal only" merchant profile, and which portal modules are then hidden?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S22-Q018 — What is the officially recommended architecture for a multi-channel merchant's reconciliation?
+
+**A (2026-10-03):** For reconciliation, the officially recommended architecture is to combine event-driven callbacks with on-demand inquiry APIs, using a clear internal payment ledger. 1) Core flow
+- Use the PayWay webhook for real-time events: - Store each transaction as a Payment record. - Deduplicate using transaction_id. - Reconcile using merchant_ref (business reference such as invoice/order).
+- Use PayWay inquiry APIs for recovery and investigation: - Get Transactions by Merchant Reference for searching by invoice/reference. - Check Transaction for recent known transactions. - Get a Transaction Details for historical detail. 2) Internal data model
+Keep three separate concepts:
+- INVOICE (what the customer owes)
+- PAYMENT (each PayWay transaction — identified by transaction_id)
+- PAYMENT ALLOCATION (how each payment is applied to one or more invoices) Typical fields:
+- Invoice: invoice_id, customer_id, original_amount, currency, amount_paid, balance_due, status.
+- Payment: payment_id, transaction_id, merchant_ref, payment_amount, payment_currency, payment_status, transaction_date, bank_ref, payment_type, raw_callback.
+- Allocation: mapping of payment amounts to one or more invoices. 3) Business rules
+- Do not rely only on callbacks; always have inquiry-based reconciliation.
+- Use transaction_id for deduplication, merchant_ref for matching.
+- Support states such as UNPAID, PARTIALLY_PAID, PAID, OVERPAID, CANCELLED, EXCEPTION.
+- Design to handle multiple payments per reference, partial payments, overpayments, refunds, missing callbacks, and corrections. This model is the recommended pattern to reconcile high-volume PayWay payments reliably across channels.
+---
+## S23. Reconciliation, Reporting & Data Export
+
+## S23. Reconciliation, Reporting & Data Export
+
+### S23-Q001 — What is the officially recommended daily reconciliation procedure, end to end?
+
+**A (2026-10-03):** Officially recommended daily reconciliation is: 1) Intra-day: record and validate payments - Use PayWay webhook as the real-time path: store each successful transaction as a separate Payment record. - Deduplicate by transaction_id; use merchant_ref to link to your Invoice or order. - Keep raw callback payloads for audit/support. 2) End-of-day: API-based payment reconciliation - Run a scheduled job to reconcile against PayWay: - Use Transaction List / Get Transactions by Merchant Reference to find payments that did not arrive via callback. - For any order with missing/uncertain status, call Check Transaction (recent) and, if needed, TransactionDetail (historic) to get the authoritative status. - For each discrepancy: - If PayWay shows APPROVED but you have no or failed callback → create/update the Payment record from API data. - If PayWay shows NOT FOUND/EXPIRED/FAILED → keep/mark your booking as expired or failed according to your TTL/business rules. 3) Daily settlement vs. portal vs. ledger - Compare three views for the day: - Your internal Payment ledger (sum by status). - Integration/merchant portal transaction list/settlement view. - Bank/settlement records or IBanking.
+- For each mismatch or missing item (present in bank/settlement but missing in your records or portal): - Collect <TRANSACTION_ID>, amount, date/time. - Use Check Transaction / TransactionDetail and portal data to confirm status and correct date. - If portal record is wrong → exclude it from that settlement run and re-include correctly later as instructed. - If payment is settled but missing in your system → insert a Payment record (manual booking) using sanitized transaction data and allocate it to the right invoice. 4) Exception handling & allocation - Maintain separate objects for INVOICE, PAYMENT, and (if needed) PAYMENT ALLOCATION so you can correctly handle: - partial payments, - overpayments and duplicates, - refunds and accounting corrections. - Unknown or mismatched references → park them in an exception queue for finance/support to investigate rather than discarding. 5) Operational monitoring & escalation - Monitor for missing/failed pushbacks; if there are clusters of failures, escalate to gateway/PayWay with transaction_id, APV/bank refs, and timestamps. - Where settlement/bank statement still disagrees with portal or APIs after checks, work with ABA PayWay/settlement support to confirm correct settlement and, if required, apply offline/manual refunds or adjustments. This combination of webhook + daily API reconciliation + settlement vs. ledger comparison + exception handling is the recommended end-to-end daily reconciliation procedure.
+
+### S23-Q002 — Which single field or combination of fields should we persist per transaction to make reconciliation deterministic?
+
+**A (2026-10-03):** Use PayWay’s transaction_id as the single canonical key per payment — it is the unique transaction‑level identifier and should always be stored and used for deduplication and Check Transaction calls. For deterministic reconciliation across systems, persist at least this combination per transaction:
+- transaction_id → unique PayWay payment key (primary)
+- merchant_ref and/or tran_id → your business/invoice/order reference
+- bank_ref / APV → bank/settlement reference
+- payment_amount + payment_currency
+- transaction_date/datetime
+- payment_type (and masked PAN/account if provided) This set lets you reliably match records between your system, PayWay APIs/portal, and bank/settlement reports.
+
+### S23-Q003 — What is the authoritative source for settlement amounts — API, portal, or bank statement?
+
+**A (2026-10-03):** Treat the bank’s settlement records / merchant bank statement as the authoritative source for settlement amounts to your merchant account. - Use PayWay portal/API as the operational view for transaction status and to prepare settlements.
+- For any mismatch between portal/API and what actually credited your account, rely on the bank settlement/iBanking reports and ask the ABA PayWay Integration/Settlement team to confirm via internal settlement records and dispute logs. So: final truth for amounts settled is the bank settlement/iBanking record (confirmed by ABA internal settlement records), not the portal/API alone.
+
+### S23-Q004 — How do we match an API transaction to a bank settlement line? What is the join key?
+
+**A (2026-10-03):** Use the **Purchase# / order ID / tran_id** as the primary join key. - PayWay exposes a purchase identifier (often shown as *Purchase# / Order ID / tran_id*) and this corresponds to the identifier shown in the **bank iBanking/settlement export**.
+- For deterministic matching, persist your API `tran_id` and ensure it matches the Purchase#/Order ID you see in the PayWay portal and in the bank report.
+- If, for some entries, the bank line does not carry that identifier, fall back to a combination of **masked PAN (if available), amount, and date/time** (and APV/approval code when present) to match. So: **API transaction ↔ bank settlement line join key = Purchase#/Order ID/tran_id**, with amount/date/time/PAN/APV as secondary match fields when needed.
+
+### S23-Q005 — Is there a settlement/batch API, or is settlement only in the portal?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S23-Q006 — What is the recommended safe batching window for `transaction-list` given the 3-day max range and page cap?
+
+**A (2026-10-03):** Given the 3-day maximum and pagination cap, the recommended safe batching strategy is: - Primary window: use daily (1-day) batches per outlet for routine reconciliation.
+- Maximum window: you may use up to 3 calendar days per request (this is the documented hard limit). For large exports or catch-up runs, chain multiple 3-day windows with pagination.
+- Within each window: - Respect the page size limit (max pagination = 1000) and iterate pages until all records are read. - Keep total calls within the rate limit of 50 requests per minute. So: default to 1-day windows (safe/daily batches), never exceed a 3-day window per call, and use pagination + rate limiting to stay within platform constraints.
+
+### S23-Q007 — How do we avoid missing or duplicating records when paginating a wide reconciliation window?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S23-Q008 — What is the timezone-safe way to compute a UTC+7 reporting window?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S23-Q009 — How should we handle unpaid/expired transactions in reconciliation?
+
+**A (2026-10-03):** For reconciliation, unpaid/expired transactions should be treated as non-payments and excluded from settlement matching. Based on the documented flows: 1) Confirm via APIs, don’t rely only on missing callbacks - Use Check Transaction / Transaction List to verify status. - If no matching APPROVED transaction is found for a given transaction_id / merchant_ref, keep the invoice/order in an unpaid state. 2) Use a queue with a retention window - Keep pending/problematic transactions in an internal queue and periodically recheck via Check Transaction. - After your defined TTL (e.g. ~1 day) with no APPROVED result, mark them as expired/cancelled and remove them from the polling queue. 3) Invoice and accounting state - For Offline KHQR/billing flows, do not create a Payment record if there is no APPROVED PayWay transaction. - Keep the invoice in UNPAID or move it to CANCELLED per your business rules. Do not allocate any amount. 4) Reconciliation and settlement - Reconciliation focuses on matching actual settled/APPROVED payments between PayWay/bank and your ledger. - Unpaid/expired attempts should not be manually booked, not included in settlement runs, and not treated as discrepancies — they are simply non-finalized attempts.
+
+### S23-Q010 — How should we handle overpayment and underpayment on a QR invoice?
+
+**A (2026-10-03):** For a QR invoice, handle over/underpayment using separate Invoice / Payment / Payment Allocation objects, not a single paid-flag. 1) Always store the real PayWay payment - For every APPROVED transaction, create a Payment record (with transaction_id, merchant_ref, payment_amount, currency, raw callback, etc.). - Do not discard a transaction just because the amount doesn’t match the invoice. 2) Underpayment (partial payment) - Example: invoice = $1,000; payment TX001 = $300. - Allocate $300 to that invoice and recalc: - amount_paid = 300 - balance_due = 700 - invoice status = PARTIALLY_PAID. - Additional payments (TX002, TX003, …) for the same merchant_ref continue to be allocated until balance_due = 0, then invoice → PAID. 3) Overpayment / duplicate payment - Example: invoice = $1,000; TX001 = $100, TX002 = $300, TX003 = $600 → total $1,000 (PAID). - A fourth payment TX004 = $100 makes total $1,100. - Allocate only up to invoice amount: - amount_paid = 1,000 - balance_due = 0 - overpayment = 100 - invoice state = OVERPAID (or PAID + overpayment flag). - TX004 must remain as a valid Payment and go into exception/refund/credit workflow per accounting policy, not be discarded. 4) Multiple payments per QR are expected - KHQR "can be paid multiple times"; one QR for INV-10001 may lead to TX001, TX002, TX003… - Use transaction_id for deduplication and merchant_ref for reconciliation and allocation. - Do not block multiple payments purely because the same merchant_ref was already paid; treat extras as partial/over/duplicate at the business layer. 5) Suggested invoice status model - UNPAID – no successful payments. - PARTIALLY_PAID – 0 < amount_paid < original_amount. - PAID – amount_paid = original_amount. - OVERPAID – amount_paid > original_amount. - EXCEPTION – for currency mismatch, unknown merchant_ref, etc., where you still store the Payment but hold it for manual resolution.
+
+### S23-Q011 — How should we handle a payment arriving for an unknown or already-closed `merchant_ref`?
+
+**A (2026-10-03):** Bong @ruzaid, when a payment arrives for an unknown or already-closed merchant_ref, do not discard it: 1) Always store the PayWay payment - Create a Payment record with transaction_id, payment_amount, payment_currency, raw callback, etc. - This preserves the audit trail and proves the bank-side transaction exists. 2) Unknown merchant_ref - Put the payment into an EXCEPTION (or similar) bucket instead of allocating it. - Finance/support can later investigate and manually map it to the correct invoice/account. 3) Already-closed invoice/reference - Treat it like a late/extra payment against a closed item (similar to overpayment/duplicate). - Keep the Payment, but do not reopen or change the closed invoice automatically unless business rules say so. - Route it into your refund / credit / manual-allocation workflow (e.g., credit the customer account, issue refund, or reassign to another open receivable) based on accounting policy. 4) State model - Use invoice states such as PAID / OVERPAID / CANCELLED / EXCEPTION. - Payments that cannot be cleanly allocated (unknown or closed reference) should mark an EXCEPTION or similar flag for manual resolution, but the transaction itself must remain recorded.
+
+### S23-Q012 — What is the data-retention requirement for transaction records, and does PayWay archive or delete old data?
+
+**A (2026-10-03):** For transaction records, the documented retention-related points are: 1) Merchant-side record retention
+- Merchants are advised to keep all relevant supporting documents (order/booking data, vouchers, receipts, invoices, IDs, T&Cs, communications, refund evidence, etc.) for at least 4–6 months.
+- Chargebacks can be initiated up to 180 days after the original transaction date, so in practice merchants should plan to keep transaction documentation at least long enough to cover that chargeback window. 2) PayWay-side technical retention windows (APIs)
+- Status inquiry (check transaction) API: - Designed for short‑term status checks. - Effective retention window is 7 days from transaction creation; after that, the status inquiry may return "transaction not found" even if the payment succeeded. - For transactions older than this, integrators must use the get transaction detail API or settlement/reconciliation data instead.
+- Pending transactions: - Pending/failed transactions are not automatically reset; they remain in a pending state until completed. Any long‑term cleanup depends on back‑office policies and is not specified in detail. 3) Archiving/deletion of PayWay data
+- The documents do not state any full data‑archival or deletion schedule for PayWay’s underlying transaction database; only the API access/visibility windows above are documented. So: merchants should retain their own transaction evidence for at least 4–6 months (and practically up to 180 days for chargebacks). On the PayWay side, you should design around a 7‑day window for check-transaction, with older data accessed via transaction-detail/settlement; long‑term archival/deletion behaviour beyond that is not documented.
+
+### S23-Q013 — Are there per-merchant limits on how far back reporting can be queried?
+
+**A (2026-10-03):** From the docs, reporting/query limits are described as system-wide, not per‑merchant: - Check-transaction API: designed for short‑term checks with an effective retention window of about 7 days. After that, it may return "transaction not found" even if the payment succeeded.
+- Transaction-list APIs: - Max 3-day date range per request. - In sandbox, any 3‑day range must fall within a 30‑day window; wider ranges return errors.
+- Archival behavior: - There is mention that older transactions (around 30 days+) may be archived and may no longer be returned by some inquiry/check APIs.
+- Get transaction detail API: intended for older transactions beyond the check-transaction retention window, with rate limits (e.g., 10 req/min), but no shorter per‑merchant history limit is stated. Nothing in the documents indicates per‑merchant configurable limits on how far back reporting can go; only these shared technical/archival windows are documented.
+
+### S23-Q014 — Can merchants grant third-party accounting/ERP vendors access to reporting, and under what agreement?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S23-Q015 — Is there a scheduled report or notification capability we can use instead of polling?
+
+**A (2026-10-03):** Bong @ruzaid, the only documented real-time/near-real-time mechanisms are: - **Pushback/webhook (return_url)** — PayWay sends POST notifications per transaction.
+- **Merchant-side polling** — via Check Transaction API and, for Customer Module, the Get Transaction‑by‑Ref API using your own scheduled jobs/cron. There is **no separate PayWay‑managed scheduled report/notification feature** documented that would replace your own polling/cron; merchants are expected to combine webhook + their own scheduled API queries as fallback.
+
+### S23-Q016 — What is the recommended approach to reconciling split payouts against their source transaction?
+
+**A (2026-10-03):** Bong @ruzaid, recommended reconciliation pattern from the docs is: 1) Anchor everything on the original PayWay transaction - Use the original tran_id (and your merchant_ref) as the primary key for the whole lifecycle: checkout → pre-auth (if any) → completion → split/payout. 2) Persist the split/payout breakdown at capture time - When you send payout (in checkout) or embed payout info in merchant_auth on complete-preauth, store the same structure in your DB: per tran_id, keep the list of beneficiary MIDs/accounts and amounts. 3) Use APIs for status + settlement confirmation - Use Check Transaction API / transaction list APIs to confirm the source transaction is APPROVED. - Use your stored payout breakdown as the ledger for how that approved amount was distributed to each beneficiary (for flows where split happens immediately on completion). 4) For flows with later Direct Payout - When you move funds from a platform sub‑account via the Payout API, include your own reference linking each payout back to the original tran_id (or related order id), and persist it. - Reconciliation is then: source tran_id → platform round‑fund sub‑account → individual payout operations. In short: PayWay gives you the tran_id + status; you’re expected to log the payout instructions per transaction and correlate any later payout calls/settlements back to that tran_id in your own ledger.
+
+### S23-Q017 — What is the recommended approach to reconciling chargebacks and disputes against settlement?
+
+**A (2026-10-03):** Bong @ruzaid, recommended reconciliation pattern from the docs: 1) Anchor on the original PayWay transaction Use <TRANSACTION_ID> / Purchase ID as the single key to tie together: the original authorization, its settlement to the merchant account, and any later chargeback/monitoring/refund actions. 2) Confirm settlement vs dispute status with ABA For each disputed/chargebacked transaction, provide the identifiers to ABA PayWay Integration Team / Merchant Support and have them confirm: - If/when the amount was settled and released to the merchant account - Whether it is now under dispute, on hold, or has been reversed/charged back. 3) Map bank statement & settlement entries to that ID - Use settlement reports/IBanking to locate the original credit for that <TRANSACTION_ID>. - Track any later deductions/holds/manual refunds processed via offline cancellation/refund forms as separate entries, linked back to the same <TRANSACTION_ID> in your ledger. 4) Handle duplicates/erroneous charges - If you accept a duplicate/erroneous chargeback or monitoring case, sign and return the ABA cancellation/refund form. - Reconcile the resulting manual/offline refund entry against the original settled transaction using the same IDs and amount. 5) Address mismatches between portal and bank - If settlement vs portal records don’t align for a disputed transaction, report the <TRANSACTION_ID> and details; ABA may instruct you to exclude incorrect records from that settlement run, include missing ones later, or process a refund. - Reflect those inclusions/exclusions or refunds as adjustments tied back to the original PayWay transaction in your accounting. Net effect: keep a dispute/chargeback log keyed by <TRANSACTION_ID> / Purchase ID and reconcile it against initial settlement lines plus subsequent adjustment lines confirmed by ABA, so each chargeback or refund clearly maps back to a specific settled transaction and case outcome.
+
+### S23-Q018 — Are there any official reconciliation templates, sample code, or a reconciliation job we should adopt rather than build?
+
+**A (2026-10-03):** UNKNOWN — not documented
+---
+## S24. Disputes, Chargebacks, Compliance & Data Protection
+
+## S24. Disputes, Chargebacks, Compliance & Data Protection
+
+### S24-Q001 — What is the dispute/chargeback process per payment method, and which party initiates?
+
+**A (2026-10-03):** Bong @ruzaid, per the docs the dispute/chargeback behavior is different by payment method: 1) Card payments (Visa, Mastercard, UnionPay, JCB, etc.)
+- Who initiates: The cardholder (via their issuing bank/card scheme). That flows through the card scheme/acquirer to ABA.
+- Process: - ABA/acquirer receives the chargeback request under card‑scheme rules. - ABA PayWay / acquiring bank then notifies the merchant via the registered contact (email/portal, including reason code, amount, deadline). - Merchant decides to accept/refund or dispute, and if disputing, collects evidence (PayWay receipt, booking/order details, invoice, proof of delivery/service, ID, communications, etc.). - Merchant submits evidence to ABA via the requested channel. - ABA/acquirer represents the case to the card scheme and later informs the merchant of the outcome (win → funds may be re‑credited; lose/no response → chargeback stands and funds remain reversed). 2) QR / wallet‑type payments via PayWay (ABA PAY, KHQR, WeChat Pay)
+- Who initiates: There is no card‑scheme chargeback mechanism.
+- Process: - These QR payments are documented as final/irrevocable once processed and cannot be charged back. - Any issue (fraud suspicion, wrong charge, customer complaint) is handled via: - Merchant‑initiated refunds/cancellations (via PayWay portal or offline forms), or - Fraud/monitoring investigations and manual reversals coordinated directly between the merchant and ABA, not through a scheme chargeback. 3) Cross‑bank transfers via PayWay (to other banks/wallets)
+- Not treated as scheme chargebacks in the docs.
+- If a customer reports a pending/reversed transfer: - Merchant/Integration Team confirm settlement on the ABA/PayWay side. - If ABA shows settled but the receiving side didn’t credit, the receiving bank is the main party to trace/refund, with ABA/merchant support coordinating using sanitized references. So: only card transactions participate in formal chargeback flows initiated by the cardholder/issuer under card‑scheme rules; QR and similar methods are final and handled via refunds/investigations rather than chargebacks.
+
+### S24-Q002 — What are the representment deadlines and required evidence per payment method?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q003 — Is `transaction-detail` (or the API) considered authoritative evidence in a dispute?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q004 — What fields must we retain as dispute evidence, and for how long?
+
+**A (2026-10-03):** Bong @ruzaid, per docs the expectation is to retain both documents and key data fields so they can be exported quickly for disputes. A. Core data fields to retain per transaction (in your DB / exports)
+- PayWay transaction identifiers: <TRANSACTION_ID> / Purchase ID.
+- Transaction date/time, amount, currency, payment method.
+- Merchant details (MID, outlet as applicable).
+- Customer/payer details: name, contact (phone/email) where collected.
+- Order/booking details: order ID / booking reference, stay/service dates, package or product description.
+- Any cancellation/refund flag, refund transaction reference and date.
+- For advanced evidence/exports when requested: - Purchaser IP address - Device ID / device name (where your system captures this) These should be exportable (CSV/XLSX, screenshots of backend/admin) when a dispute or review is raised. B. Supporting documents to retain
+- Booking / order / reservation records (including OTA/agency vouchers where relevant).
+- Formal invoice/receipt matching the PayWay amount; include service description, dates, and merchant details.
+- Cancellation & refund policy / T&Cs that applied to the booking and were disclosed to the customer.
+- Proof of service or delivery: check‑in/registration forms, service logs, delivery receipts/waybills, tickets, itineraries, usage logs, photos where applicable.
+- Customer identification (passport/ID) and signed documents (registration/check‑in forms, agreements) where applicable.
+- Communications: booking confirmations, emails, chat/WhatsApp screenshots that show acceptance, changes, or fulfillment.
+- Payment records: PayWay receipt, merchant receipt, and any refund receipts or offline cancellation/refund forms. C. Retention period
+- Docs consistently state: keep all relevant transaction and supporting records for at least 4–6 months, with multiple places recommending a minimum of six months as the safe standard for chargeback/dispute timeframes. So the recommended baseline is: keep transaction + customer + booking fields and all supporting documents for ≥6 months, and be able to provide CSV/XLSX exports and screenshots tied to <TRANSACTION_ID> for any dispute.
+
+### S24-Q005 — Are dispute rules different for partial versus full refunds?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q006 — Are there additional risk checks or delays for high-value transactions?
+
+**A (2026-10-03):** Bong @ruzaid, docs do show extra risk handling for high‑risk/high‑value behaviour, but not a fixed “high‑value = X USD” rule or standard delay. From the documented fraud/monitoring flows:
+- The bank/monitoring team flags abnormal/high‑risk patterns, explicitly including “large amounts” alongside repeated attempts, suspicious BINs, unusual geography, etc.
+- When such transactions/patterns are flagged, ABA/PayWay may: - Place holds on related transaction amounts pending investigation (so funds availability can be delayed while checks are done), and/or - Temporarily disable services on the merchant terminal/payment links, apply BIN restrictions or Full 3DS, and set transaction limits. So: there is additional monitoring and possible holds/manual review for suspicious or large‑amount activity, but the docs do not define a universal high‑value threshold or a built‑in extra settlement delay that automatically applies to every large transaction; it’s monitoring/incident driven.
+
+### S24-Q007 — What transaction limits must we enforce at checkout (per currency, per method, per day)?
+
+**A (2026-10-03):** Bong @ruzaid, docs don’t give a single global table of limits, but they do spell out what we must enforce logically at checkout: 1) Per‑transaction limits (per method & environment)
+- General PayWay rule: Each merchant profile has configured max amount per transaction and often per‑day amount / count limits. If amount exceeds the allowed range, PayWay will reject the purchase; integrator must validate on UI/server before calling the API and show a clear error (e.g. amount exceeds allowed limit).
+- Payment‑method examples (not universal defaults): - Card payments: observed default cap around USD 5,000 per transaction in one setup (platform+issuer can both cap). - Virtual cards via virtual terminal: example cap 2,000 (currency units) per transaction. - Invoicing Tool: examples of 1,000 USD single‑invoice cap in one convo; separate 5,000 threshold where additional review/docs are required. - Generic On‑Us/Off‑Us guidance: examples of On‑Us up to 50,000, Off‑Us up to 100,000 (currency per contract); sandbox examples up to 100,000 USD or 400,000,000 KHR in specific tests.
+- What to enforce in your checkout: - For each payment method you expose (ABA Pay, KHQR, card, etc.), enforce the merchant’s agreed per‑transaction max for that method & currency (don’t hardcode the example numbers above as global rules). - Block or warn before calling create-payment when amount > that method’s allowed max. 2) Per‑day / volume limits
+- Docs state merchants can have total per‑day amount limits and max transactions per day, plus volume caps (daily/monthly) — including on Shopify.
+- These limits are configured per merchant profile by ABA; if exceeded, payments will start failing.
+- At checkout you generally don’t know the live remaining quota, but you must: - Handle API errors related to daily/volume limits gracefully and surface a clear message. - Coordinate with PayWay/commercial team if you know your business model needs higher daily/monthly caps. 3) Currency‑specific behaviour
+- Limits are per payment option and environment, not simply per currency; sandbox limits often differ from production.
+- For multi‑currency setups, you must confirm the allowed max per method per currency with PayWay during onboarding/go‑live and enforce that in your front‑end/back‑end validation. Summary of required enforcement at checkout
+- Enforce per‑transaction max per payment method & currency (from your merchant configuration with PayWay).
+- Assume there are per‑day/volume limits; you can’t pre‑enforce the exact remaining quota, but you must handle limit errors clearly and coordinate increases when needed.
+- Do not rely on sandbox behaviour or example numbers as final; confirm exact limits with PayWay product/commercial for your merchant profile and wire them into your validation layer.
+
+### S24-Q008 — Does the amount in a callback ever differ from the amount we requested, and how must we handle a mismatch?
+
+**A (2026-10-03):** Bong @ruzaid **1) Does callback amount ever differ from what we requested?**
+- For **normal fixed‑amount flows** (standard purchase, dynamic KHQR with amount), the amount in PayWay and in the callback is expected to **match exactly** what you sent (amount + currency). Any difference is treated as an **error/anomaly** (formatting, rounding, wrong value sent, etc.).
+- For **open‑amount/static KHQR model** (no amount in field 54), the customer chooses how much to pay. In that case, the callback amount can differ from the **invoice amount**, but it still reflects exactly what PayWay processed and is expected to vary (partial/multiple/over‑payments). **2) How must we handle a mismatch?**
+- Always **compare callback amount + currency + merchant_ref** with your local record before marking an order/invoice as paid.
+- If you expected a **fixed amount** and callback amount/currency don’t match: - **Do not mark the order as PAID.** - Store the payment by `transaction_id` and move the invoice into an **EXCEPTION** state. - Check your original request (amount formatting, currency, payload) and use **Check Transaction API** / logs as needed; reconcile or refund according to your process.
+- If you are using the **open‑amount KHQR** model: - Treat the callback amount as the **payment_amount to allocate** to that invoice (via `merchant_ref`). - Recalculate **total paid, outstanding balance, overpayment** and set state accordingly: `UNPAID / PARTIALLY_PAID / PAID / OVERPAID / EXCEPTION`. In short: for fixed‑amount flows a mismatch is an exception to be investigated; for open‑amount KHQR it is expected and should drive allocation and invoice state changes.
+
+### S24-Q009 — What is the merchant's liability position if our server mis-handles a callback edge case (e.g. duplicate fulfilment)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q010 — What are PayWay's KYC/KYB obligations for beneficiaries in payout flows, and what is ours?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q011 — What are the AML/sanctions obligations for a merchant using payouts or split payouts?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q012 — What consent and privacy obligations apply to storing payer identity, tokens, and account numbers under Cambodian PDPA?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q013 — What is the official guidance on PCI DSS scope when using only PayWay-hosted pages?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q014 — What retention limits apply to card data, tokens, and account metadata?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q015 — Do we need a DPA or data-processing agreement with PayWay?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q016 — What is the officially required disclosure text, terms, and privacy policy wording when presenting PayWay?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q017 — Are there any prohibited business types or use cases under PayWay's acceptable-use policy?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S24-Q018 — What is the merchant's obligation to notify PayWay of a suspected data breach or fraud incident?
+
+**A (2026-10-03):** Under the PayWay/ABA guidance in our docs, merchants are expected to: 1) Notify ABA immediately of suspicious/fraudulent activity - For example, for suspected fraudulent approved transactions, merchants should immediately report suspicious activity to ABA via the official support channel (e.g., digitalsupport@ababank.com) or their PayWay contact. 2) Cooperate with investigation and provide documentation - When PayWay/bank monitoring or the issuer flags suspicious transactions, merchants must review those transactions, and supply supporting documents (order/invoice details, delivery proof, communication logs, IDs if requested, etc.). 3) Take mitigation actions on their side - Block or suspend suspicious user accounts/devices in their own system, hold/stop services, and, where applicable, process refunds for confirmed or unfulfilled fraudulent transactions. So, in practice, your obligation is to promptly inform ABA/PayWay of any suspected fraud or related incident via the official support channels and then actively support the investigation and mitigation steps.
+---
+## S25. Sandbox, Testing & Go-Live
+
+## S25. Sandbox, Testing & Go-Live
+
+### S25-Q001 — List the sandbox-only test cards, their behaviour (approved, declined, 3-D Secure, specific error codes), and their brands?
+
+**A (2026-10-03):** Sandbox test cards documented are: 1) Mastercard – Success (no 3DS) - PAN: 5156 8399 3770 6777 - Expiry: 01/30 - CVV: 993 - Behaviour: Approved in sandbox - 3‑D Secure: No (not enrolled) - Specific error/decline codes: Not applicable (success) 2) Visa – Success (3DS enrolled) - PAN: 4286 0900 0000 0206 - Expiry: 04/30 - CVV: 777 - Behaviour: Approved in sandbox - 3‑D Secure: Yes (enrolled) - Note: In sandbox, OTP is bypassed even for 3DS cards. - Specific error/decline codes: Not applicable (success) 3) Mastercard – Declined (3DS enrolled) - PAN: 5156 8302 7256 1029 - Expiry: 04/30 - CVV: 777 - Behaviour: Declined in sandbox - 3‑D Secure: Yes (enrolled) - Specific decline/error code: Not documented 4) Visa – Declined (no 3DS) - PAN: 4156 8399 3770 6777 - Expiry: 01/30 - CVV: 993 - Behaviour: Declined in sandbox - 3‑D Secure: No (not enrolled) - Specific decline/error code: Not documented All of the above are sandbox-only test cards and must not be used in production. In sandbox, 3DS OTP is not actually sent; the flow is simulated.
+
+### S25-Q002 — Are sandbox test cards guaranteed to behave like production cards, and what are the known differences?
+
+**A (2026-10-03):** No, sandbox test cards are not guaranteed to behave exactly like production cards. From the docs, key differences are: 1) 3DS / OTP behavior
+- Sandbox: 3‑D Secure may not be enforced and OTP is bypassed for test cards (no real SMS/ACS flow).
+- Production: Real cards follow the issuer’s rules — full 3DS and real OTP are required where applicable. 2) Authorization / issuer responses
+- Sandbox: Uses simulated/deterministic responses (approve/decline) and often does not call real card networks.
+- Some real‑world decline reasons (blocked card, insufficient funds, issuer‑specific rules) may not be accurately reproduced.
+- Production: All responses come from real schemes/issuers with full risk/fraud logic. 3) Balances, settlement, refunds
+- Sandbox: Uses virtual amounts — no real settlement, no real balance impact, and refunds are logical only.
+- Production: Real money movement, settlement, and chargebacks apply. 4) Test data scope
+- Sandbox: Test cards are environment‑specific, shared across integrators, and limited in scenarios.
+- Production: You must use real cards; sandbox test PANs will fail. So sandbox cards are good for functional flow testing, but you cannot rely on them to mirror all production risk, issuer, and 3DS behaviors.
+
+### S25-Q003 — How do we obtain ABA Mobile Simulator accounts for testing ABA PAY / KHQR flows?
+
+**A (2026-10-03):** To get ABA Mobile Simulator accounts for testing ABA PAY / KHQR: 1. Prepare tester details (per person) - First name - Last name - Mobile number with country code (for OTP) - Email address (Max 2 test accounts per tester) 2. Send the request to the PayWay Integration Team - Use your usual PayWay integration channel or Digital Support email. - Specify that you need: - A PayWay sandbox test account, and - Access to the ABA Mobile Simulator App for sandbox testing. 3. Integration Team will provide - Simulator test account credentials (account, registered mobile, etc.) - Installation link/instructions for the Simulator App (TestFlight for iOS, APK for Android) - Any needed sandbox API credentials / Merchant Portal activation for your testing.
+
+### S25-Q004 — Which payment methods and flows can be tested in sandbox at all, and which cannot (subscriptions, complete-with-payout, card tokenisation, partner self-activation)?
+
+**A (2026-10-03):** Based on the docs, the following can be tested in sandbox, and known limitations are: Payment methods & flows that can be tested in sandbox
+1. ABA PAY - Test via the ABA PayWay Simulator App using sandbox test accounts. - Supports QR/deeplink flows end‑to‑end (create transaction → QR/deeplink → simulator app → callback/check‑transaction). 2. KHQR - Test using the Simulator App as well. - You can: - Generate QR via qrString or checkout_qr_url. - Scan and complete payment with the simulator. - Verify callbacks or use Check‑Transaction. 3. Card payments - Test with sandbox test cards only. - Use hosted checkout URL/HTML from the Purchase API to run full card entry + ACS simulation. - OTP is not sent in sandbox; flows are simulated. 4. Alipay / WeChat (where enabled) - Can be tested with sandbox flows using returned QR / deeplink / URL. - Sandbox usually shows an “Approve” button to simulate payment completion, or PayWay can manually complete test transactions. 5. Flows around these methods - QR display and deeplink flows. - Callbacks/pushbacks to HTTPS callback URLs. - return_url pushback handling. - Refund API behavior (logical refund in sandbox; no real funds move). Things that cannot be fully tested / are limited in sandbox
+- No real money movement: no real settlement, no real account balance changes; refunds are simulation only.
+- No real bank accounts or production apps: you cannot use real ABA accounts or production mobile apps against sandbox QR/deeplink.
+- Limited cross‑bank behavior: cross‑bank KHQR / partner behaviors may not be fully reproduced; simulator focuses on ABA‑side flows.
+- Issuer / risk behavior differences: real issuer declines, fraud/risk rules, and some negative scenarios are not fully mirrored. For the specific items you listed:
+- Subscriptions/recurring, complete‑with‑payout flows, card tokenisation, and partner self‑activation are not described in the provided sandbox documentation, so their sandbox testability is not documented here.
+
+### S25-Q005 — Confirm sandbox-only seeded beneficiary accounts exist and list them, with currency and MID?
+
+**A (2026-10-03):** Bong @Ruzaid, yes — sandbox‑only seeded beneficiary accounts for payout/whitelist testing are documented. The listed sandbox beneficiary accounts and currencies are:
+- 500000001 — USD
+- 500000002 — USD
+- 500005001 — KHR
+- 500005002 — KHR
+- 070486124 — KHR
+- 002094060 — USD
+- 515630398 — KHR
+- 111111112 — KHR
+- 002092768 — KHR
+- 002092621 — USD
+- 000471132 — USD The documentation only specifies account number and currency for these seeded sandbox beneficiaries; MIDs for them are not documented.
+
+### S25-Q006 — Is there a separate UAT environment for larger merchants?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S25-Q007 — Are sandbox credentials rate-limited differently, and is heavy automated testing permitted?
+
+**A (2026-10-03):** Bong @Ruzaid, - The docs do not specify any separate per‑credential rate limit for sandbox vs production — different numeric limits by key are not documented.
+- However, sandbox portal (and sometimes API) has security controls that can block an IP for “abnormal behavior” (many repeated/automated requests), returning Access denied Error code 1020.
+- So heavy, aggressive automated testing from a single IP is not effectively permitted — it can trigger these protections.
+- If an IP is blocked, the process is: - Test from another network to confirm it’s IP‑specific. - Collect the public IP and share it with the integration/gateway team. - They can review and unblock it, after which you should reduce request intensity to avoid re‑blocking.
+
+### S25-Q008 — How do we guarantee sandbox test credentials can never be used against production?
+
+**A (2026-10-03):** Bong @Ruzaid, sandbox test credentials are prevented from being usable on production in two main ways in the docs: 1. Separate environments / endpoints - Sandbox uses its own endpoints (e.g. checkout-sandbox.payway.com.kh), production uses checkout.payway.com.kh and other prod URLs. - The docs explicitly note that using sandbox credentials on production endpoints, or production credentials on sandbox endpoints, will fail. 2. Different credential sets and data - Sandbox and production credentials are issued separately by the Integration Team; they are not the same keys and are tied to different merchant profiles. - Test cards and test accounts are valid only in sandbox and do not work in production. Operationally, the guarantee comes from this combination: environment‑specific endpoints + distinct keysets + test‑only instruments, so sandbox creds and test data cannot successfully transact on production.
+
+### S25-Q009 — Are test cards ever rotated, and how is rotation communicated?
+
+**A (2026-10-03):** Bong @Ruzaid, yes — the docs state that test card lists may be rotated or expire. For communication, what’s documented is:
+- Integrators should request updated test card numbers from the Integration Team when necessary (e.g., when existing ones stop working or during new projects). No additional automatic/standard rotation notification mechanism is documented beyond requesting updated numbers from the team.
+
+### S25-Q010 — What is the minimum sandbox test suite that must pass before go-live?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S25-Q011 — Is there a formal certification, integration review, or go-live checklist from PayWay?
+
+**A (2026-10-03):** Bong @Ruzaid, yes — the docs describe a formal review & go‑live checklist, though it’s handled operationally by the Integration Team rather than as a “certificate” document: 1. Sandbox integration & UI review - Complete sandbox integration and testing (QR/cards, check-transaction, deeplink, etc.). - Provide website/app flow, screenshots or builds (APK/TestFlight) for technical + UI guideline review. - Fix any issues from the review; team re‑checks until accepted. 2. Go‑live / production checklist - Legal/contractual sign‑off (MOU/agreement). - Confirm integration URL, HTTPS, refund/return policy visibility, platform details. - Integration team issues production credentials & portal activation only after UI/integration sign‑off. - Merchant replaces sandbox keys with production keys and runs at least one production test transaction per required method. - Merchant shares production transaction ID(s); team verifies settlement and configuration. 3. Final sign‑off & post‑go‑live - Integration team marks the merchant as live and removes temporary expirations. - A short VIP support window is provided, then cases move to standard digital support. So: there is a structured certification-style integration review + go‑live checklist, covering sandbox tests, UI/API compliance, legal, production test transaction, and explicit final sign‑off.
+
+### S25-Q012 — Is PayWay's integration team available to review our implementation before launch?
+
+**A (2026-10-03):** Bong @Ruzaid, yes — the PayWay Integration Team does review implementations before launch, and this review is a standard prerequisite for getting production credentials: - In sandbox/UAT they review: - API usage (create payment/QR, check-transaction, deeplink/return handling, etc.) - Payment UI against the PayWay UI guidelines (checkout, KHQR display, buttons, labels…)
+- Merchants must provide: - Web staging URL and/or - Mobile builds (APK/TestFlight) plus any needed test accounts/simulator access.
+- The team gives feedback; developers fix issues and resubmit until the review passes.
+- Only after successful review does the team issue production keys, then verify small production test transactions as the final go‑live check.
+
+### S25-Q013 — What are the most common go-live failures, and what pre-flight checks prevent them?
+
+**A (2026-10-03):** Bong @Ruzaid, the docs point to a few very common go‑live failures and the related pre‑flight checks: 1) Using sandbox credentials in production - Failure: All live payments fail right after switch because sandbox keys are still configured or test mode not fully disabled. - Pre‑flight checks: - Confirm merchant_id and api_key are the production ones issued by the Integration Team. - Ensure sandbox/test mode and sandbox endpoints/JS are fully disabled in the prod build. 2) Domain / IP / URL misconfiguration - Failures: - QR or checkout cannot be generated on the live site. - Webhook/callback not received after going live or after moving to real domain. - User not returned correctly because return_url still points to dev/staging. - Pre‑flight checks: - Verify return_url uses the production domain, not dev/UAT. - Provide all production domains/subdomains and server IPs to be whitelisted, and confirm they are whitelisted before launch. - Call the callback URL from a public network and ensure it returns HTTP 2xx. 3) DNS / network / environment mix‑ups after deployment - Failures: - Intermittent QR generation or webhook failures right after cut‑over or server migration. - Pre‑flight checks: - Confirm DNS has propagated and endpoints are reachable from the internet. - Check stable outbound connectivity from your servers to PayWay endpoints. - Double‑check the app/site is pointing to the correct environment URLs (sandbox vs prod). 4) Credential activation / go‑live verification not fully completed - Failures: - Prod credentials expired or not properly activated; merchant not marked as live in the gateway. - Pre‑flight checks: - Activate portal/credentials within the validity window. - Run at least one small‑value production transaction (per required method where requested) and capture the transaction ID. - Share that transaction ID and screenshots/logs with the Integration Team so they can verify settlement and mark the profile as live. These checks, done just before switching traffic, are what the docs emphasize to avoid the typical "everything fails right after go‑live" scenarios.
+
+### S25-Q014 — Can we do a low-value live transaction to validate production before full cutover?
+
+**A (2026-10-03):** Yes Bong @Ruzaid — you can do a low‑value live transaction in production before full cutover. Docs state that merchants may perform a small‑amount real payment (e.g. 0.01 or another low value) in production to:
+- Validate end‑to‑end behavior and settlement
+- Provide a production transaction ID for the Integration Team to verify and confirm go‑live Just coordinate with the merchant’s finance team so these test payments don’t create reporting confusion.
+
+### S25-Q015 — Is there a PayWay test-mode flag inside production, or must we use real credentials and real amounts?
+
+**A (2026-10-03):** Bong @Ruzaid, there is **no separate PayWay “test-mode” flag inside production**. Docs indicate:
+- **Testing / test-mode** is done in **sandbox** using sandbox credentials, sandbox endpoints, and simulator/test accounts.
+- When going live you must: - Switch to **production API base URL and production API key/merchant_id**. - **Disable sandbox/test mode** in plugins/config. - Use **real payments** in production (you can use **low-value amounts** for verification), then share the **production transaction ID** for checks. So: in production you use **real production credentials and real (possibly low) amounts**; there’s no special production-only test flag documented.
+
+### S25-Q016 — How do we clear or archive sandbox test data before cutover?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S25-Q017 — What is the recommended production cutover sequence and rollback plan?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S25-Q018 — Can we roll back to sandbox URLs as an emergency fallback, and what is the data-integrity risk?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S25-Q019 — What is the sandbox behaviour of failure paths we cannot reproduce in production (declines, timeouts, rate limits)?
+
+**A (2026-10-03):** Bong @Ruzaid, per docs sandbox behaves like this for failure/negative paths: - Declines / failed auth - Sandbox uses deterministic simulation: test cards and specific CVV/expiry values trigger approve/reject flows. - It does not simulate every real issuer decline scenario (blocked cards, some issuer-specific rejects, etc.). Some production-only behaviors cannot be exactly mirrored. - Timeouts / 5xx errors - Sandbox may occasionally be under maintenance or unstable, returning HTTP 500, timeouts or gateway errors. - These are generally environment-related, not necessarily indicative of production, and integrators are advised to retry later when this happens. - Rate limits (429) - A 429 Too Many Requests indicates rate limiting or gateway performance issues. - Recommendation is to implement retries and inform the integration/support team if it persists. - General note - Sandbox is more permissive and simulated: some failure paths are only approximations of production behavior. - For negative testing, use the test cards & patterns provided, understanding that some real-world decline patterns and issuer behaviors will only be fully observable in production.
+
+### S25-Q020 — Are there POS-specific test scenarios we should rehearse (offline mode, network loss mid-payment, duplicate submission)?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S25-Q021 — What acceptance criteria should we use to declare an integration production-ready?
+
+**A (2026-10-03):** Bong @Ruzaid, per docs an integration is *production‑ready* when all of the following are true: **1) Functional/API readiness**
+- Sandbox/UAT integration is **complete and stable** (QR generation / checkout flows working end‑to‑end).
+- Required APIs are implemented and verified: - **Purchase / create‑transaction** (KHQR/cards or relevant methods). - **check-transaction-2** with reliable status confirmation and polling after QR display (e.g., every ~3s up to ~5 minutes as required in the mobile checklist).
+- For KHQR / ABA KHQR flows: - **checkout_qr_url** is rendered correctly in WebView/QR image. - Device behavior follows ABA KHQR rules: deeplink to app when installed, QR fallback when not installed, with WebView kept as fallback.
+- For hosted checkout/mobile flows: - **continue_success_url** is correctly set (web URL) and redirects to the proper success/invoice screen. - **return_deeplink** is implemented in mobile apps for post‑bank‑app redirection.
+- Correct use of key request params (e.g., `payment_option`, `view_type=hosted_view` for native cards where used). **2) UI/UX and behavior compliance**
+- Payment UI follows the **latest PayWay UI guideline**: - Correct, latest **logos/icons** used; merchant name shown correctly. - Only the **selected payment option** is displayed under the total (no duplicates). - Header and labels follow guideline (e.g., "Checkout" title, clear payment option text).
+- KHQR/mobile flows: - Proper dialog/behavior when payer app is installed vs not installed (deeplink + QR fallback, no double deeplink launches). - Back behavior in WebView: if no history, back **closes** the WebView. - Success/thank‑you screen: - Clear success message. - **No QR shown again** on success. - Buttons (Place Order, Confirm/Close, Go Back) behave correctly across retry/cancel/success. - Amounts and (where relevant) wallet balance **auto‑update** after successful payment. - Timers/countdowns correct for success, pending, expired, etc. **3) Evidence & test coverage completed**
+- In **sandbox/UAT**: - Full‑screen **videos** and **screenshots** of the end‑to‑end flow (QR display, scan, success; plus failure/pending where applicable). - **Transaction IDs** for successful, pending, failed/expired transactions provided for backend verification. - APK/TestFlight or builds and test accounts shared for mobile app review.
+- For **production sign‑off**: - At least one **real production test transaction** performed for each enabled method. - Production **transaction ID(s)** + matching screenshots/recordings of the full flow (including final success screen) shared. **4) Review / enablement completed**
+- Integration Team has: - Completed **UI and behavior review** (KHQR/app/web as applicable). - Verified **QR-on-API** or KHQR enablement flags where used. - Requested fixes (if any) are implemented and re‑verified.
+- Integration Team then issues **production credentials / remove expiry** and confirms go‑live. In practice, "production‑ready" = all required APIs implemented & stable, UI/UX matches guideline, negative/edge cases covered in sandbox, and the Integration Team has reviewed artifacts plus at least one successful production test payment.
+
+### S25-Q022 — Who signs off go-live on the merchant side, and what artefacts must be retained?
+
+**A (2026-10-03):** On the merchant side, go-live is signed off by an authorized merchant representative/contact person — the person ABA asks to complete the integration/UI sign-off document (they provide name, position and date and sign either electronically or on a printed PDF). Key artefacts that must be retained/provided as part of go-live/sign-off:
+- The fully completed and signed integration/UI sign-off document (e-sign or signed PDF).
+- Production verification evidence, including: - At least one production transaction ID (often per outlet/branch if applicable). - Screenshots or screen recordings showing the full payment flow end‑to‑end (QR/checkout page → scan/payment app → success/receipt screen). - Where applicable, POS receipt or invoice PDF/image and merchant portal transaction screenshots showing the matching transaction record. These artefacts are shared with the ABA PayWay Integration Team for verification and should be kept by the merchant as their formal go-live record.
+---
+## S26. SDKs, Tools, Plugins & Documentation
+
+## S26. SDKs, Tools, Plugins & Documentation
+
+### S26-Q001 — Which official SDKs exist, for which languages and versions, and which are actively maintained?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q002 — Is there a supported CLI or agentic tool for PayWay operations, and what can it do (create, query, reconcile, bulk operations, audit journal)?
+
+**A (2026-10-03):** (bot went silently unresponsive to this specific question across 5 attempts incl. a paraphrase, while answering neighbors — treat as bot-side refusal/no-data; raise with ABA directly)
+
+### S26-Q003 — Does PayWay publish an OpenAPI/Swagger spec or Postman collection per endpoint? If yes, provide the URL/version?
+
+**A (2026-10-03):** ABA PayWay does not publish any official public OpenAPI/Swagger (openapi.yaml / openapi.json) specification per endpoint, so there is no URL or version documented. For Postman, there is no public per-endpoint collection URL. A Postman collection is available but is shared directly by the PayWay Integration Team on request, not published as a versioned public link.
+
+### S26-Q004 — Where is the canonical developer documentation hosted, and how is it versioned?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q005 — Is there a changelog or release-notes channel integrators should subscribe to for breaking changes?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q006 — How are breaking changes communicated, and what is the notice period?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q007 — Do official e-commerce plugins exist for Shopify, WooCommerce, and PrestaShop? Which are official, and which versions/platform versions are supported?
+
+**A (2026-10-03):** For the three platforms mentioned: - Shopify — Yes. There is an official ABA PayWay app listed on the Shopify App Store, developed and maintained by ABA Bank.
+- WooCommerce (WordPress) — Yes. There is an official ABA PayWay WooCommerce payment gateway plugin provided by ABA.
+- PrestaShop — A PayWay plugin exists but is explicitly marked as Deprecated in the current materials (no indication of ongoing support/updates). Specific supported platform/version numbers for Shopify, WooCommerce/WordPress, or PrestaShop are not documented in the available materials.
+
+### S26-Q008 — For each official plugin: which PayWay features does it support, and what does it not support (CoF, payout, pre-auth, split)?
+
+**A (2026-10-03):** The only explicitly documented point is: - WooCommerce plugin – at the time described, it does not include the pre-authorization (pre-auth) capture workflow. If pre-auth is required, merchants must either use full purchase or implement a separate server-side capture flow once available. For Shopify, PrestaShop, and for the specific features Credentials-on-File (CoF), payout/split, and pre-auth support across any plugin, there is no explicit documentation stating that these features are supported or not.
+
+### S26-Q009 — How is a plugin linked to a merchant profile — Merchant ID + API key, or OAuth?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q010 — Can a plugin switch between sandbox and production credentials, and how do we verify the active mode?
+
+**A (2026-10-03):** Plugins are designed to switch between sandbox and production by: - Credentials & endpoint - Using sandbox merchantid + API key + sandbox endpoint** (`checkout-sandbox.payway.com.kh`) when *Sandbox/Test mode* is **enabled**. - Using **production merchantid + API key + production endpoint (checkout.payway.com.kh) when Sandbox/Test mode is disabled. - How to verify the active mode 1) Check the plugin settings: - Sandbox/Test mode checked → sandbox. - Sandbox/Test mode unchecked → production. 2) Perform a test payment and see: - The checkout URL domain: checkout-sandbox.payway.com.kh (sandbox) vs checkout.payway.com.kh (production). - Where the transaction appears in the merchant portal: sandbox portal vs production portal. This is the documented behavior; plugin‑specific UI wording may differ, but the mechanism is: sandbox flag + matching credentials/endpoints.
+
+### S26-Q011 — How do plugin order statuses map to PayWay transaction statuses, and are custom mappings possible?
+
+**A (2026-10-03):** For the documented WooCommerce plugin behavior: - Mapping from PayWay to plugin order status - When PayWay reports a successful payment via pushback/callback (status parameter = Completed), the WooCommerce plugin sets the order status to Completed by default. - If the pushback is not received or fails, the order can remain in a Pending / Pending Payment-type state on the store, even though the payment may have succeeded at PayWay. - Under the API model generally, Approved / status code 0 is the canonical "paid" state; Created/Pending are non‑paid; Declined/Refunded/Cancelled should be mapped by the merchant to their own internal order statuses. - Custom mappings - The gateway/pushback status value Completed cannot be changed on the PayWay side. - If a merchant wants paid orders to be in another status (e.g. Processing instead of Completed), this must be handled in their own site logic: e.g. WooCommerce hooks or backend logic that receives Completed from PayWay and then sets whatever internal order status they prefer. - There is no documented gateway‑side or global setting to change the default mapping; only merchant‑side customization is mentioned as the solution.
+
+### S26-Q012 — Do plugins expose webhooks/hooks for ERP or fulfilment integration, and logs for troubleshooting?
+
+**A (2026-10-03):** For the documented WooCommerce plugin: - Logs for troubleshooting: The documentation explicitly mentions that you can enable plugin debug logging and capture plugin logs for troubleshooting checkout issues (gateway responses, errors, etc.).
+- ERP/fulfilment webhooks/hooks: There is no explicit documentation that the PayWay WooCommerce plugin exposes dedicated outbound webhooks or special hooks specifically for ERP or fulfilment integration beyond the normal PayWay pushback/callback and the platform’s own order-status mechanics. For other plugins (e.g. Shopify, PrestaShop), there is no documentation in the current materials about dedicated ERP/fulfilment integration hooks or plugin-level logging.
+
+### S26-Q013 — Are plugin fees the same as direct API integration?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q014 — Is there a Shopify Payment App, and does it support current checkout extensibility or only the legacy gateway API?
+
+**A (2026-10-03):** Yes, there is an ABA PayWay Shopify Payment App available in the Shopify App Store (installed by searching for “ABA PayWay” and connecting with merchant credentials). Whether this app uses Shopify’s current checkout extensibility framework or the legacy gateway API is not specified in the available documentation.
+
+### S26-Q015 — Are there agency/partner programmes for agencies deploying PayWay across many stores?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q016 — What is the sandbox test-card workflow for plugins, and is there a documented testing mode?
+
+**A (2026-10-03):** For plugins, the sandbox test-card workflow is: 1) Enable testing mode in the plugin - WooCommerce: check Sandbox Mode in the ABA PayWay plugin settings and enter sandbox Merchant ID & API Key. - Shopify: turn on the Test Mode toggle in the ABA PayWay payment app settings. 2) Use sandbox environment & credentials - Plugin must point to the sandbox endpoints (e.g. https://checkout-sandbox.payway.com.kh/...) with sandbox merchant credentials only. 3) Place test orders and pay with test cards At checkout, choose ABA PayWay and use the documented sandbox test cards, for example: - Success: MasterCard 5156 8399 3770 6777, Exp 01/30, CVV 993 - Success: Visa 4286 0900 0000 0206, Exp 04/30, CVV 777 - Declined: MasterCard 5156 8302 7256 1029, Exp 04/30, CVV 777 - Declined: Visa 4156 8399 3770 6777, Exp 01/30, CVV 993 4) Verify responses and order status - Confirm success/decline status in the PayWay sandbox portal and in the e‑commerce order list. Documented testing mode: Yes — both WooCommerce and Shopify plugins have explicit, documented sandbox/test modes (Sandbox Mode in WooCommerce; Test Mode in Shopify) intended for this test-card workflow.
+
+### S26-Q017 — At what scale should we move from a plugin to a direct API integration?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q018 — What is the official support channel and SLA for integration issues, and how do we open a ticket?
+
+**A (2026-10-03):** Official integration support channels: - During active integration with PayWay team: use your dedicated Telegram integration group for technical questions and coordination.
+- If you don’t have an integration group / after go‑live / self‑integration: contact ABA Digital Support: - Phone: +855-98 203 407 - Email: digitalsupport@ababank.com - Hours: Mon–Fri 08:00–21:00; Weekends & Public Holidays 08:00–20:00 For merchant / POS / ABA Merchant App issues, use ABA Merchant Support:
+- Phone: +855-98-203-238, +855-98-203-239 (24/7)
+- Email: merchantsupport@ababank.com How to open a ticket / escalate an issue (integration or production):
+1. Collect screenshots, error messages, transaction IDs, and a clear description of the problem.
+2. Report in the Telegram integration group (if active) with those details.
+3. For urgent/production issues, send a formal email to the designated support address (e.g. digitalsupport@ababank.com) and CC the merchant support distribution as instructed by the integration team.
+4. Include transaction identifiers and error messages in the email.
+5. Integration/support team will then escalate internally to the relevant technical/operations teams and follow up. The docs specify support availability hours as above but do not define a numeric SLA (e.g. X hours to first response).
+
+### S26-Q019 — Is there a community forum, developer group, or GitHub repository for PayWay integrators?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S26-Q020 — Does PayWay provide reference implementations, and for which stack?
+
+**A (2026-10-03):** Yes. PayWay provides reference implementations in several forms: - Official SDKs / libraries for multiple stacks: C#, Java, JavaScript (web), Android, Flutter, and C++.
+- Sample source code and API request/response examples, available via the PayWay developer documentation.
+- Ready-made checkout plugins (which serve as reference integrations) for WooCommerce (WordPress), PrestaShop, and Shopify. For stacks outside these, integrators are expected to follow the public API docs and can request additional examples from the ABA PayWay Integration Team if needed.
+---
+## S27. Monitoring, Operations & Incident Response
+
+## S27. Monitoring, Operations & Incident Response
+
+### S27-Q001 — Is there a public status page or maintenance-notification mechanism we can subscribe to?
+
+**A (2026-10-03):** PayWay does not document any public status page or self-service subscription mechanism (like RSS/email signup) for status updates. Planned maintenance and outage notifications are described as being sent proactively via official merchant support / integration channels (e.g., your PayWay merchant-support or integration communication channels). Merchants are expected to follow those official notices for timing and recovery updates.
+
+### S27-Q002 — What is the officially published uptime/latency objective, and is there an SLA we can sign up to?
+
+**A (2026-10-03):** UNKNOWN — not documented
+
+### S27-Q003 — What are the escalation paths for a production outage — support channel, on-call contact, incident reference format?
+
+**A (2026-10-03):** For a production outage, the documented escalation/support path is: 1. Primary support channel (production): - Send a detailed email to Digital Support (support email provided by the bank, e.g. DigitalSupport@ababank.com). - Include: environment = production, merchant info, error description, timestamps, transaction IDs, screenshots, and any logs. 2. Escalation / VIP period: - If you are still within the post‑go‑live VIP window, also raise the issue directly in the integration project chat/group. - CC the Integration Team on the Digital Support email so they can push/escalate internally to technical/operations/settlement teams. 3. On‑call / phone contact: - For urgent/critical issues after VIP handover, contact Digital Support by phone using the bank’s published support numbers (documented as <098 203 407 or 016 630 619> in the process description). 4. Incident reference format: - The formal incident reference is the support case/ticket ID generated by Digital Support or the ticket/email reference from the provider’s ticketing system. - When opening the case, you should also quote transaction identifiers and timestamps as secondary references inside the ticket. No additional, separate public “on‑call engineer” contact or special incident‑ID format is documented beyond the Digital Support ticket/email/phone channels above.
+
+### S27-Q004 — Which endpoints and status codes should we alert on, and what is the recommended monitoring set?
+
+**A (2026-10-03):** From the documented behaviour, the recommended monitoring/alerting set should at least cover: 1) Core endpoints to monitor
+- Check Transaction API (e.g. /api/transaction/check or equivalent "Check Transaction" endpoint)
+- Callback / pushback endpoints (your webhook URLs configured with PayWay)
+- Refund-related APIs (where you see 408/timeouts and PTL errors in the docs)
+- Any other PayWay API endpoints you use in production where PTL / gateway / validation errors are returned. 2) HTTP status codes / conditions to alert on
+- 429 Too Many Requests → indicates rate limiting or gateway performance protection; you should alert and reduce polling frequency.
+- 403 Forbidden → often means invalid credentials, wrong endpoint/method/body, or domain/whitelist problems.
+- 408 Request Timeout on refund or similar operations → documented as gateway-level timeout/invalid request; should be investigated.
+- 4xx on callbacks (e.g. 400/403/404) → PayWay reached your callback but your app rejected it. Monitor non‑200 responses from your callback endpoint.
+- 5xx from your callback endpoint → indicates your system failed while processing the pushback.
+- Connection / TLS failures on callbacks (timeouts, DNS errors, SSL issues) → indicate your callback is unreachable; use Check Transaction as fallback while investigating. 3) Gateway / PTL / business error patterns to watch
+- Credential / lifecycle / config errors - Status/code 21 with message "End of API lifetime" → credential or testing window expired. - PTL62 – "Invalid merchant information." (merchantid / merchantauth / security config issue). - Log message "Merchant have no security config file." – missing security configuration.
+- Whitelist / domain / IP issues - PTL175 – "Requested Domain is not in whitelist." - Other domain‑not‑whitelisted messages (e.g. code 6 with such description).
+- Timestamp / expiry issues - PTL06 – "The Request is Expired" – bad/expired request_time.
+- Transient / concurrency issues - PTL157 – transient error → treat as retryable, but alert if frequent. - PTL168 – concurrency validation error for duplicate operations on same transaction.
+- Generic / internal gateway errors - PTL63 – internal gateway error (as seen in logs). - SYS-ERR – "Sorry, something went wrong. Please try again later."
+- Business/validation errors worth tracking (for data quality & limits) - "Purchase with zero amount is not allowed" (Code 45). - "Purchase amount has reached transaction limit". - "Merchant Profile's MID is missing". - USD-NOT-ALLOW – invalid USD amount format (wrong decimal precision). 4) Callback health checks
+- Monitor that callbacks are received and return HTTP 200.
+- Alert when: - Pushbacks repeatedly receive non‑200 from your endpoint, or - There is a noticeable drop in callback volume vs. transaction volume (indicating connectivity problems), and - You are relying heavily on callbacks without compensating with Check Transaction. Overall, the docs emphasise:
+- Use callbacks + Check Transaction together.
+- Alert on non‑200 callbacks, 429, 403, 408, and PTL/SYS‑ERR patterns as above.
+- Watch for repeated PTL/validation errors as indicators of configuration or integration problems.
+
+### S27-Q005 — What is the recommended retry/backoff strategy per endpoint, and which requests must never be auto-retried?
+
+**A (2026-10-03):** 1) Check Transaction API (check-transaction / check-transaction-2)
+- Call from backend only, after you have a valid tran_id.
+- Common patterns from the docs: - Initial wait: a short delay after create (examples: ~3 seconds for QR UX, or ~20 seconds for backend jobs). - Polling cadence: every 3–5 seconds for near‑real‑time QR flows, or 10–20 seconds for more conservative production polling. - Retry window: typically 3–5 attempts within a few minutes, or up to the QR lifetime (often ~5 minutes), then stop.
+- Stop conditions: stop polling when status is terminal (Approved/Declined/Expired/Cancelled) or when transaction lifetime/QR expiry is reached.
+- Backoff / rate‑limit handling: if you see HTTP 429 or timeouts, slow down polling (increase interval) and/or implement exponential backoff; avoid per‑second tight loops. 2) Create‑payment / checkout and similar initiate requests
+- When requests time out or return 502/504/524 / “Something went wrong”: - Retry with exponential backoff only if the operation is idempotent. - Use a unique tran_id and treat create‑payment as idempotent on your side to avoid duplicate charges. - After a timeout, do not assume failure; confirm final state using Check Transaction.
+- Backoff guideline from docs: “retry with exponential backoff; track retries to avoid duplicate attempts” — i.e. short initial delay, then increase interval between retries, and cap the total retry window (e.g. a few minutes) before switching to manual/reconciliation. 3) Pushback/webhook callbacks from PayWay
+- PayWay itself uses only a short timeout window and limited retries; you must not rely on repeated pushback.
+- Your system should not try to make PayWay re‑push by hammering any API; instead, on missing/failed callbacks you are required to: - Harden your endpoint (fast HTTP 200, HTTPS OK, no 5xx), and - Use Check Transaction as the fallback to recover status. 4) Requests that must not be auto‑retried blindly
+- Docs explicitly warn for PRE‑AUTH capture/completion: - If a capture/complete request for a pre‑auth times out and you cannot confirm status, “do not force duplicate captures.” - In this case, do not auto‑retry in a loop; instead, provide logs and tran_id to PayWay for investigation and decide whether to retry once after recovery, cancel, or wait for automatic reversal.
+- More generally, per the docs, only idempotent operations should be auto‑retried with backoff. For non‑idempotent financial actions (e.g. certain captures, possibly refunds/cancels depending on your design), treat retries with extreme care and avoid automatic repeated attempts that can cause duplicate financial movements. Summary from the documentation:
+- Check Transaction: short initial delay, poll every 3–5s (or up to 10–20s), 3–5 attempts within QR lifetime, stop on terminal status or expiry, back off on 429/timeouts.
+- Create/checkout: retry timeouts with exponential backoff only when idempotent and always reconcile via Check Transaction.
+- Never auto‑retry blindly: especially pre‑auth capture (and in general any non‑idempotent operation) without manual/reconciled verification.
+
+### S27-Q006 — What client timeout and connect timeout should we configure against each endpoint?
+
+**A (2026-10-03):** The documentation only gives general guidance, not per-endpoint/connect-timeout values: - For client-side HTTP timeouts when initiating a payment/checkout request to PayWay, you should not use very short timeouts (like 5s). The recommended range is a generous 15–30 seconds so normal network latency and synchronous processing can complete.
+- When such a request times out on your side, you must not assume the payment failed; instead, use the Check Transaction API or rely on server-to-server callbacks to confirm final status.
+- For pushbacks/callbacks from PayWay to you, the gateway’s own timeout is around 15 seconds and your endpoint should respond well under that (ideally <5s) and return HTTP 200, doing heavy work asynchronously. The docs do not specify numeric per-endpoint client/connect timeouts (e.g., different values for create vs check-transaction vs refund) beyond the above guidance, nor do they define explicit TCP connect-timeout values. In practice, apply the 15–30s client/read timeout guideline for outbound payment-related API calls, and design your callback endpoint to answer quickly within the gateway’s ~15s window.
+
+### S27-Q007 — What is the officially recommended reconciliation job to run as a safety net for missed callbacks, and at what cadence?
+
+**A (2026-10-03):** The officially recommended safety‑net is a scheduled reconciliation job (cron) that: - Calls the Get Transaction‑by‑Ref API (get-transactions-by-mc-ref) using your merchant_ref/customer ID to fetch recent PayWay transactions.
+- Compares the returned APPROVED transactions with your local records to detect any payments that did not arrive via callback, then books/updates them in your system. Cadence: run this reconciliation job every 5–10 minutes in production as a background process.
+
+### S27-Q008 — How should we alert on transactions stuck in `PENDING` beyond our threshold?
+
+**A (2026-10-03):** Use the pending-queue pattern from the docs and put alerting on top of it: 1) **Define a pending threshold** - Base it on your polling/lifetime rules: - Poll with Check Transaction for a limited window (examples in docs: QR lifetime ~5 minutes; overall polling windows 5–15 minutes, some integrations up to 30 minutes) and then stop. - After that window, treat the payment as *incomplete* from a UX point of view, even though the gateway will keep it `PENDING` indefinitely. 2) **Mark and alert per‑transaction** - When a transaction remains `PENDING` beyond your chosen threshold, move it into your **internal queue marked as pending/problematic** (per "pending payments queue" guidance). - Trigger an **alert to your ops/support team** for these items so they can: - Reconfirm via Check Transaction / Get Transaction Details or merchant portal, and - Decide whether to deliver service, wait, or request reversal/credit via PayWay support (per the KHQR troubleshooting guidance). 3) **Aggregate/anomaly alerting** - Monitor the **count and rate** of transactions in this stuck‑pending queue. - If **many transactions show this behavior**, the docs say to **ask the Integration Team to check for API queueing or processing issues**; you should raise a higher‑severity alert in this case and escalate with a sample of tran_ids. 4) **Retention window for the queue** - Keep these problematic `PENDING` items in your internal queue only up to your retention period (docs example: up to **1 day**), with your alerts tied to that window. - After that, stop checking them automatically and close them according to your business policy (e.g., mark as expired/failed).
+
+### S27-Q009 — What logging and redaction rules apply to PayWay requests/responses in production logs?
+
+**A (2026-10-03):** For PayWay requests/responses in production, the documented rules are: - Treat all credentials as sensitive: merchant code/ID, API key or secret key, credential files, passwords, tokens, RSA keys.
+- Do not share these values in open channels (e.g., chat). When you need to show examples or logs, replace them with placeholders.
+- If any keys/credentials appear in logs, redact/mask them before sharing logs or screenshots with external parties. Outside of that, the docs do not prescribe additional field‑by‑field logging requirements; the key point is strict redaction of any secrets when logs are exposed or shared.
+
+### S27-Q010 — Is there a supported way to inspect callback delivery history for a specific `tran_id` during an incident?
+
+**A (2026-10-03):** The documented approach is **not a self-service API/UI**, but a combination of your own logs plus ABA support: 1) **Merchant-side:** - Check your **callback (pushback) endpoint logs** to see whether PayWay reached your URL, what HTTP status you returned, and any timeouts/errors. 2) **ABA-side (supported path):** - During an incident, provide the exact **`tran_id`** to the ABA PayWay Integration Team. - They can then **inspect PayWay pushback logs for that tran_id** and share log snippets (e.g., whether callbacks were attempted, if they timed out, or got non‑2xx responses). So: there is *no* dedicated public API to browse callback history; investigation is done via your own webhook logs plus ABA’s internal logs accessed through the Integration Team using `tran_id`.
+
+### S27-Q011 — What is the official process for a duplicate-charge incident — customer refund, evidence, and dispute handling?
+
+**A (2026-10-03):** Official process for a duplicate‑charge incident combines **refund** + **evidence** + **dispute handling** as follows: 1) **Identify and verify duplicates** - Confirm which payments are duplicated/erroneous by checking **PayWay portal + settlement/IBanking** to see which transactions were actually settled to your account. - Collect core details: PayWay transaction ID(s), order ID, amount, date/time, customer info. 2) **Customer refund path** - If it’s clearly a duplicate/erroneous charge and the transaction is within the online refund window and method supports it: - Refund directly via **PayWay merchant portal** (or Refund API, if integrated) for the specific transaction ID.
+- If portal/API refund is **not possible** (e.g. outside 30‑day window, KHQR cross‑bank, portal button unavailable, issuer decline): - Request an **offline/manual cancellation/refund form** from ABA PayWay Merchant Support. - Fill in transaction details and full/partial refund amount, have it **signed by authorized signatories** (and stamped if required), then return via the agreed channel. - ABA processes the manual refund and confirms; card / cross‑border refunds can take **several business days (e.g. up to ~2 weeks)** to appear to the customer. 3) **Evidence collection (for disputes/chargebacks)** When a bank/acquirer or PayWay raises a **chargeback or dispute** related to the duplicate or any suspicious/contested transaction, prepare:
+- PayWay **transaction receipt** and identifier(s) (tran_id / Purchase ID). - **Order/booking details**, invoices, OTA vouchers where relevant. - **Proof of service/delivery** (waybills, check‑in records, service logs, start/end dates). - **Guest ID/passport** or registration form where applicable. - Backend/admin **screenshots or exports** (CSV/XLSX) showing customer name, contact, address, order + delivery info; logs tying the user/device/IP to the transaction. - **Customer communications** (email/chat) explaining what happened, including any explanation of duplicate submissions or known bugs. 4) **Chargeback / dispute handling flow** - Bank/PayWay sends a **chargeback notification** with case details, reason code, and a **deadline**. - Merchant chooses to **accept/refund** or **dispute**: - **Accept / refund**: reply confirming acceptance (e.g. “Agree to accept this chargeback”) or request/sign the cancellation/refund form; bank/PayWay then processes reversal/refund. - **Dispute**: submit the collected **supporting evidence** via the instructed channel (email/portal) within the deadline. - ABA/Acquirer reviews the evidence, may request more info, and then: - If the merchant **wins**, disputed amount can be **credited back** to the merchant account. - If the merchant **loses** or does not respond in time, the **chargeback stands** and funds remain/revert to the cardholder. - During ongoing disputes or abnormal activity, PayWay/bank may **temporarily hold/deduct** disputed amounts or even **temporarily disable card payments** on the terminal until resolved. 5) **Ongoing coordination** - Coordinate with ABA PayWay / Merchant Support by email/shared channel until each case is closed. - Keep all forms, evidence, and communication records for future dispute handling or audits.
+
+### S27-Q012 — What is the official process when a customer reports a payment they do not see on their statement?
+
+**A (2026-10-03):** Officially, handle it as a reconciliation/trace case: 1) Check PayWay / merchant side - Locate the transaction in your system (order ID, tranid) and check: - PayWay **Check Transaction / Get Transaction Details / merchant portal** status. - Whether the transaction was **ever settled** to your merchant account (via portal or bank statement). 2) **If PayWay shows no settlement / no record** - Inform the customer that, based on bank/PayWay logs, the payment was **not completed or was reversed**. - Ask them to re‑check their **own statement/app** for the transaction time range. 3) **If there is any mismatch (customer shows a successful screen but no statement entry)** - Treat it as a possible **reversal / non‑settled transaction**: - Capture evidence from the customer (screenshot of app screen, reference, timestamp). - Keep your own logs (tranid, timestamps, Check‑Transaction result). - Escalate to ABA PayWay Integration / Merchant Support with these identifiers so they can confirm from bank‑side logs whether any deduction/settlement occurred. 4) If PayWay shows settlement but customer’s bank/app does not (cross‑bank or card) - Per cross‑bank guidance, advise the customer to contact their receiving bank while you provide sanitized transaction references via ABA PayWay to support any trace. Throughout, do not share sensitive data; use sanitized transaction IDs and screenshots when escalating.
+
+### S27-Q013 — Do you provide a transaction-search tool for support staff to help merchants diagnose a specific `tran_id`?
+
+**A (2026-10-03):** Yes. Officially there are two main ways to search by tran_id to help merchants diagnose issues: 1) Merchant portal search Support/merchant staff can use the PayWay merchant portal/admin interface to look up transactions by transaction ID / order ID and date range, then check status and settlement. 2) Internal log lookup by the Integration Team When a merchant reports an issue and provides the exact tran_id (case‑sensitive), the ABA PayWay Integration Team/support can search internal gateway logs for that tran_id and share findings. There is no separate public “support-only” search UI documented beyond the standard merchant portal; deeper log searches are done internally by the Integration Team using the provided tran_id.
+
+### S27-Q014 — Are there maintenance windows, and how are they announced?
+
+**A (2026-10-03):** (bot went silently unresponsive to this specific question across 3 attempts while answering neighbors — treat as bot-side refusal/no-data; raise with ABA directly)
+
+### S27-Q015 — What business-continuity guidance is offered if PayWay is unavailable?
+
+**A (2026-10-03):** When PayWay is unavailable, the documented business‑continuity guidance is: - Follow official notices Monitor the ABA PayWay merchant/support channels for incident and restoration updates, including scheduled maintenance windows and unscheduled outages. - Use alternate payment methods temporarily During outages or degraded performance, merchants are advised to accept alternate payment methods (offline payments, other gateways, etc.) until PayWay service is restored. - Avoid aggressive retries / duplicates Inform customers that processing may be slow and avoid repeated retries that can create duplicate payment attempts, especially during partial outages or timeouts. - Consider disabling the channel during incidents For known incidents/maintenance windows, integrators may temporarily disable the PayWay payment option to reduce user‑facing errors and duplicates, and re‑enable it after restoration is confirmed. - Post‑incident reconciliation After PayWay is back to normal, reconcile all affected transactions (statements vs. pushback/callback logs vs. merchant system). If callbacks were missed, use check‑transaction / reconciliation APIs and follow the manual booking flow for any settled but unposted payments.
+---
+## S28. Known Gaps & Contradictions to Resolve Explicitly
+These are the items where documentation and observed behaviour are known to disagree.
+Please answer each with `CONFIRMED` / `FALSE (correct behaviour)` / `UNKNOWN`, and if
+`UNKNOWN`, tell us who at ABA owns the answer.
+
+## S28. Known Gaps & Contradictions to Resolve Explicitly
+
+### S28-Q001 — Checkout `lifetime` is in minutes while QR `lifetime` is in seconds. Confirm both, and state where else this unit differs between domains?
+
+**A (2026-10-03):** The statement is not correct per documentation. - Checkout lifetime: documented as lifetime / life_time in the APIs and is in minutes.
+- QR lifetime (for QR/KHQR generated by those APIs): controlled by the same lifetime parameter, also in minutes. Defaults and examples (3, 5, 10 minutes, 30 days, etc.) are all expressed in minutes, not seconds. Seconds only appear in UI representation, not at gateway/API level:
+- Backend: lifetime in minutes (e.g., 3 minutes).
+- Frontend/UI: recommended to show a countdown in seconds (e.g., 180 seconds) that equals lifetime * 60 for clarity. Other unit differences between domains documented:
+- Transaction lifetime vs status‑check window: transaction lifetime is in minutes, while the Check Transaction API validity window is described in days (e.g., API valid for ~7 days after transaction). There is no domain in the docs where QR lifetime itself is defined in seconds at the API level.
+
+### S28-Q002 — Documented 26-field purchase hash vs actual 27-field hash (with `ctid`). Which is officially correct?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q003 — Payment-link pushbacks and CoF `pwt` callbacks do not verify under the documented HMAC canonicalization. Is there a published canonicalization for these two contracts?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q004 — Offline KHQR notifications have no documented authentication contract. What is the officially mandated verification path?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q005 — Callbacks are single best-effort delivery with no retry. Is there any guaranteed redelivery or replay mechanism, or is inquiry the only recovery?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q006 — Payment links have no `EXPIRED` status and expired links still accept HTTP 200. What is the officially recommended expiry enforcement?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q007 — Closing a transaction is not enforced on the hosted-card path (payments still land), but is enforced on QR. What is the officially supported remedy?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q008 — Payment-link `void` is not idempotent (second void returns `PTL188`). Is that intended design?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q009 — `removeToken` returns success for a non-existent token. Is that intended, and what is the supported existence check?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q010 — An expired uncaptured pre-auth auto-cancels with no webhook. Confirm, and state the detection mechanism?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q011 — `transaction-list` omits unpaid QR-only transactions. Is this a documented limitation or a bug?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q012 — `get-transactions-by-mc-ref` caps at 50 rows with no pagination. Is there a documented path to complete history for a high-volume reference?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q013 — CoF link-account QR window: documented 10 minutes vs observed ~90 seconds. Which is the supported value, and is there a way to extend it?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q014 — Link-card requires form-urlencoded and always returns HTML; the real result is in a `302` redirect target. Is there a documented JSON/typed alternative?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q015 — `status.code 6` (not found) is returned as HTTP 200 rather than 4xx. Is that the documented contract?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q016 — Rate-limit responses return HTTP 403 with numeric body code 429 and no rate-limit headers. Is that the documented contract, and is a `Retry-After` available?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q017 — `payment_status` reads `REFUNDED` after a partial refund. Is there a status that distinguishes full vs partial refund?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q018 — After a split payout the standard refund API is unavailable. Is there a documented, supported alternative in all cases?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q019 — Sandbox payout beneficiaries are restricted to seeded accounts, and sandbox payouts are USD-only. What is the production equivalent constraint?
+
+> **(no answer — bot went silent before this section; re-ask later)**
+
+### S28-Q020 — Subscriptions cannot be tested in sandbox because the sandbox profile is not subscription-enabled. What is the fastest path to validate subscription integration before go-live?
+
+> **(no answer — bot went silent before this section; re-ask later)**

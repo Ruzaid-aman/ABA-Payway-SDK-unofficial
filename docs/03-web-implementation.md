@@ -583,6 +583,13 @@ Configure `continueSuccessUrl` for the hosted customer success continuation and 
 
 Never mark paid or clear the cart based solely on navigation, query parameters or a provider success screen. Obtain Integration Team review of checkout and KHQR screens before production credentials are released.
 
+When provided, `returnUrl` must be public HTTPS on port 443. The SDK validates this
+before signing a payload, building a checkout form, or submitting a purchase;
+the same check applies to CLI `--return-url`. A base64-encoded `returnUrl` is
+validated after decoding and stays encoded exactly once on the wire. Callback
+delivery restrictions do not apply to browser continuation ports. Use a public
+tunnel or reverse proxy when your local callback listener runs on another port.
+
 ```typescript
 // routes/payment-result.ts
 import { Router } from 'express';

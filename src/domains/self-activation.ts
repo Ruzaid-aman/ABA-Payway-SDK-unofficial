@@ -141,6 +141,7 @@ export function createSelfActivationDomain(
       if (typeof params.redirectUrl === 'string') {
         validatePublicHttpsUrl(params.redirectUrl, 'redirectUrl', {
           allowPrivateHosts: config.allowPrivateCallbackHosts === true,
+          requireStandardPort: false,
         });
       } else if (params.redirectUrl && typeof params.redirectUrl === 'object') {
         assertNonEmpty(params.redirectUrl.ios_scheme, 'redirectUrl.ios_scheme');

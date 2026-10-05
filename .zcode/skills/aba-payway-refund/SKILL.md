@@ -75,6 +75,17 @@ validation explicitly (the detail lookup is rate-limited to 10/min). Under
 `--json`, preflight diagnostics go to stderr and local rejections emit the
 `{ error: { kind: 'validation', … } }` envelope on stdout.
 
+## Uncertain refund outcome
+
+The SDK submits refunds once by default. After a timeout, preserve the refund
+intent and serialize further refund work for that transaction. Compare
+`transaction-detail` refund amounts and operations with the pre-submit totals;
+`REFUNDED` can describe an earlier partial refund, and an unchanged immediate
+read does not prove failure. A repeated partial refund can execute again.
+Keep ambiguous attempts unresolved and ask PayWay support to trace them before
+resubmission. Do not use `--no-preflight` as timeout recovery or share secrets in
+support logs. Full runbook: `payway-sdk docs errors-and-debugging`.
+
 ## No refund after payout/split
 Once a transaction has been processed via payout/split, the **standard refund API is not available** (ABA-confirmed 2026-09-12) — refunds are manual, or a pre-auth refund before the split. Design split flows to make refund decisions before completing the payout. See `payway-sdk docs settlement-disputes` (served offline: settlement, payouts, FX, and disputes).
 

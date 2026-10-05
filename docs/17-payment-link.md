@@ -72,8 +72,8 @@ const linkId = link.data?.id;             // ← save for getDetails (NOT the UR
 | `amount` | `amount` | number | yes | >0; USD ≤2dp, KHR integer (throws); below 0.01 USD / 100 KHR floor **warns** |
 | `currency` | `currency` | `'USD' \| 'KHR'` | gateway-required | defaults `'USD'`; omitting it in the raw API answers PTL04 (sandbox-verified, undocumented) |
 | `merchantRefNo` | `merchant_ref_no` | string | SDK-required | non-empty (throws — stricter than the official "optional"); ≤50 chars **warns** (strict → throw); gateway does NOT reject duplicates — uniqueness is your job |
-| `returnUrl` | `return_url` | string | yes | public HTTPS (throws otherwise); base64-encoded automatically by the SDK |
-| `description` | `description` | string | no | >250 chars **throws** (sandbox-verified PTL04) |
+| `returnUrl` | `return_url` | string | yes | public HTTPS on port 443 (throws otherwise); base64-encoded automatically by the SDK |
+| `description` | `description` | string | no | >250 chars **throws** (sandbox-verified PTL04); leading `=`, `+`, `-`, or `@` **warns** (strict -> throw; chatbot guidance, not gateway-verified) |
 | `paymentLimit` | `payment_limit` | number | no | max number of payments; unset = unlimited; link flips to `PAID` when `total_trxn == payment_limit` |
 | `expiredDate` | `expired_date` | number | no | epoch seconds; unset = no expiry. Gateway rejects past values and offsets < ~5 min (PTL04, sandbox-verified); after expiry the link still reads OPEN — enforce expiry yourself |
 | `payout` | `payout` | `{acc, amt}[]` \| pre-encoded string | no | see §17.5 |

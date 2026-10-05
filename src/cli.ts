@@ -2102,6 +2102,7 @@ program
   .option('-y, --force', 'Skip the confirmation prompt (balance pre-flight still runs; use --no-preflight to skip validation)')
   .option('--no-preflight', 'Skip the balance pre-flight check (detail API is rate-limited to 10/min)')
   .option('--json', 'Print the raw JSON response')
+  .addHelpText('after', '\nTimeout recovery: do not blindly repeat a refund. Use transaction-detail and journal timeline\nto reconcile refund_amount and transaction_operations against the pre-submit total.\nREFUNDED also covers partial refunds; an unchanged status does not prove this attempt failed.\nKeep unresolved attempts pending and consult payway-sdk docs errors-and-debugging.\n')
   .action(
     async (opts: {
       transactionId: string;
@@ -2346,7 +2347,7 @@ program
   .option('--payment-option <option>', 'Payment option (omit to let PayWay show all options)')
   .option('--allow-duplicate-id', 'Accepted for compatibility; local form signing does not submit a transaction')
   .option('--payment-gate <0|1>', 'Hosted checkout gate; use 0 for the browser-hosted payment page')
-  .option('--return-url <url>', 'Return URL after payment')
+  .option('--return-url <url>', 'Server callback URL (public HTTPS port 443); browser continuation uses --continue-success-url')
   .option('--cancel-url <url>', 'Cancel URL')
   .option('--skip-success-page <0|1>', 'Skip the PayWay success page (0 or 1)')
   .option('--continue-success-url <url>', 'Destination used by the hosted page Continue action')
@@ -3147,7 +3148,7 @@ program
   .option('--payment-option <option>', 'Payment option', 'abapay_khqr_deeplink')
   .option('--payment-gate <0|1>', 'Gate 0 returns hosted HTML; use checkout-form for browser navigation')
   .option('--callback-url <url>', 'Callback endpoint configured in PayWay merchant settings')
-  .option('--return-url <url>', 'Return URL after payment')
+  .option('--return-url <url>', 'Server callback URL (public HTTPS port 443); browser continuation uses --continue-success-url')
   .option('--cancel-url <url>', 'Cancel URL')
   .option('--ctid <ctid>', 'Subscription token identifier (required with --token-flag)')
   .option('--token-flag <flag>', 'Subscription token flag (purchase path: CITR_FIX only)')

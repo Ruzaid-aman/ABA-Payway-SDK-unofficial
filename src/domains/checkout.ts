@@ -12,6 +12,7 @@ import {
   formatRequestTime,
   validateCurrency,
   validatePurchaseLifetimeMinutes,
+  validatePublicHttpsUrl,
   validatePositiveAmount,
   validatePayoutEntryShape,
   validateRefundAmount,
@@ -213,6 +214,9 @@ export interface CheckoutDomain {
    * @param currency - The original transaction currency. Defaults to 'USD'.
    *   Providing the correct currency enables client-side minimum-amount
    *   validation (PayWay returns PTL04 if refund_amount < 0.01 USD).
+   * A timeout leaves the outcome unknown. Reconcile cumulative refund amounts
+   * and operations before resubmitting; REFUNDED alone also covers partial
+   * refunds. The transport submits refunds once by default.
    */
   refund: (
     transactionId: string,
@@ -282,6 +286,12 @@ export function createCheckoutDomain(
     validatePositiveAmount(params.amount, params.currency || 'USD');
     validateCurrency(params.currency);
     validatePurchaseLifetimeMinutes(params.lifetime);
+    if (params.returnUrl) {
+      validatePublicHttpsUrl(params.returnUrl, 'returnUrl', {
+        allowPrivateHosts: config.allowPrivateCallbackHosts === true,
+        allowBase64: true,
+      });
+    }
 
     // ── Advisory gateway limits (live docs; audit §5) — warn unless
     // strictValidation escalates. Required-field rules below throw. ──

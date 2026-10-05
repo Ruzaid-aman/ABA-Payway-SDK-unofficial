@@ -101,8 +101,8 @@
     {
       "file": "references/web-implementation.md",
       "source": "docs/guides/03-web-implementation.md",
-      "sourceSha256": "1773b1ef9fef14cd",
-      "sha256": "63af262d841861b5"
+      "sourceSha256": "0a6c8f5d8eb4bd33",
+      "sha256": "859f88a39e3e5096"
     },
     {
       "file": "references/native-apps.md",
@@ -155,8 +155,8 @@
     {
       "file": "references/errors-and-debugging.md",
       "source": "docs/guides/12-error-handling-and-debugging.md",
-      "sourceSha256": "3304d363c0d5b9c0",
-      "sha256": "7bc15e0cf1b6792a"
+      "sourceSha256": "7e84a3630de6333e",
+      "sha256": "3207f27af1e1068c"
     },
     {
       "file": "references/deployment-checklist.md",
@@ -185,8 +185,8 @@
     {
       "file": "references/payment-link.md",
       "source": "docs/guides/17-payment-link.md",
-      "sourceSha256": "3b0c2a1f4d2d6003",
-      "sha256": "7ad3515cd2a3b066"
+      "sourceSha256": "fd2629ca85dd17b1",
+      "sha256": "51f51b29df8b0861"
     },
     {
       "file": "references/transaction-journal.md",

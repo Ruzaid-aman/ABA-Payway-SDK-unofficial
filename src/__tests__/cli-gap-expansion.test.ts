@@ -833,6 +833,17 @@ describe('API command validation/preflight expansion', () => {
     expect(json.error.message).toContain('Currency must be USD or KHR');
   });
 
+  it('generate-checkout rejects a custom callback port with one JSON validation envelope', async () => {
+    const out = await run([
+      'generate-checkout', '-a', '5', '-t', 'V2-PORT', '--return-url', 'https://example.com:8443/cb',
+      '-y', '--json', '--no-polling', '--no-save-image', '--no-open-image',
+    ]);
+    const doc = parseJsonDocument(out.stdout);
+    expect(out.exitCode).toBe(1);
+    expect(doc.error.kind).toBe('validation');
+    expect(doc.error.message).toContain('standard HTTPS port 443');
+  });
+
   it('generate-checkout rejects invalid --payment-gate and --skip-success-page values before any network call', async () => {
     const gate = await run(['generate-checkout', '-a', '5', '-c', 'USD', '--return-url', 'https://example.com/ok', '--cancel-url', 'https://example.com/no', '--payment-gate', '2', '-y', '--json']);
     expect(gate.exitCode).toBe(1);

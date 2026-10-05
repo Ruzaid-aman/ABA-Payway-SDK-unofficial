@@ -131,6 +131,10 @@ export function createPaymentLinkDomain(
           `description must be at most 250 characters, received: ${params.description.length}`,
         );
       }
+      // Questionnaire v2 S12-Q004; advisory until independently gateway-verified.
+      if (params.description !== undefined && /^[=+@-]/.test(params.description)) {
+        warnAdvisory(config, 'payment-link description should not start with =, +, -, or @ (PayWay chatbot guidance; not gateway-verified)');
+      }
 
       // Sandbox-verified: PayWay rejects requests without return_url
       // ("The return_url field is required." — PTL04).

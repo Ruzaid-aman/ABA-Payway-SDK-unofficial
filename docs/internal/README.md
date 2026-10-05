@@ -13,6 +13,7 @@ Canonical mappings
 | Additional integration/product/finance policy questions | `audit-results/four-pillars/ABA-OPEN-QUESTIONS.md`, Q44–Q56 (2026-10-02); owner inputs, not sent externally |
 | Restricted integration companion design | `docs/internal/INTEGRATION-SKILL-COMPANION.md` (proposed roles/approval/evidence boundary) |
 | Close-transaction semantics | `docs/internal/CLOSE-TRANSACTION-FINDINGS.md` |
+| Questionnaire v2 SDK/CLI review and chatbot conflicts | `docs/internal/PAYWAY-CHATBOT-QUESTIONNAIRE-V2-AUDIT-2026-10-04.md` |
 | Historical audits and remediation | `audit-results/` (see `audit-results/merged-remediation-review-2026-09-08/`) |
 | Where to find publish/package gating rules | `scripts/check-package-contents.mjs` and `docs/RELEASE-READINESS.md` |
 

@@ -168,9 +168,9 @@
       "description": "Hosted checkout + server-side purchase flow for web apps, with callback verification.",
       "source": "docs/guides/03-web-implementation.md",
       "file": "web-implementation.md",
-      "bytes": 32257,
-      "sha256": "63af262d841861b5",
-      "sourceSha256": "1773b1ef9fef14cd"
+      "bytes": 32735,
+      "sha256": "859f88a39e3e5096",
+      "sourceSha256": "0a6c8f5d8eb4bd33"
     },
     {
       "topic": "native-apps",
@@ -258,9 +258,9 @@
       "description": "Every PayWay error code with sandbox-verified hints; the debugging playbook.",
       "source": "docs/guides/12-error-handling-and-debugging.md",
       "file": "errors-and-debugging.md",
-      "bytes": 66104,
-      "sha256": "7bc15e0cf1b6792a",
-      "sourceSha256": "3304d363c0d5b9c0"
+      "bytes": 67905,
+      "sha256": "3207f27af1e1068c",
+      "sourceSha256": "7e84a3630de6333e"
     },
     {
       "topic": "deployment-checklist",
@@ -308,9 +308,9 @@
       "description": "Payment-link create/detail/void contract incl. pushbacks and VOIDED semantics.",
       "source": "docs/guides/17-payment-link.md",
       "file": "payment-link.md",
-      "bytes": 21237,
-      "sha256": "7ad3515cd2a3b066",
-      "sourceSha256": "3b0c2a1f4d2d6003"
+      "bytes": 21348,
+      "sha256": "51f51b29df8b0861",
+      "sourceSha256": "fd2629ca85dd17b1"
     },
     {
       "topic": "transaction-journal",
@@ -478,7 +478,7 @@
     },
     {
       "file": "docs-packaged/guides/03-web-implementation.md",
-      "sha256": "3814fdb56ce43530"
+      "sha256": "599dd0197c4a8b5a"
     },
     {
       "file": "docs-packaged/guides/04-native-app-implementation.md",
@@ -514,7 +514,7 @@
     },
     {
       "file": "docs-packaged/guides/12-error-handling-and-debugging.md",
-      "sha256": "6b6c5266794ca88e"
+      "sha256": "fabcb05c4978b4be"
     },
     {
       "file": "docs-packaged/guides/13-deployment-checklist.md",
@@ -534,7 +534,7 @@
     },
     {
       "file": "docs-packaged/guides/17-payment-link.md",
-      "sha256": "68ad3d021f4d2821"
+      "sha256": "94bc34097a038dd1"
     },
     {
       "file": "docs-packaged/guides/18-transaction-journal.md",
@@ -705,8 +705,8 @@
     {
       "file": "skills/aba-payway-integration/references/web-implementation.md",
       "source": "docs/guides/03-web-implementation.md",
-      "sourceSha256": "1773b1ef9fef14cd",
-      "sha256": "63af262d841861b5"
+      "sourceSha256": "0a6c8f5d8eb4bd33",
+      "sha256": "859f88a39e3e5096"
     },
     {
       "file": "skills/aba-payway-integration/references/native-apps.md",
@@ -759,8 +759,8 @@
     {
       "file": "skills/aba-payway-integration/references/errors-and-debugging.md",
       "source": "docs/guides/12-error-handling-and-debugging.md",
-      "sourceSha256": "3304d363c0d5b9c0",
-      "sha256": "7bc15e0cf1b6792a"
+      "sourceSha256": "7e84a3630de6333e",
+      "sha256": "3207f27af1e1068c"
     },
     {
       "file": "skills/aba-payway-integration/references/deployment-checklist.md",
@@ -789,8 +789,8 @@
     {
       "file": "skills/aba-payway-integration/references/payment-link.md",
       "source": "docs/guides/17-payment-link.md",
-      "sourceSha256": "3b0c2a1f4d2d6003",
-      "sha256": "7ad3515cd2a3b066"
+      "sourceSha256": "fd2629ca85dd17b1",
+      "sha256": "51f51b29df8b0861"
     },
     {
       "file": "skills/aba-payway-integration/references/transaction-journal.md",
@@ -914,7 +914,7 @@
     },
     {
       "file": "skills/aba-payway-integration/references/MANIFEST.json",
-      "sha256": "bb72e9f4dd9d07a2"
+      "sha256": "a05d1df674732214"
     }
   ]
 }

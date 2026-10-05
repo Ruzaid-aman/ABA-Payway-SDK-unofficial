@@ -512,6 +512,35 @@ Then interpret these fields carefully:
 - `transaction_operations`: refund event history, including each refund action
 - `payment_status`: coarse lifecycle state only; sandbox verification on August 25, 2026 showed `payment_status: REFUNDED` even after a partial refund, so do not treat it as proof that the full original amount was refunded
 
+### Recovering an uncertain refund
+
+A refund timeout or transport error leaves the result unknown. Refunds have no
+documented gateway idempotency key, and multiple partial refunds are allowed.
+The SDK therefore submits a refund once by default. Do not wrap it in a generic
+retry loop or treat a second submission as a harmless replay.
+
+1. Persist the refund intent, original `tran_id`, order currency, requested
+   amount, cumulative refunded amount before submission, and correlation ID.
+   Serialize refund operations for that transaction across your workers.
+2. Inspect `transaction-detail -t <id> --json` and
+   `journal timeline -t <id> --json`. Compare `refund_amount` and
+   `transaction_operations` with the saved pre-submit state in the order's
+   currency. `check-transaction` alone cannot establish the refunded amount.
+3. `REFUNDED` may describe an earlier partial refund. For example, a total of
+   USD 2 before a timed-out USD 3 refund requires evidence of the additional
+   USD 3; the status word alone cannot confirm that intent. An unchanged detail
+   result immediately after timeout also does not establish failure.
+4. Keep the intent unresolved until the amount delta and operation evidence
+   establish its outcome. An operator may resubmit only after confirming that
+   the original attempt did not execute and no competing refund is in flight.
+   Escalate ambiguous outcomes to PayWay support with sanitized logs and IDs.
+
+The CLI balance pre-flight prevents some invalid amounts but is not a lock or
+an idempotency guarantee. `--no-preflight` does not resolve an uncertain attempt.
+Never include API keys, signing material, payment tokens, or unredacted customer
+data in an escalation. API refund acceptance does not prove the customer's bank
+has finished posting the credit.
+
 ### "Invalid JSON response from PayWay API" — HTML instead of JSON
 
 If you see an error like:

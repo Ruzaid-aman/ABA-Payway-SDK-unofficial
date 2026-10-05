@@ -259,10 +259,23 @@ function isPrivateOrReservedHostname(hostname: string): boolean {
 export function validatePublicHttpsUrl(
   url: string,
   fieldName: string,
-  options?: { allowPrivateHosts?: boolean },
+  options?: {
+    allowPrivateHosts?: boolean;
+    /** Purchase accepts a URL that has already been base64-encoded. */
+    allowBase64?: boolean;
+    /** Browser redirects do not use PayWay's server callback delivery path. */
+    requireStandardPort?: boolean;
+  },
 ): void {
   if (typeof url !== 'string' || url.trim() !== url) {
     throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
+  }
+
+  if (options?.allowBase64 && /^[A-Za-z0-9+/]+={0,2}$/.test(url)) {
+    url = Buffer.from(url, 'base64').toString('utf8');
+    if (url.trim() !== url) {
+      throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
+    }
   }
 
   let parsed: URL;
@@ -273,6 +286,11 @@ export function validatePublicHttpsUrl(
   }
   if (parsed.protocol !== 'https:' || !parsed.hostname) {
     throw new PayWayConfigError(`${fieldName} must be a public HTTPS URL without surrounding whitespace`);
+  }
+  if (options?.requireStandardPort !== false && parsed.port && parsed.port !== '443') {
+    throw new PayWayConfigError(
+      `${fieldName} must use the standard HTTPS port 443; PayWay callback delivery does not support custom external ports`,
+    );
   }
   const host = parsed.hostname.toLowerCase();
   if (host === 'localhost') {

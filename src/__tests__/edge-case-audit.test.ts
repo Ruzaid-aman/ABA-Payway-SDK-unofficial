@@ -610,6 +610,12 @@ describe('edge-case: input validation', () => {
     expect(() => validatePublicHttpsUrl('http://example.com/cb', 'callbackUrl')).toThrow(PayWayConfigError);
   });
 
+  it('public callback URLs reject explicit non-443 ports (PayWay callback delivery requires standard HTTPS)', () => {
+    expect(() => validatePublicHttpsUrl('https://example.com:8443/cb', 'callbackUrl')).toThrow(/standard HTTPS port 443/);
+    expect(() => validatePublicHttpsUrl('https://example.com:443/cb', 'callbackUrl')).not.toThrow();
+    expect(() => validatePublicHttpsUrl('https://example.com/cb', 'callbackUrl')).not.toThrow();
+  });
+
   it('qr.generateQr honors allowPrivateCallbackHosts from client config', async () => {
     const server = await startServer((_req, res) => jsonResponse(res, 200, { status: { code: '00' }, qrString: 'x' }));
     try {
