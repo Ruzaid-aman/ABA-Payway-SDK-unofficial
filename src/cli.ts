@@ -1178,6 +1178,11 @@ program
     if (result.envWritten) {
       console.log(`  ${c.green('✓')} .env template created`);
     }
+    if (result.envExampleWritten) {
+      console.log(
+        `  ${c.green('✓')} .env.example written (complete variable reference; copy to .env, never commit secrets)`,
+      );
+    }
     console.log();
 
     if (result.envIssues.length > 0) {

@@ -1,3 +1,5 @@
+import { collectUnknownPayWayVarNames, nearestPayWayEnvVarName } from '../generated/env-registry.js';
+
 export type EnvIssueSeverity = 'error' | 'warn';
 
 export interface EnvIssue {
@@ -11,43 +13,23 @@ const REQUIRED_VARS = ['PAYWAY_ENV', 'PAYWAY_MERCHANT_ID', 'PAYWAY_API_KEY'] as 
 const URL_VARS = ['PAYWAY_RETURN_URL', 'PAYWAY_CANCEL_URL', 'PAYWAY_CALLBACK_URL'] as const;
 
 /**
- * Every PAYWAY_-prefixed variable the SDK/CLI ecosystem understands (TD-12).
- * Anything else present in the environment is reported as a warning so
- * typos like PAYWAY_APIKEY or stale variables surface during doctor/init.
+ * The known-variable allow-list lives in the generated registry
+ * (src/generated/env-registry.ts, emitted from knowledge/rules/env-vars.yaml —
+ * audit P1-04). Anything PAYWAY_-prefixed but absent from the registry is
+ * reported as a warning so typos like PAYWAY_APIKEY or stale variables
+ * surface during doctor/init. The generated set is complete over every
+ * process.env read in src/ (enforced by env-registry-conformance.test.ts),
+ * so real configuration can no longer produce a false
+ * "unrecognized variable" warning.
  */
-const KNOWN_VARS: ReadonlySet<string> = new Set([
-  ...REQUIRED_VARS,
-  ...URL_VARS,
-  'PAYWAY_SANDBOX',
-  'PAYWAY_BASE_URL',
-  'PAYWAY_TIMEOUT',
-  'PAYWAY_RSA_PUBLIC_KEY',
-  'PAYWAY_AGENT_API_KEY',
-  'PAYWAY_AGENT_BASE_URL',
-  'PAYWAY_PROFILE',
-  'PAYWAY_LOG_LEVEL',
-  'PAYWAY_ONBOARD_AUTO',
-  'PAYWAY_JOURNAL',
-  'PAYWAY_JOURNAL_DIR',
-  'PAYWAY_JOURNAL_MODE',
-  'PAYWAY_JOURNAL_MAX_AGE_DAYS',
-  'PAYWAY_WEBHOOK_DIR',
-  'PAYWAY_DATA_DIR',
-  'PAYWAY_FORCE_JSON_STORAGE',
-  'PAYWAY_PARTNER_ID',
-  'PAYWAY_PARTNER_API_KEY',
-  // DX-SEC-001 (P0-04): safe TLS verification — CA bundle + minimum protocol
-  // version, mapped onto the client's tlsCaFile / tlsMinVersion options.
-  'PAYWAY_TLS_CA_FILE',
-  'PAYWAY_TLS_MIN_VERSION',
-]);
-
-/** Validate env-only vars actually carry values that appear in the env map. */
 function collectUnknownVarWarnings(env: NodeJS.ProcessEnv): EnvIssue[] {
-  const unknown = Object.keys(env)
-    .filter((key) => /^PAYWAY_/i.test(key))
-    .filter((key) => !KNOWN_VARS.has(key));
+  const unknown = collectUnknownPayWayVarNames(env);
   if (unknown.length === 0) return [];
+  // With exactly one offender, name the nearest valid variable (audit P1-04
+  // criterion 2: a typo like PAYWAY_KHQ_MERCHANT_NAME points at
+  // PAYWAY_KHQR_MERCHANT_NAME). With several, the list itself is the signal.
+  const suggestion = unknown.length === 1 ? nearestPayWayEnvVarName(unknown[0]) : undefined;
+  const suggestionSuffix = suggestion ? ` Did you mean ${suggestion}?` : '';
   return [
     {
       code: 'W-PAYWAY-UNKNOWN-VAR',
@@ -55,7 +37,8 @@ function collectUnknownVarWarnings(env: NodeJS.ProcessEnv): EnvIssue[] {
       varName: unknown.join(','),
       message:
         `Unrecognized PayWay environment variable(s): ${unknown.join(', ')}. ` +
-        'Check for typos or removed configuration keys.',
+        'Check for typos or removed configuration keys.' +
+        suggestionSuffix,
     },
   ];
 }

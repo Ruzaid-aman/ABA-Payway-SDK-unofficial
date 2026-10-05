@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { buildEnvExampleText } from '../../config/envExample.js';
 import { type EnvIssue, validatePayWayEnv } from '../../config/envValidator.js';
 import { type DetectedFramework, detectFramework } from '../../config/frameworkDetector.js';
+import { PAYWAY_ENV_VARS } from '../../generated/env-registry.js';
 import { selectTemplateFiles, type TemplateModule } from '../../config/templates/index.js';
 import { FIRST_PAYMENT_TEMPLATE } from '../templates/first-payment/index.js';
 
@@ -17,6 +19,13 @@ const ENV_TEMPLATE =
   'PAYWAY_RETURN_URL=https://yoursite.com/payment/return\n' +
   'PAYWAY_CANCEL_URL=https://yoursite.com/payment/cancel\n' +
   '# PAYWAY_CALLBACK_URL=https://yoursite.com/api/payment/callback\n';
+
+// Audit P1-05: `init` writes TWO distinct artifacts — `.env` (the minimal
+// quickstart template above) and `.env.example` (the complete, grouped,
+// commented variable reference generated from knowledge/rules/env-vars.yaml,
+// the same text `npm run gen:env-vars` writes to the repo root). They are
+// different jobs and must not be the same string constant.
+const ENV_EXAMPLE_TEMPLATE = buildEnvExampleText(PAYWAY_ENV_VARS);
 
 export interface InitOptions {
   readonly cwd?: string;
@@ -34,6 +43,7 @@ export interface InitResult {
   readonly skippedFiles: readonly string[];
   readonly envIssues: readonly EnvIssue[];
   readonly envWritten: boolean;
+  readonly envExampleWritten: boolean;
   readonly reportPath: string;
   readonly nextCommand: string;
 }
@@ -114,9 +124,11 @@ export function runInit(options: InitOptions = {}): InitResult {
   }
 
   const envPath = path.join(cwd, '.env');
+  let envExampleWritten = false;
   if (mode === 'sandbox') {
     const examplePath = path.join(cwd, '.env.example');
-    if (writeFileIfMissing(examplePath, ENV_TEMPLATE)) {
+    envExampleWritten = writeFileIfMissing(examplePath, ENV_EXAMPLE_TEMPLATE);
+    if (envExampleWritten) {
       written.push('.env.example');
     } else {
       skipped.push('.env.example');
@@ -136,6 +148,7 @@ export function runInit(options: InitOptions = {}): InitResult {
     skippedFiles: skipped,
     envIssues,
     envWritten,
+    envExampleWritten,
     reportPath,
     nextCommand:
       mode === 'demo'
