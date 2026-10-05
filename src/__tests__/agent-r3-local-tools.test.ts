@@ -117,9 +117,9 @@ describe('R3 active-session artifact policy', () => {
     temporaryLinks.push({ link, root: process.cwd() });
     const escaped = path.join(link, 'secret.json');
 
-    await expect(
-      openArtifact(escaped, session([{ artifactId: 'artifact-escape', path: escaped }])),
-    ).rejects.toThrow(/artifact root/i);
+    await expect(openArtifact(escaped, session([{ artifactId: 'artifact-escape', path: escaped }]))).rejects.toThrow(
+      /artifact root/i,
+    );
     expect(spawned).toHaveLength(0);
   });
 

@@ -258,7 +258,8 @@ export function registerAgentCommands(program: Command): void {
     .action((opts: { json?: boolean }) => {
       const config = readAgentConfig();
       if (!config) {
-        const message = 'No agent configuration found. Run `payway-sdk onboard` or `payway-sdk agent setup --provider <p> --model <m> --acknowledge-privacy`.';
+        const message =
+          'No agent configuration found. Run `payway-sdk onboard` or `payway-sdk agent setup --provider <p> --model <m> --acknowledge-privacy`.';
         console.log(`  ${c.red('✗')} ${message}`);
         process.exitCode = 1;
         return;
@@ -279,10 +280,14 @@ export function registerAgentCommands(program: Command): void {
       if (config.extraBody) console.log(`  Extra body:      ${c.cyan(JSON.stringify(config.extraBody))}`);
       console.log(
         `  Privacy ack:     ${
-          config.privacyAcknowledgedAt ? c.green(config.privacyAcknowledgedAt) : c.yellow('not acknowledged (run payway-sdk agent ack)')
+          config.privacyAcknowledgedAt
+            ? c.green(config.privacyAcknowledgedAt)
+            : c.yellow('not acknowledged (run payway-sdk agent ack)')
         }`,
       );
-      console.log(`\n  ${c.dim('API key location: PAYWAY_AGENT_API_KEY environment variable (or .env) — never stored on disk.')}`);
+      console.log(
+        `\n  ${c.dim('API key location: PAYWAY_AGENT_API_KEY environment variable (or .env) — never stored on disk.')}`,
+      );
       console.log();
     });
 
@@ -362,9 +367,7 @@ export function registerAgentCommands(program: Command): void {
   // Phase 2: findUnfinishedExecutions existed and was tested, but no CLI
   // surface reached it (audit gap G10). Recovery is LOOKUP ONLY — creates are
   // never replayed; the operator checks the recorded transaction id instead.
-  const ledgerCmd = agentCmd
-    .command('ledger')
-    .description('Inspect the execution ledger (create-action lifecycle)');
+  const ledgerCmd = agentCmd.command('ledger').description('Inspect the execution ledger (create-action lifecycle)');
 
   ledgerCmd
     .command('recover')
@@ -427,15 +430,16 @@ export function registerAgentCommands(program: Command): void {
   // ─── agent ledger prune (I-13 — retention parity with `journal prune`) ────
   ledgerCmd
     .command('prune')
-    .description('Delete FINISHED (succeeded/failed) execution records older than a cutoff. Unfinished records are never removed.')
+    .description(
+      'Delete FINISHED (succeeded/failed) execution records older than a cutoff. Unfinished records are never removed.',
+    )
     .option('--before <cutoff>', 'Days back (e.g. 30) or ISO-8601 timestamp', '30')
     .option('--json', 'Machine-readable output')
     .action((opts: { before?: string; json?: boolean }) => {
       const raw = opts.before ?? '30';
       const days = Number.parseFloat(raw);
-      const before = Number.isFinite(days) && !raw.includes('T')
-        ? new Date(Date.now() - days * 86_400_000)
-        : new Date(raw);
+      const before =
+        Number.isFinite(days) && !raw.includes('T') ? new Date(Date.now() - days * 86_400_000) : new Date(raw);
       if (Number.isNaN(before.getTime())) {
         console.log(`  Invalid --before value: ${raw}`);
         process.exitCode = 1;
@@ -446,6 +450,8 @@ export function registerAgentCommands(program: Command): void {
         console.log(JSON.stringify({ before: before.toISOString(), ...result }, null, 2));
         return;
       }
-      console.log(`\n  ${c.green('✓')} Pruned ${result.removed} finished record(s); ${result.kept} kept (incl. all unfinished).\n`);
+      console.log(
+        `\n  ${c.green('✓')} Pruned ${result.removed} finished record(s); ${result.kept} kept (incl. all unfinished).\n`,
+      );
     });
 }

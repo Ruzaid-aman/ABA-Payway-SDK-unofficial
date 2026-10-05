@@ -44,7 +44,8 @@ describe('knowledge corpus freshness', () => {
     expect(manifest.generated.length).toBeGreaterThan(30);
     for (const entry of manifest.generated) {
       expect(sha16(readFileSync(path.join(repoRoot, entry.file))), entry.file).toBe(entry.sha256);
-      if (entry.source) expect(sha16(readFileSync(path.join(repoRoot, entry.source))), entry.source).toBe(entry.sourceSha256);
+      if (entry.source)
+        expect(sha16(readFileSync(path.join(repoRoot, entry.source))), entry.source).toBe(entry.sourceSha256);
     }
   });
   it('has a v1 manifest with topics', () => {
@@ -106,7 +107,8 @@ describe('knowledge corpus freshness', () => {
   it('sources every topic from a public directory — no internal provenance (D01/R03)', () => {
     // Mirrors the generator-side gate in scripts/sync-knowledge.mjs: this test
     // fails on an intentionally introduced internal source BEFORE packaging.
-    const publicSource = /^(?:[^/]+\.(?:md|json)$|docs\/README\.md$|docs\/guides\/|docs\/recipes\/|docs\/reference\/|docs\/error-codes\.json$)/;
+    const publicSource =
+      /^(?:[^/]+\.(?:md|json)$|docs\/README\.md$|docs\/guides\/|docs\/recipes\/|docs\/reference\/|docs\/error-codes\.json$)/;
     const offenders = manifest.topics
       .filter((t) => !publicSource.test(t.source.replaceAll('\\', '/')))
       .map((t) => `${t.topic} -> ${t.source}`);

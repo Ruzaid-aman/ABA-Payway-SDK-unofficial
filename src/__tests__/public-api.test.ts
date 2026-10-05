@@ -43,8 +43,21 @@ describe('public API surface (src/index.ts barrel)', () => {
   });
 
   it('error classes construct with a message and chain back to PayWayError', () => {
-    const { PayWayError, PayWayConfigError, PayWayAPIError, PayWayBusinessError, PayWayNetworkError, PayWayRateLimitError } = PublicApi;
-    for (const Ctor of [PayWayConfigError, PayWayAPIError, PayWayBusinessError, PayWayNetworkError, PayWayRateLimitError]) {
+    const {
+      PayWayError,
+      PayWayConfigError,
+      PayWayAPIError,
+      PayWayBusinessError,
+      PayWayNetworkError,
+      PayWayRateLimitError,
+    } = PublicApi;
+    for (const Ctor of [
+      PayWayConfigError,
+      PayWayAPIError,
+      PayWayBusinessError,
+      PayWayNetworkError,
+      PayWayRateLimitError,
+    ]) {
       const error = new Ctor('boom');
       expect(error, Ctor.name).toBeInstanceOf(PayWayError);
       expect(error, Ctor.name).toBeInstanceOf(Error);
@@ -66,7 +79,6 @@ describe('public API surface (src/index.ts barrel)', () => {
     breaker.recordSuccess('/api/payment-gateway/v1/exchange-rate');
     expect(PublicApi.resolveLogLevel('debug')).toBe('debug');
     expect(PublicApi.resolveLogLevel('nonsense' as never)).toBeDefined(); // unknown strings fall back
-
   });
 
   it('exports gateway code tables and constants', () => {

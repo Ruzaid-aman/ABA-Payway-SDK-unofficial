@@ -156,7 +156,11 @@ describe('WebhookServer', () => {
     expect(record.paymentLinkPushback?.parsed?.tranId).toBe('178865526240157');
     expect(record.paymentLinkPushback?.parsed?.status).toBe('APPROVED');
     expect(record.paymentLinkPushback?.parsed?.merchantRefNo).toBe('plvr-v1-mtp34wx4');
-    expect(record.paymentLinkPushback?.parsed?.raw).toEqual({ tran_id: '178865526240157', status: 0, merchant_ref_no: 'plvr-v1-mtp34wx4' });
+    expect(record.paymentLinkPushback?.parsed?.raw).toEqual({
+      tran_id: '178865526240157',
+      status: 0,
+      merchant_ref_no: 'plvr-v1-mtp34wx4',
+    });
   });
 
   it('stores a pushback parse error without discarding the raw body', async () => {
@@ -338,7 +342,12 @@ describe('WebhookServer rejectInvalidSignature (TD-09)', () => {
     storage = new JsonWebhookStorage(join(tempDir, 'callbacks.jsonl'));
     port = await getFreePort();
     // Deterministic invalid signature: verification key differs from signer key.
-    server = createWebhookServer(storage, { port, quiet: true, apiKey: 'verification-key', rejectInvalidSignature: true });
+    server = createWebhookServer(storage, {
+      port,
+      quiet: true,
+      apiKey: 'verification-key',
+      rejectInvalidSignature: true,
+    });
     await server.start();
   });
 
@@ -461,7 +470,9 @@ describe('WebhookServer callback correlation (Phase 3)', () => {
     const events = readFileSync(join(journalDir, 'journal.jsonl'), 'utf8')
       .trim()
       .split('\n')
-      .map((line) => JSON.parse(line) as { kind: string; correlationId: string; transactionId?: string; status?: string });
+      .map(
+        (line) => JSON.parse(line) as { kind: string; correlationId: string; transactionId?: string; status?: string },
+      );
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('callback.received');
     expect(events[0].transactionId).toBe('TX-J');

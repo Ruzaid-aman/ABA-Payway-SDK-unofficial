@@ -10,10 +10,14 @@ describe('renderTable', () => {
   ];
 
   it('sizes columns from the longest cell including the header', () => {
-    const lines = renderTable(columns, [
-      { name: 'acme-store', env: 'sandbox' },
-      { name: 'production-merchant', env: 'production' },
-    ], 200);
+    const lines = renderTable(
+      columns,
+      [
+        { name: 'acme-store', env: 'sandbox' },
+        { name: 'production-merchant', env: 'production' },
+      ],
+      200,
+    );
     // 'production-merchant' = 19 chars drives the name column; 'production' = 10 the env column.
     expect(lines[0]).toBe(`${'NAME'.padEnd(19)}  ${'ENV'.padEnd(10)}`.trimEnd());
     expect(lines[1]).toBe(`${'─'.repeat(19)}  ${'─'.repeat(10)}`);

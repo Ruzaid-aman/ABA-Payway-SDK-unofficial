@@ -10,7 +10,13 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { resolveWebhookDir } from '../config/data-root.js';
-import type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
+import type {
+  CustomerQrWebhookMetadata,
+  KhqrWebhookMetadata,
+  PaymentLinkPushbackMetadata,
+  WebhookRecord,
+  WebhookStorage,
+} from './storage.js';
 
 const DEFAULT_PATH = (): string => join(resolveWebhookDir(), 'callbacks.db');
 
@@ -233,7 +239,9 @@ export class SqliteWebhookStorage implements WebhookStorage {
   }
 
   updateCustomerQrMetadata(id: string, customerQr: CustomerQrWebhookMetadata): WebhookRecord {
-    this.db.prepare('UPDATE callbacks SET customer_qr_json = ? WHERE record_id = ?').run(JSON.stringify(customerQr), id);
+    this.db
+      .prepare('UPDATE callbacks SET customer_qr_json = ? WHERE record_id = ?')
+      .run(JSON.stringify(customerQr), id);
     const updated = this.getAll().find((record) => record.id === id);
     if (!updated) throw new Error(`Webhook record ${id} was not found`);
     return updated;

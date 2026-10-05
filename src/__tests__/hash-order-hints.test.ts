@@ -20,7 +20,12 @@
  * here instead of silently falling back to the generic wrong-hash message.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HASH_ORDER_HINTS, MERCHANT_AUTH_DEFAULT_HASH_FIELDS, SELF_ACTIVATION_HASH_FIELDS, type PayWayConfig } from '../client.js';
+import {
+  HASH_ORDER_HINTS,
+  MERCHANT_AUTH_DEFAULT_HASH_FIELDS,
+  SELF_ACTIVATION_HASH_FIELDS,
+  type PayWayConfig,
+} from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { createCredentialsOnFileDomain } from '../domains/credentials-on-file.js';
 import { createCheckoutDomain, PURCHASE_HASH_FIELDS } from '../domains/checkout.js';
@@ -48,7 +53,10 @@ type MerchantAuthCall = { path: string; hmacFields?: string[] };
  * The domain factories only need the first three positional args for these
  * minimal calls, so the extra optional params are left off the signature.
  */
-function makeRequestSpy(): { spy: <T>(path: string, body: Record<string, unknown>, hmacFields: string[]) => Promise<T>; calls: RequestCall[] } {
+function makeRequestSpy(): {
+  spy: <T>(path: string, body: Record<string, unknown>, hmacFields: string[]) => Promise<T>;
+  calls: RequestCall[];
+} {
   const calls: RequestCall[] = [];
   const spy = async <T>(path: string, _body: Record<string, unknown>, hmacFields: string[]): Promise<T> => {
     calls.push({ path, hmacFields });
@@ -260,7 +268,9 @@ describe('HASH_ORDER_HINTS pinned to the captured hmacFields of each domain call
     const addCall = authSpy.calls.find((c) => c.path === ENDPOINTS.addBeneficiary);
     const updateCall = authSpy.calls.find((c) => c.path === ENDPOINTS.updateBeneficiaryStatus);
     expect(HASH_ORDER_HINTS[ENDPOINTS.addBeneficiary]).toBe(effectiveMerchantAuthFields(addCall!).join('.'));
-    expect(HASH_ORDER_HINTS[ENDPOINTS.updateBeneficiaryStatus]).toBe(effectiveMerchantAuthFields(updateCall!).join('.'));
+    expect(HASH_ORDER_HINTS[ENDPOINTS.updateBeneficiaryStatus]).toBe(
+      effectiveMerchantAuthFields(updateCall!).join('.'),
+    );
   });
 
   it('payment-link: create, getDetails and void pass NO hmacFields override → default applies', async () => {
@@ -291,7 +301,9 @@ describe('HASH_ORDER_HINTS structural guards', () => {
   it('every key is a real ENDPOINTS value', () => {
     const endpointValues = Object.values(ENDPOINTS);
     for (const key of Object.keys(HASH_ORDER_HINTS)) {
-      expect(endpointValues.includes(key as (typeof endpointValues)[number]), `unknown endpoint key: ${key}`).toBe(true);
+      expect(endpointValues.includes(key as (typeof endpointValues)[number]), `unknown endpoint key: ${key}`).toBe(
+        true,
+      );
     }
   });
 
@@ -341,8 +353,7 @@ describe('HASH_ORDER_HINTS structural guards', () => {
         ENDPOINTS.payout,
         ENDPOINTS.addBeneficiary,
         ENDPOINTS.updateBeneficiaryStatus,
-      ]
-        .sort(),
+      ].sort(),
     );
   });
 });

@@ -34,8 +34,15 @@ describe('computeWebhookRouteUrls', () => {
 
 describe('probeWebhookUrl', () => {
   it('accepts only an acknowledged capture response', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ acknowledged: true, id: 'wh_probe' }), { status: 200 })));
-    await expect((await import('../cli/commands/setup-webhook-helpers.js')).probeWebhookUrl('https://tunnel.example/aba-payway-khqr-webhook')).resolves.toEqual({
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ acknowledged: true, id: 'wh_probe' }), { status: 200 })),
+    );
+    await expect(
+      (await import('../cli/commands/setup-webhook-helpers.js')).probeWebhookUrl(
+        'https://tunnel.example/aba-payway-khqr-webhook',
+      ),
+    ).resolves.toEqual({
       acknowledged: true,
       id: 'wh_probe',
     });

@@ -72,9 +72,7 @@ export async function startRepl(options: { profile?: string; sessionId?: string 
  * clear-screen writes go to `io.output` so a TTY-less harness can still verify
  * them.
  */
-export async function runRepl(
-  io: ReplIo & { profile?: string; sessionId?: string },
-): Promise<void> {
+export async function runRepl(io: ReplIo & { profile?: string; sessionId?: string }): Promise<void> {
   let profile = io.profile ?? process.env.PAYWAY_PROFILE ?? undefined;
   let context = resolvePayWayContext({ profile });
   profile = context.profileName ?? profile;
@@ -166,7 +164,9 @@ export async function runRepl(
       console.log(`  ${c.dim(`No hits for "${query}" — try different keywords.`)}`);
       return;
     }
-    console.log(`\n${c.bold(`Knowledge search: "${query}"`)} ${c.dim(`— ${result.totalHits} hit(s)${result.truncated ? ' (truncated)' : ''}`)}`);
+    console.log(
+      `\n${c.bold(`Knowledge search: "${query}"`)} ${c.dim(`— ${result.totalHits} hit(s)${result.truncated ? ' (truncated)' : ''}`)}`,
+    );
     for (const hit of result.hits.slice(0, 10)) {
       console.log(`  ${c.cyan(hit.topic)}  ${c.dim(hit.text.slice(0, 70))}`);
     }

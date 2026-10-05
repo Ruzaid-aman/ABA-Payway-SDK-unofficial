@@ -165,7 +165,10 @@ describe('Linked-token store', () => {
   it('file lands in the resolved dir with the expected name', () => {
     saveLinkedToken({ ctid: 'c1', pwt: 'tok' }, dir);
     expect(existsSync(join(dir, LINKED_TOKENS_FILE_NAME))).toBe(true);
-    const file = JSON.parse(readFileSync(join(dir, LINKED_TOKENS_FILE_NAME), 'utf8')) as { version: number; tokens: unknown[] };
+    const file = JSON.parse(readFileSync(join(dir, LINKED_TOKENS_FILE_NAME), 'utf8')) as {
+      version: number;
+      tokens: unknown[];
+    };
     expect(file.version).toBe(1);
     expect(file.tokens).toHaveLength(1);
   });
@@ -177,9 +180,9 @@ describe('Linked-token store', () => {
     expect(resolveTokenStoreDir(undefined, { APPDATA: appData } as NodeJS.ProcessEnv)).toBe(
       join(appData, 'aba-payway-sdk', 'data'),
     );
-    expect(
-      resolveTokenStoreDir(undefined, { PAYWAY_DATA_DIR: '/data', APPDATA: appData } as NodeJS.ProcessEnv),
-    ).toBe('/data');
+    expect(resolveTokenStoreDir(undefined, { PAYWAY_DATA_DIR: '/data', APPDATA: appData } as NodeJS.ProcessEnv)).toBe(
+      '/data',
+    );
   });
 
   it('removeLinkedTokens deletes by ctid (or ctid+pwt) and returns the count', () => {
@@ -269,7 +272,13 @@ describe('Server CoF token capture', () => {
   function httpRequest(p: number, path: string, body: string, headers: Record<string, string>): Promise<number> {
     return new Promise((resolve, reject) => {
       const req = http.request(
-        { hostname: '127.0.0.1', port: p, method: 'POST', path, headers: { 'Content-Type': 'application/json', ...headers } },
+        {
+          hostname: '127.0.0.1',
+          port: p,
+          method: 'POST',
+          path,
+          headers: { 'Content-Type': 'application/json', ...headers },
+        },
         (res) => {
           res.resume();
           res.on('end', () => resolve(res.statusCode ?? 0));

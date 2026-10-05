@@ -13,7 +13,8 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('questionnaire v2 callback boundaries', () => {
   it.each(['http://example.com/cb', 'https://example.com:8443/cb', 'https://127.0.0.1/cb'])(
-    'rejects unreachable purchase callbacks before signing or submitting: %s', (returnUrl) => {
+    'rejects unreachable purchase callbacks before signing or submitting: %s',
+    (returnUrl) => {
       const request = vi.fn();
       const checkout = createCheckoutDomain(config, request, request, baseUrl);
       expect(() => checkout.createTransaction({ ...purchase, returnUrl })).toThrow(/returnUrl/);
@@ -33,12 +34,18 @@ describe('questionnaire v2 callback boundaries', () => {
       expect(checkout.createTransaction({ ...purchase, returnUrl: encoded })).toEqual(
         checkout.createTransaction({ ...purchase, returnUrl: url }),
       );
-      expect(() => checkout.createTransaction({
-        ...purchase, returnUrl: Buffer.from('https://example.com:8443/cb').toString('base64'),
-      })).toThrow(/standard HTTPS port 443/);
-      expect(() => checkout.createTransaction({
-        ...purchase, returnUrl: Buffer.from(' https://example.com/cb ').toString('base64'),
-      })).toThrow(/whitespace/);
+      expect(() =>
+        checkout.createTransaction({
+          ...purchase,
+          returnUrl: Buffer.from('https://example.com:8443/cb').toString('base64'),
+        }),
+      ).toThrow(/standard HTTPS port 443/);
+      expect(() =>
+        checkout.createTransaction({
+          ...purchase,
+          returnUrl: Buffer.from(' https://example.com/cb ').toString('base64'),
+        }),
+      ).toThrow(/whitespace/);
     } finally {
       vi.useRealTimers();
     }
@@ -48,25 +55,30 @@ describe('questionnaire v2 callback boundaries', () => {
     const request = vi.fn();
     const checkout = createCheckoutDomain({ ...config, allowPrivateCallbackHosts: true }, request, request, baseUrl);
     expect(checkout.createTransaction(purchase)).not.toHaveProperty('return_url');
-    expect(() => checkout.createTransaction({
-      ...purchase,
-      returnUrl: 'https://10.1.2.3/cb',
-      continueSuccessUrl: 'https://example.com:8443/done',
-      cancelUrl: 'https://example.com:8443/cancel',
-    })).not.toThrow();
+    expect(() =>
+      checkout.createTransaction({
+        ...purchase,
+        returnUrl: 'https://10.1.2.3/cb',
+        continueSuccessUrl: 'https://example.com:8443/done',
+        cancelUrl: 'https://example.com:8443/cancel',
+      }),
+    ).not.toThrow();
   });
 
   it('applies the callback port restriction to partner pushbacks, not browser redirects', async () => {
     const request = vi.fn().mockResolvedValue({ status: { code: '00' } });
     const domain = createSelfActivationDomain(config, request);
     const params = {
-      registerRef: 'REG-001', currency: 'USD' as const,
-      pushbackUrl: 'https://example.com/cb', redirectUrl: 'https://example.com:8443/done',
+      registerRef: 'REG-001',
+      currency: 'USD' as const,
+      pushbackUrl: 'https://example.com/cb',
+      redirectUrl: 'https://example.com:8443/done',
     };
     await domain.registerMerchant(params);
     expect(request).toHaveBeenCalledOnce();
-    expect(() => domain.registerMerchant({ ...params, pushbackUrl: 'https://example.com:8443/cb' }))
-      .toThrow(/standard HTTPS port 443/);
+    expect(() => domain.registerMerchant({ ...params, pushbackUrl: 'https://example.com:8443/cb' })).toThrow(
+      /standard HTTPS port 443/,
+    );
     expect(request).toHaveBeenCalledOnce();
   });
 });
@@ -80,12 +92,15 @@ describe('questionnaire v2 payment-link description advisory', () => {
     expect(request.mock.calls[0][1].description).toBe('=invoice');
   });
 
-  it.each(['=invoice', '+invoice', '-invoice', '@invoice'])('strict mode rejects %s before submission', (description) => {
-    const request = vi.fn();
-    const domain = createPaymentLinkDomain({ ...config, strictValidation: true }, request);
-    expect(() => domain.create({ ...link, description })).toThrow(/description.*start/);
-    expect(request).not.toHaveBeenCalled();
-  });
+  it.each(['=invoice', '+invoice', '-invoice', '@invoice'])(
+    'strict mode rejects %s before submission',
+    (description) => {
+      const request = vi.fn();
+      const domain = createPaymentLinkDomain({ ...config, strictValidation: true }, request);
+      expect(() => domain.create({ ...link, description })).toThrow(/description.*start/);
+      expect(request).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(['', 'Invoice #1 - service', 'x'.repeat(250)])('accepts permitted description text', async (description) => {
     const request = vi.fn().mockResolvedValue({});

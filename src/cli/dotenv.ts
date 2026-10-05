@@ -25,8 +25,7 @@ export function parseDotEnvFile(envPath: string): Record<string, string> {
     let val = line.slice(eqIdx + 1).trim();
 
     const opensQuote =
-      (val.startsWith('"') && !val.slice(1).endsWith('"')) ||
-      (val.startsWith("'") && !val.slice(1).endsWith("'"));
+      (val.startsWith('"') && !val.slice(1).endsWith('"')) || (val.startsWith("'") && !val.slice(1).endsWith("'"));
     if (opensQuote) {
       const quote = val[0];
       const parts = [val.slice(1)];

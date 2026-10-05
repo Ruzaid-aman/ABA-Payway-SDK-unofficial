@@ -28,9 +28,16 @@ const BASE_PARAMS: GenerateQrParams = {
 
 type RequestCall = { path: string; body: Record<string, unknown>; hmacFields: string[] };
 
-function makeRequestSpy(): { spy: <TResponse>(path: string, body: Record<string, unknown>, hmacFields: string[]) => Promise<TResponse>; calls: RequestCall[] } {
+function makeRequestSpy(): {
+  spy: <TResponse>(path: string, body: Record<string, unknown>, hmacFields: string[]) => Promise<TResponse>;
+  calls: RequestCall[];
+} {
   const calls: RequestCall[] = [];
-  const spy = async <TResponse>(path: string, body: Record<string, unknown>, hmacFields: string[]): Promise<TResponse> => {
+  const spy = async <TResponse>(
+    path: string,
+    body: Record<string, unknown>,
+    hmacFields: string[],
+  ): Promise<TResponse> => {
     calls.push({ path, body, hmacFields });
     return { status: { code: '0' }, qrString: 'x' } as TResponse;
   };
@@ -209,7 +216,11 @@ describe('generateQr advisory validations', () => {
     const { spy } = makeRequestSpy();
     const domain = createQrDomain(CONFIG, spy);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await domain.generateQr({ ...BASE_PARAMS, firstName: 'Dara', items: Array.from({ length: 10 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 0.01 })) });
+    await domain.generateQr({
+      ...BASE_PARAMS,
+      firstName: 'Dara',
+      items: Array.from({ length: 10 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 0.01 })),
+    });
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -217,7 +228,10 @@ describe('generateQr advisory validations', () => {
     const { spy } = makeRequestSpy();
     const domain = createQrDomain(CONFIG, spy);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await domain.generateQr({ ...BASE_PARAMS, items: Array.from({ length: 11 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 0.01 })) });
+    await domain.generateQr({
+      ...BASE_PARAMS,
+      items: Array.from({ length: 11 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 0.01 })),
+    });
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -225,7 +239,10 @@ describe('generateQr advisory validations', () => {
     const { spy } = makeRequestSpy();
     const domain = createQrDomain(CONFIG, spy);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await domain.generateQr({ ...BASE_PARAMS, items: Array.from({ length: 51 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 0.01 })) });
+    await domain.generateQr({
+      ...BASE_PARAMS,
+      items: Array.from({ length: 51 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 0.01 })),
+    });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('QR-016'));
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('50 line items'));
   });

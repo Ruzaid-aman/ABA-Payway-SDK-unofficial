@@ -166,10 +166,11 @@ describe('R1 model path confinement', () => {
       actions: [{ tool: 'save_artifact', content: 'receipt', root: externalRoot }],
     } as unknown as AgentPlanV1);
     const { payway } = makePayWay();
-    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
-      'save the receipt',
-      approvedOptions(payway),
-    );
+    const result = await createOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('save the receipt', approvedOptions(payway));
 
     expect(result.status).toBe('failed');
     expect(existsSync(externalRoot)).toBe(false);
@@ -185,10 +186,11 @@ describe('R1 pre-authorization risk gate', () => {
   ])('blocks %s before creating a ledger record or calling the SDK', async (_name, plan) => {
     const provider = new FakeProvider(plan);
     const { payway, calls } = makePayWay();
-    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
-      'make payment',
-      approvedOptions(payway),
-    );
+    const result = await createOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('make payment', approvedOptions(payway));
 
     expect(result.status).toBe('blocked');
     expect(calls.generateQr).toBe(0);
@@ -212,10 +214,11 @@ describe('R1 pre-authorization risk gate', () => {
   ])('blocks non-public literal callback URL %s before ledger or SDK activity', async (callbackUrl) => {
     const provider = new FakeProvider(onlineQrPlan({ callbackUrl }));
     const { payway, calls } = makePayWay();
-    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
-      'make payment',
-      approvedOptions(payway),
-    );
+    const result = await createOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('make payment', approvedOptions(payway));
 
     expect(result.status).toBe('blocked');
     expect(calls.generateQr).toBe(0);
@@ -238,10 +241,11 @@ describe('R1 pre-authorization risk gate', () => {
       ],
     });
     const { payway, calls } = makePayWay();
-    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
-      'checkout',
-      approvedOptions(payway),
-    );
+    const result = await createOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('checkout', approvedOptions(payway));
 
     expect(result.status).toBe('blocked');
     expect(calls.checkout).toBe(0);
@@ -264,10 +268,11 @@ describe('R1 pre-authorization risk gate', () => {
       ],
     });
     const { payway, calls } = makePayWay();
-    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
-      'checkout',
-      approvedOptions(payway),
-    );
+    const result = await createOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('checkout', approvedOptions(payway));
 
     expect(result.status).toBe('blocked');
     expect(calls.checkout).toBe(0);
@@ -279,10 +284,11 @@ describe('R1 materialized plan validation', () => {
   it('rejects an invalid materialized plan before invoking the executor', async () => {
     const provider = new FakeProvider(onlineQrPlan({ transactionId: 'tx-id-too-long-for-materialized-plan' }));
     const { payway, calls } = makePayWay();
-    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
-      'make payment',
-      approvedOptions(payway),
-    );
+    const result = await createOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('make payment', approvedOptions(payway));
 
     expect(result).toMatchObject({ status: 'failed', error: { code: 'INVALID_MATERIALIZED_PLAN' } });
     expect(calls.generateQr).toBe(0);
@@ -347,10 +353,11 @@ describe('R1 privacy and provider context boundaries', () => {
       context: { optional: { signingMaterial: 'PAYWAY-SIGNING-CANARY', providerKey: 'PROVIDER-API-CANARY' } },
     });
     const { payway } = makePayWay();
-    const result = await createOrchestrator({ context: makeContext(), provider, providerConfig: privacyConfig() }).runOneShot(
-      'make payment',
-      approvedOptions(payway),
-    );
+    const result = await createOrchestrator({
+      context: makeContext(),
+      provider,
+      providerConfig: privacyConfig(),
+    }).runOneShot('make payment', approvedOptions(payway));
     delete process.env.PAYWAY_AGENT_API_KEY;
 
     const session = loadSession(result.sessionId!);

@@ -10,7 +10,13 @@ import { randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { resolveWebhookDir } from '../config/data-root.js';
-import type { CustomerQrWebhookMetadata, KhqrWebhookMetadata, PaymentLinkPushbackMetadata, WebhookRecord, WebhookStorage } from './storage.js';
+import type {
+  CustomerQrWebhookMetadata,
+  KhqrWebhookMetadata,
+  PaymentLinkPushbackMetadata,
+  WebhookRecord,
+  WebhookStorage,
+} from './storage.js';
 
 const DEFAULT_PATH = (): string => join(resolveWebhookDir(), 'callbacks.jsonl');
 

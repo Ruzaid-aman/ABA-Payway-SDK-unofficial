@@ -126,7 +126,14 @@ describe('machine-output failure contract (S05)', () => {
   });
 
   it('emits the envelope for a nonexistent selected profile instead of a stack (S05)', async () => {
-    const { stdout, stderr, exitCode } = await run(['check-transaction', '-t', 'tx-1', '--json', '--profile', 'no-such-profile']);
+    const { stdout, stderr, exitCode } = await run([
+      'check-transaction',
+      '-t',
+      'tx-1',
+      '--json',
+      '--profile',
+      'no-such-profile',
+    ]);
     const envelope = expectOneEnvelope(stdout);
     expect(String(envelope.error.message)).toContain('no-such-profile');
     expect(stderr).not.toMatch(/at\s+/); // no stack trace channel for machine consumers

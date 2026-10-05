@@ -165,10 +165,7 @@ export function markSubmitted(id: string): ExecutionRecordV1 {
  * result (Phase 2 resultSummary) so the ledger answers "what came back",
  * not just "it worked". Rejects if the record is not 'submitted'.
  */
-export function markSucceeded(
-  id: string,
-  resultSummary?: Record<string, unknown>,
-): ExecutionRecordV1 {
+export function markSucceeded(id: string, resultSummary?: Record<string, unknown>): ExecutionRecordV1 {
   return advance(id, 'submitted', 'succeeded', (record) => {
     if (resultSummary) record.resultSummary = resultSummary;
   });

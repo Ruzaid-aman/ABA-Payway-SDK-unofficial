@@ -242,8 +242,12 @@ export function markTokenRenewed(
   const kept = existing.slice();
   kept[idx] = { ...existing[idx], renewedAt: renewedAt ?? new Date().toISOString() };
   const tmp = `${file}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}
-`, 'utf8');
+  writeFileSync(
+    tmp,
+    `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}
+`,
+    'utf8',
+  );
   renameSync(tmp, file);
   return kept[idx];
 }
@@ -271,8 +275,12 @@ export function markTokenCharged(
   const kept = existing.slice();
   kept[idx] = { ...existing[idx], lastChargedAt: chargedAt ?? new Date().toISOString() };
   const tmp = `${file}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}
-`, 'utf8');
+  writeFileSync(
+    tmp,
+    `${JSON.stringify({ version: 1 as const, tokens: kept }, null, 2)}
+`,
+    'utf8',
+  );
   renameSync(tmp, file);
   return kept[idx];
 }

@@ -54,11 +54,7 @@ export interface PaymentIO {
     validate?: (value: string) => string | undefined;
   }): Promise<string>;
   /** Single choice from a labeled option list; Ctrl-C cancels. */
-  select<T extends string>(options: {
-    message: string;
-    options: SelectOption<T>[];
-    initial?: T;
-  }): Promise<T>;
+  select<T extends string>(options: { message: string; options: SelectOption<T>[]; initial?: T }): Promise<T>;
   /** Yes/no confirmation. */
   confirm(options: { message: string; initial?: boolean }): Promise<boolean>;
   /** Informational boxed note. */
@@ -106,11 +102,7 @@ export function createClackIO(): PaymentIO {
       );
       return String(value);
     },
-    async select<T extends string>(opts: {
-      message: string;
-      options: SelectOption<T>[];
-      initial?: T;
-    }): Promise<T> {
+    async select<T extends string>(opts: { message: string; options: SelectOption<T>[]; initial?: T }): Promise<T> {
       const { message, options, initial } = opts;
       const value = assertNotCancelled(
         await clackSelectString({ message, options, initialValue: initial }),
@@ -119,7 +111,10 @@ export function createClackIO(): PaymentIO {
       return value as T;
     },
     async confirm({ message, initial }) {
-      const value = assertNotCancelled(await clackConfirm({ message, initialValue: initial }), 'Confirmation cancelled');
+      const value = assertNotCancelled(
+        await clackConfirm({ message, initialValue: initial }),
+        'Confirmation cancelled',
+      );
       return Boolean(value);
     },
     note(body, title) {

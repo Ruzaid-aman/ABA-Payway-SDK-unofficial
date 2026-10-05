@@ -238,10 +238,7 @@ describe('R3 callback URL policy', () => {
   );
 
   it.each([
-    [
-      'callback URL',
-      onlineQrPlan({ callbackUrl: 'https://router.home.arpa/callback' }),
-    ],
+    ['callback URL', onlineQrPlan({ callbackUrl: 'https://router.home.arpa/callback' })],
     [
       'return URL',
       {

@@ -51,7 +51,11 @@ const mockRoutes: Record<string, (body: Record<string, unknown>) => { status: nu
 
 function seedWebhookStore(records: unknown[]): void {
   mkdirSync(webhookDir, { recursive: true });
-  writeFileSync(path.join(webhookDir, 'callbacks.jsonl'), `${records.map((r) => JSON.stringify(r)).join('\n')}\n`, 'utf8');
+  writeFileSync(
+    path.join(webhookDir, 'callbacks.jsonl'),
+    `${records.map((r) => JSON.stringify(r)).join('\n')}\n`,
+    'utf8',
+  );
 }
 
 let seq = 0;
@@ -147,7 +151,9 @@ afterAll(() => {
 });
 
 /** Run one in-process invocation with captured console and restored exitCode. */
-async function run(argv: string[]): Promise<{ text: string; stdout: string; stderr: string; exitCode: typeof process.exitCode }> {
+async function run(
+  argv: string[],
+): Promise<{ text: string; stdout: string; stderr: string; exitCode: typeof process.exitCode }> {
   const captured = captureConsole();
   const before = process.exitCode;
   try {
@@ -196,8 +202,20 @@ describe('journal group expansion (stats/reconcile/explain/anomalies + output br
     seedJournal([
       journalEvent({ kind: 'execution.started', command: 'payway-sdk check-transaction' }),
       journalEvent({ kind: 'execution.request', transactionId: 'GAP-T1', endpoint: '/check-transaction', attempt: 0 }),
-      journalEvent({ kind: 'execution.response', transactionId: 'GAP-T1', endpoint: '/check-transaction', httpStatus: 200, durationMs: 120, correlationId: 'gap-cid-1' }),
-      journalEvent({ kind: 'status.observed', transactionId: 'GAP-T1', status: 'APPROVED', endpoint: '/check-transaction' }),
+      journalEvent({
+        kind: 'execution.response',
+        transactionId: 'GAP-T1',
+        endpoint: '/check-transaction',
+        httpStatus: 200,
+        durationMs: 120,
+        correlationId: 'gap-cid-1',
+      }),
+      journalEvent({
+        kind: 'status.observed',
+        transactionId: 'GAP-T1',
+        status: 'APPROVED',
+        endpoint: '/check-transaction',
+      }),
       journalEvent({ kind: 'execution.error', transactionId: 'GAP-T2', httpStatus: 403, paywayCode: '429' }),
     ]);
     const human = await run(['journal', 'stats', '--dir', journalDir]);
@@ -264,7 +282,12 @@ describe('journal group expansion (stats/reconcile/explain/anomalies + output br
     seedJournal([
       journalEvent({ kind: 'execution.request', transactionId: 'GAP-E1', endpoint: '/generate-qr', attempt: 0 }),
       journalEvent({ kind: 'execution.response', transactionId: 'GAP-E1', httpStatus: 200, durationMs: 80 }),
-      journalEvent({ kind: 'status.observed', transactionId: 'GAP-E1', status: 'APPROVED', endpoint: '/check-transaction' }),
+      journalEvent({
+        kind: 'status.observed',
+        transactionId: 'GAP-E1',
+        status: 'APPROVED',
+        endpoint: '/check-transaction',
+      }),
     ]);
     const found = await run(['journal', 'explain', '-t', 'GAP-E1', '--dir', journalDir]);
     expect(found.stdout).toContain('Investigation: GAP-E1');
@@ -275,7 +298,9 @@ describe('journal group expansion (stats/reconcile/explain/anomalies + output br
     expect(missing.stdout).toContain('No journal events found');
     expect(missing.stdout).toContain('check-transaction -t GAP-NOPE');
 
-    const json = parseJsonDocument((await run(['journal', 'explain', '-t', 'GAP-E1', '--dir', journalDir, '--json'])).stdout);
+    const json = parseJsonDocument(
+      (await run(['journal', 'explain', '-t', 'GAP-E1', '--dir', journalDir, '--json'])).stdout,
+    );
     expect(json.found).toBe(true);
     expect(json.transactionId).toBe('GAP-E1');
     expect(json.steps.length).toBeGreaterThan(0);
@@ -284,7 +309,12 @@ describe('journal group expansion (stats/reconcile/explain/anomalies + output br
   it('explain surfaces the gateway hint for a payway code and the failed-before-status verdict', async () => {
     seedJournal([
       journalEvent({ kind: 'execution.request', transactionId: 'GAP-ERR', endpoint: '/generate-qr', attempt: 0 }),
-      journalEvent({ kind: 'execution.error', transactionId: 'GAP-ERR', paywayCode: '49', error: { code: '49', message: 'Invalid Request' } }),
+      journalEvent({
+        kind: 'execution.error',
+        transactionId: 'GAP-ERR',
+        paywayCode: '49',
+        error: { code: '49', message: 'Invalid Request' },
+      }),
     ]);
     const out = await run(['journal', 'explain', '-t', 'GAP-ERR', '--dir', journalDir]);
     expect(out.stdout).toContain('failed before a status was ever observed');
@@ -306,10 +336,20 @@ describe('journal group expansion (stats/reconcile/explain/anomalies + output br
     const spikeDay = '2026-09-28';
     const events = [
       // Quiet baseline day: one error.
-      journalEvent({ kind: 'execution.error', ts: '2026-09-27T10:00:00.000Z', transactionId: 'GAP-B1', httpStatus: 500 }),
+      journalEvent({
+        kind: 'execution.error',
+        ts: '2026-09-27T10:00:00.000Z',
+        transactionId: 'GAP-B1',
+        httpStatus: 500,
+      }),
       // Spike day: 6 errors.
       ...Array.from({ length: 6 }, (_, i) =>
-        journalEvent({ kind: 'execution.error', ts: `${spikeDay}T1${i}:00:00.000Z`, transactionId: `GAP-S${i}`, httpStatus: 500 }),
+        journalEvent({
+          kind: 'execution.error',
+          ts: `${spikeDay}T1${i}:00:00.000Z`,
+          transactionId: `GAP-S${i}`,
+          httpStatus: 500,
+        }),
       ),
     ];
     seedJournal(events);
@@ -353,10 +393,14 @@ describe('journal group expansion (stats/reconcile/explain/anomalies + output br
       journalEvent({ kind: 'status.observed', transactionId: 'GAP-K1', status: 'PENDING' }),
       journalEvent({ kind: 'status.observed', transactionId: 'GAP-K1', status: 'APPROVED' }),
     ]);
-    const byKind = parseJsonDocument((await run(['journal', 'show', '--kind', 'status.observed', '--dir', journalDir, '--json'])).stdout);
+    const byKind = parseJsonDocument(
+      (await run(['journal', 'show', '--kind', 'status.observed', '--dir', journalDir, '--json'])).stdout,
+    );
     expect(byKind.shown).toBe(2);
 
-    const lastOne = parseJsonDocument((await run(['journal', 'show', '--last', '1', '--dir', journalDir, '--json'])).stdout);
+    const lastOne = parseJsonDocument(
+      (await run(['journal', 'show', '--last', '1', '--dir', journalDir, '--json'])).stdout,
+    );
     expect(lastOne.shown).toBe(1);
     expect(lastOne.events[0].status).toBe('APPROVED');
   });
@@ -404,7 +448,9 @@ describe('journal group expansion (stats/reconcile/explain/anomalies + output br
       `${[journalEvent({ transactionId: 'GAP-P1' }), journalEvent({ transactionId: 'GAP-P2' })].map((e) => JSON.stringify(e)).join('\n')}\n`,
       'utf8',
     );
-    const result = parseJsonDocument((await run(['journal', 'prune', '--before', '2099-01-01T00:00:00.000Z', '--dir', pruneDir, '--json'])).stdout);
+    const result = parseJsonDocument(
+      (await run(['journal', 'prune', '--before', '2099-01-01T00:00:00.000Z', '--dir', pruneDir, '--json'])).stdout,
+    );
     expect(result.before).toBe('2099-01-01T00:00:00.000Z');
     expect(result.removed).toBe(2);
     expect(result.kept).toBe(0);
@@ -577,7 +623,9 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
     const savedKey = process.env.PAYWAY_API_KEY;
     delete process.env.PAYWAY_API_KEY;
     try {
-      const noKey = parseJsonDocument((await run(['webhook', 'verify-callback', '--body', '{}', '--sig', 'abc', '--json'])).stdout);
+      const noKey = parseJsonDocument(
+        (await run(['webhook', 'verify-callback', '--body', '{}', '--sig', 'abc', '--json'])).stdout,
+      );
       expect(noKey.error.message).toContain('API key');
     } finally {
       process.env.PAYWAY_API_KEY = savedKey;
@@ -586,7 +634,9 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
     // (The bare no-body branch reads stdin, which never closes under the
     // vitest runner — covered by the CLI child-process suites instead.)
 
-    const badJson = parseJsonDocument((await run(['webhook', 'verify-callback', '--body', '{nope', '--sig', 'abc', '--api-key', 'k', '--json'])).stdout);
+    const badJson = parseJsonDocument(
+      (await run(['webhook', 'verify-callback', '--body', '{nope', '--sig', 'abc', '--api-key', 'k', '--json'])).stdout,
+    );
     expect(badJson.error.message).toContain('not valid JSON');
   });
 
@@ -597,13 +647,37 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
     const signature = signCallbackBody(unsigned, API_KEY);
     const body = { ...unsigned, hash: signature };
     const ok = parseJsonDocument(
-      (await run(['webhook', 'verify-callback', '--body', JSON.stringify(body), '--sig', signature, '--api-key', API_KEY, '--json'])).stdout,
+      (
+        await run([
+          'webhook',
+          'verify-callback',
+          '--body',
+          JSON.stringify(body),
+          '--sig',
+          signature,
+          '--api-key',
+          API_KEY,
+          '--json',
+        ])
+      ).stdout,
     );
     expect(ok.valid).toBe(true);
     expect(ok.tranId).toBe('GAP-SIG');
 
     const bad = parseJsonDocument(
-      (await run(['webhook', 'verify-callback', '--body', JSON.stringify(body), '--sig', 'wrong-signature', '--api-key', API_KEY, '--json'])).stdout,
+      (
+        await run([
+          'webhook',
+          'verify-callback',
+          '--body',
+          JSON.stringify(body),
+          '--sig',
+          'wrong-signature',
+          '--api-key',
+          API_KEY,
+          '--json',
+        ])
+      ).stdout,
     );
     expect(bad.valid).toBe(false);
     expect(bad.reason).toBe('signature_mismatch');
@@ -611,11 +685,19 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
 
   it('verify-callback --record reports the persisted verdict without re-checking', async () => {
     seedWebhookStore([
-      baseRecord({ id: 'wh_gap_ver', signatureVerdict: 'verified', signatureSource: 'header', matchedTransactionId: 'GAP-V', matchedStatus: 'APPROVED' }),
+      baseRecord({
+        id: 'wh_gap_ver',
+        signatureVerdict: 'verified',
+        signatureSource: 'header',
+        matchedTransactionId: 'GAP-V',
+        matchedStatus: 'APPROVED',
+      }),
       baseRecord({ id: 'wh_gap_inv', signatureVerdict: 'invalid', verificationReason: 'signature_mismatch' }),
       baseRecord({ id: 'wh_gap_uns' }),
     ]);
-    const ok = parseJsonDocument((await run(['webhook', 'verify-callback', '--record', 'wh_gap_ver', '--json'])).stdout);
+    const ok = parseJsonDocument(
+      (await run(['webhook', 'verify-callback', '--record', 'wh_gap_ver', '--json'])).stdout,
+    );
     expect(ok.verdict).toBe('verified');
     expect(ok.signatureSource).toBe('header');
     expect(ok.matchedStatus).toBe('APPROVED');
@@ -624,7 +706,9 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
     expect(parseJsonDocument(invalid.stdout).verdict).toBe('invalid');
     expect(invalid.exitCode).toBe(1);
 
-    const unsigned = parseJsonDocument((await run(['webhook', 'verify-callback', '--record', 'wh_gap_uns', '--json'])).stdout);
+    const unsigned = parseJsonDocument(
+      (await run(['webhook', 'verify-callback', '--record', 'wh_gap_uns', '--json'])).stdout,
+    );
     expect(unsigned.verdict).toBe('unsigned');
 
     const human = await run(['webhook', 'verify-callback', '--record', 'wh_gap_ver']);
@@ -679,22 +763,49 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
         signatureVerdict: 'verified',
       }),
     ]);
-    const ok = parseJsonDocument((await run(['webhook', 'resend', '--record', 'wh_gap_send', '--to', `${baseUrl}/resend-ok`, '--json'])).stdout);
+    const ok = parseJsonDocument(
+      (await run(['webhook', 'resend', '--record', 'wh_gap_send', '--to', `${baseUrl}/resend-ok`, '--json'])).stdout,
+    );
     expect(ok.httpStatus).toBe(200);
     expect(ok.ok).toBe(true);
 
-    const failing = await run(['webhook', 'resend', '--record', 'wh_gap_send', '--to', `${baseUrl}/resend-bad`, '--json']);
+    const failing = await run([
+      'webhook',
+      'resend',
+      '--record',
+      'wh_gap_send',
+      '--to',
+      `${baseUrl}/resend-bad`,
+      '--json',
+    ]);
     expect(failing.exitCode).toBe(3);
     expect(parseJsonDocument(failing.stdout).httpStatus).toBe(500);
 
-    const human = await run(['webhook', 'resend', '--record', 'wh_gap_send', '--to', `${baseUrl}/resend-ok`, '--forward-headers', 'X-Extra: 1']);
+    const human = await run([
+      'webhook',
+      'resend',
+      '--record',
+      'wh_gap_send',
+      '--to',
+      `${baseUrl}/resend-ok`,
+      '--forward-headers',
+      'X-Extra: 1',
+    ]);
     expect(human.stdout).toContain('Resending captured webhook');
     expect(human.stdout).toContain('delivered [HTTP 200]');
   });
 
   it('resend surfaces transport failures as network errors with exit 3', async () => {
     seedWebhookStore([baseRecord({ id: 'wh_gap_dead' })]);
-    const out = await run(['webhook', 'resend', '--record', 'wh_gap_dead', '--to', 'http://127.0.0.1:9/nope', '--json']);
+    const out = await run([
+      'webhook',
+      'resend',
+      '--record',
+      'wh_gap_dead',
+      '--to',
+      'http://127.0.0.1:9/nope',
+      '--json',
+    ]);
     expect(out.exitCode).toBe(3);
     const doc = parseJsonDocument(out.stdout);
     expect(doc.error.kind).toBe('network');
@@ -706,7 +817,15 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
     expect(parseJsonDocument(badShape.stdout).error.message).toContain('invalid webhook record id');
 
     seedWebhookStore([]);
-    const missing = await run(['webhook', 'resend', '--record', 'wh_gap_gone', '--to', `${baseUrl}/resend-ok`, '--json']);
+    const missing = await run([
+      'webhook',
+      'resend',
+      '--record',
+      'wh_gap_gone',
+      '--to',
+      `${baseUrl}/resend-ok`,
+      '--json',
+    ]);
     expect(missing.exitCode).toBe(1);
     expect(parseJsonDocument(missing.stdout).error.message).toContain('not found');
   });
@@ -721,7 +840,16 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
     expect(ok.tranId).toBe('GAP-TRG');
     expect(ok.ok).toBe(true);
 
-    const human = await run(['webhook', 'trigger', '--url', `${baseUrl}/trigger-ok`, '-t', 'GAP-TRG2', '--api-key', API_KEY]);
+    const human = await run([
+      'webhook',
+      'trigger',
+      '--url',
+      `${baseUrl}/trigger-ok`,
+      '-t',
+      'GAP-TRG2',
+      '--api-key',
+      API_KEY,
+    ]);
     expect(human.stdout).toContain('Triggering fixture webhook');
     expect(human.stdout).toContain('yes (X-PAYWAY-HMAC-SHA512)');
     expect(human.stdout).toContain('the gateway never saw this tran_id');
@@ -732,7 +860,15 @@ describe('webhook workbench expansion (status/stop/verify/list/show/resend/trigg
   });
 
   it('trigger validates unknown events and non-positive amounts locally', async () => {
-    const badEvent = await run(['webhook', 'trigger', '--url', `${baseUrl}/trigger-ok`, '--event', 'nope.nope', '--json']);
+    const badEvent = await run([
+      'webhook',
+      'trigger',
+      '--url',
+      `${baseUrl}/trigger-ok`,
+      '--event',
+      'nope.nope',
+      '--json',
+    ]);
     expect(badEvent.exitCode).toBe(1);
     expect(parseJsonDocument(badEvent.stdout).error.message).toContain('unknown fixture event');
 
@@ -822,12 +958,37 @@ describe('API command validation/preflight expansion', () => {
   });
 
   it('generate-checkout rejects a bad currency locally in human and --json modes', async () => {
-    const human = await run(['generate-checkout', '-a', '5', '-c', 'EUR', '--return-url', 'https://example.com/ok', '--cancel-url', 'https://example.com/no', '-y']);
+    const human = await run([
+      'generate-checkout',
+      '-a',
+      '5',
+      '-c',
+      'EUR',
+      '--return-url',
+      'https://example.com/ok',
+      '--cancel-url',
+      'https://example.com/no',
+      '-y',
+    ]);
     expect(human.exitCode).toBe(1);
     expect(human.stdout).toContain('Currency must be USD or KHR');
 
     const json = parseJsonDocument(
-      (await run(['generate-checkout', '-a', '5', '-c', 'EUR', '--return-url', 'https://example.com/ok', '--cancel-url', 'https://example.com/no', '-y', '--json'])).stdout,
+      (
+        await run([
+          'generate-checkout',
+          '-a',
+          '5',
+          '-c',
+          'EUR',
+          '--return-url',
+          'https://example.com/ok',
+          '--cancel-url',
+          'https://example.com/no',
+          '-y',
+          '--json',
+        ])
+      ).stdout,
     );
     expect(json.error.kind).toBe('validation');
     expect(json.error.message).toContain('Currency must be USD or KHR');
@@ -835,8 +996,18 @@ describe('API command validation/preflight expansion', () => {
 
   it('generate-checkout rejects a custom callback port with one JSON validation envelope', async () => {
     const out = await run([
-      'generate-checkout', '-a', '5', '-t', 'V2-PORT', '--return-url', 'https://example.com:8443/cb',
-      '-y', '--json', '--no-polling', '--no-save-image', '--no-open-image',
+      'generate-checkout',
+      '-a',
+      '5',
+      '-t',
+      'V2-PORT',
+      '--return-url',
+      'https://example.com:8443/cb',
+      '-y',
+      '--json',
+      '--no-polling',
+      '--no-save-image',
+      '--no-open-image',
     ]);
     const doc = parseJsonDocument(out.stdout);
     expect(out.exitCode).toBe(1);
@@ -845,11 +1016,39 @@ describe('API command validation/preflight expansion', () => {
   });
 
   it('generate-checkout rejects invalid --payment-gate and --skip-success-page values before any network call', async () => {
-    const gate = await run(['generate-checkout', '-a', '5', '-c', 'USD', '--return-url', 'https://example.com/ok', '--cancel-url', 'https://example.com/no', '--payment-gate', '2', '-y', '--json']);
+    const gate = await run([
+      'generate-checkout',
+      '-a',
+      '5',
+      '-c',
+      'USD',
+      '--return-url',
+      'https://example.com/ok',
+      '--cancel-url',
+      'https://example.com/no',
+      '--payment-gate',
+      '2',
+      '-y',
+      '--json',
+    ]);
     expect(gate.exitCode).toBe(1);
     expect(parseJsonDocument(gate.stdout).error.message).toContain('--payment-gate must be 0 or 1');
 
-    const skip = await run(['generate-checkout', '-a', '5', '-c', 'USD', '--return-url', 'https://example.com/ok', '--cancel-url', 'https://example.com/no', '--skip-success-page', '9', '-y', '--json']);
+    const skip = await run([
+      'generate-checkout',
+      '-a',
+      '5',
+      '-c',
+      'USD',
+      '--return-url',
+      'https://example.com/ok',
+      '--cancel-url',
+      'https://example.com/no',
+      '--skip-success-page',
+      '9',
+      '-y',
+      '--json',
+    ]);
     expect(skip.exitCode).toBe(1);
     expect(parseJsonDocument(skip.stdout).error.message).toContain('--skip-success-page must be 0 or 1');
   });
@@ -867,7 +1066,20 @@ describe('API command validation/preflight expansion', () => {
     expect(badEntry.exitCode).toBe(1);
     expect(parseJsonDocument(badEntry.stdout).error.message).toContain('invalid beneficiary');
 
-    const badCustomFields = await run(['payout', '-t', 'GAP-PO', '-a', '5', '-c', 'USD', '-b', '500000001:5', '--custom-fields', '{oops', '--json']);
+    const badCustomFields = await run([
+      'payout',
+      '-t',
+      'GAP-PO',
+      '-a',
+      '5',
+      '-c',
+      'USD',
+      '-b',
+      '500000001:5',
+      '--custom-fields',
+      '{oops',
+      '--json',
+    ]);
     expect(badCustomFields.exitCode).toBe(1);
     expect(parseJsonDocument(badCustomFields.stdout).error.message).toContain('--custom-fields is not valid JSON');
 
@@ -894,14 +1106,52 @@ describe('API command validation/preflight expansion', () => {
       status: 200,
       payload: { status: { code: '00', message: 'Success' }, qr_string: '00020101021229zz-gap-soundbox' },
     });
-    const json = parseJsonDocument((await run(['request-qr', '-c', 'USD', '--payment-option', 'abapay', '--callback-url', 'https://example.com/cb', '-a', '3.5', '-y', '--json'])).stdout);
+    const json = parseJsonDocument(
+      (
+        await run([
+          'request-qr',
+          '-c',
+          'USD',
+          '--payment-option',
+          'abapay',
+          '--callback-url',
+          'https://example.com/cb',
+          '-a',
+          '3.5',
+          '-y',
+          '--json',
+        ])
+      ).stdout,
+    );
     expect(json.status.code).toBe('00');
 
-    const human = await run(['request-qr', '-c', 'USD', '--payment-option', 'abapay', '--callback-url', 'https://example.com/cb', '-a', '3.5', '--no-save-image', '-y']);
+    const human = await run([
+      'request-qr',
+      '-c',
+      'USD',
+      '--payment-option',
+      'abapay',
+      '--callback-url',
+      'https://example.com/cb',
+      '-a',
+      '3.5',
+      '--no-save-image',
+      '-y',
+    ]);
     expect(human.stdout).toContain('Soundbox QR created');
     expect(human.stdout).toContain('QR String:');
 
-    const keypad = await run(['request-qr', '-c', 'USD', '--payment-option', 'abapay', '--callback-url', 'https://example.com/cb', '--no-save-image', '-y']);
+    const keypad = await run([
+      'request-qr',
+      '-c',
+      'USD',
+      '--payment-option',
+      'abapay',
+      '--callback-url',
+      'https://example.com/cb',
+      '--no-save-image',
+      '-y',
+    ]);
     expect(keypad.stdout).toContain('(keyed on device)');
   });
 
@@ -910,7 +1160,16 @@ describe('API command validation/preflight expansion', () => {
       status: 400,
       payload: { status: { code: '04', message: 'Parameter validation required' } },
     });
-    const out = await run(['request-qr', '-c', 'USD', '--payment-option', 'abapay', '--callback-url', 'https://example.com/cb', '--json']);
+    const out = await run([
+      'request-qr',
+      '-c',
+      'USD',
+      '--payment-option',
+      'abapay',
+      '--callback-url',
+      'https://example.com/cb',
+      '--json',
+    ]);
     const doc = parseJsonDocument(out.stdout);
     expect(doc.error.kind).toBeDefined();
     expect(out.exitCode).toBe(doc.error.exitCode);
@@ -920,12 +1179,37 @@ describe('API command validation/preflight expansion', () => {
     delete process.env.PAYWAY_PARTNER_ID;
     delete process.env.PAYWAY_PARTNER_API_KEY;
     try {
-      const human = await run(['self-activation', 'new-merchant', '--pushback-url', 'https://example.com/pb', '--redirect-url', 'https://example.com/rd', '--register-ref', 'gap-reg-1', '--currency', 'USD']);
+      const human = await run([
+        'self-activation',
+        'new-merchant',
+        '--pushback-url',
+        'https://example.com/pb',
+        '--redirect-url',
+        'https://example.com/rd',
+        '--register-ref',
+        'gap-reg-1',
+        '--currency',
+        'USD',
+      ]);
       expect(human.exitCode).toBe(1);
       expect(human.stdout).toContain('Missing partner credentials');
 
       const json = parseJsonDocument(
-        (await run(['self-activation', 'new-merchant', '--pushback-url', 'https://example.com/pb', '--redirect-url', 'https://example.com/rd', '--register-ref', 'gap-reg-1', '--currency', 'USD', '--json'])).stdout,
+        (
+          await run([
+            'self-activation',
+            'new-merchant',
+            '--pushback-url',
+            'https://example.com/pb',
+            '--redirect-url',
+            'https://example.com/rd',
+            '--register-ref',
+            'gap-reg-1',
+            '--currency',
+            'USD',
+            '--json',
+          ])
+        ).stdout,
       );
       expect(json.error.kind).toBe('validation');
       expect(json.error.message).toContain('partner');
@@ -938,19 +1222,30 @@ describe('API command validation/preflight expansion', () => {
   it('self-activation new-merchant renders the human success card with URL and token', async () => {
     mockRoutes['new-merchant'] = () => ({
       status: 200,
-      payload: { status: { code: '00', message: 'Success' }, url: 'https://onboard.example.com/start', token: 'sess-gap-1' },
+      payload: {
+        status: { code: '00', message: 'Success' },
+        url: 'https://onboard.example.com/start',
+        token: 'sess-gap-1',
+      },
     });
     process.env.PAYWAY_PARTNER_ID = 'partner-gap';
     process.env.PAYWAY_PARTNER_API_KEY = 'p'.repeat(32);
     try {
       const out = await run([
-        'self-activation', 'new-merchant',
-        '--pushback-url', 'https://example.com/pb',
-        '--redirect-url', 'https://example.com/rd',
-        '--register-ref', 'gap-reg-2',
-        '--currency', 'USD',
-        '--merchant-type', '1',
-        '--type', '0',
+        'self-activation',
+        'new-merchant',
+        '--pushback-url',
+        'https://example.com/pb',
+        '--redirect-url',
+        'https://example.com/rd',
+        '--register-ref',
+        'gap-reg-2',
+        '--currency',
+        'USD',
+        '--merchant-type',
+        '1',
+        '--type',
+        '0',
       ]);
       expect(out.exitCode).not.toBe(1);
       expect(out.stdout).toContain('Merchant registration request accepted');

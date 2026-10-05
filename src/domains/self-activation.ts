@@ -101,11 +101,20 @@ export interface SelfActivationMerchantInfoResponse {
 
 export interface SelfActivationDomain {
   /** `POST /api/merchant-portal/online-self-activation/new-merchant` — signs with SHA256. */
-  registerMerchant: (params: SelfActivationRegisterParams, callOptions?: RequestCallOptions) => Promise<SelfActivationRegisterResponse>;
+  registerMerchant: (
+    params: SelfActivationRegisterParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<SelfActivationRegisterResponse>;
   /** `POST /api/merchant-portal/online-self-activation/get-mc-credential-info` — signs with SHA512 (per that endpoint's own prose). */
-  getCredentialInfo: (params: SelfActivationCredentialInfoParams, callOptions?: RequestCallOptions) => Promise<SelfActivationCredentialInfoResponse>;
+  getCredentialInfo: (
+    params: SelfActivationCredentialInfoParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<SelfActivationCredentialInfoResponse>;
   /** `POST /api/merchant-portal/online-self-activation/get-mc-info` — signs with SHA256. */
-  getMerchantInfo: (params: SelfActivationMerchantInfoParams, callOptions?: RequestCallOptions) => Promise<SelfActivationMerchantInfoResponse>;
+  getMerchantInfo: (
+    params: SelfActivationMerchantInfoParams,
+    callOptions?: RequestCallOptions,
+  ) => Promise<SelfActivationMerchantInfoResponse>;
 }
 
 export function createSelfActivationDomain(
@@ -174,16 +183,12 @@ export function createSelfActivationDomain(
         delete requestData.merchant_type;
       }
 
-      return partnerRequest<SelfActivationRegisterResponse>(
-        ENDPOINTS.registerNewMerchant,
-        requestData,
-        {
-          hashAlgorithm: 'sha256',
-          bodyExtras: params.referenceId !== undefined ? { reference_id: params.referenceId } : undefined,
-          requestTime: params.requestTime,
-          callOptions,
-        },
-      );
+      return partnerRequest<SelfActivationRegisterResponse>(ENDPOINTS.registerNewMerchant, requestData, {
+        hashAlgorithm: 'sha256',
+        bodyExtras: params.referenceId !== undefined ? { reference_id: params.referenceId } : undefined,
+        requestTime: params.requestTime,
+        callOptions,
+      });
     },
 
     getCredentialInfo: (params, callOptions) => {
@@ -239,18 +244,17 @@ export function createSelfActivationDomain(
         // merchant's RSA public key (spec: opensslEncrypt($hash_encrypt_string,
         // Merchant rsa_public_key) — same 117-byte-chunk PKCS1 scheme as
         // merchant_auth, base64-encoded).
-        requestData.rsa_public_key_hash_encrypt = encryptMerchantAuth(publicKeyHashEncrypt, params.merchantRsaPublicKeyPem);
+        requestData.rsa_public_key_hash_encrypt = encryptMerchantAuth(
+          publicKeyHashEncrypt,
+          params.merchantRsaPublicKeyPem,
+        );
       }
 
-      return partnerRequest<SelfActivationMerchantInfoResponse>(
-        ENDPOINTS.getMerchantInfo,
-        requestData,
-        {
-          hashAlgorithm: 'sha256',
-          requestTime: requestTimeForHmac,
-          callOptions,
-        },
-      );
+      return partnerRequest<SelfActivationMerchantInfoResponse>(ENDPOINTS.getMerchantInfo, requestData, {
+        hashAlgorithm: 'sha256',
+        requestTime: requestTimeForHmac,
+        callOptions,
+      });
     },
   };
 }

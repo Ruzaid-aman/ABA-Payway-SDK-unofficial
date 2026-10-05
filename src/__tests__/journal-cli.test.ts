@@ -25,11 +25,7 @@ afterEach(() => {
 });
 
 function writeJournal(events: JournalEventV1[]): void {
-  writeFileSync(
-    path.join(dir, 'journal.jsonl'),
-    `${events.map((e) => JSON.stringify(e)).join('\n')}\n`,
-    'utf8',
-  );
+  writeFileSync(path.join(dir, 'journal.jsonl'), `${events.map((e) => JSON.stringify(e)).join('\n')}\n`, 'utf8');
 }
 
 let seq = 0;
@@ -84,7 +80,11 @@ describe('journal CLI', () => {
   });
 
   it('prune removes events older than the cutoff', async () => {
-    const old = ev({ kind: 'execution.request', correlationId: 'old', ts: new Date(Date.now() - 86_400_000 * 5).toISOString() });
+    const old = ev({
+      kind: 'execution.request',
+      correlationId: 'old',
+      ts: new Date(Date.now() - 86_400_000 * 5).toISOString(),
+    });
     const fresh = ev({ kind: 'execution.request', correlationId: 'fresh' });
     writeJournal([old, fresh]);
 

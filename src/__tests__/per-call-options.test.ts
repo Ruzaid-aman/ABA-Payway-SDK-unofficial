@@ -49,9 +49,7 @@ describe('RequestCallOptions (per-call timeout / abort)', () => {
   it('timeoutMs overrides the client-wide timeout for a single call', async () => {
     const client = makeClient(30_000);
     // The 400 ms server delay trips the 80 ms per-call override…
-    await expect(
-      client.checkout.checkTransaction('T001', undefined, { timeoutMs: 80 }),
-    ).rejects.toThrow(/timed out/);
+    await expect(client.checkout.checkTransaction('T001', undefined, { timeoutMs: 80 })).rejects.toThrow(/timed out/);
     // …while a call without overrides succeeds under the 30 s client default.
     await expect(client.checkout.checkTransaction('T001')).resolves.toMatchObject({
       status: { code: '00' },
@@ -68,9 +66,9 @@ describe('RequestCallOptions (per-call timeout / abort)', () => {
     const controller = new AbortController();
     const before = requestCount;
     setTimeout(() => controller.abort(), 50);
-    await expect(
-      client.checkout.checkTransaction('T001', undefined, { signal: controller.signal }),
-    ).rejects.toThrow('Request aborted by caller signal');
+    await expect(client.checkout.checkTransaction('T001', undefined, { signal: controller.signal })).rejects.toThrow(
+      'Request aborted by caller signal',
+    );
     expect(requestCount).toBe(before + 1); // exactly one attempt — aborts do not retry
   });
 
@@ -79,9 +77,9 @@ describe('RequestCallOptions (per-call timeout / abort)', () => {
     const controller = new AbortController();
     controller.abort();
     const before = requestCount;
-    await expect(
-      client.checkout.checkTransaction('T001', undefined, { signal: controller.signal }),
-    ).rejects.toThrow('Request aborted by caller signal');
+    await expect(client.checkout.checkTransaction('T001', undefined, { signal: controller.signal })).rejects.toThrow(
+      'Request aborted by caller signal',
+    );
     expect(requestCount).toBe(before);
   });
 });

@@ -64,9 +64,7 @@ function flagOptions(entry: FlatEntry, rootOptions: CompletionOption[]): Complet
 }
 
 function flagTokens(options: CompletionOption[]): string {
-  return options
-    .map((option) => [option.short, option.long].filter(Boolean).join(' '))
-    .join(' ');
+  return options.map((option) => [option.short, option.long].filter(Boolean).join(' ')).join(' ');
 }
 
 /** POSIX single-quote escaping (bash/zsh/fish description strings). */
@@ -221,7 +219,10 @@ export function generateFishScript(root: CompletionCommand): string {
     const flagScope =
       entry.path === ''
         ? ''
-        : `-n '${entry.path.split(' ').map((segment) => `__fish_seen_subcommand_from ${segment}`).join('; and ')}'`;
+        : `-n '${entry.path
+            .split(' ')
+            .map((segment) => `__fish_seen_subcommand_from ${segment}`)
+            .join('; and ')}'`;
     for (const option of flagOptions(entry, rootFlags)) {
       const long = option.long ?? '';
       const short = option.short ? ` -s ${option.short.replace(/^-/, '')}` : '';
@@ -291,7 +292,9 @@ export function generatePowerShellScript(root: CompletionCommand): string {
   lines.push('  }');
   lines.push('  $candidates |');
   lines.push('    Where-Object { $_ -like "$wordToComplete*" } |');
-  lines.push(`    ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }`);
+  lines.push(
+    `    ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }`,
+  );
   lines.push('}');
   return lines.join('\n');
 }

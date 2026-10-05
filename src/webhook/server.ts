@@ -226,11 +226,7 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
    * the queue owns the network call. Errors and outcomes are logged by the
    * forwarder/queue — capture never depends on delivery.
    */
-  function dispatchForward(
-    body: string,
-    headers: Record<string, string | string[] | undefined>,
-    label: string,
-  ): void {
+  function dispatchForward(body: string, headers: Record<string, string | string[] | undefined>, label: string): void {
     forwardQueue?.enqueue(body, { headers, label });
   }
 
@@ -260,16 +256,23 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
       }
       if (payload.action === 'identify') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ instanceId: options.control?.instanceId, pid: process.pid, port, startedAt: new Date().toISOString() }));
+        res.end(
+          JSON.stringify({
+            instanceId: options.control?.instanceId,
+            pid: process.pid,
+            port,
+            startedAt: new Date().toISOString(),
+          }),
+        );
         return;
       }
       if (payload.action === 'shutdown') {
         const expected = options.control?.controlToken ?? '';
         const presented = typeof payload.token === 'string' ? payload.token : '';
         const authorized =
-          expected.length > 0
-          && presented.length === expected.length
-          && timingSafeEqual(Buffer.from(presented, 'utf8'), Buffer.from(expected, 'utf8'));
+          expected.length > 0 &&
+          presented.length === expected.length &&
+          timingSafeEqual(Buffer.from(presented, 'utf8'), Buffer.from(expected, 'utf8'));
         if (!authorized) {
           res.writeHead(403, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'unauthorized' }));
@@ -374,15 +377,8 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         return { verdict: 'invalid', reason: 'signature_mismatch' };
       }
       try {
-        const detailed = verifyCallbackDetailed(
-          payload,
-          signature as string,
-          key,
-          { stripHash: true },
-        );
-        return detailed.valid
-          ? { verdict: 'verified' }
-          : { verdict: 'invalid', reason: detailed.reason };
+        const detailed = verifyCallbackDetailed(payload, signature as string, key, { stripHash: true });
+        return detailed.valid ? { verdict: 'verified' } : { verdict: 'invalid', reason: detailed.reason };
       } catch {
         return { verdict: 'invalid', reason: 'signature_mismatch' };
       }
@@ -520,7 +516,9 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
             try {
               storage.updatePaymentLinkPushbackMetadata(record.id, pushback);
             } catch (error) {
-              log(`  Unable to store pushback parse metadata: ${error instanceof Error ? error.message : String(error)}`);
+              log(
+                `  Unable to store pushback parse metadata: ${error instanceof Error ? error.message : String(error)}`,
+              );
             }
           }
           dispatchForward(body, headers, `payment-link pushback [${record.id}]`);
@@ -545,12 +543,15 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
 
           // Signature verdict whenever the delivery is signed and an apiKey is
           // configured; unsigned deliveries (offline KHQR) stay 'unsigned'.
-          const { verdict: signatureVerdict, reason: verificationReason, source: signatureSource } = computeSignatureVerdict(
-            body,
-            req.headers['x-payway-hmac-sha512'],
-          );
+          const {
+            verdict: signatureVerdict,
+            reason: verificationReason,
+            source: signatureSource,
+          } = computeSignatureVerdict(body, req.headers['x-payway-hmac-sha512']);
           if (signatureVerdict !== 'unsigned') {
-            log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}${signatureSource ? ` (${signatureSource}-hash)` : ''}`);
+            log(
+              `  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}${signatureSource ? ` (${signatureSource}-hash)` : ''}`,
+            );
           }
 
           const matchedTransactionId = extractTransactionIdFrom(khqrBody);
@@ -566,7 +567,9 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
           if (matchedTransactionId && matchedStatus !== undefined) {
             replay = storage
               .getAll()
-              .some((prior) => prior.matchedTransactionId === matchedTransactionId && prior.matchedStatus === matchedStatus);
+              .some(
+                (prior) => prior.matchedTransactionId === matchedTransactionId && prior.matchedStatus === matchedStatus,
+              );
           }
           const record = storage.save({
             headers,
@@ -616,7 +619,9 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
               try {
                 storage.updateCustomerQrMetadata(record.id, customerQr);
               } catch (error) {
-                log(`  Unable to store customer-qr parse metadata: ${error instanceof Error ? error.message : String(error)}`);
+                log(
+                  `  Unable to store customer-qr parse metadata: ${error instanceof Error ? error.message : String(error)}`,
+                );
               }
             }
             dispatchForward(body, headers, `customer-module callback [${record.id}]`);
@@ -667,12 +672,15 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
 
         // Verify BEFORE saving so the verdict is part of the durable record
         // (Phase 3 — previously computed, logged, then dropped: audit gap G7).
-        const { verdict: signatureVerdict, reason: verificationReason, source: signatureSource } = computeSignatureVerdict(
-          body,
-          req.headers['x-payway-hmac-sha512'],
-        );
+        const {
+          verdict: signatureVerdict,
+          reason: verificationReason,
+          source: signatureSource,
+        } = computeSignatureVerdict(body, req.headers['x-payway-hmac-sha512']);
         if (signatureVerdict !== 'unsigned') {
-          log(`  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}${signatureSource ? ` (${signatureSource}-hash)` : ''}`);
+          log(
+            `  Signature: ${signatureVerdict === 'verified' ? '\x1b[32m✓ valid\x1b[0m' : '\x1b[31m✗ invalid\x1b[0m'}${signatureSource ? ` (${signatureSource}-hash)` : ''}`,
+          );
         }
 
         // Correlate the delivery with its transaction (gap G8) and flag
@@ -684,7 +692,9 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         if (matchedTransactionId && matchedStatus !== undefined) {
           replay = storage
             .getAll()
-            .some((prior) => prior.matchedTransactionId === matchedTransactionId && prior.matchedStatus === matchedStatus);
+            .some(
+              (prior) => prior.matchedTransactionId === matchedTransactionId && prior.matchedStatus === matchedStatus,
+            );
         }
 
         const record = storage.save({
@@ -770,10 +780,13 @@ export function createWebhookServer(storage: WebhookStorage, options: WebhookSer
         // actual binding so a wide bind is never silent.
         server.listen(port, host, () => {
           running = true;
-          const binding = host === '127.0.0.1' ? `http://localhost:${port}${WEBHOOK_PATH}` : `http://${host}:${port}${WEBHOOK_PATH}`;
+          const binding =
+            host === '127.0.0.1' ? `http://localhost:${port}${WEBHOOK_PATH}` : `http://${host}:${port}${WEBHOOK_PATH}`;
           log(`\n  \x1b[1mWebhook listener running on\x1b[0m \x1b[36m${binding}\x1b[0m`);
           if (host !== '127.0.0.1' && host !== 'localhost') {
-            log(`  \x1b[33m⚠ Bound to ${host} — raw callback bodies (customer PII, signatures) are reachable beyond this machine.\x1b[0m`);
+            log(
+              `  \x1b[33m⚠ Bound to ${host} — raw callback bodies (customer PII, signatures) are reachable beyond this machine.\x1b[0m`,
+            );
           }
           log(`  \x1b[2mPress Ctrl+C to stop.\x1b[0m\n`);
           resolve();

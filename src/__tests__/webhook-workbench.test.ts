@@ -71,7 +71,11 @@ describe('WebhookForwarder', () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error('ECONNREFUSED: receiver down');
     });
-    const forwarder = new WebhookForwarder({ url: 'http://localhost:9/x', fetchImpl: fetchImpl as unknown as typeof fetch, quiet: true });
+    const forwarder = new WebhookForwarder({
+      url: 'http://localhost:9/x',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      quiet: true,
+    });
 
     const outcome = await forwarder.forward('{}', {});
 
@@ -82,7 +86,11 @@ describe('WebhookForwarder', () => {
 
   it('counts non-2xx receiver answers as failures without throwing', async () => {
     const fetchImpl = vi.fn(async () => new Response('no', { status: 500 }));
-    const forwarder = new WebhookForwarder({ url: 'http://localhost:9/x', fetchImpl: fetchImpl as unknown as typeof fetch, quiet: true });
+    const forwarder = new WebhookForwarder({
+      url: 'http://localhost:9/x',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      quiet: true,
+    });
 
     const outcome = await forwarder.forward('{}', {});
 
@@ -92,7 +100,11 @@ describe('WebhookForwarder', () => {
 
   it('joins array-valued signature headers with commas', async () => {
     const fetchImpl = vi.fn(async () => new Response('ok', { status: 200 }));
-    const forwarder = new WebhookForwarder({ url: 'http://localhost:1/x', fetchImpl: fetchImpl as unknown as typeof fetch, quiet: true });
+    const forwarder = new WebhookForwarder({
+      url: 'http://localhost:1/x',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      quiet: true,
+    });
     await forwarder.forward('{}', { headers: { 'x-payway-hmac-sha512': ['a', 'b'] } });
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect((init.headers as Record<string, string>)['X-PAYWAY-HMAC-SHA512']).toBe('a, b');
@@ -134,12 +146,7 @@ describe('buildWebhookFixture', () => {
 
     // Round-trip: the receiver strips the body hash and re-verifies exactly
     // this way (computeSignatureVerdict's body channel).
-    const verdict = verifyCallbackDetailed(
-      fixture.parsed,
-      fixture.signature as string,
-      API_KEY,
-      { stripHash: true },
-    );
+    const verdict = verifyCallbackDetailed(fixture.parsed, fixture.signature as string, API_KEY, { stripHash: true });
     expect(verdict).toEqual({ valid: true });
     // The discriminator holds: classifyCallback tags it as a CoF link.
     expect(classifyCallback(fixture.parsed)).toBe('cof-link');
@@ -168,12 +175,7 @@ describe('buildWebhookFixture', () => {
     expect(fixture.parsed.payer_name).toBe('Payer Name');
 
     // The fixture must round-trip through the SDK verifier AND the parser.
-    const verdict = verifyCallbackDetailed(
-      fixture.parsed,
-      fixture.signature as string,
-      API_KEY,
-      { stripHash: true },
-    );
+    const verdict = verifyCallbackDetailed(fixture.parsed, fixture.signature as string, API_KEY, { stripHash: true });
     expect(verdict).toEqual({ valid: true });
     const parsedCallback = parseCustomerQrCallback(fixture.parsed);
     expect(parsedCallback.kind).toBe('customer-module-qr');
@@ -186,7 +188,13 @@ describe('buildWebhookFixture', () => {
   });
 
   it('signs online checkout fixtures so the SDK verifier accepts them (round-trip pin)', () => {
-    for (const event of ['payment.approved', 'payment.declined', 'payment.pending', 'payment.refunded', 'payment.cancelled'] as const) {
+    for (const event of [
+      'payment.approved',
+      'payment.declined',
+      'payment.pending',
+      'payment.refunded',
+      'payment.cancelled',
+    ] as const) {
       const fixture = buildWebhookFixture(event, API_KEY, { tranId: 't-fixed', amount: 12.5, currency: 'USD' });
       expect(fixture.route).toBe('/aba-payway-webhook');
       expect(fixture.verification).toBe('hmac');
@@ -220,7 +228,10 @@ describe('buildWebhookFixture', () => {
   });
 
   it('builds the no-hash payment-link pushback contract: {tran_id, status: 0, merchant_ref_no}', () => {
-    const fixture = buildWebhookFixture('payment-link.pushback', API_KEY, { tranId: '178865526240157', merchantRef: 'plvr-1' });
+    const fixture = buildWebhookFixture('payment-link.pushback', API_KEY, {
+      tranId: '178865526240157',
+      merchantRef: 'plvr-1',
+    });
     expect(fixture.route).toBe('/aba-payway-pushback');
     expect(fixture.signature).toBeUndefined();
     expect(fixture.verification).toBe('check-transaction');

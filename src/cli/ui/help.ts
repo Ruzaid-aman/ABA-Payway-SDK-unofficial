@@ -131,9 +131,7 @@ export const COMMAND_EXAMPLES: Record<string, string[]> = {
     'payway-sdk webhook trigger --url http://localhost:3000/webhooks/aba --event payment.approved',
     'payway-sdk webhook verify-callback --body-file callback.json --sig "<X-PAYWAY-HMAC-SHA512>"',
   ],
-  'setup-webhook': [
-    'payway-sdk setup-webhook --tunnel --forward-to http://localhost:3000/webhooks/aba',
-  ],
+  'setup-webhook': ['payway-sdk setup-webhook --tunnel --forward-to http://localhost:3000/webhooks/aba'],
 };
 
 /**

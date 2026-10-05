@@ -111,7 +111,9 @@ describe('getCheckoutFormHtml (PayWay wiring)', () => {
 
   it('rejects unsafe form ids and honors custom rendering options', () => {
     const payway = new PayWay({ merchantId: 'mid', apiKey: 'key', environment: 'sandbox' });
-    expect(() => payway.checkout.getCheckoutFormHtml(BASE_PARAMS, { formId: `f"><script>` })).toThrow(PayWayConfigError);
+    expect(() => payway.checkout.getCheckoutFormHtml(BASE_PARAMS, { formId: `f"><script>` })).toThrow(
+      PayWayConfigError,
+    );
 
     const html = payway.checkout.getCheckoutFormHtml(BASE_PARAMS, {
       formId: 'my_pay_form',

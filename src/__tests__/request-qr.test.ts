@@ -37,7 +37,13 @@ function makeRequestSpy() {
     hmacFields: string[],
   ): Promise<TResponse> => {
     calls.push({ path, body, hmacFields });
-    return { tran_id: 'sb-test-001', qr_string: 'QR', amount: null, currency: 'USD', status: { code: 0, message: 'Success' } } as TResponse;
+    return {
+      tran_id: 'sb-test-001',
+      qr_string: 'QR',
+      amount: null,
+      currency: 'USD',
+      status: { code: 0, message: 'Success' },
+    } as TResponse;
   };
   return { spy, calls };
 }
@@ -81,7 +87,17 @@ describe('requestQr (Soundbox QR)', () => {
     const domain = createQrDomain(CONFIG, spy);
     await domain.requestQr(BASE_PARAMS);
 
-    const body = { req_time: '20260912000000', merchant_id: 'm', tran_id: 't', amount: '', purchase_type: 'purchase', payment_option: 'abapay', callback_url: 'cb', currency: 'USD', lifetime: '' };
+    const body = {
+      req_time: '20260912000000',
+      merchant_id: 'm',
+      tran_id: 't',
+      amount: '',
+      purchase_type: 'purchase',
+      payment_option: 'abapay',
+      callback_url: 'cb',
+      currency: 'USD',
+      lifetime: '',
+    };
     const expected = generateHmac(body, [...REQUEST_QR_HASH_FIELDS], 'key');
     const actual = generateHmac(
       Object.fromEntries(REQUEST_QR_HASH_FIELDS.map((f) => [f, body[f] ?? ''])),

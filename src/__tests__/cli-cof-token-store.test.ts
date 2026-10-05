@@ -112,7 +112,15 @@ describe('cof charge token resolution', () => {
 
     try {
       const { text, exitCode } = await run([
-        'cof', 'token', 'renew', '-r', 'reqren1', '-c', 'custren1', '--token', 'pwt-renew-token',
+        'cof',
+        'token',
+        'renew',
+        '-r',
+        'reqren1',
+        '-c',
+        'custren1',
+        '--token',
+        'pwt-renew-token',
       ]);
       expect(text).toContain('Token renew requested');
       expect(text).toContain('expiry window restarted');
@@ -131,9 +139,7 @@ describe('cof charge token resolution', () => {
 
     // NO receiver started: any gateway attempt would fail with a network error,
     // so a validation exit + message proves the local guard fired first.
-    const { text, exitCode } = await run([
-      'cof', 'charge', '-t', 'ord-dead', '-a', '1.00', '--ctid', 'custdead',
-    ]);
+    const { text, exitCode } = await run(['cof', 'charge', '-t', 'ord-dead', '-a', '1.00', '--ctid', 'custdead']);
     expect(text).toContain('expired');
     expect(text).toContain('docs/09: rolling ~90-day validity');
     expect(text).toContain('charge with an explicit --token');
@@ -154,9 +160,7 @@ describe('cof charge token resolution', () => {
     process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
 
     try {
-      const { text, exitCode } = await run([
-        'cof', 'charge', '-t', 'ord-soon', '-a', '1.00', '--ctid', 'custsoon',
-      ]);
+      const { text, exitCode } = await run(['cof', 'charge', '-t', 'ord-soon', '-a', '1.00', '--ctid', 'custsoon']);
       expect(text).toContain('expiring in');
       expect(text).toContain('renew soon');
       expect([0, undefined]).toContain(exitCode);
@@ -177,9 +181,7 @@ describe('cof charge token resolution', () => {
     process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
 
     try {
-      const { text, exitCode } = await run([
-        'cof', 'token', 'remove', '-c', 'custrm1', '--token', 'pwt-remove-me',
-      ]);
+      const { text, exitCode } = await run(['cof', 'token', 'remove', '-c', 'custrm1', '--token', 'pwt-remove-me']);
       expect(text).toContain('Token removed');
       expect(text).toContain('removed 1 captured token');
       expect(loadLinkedTokens().find((t) => t.pwt === 'pwt-remove-me')).toBeUndefined();
@@ -201,9 +203,7 @@ describe('cof charge token resolution', () => {
     process.env.PAYWAY_BASE_URL = `http://127.0.0.1:${port}`;
 
     try {
-      const { exitCode } = await run([
-        'cof', 'token', 'remove', '-c', 'custrm2', '--token', 'pwt-keep-me',
-      ]);
+      const { exitCode } = await run(['cof', 'token', 'remove', '-c', 'custrm2', '--token', 'pwt-keep-me']);
       expect(exitCode).not.toBe(0);
       expect(loadLinkedTokens().find((t) => t.pwt === 'pwt-keep-me')).toBeDefined();
     } finally {
@@ -225,7 +225,9 @@ describe('cof charge token resolution', () => {
     expect(text).toContain('renew with: cof token renew');
 
     const { stdout } = await run(['cof', 'token', 'list', '--json']);
-    const doc = JSON.parse(stdout) as { tokens: Array<{ ctid: string; expiry: { status: string; daysLeft: number | null } }> };
+    const doc = JSON.parse(stdout) as {
+      tokens: Array<{ ctid: string; expiry: { status: string; daysLeft: number | null } }>;
+    };
     const byCtid = Object.fromEntries(doc.tokens.map((t) => [t.ctid, t]));
     expect(byCtid.exp1?.expiry.status).toBe('valid');
     expect(byCtid.exp2?.expiry.status).toBe('expiring-soon');
@@ -253,7 +255,14 @@ describe('cof charge token resolution', () => {
 
     try {
       const { text, exitCode } = await run([
-        'cof', 'charge', '-t', 'ord-resolve', '-a', '2.50', '--ctid', 'custcharge1',
+        'cof',
+        'charge',
+        '-t',
+        'ord-resolve',
+        '-a',
+        '2.50',
+        '--ctid',
+        'custcharge1',
       ]);
       expect(text).toContain('Using captured token');
       expect(text).toContain('pwt-…oken');
@@ -273,7 +282,10 @@ describe('cof link-account QR presentation', () => {
       res.end(
         JSON.stringify({
           status: { code: '00', message: 'Success' },
-          data: { qr_string: '00020101-link-qr-payload', deeplink: 'abamobilebank://ababank.com?type=payway&qrcode=00020101-link-qr-payload' },
+          data: {
+            qr_string: '00020101-link-qr-payload',
+            deeplink: 'abamobilebank://ababank.com?type=payway&qrcode=00020101-link-qr-payload',
+          },
         }),
       );
     });
@@ -284,7 +296,17 @@ describe('cof link-account QR presentation', () => {
 
     try {
       const { text, exitCode } = await run([
-        'cof', 'link-account', '-r', 'qrtest001', '-c', 'qrcycle01', '-f', 'CITI_FLEX', '--currency', 'USD', '-y',
+        'cof',
+        'link-account',
+        '-r',
+        'qrtest001',
+        '-c',
+        'qrcycle01',
+        '-f',
+        'CITI_FLEX',
+        '--currency',
+        'USD',
+        '-y',
       ]);
       expect(text).toContain('Account link requested');
       expect(text).toContain('QR PNG:');
@@ -318,9 +340,24 @@ describe('cof link-account QR presentation', () => {
 
     try {
       const { stdout, exitCode } = await run([
-        'cof', 'link-account', '-r', 'qrtest002', '-c', 'qrcycle01', '-f', 'CITI_FLEX', '--currency', 'USD', '-y', '--json',
+        'cof',
+        'link-account',
+        '-r',
+        'qrtest002',
+        '-c',
+        'qrcycle01',
+        '-f',
+        'CITI_FLEX',
+        '--currency',
+        'USD',
+        '-y',
+        '--json',
       ]);
-      const doc = JSON.parse(stdout) as { status?: { code?: string }; data?: { qr_string?: string }; qrPngPath?: string };
+      const doc = JSON.parse(stdout) as {
+        status?: { code?: string };
+        data?: { qr_string?: string };
+        qrPngPath?: string;
+      };
       expect(doc.status?.code).toBe('00');
       expect(doc.qrPngPath).toContain('cof-link-account-qrtest002.png');
       expect([0, undefined]).toContain(exitCode);
@@ -341,7 +378,17 @@ describe('cof link-account QR presentation', () => {
 
     try {
       const { text, exitCode } = await run([
-        'cof', 'link-account', '-r', 'qrtest003', '-c', 'qrcycle01', '-f', 'CITI_FLEX', '--currency', 'USD', '-y',
+        'cof',
+        'link-account',
+        '-r',
+        'qrtest003',
+        '-c',
+        'qrcycle01',
+        '-f',
+        'CITI_FLEX',
+        '--currency',
+        'USD',
+        '-y',
       ]);
       expect(text).toContain('Account link requested');
       expect(text).not.toContain('QR PNG:');
@@ -368,7 +415,17 @@ describe('cof link-account QR presentation', () => {
 
     try {
       const { text } = await run([
-        'cof', 'link-account', '-r', 'qrtest004', '-c', 'qrcycle01', '-f', 'CITI_FLEX', '--currency', 'USD', '-y',
+        'cof',
+        'link-account',
+        '-r',
+        'qrtest004',
+        '-c',
+        'qrcycle01',
+        '-f',
+        'CITI_FLEX',
+        '--currency',
+        'USD',
+        '-y',
       ]);
       expect(text).toContain('expires 20');
       expect(text).toContain('~10 min left');
@@ -396,7 +453,15 @@ describe('cof charge approval-QR presentation (defensive, §26)', () => {
 
     try {
       const { text, exitCode } = await run([
-        'cof', 'charge', '-t', 'ord-qr1', '-a', '1.00', '--token', 'pwt-qr-charge', '--no-open-image',
+        'cof',
+        'charge',
+        '-t',
+        'ord-qr1',
+        '-a',
+        '1.00',
+        '--token',
+        'pwt-qr-charge',
+        '--no-open-image',
       ]);
       expect(text).toContain('COF charge submitted');
       expect(text).toContain('Approval QR:');
@@ -421,7 +486,15 @@ describe('cof charge approval-QR presentation (defensive, §26)', () => {
 
     try {
       const { stdout } = await run([
-        'cof', 'charge', '-t', 'ord-qr2', '-a', '1.00', '--token', 'pwt-qr-charge', '--json',
+        'cof',
+        'charge',
+        '-t',
+        'ord-qr2',
+        '-a',
+        '1.00',
+        '--token',
+        'pwt-qr-charge',
+        '--json',
       ]);
       const doc = JSON.parse(stdout) as { qrPngPath?: string };
       expect(doc.qrPngPath).toBeUndefined();

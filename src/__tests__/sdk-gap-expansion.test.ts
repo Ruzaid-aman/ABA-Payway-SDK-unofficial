@@ -27,12 +27,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PayWayConfig } from '../client.js';
 import { generateTestRsaKeyPair } from '../test/test-utils.js';
 import { createPayoutDomain } from '../domains/payout.js';
-import {
-  clearLifecycleState,
-  lifecyclePath,
-  readLifecycleState,
-  writeLifecycleState,
-} from '../webhook/lifecycle.js';
+import { clearLifecycleState, lifecyclePath, readLifecycleState, writeLifecycleState } from '../webhook/lifecycle.js';
 import { paymentArtifact, paymentLifecycle, paymentNextStep } from '../payment-lifecycle.js';
 import { detectJournalAnomalies, explainTransaction } from '../journal/intelligence.js';
 import { runMcpExtra } from '../mcp/extras.js';
@@ -69,10 +64,7 @@ function makePayoutDomain(config: Partial<PayWayConfig> = {}) {
     calls.push({ path, body, hmacFields, contentType, hashEncoding, callOptions });
     return { status: { code: '0' } } as T;
   };
-  const requestWithMerchantAuth = async <T>(
-    path: string,
-    authPayload: Record<string, unknown>,
-  ): Promise<T> => {
+  const requestWithMerchantAuth = async <T>(path: string, authPayload: Record<string, unknown>): Promise<T> => {
     calls.push({ path, body: authPayload, hmacFields: ['request_time', 'merchant_auth'] });
     return { status: { code: '0' } } as T;
   };
@@ -151,7 +143,7 @@ describe('payout domain guards and wire shape', () => {
 
 describe('webhook receiver lifecycle state', () => {
   let appdata: string;
-  const env = () => ({ APPDATA: appdata } as NodeJS.ProcessEnv);
+  const env = () => ({ APPDATA: appdata }) as NodeJS.ProcessEnv;
 
   beforeEach(() => {
     appdata = mkdtempSync(path.join(tmpdir(), 'payway-lifecycle-'));
@@ -200,7 +192,18 @@ describe('webhook receiver lifecycle state', () => {
 
   it('clear is idempotent', () => {
     writeLifecycleState(
-      { version: 2, instanceId: 'i', controlToken: 't', pid: 1, port: 1, host: '127.0.0.1', publicBaseUrl: null, callbackUrl: null, previousCallbackUrl: null, startedAt: 'x' },
+      {
+        version: 2,
+        instanceId: 'i',
+        controlToken: 't',
+        pid: 1,
+        port: 1,
+        host: '127.0.0.1',
+        publicBaseUrl: null,
+        callbackUrl: null,
+        previousCallbackUrl: null,
+        startedAt: 'x',
+      },
       env(),
     );
     clearLifecycleState(env());
@@ -321,7 +324,13 @@ describe('explainTransaction verdict matrix', () => {
         attempt: 0,
         requestDigest: { amount: 5, note: 'x'.repeat(300) },
       }),
-      ev({ transactionId: 'V5', kind: 'execution.error', attempt: 0, paywayCode: '69', error: { code: 'api_error', message: 'rejected' } }),
+      ev({
+        transactionId: 'V5',
+        kind: 'execution.error',
+        attempt: 0,
+        paywayCode: '69',
+        error: { code: 'api_error', message: 'rejected' },
+      }),
       ev({ transactionId: 'V5', kind: 'execution.response', httpStatus: 200, traceId: 'tr-123' }),
       ev({ transactionId: 'V5', kind: 'poll.attempt', attempt: 1, status: 'ERROR:timeout', durationMs: 5 }),
       ev({ transactionId: 'V5', kind: 'poll.attempt', attempt: 2, status: 'PENDING', durationMs: 50 }),
@@ -348,7 +357,13 @@ describe('explainTransaction verdict matrix', () => {
   it('lists retry attempts as numbered steps and hints the retry count', () => {
     write([
       ev({ transactionId: 'V6', kind: 'execution.request', endpoint: '/generate-qr', attempt: 0 }),
-      ev({ transactionId: 'V6', kind: 'execution.error', attempt: 0, httpStatus: 500, error: { code: 'transport', message: 'boom' } }),
+      ev({
+        transactionId: 'V6',
+        kind: 'execution.error',
+        attempt: 0,
+        httpStatus: 500,
+        error: { code: 'transport', message: 'boom' },
+      }),
       ev({ transactionId: 'V6', kind: 'execution.request', endpoint: '/generate-qr', attempt: 1 }),
     ]);
     const report = explainTransaction('V6', { journalDir: dir });
@@ -384,7 +399,11 @@ describe('detectJournalAnomalies heuristics', () => {
       ev({ ts: '2026-09-27T01:01:00.000Z', correlationId: 'base-a' }),
     );
     // Burst day: three retried exchanges.
-    for (const [cid, minute] of [['b1', 1], ['b2', 2], ['b3', 3]] as const) {
+    for (const [cid, minute] of [
+      ['b1', 1],
+      ['b2', 2],
+      ['b3', 3],
+    ] as const) {
       events.push(
         ev({ ts: `2026-09-28T0${minute}:00:00.000Z`, correlationId: cid }),
         ev({ ts: `2026-09-28T0${minute}:01:00.000Z`, correlationId: cid }),
@@ -457,7 +476,11 @@ describe('mcp extras validation and projection', () => {
       ev({ transactionId: 'MX-1', kind: 'status.observed', status: 'APPROVED' }),
       ev({ transactionId: 'MX-OTHER' }),
     ]);
-    const filtered = await runMcpExtra('journal_timeline', { transactionId: 'MX-1', kind: 'status.observed' }, undefined);
+    const filtered = await runMcpExtra(
+      'journal_timeline',
+      { transactionId: 'MX-1', kind: 'status.observed' },
+      undefined,
+    );
     expect(filtered.ok).toBe(true);
     expect(filtered.data?.events).toHaveLength(1);
 

@@ -53,7 +53,10 @@ function makeProgram(): { program: Command; received: Array<string[]> } {
   return { program, received };
 }
 
-async function runSession(lines: string[], opts: { resume?: boolean; sessionDir: string } ): Promise<{ stdout: string[] }> {
+async function runSession(
+  lines: string[],
+  opts: { resume?: boolean; sessionDir: string },
+): Promise<{ stdout: string[] }> {
   const { program } = makeProgram();
   const input = new PassThrough();
   const output = new PassThrough();

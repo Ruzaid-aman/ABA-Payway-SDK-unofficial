@@ -133,10 +133,7 @@ describe('normalizeTransactionsByMerchantRefResponse', () => {
 describe('khqr domain getTransactionsByMerchantRef (normalized through the request path)', () => {
   function makeDomain(response: unknown) {
     const request = vi.fn().mockResolvedValue(response);
-    const domain = createKhqrDomain(
-      { merchantId: 'ec000002', apiKey: 'key' } as never,
-      request as never,
-    );
+    const domain = createKhqrDomain({ merchantId: 'ec000002', apiKey: 'key' } as never, request as never);
     return { domain, request };
   }
 

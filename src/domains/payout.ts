@@ -1,5 +1,11 @@
 import { encryptMerchantAuth } from '../auth.js';
-import type { AddBeneficiaryParams, PayoutParams, PayWayConfig, RequestCallOptions, UpdateBeneficiaryStatusParams } from '../client.js';
+import type {
+  AddBeneficiaryParams,
+  PayoutParams,
+  PayWayConfig,
+  RequestCallOptions,
+  UpdateBeneficiaryStatusParams,
+} from '../client.js';
 import { ENDPOINTS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 import { validateSandboxBeneficiary } from '../sandbox-beneficiaries.js';
@@ -15,10 +21,7 @@ import {
 } from '../utils.js';
 
 export interface PayoutDomain {
-  payout: (
-    params: PayoutParams,
-    callOptions?: RequestCallOptions,
-  ) => Promise<components['schemas']['PayoutResponse']>;
+  payout: (params: PayoutParams, callOptions?: RequestCallOptions) => Promise<components['schemas']['PayoutResponse']>;
   updateBeneficiaryStatus: (
     params: UpdateBeneficiaryStatusParams,
     callOptions?: RequestCallOptions,

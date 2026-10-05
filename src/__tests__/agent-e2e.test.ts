@@ -20,7 +20,7 @@ import {
 } from '../agent/orchestrator.js';
 import { serializeCommandResult } from '../agent/output.js';
 import { scrubSensitive } from '../agent/privacy.js';
-import type { ProviderAdapter, } from '../agent/provider.js';
+import type { ProviderAdapter } from '../agent/provider.js';
 import { validateCommandResult } from '../agent/schemas.js';
 import { getAgentDataPaths } from '../agent/storage.js';
 import type { PayWay } from '../client.js';

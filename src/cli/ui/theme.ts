@@ -34,10 +34,7 @@ function envFlag(value: string | undefined): boolean {
   return value !== undefined && value !== '' && value !== '0' && value.toLowerCase() !== 'false';
 }
 
-export function isColorEnabled(
-  stream: TtyStream = process.stdout,
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function isColorEnabled(stream: TtyStream = process.stdout, env: NodeJS.ProcessEnv = process.env): boolean {
   if (colorOverride !== undefined) return colorOverride;
   if (envFlag(env.NO_COLOR)) return false;
   if (envFlag(env.FORCE_COLOR)) return true;

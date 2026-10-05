@@ -104,15 +104,34 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
   const log = deps.log ?? ((line: string) => console.log(line));
   const loadStorage = deps.loadStorage ?? (() => loadDefaultStorage());
 
-  const webhook = new Command('webhook').description('Local webhook workbench: verify, trigger, resend captured callbacks');
+  const webhook = new Command('webhook').description(
+    'Local webhook workbench: verify, trigger, resend captured callbacks',
+  );
 
-  const status = new Command('status').description('Show the owned local webhook receiver state').option('--json').action((opts: { json?: boolean }) => {
-    const state = readLifecycleState();
-    const running = state ? (() => { try { process.kill(state.pid, 0); return true; } catch { return false; } })() : false;
-    const result = { state: state ? (running ? 'running' : 'stale') : 'absent', receiver: state };
-    if (opts.json) log(JSON.stringify(result));
-    else log(state ? `Webhook receiver: ${result.state} (pid ${state.pid}, port ${state.port}, host ${state.host})` : 'Webhook receiver: absent');
-  });
+  const status = new Command('status')
+    .description('Show the owned local webhook receiver state')
+    .option('--json')
+    .action((opts: { json?: boolean }) => {
+      const state = readLifecycleState();
+      const running = state
+        ? (() => {
+            try {
+              process.kill(state.pid, 0);
+              return true;
+            } catch {
+              return false;
+            }
+          })()
+        : false;
+      const result = { state: state ? (running ? 'running' : 'stale') : 'absent', receiver: state };
+      if (opts.json) log(JSON.stringify(result));
+      else
+        log(
+          state
+            ? `Webhook receiver: ${result.state} (pid ${state.pid}, port ${state.port}, host ${state.host})`
+            : 'Webhook receiver: absent',
+        );
+    });
 
   const stop = new Command('stop')
     .description('Stop the owned local webhook receiver (identity-verified; never signals a foreign process)')
@@ -134,13 +153,22 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       // pid-reused/unreachable receiver keeps its record for diagnosis.
       if (outcome.stateCleared || outcome.reason === 'pid-reused') clearLifecycleState();
       if (opts.json) {
-        log(JSON.stringify({ stopped: outcome.stopped, reason: outcome.reason, detail: outcome.detail, pid: outcome.pid, port: outcome.port }));
+        log(
+          JSON.stringify({
+            stopped: outcome.stopped,
+            reason: outcome.reason,
+            detail: outcome.detail,
+            pid: outcome.pid,
+            port: outcome.port,
+          }),
+        );
       } else if (outcome.stopped) {
         log(`Stopped webhook receiver pid ${outcome.pid}.`);
       } else {
         log(`  ${c.red('✗')} Not stopped (${outcome.reason}): ${outcome.detail}`);
       }
-      if (!outcome.stopped && outcome.reason !== 'stale' && outcome.reason !== 'absent') process.exitCode = EXIT_NETWORK;
+      if (!outcome.stopped && outcome.reason !== 'stale' && outcome.reason !== 'absent')
+        process.exitCode = EXIT_NETWORK;
     });
 
   // --- webhook verify-callback (W-4) -------------------------------------
@@ -161,7 +189,16 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
         const recordId = String(opts.record);
         if (!isRecordId(recordId)) {
           if (json) {
-            log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `invalid webhook record id: ${recordId}` } }));
+            log(
+              JSON.stringify({
+                error: {
+                  kind: 'validation',
+                  exitCode: EXIT_VALIDATION,
+                  type: 'PayWayConfigError',
+                  message: `invalid webhook record id: ${recordId}`,
+                },
+              }),
+            );
           } else {
             log(`  ${c.red('✗')} Not a webhook record id (expected wh_…): ${c.red(recordId)}`);
           }
@@ -173,21 +210,47 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
           const record = storage.getAll().find((entry) => entry.id === recordId);
           if (!record) {
             if (json) {
-              log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `webhook record ${recordId} not found` } }));
+              log(
+                JSON.stringify({
+                  error: {
+                    kind: 'validation',
+                    exitCode: EXIT_VALIDATION,
+                    type: 'PayWayConfigError',
+                    message: `webhook record ${recordId} not found`,
+                  },
+                }),
+              );
             } else {
-              log(`  ${c.red('✗')} Webhook record ${c.red(recordId)} not found — run ${c.cyan('payway-sdk webhook list')} for ids.`);
+              log(
+                `  ${c.red('✗')} Webhook record ${c.red(recordId)} not found — run ${c.cyan('payway-sdk webhook list')} for ids.`,
+              );
             }
             process.exitCode = EXIT_VALIDATION;
             return;
           }
           const verdict = record.signatureVerdict ?? 'unsigned';
           if (json) {
-            log(JSON.stringify({ record: recordId, verdict, signatureSource: record.signatureSource ?? null, reason: record.verificationReason ?? null, matchedTransactionId: record.matchedTransactionId ?? null, matchedStatus: record.matchedStatus ?? null, replay: record.replay ?? false }));
+            log(
+              JSON.stringify({
+                record: recordId,
+                verdict,
+                signatureSource: record.signatureSource ?? null,
+                reason: record.verificationReason ?? null,
+                matchedTransactionId: record.matchedTransactionId ?? null,
+                matchedStatus: record.matchedStatus ?? null,
+                replay: record.replay ?? false,
+              }),
+            );
           } else {
             log(`\n${c.bold('Captured webhook record')} ${recordId}`);
             log(`  received:  ${record.receivedAt}`);
-            log(`  signature: ${verdict === 'verified' ? c.green(`✓ verified (${record.signatureSource ?? '?'}-hash)`) : verdict === 'invalid' ? c.red(`✗ invalid (${record.verificationReason ?? 'unknown'})`) : c.yellow('unsigned (no signature header or body hash captured)')}`);
-            if (record.matchedTransactionId) log(`  tran_id:    ${record.matchedTransactionId}${record.matchedStatus ? `  status=${record.matchedStatus}` : ''}`);
+            log(
+              `  signature: ${verdict === 'verified' ? c.green(`✓ verified (${record.signatureSource ?? '?'}-hash)`) : verdict === 'invalid' ? c.red(`✗ invalid (${record.verificationReason ?? 'unknown'})`) : c.yellow('unsigned (no signature header or body hash captured)')}`,
+            );
+            if (record.matchedTransactionId)
+              log(
+                `  tran_id:    ${record.matchedTransactionId}${record.matchedStatus ? `  status=${record.matchedStatus}` : ''}`,
+              );
             if (record.replay) log(`  ${c.yellow('replay')} — the same (tran_id, status) pair was captured before`);
             log('');
           }
@@ -202,7 +265,16 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       const sig = (opts.sig as string) || process.env.X_PAYWAY_HMAC_SHA512 || undefined;
       if (!sig) {
         if (json) {
-          log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: 'missing --sig "<X-PAYWAY-HMAC-SHA512 header value>"' } }));
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: 'missing --sig "<X-PAYWAY-HMAC-SHA512 header value>"',
+              },
+            }),
+          );
         } else {
           log(`  ${c.red('✗')} Missing signature. Pass ${c.cyan('--sig "<X-PAYWAY-HMAC-SHA512 header value>"')}.`);
         }
@@ -211,7 +283,16 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       }
       if (!apiKey) {
         if (json) {
-          log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: 'missing API key (PAYWAY_API_KEY env or --api-key)' } }));
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: 'missing API key (PAYWAY_API_KEY env or --api-key)',
+              },
+            }),
+          );
         } else {
           log(`  ${c.red('✗')} Missing API key. Set ${c.cyan('PAYWAY_API_KEY')} or pass ${c.cyan('--api-key')}.`);
         }
@@ -224,9 +305,20 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       if (!raw) raw = await readStdinBody();
       if (!raw || raw.trim() === '') {
         if (json) {
-          log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: "missing body — pass --body '<json>', --body-file <path>, or pipe the raw body" } }));
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: "missing body — pass --body '<json>', --body-file <path>, or pipe the raw body",
+              },
+            }),
+          );
         } else {
-          log(`  ${c.red('✗')} Missing body. Pass ${c.cyan(`--body '<json>'`)}, ${c.cyan('--body-file <path>')}, or pipe the raw body.`);
+          log(
+            `  ${c.red('✗')} Missing body. Pass ${c.cyan(`--body '<json>'`)}, ${c.cyan('--body-file <path>')}, or pipe the raw body.`,
+          );
         }
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -237,9 +329,20 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
         body = JSON.parse(raw) as Record<string, unknown>;
       } catch (error) {
         if (json) {
-          log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `body is not valid JSON: ${error instanceof Error ? error.message : String(error)}` } }));
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: `body is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            }),
+          );
         } else {
-          log(`  ${c.red('✗')} Body is not valid JSON: ${c.red(error instanceof Error ? error.message : String(error))}`);
+          log(
+            `  ${c.red('✗')} Body is not valid JSON: ${c.red(error instanceof Error ? error.message : String(error))}`,
+          );
         }
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -251,10 +354,14 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
         log(JSON.stringify({ valid: result.valid, reason: result.reason ?? null, tranId: tranId ?? null }));
       } else {
         log(`\n${c.bold('Callback signature check')}`);
-        log(`  verdict:  ${result.valid ? c.green('✓ VALID — safe to process') : c.red('✗ INVALID — DO NOT process (log and discard)')}`);
+        log(
+          `  verdict:  ${result.valid ? c.green('✓ VALID — safe to process') : c.red('✗ INVALID — DO NOT process (log and discard)')}`,
+        );
         if (result.reason) log(`  reason:   ${result.reason}`);
         if (tranId) log(`  tran_id:  ${tranId}`);
-        log(`  ${c.dim('algorithm: sorted-key concat → HMAC-SHA512 → Base64, timing-safe compare (hash field stripped)')}`);
+        log(
+          `  ${c.dim('algorithm: sorted-key concat → HMAC-SHA512 → Base64, timing-safe compare (hash field stripped)')}`,
+        );
         log('');
       }
       if (!result.valid) process.exitCode = EXIT_VALIDATION;
@@ -263,14 +370,26 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
 
   // --- webhook show (Q18/evidence inspection) -----------------------------
   const show = new Command('show')
-    .description('Print one captured webhook record in full — headers, raw body, verdicts, metadata (evidence inspection)')
+    .description(
+      'Print one captured webhook record in full — headers, raw body, verdicts, metadata (evidence inspection)',
+    )
     .requiredOption('--record <id>', 'Webhook record id (see webhook list)')
     .option('--json', 'Machine-readable output envelope (the full stored record)')
     .action(async (opts: Record<string, string | boolean | undefined>) => {
       const json = opts.json === true;
       const recordId = String(opts.record);
       if (!isRecordId(recordId)) {
-        if (json) log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `invalid webhook record id: ${recordId}` } }));
+        if (json)
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: `invalid webhook record id: ${recordId}`,
+              },
+            }),
+          );
         else log(`  ${c.red('✗')} Not a webhook record id (expected wh_…): ${c.red(recordId)}`);
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -283,8 +402,21 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
         storage.close();
       }
       if (!record) {
-        if (json) log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `webhook record ${recordId} not found` } }));
-        else log(`  ${c.red('✗')} Webhook record ${c.red(recordId)} not found — run ${c.cyan('payway-sdk webhook list')} for ids.`);
+        if (json)
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: `webhook record ${recordId} not found`,
+              },
+            }),
+          );
+        else
+          log(
+            `  ${c.red('✗')} Webhook record ${c.red(recordId)} not found — run ${c.cyan('payway-sdk webhook list')} for ids.`,
+          );
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -297,8 +429,13 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       const verdict = record.signatureVerdict ?? 'unsigned';
       log(`\n${c.bold('Captured webhook record')} ${recordId}`);
       log(`  received:   ${record.receivedAt}${record.sourceIp ? `  from ${record.sourceIp}` : ''}`);
-      log(`  signature:  ${verdict === 'verified' ? c.green(`✓ verified (${record.signatureSource ?? '?'}-hash)`) : verdict === 'invalid' ? c.red(`✗ invalid (${record.verificationReason ?? 'unknown'})`) : c.yellow('unsigned (no signature header or body hash)')}`);
-      if (record.matchedTransactionId) log(`  tran_id:    ${record.matchedTransactionId}${record.matchedStatus ? `  status=${record.matchedStatus}` : ''}`);
+      log(
+        `  signature:  ${verdict === 'verified' ? c.green(`✓ verified (${record.signatureSource ?? '?'}-hash)`) : verdict === 'invalid' ? c.red(`✗ invalid (${record.verificationReason ?? 'unknown'})`) : c.yellow('unsigned (no signature header or body hash)')}`,
+      );
+      if (record.matchedTransactionId)
+        log(
+          `  tran_id:    ${record.matchedTransactionId}${record.matchedStatus ? `  status=${record.matchedStatus}` : ''}`,
+        );
       if (record.replay) log(`  ${c.yellow('replay')} — the same (tran_id, status) pair was captured before`);
       if (record.khqr?.parsed) log(`  route:      khqr (${record.khqr.parsed.kind})`);
       if (record.paymentLinkPushback?.parsed) log('  route:      payment-link pushback');
@@ -330,7 +467,20 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       try {
         const records = storage.getAll().slice(-limit);
         if (json) {
-          log(JSON.stringify({ count: records.length, records: records.map((r) => ({ id: r.id, receivedAt: r.receivedAt, matchedTransactionId: r.matchedTransactionId ?? null, matchedStatus: r.matchedStatus ?? null, signatureVerdict: r.signatureVerdict ?? 'unsigned', signatureSource: r.signatureSource ?? null, replay: r.replay ?? false })) }));
+          log(
+            JSON.stringify({
+              count: records.length,
+              records: records.map((r) => ({
+                id: r.id,
+                receivedAt: r.receivedAt,
+                matchedTransactionId: r.matchedTransactionId ?? null,
+                matchedStatus: r.matchedStatus ?? null,
+                signatureVerdict: r.signatureVerdict ?? 'unsigned',
+                signatureSource: r.signatureSource ?? null,
+                replay: r.replay ?? false,
+              })),
+            }),
+          );
           return;
         }
         log(`\n${c.bold('Captured webhook records')} (newest ${records.length})`);
@@ -358,7 +508,17 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       const recordId = String(opts.record);
       const to = String(opts.to);
       if (!isRecordId(recordId)) {
-        if (json) log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `invalid webhook record id: ${recordId}` } }));
+        if (json)
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: `invalid webhook record id: ${recordId}`,
+              },
+            }),
+          );
         else log(`  ${c.red('✗')} Not a webhook record id (expected wh_…): ${c.red(recordId)}`);
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -371,8 +531,21 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
         storage.close();
       }
       if (!record) {
-        if (json) log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `webhook record ${recordId} not found` } }));
-        else log(`  ${c.red('✗')} Webhook record ${c.red(recordId)} not found — run ${c.cyan('payway-sdk webhook list')} for ids.`);
+        if (json)
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: `webhook record ${recordId} not found`,
+              },
+            }),
+          );
+        else
+          log(
+            `  ${c.red('✗')} Webhook record ${c.red(recordId)} not found — run ${c.cyan('payway-sdk webhook list')} for ids.`,
+          );
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -390,7 +563,10 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       if (!json) {
         log(`\n${c.bold('Resending captured webhook')} ${recordId}`);
         log(`  to:      ${to}`);
-        if (record.matchedTransactionId) log(`  tran_id: ${record.matchedTransactionId}${record.matchedStatus ? `  status=${record.matchedStatus}` : ''}`);
+        if (record.matchedTransactionId)
+          log(
+            `  tran_id: ${record.matchedTransactionId}${record.matchedStatus ? `  status=${record.matchedStatus}` : ''}`,
+          );
         log('');
       }
       try {
@@ -398,13 +574,17 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
         if (json) {
           log(JSON.stringify({ record: recordId, httpStatus: response.status, ok: response.ok }));
         } else {
-          log(`  ${response.ok ? c.green(`✓ delivered [HTTP ${response.status}]`) : c.yellow(`→ receiver answered HTTP ${response.status}`)}`);
+          log(
+            `  ${response.ok ? c.green(`✓ delivered [HTTP ${response.status}]`) : c.yellow(`→ receiver answered HTTP ${response.status}`)}`,
+          );
         }
         if (!response.ok) process.exitCode = EXIT_NETWORK;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (json) {
-          log(JSON.stringify({ error: { kind: 'network', exitCode: EXIT_NETWORK, type: 'PayWayNetworkError', message } }));
+          log(
+            JSON.stringify({ error: { kind: 'network', exitCode: EXIT_NETWORK, type: 'PayWayNetworkError', message } }),
+          );
         } else {
           log(`  ${c.red('✗')} delivery failed: ${c.red(message)}`);
         }
@@ -422,7 +602,11 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
     .option('-a, --amount <number>', 'Fixture amount (default 10 USD / 40000 KHR)')
     .option('-c, --currency <code>', 'Fixture currency: USD (default) or KHR', 'USD')
     .option('--payer-name <name>', 'Payer name shown in the fixture', 'Mock Payer')
-    .option('--customer-name <name>', 'Customer Module fixtures only: portal customer name in the nested customer object', 'Mock Customer')
+    .option(
+      '--customer-name <name>',
+      'Customer Module fixtures only: portal customer name in the nested customer object',
+      'Mock Customer',
+    )
     .option('--ctid <ctid>', 'CoF link fixture only: customer token identifier (default mockcust01)')
     .option('--api-key <key>', 'Merchant API key for signing (or PAYWAY_API_KEY env)')
     .option('--forward-headers <headers>', 'Extra headers: "Key1:Value1, Key2:Value2"')
@@ -431,8 +615,21 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       const json = opts.json === true;
       const event = String(opts.event ?? 'payment.approved') as WebhookFixtureEvent;
       if (!WEBHOOK_FIXTURE_EVENTS.includes(event)) {
-        if (json) log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `unknown fixture event "${event}" — valid: ${WEBHOOK_FIXTURE_EVENTS.join(', ')}` } }));
-        else log(`  ${c.red('✗')} Unknown fixture event ${c.red(String(event))} — valid: ${c.cyan(WEBHOOK_FIXTURE_EVENTS.join(', '))}`);
+        if (json)
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: `unknown fixture event "${event}" — valid: ${WEBHOOK_FIXTURE_EVENTS.join(', ')}`,
+              },
+            }),
+          );
+        else
+          log(
+            `  ${c.red('✗')} Unknown fixture event ${c.red(String(event))} — valid: ${c.cyan(WEBHOOK_FIXTURE_EVENTS.join(', '))}`,
+          );
         process.exitCode = EXIT_VALIDATION;
         return;
       }
@@ -440,7 +637,17 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
       const currency = (String(opts.currency ?? 'USD').toUpperCase() === 'KHR' ? 'KHR' : 'USD') as 'USD' | 'KHR';
       const amount = opts.amount !== undefined ? Number(opts.amount) : undefined;
       if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
-        if (json) log(JSON.stringify({ error: { kind: 'validation', exitCode: EXIT_VALIDATION, type: 'PayWayConfigError', message: `amount must be a positive number, received: ${opts.amount}` } }));
+        if (json)
+          log(
+            JSON.stringify({
+              error: {
+                kind: 'validation',
+                exitCode: EXIT_VALIDATION,
+                type: 'PayWayConfigError',
+                message: `amount must be a positive number, received: ${opts.amount}`,
+              },
+            }),
+          );
         else log(`  ${c.red('✗')} Amount must be a positive number, received: ${c.red(String(opts.amount))}`);
         process.exitCode = EXIT_VALIDATION;
         return;
@@ -510,7 +717,9 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
             }),
           );
         } else {
-          log(`  ${response.ok ? c.green(`✓ receiver acknowledged [HTTP ${response.status}]`) : c.yellow(`→ receiver answered HTTP ${response.status}`)}`);
+          log(
+            `  ${response.ok ? c.green(`✓ receiver acknowledged [HTTP ${response.status}]`) : c.yellow(`→ receiver answered HTTP ${response.status}`)}`,
+          );
           const next =
             event === 'cof-link.linked'
               ? `Next: payway-sdk cof token list — the receiver persists the fixture pwt when the body-hash verifies (fixture is synthetic; the gateway never saw it)`
@@ -520,7 +729,10 @@ export function registerWebhookCommands(program: Command, deps: WebhookCommandDe
         if (!response.ok) process.exitCode = EXIT_NETWORK;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (json) log(JSON.stringify({ error: { kind: 'network', exitCode: EXIT_NETWORK, type: 'PayWayNetworkError', message } }));
+        if (json)
+          log(
+            JSON.stringify({ error: { kind: 'network', exitCode: EXIT_NETWORK, type: 'PayWayNetworkError', message } }),
+          );
         else log(`  ${c.red('✗')} delivery failed: ${c.red(message)}`);
         process.exitCode = EXIT_NETWORK;
       }

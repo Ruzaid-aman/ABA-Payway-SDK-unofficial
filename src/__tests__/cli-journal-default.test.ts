@@ -77,10 +77,7 @@ function journalKinds(): string[] {
 
 describe('CLI journal default (storage wave 1)', () => {
   it('journals an API command into the data root with no flags or env', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0, tran_id: 'T1' } })),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0, tran_id: 'T1' } })));
     const { exitCode } = await run(['check-transaction', '-t', 'T1', '--json']);
     expect(exitCode).toBeUndefined();
     expect(existsSync(journalPath)).toBe(true);
@@ -88,10 +85,7 @@ describe('CLI journal default (storage wave 1)', () => {
   });
 
   it('--no-journal leaves no journal file', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0, tran_id: 'T2' } })),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0, tran_id: 'T2' } })));
     await run(['--no-journal', 'check-transaction', '-t', 'T2', '--json']);
     expect(existsSync(journalPath)).toBe(false);
   });
@@ -99,10 +93,7 @@ describe('CLI journal default (storage wave 1)', () => {
   it('respects an explicitly falsy PAYWAY_JOURNAL', async () => {
     process.env.PAYWAY_JOURNAL = '0';
     try {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0, tran_id: 'T3' } })),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: 0, tran_id: 'T3' } })));
       await run(['check-transaction', '-t', 'T3', '--json']);
       expect(existsSync(journalPath)).toBe(false);
     } finally {

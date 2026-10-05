@@ -25,7 +25,10 @@ export function formatKeyValueSummary(
  * Next-step panel: a dim header plus one bullet per suggestion.
  * Lines are expected to be full copy-paste commands.
  */
-export function renderNextSteps(lines: string[], opts: { indent?: string; bullet?: string; header?: string } = {}): string[] {
+export function renderNextSteps(
+  lines: string[],
+  opts: { indent?: string; bullet?: string; header?: string } = {},
+): string[] {
   if (lines.length === 0) return [];
   const indent = opts.indent ?? '  ';
   const bullet = opts.bullet ?? '·';

@@ -35,9 +35,7 @@ function writeProfileStore(appData: string, store: unknown): void {
 const SAVED_PROFILE_STORE = {
   version: 1,
   defaultProfile: 'audit-profile',
-  profiles: [
-    { name: 'audit-profile', environment: 'sandbox', merchantId: 'stub-merchant', apiKey: 'stub-key' },
-  ],
+  profiles: [{ name: 'audit-profile', environment: 'sandbox', merchantId: 'stub-merchant', apiKey: 'stub-key' }],
 };
 
 interface JsonRpcMessage {
@@ -45,7 +43,10 @@ interface JsonRpcMessage {
   result?: Record<string, unknown>;
 }
 
-function exchange(frames: unknown[], options: { appData?: string; env?: Record<string, string> } = {}): Promise<{ stdout: string; responses: JsonRpcMessage[]; stderr: string }> {
+function exchange(
+  frames: unknown[],
+  options: { appData?: string; env?: Record<string, string> } = {},
+): Promise<{ stdout: string; responses: JsonRpcMessage[]; stderr: string }> {
   return new Promise((resolve, reject) => {
     const appData = options.appData ?? tempDir;
     const child = spawn(process.execPath, [distCliPath(), 'mcp'], {
@@ -64,7 +65,11 @@ function exchange(frames: unknown[], options: { appData?: string; env?: Record<s
     let buffer = '';
     const timeout = setTimeout(() => {
       child.kill();
-      reject(new Error(`mcp stdio did not answer in time; got: ${responses.length} responses; stderr: ${stderr.slice(0, 400)}`));
+      reject(
+        new Error(
+          `mcp stdio did not answer in time; got: ${responses.length} responses; stderr: ${stderr.slice(0, 400)}`,
+        ),
+      );
       // 20s: the full suite runs many workers; a cold dist spawn under load
       // can exceed a tighter budget (observed 8s flake).
     }, 20_000);
@@ -112,7 +117,12 @@ function exchange(frames: unknown[], options: { appData?: string; env?: Record<s
 }
 
 const HANDSHAKE = [
-  { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0.0.1' } } },
+  {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0.0.1' } },
+  },
   { jsonrpc: '2.0', method: 'notifications/initialized' },
   { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
 ];
@@ -120,7 +130,12 @@ const HANDSHAKE = [
 describe('mcp stdio smoke (dist, real transport)', () => {
   it('answers initialize and tools/list over a real pipe', async () => {
     const { responses } = await exchange([
-      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0.0.1' } } },
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0.0.1' } },
+      },
       { jsonrpc: '2.0', method: 'notifications/initialized' },
       { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
     ]);
@@ -130,9 +145,9 @@ describe('mcp stdio smoke (dist, real transport)', () => {
     expect(serverInfo?.name).toBe('payway-sdk');
     // Audit S09: the server version must be the built package's version —
     // never a hardcoded number that drifts from package.json.
-    const packageVersion = (JSON.parse(
-      readFileSync(path.join(distCliPath(), '..', '..', 'package.json'), 'utf8'),
-    ) as { version: string }).version;
+    const packageVersion = (
+      JSON.parse(readFileSync(path.join(distCliPath(), '..', '..', 'package.json'), 'utf8')) as { version: string }
+    ).version;
     expect(serverInfo?.version).toBe(packageVersion);
 
     const tools = responses.find((r) => r.id === 2);

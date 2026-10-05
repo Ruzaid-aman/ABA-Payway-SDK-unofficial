@@ -246,14 +246,18 @@ export function extractTransactionIdFrom(value: unknown): string | undefined {
     firstString(value.transaction_id) ??
     firstString(status?.tran_id) ??
     firstString(value.tranId) ??
-    (data ? firstString(data.transaction_id) ?? firstString(data.tran_id) : undefined)
+    (data ? (firstString(data.transaction_id) ?? firstString(data.tran_id)) : undefined)
   );
 }
 
 export function extractMerchantRefFrom(value: unknown): string | undefined {
   if (!isObject(value)) return undefined;
   const data = isObject(value.data) ? value.data : undefined;
-  return firstString(value.merchant_ref) ?? firstString(value.merchant_refno) ?? (data ? firstString(data.merchant_ref) : undefined);
+  return (
+    firstString(value.merchant_ref) ??
+    firstString(value.merchant_refno) ??
+    (data ? firstString(data.merchant_ref) : undefined)
+  );
 }
 
 /** Gateway `status.trace` normalized to a string (schema requires string). */

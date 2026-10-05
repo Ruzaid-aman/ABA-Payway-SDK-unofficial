@@ -167,7 +167,12 @@ export function renderSetupSummary(config: ProviderConfigV1): string[] {
   ];
   if (config.baseUrl) lines.push(`    Base URL:        ${c.cyan(config.baseUrl)}`);
   lines.push(`    Timeout:         ${c.cyan(`${config.timeoutMs ?? 30000}ms`)}`);
-  if (config.maxTokens !== undefined || config.temperature !== undefined || config.topP !== undefined || config.extraBody) {
+  if (
+    config.maxTokens !== undefined ||
+    config.temperature !== undefined ||
+    config.topP !== undefined ||
+    config.extraBody
+  ) {
     const parts: string[] = [];
     if (config.temperature !== undefined) parts.push(`temperature=${config.temperature}`);
     if (config.topP !== undefined) parts.push(`top_p=${config.topP}`);
@@ -176,9 +181,7 @@ export function renderSetupSummary(config: ProviderConfigV1): string[] {
     lines.push(`    Sampling:        ${c.cyan(parts.join(', '))}`);
   }
   lines.push('');
-  lines.push(
-    `  ${c.dim('API key is read from the PAYWAY_AGENT_API_KEY environment variable; it is never stored.')}\n`,
-  );
+  lines.push(`  ${c.dim('API key is read from the PAYWAY_AGENT_API_KEY environment variable; it is never stored.')}\n`);
   return lines;
 }
 
@@ -270,8 +273,7 @@ export function renderSessionList(sessions: AgentSessionV1[]): string[] {
     return ['No agent sessions found.'];
   }
   return sessions.map(
-    (s) =>
-      `${c.cyan(s.sessionId)}  ${c.dim(s.contextLabel)}  events:${s.events.length}  updated:${c.dim(s.updatedAt)}`,
+    (s) => `${c.cyan(s.sessionId)}  ${c.dim(s.contextLabel)}  events:${s.events.length}  updated:${c.dim(s.updatedAt)}`,
   );
 }
 

@@ -145,12 +145,7 @@ export function buildWebhookFixture(
 ): WebhookFixture {
   const now = new Date();
   const currency = overrides.currency ?? 'USD';
-  const amount =
-    overrides.amount !== undefined
-      ? overrides.amount
-      : currency === 'KHR'
-        ? 40000
-        : 10;
+  const amount = overrides.amount !== undefined ? overrides.amount : currency === 'KHR' ? 40000 : 10;
   const amountStr = currency === 'KHR' ? String(Math.round(amount)) : amount.toFixed(2);
   const tranId = overrides.tranId ?? autoTranId('mock-');
 

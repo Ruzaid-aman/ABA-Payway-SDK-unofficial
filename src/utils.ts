@@ -34,10 +34,7 @@ const VALID_CURRENCIES: Array<'USD' | 'KHR'> = ['USD', 'KHR'];
  */
 const advisoryWarned = new Set<string>();
 
-export function warnAdvisory(
-  config: { strictValidation?: boolean } | undefined,
-  message: string,
-): void {
+export function warnAdvisory(config: { strictValidation?: boolean } | undefined, message: string): void {
   if (config?.strictValidation) {
     throw new PayWayConfigError(message);
   }
@@ -135,7 +132,9 @@ export function validateAmountFloor(
  */
 export function validatePayoutEntryShape(entry: unknown): asserts entry is { acc: string; amt: number } {
   if (entry === null || typeof entry !== 'object') {
-    throw new PayWayConfigError('payout entries must be objects with a non-empty string "acc" key and a numeric "amt" key');
+    throw new PayWayConfigError(
+      'payout entries must be objects with a non-empty string "acc" key and a numeric "amt" key',
+    );
   }
   const { acc, amt } = entry as { acc?: unknown; amt?: unknown };
   if (typeof acc !== 'string' || acc.trim().length === 0) {
@@ -564,11 +563,17 @@ export function computeRefundableBalance(
       ...base,
       payerAmount: Number.isFinite(payerAmount) ? payerAmount : undefined,
       payerCurrency,
-      reason: 'original_amount is missing from the detail response — the refundable balance cannot be derived from the merchant order money',
+      reason:
+        'original_amount is missing from the detail response — the refundable balance cannot be derived from the merchant order money',
     };
   }
   if (!Number.isFinite(refunded)) {
-    return { ...base, orderAmount, orderCurrency, reason: 'refund_amount is not a finite number in the detail response' };
+    return {
+      ...base,
+      orderAmount,
+      orderCurrency,
+      reason: 'refund_amount is not a finite number in the detail response',
+    };
   }
 
   // R1: the balance is ORDER money (original_amount − refund_amount). A
@@ -696,10 +701,12 @@ export function encodeBase64IfNeeded(val: unknown): string {
  * for a security-sensitive transform, tested in one place.
  */
 export function escapeHtmlAttribute(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(
-    /'/g,
-    '&#39;',
-  );
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function filterParams<T extends Record<string, unknown>>(obj: T): Partial<T> {
@@ -751,17 +758,13 @@ function isSensitiveKeyFuzzy(keyLower: string): boolean {
 
 function sanitizeValue(value: unknown, keyHint?: string): unknown {
   if (value === null || typeof value !== 'object') {
-      if (
-        typeof value === 'string' &&
-        keyHint !== undefined &&
-        /^[a-f0-9]{40,}$/i.test(value)
-      ) {
-        // SHA-1-length-or-longer hex strings under unrecognized keys are
-        // almost certainly credentials/hashes — mask them defensively (TD-12).
-        // 32-char hex (MD5-length order refs etc.) stays visible to avoid
-        // masking benign identifiers (EC-23).
-        return '***HIDDEN***';
-      }
+    if (typeof value === 'string' && keyHint !== undefined && /^[a-f0-9]{40,}$/i.test(value)) {
+      // SHA-1-length-or-longer hex strings under unrecognized keys are
+      // almost certainly credentials/hashes — mask them defensively (TD-12).
+      // 32-char hex (MD5-length order refs etc.) stays visible to avoid
+      // masking benign identifiers (EC-23).
+      return '***HIDDEN***';
+    }
     return value;
   }
 

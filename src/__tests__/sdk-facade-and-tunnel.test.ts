@@ -100,56 +100,52 @@ describe('tunnel manager', () => {
   // on POSIX, spawning a batch file fails with EACCES/ENOENT before any
   // tunnel logic runs. Each variant is gated to its platform and both
   // exercise the same contract: spawn → parse stdout URL → stop() cleanup.
-  it(
-    'start() resolves the public URL from a fake cloudflared (.cmd shim) and stop() cleans up',
-    { skip: process.platform !== 'win32', timeout: 20_000 },
-    async () => {
-      // Windows batch shim: print a tunnel URL on stdout, then idle.
-      const dir = mkdtempSync(path.join(tmpdir(), 'payway-tunnel-'));
-      tempDirs.push(dir);
-      const scriptPath = path.join(dir, 'fake-cloudflared.cmd');
-      writeFileSync(
-        scriptPath,
-        [
-          '@echo off',
-          'echo INF Starting tunnel https://fake-tunnel-abc123.trycloudflare.com',
-          'ping -n 20 127.0.0.1 > nul',
-          '',
-        ].join('\r\n'),
-      );
-      const manager = createTunnelManager(scriptPath);
-      const url = await manager.start(4598);
-      expect(url).toBe('https://fake-tunnel-abc123.trycloudflare.com');
-      expect(manager.isRunning).toBe(true);
-      await manager.stop();
-      expect(manager.isRunning).toBe(false);
-    },
-  );
+  it('start() resolves the public URL from a fake cloudflared (.cmd shim) and stop() cleans up', {
+    skip: process.platform !== 'win32',
+    timeout: 20_000,
+  }, async () => {
+    // Windows batch shim: print a tunnel URL on stdout, then idle.
+    const dir = mkdtempSync(path.join(tmpdir(), 'payway-tunnel-'));
+    tempDirs.push(dir);
+    const scriptPath = path.join(dir, 'fake-cloudflared.cmd');
+    writeFileSync(
+      scriptPath,
+      [
+        '@echo off',
+        'echo INF Starting tunnel https://fake-tunnel-abc123.trycloudflare.com',
+        'ping -n 20 127.0.0.1 > nul',
+        '',
+      ].join('\r\n'),
+    );
+    const manager = createTunnelManager(scriptPath);
+    const url = await manager.start(4598);
+    expect(url).toBe('https://fake-tunnel-abc123.trycloudflare.com');
+    expect(manager.isRunning).toBe(true);
+    await manager.stop();
+    expect(manager.isRunning).toBe(false);
+  });
 
-  it(
-    'start() resolves the public URL from a fake cloudflared (POSIX sh shim) and stop() cleans up',
-    { skip: process.platform === 'win32', timeout: 20_000 },
-    async () => {
-      // POSIX shim: executable shebang script (spawned directly, no shell).
-      // print a tunnel URL on stdout, then idle.
-      const dir = mkdtempSync(path.join(tmpdir(), 'payway-tunnel-'));
-      tempDirs.push(dir);
-      const scriptPath = path.join(dir, 'fake-cloudflared.sh');
-      writeFileSync(
-        scriptPath,
-        ['#!/bin/sh', 'echo INF Starting tunnel https://fake-tunnel-posix9.trycloudflare.com', 'sleep 15', ''].join(
-          '\n',
-        ),
-      );
-      chmodSync(scriptPath, 0o755);
-      const manager = createTunnelManager(scriptPath);
-      const url = await manager.start(4598);
-      expect(url).toBe('https://fake-tunnel-posix9.trycloudflare.com');
-      expect(manager.isRunning).toBe(true);
-      await manager.stop();
-      expect(manager.isRunning).toBe(false);
-    },
-  );
+  it('start() resolves the public URL from a fake cloudflared (POSIX sh shim) and stop() cleans up', {
+    skip: process.platform === 'win32',
+    timeout: 20_000,
+  }, async () => {
+    // POSIX shim: executable shebang script (spawned directly, no shell).
+    // print a tunnel URL on stdout, then idle.
+    const dir = mkdtempSync(path.join(tmpdir(), 'payway-tunnel-'));
+    tempDirs.push(dir);
+    const scriptPath = path.join(dir, 'fake-cloudflared.sh');
+    writeFileSync(
+      scriptPath,
+      ['#!/bin/sh', 'echo INF Starting tunnel https://fake-tunnel-posix9.trycloudflare.com', 'sleep 15', ''].join('\n'),
+    );
+    chmodSync(scriptPath, 0o755);
+    const manager = createTunnelManager(scriptPath);
+    const url = await manager.start(4598);
+    expect(url).toBe('https://fake-tunnel-posix9.trycloudflare.com');
+    expect(manager.isRunning).toBe(true);
+    await manager.stop();
+    expect(manager.isRunning).toBe(false);
+  });
 
   it('findCloudflared returns null or a path without throwing', async () => {
     const result = await findCloudflared();

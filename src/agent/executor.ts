@@ -119,10 +119,14 @@ export async function executeAction(
       },
       sensitiveValues,
     ) as { code?: string; message: string };
-    markOutcomeUnknown(executionId, {
-      code: safeError.code,
-      message: safeError.message,
-    }, sensitiveValues);
+    markOutcomeUnknown(
+      executionId,
+      {
+        code: safeError.code,
+        message: safeError.message,
+      },
+      sensitiveValues,
+    );
     recordCorrelation(executionContext, executionId, client);
     return {
       ok: false,
@@ -145,15 +149,23 @@ export async function executeAction(
       summary ? (scrubSensitive(summary, sensitiveValues) as Record<string, unknown>) : undefined,
     );
   } else if (result.error?.code === 'OUTCOME_UNKNOWN') {
-    markOutcomeUnknown(executionId, {
-      code: result.error.code,
-      message: result.error.message,
-    }, sensitiveValues);
+    markOutcomeUnknown(
+      executionId,
+      {
+        code: result.error.code,
+        message: result.error.message,
+      },
+      sensitiveValues,
+    );
   } else {
-    markFailed(executionId, {
-      code: result.error?.code,
-      message: result.error?.message ?? 'Tool reported failure',
-    }, sensitiveValues);
+    markFailed(
+      executionId,
+      {
+        code: result.error?.code,
+        message: result.error?.message ?? 'Tool reported failure',
+      },
+      sensitiveValues,
+    );
   }
 
   recordCorrelation(executionContext, executionId, client);
@@ -207,11 +219,7 @@ export function summarizeToolData(data: Record<string, unknown> | undefined): Re
  * sidecar) with the SDK correlation id of the exchange that just ran —
  * the same cid every transaction-journal event carries. First-write-wins.
  */
-function recordCorrelation(
-  executionContext: ExecutionContext,
-  executionId: string,
-  client: PayWay,
-): void {
+function recordCorrelation(executionContext: ExecutionContext, executionId: string, client: PayWay): void {
   const cid = client.lastCorrelationId;
   if (!cid) return;
   executionContext.correlationId = cid;

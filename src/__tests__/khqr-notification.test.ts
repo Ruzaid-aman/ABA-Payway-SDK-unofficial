@@ -80,8 +80,6 @@ describe('extractJsonPayload (HTML-wrapped / payload variations)', () => {
   });
 
   it('throws when no parseable object exists in the body', () => {
-    expect(() => extractJsonPayload('<html><body>502 Bad Gateway</body></html>')).toThrow(
-      /No parseable JSON object/,
-    );
+    expect(() => extractJsonPayload('<html><body>502 Bad Gateway</body></html>')).toThrow(/No parseable JSON object/);
   });
 });

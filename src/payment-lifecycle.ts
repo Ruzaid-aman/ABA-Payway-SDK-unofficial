@@ -7,24 +7,33 @@ export type PaymentLifecycle = 'created' | 'pending' | 'approved' | 'failed' | '
 export function paymentLifecycle(paymentStatus: unknown): PaymentLifecycle {
   if (typeof paymentStatus !== 'string') return 'unknown';
   switch (paymentStatus.toUpperCase()) {
-    case 'APPROVED': return 'approved';
-    case 'PENDING': return 'pending';
+    case 'APPROVED':
+      return 'approved';
+    case 'PENDING':
+      return 'pending';
     case 'DECLINED':
     // The gateway emits the typo "DECLINDED" in transaction-list output (acknowledged
     // by ABA 2026-09-12; still observed live) — treat it as DECLINED, not unknown.
     case 'DECLINDED':
-    case 'CANCELLED': return 'failed';
-    default: return 'unknown';
+    case 'CANCELLED':
+      return 'failed';
+    default:
+      return 'unknown';
   }
 }
 
 export function paymentNextStep(status: PaymentLifecycle): string {
   switch (status) {
-    case 'created': return 'Show the payment artifact, then check the existing transaction. Creation is not payment confirmation.';
-    case 'pending': return 'Check the existing transaction again. Keep expiry and closure locally; PENDING does not prove it is still payable.';
-    case 'approved': return 'Match the stored order transaction ID, amount, and currency, then fulfill once atomically.';
-    case 'failed': return 'Inspect the rejection before offering a new payment attempt with a fresh transaction ID.';
-    case 'unknown': return 'Query the existing transaction before creating a replacement. Do not fulfill from an unknown outcome.';
+    case 'created':
+      return 'Show the payment artifact, then check the existing transaction. Creation is not payment confirmation.';
+    case 'pending':
+      return 'Check the existing transaction again. Keep expiry and closure locally; PENDING does not prove it is still payable.';
+    case 'approved':
+      return 'Match the stored order transaction ID, amount, and currency, then fulfill once atomically.';
+    case 'failed':
+      return 'Inspect the rejection before offering a new payment attempt with a fresh transaction ID.';
+    case 'unknown':
+      return 'Query the existing transaction before creating a replacement. Do not fulfill from an unknown outcome.';
   }
 }
 

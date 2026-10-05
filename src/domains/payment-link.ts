@@ -57,9 +57,15 @@ export function imageWidthFromBytes(data: Uint8Array): number | null {
     let offset = 2;
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     while (offset + 9 < view.byteLength) {
-      if (data[offset] !== 0xff) { offset += 1; continue; }
+      if (data[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
       const marker = data[offset + 1];
-      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { offset += 2; continue; }
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+        offset += 2;
+        continue;
+      }
       const length = view.getUint16(offset + 2);
       const isStartOfFrame = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
       if (isStartOfFrame) {
@@ -133,7 +139,10 @@ export function createPaymentLinkDomain(
       }
       // Questionnaire v2 S12-Q004; advisory until independently gateway-verified.
       if (params.description !== undefined && /^[=+@-]/.test(params.description)) {
-        warnAdvisory(config, 'payment-link description should not start with =, +, -, or @ (PayWay chatbot guidance; not gateway-verified)');
+        warnAdvisory(
+          config,
+          'payment-link description should not start with =, +, -, or @ (PayWay chatbot guidance; not gateway-verified)',
+        );
       }
 
       // Sandbox-verified: PayWay rejects requests without return_url
@@ -255,7 +264,12 @@ export function createPaymentLinkDomain(
           // plaintext — encryptMerchantAuth JSON-encodes the whole payload, so
           // an array value would double-encode. Pre-encoded strings pass
           // through unchanged; arrays are JSON.stringify'd once, here.
-          payout: params.payout === undefined ? undefined : typeof params.payout === 'string' ? params.payout : JSON.stringify(params.payout),
+          payout:
+            params.payout === undefined
+              ? undefined
+              : typeof params.payout === 'string'
+                ? params.payout
+                : JSON.stringify(params.payout),
         }),
         multipartFile ? { multipartFile, callOptions } : { callOptions },
       );
@@ -365,7 +379,8 @@ export function parsePaymentLinkPushback(body: string | Record<string, unknown>)
   return {
     tranId: String(raw.tran_id),
     status: approved ? 'APPROVED' : 'UNKNOWN',
-    merchantRefNo: raw.merchant_ref_no === undefined || raw.merchant_ref_no === null ? undefined : String(raw.merchant_ref_no),
+    merchantRefNo:
+      raw.merchant_ref_no === undefined || raw.merchant_ref_no === null ? undefined : String(raw.merchant_ref_no),
     raw,
   };
 }

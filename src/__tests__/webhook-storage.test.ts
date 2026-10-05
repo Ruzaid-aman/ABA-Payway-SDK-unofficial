@@ -206,7 +206,11 @@ describe('JsonWebhookStorage Phase 3 fields', () => {
   });
 
   it('reads legacy records without the new fields (undefined, not throw)', () => {
-    writeFileSync(join(tempDir, 'callbacks.jsonl'), `${JSON.stringify({ id: 'wh_old', receivedAt: new Date().toISOString(), headers: {}, body: 'x' })}\n`, 'utf-8');
+    writeFileSync(
+      join(tempDir, 'callbacks.jsonl'),
+      `${JSON.stringify({ id: 'wh_old', receivedAt: new Date().toISOString(), headers: {}, body: 'x' })}\n`,
+      'utf-8',
+    );
     const [legacy] = storage.getAll();
     expect(legacy.id).toBe('wh_old');
     expect(legacy.signatureVerdict).toBeUndefined();
@@ -281,7 +285,9 @@ describe('JsonWebhookStorage customerQr metadata (Customer Module callbacks)', (
 
   it('round-trips the parsed Customer Module callback via updateCustomerQrMetadata', () => {
     const saved = storage.save({ headers: {}, body: JSON.stringify(REAL_CUSTOMER_QR_BODY), sourceIp: '127.0.0.1' });
-    const updated = storage.updateCustomerQrMetadata(saved.id, { parsed: parseCustomerQrCallback(REAL_CUSTOMER_QR_BODY) });
+    const updated = storage.updateCustomerQrMetadata(saved.id, {
+      parsed: parseCustomerQrCallback(REAL_CUSTOMER_QR_BODY),
+    });
     expect(updated.customerQr?.parsed?.kind).toBe('customer-module-qr');
     expect(updated.customerQr?.parsed?.notification.customer?.customer_name).toBe('dhitraj');
 

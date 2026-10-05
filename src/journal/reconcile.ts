@@ -172,9 +172,7 @@ export function reconcileTransactions(options: ReconcileOptions = {}): Reconcile
   for (const delivery of deliveries) {
     if (!delivery.transactionId) continue;
     const entry = entryFor(delivery.transactionId);
-    entry.sources = entry.sources.includes('webhook-store')
-      ? entry.sources
-      : [...entry.sources, 'webhook-store'];
+    entry.sources = entry.sources.includes('webhook-store') ? entry.sources : [...entry.sources, 'webhook-store'];
     if (markCallbackPairSeen(delivery.transactionId, delivery.status)) entry.callbackReplaySeen = true;
     if (delivery.replay) entry.callbackReplaySeen = true;
     if (!entry.callbackReceived) {

@@ -335,7 +335,12 @@ describe('paymentLink.create multipart wire format (client)', () => {
     // payment-link create is a mutation: single-submit by default (a dropped
     // response is an unknown outcome). The FormData-reuse mechanic is pinned
     // here under the explicit 'transient' opt-in.
-    const retrying = new PayWay({ ...CONFIG_WITH_RSA, maxRetries: 1, retryDelayMs: 1, mutationRetryPolicy: 'transient' });
+    const retrying = new PayWay({
+      ...CONFIG_WITH_RSA,
+      maxRetries: 1,
+      retryDelayMs: 1,
+      mutationRetryPolicy: 'transient',
+    });
 
     await retrying.paymentLink.create({
       ...VALID_PARAMS,

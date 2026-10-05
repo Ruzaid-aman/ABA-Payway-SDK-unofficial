@@ -77,7 +77,10 @@ describe('TunnelManager', () => {
 
 describe('startTunnelWithRetry', () => {
   it('retries one transient startup failure and returns the next tunnel URL', async () => {
-    const start = vi.fn().mockRejectedValueOnce(new Error('quick tunnel exited')).mockResolvedValueOnce('https://second.trycloudflare.com');
+    const start = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('quick tunnel exited'))
+      .mockResolvedValueOnce('https://second.trycloudflare.com');
     await expect(startTunnelWithRetry(start, 8443)).resolves.toBe('https://second.trycloudflare.com');
     expect(start).toHaveBeenCalledTimes(2);
   });

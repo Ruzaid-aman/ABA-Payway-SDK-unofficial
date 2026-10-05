@@ -147,7 +147,13 @@ describe('runOnboardCommand — interactive (scripted IO)', () => {
     const setExitCode = vi.fn();
     await runOnboardCommand(
       { stage: 'bogus' },
-      { interactive: true, io: ioScript(), note: () => {}, banners: { cancel, intro: () => {}, outro: () => {} }, setExitCode },
+      {
+        interactive: true,
+        io: ioScript(),
+        note: () => {},
+        banners: { cancel, intro: () => {}, outro: () => {} },
+        setExitCode,
+      },
     );
     expect(cancel).toHaveBeenCalledWith(expect.stringContaining('bogus'));
     expect(setExitCode).toHaveBeenCalledWith(1);
@@ -170,12 +176,21 @@ describe('runOnboardCommand — interactive (scripted IO)', () => {
   });
 
   it('declining the privacy stage reports the skip note and still finishes with the readiness panel', async () => {
-    const io = ioScript({ async confirm() { return false; } });
+    const io = ioScript({
+      async confirm() {
+        return false;
+      },
+    });
     const notes: string[] = [];
     const outro = vi.fn();
     await runOnboardCommand(
       { stage: 'privacy' },
-      { interactive: true, io, note: (m: string) => notes.push(m), banners: { intro: () => {}, outro, cancel: vi.fn() } },
+      {
+        interactive: true,
+        io,
+        note: (m: string) => notes.push(m),
+        banners: { intro: () => {}, outro, cancel: vi.fn() },
+      },
     );
 
     expect(notes.join('\n')).toContain('Privacy not acknowledged');

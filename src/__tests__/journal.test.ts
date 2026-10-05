@@ -92,7 +92,7 @@ describe('resolveJournalConfig', () => {
   });
 
   it('treats an invalid PAYWAY_JOURNAL_MODE as digest', () => {
-    expect(resolveJournalConfig(true, { PAYWAY_JOURNAL_MODE: 'loud'})?.mode).toBe('digest');
+    expect(resolveJournalConfig(true, { PAYWAY_JOURNAL_MODE: 'loud' })?.mode).toBe('digest');
   });
 });
 
@@ -431,11 +431,7 @@ describe('pruneJournal', () => {
     const lines = readFileSync(file, 'utf8').trimEnd().split('\n');
     const old = JSON.parse(lines[0]) as JournalEventV1;
     old.ts = new Date(Date.now() - 86_400_000).toISOString();
-    writeFileSync(
-      file,
-      `${JSON.stringify(old)}\n`,
-      'utf8',
-    );
+    writeFileSync(file, `${JSON.stringify(old)}\n`, 'utf8');
     emitter?.emit({ kind: 'execution.request', correlationId: 'new' });
 
     const result = pruneJournal(new Date(Date.now() - 3_600_000), file);

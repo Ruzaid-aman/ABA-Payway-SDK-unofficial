@@ -91,7 +91,12 @@ describe('createPollDisplay (clack mode)', () => {
     const { io, spinners } = createFakeIO();
     const display = createPollDisplay(io, META);
 
-    display.onEvent({ kind: 'error-attempt', attempt: 4, paymentStatus: 'ERROR: Connection timeout', elapsedMs: 20_000 });
+    display.onEvent({
+      kind: 'error-attempt',
+      attempt: 4,
+      paymentStatus: 'ERROR: Connection timeout',
+      elapsedMs: 20_000,
+    });
 
     expect(spinners).toHaveLength(1);
     expect(spinners[0].messages[0]).toBe('Poll #4 · ERROR: Connection timeout · 0:20 elapsed / 9:40 left');

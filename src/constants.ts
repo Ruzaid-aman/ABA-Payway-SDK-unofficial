@@ -211,50 +211,158 @@ export const PAYOUT_ERROR_CODES = {
  * Sources: docs/12 error table + 2026-08-25 sandbox campaigns.
  */
 export const GATEWAY_CODE_HINTS: Record<string, { title: string; hint: string }> = {
-  '0': { title: 'Success', hint: 'Business success. purchase/exchange-rate/close-transaction/transaction-list and the merchant-portal APIs report "00"; generate-qr and payout report "0".' },
-  '1': { title: 'Wrong Hash', hint: 'HMAC signature mismatch — check API key, field ordering, base64 vs hex encoding.' },
-  '2': { title: 'Transaction Not Closable', hint: 'Transaction status does not allow close — sandbox-verified: closing an already PAID transaction answers 403 code 2 (SANDBOX-FINDINGS §21). Only OPEN/PENDING transactions can be closed.' },
-  '3': { title: 'Invalid Transaction Amount', hint: 'Amount rejected (non-positive, wrong decimal scale, or mismatched) — seen on purchase, pre-auth-completion and refund (production telemetry 2026-09). Below-minimum floor: USD < 0.01 / KHR < 100 (payment-credential endpoint error table 2026-10).' },
-  '4': { title: 'Duplicated Transaction ID', hint: 'tran_id already exists for this merchant — send a fresh unique tran_id (production telemetry 2026-09: purchase, generate-qr, payout). The STRING code "04" is the separate validation/binding failure. On the payment-credential purchase leg the duplicate code is instead 83.' },
+  '0': {
+    title: 'Success',
+    hint: 'Business success. purchase/exchange-rate/close-transaction/transaction-list and the merchant-portal APIs report "00"; generate-qr and payout report "0".',
+  },
+  '1': {
+    title: 'Wrong Hash',
+    hint: 'HMAC signature mismatch — check API key, field ordering, base64 vs hex encoding.',
+  },
+  '2': {
+    title: 'Transaction Not Closable',
+    hint: 'Transaction status does not allow close — sandbox-verified: closing an already PAID transaction answers 403 code 2 (SANDBOX-FINDINGS §21). Only OPEN/PENDING transactions can be closed.',
+  },
+  '3': {
+    title: 'Invalid Transaction Amount',
+    hint: 'Amount rejected (non-positive, wrong decimal scale, or mismatched) — seen on purchase, pre-auth-completion and refund (production telemetry 2026-09). Below-minimum floor: USD < 0.01 / KHR < 100 (payment-credential endpoint error table 2026-10).',
+  },
+  '4': {
+    title: 'Duplicated Transaction ID',
+    hint: 'tran_id already exists for this merchant — send a fresh unique tran_id (production telemetry 2026-09: purchase, generate-qr, payout). The STRING code "04" is the separate validation/binding failure. On the payment-credential purchase leg the duplicate code is instead 83.',
+  },
   '5': { title: 'Transaction Not Found', hint: 'Close/cancel target does not exist — verify tran_id.' },
-  '6': { title: 'tran_id not found', hint: 'check-transaction found no transaction with this ID. On purchase the same numeric code means "Requested Domain is not in whitelist" (production telemetry 2026-09, confirmed by the payment-credential endpoint error table 2026-10) — ask PayWay to whitelist the domain.' },
+  '6': {
+    title: 'tran_id not found',
+    hint: 'check-transaction found no transaction with this ID. On purchase the same numeric code means "Requested Domain is not in whitelist" (production telemetry 2026-09, confirmed by the payment-credential endpoint error table 2026-10) — ask PayWay to whitelist the domain.',
+  },
   '7': { title: 'Invalid Request Data', hint: 'Missing or malformed field - check parameter types.' },
-  '8': { title: 'merchant_id not found', hint: 'Merchant identity rejected on this endpoint (sandbox-verified HTTP 403 on check-transaction) - check PAYWAY_MERCHANT_ID or the active profile. Production telemetry 2026-09: on refund/payout/transaction-list/generate-qr an 8 is instead a GENERIC 500-class "Something went wrong" — retry once, then contact PayWay support with the trace id (the payment-credential endpoint error table 2026-10 confirms the generic reading on purchase too).' },
-  '11': { title: 'Payment Processor Unresponsive', hint: 'No valid response returned from the payment processor — transient upstream failure; surface the gateway advice ("Something went wrong. Try again or contact the merchant for help."), retry once, then contact PayWay support (payment-credential endpoint error table 2026-10).' },
-  '12': { title: 'Payment currency not allowed', hint: 'Payout currency must match the beneficiary account currency and your merchant credential currency (e.g. send USD to a USD account). Root cause per the payment-credential endpoint table (2026-10): the merchant profile has no settlement account for the requested currency.' },
+  '8': {
+    title: 'merchant_id not found',
+    hint: 'Merchant identity rejected on this endpoint (sandbox-verified HTTP 403 on check-transaction) - check PAYWAY_MERCHANT_ID or the active profile. Production telemetry 2026-09: on refund/payout/transaction-list/generate-qr an 8 is instead a GENERIC 500-class "Something went wrong" — retry once, then contact PayWay support with the trace id (the payment-credential endpoint error table 2026-10 confirms the generic reading on purchase too).',
+  },
+  '11': {
+    title: 'Payment Processor Unresponsive',
+    hint: 'No valid response returned from the payment processor — transient upstream failure; surface the gateway advice ("Something went wrong. Try again or contact the merchant for help."), retry once, then contact PayWay support (payment-credential endpoint error table 2026-10).',
+  },
+  '12': {
+    title: 'Payment currency not allowed',
+    hint: 'Payout currency must match the beneficiary account currency and your merchant credential currency (e.g. send USD to a USD account). Root cause per the payment-credential endpoint table (2026-10): the merchant profile has no settlement account for the requested currency.',
+  },
   '15': { title: 'Invalid Merchant', hint: 'merchant_id not recognized in this environment.' },
   '16': { title: 'Invalid Amount', hint: 'Amount format wrong — use formatAmount()/decimal rules for the currency.' },
   '17': { title: 'Invalid Currency', hint: "Currency must be 'USD' or 'KHR'." },
-  '22': { title: 'Expired Transaction', hint: 'Transaction/token expired — create a new one or renew the token. On purchase/payment-credential the code instead means "This service is not enabled" — the requested transaction type is not supported for this merchant profile (endpoint error table 2026-10).' },
+  '22': {
+    title: 'Expired Transaction',
+    hint: 'Transaction/token expired — create a new one or renew the token. On purchase/payment-credential the code instead means "This service is not enabled" — the requested transaction type is not supported for this merchant profile (endpoint error table 2026-10).',
+  },
   '23': { title: 'Transaction Not Found', hint: 'No transaction with this tran_id (may have been closed).' },
-  '24': { title: 'Invalid Beneficiary Data', hint: 'RSA-encrypted beneficiaries malformed — verify public key + account format.' },
-  '25': { title: 'Too Many Beneficiaries', hint: 'Payout/split list exceeds the 10-beneficiary maximum per request — split across multiple requests (payment-credential endpoint error table 2026-10).' },
-  '26': { title: 'Invalid Merchant Profile', hint: 'Merchant identity rejected (sandbox-verified HTTP 400 on exchange-rate with unknown merchant_id) — check PAYWAY_MERCHANT_ID or the active profile.' },
-  '29': { title: 'Card Inactive', hint: 'Issuer reports the card inactive — customer uses another card (purchase telemetry 2026-09: "your card is inactive").' },
-  '30': { title: 'Card Declined By Issuer', hint: 'Issuer declined — customer verifies the card is active or uses another card.' },
-  '36': { title: 'Payout Account or Amount Invalid', hint: 'A payout entry is invalid or the beneficiary amounts do not total the transaction amount — the SDK and payment-link create enforce the total-matches rule locally; sibling PTL-PAYOUT-36 covers pre-auth complete-payout (payment-credential endpoint error table 2026-10).' },
-  '37': { title: 'Payout Whitelist', hint: 'Payout account not whitelisted — call addBeneficiary() first (production message: "Payout accounts are not in whitelist.").' },
-  '38': { title: 'Payout Invalid Transaction ID', hint: 'A payout entry carries an invalid tran_id — check format and uniqueness (payment-credential endpoint error table 2026-10).' },
-  '39': { title: 'Payout Duplicated Account', hint: 'The same beneficiary account appears more than once in the payout list — dedupe before retry (payment-credential endpoint error table 2026-10).' },
-  '40': { title: 'Payout Duplicated Transaction ID', hint: 'A payout tran_id already exists — payout tran_ids must be unique per merchant (payment-credential endpoint error table 2026-10).' },
-  '41': { title: 'Payout MID Not Linked', hint: 'The payout mid is not linked to any merchant profile — verify the split-payout MID with PayWay (payment-credential endpoint error table 2026-10).' },
-  '46': { title: 'KHR Amount Has Decimals', hint: 'KHR amounts must be whole numbers — the SDK already rejects decimal KHR amounts locally with PayWayConfigError (payment-credential endpoint error table 2026-10).' },
-  '49': { title: 'Invalid Request', hint: "Validation failed. For transaction-list dates use \"YYYY-MM-DD HH:mm:ss\"." },
-  '52': { title: 'Incorrect Card Details', hint: 'Card number/expiry/CVV failed — customer re-enters the card details.' },
-  '58': { title: 'Card Declined By Issuer', hint: 'Issuer declined without detail — customer contacts the issuer bank or uses another card.' },
-  '59': { title: 'Card Insufficient Funds', hint: 'Card funds/limit exhausted — customer uses another card or frees funds first.' },
-  '60': { title: 'Card Usage Limit Reached', hint: 'Card hit its issuer usage limit — another card, or issuer-bank support.' },
-  '68': { title: 'Card Declined By Issuer', hint: 'Issuer declined without detail — customer contacts the issuer bank or uses another card.' },
-  '69': { title: 'Lifetime Below Minimum', hint: 'Checkout purchase lifetime must be >= 3 minutes (API takes minutes; max 43200 = 30 days; spec-documented).' },
-  '71': { title: 'Card Payout To ABA Account Not Allowed', hint: 'Card-token payouts cannot target an ABA account — use a whitelisted bank/beneficiary account (payment-credential endpoint error table 2026-10).' },
-  '75': { title: 'Card Declined By Issuer', hint: 'Issuer declined; message advises another card or issuer-bank support.' },
-  '77': { title: 'Transaction Fees Not Supported', hint: 'Consumer/merchant transaction-fee configuration is not supported for this card-on-file purchase — drop the fee fields (payment-credential endpoint error table 2026-10).' },
-  '80': { title: 'Custom Fields Invalid', hint: 'custom_fields or items cannot be decoded, or too many items per request — send valid JSON and trim the list (payment-credential endpoint error table 2026-10).' },
-  '83': { title: 'Transaction Duplicated', hint: 'tran_id already used for this merchant profile — on the payment-credential purchase leg the duplicate code is 83, not 4 (endpoint error table 2026-10); same remediation as 4: send a fresh unique tran_id.' },
+  '24': {
+    title: 'Invalid Beneficiary Data',
+    hint: 'RSA-encrypted beneficiaries malformed — verify public key + account format.',
+  },
+  '25': {
+    title: 'Too Many Beneficiaries',
+    hint: 'Payout/split list exceeds the 10-beneficiary maximum per request — split across multiple requests (payment-credential endpoint error table 2026-10).',
+  },
+  '26': {
+    title: 'Invalid Merchant Profile',
+    hint: 'Merchant identity rejected (sandbox-verified HTTP 400 on exchange-rate with unknown merchant_id) — check PAYWAY_MERCHANT_ID or the active profile.',
+  },
+  '29': {
+    title: 'Card Inactive',
+    hint: 'Issuer reports the card inactive — customer uses another card (purchase telemetry 2026-09: "your card is inactive").',
+  },
+  '30': {
+    title: 'Card Declined By Issuer',
+    hint: 'Issuer declined — customer verifies the card is active or uses another card.',
+  },
+  '36': {
+    title: 'Payout Account or Amount Invalid',
+    hint: 'A payout entry is invalid or the beneficiary amounts do not total the transaction amount — the SDK and payment-link create enforce the total-matches rule locally; sibling PTL-PAYOUT-36 covers pre-auth complete-payout (payment-credential endpoint error table 2026-10).',
+  },
+  '37': {
+    title: 'Payout Whitelist',
+    hint: 'Payout account not whitelisted — call addBeneficiary() first (production message: "Payout accounts are not in whitelist.").',
+  },
+  '38': {
+    title: 'Payout Invalid Transaction ID',
+    hint: 'A payout entry carries an invalid tran_id — check format and uniqueness (payment-credential endpoint error table 2026-10).',
+  },
+  '39': {
+    title: 'Payout Duplicated Account',
+    hint: 'The same beneficiary account appears more than once in the payout list — dedupe before retry (payment-credential endpoint error table 2026-10).',
+  },
+  '40': {
+    title: 'Payout Duplicated Transaction ID',
+    hint: 'A payout tran_id already exists — payout tran_ids must be unique per merchant (payment-credential endpoint error table 2026-10).',
+  },
+  '41': {
+    title: 'Payout MID Not Linked',
+    hint: 'The payout mid is not linked to any merchant profile — verify the split-payout MID with PayWay (payment-credential endpoint error table 2026-10).',
+  },
+  '46': {
+    title: 'KHR Amount Has Decimals',
+    hint: 'KHR amounts must be whole numbers — the SDK already rejects decimal KHR amounts locally with PayWayConfigError (payment-credential endpoint error table 2026-10).',
+  },
+  '49': { title: 'Invalid Request', hint: 'Validation failed. For transaction-list dates use "YYYY-MM-DD HH:mm:ss".' },
+  '52': {
+    title: 'Incorrect Card Details',
+    hint: 'Card number/expiry/CVV failed — customer re-enters the card details.',
+  },
+  '58': {
+    title: 'Card Declined By Issuer',
+    hint: 'Issuer declined without detail — customer contacts the issuer bank or uses another card.',
+  },
+  '59': {
+    title: 'Card Insufficient Funds',
+    hint: 'Card funds/limit exhausted — customer uses another card or frees funds first.',
+  },
+  '60': {
+    title: 'Card Usage Limit Reached',
+    hint: 'Card hit its issuer usage limit — another card, or issuer-bank support.',
+  },
+  '68': {
+    title: 'Card Declined By Issuer',
+    hint: 'Issuer declined without detail — customer contacts the issuer bank or uses another card.',
+  },
+  '69': {
+    title: 'Lifetime Below Minimum',
+    hint: 'Checkout purchase lifetime must be >= 3 minutes (API takes minutes; max 43200 = 30 days; spec-documented).',
+  },
+  '71': {
+    title: 'Card Payout To ABA Account Not Allowed',
+    hint: 'Card-token payouts cannot target an ABA account — use a whitelisted bank/beneficiary account (payment-credential endpoint error table 2026-10).',
+  },
+  '75': {
+    title: 'Card Declined By Issuer',
+    hint: 'Issuer declined; message advises another card or issuer-bank support.',
+  },
+  '77': {
+    title: 'Transaction Fees Not Supported',
+    hint: 'Consumer/merchant transaction-fee configuration is not supported for this card-on-file purchase — drop the fee fields (payment-credential endpoint error table 2026-10).',
+  },
+  '80': {
+    title: 'Custom Fields Invalid',
+    hint: 'custom_fields or items cannot be decoded, or too many items per request — send valid JSON and trim the list (payment-credential endpoint error table 2026-10).',
+  },
+  '83': {
+    title: 'Transaction Duplicated',
+    hint: 'tran_id already used for this merchant profile — on the payment-credential purchase leg the duplicate code is 83, not 4 (endpoint error table 2026-10); same remediation as 4: send a fresh unique tran_id.',
+  },
   '96': { title: 'Payee / Merchant Data', hint: 'Beneficiary payee unknown, or payment-link id invalid (detail).' },
-  '500': { title: 'Gateway Error', hint: 'Generic 500-class failure ("Something went wrong... digital support team") — retry once, then contact PayWay support with the trace id (telemetry: transaction-list, generate-qr, payment-link detail).' },
-  '503': { title: 'System Under Maintenance', hint: 'PayWay is under maintenance — pause and retry later (telemetry: purchase).' },
-  '999': { title: 'Something Went Wrong', hint: 'Generic gateway failure, "please try again later" — retry with backoff; not a merchant config issue (telemetry: purchase).' },
+  '500': {
+    title: 'Gateway Error',
+    hint: 'Generic 500-class failure ("Something went wrong... digital support team") — retry once, then contact PayWay support with the trace id (telemetry: transaction-list, generate-qr, payment-link detail).',
+  },
+  '503': {
+    title: 'System Under Maintenance',
+    hint: 'PayWay is under maintenance — pause and retry later (telemetry: purchase).',
+  },
+  '999': {
+    title: 'Something Went Wrong',
+    hint: 'Generic gateway failure, "please try again later" — retry with backoff; not a merchant config issue (telemetry: purchase).',
+  },
 };
 
 /**
@@ -282,10 +390,14 @@ export const PAYMENT_LINK_TITLES: Record<string, string> = {
 };
 
 export const PAYMENT_LINK_HINTS: Record<string, string> = {
-  PTL05: 'Check datatypes — amounts are numbers in the SDK (the official docs declare strings; the gateway accepts numbers). Sandbox probes: malformed values answered PTL04 instead.',
-  PTL99: 'Currency not enabled for the merchant profile. Sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile.',
-  PTL132: 'Invalid payment link — pass the opaque data.id returned by create, NOT merchant_ref_no, NOT the URL slug. Sandbox note (2026-09-06): a bogus id answered 96 instead.',
-  PTL188: 'The payment link is already voided — already in the desired terminal state, not a failure. Void is not idempotent (HTTP 403, SANDBOX-FINDINGS §23); a second void on the same link id always answers PTL188.',
+  PTL05:
+    'Check datatypes — amounts are numbers in the SDK (the official docs declare strings; the gateway accepts numbers). Sandbox probes: malformed values answered PTL04 instead.',
+  PTL99:
+    'Currency not enabled for the merchant profile. Sandbox probe: EUR answered PTL04 — PTL99 not yet reproduced on this profile.',
+  PTL132:
+    'Invalid payment link — pass the opaque data.id returned by create, NOT merchant_ref_no, NOT the URL slug. Sandbox note (2026-09-06): a bogus id answered 96 instead.',
+  PTL188:
+    'The payment link is already voided — already in the desired terminal state, not a failure. Void is not idempotent (HTTP 403, SANDBOX-FINDINGS §23); a second void on the same link id always answers PTL188.',
 };
 
 /**
@@ -375,7 +487,14 @@ export const QR_TEMPLATE_NAMES: readonly string[] = QR_TEMPLATES.map((template) 
  * support it per profile), but merchants should verify availability for their
  * merchant profile with ABA before advertising it on checkout.
  */
-export const PAYMENT_OPTIONS = ['cards', 'abapay_khqr', 'abapay_khqr_deeplink', 'alipay', 'wechat', 'google_pay'] as const;
+export const PAYMENT_OPTIONS = [
+  'cards',
+  'abapay_khqr',
+  'abapay_khqr_deeplink',
+  'alipay',
+  'wechat',
+  'google_pay',
+] as const;
 
 export type PaymentOptionName = (typeof PAYMENT_OPTIONS)[number];
 
@@ -424,4 +543,3 @@ export const PURCHASE_PAYMENT_OPTIONS_LEGACY = ['abapay', 'abapay_deeplink'] as 
 export const QR_PAYMENT_OPTIONS = ['abapay_khqr', 'wechat', 'alipay'] as const;
 
 export type QrPaymentOptionName = (typeof QR_PAYMENT_OPTIONS)[number];
-

@@ -75,7 +75,10 @@ function buildProgram(): Command {
     .action((opts: { tag?: string }) => {
       console.log(`echo-ran:${opts.tag ?? 'none'}`);
     });
-  program.command('needs-opt').requiredOption('--req <v>').action(() => {});
+  program
+    .command('needs-opt')
+    .requiredOption('--req <v>')
+    .action(() => {});
   setAgentProgram(program);
   return program;
 }
@@ -254,7 +257,7 @@ describe('REPL (in-process via runRepl with injected streams)', () => {
     expect(text).toContain('REPL directives');
     expect(text).toContain('1. :help');
     expect(text).toContain('Unknown directive: :bogus (try :help)');
-    expect(text).toContain("Unknown directive: :run (try :help)");
+    expect(text).toContain('Unknown directive: :run (try :help)');
     expect(text).toContain('Goodbye.');
   });
 
@@ -337,7 +340,9 @@ describe('REPL (in-process via runRepl with injected streams)', () => {
     buildProgram();
     await runReplCaptured([':session', ':exit']);
     const line = logs.find((l) => l.includes('session:')) ?? '';
-    const sessionId = stripAnsi(line).replace(/.*session:\s*/, '').trim();
+    const sessionId = stripAnsi(line)
+      .replace(/.*session:\s*/, '')
+      .trim();
     expect(sessionId).toMatch(/^[0-9a-f-]{10,}$/i);
     const { sessionsDir } = getAgentDataPaths(process.env.APPDATA);
     expect(existsSync(path.join(sessionsDir, `${sessionId}.json`))).toBe(true);

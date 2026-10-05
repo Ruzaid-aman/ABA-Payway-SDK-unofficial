@@ -36,7 +36,12 @@ import {
   type JournalPruneResult,
 } from '../journal/writer.js';
 import type { JournalContext, JournalEmitterInput, JournalMode } from '../journal/types.js';
-import { readSqliteJournalEvents, pruneSqliteJournal, SqliteJournalSink, type SqliteDb } from '../journal/sink-sqlite.js';
+import {
+  readSqliteJournalEvents,
+  pruneSqliteJournal,
+  SqliteJournalSink,
+  type SqliteDb,
+} from '../journal/sink-sqlite.js';
 import {
   loadLinkedTokens,
   markTokenCharged,
@@ -145,7 +150,7 @@ export async function createStorageService(options: StorageServiceOptions = {}):
         read: () => readSqliteJournalEvents(db),
         prune: (before) => pruneSqliteJournal(db, before),
       },
-      tokens: new SqliteLinkedTokenStore(db),  // markRenewed is a native method on the sqlite store
+      tokens: new SqliteLinkedTokenStore(db), // markRenewed is a native method on the sqlite store
       webhooks: SqliteWebhookStorage.fromDb(db),
       close: () => db.close(),
     };
@@ -159,10 +164,7 @@ export async function createStorageService(options: StorageServiceOptions = {}):
   // The JSON journal sink constructs from a dir config and writes exactly
   // `<dir>/journal.jsonl` — the facade's layout contract IS that file, so no
   // adapter is needed (append-only JSONL, fail-open, one write pipeline).
-  const emitter: JournalContext = createJournalEmitterForSink(
-    new JsonlJournalSink({ dir: dataRoot, mode }),
-    mode,
-  );
+  const emitter: JournalContext = createJournalEmitterForSink(new JsonlJournalSink({ dir: dataRoot, mode }), mode);
 
   return {
     backend,

@@ -119,10 +119,7 @@ export function restoreEnvCallbackUrl(
     return 'restored';
   }
   if (idx === -1) return 'no-op';
-  writeFile(
-    envFile,
-    lines.filter((l) => !l.trim().startsWith(`${key}=`)).join('\n'),
-  );
+  writeFile(envFile, lines.filter((l) => !l.trim().startsWith(`${key}=`)).join('\n'));
   return 'removed';
 }
 

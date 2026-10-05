@@ -4,10 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCheckoutPayload, createHostedCheckoutForm } from '../../docs/examples/backend/checkout-signing.ts';
 import { createWebhookServer } from 'aba-payway-ts';
-import {
-  createPaymentLink,
-  getPaymentLinkDetails,
-} from '../../docs/examples/backend/payment-link-create.ts';
+import { createPaymentLink, getPaymentLinkDetails } from '../../docs/examples/backend/payment-link-create.ts';
 import { extractWebhookSignature, removeHashField } from '../../docs/examples/backend/webhook-verification.ts';
 
 describe('Documentation examples', () => {
@@ -111,9 +108,7 @@ describe('Documentation examples', () => {
   });
 
   it('keeps the public onboarding path executable and credential safe', () => {
-    const onboarding = ['QUICKSTART.md', 'docs/guides/QUICK-START-1-PAGER.md']
-      .map(readDoc)
-      .join('\n');
+    const onboarding = ['QUICKSTART.md', 'docs/guides/QUICK-START-1-PAGER.md'].map(readDoc).join('\n');
 
     expect(onboarding).toContain('payway-sdk demo --check');
     expect(onboarding).toContain('payway-sdk init --mode sandbox --template first-payment');
@@ -138,9 +133,7 @@ describe('Documentation examples', () => {
       .map((name) => join(repoRoot, 'payway-boilerplate', 'ABA KHQR onsite generation', name))
       .find(existsSync);
     expect(suppliedConfigPath).toBeDefined();
-    const suppliedConfig = JSON.parse(
-      readFileSync(suppliedConfigPath as string, 'utf8'),
-    ) as Record<string, string>;
+    const suppliedConfig = JSON.parse(readFileSync(suppliedConfigPath as string, 'utf8')) as Record<string, string>;
     const documentation = khqrDocs.join('\n');
 
     for (const key of ['t30_00', 't30_01', 't30_02', 't52', 't59', 't60', 't62_68']) {
@@ -250,12 +243,9 @@ describe('Documentation examples', () => {
   });
 
   it('keeps the payment-link example file on the public param contract', () => {
-    const example = readFileSync(
-      join(currentDir, '../../docs/examples/backend/payment-link-create.ts'),
-      'utf-8',
-    );
+    const example = readFileSync(join(currentDir, '../../docs/examples/backend/payment-link-create.ts'), 'utf-8');
     // Purchase-path payout keys — NOT the payout domain's {account, amount}.
-    expect(example).toContain("payout?: { acc: string; amt: number }[]");
+    expect(example).toContain('payout?: { acc: string; amt: number }[]');
     expect(example).not.toContain('account:');
     // The detail helper must document the opaque-Link-ID rule.
     expect(example).toContain('data.id');

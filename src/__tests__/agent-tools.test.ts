@@ -73,7 +73,11 @@ function makePayWay(): PayWay {
       }),
     },
     paymentLink: {
-      create: fn(async () => ({ status: { code: '0' }, data: { id: 'pl1', payment_link: 'https://link-sandbox/ABAPAY1' }, tran_id: 123 })),
+      create: fn(async () => ({
+        status: { code: '0' },
+        data: { id: 'pl1', payment_link: 'https://link-sandbox/ABAPAY1' },
+        tran_id: 123,
+      })),
       getDetails: fn(async () => ({
         status: { code: '00', message: 'Success' },
         data: { id: 'pl1', status: 'OPEN', total_trxn: 0, total_amount: 0, payment_link: 'https://link/pl1' },

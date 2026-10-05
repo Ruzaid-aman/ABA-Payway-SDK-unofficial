@@ -230,23 +230,19 @@ describe('Validation: gateway-parity identifier & token-flag rules (TD-06)', () 
   );
 
   it('rejects requestId shorter than 5 characters on linkAccount', () => {
-    expect(() =>
-      cof.linkAccount({ requestId: 'r1' } as unknown as LinkAccountParams),
-    ).toThrow(PayWayConfigError);
+    expect(() => cof.linkAccount({ requestId: 'r1' } as unknown as LinkAccountParams)).toThrow(PayWayConfigError);
   });
 
   it('rejects requestId containing characters outside [a-zA-Z0-9]', () => {
-    expect(() =>
-      cof.linkAccount({ requestId: 'REQ-001' } as unknown as LinkAccountParams),
-    ).toThrow(/a-zA-Z0-9/);
+    expect(() => cof.linkAccount({ requestId: 'REQ-001' } as unknown as LinkAccountParams)).toThrow(/a-zA-Z0-9/);
   });
 
   it('rejects ctid violating the [a-zA-Z0-9]{5,24} rule on removeToken', () => {
     // 2026-08-31: getTokenDetails no longer takes ctid/pwt (live docs §16) —
     // the ctid format rule is pinned on removeToken instead.
-    expect(() =>
-      cof.removeToken({ ctid: 'CUST-005', paymentToken: 'pt' } as unknown as RemoveTokenParams),
-    ).toThrow(PayWayConfigError);
+    expect(() => cof.removeToken({ ctid: 'CUST-005', paymentToken: 'pt' } as unknown as RemoveTokenParams)).toThrow(
+      PayWayConfigError,
+    );
   });
 
   it('accepts identifiers matching the gateway rule end-to-end', async () => {
@@ -262,7 +258,12 @@ describe('Validation: gateway-parity identifier & token-flag rules (TD-06)', () 
     // 2026-08-31 live-docs parity: ctid + currency are now REQUIRED on
     // linkAccount, so the fixture includes them to reach the tokenFlag rule.
     expect(() =>
-      cof.linkAccount({ requestId: 'req01', ctid: 'ctid01', currency: 'USD', tokenFlag: 'MITR_FIX' } as unknown as LinkAccountParams),
+      cof.linkAccount({
+        requestId: 'req01',
+        ctid: 'ctid01',
+        currency: 'USD',
+        tokenFlag: 'MITR_FIX',
+      } as unknown as LinkAccountParams),
     ).toThrow(/tokenFlag/);
   });
 
@@ -309,12 +310,8 @@ describe('Validation: token-trio capability guard (TD-03, flipped 2026-08-31)', 
       expect((error as Error).message).toContain('allowUnverifiedTokenOperations');
       expect((error as Error).message).toContain('sandbox-verified 2026-08-31');
     }
-    expect(() =>
-      explicitOptOut.getTokenDetails({ requestId: 'req01' }),
-    ).toThrow(PayWayConfigError);
-    expect(() =>
-      explicitOptOut.removeToken({ ctid: 'ctid01', paymentToken: 'pt' }),
-    ).toThrow(PayWayConfigError);
+    expect(() => explicitOptOut.getTokenDetails({ requestId: 'req01' })).toThrow(PayWayConfigError);
+    expect(() => explicitOptOut.removeToken({ ctid: 'ctid01', paymentToken: 'pt' })).toThrow(PayWayConfigError);
   });
 
   it('allows the trio by default with the §16-verified params', async () => {
@@ -329,7 +326,12 @@ describe('Validation: token-trio capability guard (TD-03, flipped 2026-08-31)', 
     rawSpy.mockClear();
     // 2026-08-31 live-docs parity: linkAccount now requires ctid, tokenFlag,
     // and currency — the minimal fixture grew accordingly.
-    await allowed.linkAccount({ requestId: 'req01', ctid: 'ctid01', tokenFlag: 'CITI_FLEX', currency: 'USD' } as unknown as LinkAccountParams);
+    await allowed.linkAccount({
+      requestId: 'req01',
+      ctid: 'ctid01',
+      tokenFlag: 'CITI_FLEX',
+      currency: 'USD',
+    } as unknown as LinkAccountParams);
     expect(rawSpy).toHaveBeenCalled();
   });
 });

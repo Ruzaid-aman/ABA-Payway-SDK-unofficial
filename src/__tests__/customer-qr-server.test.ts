@@ -85,7 +85,13 @@ function httpRequest(
 ): Promise<{ statusCode: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = http.request(
-      { hostname: '127.0.0.1', port, method: 'POST', path, headers: { 'Content-Type': 'application/json', ...headers } },
+      {
+        hostname: '127.0.0.1',
+        port,
+        method: 'POST',
+        path,
+        headers: { 'Content-Type': 'application/json', ...headers },
+      },
       (res) => {
         let data = '';
         res.on('data', (chunk: Buffer) => (data += chunk.toString()));

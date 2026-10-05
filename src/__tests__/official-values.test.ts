@@ -11,11 +11,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GenerateQrParams, PayWayConfig } from '../client.js';
-import {
-  PURCHASE_PAYMENT_OPTIONS,
-  PURCHASE_PAYMENT_OPTIONS_LEGACY,
-  QR_PAYMENT_OPTIONS,
-} from '../constants.js';
+import { PURCHASE_PAYMENT_OPTIONS, PURCHASE_PAYMENT_OPTIONS_LEGACY, QR_PAYMENT_OPTIONS } from '../constants.js';
 import { createCheckoutDomain } from '../domains/checkout.js';
 import { createQrDomain } from '../domains/qr.js';
 import { PayWayConfigError } from '../errors.js';
@@ -95,12 +91,15 @@ describe('DX-RULE-001: purchase payment_option official enum (PUR-003)', () => {
     expect([...PURCHASE_PAYMENT_OPTIONS_LEGACY]).toEqual(['abapay', 'abapay_deeplink']);
   });
 
-  it.each([...PURCHASE_PAYMENT_OPTIONS])('normal mode: official value %s produces no diagnostic', async (paymentOption) => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const extra = paymentOption === 'google_pay' ? { googlePayToken: 'tok' } : {};
-    await expect(checkoutPurchase(TEST_CONFIG, { paymentOption, ...extra })).resolves.toBeDefined();
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
+  it.each([...PURCHASE_PAYMENT_OPTIONS])(
+    'normal mode: official value %s produces no diagnostic',
+    async (paymentOption) => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const extra = paymentOption === 'google_pay' ? { googlePayToken: 'tok' } : {};
+      await expect(checkoutPurchase(TEST_CONFIG, { paymentOption, ...extra })).resolves.toBeDefined();
+      expect(warnSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([...PURCHASE_PAYMENT_OPTIONS])(
     'strictValidation: official value %s does not throw (google_pay needs its token)',
@@ -132,15 +131,18 @@ describe('DX-RULE-001: purchase payment_option official enum (PUR-003)', () => {
     },
   );
 
-  it.each(['paypal', 'nonsense_option'])('normal mode: unknown value %s throws citing PUR-003 with the official values', async (paymentOption) => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await expect(checkoutPurchase(TEST_CONFIG, { paymentOption })).rejects.toThrow(PayWayConfigError);
-    await expect(checkoutPurchase(TEST_CONFIG, { paymentOption })).rejects.toThrow(/PUR-003/);
-    await expect(checkoutPurchase(TEST_CONFIG, { paymentOption })).rejects.toThrow(
-      new RegExp(PURCHASE_PAYMENT_OPTIONS.join('.*')),
-    );
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
+  it.each(['paypal', 'nonsense_option'])(
+    'normal mode: unknown value %s throws citing PUR-003 with the official values',
+    async (paymentOption) => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await expect(checkoutPurchase(TEST_CONFIG, { paymentOption })).rejects.toThrow(PayWayConfigError);
+      await expect(checkoutPurchase(TEST_CONFIG, { paymentOption })).rejects.toThrow(/PUR-003/);
+      await expect(checkoutPurchase(TEST_CONFIG, { paymentOption })).rejects.toThrow(
+        new RegExp(PURCHASE_PAYMENT_OPTIONS.join('.*')),
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(['paypal'])('strictValidation: unknown value %s throws citing PUR-003 too', async (paymentOption) => {
     await expect(checkoutPurchase(STRICT_CONFIG, { paymentOption })).rejects.toThrow(PayWayConfigError);
@@ -156,12 +158,15 @@ describe('DX-RULE-002: generate-qr payment_option membership (QR-012)', () => {
     expect([...QR_PAYMENT_OPTIONS]).toEqual(['abapay_khqr', 'wechat', 'alipay']);
   });
 
-  it.each([...QR_PAYMENT_OPTIONS])('official generate-qr value %s is accepted (no diagnostic)', async (paymentOption) => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { domain } = makeQrDomain(TEST_CONFIG);
-    await expect(domain.generateQr({ ...QR_BASE, paymentOption })).resolves.toBeDefined();
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
+  it.each([...QR_PAYMENT_OPTIONS])(
+    'official generate-qr value %s is accepted (no diagnostic)',
+    async (paymentOption) => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { domain } = makeQrDomain(TEST_CONFIG);
+      await expect(domain.generateQr({ ...QR_BASE, paymentOption })).resolves.toBeDefined();
+      expect(warnSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(['cards', 'abapay', 'abapay_deeplink', 'abapay_khqr_deeplink', 'google_pay', 'nonsense_option'])(
     'generate-qr value %s throws citing QR-012 with the official values',
@@ -169,9 +174,7 @@ describe('DX-RULE-002: generate-qr payment_option membership (QR-012)', () => {
       const { domain } = makeQrDomain(TEST_CONFIG);
       expect(() => domain.generateQr({ ...QR_BASE, paymentOption })).toThrow(PayWayConfigError);
       expect(() => domain.generateQr({ ...QR_BASE, paymentOption })).toThrow(/QR-012/);
-      expect(() => domain.generateQr({ ...QR_BASE, paymentOption })).toThrow(
-        new RegExp(QR_PAYMENT_OPTIONS.join('.*')),
-      );
+      expect(() => domain.generateQr({ ...QR_BASE, paymentOption })).toThrow(new RegExp(QR_PAYMENT_OPTIONS.join('.*')));
     },
   );
 
@@ -187,7 +190,12 @@ describe('DX-RULE-002: generate-qr payment_option membership (QR-012)', () => {
     // Long-enough transactionId: request-qr identifiers are advised to match
     // [a-zA-Z0-9-]{5,24} (repository assumption, out of scope here).
     await expect(
-      domain.requestQr({ transactionId: 'sb-0001', currency: 'USD', paymentOption: 'abapay', callbackUrl: 'https://example.com/soundbox' }),
+      domain.requestQr({
+        transactionId: 'sb-0001',
+        currency: 'USD',
+        paymentOption: 'abapay',
+        callbackUrl: 'https://example.com/soundbox',
+      }),
     ).resolves.toBeDefined();
     expect(warnSpy).not.toHaveBeenCalled();
   });
@@ -278,9 +286,7 @@ describe('runTestSuite emits no purchase-enum advisory', () => {
       initiate: (payload, config) => {
         seen.push(payload.paymentOption);
         const responseType = (config as { responseType?: string })?.responseType;
-        return generateMockSession(
-          (responseType ?? 'qr_string') as Parameters<typeof generateMockSession>[0],
-        );
+        return generateMockSession((responseType ?? 'qr_string') as Parameters<typeof generateMockSession>[0]);
       },
       handle: (session) => ({
         success: true,

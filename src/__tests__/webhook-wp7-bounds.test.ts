@@ -41,7 +41,9 @@ function getFreePort(): Promise<number> {
   });
 }
 
-async function startServer(extra: Record<string, unknown> = {}): Promise<{ port: number; stop: () => Promise<void>; storage: JsonWebhookStorage }> {
+async function startServer(
+  extra: Record<string, unknown> = {},
+): Promise<{ port: number; stop: () => Promise<void>; storage: JsonWebhookStorage }> {
   const storage = new JsonWebhookStorage(path.join(tempRoot, `cb-${Math.random().toString(36).slice(2)}.jsonl`));
   const port = await getFreePort();
   const server = createWebhookServer(storage, { port, quiet: true, ...extra });
@@ -154,7 +156,9 @@ describe('capture retention (WP07)', () => {
     }
     expect(storage.count()).toBe(1_000);
     // The file on disk agrees with the count (physical compaction, not a read filter).
-    const lines = readFileSync(file, 'utf-8').split('\n').filter((line) => line.trim().length > 0);
+    const lines = readFileSync(file, 'utf-8')
+      .split('\n')
+      .filter((line) => line.trim().length > 0);
     expect(lines).toHaveLength(1_000);
   });
 

@@ -5,9 +5,6 @@ interface TtyStream {
 }
 
 /** Interactive authorization is available only when both terminal directions are TTYs. */
-export function isInteractiveTerminal(
-  stdin: TtyStream = process.stdin,
-  stdout: TtyStream = process.stdout,
-): boolean {
+export function isInteractiveTerminal(stdin: TtyStream = process.stdin, stdout: TtyStream = process.stdout): boolean {
   return stdin.isTTY === true && stdout.isTTY === true;
 }

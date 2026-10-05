@@ -24,7 +24,9 @@ describe('resolvePromptMode', () => {
   it('returns clack only when both stdin and stdout are TTYs', () => {
     expect(resolvePromptMode({}, {}, tty)).toBe('clack');
     expect(resolvePromptMode({}, {}, piped)).toBe('readline');
-    expect(resolvePromptMode({}, {}, { stdin: { isTTY: true, readable: true }, stdout: { isTTY: false } })).toBe('readline');
+    expect(resolvePromptMode({}, {}, { stdin: { isTTY: true, readable: true }, stdout: { isTTY: false } })).toBe(
+      'readline',
+    );
   });
 
   it('returns none for machine contexts regardless of TTY', () => {

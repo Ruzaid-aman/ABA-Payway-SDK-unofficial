@@ -54,7 +54,8 @@ function checkRsaPem(env: NodeJS.ProcessEnv): DoctorCheck | undefined {
     return { id: 'env-rsa-pem', label: 'RSA public key shape', ok: true, detail: 'BEGIN/END PUBLIC KEY detected' };
   }
 
-  const truncated = pem.startsWith('"-----BEGIN') || (pem.includes('BEGIN PUBLIC KEY') && !pem.includes('END PUBLIC KEY'));
+  const truncated =
+    pem.startsWith('"-----BEGIN') || (pem.includes('BEGIN PUBLIC KEY') && !pem.includes('END PUBLIC KEY'));
   return {
     id: 'env-rsa-pem',
     label: 'RSA public key shape',
@@ -75,8 +76,13 @@ function checkEnvFile(cwd: string, configurationAvailable: boolean): DoctorCheck
     id: 'env-file',
     label: '.env file exists',
     ok: exists || configurationAvailable,
-    detail: exists ? envPath : configurationAvailable ? 'not present; using profile or environment variables' : `.env not found in ${cwd}`,
-    fix: exists || configurationAvailable ? undefined : 'Run `payway-sdk init --mode sandbox` to create a .env template',
+    detail: exists
+      ? envPath
+      : configurationAvailable
+        ? 'not present; using profile or environment variables'
+        : `.env not found in ${cwd}`,
+    fix:
+      exists || configurationAvailable ? undefined : 'Run `payway-sdk init --mode sandbox` to create a .env template',
   };
 }
 
@@ -206,7 +212,8 @@ function resolveDoctorContext(input: {
   profileName?: string;
 }): DoctorContext {
   const environmentValue = input.env.PAYWAY_ENV?.trim() || input.fileVars.PAYWAY_ENV?.trim() || 'sandbox';
-  const environment = environmentValue === 'production' ? 'production' : environmentValue === 'sandbox' ? 'sandbox' : 'custom';
+  const environment =
+    environmentValue === 'production' ? 'production' : environmentValue === 'sandbox' ? 'sandbox' : 'custom';
   const endpoint =
     input.env.PAYWAY_BASE_URL?.trim() ||
     input.fileVars.PAYWAY_BASE_URL?.trim() ||
@@ -216,7 +223,9 @@ function resolveDoctorContext(input: {
         ? BASE_URLS.production
         : BASE_URLS.sandbox);
   const environmentHasCredentials = Boolean(input.env.PAYWAY_MERCHANT_ID?.trim() && input.env.PAYWAY_API_KEY?.trim());
-  const fileHasCredentials = Boolean(input.fileVars.PAYWAY_MERCHANT_ID?.trim() && input.fileVars.PAYWAY_API_KEY?.trim());
+  const fileHasCredentials = Boolean(
+    input.fileVars.PAYWAY_MERCHANT_ID?.trim() && input.fileVars.PAYWAY_API_KEY?.trim(),
+  );
   const credentialSource = input.profileName
     ? 'profile'
     : environmentHasCredentials

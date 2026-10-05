@@ -36,7 +36,14 @@ describe('error-code registry (docs/error-codes.json)', () => {
 
   it('marks live-verified codes with SANDBOX-FINDINGS evidence', () => {
     const registry = JSON.parse(readFileSync(registryPath, 'utf8')) as {
-      codes: { code: string; family: string; title: string; hint: string; sandboxVerified?: boolean; evidence?: string }[];
+      codes: {
+        code: string;
+        family: string;
+        title: string;
+        hint: string;
+        sandboxVerified?: boolean;
+        evidence?: string;
+      }[];
     };
     const verified = registry.codes.filter((c) => c.sandboxVerified);
     expect(verified.length).toBeGreaterThanOrEqual(20);
@@ -50,9 +57,35 @@ describe('purchase payment-credential endpoint error table (ABA, 2026-10-01)', (
   // Every code the endpoint table lists must resolve through the explain maps
   // (raw file: docs/internal/PAYMENT-CREDENTIAL-ERROR-TABLE-2026-10.md).
   const TABLE_CODES = [
-    '00', '01', '04', '3', '6', '08', '11', '12', '22', '25', '26', '32', '35', '36',
-    '37', '38', '39', '40', '41', '44', '46', '71', '77', '80', '83', '102', '105',
-    'CDA45', '503',
+    '00',
+    '01',
+    '04',
+    '3',
+    '6',
+    '08',
+    '11',
+    '12',
+    '22',
+    '25',
+    '26',
+    '32',
+    '35',
+    '36',
+    '37',
+    '38',
+    '39',
+    '40',
+    '41',
+    '44',
+    '46',
+    '71',
+    '77',
+    '80',
+    '83',
+    '102',
+    '105',
+    'CDA45',
+    '503',
   ];
 
   it('resolves every code from the endpoint table', () => {

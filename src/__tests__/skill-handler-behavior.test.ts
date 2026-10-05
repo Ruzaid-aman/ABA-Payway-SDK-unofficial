@@ -68,9 +68,7 @@ function compileHandler(orders: OrdersCollaborator, seen?: Set<string>) {
 
 const ordersFor = (amount: number, currency: string): OrdersCollaborator => ({
   findByCustomerRef: (ref) =>
-    ref === 'cust-001'
-      ? { expectsExactly: (a: number, c: string) => a === amount && c === currency }
-      : null,
+    ref === 'cust-001' ? { expectsExactly: (a: number, c: string) => a === amount && c === currency } : null,
 });
 
 /** Build the supported-fixture body with defaults (approved, 10 USD, cust-001). */
@@ -91,7 +89,9 @@ describe('aba-payway-customer-qr guide handler (R2: real guide code + supported 
     await handler(fixtureRequest(body()), res);
     expect(res.sentStatus).toBe(200);
     expect(harness.jobsQueued).toBe(1);
-    expect(harness.claims).toEqual([{ tranId: 'tran-approved-1', merchantRef: 'cust-001', amount: 10, currency: 'USD' }]);
+    expect(harness.claims).toEqual([
+      { tranId: 'tran-approved-1', merchantRef: 'cust-001', amount: 10, currency: 'USD' },
+    ]);
   });
 
   it('acknowledges but never queues a PENDING callback', async () => {
@@ -160,7 +160,12 @@ describe('aba-payway-customer-qr guide handler (R2: real guide code + supported 
       res,
     );
     expect(harness.jobsQueued).toBe(1);
-    expect(harness.claims[0]).toEqual({ tranId: 'tran-xrate-1', merchantRef: 'cust-001', amount: 4000, currency: 'KHR' });
+    expect(harness.claims[0]).toEqual({
+      tranId: 'tran-xrate-1',
+      merchantRef: 'cust-001',
+      amount: 4000,
+      currency: 'KHR',
+    });
   });
 
   it('rejects an invalid signature with 400 before any fulfillment (authenticity first)', async () => {

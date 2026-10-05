@@ -216,7 +216,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: 'function',
       function: {
         name: 'query_journal',
-        description: 'Query the local transaction journal (no network): the chronological timeline of one transaction, aggregate stats (latency/retries/errors/funnel), reconcile creations vs webhook callbacks, or detect anomalies. Only knows what was journaled while recording was on.',
+        description:
+          'Query the local transaction journal (no network): the chronological timeline of one transaction, aggregate stats (latency/retries/errors/funnel), reconcile creations vs webhook callbacks, or detect anomalies. Only knows what was journaled while recording was on.',
         parameters: {
           type: 'object',
           additionalProperties: false,
@@ -224,7 +225,11 @@ function buildToolDefinitions(): ToolDefinition[] {
             query: str('One of: timeline | stats | reconcile | anomalies.'),
             transactionId: opt(str('Required for timeline: the transaction id to reconstruct.')),
             kind: opt(str('Optional event-kind filter, e.g. execution.error.')),
-            last: opt({ type: 'integer', minimum: 1, description: 'Optional cap on returned timeline events (default 100).' }),
+            last: opt({
+              type: 'integer',
+              minimum: 1,
+              description: 'Optional cap on returned timeline events (default 100).',
+            }),
             rationale: opt(str('Why this action is being proposed.')),
           },
           required: ['query'],
@@ -235,14 +240,19 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: 'function',
       function: {
         name: 'query_knowledge',
-        description: 'Search or read the built-in PayWay knowledge base offline (no network): integration guides, gateway error-code hints, and sandbox-verified lessons for web checkout, QR, callbacks/webhooks, payment links, COF, pre-auth, payouts, and deployment. Prefer this over guessing gateway behavior.',
+        description:
+          'Search or read the built-in PayWay knowledge base offline (no network): integration guides, gateway error-code hints, and sandbox-verified lessons for web checkout, QR, callbacks/webhooks, payment links, COF, pre-auth, payouts, and deployment. Prefer this over guessing gateway behavior.',
         parameters: {
           type: 'object',
           additionalProperties: false,
           properties: {
             query: str('One of: search | read.'),
             pattern: opt(str('For search: space-separated keywords — every keyword must appear on the hit line.')),
-            topic: opt(str('For read: a topic slug, e.g. quickstart, web-implementation, callbacks-webhooks, errors-and-debugging, payment-link, sdk-cli-reference.')),
+            topic: opt(
+              str(
+                'For read: a topic slug, e.g. quickstart, web-implementation, callbacks-webhooks, errors-and-debugging, payment-link, sdk-cli-reference.',
+              ),
+            ),
             rationale: opt(str('Why this action is being proposed.')),
           },
           required: ['query'],
@@ -253,7 +263,8 @@ function buildToolDefinitions(): ToolDefinition[] {
       type: 'function',
       function: {
         name: 'get_payment_link_details',
-        description: 'Get the status and details of a payment link by its opaque Link ID (data.id from create — not the merchant ref, not the URL slug).',
+        description:
+          'Get the status and details of a payment link by its opaque Link ID (data.id from create — not the merchant ref, not the URL slug).',
         parameters: {
           type: 'object',
           additionalProperties: false,
@@ -370,9 +381,7 @@ function describeTool(tool: ToolDefinition): string {
 }
 
 function buildToolCatalog(): string {
-  return buildToolDefinitions()
-    .map(describeTool)
-    .join('\n');
+  return buildToolDefinitions().map(describeTool).join('\n');
 }
 
 /**
@@ -412,11 +421,11 @@ export function buildStrictJsonSystemPrompt(): string {
     '- `request` must be a non-empty string.',
     '- `actions` must be an array of one or more action objects.',
     "- Each action's `tool` value must be copied VERBATIM from the TOOL CATALOG above.",
-    '- Each action must include every parameter listed under that tool\'s `required:` line.',
+    "- Each action must include every parameter listed under that tool's `required:` line.",
     '- Do not invent parameters that are not part of the chosen tool.',
     '- Use `null` for any `transactionId` that is not yet known (a draft plan).',
     '- `callbackUrl`, `returnUrl`, and `cancelUrl` must be https:// URLs.',
-    '- Local artifact tools (`save_artifact`, `open_artifact`, `copy_to_clipboard`) operate on artifacts that ALREADY exist in this session. NEVER chain them after a create action in the same plan to persist that action\'s future output.',
+    "- Local artifact tools (`save_artifact`, `open_artifact`, `copy_to_clipboard`) operate on artifacts that ALREADY exist in this session. NEVER chain them after a create action in the same plan to persist that action's future output.",
     '- Output must be parseable by a strict JSON parser: a single object, no fences, no prose, no trailing content.',
   ].join('\n');
 }

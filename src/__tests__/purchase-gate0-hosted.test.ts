@@ -76,7 +76,9 @@ describe('purchase() gate-0 hosted HTML success (W2-2)', () => {
   });
 
   it('keeps parsing JSON purchases as before (no gate)', async () => {
-    fetchSpy.mockResolvedValue(mockJsonResponse({ status: { code: '00' }, qrString: '000201', abapay_deeplink: 'aba://x' }));
+    fetchSpy.mockResolvedValue(
+      mockJsonResponse({ status: { code: '00' }, qrString: '000201', abapay_deeplink: 'aba://x' }),
+    );
 
     const result = await payway.checkout.purchase({ ...BASE_PARAMS });
 

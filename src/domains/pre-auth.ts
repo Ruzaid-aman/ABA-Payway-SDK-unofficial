@@ -76,7 +76,12 @@ export function createPreAuthDomain(
   ) => Promise<TResponse>,
 ): PreAuthDomain {
   return {
-    complete: (transactionId: string, amount: number, opts: PreAuthCompleteOptions = {}, callOptions?: RequestCallOptions) => {
+    complete: (
+      transactionId: string,
+      amount: number,
+      opts: PreAuthCompleteOptions = {},
+      callOptions?: RequestCallOptions,
+    ) => {
       // Validate inputs
       validateTransactionId(transactionId);
       validatePositiveAmount(amount, 'USD');
@@ -145,15 +150,11 @@ export function createPreAuthDomain(
       if (opts.idempotencyKey) body.idempotency_key = opts.idempotencyKey;
       if (opts.reason) body.reason = opts.reason;
 
-      return requestWithMerchantAuth<components['schemas']['CancelPreAuthResponse']>(
-        ENDPOINTS.cancelPreAuth,
-        body,
-        {
-          hmacFields: ['merchant_id', 'merchant_auth', 'request_time'],
-          contentType: 'application/json',
-          callOptions,
-        },
-      );
+      return requestWithMerchantAuth<components['schemas']['CancelPreAuthResponse']>(ENDPOINTS.cancelPreAuth, body, {
+        hmacFields: ['merchant_id', 'merchant_auth', 'request_time'],
+        contentType: 'application/json',
+        callOptions,
+      });
     },
   };
 }

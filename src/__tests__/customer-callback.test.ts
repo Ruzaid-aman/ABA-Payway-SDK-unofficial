@@ -8,11 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  classifyCallback,
-  parseCustomerQrCallback,
-  type CallbackKind,
-} from '../webhook/customer-callback.js';
+import { classifyCallback, parseCustomerQrCallback, type CallbackKind } from '../webhook/customer-callback.js';
 
 const REAL_CUSTOMER_QR_CALLBACK = {
   payment_status_code: 0,
@@ -132,7 +128,11 @@ describe('classifyCallback', () => {
     ['real customer-module callback', REAL_CUSTOMER_QR_CALLBACK, 'customer-module-qr'],
     ['real mc-ref row (has transaction_id + merchant_ref, no customer)', REAL_MC_REF_ROW, 'khqr-offline'],
     ['online checkout callback', { tran_id: 't1', status: 'APPROVED', apv: '123' }, 'online-checkout'],
-    ['payment-link pushback trio', { tran_id: '178865526240157', status: 0, merchant_ref_no: 'plvr-v1' }, 'payment-link-pushback'],
+    [
+      'payment-link pushback trio',
+      { tran_id: '178865526240157', status: 0, merchant_ref_no: 'plvr-v1' },
+      'payment-link-pushback',
+    ],
     ['empty object', {}, 'unknown'],
     ['non-object', 'nope', 'unknown'],
     ['null', null, 'unknown'],
@@ -181,9 +181,7 @@ describe('classifyCallback', () => {
   });
 
   it('an online-checkout body that also carries a customer KEY (not object shape + transaction_id) stays online', () => {
-    expect(
-      classifyCallback({ tran_id: 't1', status: 'APPROVED', customer: 'not-an-object' }),
-    ).toBe('online-checkout');
+    expect(classifyCallback({ tran_id: 't1', status: 'APPROVED', customer: 'not-an-object' })).toBe('online-checkout');
   });
 
   it('a body with customer object but NO transaction_id is not customer-module (falls through, conservative)', () => {

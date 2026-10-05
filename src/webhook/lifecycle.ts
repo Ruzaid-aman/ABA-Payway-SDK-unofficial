@@ -25,7 +25,9 @@ export interface WebhookLifecycleState {
   startedAt: string;
 }
 
-export function createLifecycleState(input: Omit<WebhookLifecycleState, 'version' | 'instanceId' | 'controlToken' | 'startedAt'> & { startedAt?: string }): WebhookLifecycleState {
+export function createLifecycleState(
+  input: Omit<WebhookLifecycleState, 'version' | 'instanceId' | 'controlToken' | 'startedAt'> & { startedAt?: string },
+): WebhookLifecycleState {
   return {
     version: 2,
     instanceId: randomUUID(),
@@ -51,18 +53,24 @@ export function readLifecycleState(env?: NodeJS.ProcessEnv): WebhookLifecycleSta
   try {
     const parsed = JSON.parse(readFileSync(file, 'utf8')) as WebhookLifecycleState;
     if (
-      parsed.version !== 2
-      || !Number.isInteger(parsed.pid)
-      || !Number.isInteger(parsed.port)
-      || typeof parsed.instanceId !== 'string'
-      || typeof parsed.controlToken !== 'string'
+      parsed.version !== 2 ||
+      !Number.isInteger(parsed.pid) ||
+      !Number.isInteger(parsed.port) ||
+      typeof parsed.instanceId !== 'string' ||
+      typeof parsed.controlToken !== 'string'
     ) {
       return null;
     }
     return parsed;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function clearLifecycleState(env?: NodeJS.ProcessEnv): void {
-  try { unlinkSync(lifecyclePath(env)); } catch { /* already absent */ }
+  try {
+    unlinkSync(lifecyclePath(env));
+  } catch {
+    /* already absent */
+  }
 }

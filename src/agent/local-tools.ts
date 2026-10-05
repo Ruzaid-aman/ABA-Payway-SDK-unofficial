@@ -46,12 +46,8 @@ function openCommandFor(target: string): AllowedCommand {
 }
 
 function activeArtifactPath(reference: string, session: AgentSessionV1): string {
-  const artifacts = session.events
-    .filter((event) => event.type === 'artifact')
-    .map((event) => event.data);
-  const selected = artifacts.find(
-    (artifact) => artifact.artifactId === reference || artifact.path === reference,
-  );
+  const artifacts = session.events.filter((event) => event.type === 'artifact').map((event) => event.data);
+  const selected = artifacts.find((artifact) => artifact.artifactId === reference || artifact.path === reference);
   if (!selected || typeof selected.path !== 'string') {
     throw new Error('openArtifact local reference does not belong to the active session');
   }
@@ -76,7 +72,9 @@ export function validateOpenArtifactReference(reference: string, session: AgentS
 
   // Windows drive paths are absolute file paths, not URI schemes.
   if (!path.isAbsolute(reference) && SCHEME_PATTERN.test(reference)) {
-    throw new Error(`openArtifact only allows public https URLs or active-session artifacts; rejected scheme in "${reference}"`);
+    throw new Error(
+      `openArtifact only allows public https URLs or active-session artifacts; rejected scheme in "${reference}"`,
+    );
   }
 
   const trackedPath = activeArtifactPath(reference, session);

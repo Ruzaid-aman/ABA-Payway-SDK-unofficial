@@ -426,7 +426,7 @@ export interface CofPaymentParams {
 /**
  * Renew an expired (or expiring) ACCOUNT token. Live-documented hash:
  * `ctid.request_time.pwt.merchant_id.request_id` (sandbox-verified 2026-08-31,
-   * sandbox verification dated 2026-08-31).
+ * sandbox verification dated 2026-08-31).
  */
 export interface RenewTokenParams {
   requestId: string;
@@ -438,7 +438,7 @@ export interface RenewTokenParams {
 /**
  * Retrieve stored-token details. Live-documented request carries ONLY
  * request_time/merchant_id/request_id — no ctid, no pwt (sandbox-verified
-   * 2026-08-31).
+ * 2026-08-31).
  */
 export interface GetTokenDetailsParams {
   requestId: string;
@@ -448,7 +448,7 @@ export interface GetTokenDetailsParams {
 /**
  * Remove a linked account or card token (irreversible). Live-documented
  * request: request_time/merchant_id/ctid/pwt — no request_id
-   * (sandbox-verified 2026-08-31).
+ * (sandbox-verified 2026-08-31).
  */
 export interface RemoveTokenParams {
   ctid: string;
@@ -460,7 +460,7 @@ export interface RemoveTokenParams {
  * @deprecated Legacy shared shape for the v3 token trio. The endpoints now
  * take per-endpoint params ({@link RenewTokenParams},
  * {@link GetTokenDetailsParams}, {@link RemoveTokenParams}) — the old shared
-   * composition was wrong in the 2026-08-31 sandbox verification.
+ * composition was wrong in the 2026-08-31 sandbox verification.
  */
 export type TokenParams = RenewTokenParams;
 
@@ -706,7 +706,8 @@ const SIGNATURE_ERROR_CODES = new Set(['1', '01']);
 /** Advisory hints appended to business errors for codes observed live (§16). */
 const CODE_HINTS: Record<string, string> = {
   '98': 'Merchant ID not found — verify the merchant credential (env/profile) for the target environment.',
-  '104': 'Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX; charging: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX). For purchase-path subscriptions (CITR_FIX) it means the merchant profile is NOT enabled for subscription/token registration; ask ABA to enable it.',
+  '104':
+    'Token flag/ctid rejected — check that the account token exists and the token_flag matches the operation (linking: CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX; charging: CITU_FLEX|MITU_FLEX|MITU_FIX|MITR_FLEX|MITR_FIX). For purchase-path subscriptions (CITR_FIX) it means the merchant profile is NOT enabled for subscription/token registration; ask ABA to enable it.',
   '105': 'Account token invalid or expired — re-link via linkAccount/linkCard, or renew via renewToken.',
   '09': 'Token not found — the ctid/request_id does not reference a known account token.',
 };
@@ -758,9 +759,7 @@ function classifyBusinessCode(
 
   const fieldErrors =
     errorsMap && typeof errorsMap === 'object' && !Array.isArray(errorsMap)
-      ? Object.fromEntries(
-          Object.entries(errorsMap as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
-        )
+      ? Object.fromEntries(Object.entries(errorsMap as Record<string, unknown>).map(([k, v]) => [k, String(v)]))
       : undefined;
 
   const advisoryHint = CODE_HINTS[code] ? ` Hint: ${CODE_HINTS[code]}` : '';
@@ -968,9 +967,8 @@ function createHttpError(
       // nesting it under status, e.g. the legacy transaction-list 403 shape
       // {"code": "49", "message": "Invalid Start Date"}.
       const flatCode = body.code;
-      const flatTrimmed = flatCode === undefined || flatCode === null || typeof flatCode === 'object'
-        ? ''
-        : String(flatCode).trim();
+      const flatTrimmed =
+        flatCode === undefined || flatCode === null || typeof flatCode === 'object' ? '' : String(flatCode).trim();
       const flatIsNonZero = flatTrimmed !== '0' && flatTrimmed !== '00' && flatTrimmed !== '';
       if (flatIsNonZero) {
         extractedCode = flatTrimmed;
@@ -991,7 +989,7 @@ function createHttpError(
       response.status,
       typeof rawBody === 'object' && rawBody !== null
         ? ((rawBody as Record<string, unknown>).errors ??
-          ((rawBody as Record<string, unknown>).status as Record<string, unknown> | undefined)?.errors)
+            ((rawBody as Record<string, unknown>).status as Record<string, unknown> | undefined)?.errors)
         : undefined,
     );
     if (classified) {
@@ -1071,10 +1069,7 @@ export function findTlsCertificateFailure(error: unknown): { code?: string; mess
     const candidate = current as { code?: unknown; message?: unknown; cause?: unknown };
     const code = typeof candidate.code === 'string' ? candidate.code : undefined;
     const message = typeof candidate.message === 'string' ? candidate.message : '';
-    if (
-      (code !== undefined && TLS_CERT_ERROR_CODE.test(code)) ||
-      TLS_CERT_ERROR_MESSAGE.test(message)
-    ) {
+    if ((code !== undefined && TLS_CERT_ERROR_CODE.test(code)) || TLS_CERT_ERROR_MESSAGE.test(message)) {
       return { code, message: message || code || 'TLS certificate verification failed' };
     }
     current = candidate.cause;
@@ -1548,7 +1543,8 @@ export class PayWay {
     const baseUrlFromEnv = parseHttpBaseUrl(namedEnvironment);
     const timeoutFromEnv = Number.parseInt(process.env.PAYWAY_TIMEOUT ?? '', 10);
     const debugFromEnv = process.env.DEBUG_PAYWAY === 'true' || process.env.DEBUG_PAYWAY === '1';
-    const strictFromEnv = process.env.PAYWAY_STRICT_VALIDATION === '1' || process.env.PAYWAY_STRICT_VALIDATION === 'true';
+    const strictFromEnv =
+      process.env.PAYWAY_STRICT_VALIDATION === '1' || process.env.PAYWAY_STRICT_VALIDATION === 'true';
     // DX-SEC-001: safe TLS verification via a locally-provided CA bundle —
     // replaces the NODE_TLS_REJECT_UNAUTHORIZED=0 workaround (P0-04).
     const tlsCaFileFromEnv = process.env.PAYWAY_TLS_CA_FILE?.trim();
@@ -1604,9 +1600,7 @@ export class PayWay {
       resolvedConfig.maxRetries !== undefined &&
       (!Number.isInteger(resolvedConfig.maxRetries) || resolvedConfig.maxRetries < 0)
     ) {
-      throw new PayWayConfigError(
-        `maxRetries must be a non-negative integer, received: ${resolvedConfig.maxRetries}`,
-      );
+      throw new PayWayConfigError(`maxRetries must be a non-negative integer, received: ${resolvedConfig.maxRetries}`);
     }
     if (
       resolvedConfig.retryDelayMs !== undefined &&
@@ -1687,9 +1681,7 @@ export class PayWay {
     const rule = this.rateLimitRules[endpoint];
     if (!rule) return;
     const now = Date.now();
-    const list = (this.recentCallsByEndpoint.get(endpoint) ?? []).filter(
-      (ts) => now - ts < rule.intervalMs,
-    );
+    const list = (this.recentCallsByEndpoint.get(endpoint) ?? []).filter((ts) => now - ts < rule.intervalMs);
     list.push(now);
     this.recentCallsByEndpoint.set(endpoint, list);
   }
@@ -1699,9 +1691,7 @@ export class PayWay {
     const rule = this.rateLimitRules[endpoint];
     if (!rule) return undefined;
     const now = Date.now();
-    const list = (this.recentCallsByEndpoint.get(endpoint) ?? []).filter(
-      (ts) => now - ts < rule.intervalMs,
-    );
+    const list = (this.recentCallsByEndpoint.get(endpoint) ?? []).filter((ts) => now - ts < rule.intervalMs);
     if (list.length < rule.limit) return undefined;
     return Math.max(0, rule.intervalMs - (now - list[0]));
   }
@@ -2201,7 +2191,13 @@ export class PayWay {
       bodyPayload = form.toString();
     }
 
-    return this._executeFetch<TResponse>(path, { 'Content-Type': contentType }, bodyPayload, undefined, options.callOptions);
+    return this._executeFetch<TResponse>(
+      path,
+      { 'Content-Type': contentType },
+      bodyPayload,
+      undefined,
+      options.callOptions,
+    );
   }
 
   /**
@@ -2236,7 +2232,9 @@ export class PayWay {
   ): Promise<TResponse> {
     const { partnerId, partnerApiKey, publicKeyPem } = this.config;
     if (!partnerId) {
-      throw new PayWayConfigError('partnerId is required for online-self-activation endpoints (set partnerId or PAYWAY_PARTNER_ID)');
+      throw new PayWayConfigError(
+        'partnerId is required for online-self-activation endpoints (set partnerId or PAYWAY_PARTNER_ID)',
+      );
     }
     if (!partnerApiKey && !this.config.apiKey) {
       throw new PayWayConfigError(
@@ -2244,10 +2242,14 @@ export class PayWay {
       );
     }
     if (!publicKeyPem) {
-      throw new PayWayConfigError('publicKeyPem is required to RSA-encrypt request_data for online-self-activation endpoints');
+      throw new PayWayConfigError(
+        'publicKeyPem is required to RSA-encrypt request_data for online-self-activation endpoints',
+      );
     }
     if (!isValidPublicKeyPem(publicKeyPem)) {
-      throw new PayWayConfigError('publicKeyPem does not look like a public key PEM (expected "-----BEGIN PUBLIC KEY-----")');
+      throw new PayWayConfigError(
+        'publicKeyPem does not look like a public key PEM (expected "-----BEGIN PUBLIC KEY-----")',
+      );
     }
 
     const requestTime = options.requestTime ?? formatRequestTime();
@@ -2283,11 +2285,7 @@ export class PayWay {
    * @param signature - The signature/hash received from the PayWay callback headers/body.
    * @returns True if the signature is valid and authentic, false otherwise.
    */
-  public verifyCallback(
-    body: Record<string, unknown>,
-    signature: string,
-    options?: { stripHash?: boolean },
-  ): boolean {
+  public verifyCallback(body: Record<string, unknown>, signature: string, options?: { stripHash?: boolean }): boolean {
     return verifyCallbackSignature(body, signature, this.config.apiKey, options);
   }
 

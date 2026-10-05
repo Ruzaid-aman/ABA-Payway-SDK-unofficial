@@ -17,10 +17,7 @@ export const PAYWAY_DATA_DIR_ENV = 'PAYWAY_DATA_DIR';
 
 const WEBHOOK_DIR_NAME = 'webhook_data';
 
-export function resolvePaywayDataRoot(
-  appDataDirectory?: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string {
+export function resolvePaywayDataRoot(appDataDirectory?: string, env: NodeJS.ProcessEnv = process.env): string {
   const explicit = env[PAYWAY_DATA_DIR_ENV]?.trim();
   if (explicit) return explicit;
   const base = appDataDirectory ?? env.APPDATA ?? path.join(homedir(), '.config');

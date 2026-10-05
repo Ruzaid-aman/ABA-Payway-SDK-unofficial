@@ -29,7 +29,10 @@ describe('classifyReplLine — new directives', () => {
 describe('agent REPL polish (runRepl seam)', () => {
   function makeProgram(): Command {
     const program = new Command();
-    program.command('journal').description('journal reads').action(() => {});
+    program
+      .command('journal')
+      .description('journal reads')
+      .action(() => {});
     return program;
   }
 

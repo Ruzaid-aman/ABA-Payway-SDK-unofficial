@@ -388,11 +388,26 @@ describe('checkout-payload.cjs (signed checkout payload + HTML form)', () => {
   it('rejects subscription shapes that violate the SDK trio rules', () => {
     // tokenFlag without ctid:
     expect(() =>
-      checkout.buildCheckoutPayload({ tranId: 'ok', amount: 5, merchantId: 'm', apiKey: 'k', tokenFlag: 'CITR_FIX', frequency: '1M' }),
+      checkout.buildCheckoutPayload({
+        tranId: 'ok',
+        amount: 5,
+        merchantId: 'm',
+        apiKey: 'k',
+        tokenFlag: 'CITR_FIX',
+        frequency: '1M',
+      }),
     ).toThrow(/ctid is required/);
     // non-CITR_FIX flag on the purchase path:
     expect(() =>
-      checkout.buildCheckoutPayload({ tranId: 'ok', amount: 5, merchantId: 'm', apiKey: 'k', ctid: 'c123', tokenFlag: 'CITI_FLEX', frequency: '1M' }),
+      checkout.buildCheckoutPayload({
+        tranId: 'ok',
+        amount: 5,
+        merchantId: 'm',
+        apiKey: 'k',
+        ctid: 'c123',
+        tokenFlag: 'CITI_FLEX',
+        frequency: '1M',
+      }),
     ).toThrow(/CITR_FIX/);
     // frequency without tokenFlag:
     expect(() =>

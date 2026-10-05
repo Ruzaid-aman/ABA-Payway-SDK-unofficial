@@ -6,12 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runCli } from '../cli.js';
 import { runDoctor } from '../cli/commands/doctor.js';
 import { createJournalEmitter, resolveJournalConfig } from '../journal/writer.js';
-import {
-  confirmExecution,
-  createExecutionRecord,
-  markSubmitted,
-  markSucceeded,
-} from '../agent/ledger.js';
+import { confirmExecution, createExecutionRecord, markSubmitted, markSucceeded } from '../agent/ledger.js';
 import { getAgentDataPaths } from '../agent/storage.js';
 import { JOURNAL_VERSION, type JournalEventV1 } from '../journal/types.js';
 import { captureConsole } from '../test/test-utils.js';
@@ -93,24 +88,18 @@ describe('I-3: duplicate transaction-id advisory', () => {
     vi.stubEnv('PAYWAY_JOURNAL', '1');
     vi.stubEnv('PAYWAY_JOURNAL_DIR', dir);
     writeJournal([
-      ev({ kind: 'execution.request', transactionId: 'DUP-ID', endpoint: '/api/payment-gateway/v1/payments/generate-qr' }),
+      ev({
+        kind: 'execution.request',
+        transactionId: 'DUP-ID',
+        endpoint: '/api/payment-gateway/v1/payments/generate-qr',
+      }),
     ]);
 
     const captured = captureConsole();
     try {
       // Validation-free command path that passes through the advisory:
       // checkout-form generates an id then warns (create-flavored but local).
-      await runCli([
-        'generate-qr',
-        '-a',
-        '5.00',
-        '-t',
-        'DUP-ID',
-        '--offline',
-        '--ref',
-        'mref-1',
-        '-y',
-      ]);
+      await runCli(['generate-qr', '-a', '5.00', '-t', 'DUP-ID', '--offline', '--ref', 'mref-1', '-y']);
     } finally {
       captured.restore();
     }
@@ -180,7 +169,11 @@ describe('I-4: doctor journal row', () => {
 describe('I-6: timeline --with-webhooks joins raw captures', () => {
   it('enriches callback steps with verdict/matched status/replay', async () => {
     writeJournal([
-      ev({ kind: 'execution.request', transactionId: 'T-WH', endpoint: '/api/payment-gateway/v1/payments/generate-qr' }),
+      ev({
+        kind: 'execution.request',
+        transactionId: 'T-WH',
+        endpoint: '/api/payment-gateway/v1/payments/generate-qr',
+      }),
       ev({ kind: 'callback.received', correlationId: 'wh_rec1', transactionId: 'T-WH', status: 'APPROVED' }),
     ]);
     const webhookDir = path.join(dir, 'webhook_data');
@@ -222,11 +215,23 @@ describe('I-6: timeline --with-webhooks joins raw captures', () => {
 describe('I-13: agent ledger prune', () => {
   it('removes only FINISHED records older than the cutoff; keeps unfinished and unparseable', async () => {
     // Seed ledger records through the real API (APPDATA is stubbed).
-    const oldFinished = createExecutionRecord({ sessionId: 's1', tool: 'create_payment_link', transactionId: 'tx-old-1' });
+    const oldFinished = createExecutionRecord({
+      sessionId: 's1',
+      tool: 'create_payment_link',
+      transactionId: 'tx-old-1',
+    });
     markSucceeded(markSubmitted(confirmExecution(oldFinished.executionId).executionId).executionId);
-    const keptFinished = createExecutionRecord({ sessionId: 's1', tool: 'create_payment_link', transactionId: 'tx-new-1' });
+    const keptFinished = createExecutionRecord({
+      sessionId: 's1',
+      tool: 'create_payment_link',
+      transactionId: 'tx-new-1',
+    });
     markSucceeded(markSubmitted(confirmExecution(keptFinished.executionId).executionId).executionId);
-    const unfinished = createExecutionRecord({ sessionId: 's1', tool: 'create_payment_link', transactionId: 'tx-unc-1' });
+    const unfinished = createExecutionRecord({
+      sessionId: 's1',
+      tool: 'create_payment_link',
+      transactionId: 'tx-unc-1',
+    });
     void unfinished;
     confirmExecution(unfinished.executionId);
 
@@ -300,9 +305,17 @@ describe('I-12: REPL recovery banner', () => {
 
   it('surfaces unfinished creates from the most recent prior session', async () => {
     seedSession('sess_prior_1');
-    const first = createExecutionRecord({ sessionId: 'sess_prior_1', tool: 'create_payment_link', transactionId: 'tx-banner-1' });
+    const first = createExecutionRecord({
+      sessionId: 'sess_prior_1',
+      tool: 'create_payment_link',
+      transactionId: 'tx-banner-1',
+    });
     confirmExecution(first.executionId);
-    const second = createExecutionRecord({ sessionId: 'sess_prior_1', tool: 'create_payment_link', transactionId: 'tx-banner-1' });
+    const second = createExecutionRecord({
+      sessionId: 'sess_prior_1',
+      tool: 'create_payment_link',
+      transactionId: 'tx-banner-1',
+    });
     void second;
 
     const captured = await runReplCaptured();

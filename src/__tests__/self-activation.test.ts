@@ -104,7 +104,11 @@ describe('selfActivation.registerMerchant (new-merchant)', () => {
     const domain = createSelfActivationDomain(PARTNER_CONFIG, spy);
     expect(() => domain.registerMerchant({ ...BASE_PARAMS, type: 1 })).toThrow(PayWayConfigError);
     expect(() =>
-      domain.registerMerchant({ ...BASE_PARAMS, type: 1, redirectUrl: { ios_scheme: 'app://', android_scheme: 'app://' } }),
+      domain.registerMerchant({
+        ...BASE_PARAMS,
+        type: 1,
+        redirectUrl: { ios_scheme: 'app://', android_scheme: 'app://' },
+      }),
     ).not.toThrow();
   });
 
@@ -155,9 +159,11 @@ describe('selfActivation.getMerchantInfo (get-mc-info)', () => {
 
 describe('partner-auth wire shape (client level)', () => {
   it('sends JSON with partner_id + RSA request_data, no merchant_id, hash over the trio', async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(
-      mockJsonResponse({ status: { code: '00', message: 'Success.' }, url: 'https://onboard', token: 'tok' }),
-    );
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(
+        mockJsonResponse({ status: { code: '00', message: 'Success.' }, url: 'https://onboard', token: 'tok' }),
+      );
     vi.stubGlobal('fetch', fetchSpy);
     const payway = new PayWay(PARTNER_CONFIG);
     const result = await payway.selfActivation.registerMerchant(BASE_PARAMS);
@@ -213,9 +219,7 @@ describe('partner-auth wire shape (client level)', () => {
   });
 
   it('falls back to apiKey when partnerApiKey is unset and throws without partnerId', async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(
-      mockJsonResponse({ status: { code: '00', message: 'Success.' } }),
-    );
+    const fetchSpy = vi.fn().mockResolvedValue(mockJsonResponse({ status: { code: '00', message: 'Success.' } }));
     vi.stubGlobal('fetch', fetchSpy);
     const payway = new PayWay({ ...PARTNER_CONFIG, partnerApiKey: undefined });
     await payway.selfActivation.getCredentialInfo({ registerRef: 'REG-0012' });

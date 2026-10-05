@@ -142,7 +142,8 @@ function sendHtml(res: ServerResponse): void {
     'content-type': 'text/html; charset=utf-8',
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
-    'content-security-policy': "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'",
+    'content-security-policy':
+      "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'",
   });
   res.end(DEMO_HTML);
 }
@@ -202,12 +203,14 @@ export async function startDemoApp(options: DemoAppOptions = {}): Promise<DemoAp
     try {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
       if (req.method === 'GET' && url.pathname === '/') return sendHtml(res);
-      if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { ok: true, mode: 'simulated' });
+      if (req.method === 'GET' && url.pathname === '/api/health')
+        return sendJson(res, 200, { ok: true, mode: 'simulated' });
 
       if (req.method === 'POST' && url.pathname === '/api/payments') {
         const body = await readJson(req);
         const amount = Number(body.amount);
-        if (!Number.isFinite(amount) || amount <= 0) return sendJson(res, 400, { error: 'Amount must be a positive number' });
+        if (!Number.isFinite(amount) || amount <= 0)
+          return sendJson(res, 400, { error: 'Amount must be a positive number' });
         if (body.currency !== 'USD') return sendJson(res, 400, { error: 'The demo supports USD only' });
 
         sequence += 1;
@@ -286,7 +289,13 @@ export async function checkDemoApp(): Promise<{ url: string; ok: true }> {
     const [health, page] = await Promise.all([fetch(`${app.url}/api/health`), fetch(app.url)]);
     const status = (await health.json()) as { ok?: boolean; mode?: string };
     const html = await page.text();
-    if (!health.ok || status.ok !== true || status.mode !== 'simulated' || !page.ok || !html.includes('SIMULATED DEMO')) {
+    if (
+      !health.ok ||
+      status.ok !== true ||
+      status.mode !== 'simulated' ||
+      !page.ok ||
+      !html.includes('SIMULATED DEMO')
+    ) {
       throw new Error('Demo self-check failed');
     }
     const createdResponse = await fetch(`${app.url}/api/payments`, {
@@ -294,8 +303,17 @@ export async function checkDemoApp(): Promise<{ url: string; ok: true }> {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ amount: 3, currency: 'USD' }),
     });
-    const created = (await createdResponse.json()) as { transactionId?: string; status?: string; qrImageDataUrl?: string };
-    if (!createdResponse.ok || !created.transactionId || created.status !== 'PENDING' || !created.qrImageDataUrl?.startsWith('data:image/png')) {
+    const created = (await createdResponse.json()) as {
+      transactionId?: string;
+      status?: string;
+      qrImageDataUrl?: string;
+    };
+    if (
+      !createdResponse.ok ||
+      !created.transactionId ||
+      created.status !== 'PENDING' ||
+      !created.qrImageDataUrl?.startsWith('data:image/png')
+    ) {
       throw new Error('Demo payment creation self-check failed');
     }
     const approvedResponse = await fetch(

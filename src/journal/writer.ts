@@ -112,7 +112,9 @@ export class JsonlJournalSink implements JournalSink {
       if (this.warned) return;
       this.warned = true;
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[payway] journal: failed to persist event (${message}) — further journal write failures are silent`);
+      console.warn(
+        `[payway] journal: failed to persist event (${message}) — further journal write failures are silent`,
+      );
     }
   }
 }

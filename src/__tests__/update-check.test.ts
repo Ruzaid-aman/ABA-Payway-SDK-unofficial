@@ -4,7 +4,10 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isNewerVersion, isTopLevelHelpArgv, maybeNoticeUpdate } from '../cli/update-check.js';
 
-function ttyStreams(): { streams: { stdout: { isTTY: boolean }; stderr: { write: (chunk: string) => unknown } }; stderrText: () => string } {
+function ttyStreams(): {
+  streams: { stdout: { isTTY: boolean }; stderr: { write: (chunk: string) => unknown } };
+  stderrText: () => string;
+} {
   const chunks: string[] = [];
   return {
     streams: { stdout: { isTTY: true }, stderr: { write: (chunk: string) => chunks.push(chunk) } },

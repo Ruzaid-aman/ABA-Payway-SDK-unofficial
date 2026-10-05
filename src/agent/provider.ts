@@ -194,9 +194,7 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
       return data;
     }
 
-    throw (
-      lastError ?? new ProviderProposalError('provider request failed after retries')
-    );
+    throw lastError ?? new ProviderProposalError('provider request failed after retries');
   }
 
   return {
@@ -230,10 +228,7 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
       } else {
         baseMessages.unshift({ role: 'system', content: buildStrictJsonSystemPrompt() });
         baseMessages.push({ role: 'user', content: request });
-        data = await postChatCompletions(
-          { model: config.model, messages: [...baseMessages], ...sampling },
-          apiKey,
-        );
+        data = await postChatCompletions({ model: config.model, messages: [...baseMessages], ...sampling }, apiKey);
       }
 
       const choice = data.choices?.[0];
@@ -298,10 +293,7 @@ export function createProviderAdapter(config: ProviderConfigV1, fetchImpl: typeo
               'no markdown fences, no prose.',
           },
         ];
-        data = await postChatCompletions(
-          { model: config.model, messages: repairMessages, ...sampling },
-          apiKey,
-        );
+        data = await postChatCompletions({ model: config.model, messages: repairMessages, ...sampling }, apiKey);
         const repairChoice = data.choices?.[0];
         outcome = parseStrictJson(repairChoice?.message?.content);
       }

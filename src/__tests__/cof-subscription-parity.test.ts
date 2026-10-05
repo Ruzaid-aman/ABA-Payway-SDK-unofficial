@@ -26,7 +26,13 @@ const TEST_CONFIG = {
 const STRICT_CONFIG = { ...TEST_CONFIG, strictValidation: true } as unknown as PayWayConfig;
 
 function makeCofDomain(config: PayWayConfig = TEST_CONFIG as unknown as PayWayConfig) {
-  const calls: Array<{ path: string; body: Record<string, unknown>; hmacFields: string[]; timeField?: string; contentType?: string }> = [];
+  const calls: Array<{
+    path: string;
+    body: Record<string, unknown>;
+    hmacFields: string[];
+    timeField?: string;
+    contentType?: string;
+  }> = [];
   const request = async <T>(
     path: string,
     body: Record<string, unknown>,

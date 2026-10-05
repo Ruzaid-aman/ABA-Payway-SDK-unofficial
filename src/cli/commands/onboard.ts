@@ -18,11 +18,7 @@ import { cancel, intro, note as clackNote, outro } from '@clack/prompts';
 import { REMEDIES } from '../../agent/onboarding/remedies.js';
 import { isInteractiveTerminal } from '../../agent/terminal.js';
 import { scanOnboardingState } from '../../agent/onboarding/scan.js';
-import {
-  runStage,
-  type OnboardingIO,
-  type StageContext,
-} from '../../agent/onboarding/stages.js';
+import { runStage, type OnboardingIO, type StageContext } from '../../agent/onboarding/stages.js';
 import { serializeCommandResult } from '../../agent/output.js';
 import { OnboardCancel, buildClackIO } from './onboard-clack-io.js';
 import {

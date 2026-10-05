@@ -16,11 +16,7 @@ describe('doctor RSA PEM shape check', () => {
   it('flags a truncated multi-line PEM with a targeted fix hint', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'payway-doctor-'));
     tempDirs.push(dir);
-    writeFileSync(
-      path.join(dir, '.env'),
-      ['PAYWAY_RSA_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----', ''].join('\n'),
-      'utf8',
-    );
+    writeFileSync(path.join(dir, '.env'), ['PAYWAY_RSA_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----', ''].join('\n'), 'utf8');
 
     const result = runDoctor({ cwd: dir });
     const check = result.checks.find((c) => c.id === 'env-rsa-pem');

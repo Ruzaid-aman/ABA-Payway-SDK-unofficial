@@ -28,12 +28,11 @@ export interface ScanSnapshot {
 export function scanOnboardingState(env: NodeJS.ProcessEnv = process.env): ScanSnapshot {
   const agentConfig = readAgentConfig();
   const store = loadProfileStore();
-  const profile =
-    store.defaultProfile
-      ? store.profiles.find((p) => p.name === store.defaultProfile) ?? null
-      : store.activeProfile
-        ? store.profiles.find((p) => p.name === store.activeProfile) ?? null
-        : null;
+  const profile = store.defaultProfile
+    ? (store.profiles.find((p) => p.name === store.defaultProfile) ?? null)
+    : store.activeProfile
+      ? (store.profiles.find((p) => p.name === store.activeProfile) ?? null)
+      : null;
 
   const context = resolvePayWayContext({ env });
 

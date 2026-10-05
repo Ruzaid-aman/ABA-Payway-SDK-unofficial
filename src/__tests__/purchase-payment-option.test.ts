@@ -70,7 +70,9 @@ describe('purchase payment_option official set (PUR-003)', () => {
   it.each(['cards', 'abapay_khqr', 'abapay_khqr_deeplink', 'alipay', 'wechat', 'google_pay'])(
     'stays silent on officially documented value %s',
     (paymentOption) => {
-      expect(() => checkoutPaymentOption(paymentOption, paymentOption === 'google_pay' ? { googlePayToken: 'tok' } : undefined)).not.toThrow();
+      expect(() =>
+        checkoutPaymentOption(paymentOption, paymentOption === 'google_pay' ? { googlePayToken: 'tok' } : undefined),
+      ).not.toThrow();
       expect(warnSpy).not.toHaveBeenCalled();
     },
   );

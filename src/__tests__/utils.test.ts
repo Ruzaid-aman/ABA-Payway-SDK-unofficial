@@ -435,8 +435,6 @@ describe('isValidPublicKeyPem', () => {
   });
 
   it('rejects private-key PEMs', () => {
-    expect(
-      isValidPublicKeyPem('-----BEGIN PRIVATE KEY-----\nMIIEvQ\n-----END PRIVATE KEY-----'),
-    ).toBe(false);
+    expect(isValidPublicKeyPem('-----BEGIN PRIVATE KEY-----\nMIIEvQ\n-----END PRIVATE KEY-----')).toBe(false);
   });
 });

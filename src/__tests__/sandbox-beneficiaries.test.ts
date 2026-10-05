@@ -68,7 +68,9 @@ describe('validateSandboxBeneficiary — sandbox enforcement', () => {
   });
 
   it('rejects an unknown account in sandbox', () => {
-    expect(() => validateSandboxBeneficiary('999999999', 'USD', { sandbox: true })).toThrow(/not a known sandbox beneficiary/);
+    expect(() => validateSandboxBeneficiary('999999999', 'USD', { sandbox: true })).toThrow(
+      /not a known sandbox beneficiary/,
+    );
   });
 
   it('rejects currency mismatch (USD account used for KHR)', () => {

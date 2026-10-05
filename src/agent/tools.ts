@@ -274,10 +274,7 @@ async function runCheckTransactionByMerchantRef(
   };
 }
 
-async function runGetPaymentLinkDetails(
-  action: MaterializedAgentAction,
-  client: PayWay,
-): Promise<ToolExecutionResult> {
+async function runGetPaymentLinkDetails(action: MaterializedAgentAction, client: PayWay): Promise<ToolExecutionResult> {
   const params = action as unknown as GetPaymentLinkDetailsParams;
   const response = await client.paymentLink.getDetails(params.paymentLinkId);
   const asRecord = response as Record<string, unknown>;

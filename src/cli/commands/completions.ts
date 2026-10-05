@@ -25,7 +25,10 @@ export function registerCompletionsCommand(program: Command): void {
         process.exitCode = 1;
         return;
       }
-      const script = generateCompletionScript(shell as (typeof COMPLETION_SHELLS)[number], collectCompletionTree(program));
+      const script = generateCompletionScript(
+        shell as (typeof COMPLETION_SHELLS)[number],
+        collectCompletionTree(program),
+      );
       process.stdout.write(`${script}\n`);
       console.error(`  ${INSTALL_HINTS[shell as (typeof COMPLETION_SHELLS)[number]]}.`);
     });

@@ -20,7 +20,12 @@ import readline from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 import { createWebhookServer, type WebhookServerResult } from '../../webhook/server.js';
 import { createStorage, type StorageType } from '../../webhook/storage-factory.js';
-import { createTunnelManager, findCloudflared, startTunnelWithRetry, type TunnelManager } from '../../webhook/tunnel.js';
+import {
+  createTunnelManager,
+  findCloudflared,
+  startTunnelWithRetry,
+  type TunnelManager,
+} from '../../webhook/tunnel.js';
 import { appendEnvVar } from './onboard-helpers.js';
 import { lazyPalette } from '../ui/theme.js';
 import {
@@ -163,7 +168,8 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     const rl = readline.createInterface({
       input: (deps.input ?? process.stdin) as never,
       output: (deps.output ?? process.stdout) as never,
-    });    try {
+    });
+    try {
       const hasUrl = await promptConfirmation(rl, `  Do you have a public URL to receive callbacks? (y/n): `);
       if (hasUrl) {
         publicUrl = await promptQuestion(rl, `  Enter your public URL: `);
@@ -260,7 +266,9 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
       const probe = await (deps.probeWebhook ?? probeWebhookUrl)(computeWebhookRouteUrls(publicUrl).customerQr);
       log(`  ${c.green('✓')} Public customer-KHQR route verified (capture ${probe.id})`);
     } catch (err) {
-      log(`\n  ${c.red('✗')} Public webhook readiness probe failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      log(
+        `\n  ${c.red('✗')} Public webhook readiness probe failed: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
       if (tunnel?.isRunning) await tunnel.stop().catch(() => undefined);
       await webhookServer.stop().catch(() => undefined);
       storage.close();
@@ -271,12 +279,14 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
 
   // ── Step 4: Compute webhook URL ──────────────────────────────────────
   const webhookUrl = computeWebhookUrl(publicUrl, port);
-  const routeUrls = publicUrl ? computeWebhookRouteUrls(publicUrl) : {
-    baseUrl: `http://localhost:${port}`,
-    online: webhookUrl,
-    customerQr: `http://localhost:${port}/aba-payway-khqr-webhook`,
-    pushback: `http://localhost:${port}/aba-payway-pushback`,
-  };
+  const routeUrls = publicUrl
+    ? computeWebhookRouteUrls(publicUrl)
+    : {
+        baseUrl: `http://localhost:${port}`,
+        online: webhookUrl,
+        customerQr: `http://localhost:${port}/aba-payway-khqr-webhook`,
+        pushback: `http://localhost:${port}/aba-payway-pushback`,
+      };
 
   // ── Step 5: Persist tunnel URL to .env as PAYWAY_CALLBACK_URL ──────
   let previousCallbackUrl: string | null = null; // Save original value to restore on shutdown
@@ -295,7 +305,9 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
     log(
       `  ${appended.action === 'kept' ? c.dim('PAYWAY_JOURNAL already set in .env') : `${c.green('✓')} Appended PAYWAY_JOURNAL=1 to .env`}`,
     );
-    log(`  ${c.dim('Callbacks will now emit callback.received journal events — journal reconcile works out of the box.')}`);
+    log(
+      `  ${c.dim('Callbacks will now emit callback.received journal events — journal reconcile works out of the box.')}`,
+    );
     log('');
   }
 
@@ -318,7 +330,9 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   log(`    ${c.cyan(webhookUrl)}`);
   log(`  ${c.dim('The same listener also serves:')}`);
   log(`    ${c.dim(`${routeUrls.customerQr} — offline KHQR and customer QR notifications`)}`);
-  log(`    ${c.dim(`${routeUrls.pushback} — payment-link pushbacks (use as the link's return_url; no hash — verify via check-transaction)`)}`);
+  log(
+    `    ${c.dim(`${routeUrls.pushback} — payment-link pushbacks (use as the link's return_url; no hash — verify via check-transaction)`)}`,
+  );
   if (opts.forwardTo) {
     log('');
     log(`  ${c.bold('Forwarding captured callbacks to:')}`);
@@ -384,5 +398,4 @@ export async function runSetupWebhook(opts: SetupWebhookOptions, deps: SetupWebh
   register('SIGTERM', () => {
     shutdown().catch(() => process.exit(1));
   });
-
 }

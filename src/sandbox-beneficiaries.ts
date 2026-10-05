@@ -104,9 +104,7 @@ export function validateSandboxBeneficiary(
   }
 
   if (!VALID_BENEFICIARY_LENGTHS.includes(normalized.length as (typeof VALID_BENEFICIARY_LENGTHS)[number])) {
-    throw new PayWayConfigError(
-      `beneficiary "${id}" must be 9, 11, or 15 digits (received ${normalized.length})`,
-    );
+    throw new PayWayConfigError(`beneficiary "${id}" must be 9, 11, or 15 digits (received ${normalized.length})`);
   }
 
   if (!opts.sandbox) {

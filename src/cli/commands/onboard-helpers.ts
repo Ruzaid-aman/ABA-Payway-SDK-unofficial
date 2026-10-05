@@ -85,12 +85,7 @@ export interface AppendEnvVarResult {
  * different existing value (the historical appendEnvVar behavior), making
  * the value visible in the passed env object too.
  */
-export function appendEnvVar(
-  envFile: string,
-  env: NodeJS.ProcessEnv,
-  key: string,
-  value: string,
-): AppendEnvVarResult {
+export function appendEnvVar(envFile: string, env: NodeJS.ProcessEnv, key: string, value: string): AppendEnvVarResult {
   const content = existsSync(envFile) ? readFileSync(envFile, 'utf8') : '';
   const lines = content.split(/\r?\n/);
   const idx = lines.findIndex((l) => l.startsWith(`${key}=`));

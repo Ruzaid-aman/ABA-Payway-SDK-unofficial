@@ -52,7 +52,12 @@ export function suggest<T extends string>(value: string, candidates: readonly T[
  * A ready-to-print hint line, or undefined when nothing is close enough.
  * Example: `Unknown currency 'US'. Did you mean 'USD'?`
  */
-export function suggestMessage(value: string, candidates: readonly string[], kind: string, maxDistance = 2): string | undefined {
+export function suggestMessage(
+  value: string,
+  candidates: readonly string[],
+  kind: string,
+  maxDistance = 2,
+): string | undefined {
   const match = suggest(value, candidates, maxDistance);
   if (!match) return undefined;
   return `Unknown ${kind} '${value}'. Did you mean '${match}'?`;

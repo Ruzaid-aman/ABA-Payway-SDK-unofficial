@@ -80,7 +80,11 @@ describe('runMcpExtra — journal_timeline', () => {
         })}\n`,
     );
     writeFileSync(path.join(journalDir, 'journal.jsonl'), lines.join(''), 'utf8');
-    const filtered = await runMcpExtra('journal_timeline', { transactionId: 'TRX-2', kind: 'execution.error' }, undefined as never);
+    const filtered = await runMcpExtra(
+      'journal_timeline',
+      { transactionId: 'TRX-2', kind: 'execution.error' },
+      undefined as never,
+    );
     expect((filtered.data as { events: unknown[] }).events).toHaveLength(1);
     const capped = await runMcpExtra('journal_timeline', { transactionId: 'TRX-2', last: 2 }, undefined as never);
     expect((capped.data as { events: unknown[] }).events).toHaveLength(2);

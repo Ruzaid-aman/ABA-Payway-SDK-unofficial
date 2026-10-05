@@ -360,7 +360,12 @@ export function startMockPaywayServer(port = 0): Promise<HttpServer> {
           }
           voidedPaymentLinks.add(firstId);
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ status: { code: '00', message: 'Success.', tran_id: `${Date.now()}`, lang: 'en', trace_id: 'mocktrace' }, tran_id: Date.now() }));
+          res.end(
+            JSON.stringify({
+              status: { code: '00', message: 'Success.', tran_id: `${Date.now()}`, lang: 'en', trace_id: 'mocktrace' },
+              tran_id: Date.now(),
+            }),
+          );
         });
         return;
       }

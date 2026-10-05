@@ -229,7 +229,11 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
     } else if (linkCardMode === 'json-400') {
       // §24 LC-3: a missing hash answers HTTP 400 04 + errors{} (JSON).
       send(400, {
-        status: { code: '04', message: 'The given data was invalid.', errors: { hash: ['The hash field is required.'] } },
+        status: {
+          code: '04',
+          message: 'The given data was invalid.',
+          errors: { hash: ['The hash field is required.'] },
+        },
       });
     } else {
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -277,7 +281,10 @@ function mockHandler(req: IncomingMessage, res: ServerResponse, body: string): v
     if (voidCallCount > 1) {
       send(403, { status: { code: 'PTL188', message: 'The payment link is already voided.' } });
     } else {
-      send(200, { status: { code: '00', message: 'Success.', lang: 'en', trace_id: 'mock' }, tran_id: 178912355579535 });
+      send(200, {
+        status: { code: '00', message: 'Success.', lang: 'en', trace_id: 'mock' },
+        tran_id: 178912355579535,
+      });
     }
   } else {
     send(404, { message: `unknown endpoint ${url}` });
@@ -403,7 +410,9 @@ describe('CLI API commands against the local mock gateway', () => {
     rejectExchangeRate = true;
     try {
       const { stdout, exitCode } = await run(['exchange-rate', '--json']);
-      const parsed = JSON.parse(stripAnsi(stdout)) as { error?: { kind?: string; exitCode?: number; paywayCode?: string } };
+      const parsed = JSON.parse(stripAnsi(stdout)) as {
+        error?: { kind?: string; exitCode?: number; paywayCode?: string };
+      };
       expect(parsed.error?.kind).toBe('api');
       expect(parsed.error?.exitCode).toBe(2);
       expect(parsed.error?.paywayCode).toBe('PTL04');
@@ -464,7 +473,9 @@ describe('CLI API commands against the local mock gateway', () => {
     rejectPreAuth = true;
     try {
       const { stdout, exitCode } = await run(['pre-auth', 'complete', '-t', 'PRE-FAIL', '-a', '5', '--json', '-y']);
-      const parsed = JSON.parse(stripAnsi(stdout)) as { error?: { kind?: string; paywayCode?: string; exitCode?: number } };
+      const parsed = JSON.parse(stripAnsi(stdout)) as {
+        error?: { kind?: string; paywayCode?: string; exitCode?: number };
+      };
       expect(parsed.error?.kind).toBe('api');
       expect(parsed.error?.paywayCode).toBe('PTL04');
       expect(parsed.error?.exitCode).toBe(2);
@@ -531,19 +542,22 @@ describe('CLI API commands against the local mock gateway', () => {
     expect(refundRequests).toBe(before);
   });
 
-  it.each(['PAYWAY_API_KEY', 'PAYWAY_RSA_PUBLIC_KEY'])('refund --json emits a validation envelope for missing %s', async (key) => {
-    const saved = process.env[key];
-    const before = refundRequests;
-    delete process.env[key];
-    try {
-      const { stdout, exitCode } = await run(['refund', '-t', 'R-OK', '-a', '1', '-y', '--json']);
-      expect(JSON.parse(stdout).error.kind).toBe('validation');
-      expect(exitCode).toBe(1);
-      expect(refundRequests).toBe(before);
-    } finally {
-      process.env[key] = saved;
-    }
-  });
+  it.each(['PAYWAY_API_KEY', 'PAYWAY_RSA_PUBLIC_KEY'])(
+    'refund --json emits a validation envelope for missing %s',
+    async (key) => {
+      const saved = process.env[key];
+      const before = refundRequests;
+      delete process.env[key];
+      try {
+        const { stdout, exitCode } = await run(['refund', '-t', 'R-OK', '-a', '1', '-y', '--json']);
+        expect(JSON.parse(stdout).error.kind).toBe('validation');
+        expect(exitCode).toBe(1);
+        expect(refundRequests).toBe(before);
+      } finally {
+        process.env[key] = saved;
+      }
+    },
+  );
 
   it('refund --json emits an API envelope on gateway rejection without retrying the mutation', async () => {
     const before = refundRequests;
@@ -706,7 +720,9 @@ describe('CLI API commands against the local mock gateway', () => {
     });
     expect(result.context).not.toHaveProperty('apiKey');
     expect(existsSync(imagePath)).toBe(true);
-    expect(readFileSync(imagePath).subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    expect(readFileSync(imagePath).subarray(0, 8)).toEqual(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
     expect([undefined, 0]).toContain(exitCode as number);
   });
 
@@ -728,7 +744,10 @@ describe('CLI API commands against the local mock gateway', () => {
       '--no-show-qr',
     ]);
 
-    const records = stdout.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, any>);
+    const records = stdout
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, any>);
     expect(records.map((record) => record.event)).toEqual(['creation', 'poll', 'final']);
     expect(records[1]).toMatchObject({ event: 'poll', paymentStatus: 'APPROVED', terminal: true });
     expect(records[2]).toMatchObject({
@@ -743,15 +762,33 @@ describe('CLI API commands against the local mock gateway', () => {
     const journalDir = path.join(tempDir, 'structured-journal');
     process.env.PAYWAY_JOURNAL_DIR = journalDir;
     try {
-      const args = ['--journal', 'generate-checkout', '-a', '5.00', '-t', 'CO-JOURNAL',
-        '--output', 'ndjson', '--poll-interval', '0.001', '--poll-timeout', '1', '--no-save-image'];
+      const args = [
+        '--journal',
+        'generate-checkout',
+        '-a',
+        '5.00',
+        '-t',
+        'CO-JOURNAL',
+        '--output',
+        'ndjson',
+        '--poll-interval',
+        '0.001',
+        '--poll-timeout',
+        '1',
+        '--no-save-image',
+      ];
       await run(args);
       const result = await run(args);
-      const records = result.stdout.trim().split('\n').map((line) => JSON.parse(line));
+      const records = result.stdout
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
       expect(records.map((record) => record.event)).toEqual(['creation', 'poll', 'final']);
       expect(result.stderr).toContain('already appears in the local journal');
       const journal = readFileSync(path.join(journalDir, 'journal.jsonl'), 'utf8')
-        .trim().split('\n').map((line) => JSON.parse(line));
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
       expect(journal.some((event) => event.kind === 'poll.attempt' && event.transactionId === 'CO-JOURNAL')).toBe(true);
       const suppressed = await run([...args, '--allow-duplicate-id']);
       expect(suppressed.stderr).not.toContain('already appears in the local journal');
@@ -782,21 +819,33 @@ describe('CLI API commands against the local mock gateway', () => {
     }
   });
 
-  it.each(['generate-checkout', 'generate-qr'])('%s preserves accepted creation when writing the PNG fails', async (command) => {
-    const blockedParent = path.join(tempDir, `${command}-not-a-directory`);
-    writeFileSync(blockedParent, 'ordinary file');
-    const { stdout, exitCode } = await run([
-      command, '-a', '5.00', '-t', 'ARTIFACT-FAIL', '--output', 'json',
-      '--callback-url', 'https://example.com/cb', '--no-polling',
-      '--save-image', path.join(blockedParent, 'qr.png'),
-    ]);
-    const result = JSON.parse(stdout);
-    expect(result.creation.outcome).toBe('accepted');
-    expect(result.creation.gatewayResponse).toBeDefined();
-    expect(result.payment.status).not.toBe('NOT_CREATED');
-    expect(result.nextAction.kind).toBe('check_existing_transaction');
-    expect(exitCode).not.toBe(0);
-  });
+  it.each(['generate-checkout', 'generate-qr'])(
+    '%s preserves accepted creation when writing the PNG fails',
+    async (command) => {
+      const blockedParent = path.join(tempDir, `${command}-not-a-directory`);
+      writeFileSync(blockedParent, 'ordinary file');
+      const { stdout, exitCode } = await run([
+        command,
+        '-a',
+        '5.00',
+        '-t',
+        'ARTIFACT-FAIL',
+        '--output',
+        'json',
+        '--callback-url',
+        'https://example.com/cb',
+        '--no-polling',
+        '--save-image',
+        path.join(blockedParent, 'qr.png'),
+      ]);
+      const result = JSON.parse(stdout);
+      expect(result.creation.outcome).toBe('accepted');
+      expect(result.creation.gatewayResponse).toBeDefined();
+      expect(result.payment.status).not.toBe('NOT_CREATED');
+      expect(result.nextAction.kind).toBe('check_existing_transaction');
+      expect(exitCode).not.toBe(0);
+    },
+  );
 
   it('generate-checkout --output json reports an ambiguous create without replaying it', async () => {
     const before = capturedPurchaseBodies.length;
@@ -1053,20 +1102,16 @@ describe('CLI API commands against the local mock gateway', () => {
   it('transaction-detail --wait retries through code 6 and prints the lag hint', async () => {
     // 'MISSING' keeps answering code 6, so --wait exhausts its budget and
     // prints the check-transaction escape-hatch hint (exit code 2).
-    const { text, exitCode } = await run([
-      'transaction-detail',
-      '-t',
-      'MISSING',
-      '--wait',
-      '2',
-    ]);
+    const { text, exitCode } = await run(['transaction-detail', '-t', 'MISSING', '--wait', '2']);
     expect(text).toContain('tran_id not found');
     expect(exitCode).toBe(2);
   }, 30_000);
 
   it('transaction-detail --json prints a JSON error envelope and exits 2', async () => {
     const { text, exitCode } = await run(['transaction-detail', '-t', 'MISSING', '--json']);
-    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { error: { message: string; paywayCode: string; kind: string; exitCode: number } };
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
+      error: { message: string; paywayCode: string; kind: string; exitCode: number };
+    };
     expect(parsed.error.message).toContain('tran_id not found');
     expect(parsed.error.paywayCode).toBe('6');
     expect(parsed.error.kind).toBe('api');
@@ -1079,7 +1124,9 @@ describe('CLI API commands against the local mock gateway', () => {
     const { text, exitCode } = await run(['check-transaction', '-t', 'MISSING', '--json']);
     // T3.5: the --json path prints a machine-parseable envelope (the human
     // message stays inside it), never the ✗-prefixed block.
-    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { error: { message: string; paywayCode: string; kind: string; exitCode: number } };
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
+      error: { message: string; paywayCode: string; kind: string; exitCode: number };
+    };
     expect(parsed.error.message).toContain('tran_id not found');
     expect(parsed.error.paywayCode).toBe('6');
     expect(parsed.error.kind).toBe('api');
@@ -1093,7 +1140,9 @@ describe('CLI API commands against the local mock gateway', () => {
   // rejections under --json — branch on the envelope, never on stdout text.
   it('payment-link detail --json prints the PTL132 body as a JSON error envelope', async () => {
     const { text, exitCode } = await run(['payment-link', 'detail', '-i', 'PLINK-UNKNOWN==', '--json']);
-    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { error: { message: string; paywayCode: string; kind: string; exitCode: number } };
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
+      error: { message: string; paywayCode: string; kind: string; exitCode: number };
+    };
     expect(parsed.error.message).toContain('Invalid payment link');
     expect(parsed.error.paywayCode).toBe('PTL132');
     expect(parsed.error.kind).toBe('api');
@@ -1133,7 +1182,9 @@ describe('CLI API commands against the local mock gateway', () => {
 
   it('payment-link void --json on an already-voided link prints the PTL188 error envelope and exits 2', async () => {
     const { text, exitCode } = await run(['payment-link', 'void', '-i', 'PLINK-MOCK-1==', '--json']);
-    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { error: { message: string; paywayCode: string; kind: string; exitCode: number; hint?: string } };
+    const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
+      error: { message: string; paywayCode: string; kind: string; exitCode: number; hint?: string };
+    };
     expect(parsed.error.message).toContain('already voided');
     expect(parsed.error.paywayCode).toBe('PTL188');
     expect(parsed.error.kind).toBe('api');
@@ -1156,10 +1207,14 @@ describe('CLI API commands against the local mock gateway', () => {
     const { text, exitCode } = await run([
       'payment-link',
       'create',
-      '-t', 'Mock link',
-      '-a', '5.00',
-      '-r', 'PL-MOCK-REF-1',
-      '--return-url', 'https://example.com/return',
+      '-t',
+      'Mock link',
+      '-a',
+      '5.00',
+      '-r',
+      'PL-MOCK-REF-1',
+      '--return-url',
+      'https://example.com/return',
       '--json',
     ]);
     const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
@@ -1183,10 +1238,14 @@ describe('CLI API commands against the local mock gateway', () => {
     const { text, exitCode } = await run([
       'payment-link',
       'create',
-      '-t', 'Mock link',
-      '-a', '5.00',
-      '-r', 'PL-MOCK-REF-NOSHOW',
-      '--return-url', 'https://example.com/return',
+      '-t',
+      'Mock link',
+      '-a',
+      '5.00',
+      '-r',
+      'PL-MOCK-REF-NOSHOW',
+      '--return-url',
+      'https://example.com/return',
       '--no-show-qr',
     ]);
     // Flag accepted (no "unknown option" error) and the create succeeded.
@@ -1410,17 +1469,7 @@ describe('CLI API commands against the local mock gateway', () => {
   });
 
   it('cof charge submits a payment against a linked token (--json)', async () => {
-    const { text, exitCode } = await run([
-      'cof',
-      'charge',
-      '-t',
-      'COF-1',
-      '-a',
-      '5.00',
-      '--token',
-      'PWT-1',
-      '--json',
-    ]);
+    const { text, exitCode } = await run(['cof', 'charge', '-t', 'COF-1', '-a', '5.00', '--token', 'PWT-1', '--json']);
     expect(text).toContain('"COF-1"');
     expect([undefined, 0]).toContain(exitCode as number);
   });
@@ -1629,9 +1678,7 @@ describe('CLI API commands against the local mock gateway', () => {
 
 describe('tx-batch command', () => {
   it('check --json yields per-item envelopes and exit 1 on partial failure', async () => {
-    const { text, exitCode } = await run([
-      'tx-batch', 'check', '-t', 'APPROVED-1', '-t', 'MISSING', '--json',
-    ]);
+    const { text, exitCode } = await run(['tx-batch', 'check', '-t', 'APPROVED-1', '-t', 'MISSING', '--json']);
     expect(text).toContain('"operation": "check"');
     expect(text).toContain('"total": 2');
     expect(text).toContain('"failed": 1');
@@ -1677,7 +1724,17 @@ describe('tx-batch command', () => {
   });
 
   it('detail reports a failed item for a missing transaction (partial → exit 1)', async () => {
-    const { text, exitCode } = await run(['tx-batch', 'detail', '-t', 'APPROVED-1', '-t', 'MISSING', '--pace', '0', '--json']);
+    const { text, exitCode } = await run([
+      'tx-batch',
+      'detail',
+      '-t',
+      'APPROVED-1',
+      '-t',
+      'MISSING',
+      '--pace',
+      '0',
+      '--json',
+    ]);
     expect(text).toContain('"operation": "detail"');
     expect(text).toContain('"failed": 1');
     expect(exitCode).toBe(1);

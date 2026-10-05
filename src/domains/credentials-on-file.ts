@@ -78,10 +78,7 @@ export interface CredentialsOnFileDomain {
     params: LinkAccountParams,
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['LinkAccountResponse']>;
-  linkCard: (
-    params: LinkCardParams,
-    callOptions?: RequestCallOptions,
-  ) => Promise<LinkCardResponse>;
+  linkCard: (params: LinkCardParams, callOptions?: RequestCallOptions) => Promise<LinkCardResponse>;
   /**
    * Submit the hosted card-link request server-to-server.
    *
@@ -398,7 +395,11 @@ export function createCredentialsOnFileDomain(
     },
 
     payment: (params: CofPaymentParams, callOptions?: RequestCallOptions) => {
-      if (params.requestId !== undefined && typeof params.requestId === 'string' && params.requestId.trim().length > 0) {
+      if (
+        params.requestId !== undefined &&
+        typeof params.requestId === 'string' &&
+        params.requestId.trim().length > 0
+      ) {
         validateRequestIdOrCtid(params.requestId, 'requestId');
       }
       if (params.ctid !== undefined) {

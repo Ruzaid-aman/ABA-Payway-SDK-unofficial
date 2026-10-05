@@ -81,7 +81,12 @@ function materialize(template: typeof EXPRESS_TEMPLATE, sub: string): string {
 /** Sorted-key value concatenation — verifyCallbackDetailed's canonical form. */
 function sign(body: Record<string, string>): string {
   return createHmac('sha512', API_KEY)
-    .update(Object.keys(body).sort().map((key) => body[key]).join(''))
+    .update(
+      Object.keys(body)
+        .sort()
+        .map((key) => body[key])
+        .join(''),
+    )
     .digest('base64');
 }
 
@@ -184,10 +189,7 @@ describe('generated scaffold files (S02)', () => {
 
     async function deliver(body: Record<string, string>): Promise<MockRes> {
       const res = mockRes();
-      await callbackHandler(
-        { headers: { 'x-payway-hmac-sha512': sign(body) }, body },
-        res,
-      );
+      await callbackHandler({ headers: { 'x-payway-hmac-sha512': sign(body) }, body }, res);
       return res;
     }
 
@@ -321,7 +323,10 @@ describe('generated scaffold files (S02)', () => {
       const restartedRoutes = path.join(dir, 'routes-restarted', 'payment');
       mkdirSync(restartedRoutes, { recursive: true });
       for (const name of ['order-store.js', 'callback.js']) {
-        writeFileSync(path.join(restartedRoutes, name), readFileSync(path.join(dir, 'routes', 'payment', name), 'utf8'));
+        writeFileSync(
+          path.join(restartedRoutes, name),
+          readFileSync(path.join(dir, 'routes', 'payment', name), 'utf8'),
+        );
       }
       const freshModule = await import(pathToFileURL(path.join(restartedRoutes, 'callback.js')).href);
       const freshHandler = freshModule.default.routes[0].handler;
@@ -350,7 +355,9 @@ describe('generated scaffold files (S02)', () => {
           expect(callback?.content.includes(field), `${template.framework} callback lacks ${field}`).toBe(true);
         }
         for (const pattern of FORBIDDEN_LEGACY) {
-          expect(pattern.test(callback?.content ?? ''), `${template.framework} uses legacy shape ${pattern}`).toBe(false);
+          expect(pattern.test(callback?.content ?? ''), `${template.framework} uses legacy shape ${pattern}`).toBe(
+            false,
+          );
         }
         // PRE-AUTH shares code 0 with APPROVED — the guard must exist.
         expect(callback?.content.includes('PRE-AUTH'), `${template.framework} lacks the PRE-AUTH guard`).toBe(true);
@@ -408,7 +415,11 @@ describe('generated scaffold files (S02)', () => {
     });
 
     const jsonRequest = (url: string, payload: unknown, headers: Record<string, string> = {}): Request =>
-      new Request(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(payload) });
+      new Request(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify(payload),
+      });
 
     it('checkout stores server-owned values and projects the artifact only', async () => {
       const res = await checkoutPost(jsonRequest('http://test/api/payment/checkout', { sku: 'demo-item', amount: 1 }));

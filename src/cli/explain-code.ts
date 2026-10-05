@@ -15,7 +15,17 @@ import {
 
 export interface CodeExplanation {
   readonly code: string;
-  readonly family: 'gateway' | 'refund' | 'pre-auth' | 'payout' | 'payment-status' | 'cof' | 'qr' | 'cda' | 'payment-link' | 'credential';
+  readonly family:
+    | 'gateway'
+    | 'refund'
+    | 'pre-auth'
+    | 'payout'
+    | 'payment-status'
+    | 'cof'
+    | 'qr'
+    | 'cda'
+    | 'payment-link'
+    | 'credential';
   readonly title: string;
   readonly hint: string;
   /** True when the code's meaning was reproduced against the live sandbox. */
@@ -72,9 +82,21 @@ export const SANDBOX_VERIFIED_EVIDENCE: Record<string, string> = {
 export const ABA_TELEMETRY: Record<string, { apis: string[]; message?: string }> = {
   'gateway:0': {
     apis: [
-      'purchase', 'generate-qr', 'close-transaction', 'exchange-rate', 'transaction-list', 'payout',
-      'cof-charge', 'cof-link-account', 'refund', 'pre-auth-complete', 'pre-auth-cancel',
-      'whitelist-add', 'whitelist-status', 'payment-link-create', 'payment-link-detail',
+      'purchase',
+      'generate-qr',
+      'close-transaction',
+      'exchange-rate',
+      'transaction-list',
+      'payout',
+      'cof-charge',
+      'cof-link-account',
+      'refund',
+      'pre-auth-complete',
+      'pre-auth-cancel',
+      'whitelist-add',
+      'whitelist-status',
+      'payment-link-create',
+      'payment-link-detail',
     ],
   },
   'gateway:1': { apis: ['purchase', 'generate-qr'], message: 'Wrong Hash.' },
@@ -87,44 +109,103 @@ export const ABA_TELEMETRY: Record<string, { apis: string[]; message?: string }>
   },
   'gateway:12': { apis: ['purchase', 'generate-qr'], message: 'Payment currency is not allowed.' },
   'gateway:26': { apis: ['exchange-rate'], message: 'Invalid Merchant Profile' },
-  'gateway:29': { apis: ['purchase'], message: 'Sorry, your payment cannot be processed as your card is inactive. Please use another card.' },
-  'gateway:30': { apis: ['purchase'], message: 'Your payment is declined by the card issuer bank. Please make sure your card is active, or contact your issuer bank for support.' },
+  'gateway:29': {
+    apis: ['purchase'],
+    message: 'Sorry, your payment cannot be processed as your card is inactive. Please use another card.',
+  },
+  'gateway:30': {
+    apis: ['purchase'],
+    message:
+      'Your payment is declined by the card issuer bank. Please make sure your card is active, or contact your issuer bank for support.',
+  },
   'gateway:37': { apis: ['payout'], message: 'Payout accounts are not in whitelist.' },
   'gateway:44': { apis: ['purchase'], message: 'Purchase has reached transaction limit.' },
   'gateway:52': { apis: ['purchase'], message: 'Incorrect card details. Please check and try again.' },
-  'gateway:58': { apis: ['purchase'], message: 'Your payment is declined by the card issuer bank. Please contact issuer bank for support.' },
-  'gateway:59': { apis: ['purchase'], message: 'Your payment card has insufficient funds. Please check and try again.' },
-  'gateway:60': { apis: ['purchase'], message: 'Your payment card has reached its usage limit. Please use another card, or contact issuer bank for support.' },
-  'gateway:68': { apis: ['purchase'], message: 'Your payment is declined by the card issuer bank. Please contact issuer bank for support.' },
-  'gateway:75': { apis: ['purchase'], message: 'Your payment is declined by the card issuer bank. Please use another card, or contact issuer bank for support.' },
+  'gateway:58': {
+    apis: ['purchase'],
+    message: 'Your payment is declined by the card issuer bank. Please contact issuer bank for support.',
+  },
+  'gateway:59': {
+    apis: ['purchase'],
+    message: 'Your payment card has insufficient funds. Please check and try again.',
+  },
+  'gateway:60': {
+    apis: ['purchase'],
+    message:
+      'Your payment card has reached its usage limit. Please use another card, or contact issuer bank for support.',
+  },
+  'gateway:68': {
+    apis: ['purchase'],
+    message: 'Your payment is declined by the card issuer bank. Please contact issuer bank for support.',
+  },
+  'gateway:75': {
+    apis: ['purchase'],
+    message:
+      'Your payment is declined by the card issuer bank. Please use another card, or contact issuer bank for support.',
+  },
   'gateway:96': { apis: ['generate-qr', 'whitelist-add'], message: 'Invalid merchant data' },
   'gateway:500': {
     apis: ['transaction-list', 'generate-qr', 'payment-link-detail'],
     message: 'Something went wrong. Please reach out to our digital support team for assistance',
   },
-  'gateway:503': { apis: ['purchase'], message: "System under maintenance. We'll update you when available. Thanks for your patience." },
+  'gateway:503': {
+    apis: ['purchase'],
+    message: "System under maintenance. We'll update you when available. Thanks for your patience.",
+  },
   'gateway:999': { apis: ['purchase'], message: 'Something went wrong. Please try again later.' },
   'cof:04': { apis: ['purchase', 'generate-qr'], message: 'The given data was invalid.' },
   'cof:105': { apis: ['purchase'], message: 'Invalid pwt or ctid.' },
   'qr:6': { apis: ['purchase'], message: 'Requested Domain is not in whitelist.' },
   'qr:12': { apis: ['generate-qr', 'purchase'], message: 'Payment currency is not allowed.' },
-  'qr:16': { apis: ['purchase'], message: 'Invalid First Name. It must not contain numbers or special characters or not more than 100 characters.' },
-  'qr:17': { apis: ['purchase'], message: 'Invalid Last Name. It must not contain numbers or special characters or not more than 100 characters.' },
+  'qr:16': {
+    apis: ['purchase'],
+    message: 'Invalid First Name. It must not contain numbers or special characters or not more than 100 characters.',
+  },
+  'qr:17': {
+    apis: ['purchase'],
+    message: 'Invalid Last Name. It must not contain numbers or special characters or not more than 100 characters.',
+  },
   'qr:19': { apis: ['purchase'], message: 'Invalid Email.' },
   'qr:21': { apis: ['generate-qr'], message: 'End of API lifetime.' },
   'qr:32': { apis: ['generate-qr', 'purchase'], message: 'Service is not enable.' },
-  'refund:PTL04': { apis: ['payment-link-create', 'pre-auth-complete', 'whitelist-add'], message: 'Parameter validation required' },
+  'refund:PTL04': {
+    apis: ['payment-link-create', 'pre-auth-complete', 'whitelist-add'],
+    message: 'Parameter validation required',
+  },
   'refund:PTL36': { apis: ['refund', 'pre-auth-cancel'], message: 'Transaction not found or is invalid' },
-  'refund:PTL57': { apis: ['refund'], message: 'Unable to process refund due to an invalid transaction status or an incorrect refund amount' },
-  'refund:PTL58': { apis: ['refund'], message: 'Refund failed: The payment service provider returned an unexpected response' },
-  'refund:PTL168': { apis: ['refund', 'pre-auth-complete', 'pre-auth-cancel'], message: 'Another request is already in progress. Please wait a few seconds and try again.' },
-  'pre-auth:PTL59': { apis: ['pre-auth-complete'], message: 'Unable to complete pre-authorization: The transaction status is invalid or the completion amount is incorrect' },
-  'pre-auth:PTL170': { apis: ['pre-auth-cancel'], message: 'Unable to cancel pre-authorization: The transaction status is invalid' },
-  'pre-auth:PTL172': { apis: ['pre-auth-complete'], message: 'Pre-authorization completion failed: The payment service provider returned an unexpected response' },
+  'refund:PTL57': {
+    apis: ['refund'],
+    message: 'Unable to process refund due to an invalid transaction status or an incorrect refund amount',
+  },
+  'refund:PTL58': {
+    apis: ['refund'],
+    message: 'Refund failed: The payment service provider returned an unexpected response',
+  },
+  'refund:PTL168': {
+    apis: ['refund', 'pre-auth-complete', 'pre-auth-cancel'],
+    message: 'Another request is already in progress. Please wait a few seconds and try again.',
+  },
+  'pre-auth:PTL59': {
+    apis: ['pre-auth-complete'],
+    message:
+      'Unable to complete pre-authorization: The transaction status is invalid or the completion amount is incorrect',
+  },
+  'pre-auth:PTL170': {
+    apis: ['pre-auth-cancel'],
+    message: 'Unable to cancel pre-authorization: The transaction status is invalid',
+  },
+  'pre-auth:PTL172': {
+    apis: ['pre-auth-complete'],
+    message: 'Pre-authorization completion failed: The payment service provider returned an unexpected response',
+  },
   'payout:12': { apis: ['purchase', 'generate-qr'], message: 'Payment currency is not allowed.' },
   'payout:PTL148': { apis: ['whitelist-add'], message: 'Payee already exists.' },
   'cda:CDA00': { apis: ['purchase'], message: 'OK' },
-  'cda:CDA09': { apis: ['purchase'], message: "Sorry, we couldn't process the payment. Please try again in few minutes or contact to the merchant directly." },
+  'cda:CDA09': {
+    apis: ['purchase'],
+    message:
+      "Sorry, we couldn't process the payment. Please try again in few minutes or contact to the merchant directly.",
+  },
   'cda:CDA45': { apis: ['purchase'], message: 'Payer account has insufficient funds.' },
 };
 
@@ -218,7 +299,8 @@ const PAYOUT_HINTS: Record<string, string> = {
   [PAYOUT_ERROR_CODES.ACCOUNT_NOT_WHITELISTED]: 'Whitelist the beneficiary first via addBeneficiary().',
   'PTL-PAYOUT-37': 'Whitelist the beneficiary first via addBeneficiary().',
   PTL46: 'Whitelist the beneficiary first via addBeneficiary().',
-  [PAYOUT_ERROR_CODES.AMOUNT_MISMATCH]: 'Sum of beneficiary amounts must equal the payout (transaction complete) amount.',
+  [PAYOUT_ERROR_CODES.AMOUNT_MISMATCH]:
+    'Sum of beneficiary amounts must equal the payout (transaction complete) amount.',
   PTL148:
     'The payee is already on the payout whitelist — benign, no action needed (production telemetry 2026-09: the most common add-whitelist response). Re-enable via update-whitelist-status if it was disabled.',
 };
@@ -240,8 +322,10 @@ const COF_HINTS: Record<string, string> = {
   '04': 'Laravel-style binding/validation layer rejected the request — inspect the errors{} field map on the thrown error.',
   '09': 'The ctid/request_id does not reference a known account token — verify or re-link.',
   '98': 'Merchant ID not found — verify the merchant credential (env/profile) for the target environment.',
-  '104': 'The merchant account is not enabled for this token_flag — contact PayWay to provision, or use a linking enum (CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX).',
-  '105': 'The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken. On purchase/charge the gateway also words it "Invalid pwt or ctid." — for ctid-keyed charges check the ctid→pwt resolution first (production telemetry 2026-09). The payment-credential endpoint table (2026-10) enumerates the causes: token not found / removed / frozen / expired, token_flag not allowed, or amount above the token per-transaction limit.',
+  '104':
+    'The merchant account is not enabled for this token_flag — contact PayWay to provision, or use a linking enum (CITI_FLEX|CITO_FLEX|CITO_FIX|CITR_FLEX).',
+  '105':
+    'The payment credential token is invalid or expired — re-link via linkAccount/linkCard or renew via renewToken. On purchase/charge the gateway also words it "Invalid pwt or ctid." — for ctid-keyed charges check the ctid→pwt resolution first (production telemetry 2026-09). The payment-credential endpoint table (2026-10) enumerates the causes: token not found / removed / frozen / expired, token_flag not allowed, or amount above the token per-transaction limit.',
 };
 
 // ABA-account (CDA) response codes echoed on purchase when the payer pays
@@ -256,7 +340,8 @@ const CDA_TITLES: Record<string, string> = {
 
 const CDA_HINTS: Record<string, string> = {
   CDA00: 'Payer-account success — treat like 00 (purchase telemetry: tens of thousands of occurrences).',
-  CDA09: 'Payer-account decline, usually transient — the customer-facing message advises retrying in a few minutes; safe to surface as-is.',
+  CDA09:
+    'Payer-account decline, usually transient — the customer-facing message advises retrying in a few minutes; safe to surface as-is.',
   CDA45: 'The payer ABA account lacks funds — customer tops up or pays from another account.',
 };
 
@@ -271,7 +356,26 @@ const CDA_HINTS: Record<string, string> = {
  * (ABA, 2026-10-01 — docs/internal/PAYMENT-CREDENTIAL-ERROR-TABLE-2026-10.md)
  * and supersede those two codes' old spec-page glosses.
  */
-const QR_CODES = ['1', '6', '12', '16', '17', '18', '19', '21', '23', '32', '35', '44', '47', '48', '96', '102', '403', '429'] as const;
+const QR_CODES = [
+  '1',
+  '6',
+  '12',
+  '16',
+  '17',
+  '18',
+  '19',
+  '21',
+  '23',
+  '32',
+  '35',
+  '44',
+  '47',
+  '48',
+  '96',
+  '102',
+  '403',
+  '429',
+] as const;
 
 const QR_TITLES: Record<string, string> = {
   '1': 'QR request rejected (wrong hash or malformed request)',
@@ -304,11 +408,16 @@ const QR_HINTS: Record<string, string> = {
   '96': 'Merchant data rejected — verify merchant_id/credential for the target environment (generate-qr + add-whitelist-payout telemetry).',
   '403': 'Merchant credential not authorized for generate-qr in this environment.',
   '429': 'Pace requests — the SDK throttles locally, but concurrent callers share the window.',
-  '102': 'URL not in whitelist — callback_url host is not whitelisted or is not a valid URL (payment-credential endpoint error table 2026-10; supersedes the old "QR request limit exceeded" gloss).',
+  '102':
+    'URL not in whitelist — callback_url host is not whitelisted or is not a valid URL (payment-credential endpoint error table 2026-10; supersedes the old "QR request limit exceeded" gloss).',
 };
 
 export function explainPayWayCode(rawCode: string): CodeExplanation | undefined {
-  const code = rawCode.trim().toUpperCase().replace(/^PTL0+/, 'PTL0').replace(/^CODE[=: ]*/, '');
+  const code = rawCode
+    .trim()
+    .toUpperCase()
+    .replace(/^PTL0+/, 'PTL0')
+    .replace(/^CODE[=: ]*/, '');
 
   // PTL* families
   if (code in REFUND_LABELS) {
@@ -326,14 +435,24 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
     return withProvenance({ code, family: 'payout', title: PAYOUT_TITLES[code], hint: PAYOUT_HINTS[code] ?? '' });
   }
   if (code in CREDENTIAL_TITLES) {
-    return withProvenance({ code, family: 'credential', title: CREDENTIAL_TITLES[code], hint: CREDENTIAL_HINTS[code] ?? '' });
+    return withProvenance({
+      code,
+      family: 'credential',
+      title: CREDENTIAL_TITLES[code],
+      hint: CREDENTIAL_HINTS[code] ?? '',
+    });
   }
 
   // Payment-link family (2026-09-06): PTL05/PTL99/PTL132 — PTL02/PTL04 are
   // claimed by the refund family and 96 by the QR family, so this branch only
   // claims the unclaimed payment-link codes.
   if (code in PAYMENT_LINK_TITLES) {
-    return withProvenance({ code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code], hint: PAYMENT_LINK_HINTS[code] ?? '' });
+    return withProvenance({
+      code,
+      family: 'payment-link',
+      title: PAYMENT_LINK_TITLES[code],
+      hint: PAYMENT_LINK_HINTS[code] ?? '',
+    });
   }
 
   // COF / QR families (B5, live parity) — checked before the generic numeric
@@ -350,7 +469,9 @@ export function explainPayWayCode(rawCode: string): CodeExplanation | undefined 
       code: numeric,
       family: 'qr',
       title: QR_TITLES[numeric] ?? `QR gateway error code ${numeric}`,
-      hint: QR_HINTS[numeric] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
+      hint:
+        QR_HINTS[numeric] ??
+        'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
     });
   }
 
@@ -379,13 +500,29 @@ export function explainAll(): CodeExplanation[] {
     );
   }
   for (const [name, code] of Object.entries(PRE_AUTH_ERROR_CODES)) {
-    all.push(withProvenance({ code, family: 'pre-auth', title: PRE_AUTH_TITLES[code] ?? name, hint: PRE_AUTH_HINTS[code] ?? '' }));
+    all.push(
+      withProvenance({
+        code,
+        family: 'pre-auth',
+        title: PRE_AUTH_TITLES[code] ?? name,
+        hint: PRE_AUTH_HINTS[code] ?? '',
+      }),
+    );
   }
   for (const code of Object.keys(PAYOUT_TITLES)) {
-    all.push(withProvenance({ code, family: 'payout', title: PAYOUT_TITLES[code] ?? code, hint: PAYOUT_HINTS[code] ?? '' }));
+    all.push(
+      withProvenance({ code, family: 'payout', title: PAYOUT_TITLES[code] ?? code, hint: PAYOUT_HINTS[code] ?? '' }),
+    );
   }
   for (const code of Object.keys(PAYMENT_LINK_TITLES)) {
-    all.push(withProvenance({ code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code] ?? code, hint: PAYMENT_LINK_HINTS[code] ?? '' }));
+    all.push(
+      withProvenance({
+        code,
+        family: 'payment-link',
+        title: PAYMENT_LINK_TITLES[code] ?? code,
+        hint: PAYMENT_LINK_HINTS[code] ?? '',
+      }),
+    );
   }
   for (const [code, title] of Object.entries(COF_TITLES)) {
     all.push(withProvenance({ code, family: 'cof', title, hint: COF_HINTS[code] ?? '' }));
@@ -399,7 +536,9 @@ export function explainAll(): CodeExplanation[] {
         code,
         family: 'qr',
         title: QR_TITLES[code] ?? `QR gateway error code ${code}`,
-        hint: QR_HINTS[code] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
+        hint:
+          QR_HINTS[code] ??
+          'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
       }),
     );
   }
@@ -505,7 +644,11 @@ export interface ScopedCodeExplanation extends CodeExplanation {
  * explainPayWayCode's family assignment for it.
  */
 function explainInFamily(rawCode: string, family: ExplainFamily): CodeExplanation | undefined {
-  const code = rawCode.trim().toUpperCase().replace(/^PTL0+/, 'PTL0').replace(/^CODE[=: ]*/, '');
+  const code = rawCode
+    .trim()
+    .toUpperCase()
+    .replace(/^PTL0+/, 'PTL0')
+    .replace(/^CODE[=: ]*/, '');
   const numeric = code.replace(/^0+(?=\d)/, '');
   switch (family) {
     case 'refund':
@@ -529,7 +672,12 @@ function explainInFamily(rawCode: string, family: ExplainFamily): CodeExplanatio
       return undefined;
     case 'pre-auth':
       if (code in PRE_AUTH_TITLES) {
-        return withProvenance({ code, family: 'pre-auth', title: PRE_AUTH_TITLES[code], hint: PRE_AUTH_HINTS[code] ?? '' });
+        return withProvenance({
+          code,
+          family: 'pre-auth',
+          title: PRE_AUTH_TITLES[code],
+          hint: PRE_AUTH_HINTS[code] ?? '',
+        });
       }
       return undefined;
     case 'payout':
@@ -539,12 +687,22 @@ function explainInFamily(rawCode: string, family: ExplainFamily): CodeExplanatio
       return undefined;
     case 'credential':
       if (code in CREDENTIAL_TITLES) {
-        return withProvenance({ code, family: 'credential', title: CREDENTIAL_TITLES[code], hint: CREDENTIAL_HINTS[code] ?? '' });
+        return withProvenance({
+          code,
+          family: 'credential',
+          title: CREDENTIAL_TITLES[code],
+          hint: CREDENTIAL_HINTS[code] ?? '',
+        });
       }
       return undefined;
     case 'payment-link':
       if (code in PAYMENT_LINK_TITLES) {
-        return withProvenance({ code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code], hint: PAYMENT_LINK_HINTS[code] ?? '' });
+        return withProvenance({
+          code,
+          family: 'payment-link',
+          title: PAYMENT_LINK_TITLES[code],
+          hint: PAYMENT_LINK_HINTS[code] ?? '',
+        });
       }
       return undefined;
     case 'cof':
@@ -563,7 +721,9 @@ function explainInFamily(rawCode: string, family: ExplainFamily): CodeExplanatio
           code: numeric,
           family: 'qr',
           title: QR_TITLES[numeric] ?? `QR gateway error code ${numeric}`,
-          hint: QR_HINTS[numeric] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
+          hint:
+            QR_HINTS[numeric] ??
+            'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
         });
       }
       return undefined;
@@ -587,11 +747,16 @@ export function explainCodeFamilies(rawCode: string): ExplainFamily[] {
  * one `alternatives` entry per family — additive fields only, the default
  * answer never changes.
  */
-export function explainPayWayCodeScoped(rawCode: string, opts: ScopedExplainOptions = {}): ScopedCodeExplanation | undefined {
+export function explainPayWayCodeScoped(
+  rawCode: string,
+  opts: ScopedExplainOptions = {},
+): ScopedCodeExplanation | undefined {
   if (opts.operation) {
     const family = OPERATION_FAMILY[opts.operation];
     if (!family) {
-      throw new Error(`Unknown explain operation '${opts.operation}'. Valid operations: ${Object.keys(OPERATION_FAMILY).join(', ')}`);
+      throw new Error(
+        `Unknown explain operation '${opts.operation}'. Valid operations: ${Object.keys(OPERATION_FAMILY).join(', ')}`,
+      );
     }
     return explainInFamily(rawCode, family);
   }

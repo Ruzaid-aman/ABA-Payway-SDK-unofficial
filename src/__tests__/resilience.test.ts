@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  CircuitBreaker,
-  CircuitOpenError,
-  DEFAULT_CIRCUIT_BREAKER_OPTIONS,
-} from '../circuit-breaker.js';
+import { CircuitBreaker, CircuitOpenError, DEFAULT_CIRCUIT_BREAKER_OPTIONS } from '../circuit-breaker.js';
 import { PayWayError } from '../errors.js';
 import { computeTokenExpiry, daysUntilTokenExpiry } from '../utils.js';
 import { createPayWayLogger, resolveLogLevel } from '../logger.js';

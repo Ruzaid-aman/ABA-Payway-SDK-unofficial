@@ -84,7 +84,11 @@ async function fetchLatestVersion(fetchImpl: typeof fetch, timeoutMs: number): P
   }
 }
 
-function noticeIfNewer(streams: UpdateNoticeStreams, currentVersion: string, latestVersion: string | null | undefined): void {
+function noticeIfNewer(
+  streams: UpdateNoticeStreams,
+  currentVersion: string,
+  latestVersion: string | null | undefined,
+): void {
   if (!latestVersion || !isNewerVersion(currentVersion, latestVersion)) return;
   streams.stderr.write(`  Update available: v${currentVersion} → v${latestVersion} — npm i aba-payway-ts@latest\n`);
 }

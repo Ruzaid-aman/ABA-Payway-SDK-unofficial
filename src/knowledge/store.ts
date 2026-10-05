@@ -85,10 +85,12 @@ export function readTopic(slug: string, explicitDir?: string): ReadTopicResult |
   const { dir, topics } = found;
   const wanted = normalizeSlug(slug);
   const exact = topics.find((t) => t.topic === wanted || normalizeSlug(t.file) === wanted);
-  const topic = exact ?? (() => {
-    const prefixed = topics.filter((t) => t.topic.startsWith(wanted));
-    return prefixed.length === 1 ? prefixed[0] : undefined;
-  })();
+  const topic =
+    exact ??
+    (() => {
+      const prefixed = topics.filter((t) => t.topic.startsWith(wanted));
+      return prefixed.length === 1 ? prefixed[0] : undefined;
+    })();
   if (!topic) {
     const matches = topics.filter((t) => t.topic.startsWith(wanted));
     if (matches.length > 1) return { status: 'ambiguous', matches };

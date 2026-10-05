@@ -66,7 +66,10 @@ function childEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-function runPrintedCommand(dir: string, nextCommand: string): { status: number | null; stdout: string; stderr: string } {
+function runPrintedCommand(
+  dir: string,
+  nextCommand: string,
+): { status: number | null; stdout: string; stderr: string } {
   // The printed command is `node --env-file-if-exists=.env payway-first-payment.mjs`.
   const args = nextCommand.replace(/^node\s+/, '').split(/\s+/);
   return spawnSync(process.execPath, args, { cwd: dir, env: childEnv(), encoding: 'utf8' });

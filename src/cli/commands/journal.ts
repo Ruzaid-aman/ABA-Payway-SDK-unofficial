@@ -10,10 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Command } from 'commander';
 import { resolveWebhookDir } from '../../config/data-root.js';
-import {
-  DEFAULT_JOURNAL_FILE_NAME,
-  type JournalEventV1,
-} from '../../journal/types.js';
+import { DEFAULT_JOURNAL_FILE_NAME, type JournalEventV1 } from '../../journal/types.js';
 import type { WebhookRecord } from '../../webhook/storage.js';
 import { explainTransaction, detectJournalAnomalies } from '../../journal/intelligence.js';
 import { reconcileTransactions } from '../../journal/reconcile.js';
@@ -81,7 +78,9 @@ export function registerJournalCommands(program: Command): void {
       const shown = filtered.slice(Math.max(0, filtered.length - last));
 
       if (opts.json) {
-        console.log(JSON.stringify({ file, total: events.length, shown: shown.length, malformed, events: shown }, null, 2));
+        console.log(
+          JSON.stringify({ file, total: events.length, shown: shown.length, malformed, events: shown }, null, 2),
+        );
         return;
       }
       if (events.length === 0) {
@@ -89,7 +88,9 @@ export function registerJournalCommands(program: Command): void {
         console.log(`  ${c.dim('Enable recording with --journal or PAYWAY_JOURNAL=1.')}`);
         return;
       }
-      console.log(`  ${c.dim(file)} — ${shown.length} of ${events.length} events${malformed > 0 ? `, ${malformed} malformed skipped` : ''}`);
+      console.log(
+        `  ${c.dim(file)} — ${shown.length} of ${events.length} events${malformed > 0 ? `, ${malformed} malformed skipped` : ''}`,
+      );
       for (const event of shown) console.log(`  ${eventLine(event)}`);
     });
 
@@ -98,7 +99,10 @@ export function registerJournalCommands(program: Command): void {
     .description('Reconstruct the chronological history of one transaction')
     .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
     .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
-    .option('--with-webhooks', 'Enrich callback steps with the persisted signature verdict/matched status from the webhook capture store')
+    .option(
+      '--with-webhooks',
+      'Enrich callback steps with the persisted signature verdict/matched status from the webhook capture store',
+    )
     .option('--json', 'Machine-readable output')
     .action((opts: { transactionId: string; dir?: string; withWebhooks?: boolean; json?: boolean }) => {
       const c = currentPalette();
@@ -144,9 +148,8 @@ export function registerJournalCommands(program: Command): void {
     .action((opts: { before?: string; dir?: string; json?: boolean }) => {
       const raw = opts.before ?? '30';
       const days = Number.parseFloat(raw);
-      const before = Number.isFinite(days) && !raw.includes('T')
-        ? new Date(Date.now() - days * 86_400_000)
-        : new Date(raw);
+      const before =
+        Number.isFinite(days) && !raw.includes('T') ? new Date(Date.now() - days * 86_400_000) : new Date(raw);
       if (Number.isNaN(before.getTime())) {
         console.log(`  Invalid --before value: ${raw}`);
         process.exitCode = 1;
@@ -167,7 +170,10 @@ export function registerJournalCommands(program: Command): void {
       'Join journal creations with webhook captures: which transactions never received a callback, which callbacks have no tracked creation.',
     )
     .option('--dir <path>', 'Journal directory (default: PAYWAY_JOURNAL_DIR or the PAYWAY_DATA_DIR data root)')
-    .option('--webhook-dir <path>', 'Webhook capture directory (default: PAYWAY_WEBHOOK_DIR or <data root>/webhook_data)')
+    .option(
+      '--webhook-dir <path>',
+      'Webhook capture directory (default: PAYWAY_WEBHOOK_DIR or <data root>/webhook_data)',
+    )
     .option('--json', 'Machine-readable output')
     .action((opts: { dir?: string; webhookDir?: string; json?: boolean }) => {
       const c = currentPalette();
@@ -182,7 +188,9 @@ export function registerJournalCommands(program: Command): void {
         `  ${c.bold('Reconcile:')} ${summary.total} transaction(s) — ${summary.withCallback} with callback, ` +
           `${c.red(String(summary.withoutCallback))} without, ${summary.webhookOnly} webhook-only`,
       );
-      console.log(`  ${c.dim(`journal: ${report.journalFile ?? '(not found)'} · webhook store: ${report.webhookFile ?? '(not found)'}`)}`);
+      console.log(
+        `  ${c.dim(`journal: ${report.journalFile ?? '(not found)'} · webhook store: ${report.webhookFile ?? '(not found)'}`)}`,
+      );
       if (summary.total === 0) {
         console.log(`  ${c.dim('Nothing to reconcile — enable recording with --journal or PAYWAY_JOURNAL=1.')}`);
         return;
@@ -219,11 +227,15 @@ export function registerJournalCommands(program: Command): void {
         `  ${c.bold('Exchanges:')} ${report.exchanges.total} total, ${(report.exchanges.retryRate * 100).toFixed(1)}% retried, ` +
           `${(report.exchanges.failureRate * 100).toFixed(1)}% of attempts failed`,
       );
-      console.log(`  ${c.bold('Window:')} ${report.window.from ?? '—'} → ${report.window.to ?? '—'} (${report.window.events} events)`);
+      console.log(
+        `  ${c.bold('Window:')} ${report.window.from ?? '—'} → ${report.window.to ?? '—'} (${report.window.events} events)`,
+      );
       if (report.latency.length > 0) {
         console.log(`\n  ${c.bold('Latency (successful responses):')}`);
         for (const row of report.latency.slice(0, 8)) {
-          console.log(`  ${c.dim(row.endpoint)}  n=${row.count}  p50=${row.p50}ms  p90=${row.p90}ms  p99=${row.p99}ms  max=${row.max}ms`);
+          console.log(
+            `  ${c.dim(row.endpoint)}  n=${row.count}  p50=${row.p50}ms  p90=${row.p90}ms  p99=${row.p99}ms  max=${row.max}ms`,
+          );
         }
       }
       if (report.topErrors.length > 0) {
@@ -290,7 +302,9 @@ export function registerJournalCommands(program: Command): void {
         return;
       }
       for (const anomaly of report.anomalies) {
-        console.log(`  ${c.yellow('▲')} [${anomaly.kind}] ${c.bold(anomaly.subject)} — ${anomaly.metric} (${anomaly.baseline})`);
+        console.log(
+          `  ${c.yellow('▲')} [${anomaly.kind}] ${c.bold(anomaly.subject)} — ${anomaly.metric} (${anomaly.baseline})`,
+        );
         console.log(`     ${c.dim(anomaly.detail)}`);
       }
       console.log(`\n  ${c.dim('Heuristics:')}`);

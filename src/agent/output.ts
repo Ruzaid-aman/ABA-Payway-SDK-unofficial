@@ -74,6 +74,8 @@ export function renderCreatePlanConfirmation(proposal: CreatePlanConfirmation): 
     lines.push(`Artifacts: ${action.artifacts.join('; ') || 'none'}`);
   }
   lines.push(`Assumptions: ${proposal.assumptions.join('; ') || 'none'}`);
-  lines.push(`Plan context: ${Object.keys(proposal.planContext).length > 0 ? JSON.stringify(proposal.planContext) : 'none'}`);
+  lines.push(
+    `Plan context: ${Object.keys(proposal.planContext).length > 0 ? JSON.stringify(proposal.planContext) : 'none'}`,
+  );
   return lines.join('\n');
 }

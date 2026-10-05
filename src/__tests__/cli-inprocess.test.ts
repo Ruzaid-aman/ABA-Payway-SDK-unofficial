@@ -105,7 +105,12 @@ describe('CLI in-process (runCli)', () => {
   it('explain --json prints one JSON doc; unknown code prints the error envelope', async () => {
     const known = await run(['explain', 'PTL36', '--json']);
     const doc = JSON.parse(known.stdout);
-    expect(doc).toMatchObject({ code: 'PTL36', family: 'refund', title: 'Transaction not found', sandboxVerified: true });
+    expect(doc).toMatchObject({
+      code: 'PTL36',
+      family: 'refund',
+      title: 'Transaction not found',
+      sandboxVerified: true,
+    });
     expect(doc.evidence).toMatch(/SANDBOX-FINDINGS §/);
 
     const all = await run(['explain', '--json']);
@@ -241,7 +246,9 @@ describe('CLI in-process (runCli)', () => {
 
   // 30s ceiling: walks the whole skills tree; the 5s default false-fails when
   // the machine is loaded (seen 2026-09-29 under parallel coverage runs).
-  it('skills doctor tolerates a missing packaged-skills directory and reports diagnostics', { timeout: 30_000 }, async () => {
+  it('skills doctor tolerates a missing packaged-skills directory and reports diagnostics', {
+    timeout: 30_000,
+  }, async () => {
     const { text, exitCode } = await run(['skills', 'doctor']);
     expect(text.length).toBeGreaterThan(0);
     expect(text).not.toContain('ENOENT'); // missing dir is reported, not crashed on
@@ -402,11 +409,16 @@ describe('checkout-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', '5',
-        '-r', 'ref-img-1',
-        '--return-url', 'https://example.com/return',
-        '--image', 'definitely-missing-image.png',
+        '-t',
+        'T',
+        '-a',
+        '5',
+        '-r',
+        'ref-img-1',
+        '--return-url',
+        'https://example.com/return',
+        '--image',
+        'definitely-missing-image.png',
       ]);
       expect(text).toContain('--image file not found');
       expect(exitCode).toBe(1);
@@ -424,11 +436,16 @@ describe('checkout-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', '5',
-        '-r', 'ref-payout-1',
-        '--return-url', 'https://example.com/return',
-        '--payout', '[{"acc":"000111222","amt":4}]',
+        '-t',
+        'T',
+        '-a',
+        '5',
+        '-r',
+        'ref-payout-1',
+        '--return-url',
+        'https://example.com/return',
+        '--payout',
+        '[{"acc":"000111222","amt":4}]',
       ]);
       expect(text).toContain('must equal the payment-link amount');
       expect(exitCode).toBe(1);
@@ -446,11 +463,16 @@ describe('checkout-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', '5',
-        '-r', 'ref-payout-2',
-        '--return-url', 'https://example.com/return',
-        '--payout', '[{"account":"000111222","amount":5}]',
+        '-t',
+        'T',
+        '-a',
+        '5',
+        '-r',
+        'ref-payout-2',
+        '--return-url',
+        'https://example.com/return',
+        '--payout',
+        '[{"account":"000111222","amount":5}]',
       ]);
       expect(text).toContain('--payout must be a JSON array of {acc, amt} objects');
       expect(exitCode).toBe(1);
@@ -471,11 +493,16 @@ describe('checkout-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', '5',
-        '-r', 'ref-payout-3',
-        '--return-url', 'https://example.com/return',
-        '--payout', '[{"acc":"","amt":5}]',
+        '-t',
+        'T',
+        '-a',
+        '5',
+        '-r',
+        'ref-payout-3',
+        '--return-url',
+        'https://example.com/return',
+        '--payout',
+        '[{"acc":"","amt":5}]',
       ]);
       expect(text).toContain('--payout must be a JSON array of {acc, amt} objects');
       expect(exitCode).toBe(1);
@@ -493,11 +520,16 @@ describe('checkout-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', '5',
-        '-r', 'ref-payout-4',
-        '--return-url', 'https://example.com/return',
-        '--payout', '[{"acc":"000111222","amt":-5}]',
+        '-t',
+        'T',
+        '-a',
+        '5',
+        '-r',
+        'ref-payout-4',
+        '--return-url',
+        'https://example.com/return',
+        '--payout',
+        '[{"acc":"000111222","amt":-5}]',
       ]);
       expect(text).toContain('--payout must be a JSON array of {acc, amt} objects');
       expect(exitCode).toBe(1);
@@ -519,11 +551,16 @@ describe('checkout-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', '5',
-        '-r', 'ref-json-envelope-1',
-        '--return-url', 'https://example.com/return',
-        '--payout', '[{"acc":"000111222","amt":4}]',
+        '-t',
+        'T',
+        '-a',
+        '5',
+        '-r',
+        'ref-json-envelope-1',
+        '--return-url',
+        'https://example.com/return',
+        '--payout',
+        '[{"acc":"000111222","amt":4}]',
         '--json',
       ]);
       const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
@@ -550,10 +587,14 @@ describe('checkout-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', 'not-a-number',
-        '-r', 'ref-json-envelope-2',
-        '--return-url', 'https://example.com/return',
+        '-t',
+        'T',
+        '-a',
+        'not-a-number',
+        '-r',
+        'ref-json-envelope-2',
+        '--return-url',
+        'https://example.com/return',
         '--json',
       ]);
       const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as {
@@ -583,11 +624,16 @@ describe('checkout-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', '5',
-        '-r', 'ref-img-cap-1',
-        '--return-url', 'https://example.com/return',
-        '--image', oversized,
+        '-t',
+        'T',
+        '-a',
+        '5',
+        '-r',
+        'ref-img-cap-1',
+        '--return-url',
+        'https://example.com/return',
+        '--image',
+        oversized,
       ]);
       expect(text).toContain('exceeding the documented 3MB payment-link image limit');
       expect(exitCode).toBe(1);
@@ -610,11 +656,16 @@ describe('checkout-form (in-process runCli)', () => {
       const { text } = await run([
         'payment-link',
         'create',
-        '-t', 'T',
-        '-a', '5',
-        '-r', 'ref-img-cap-2',
-        '--return-url', 'https://example.com/return',
-        '--image', exact,
+        '-t',
+        'T',
+        '-a',
+        '5',
+        '-r',
+        'ref-img-cap-2',
+        '--return-url',
+        'https://example.com/return',
+        '--image',
+        exact,
       ]);
       // No local rejection: the failure (if any) comes from the gateway call,
       // never from the size check.
@@ -662,10 +713,14 @@ describe('cof link-card-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'cof',
         'link-card-form',
-        '-c', 'customerabc123',
-        '-f', 'CITI_FLEX',
-        '-r', 'link67890',
-        '--out', outPath,
+        '-c',
+        'customerabc123',
+        '-f',
+        'CITI_FLEX',
+        '-r',
+        'link67890',
+        '--out',
+        outPath,
         '--no-open-page',
       ]);
       expect(exitCode).toBe(0);
@@ -699,9 +754,12 @@ describe('cof link-card-form (in-process runCli)', () => {
       const { text, exitCode } = await run([
         'cof',
         'link-card-form',
-        '-c', 'customerabc123',
-        '-f', 'CITO_FLEX',
-        '-r', 'stdoutreq01',
+        '-c',
+        'customerabc123',
+        '-f',
+        'CITO_FLEX',
+        '-r',
+        'stdoutreq01',
       ]);
       expect(exitCode).toBe(0);
       const html = stdoutChunks.join('');

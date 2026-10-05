@@ -5,7 +5,13 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { startMockPaywayServer, getMockPaywayUrl, stopMockPaywayServer } from '../test/index.js';
 import { createPayWayMcpServer } from '../mcp/server.js';
 
-const ENV_KEYS = ['PAYWAY_BASE_URL', 'PAYWAY_ENV', 'PAYWAY_MERCHANT_ID', 'PAYWAY_API_KEY', 'PAYWAY_MCP_ALLOW_MUTATIONS'];
+const ENV_KEYS = [
+  'PAYWAY_BASE_URL',
+  'PAYWAY_ENV',
+  'PAYWAY_MERCHANT_ID',
+  'PAYWAY_API_KEY',
+  'PAYWAY_MCP_ALLOW_MUTATIONS',
+];
 const savedEnv: Record<string, string | undefined> = {};
 
 beforeAll(() => {
@@ -97,7 +103,10 @@ describe('payway-sdk MCP server', () => {
 
   it('calls query_knowledge offline (search)', async () => {
     client = await connect();
-    const result = await client.callTool({ name: 'query_knowledge', arguments: { query: 'search', pattern: 'callback hmac' } });
+    const result = await client.callTool({
+      name: 'query_knowledge',
+      arguments: { query: 'search', pattern: 'callback hmac' },
+    });
     expect(result.isError).toBeUndefined();
     const payload = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as {
       tool: string;

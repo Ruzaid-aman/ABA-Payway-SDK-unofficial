@@ -196,7 +196,9 @@ maybeDescribe('SqliteWebhookStorage customerQr metadata (Customer Module callbac
   it('migrates a pre-customerQr database in place (customer_qr_json column added)', async () => {
     const dir = makeTempDir();
     const dbPath = path.join(dir, 'legacy.db');
-    const { DatabaseSync } = await import('node:sqlite') as { DatabaseSync: new (p: string) => { exec(sql: string): void; close(): void } };
+    const { DatabaseSync } = (await import('node:sqlite')) as {
+      DatabaseSync: new (p: string) => { exec(sql: string): void; close(): void };
+    };
     const legacy = new DatabaseSync(dbPath);
     legacy.exec(`CREATE TABLE callbacks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -213,7 +215,9 @@ maybeDescribe('SqliteWebhookStorage customerQr metadata (Customer Module callbac
       matched_status TEXT,
       replay INTEGER
     )`);
-    legacy.exec("INSERT INTO callbacks (record_id, received_at, headers_json, body) VALUES ('wh_legacy1', '2026-01-01T00:00:00Z', '{}', '{}')");
+    legacy.exec(
+      "INSERT INTO callbacks (record_id, received_at, headers_json, body) VALUES ('wh_legacy1', '2026-01-01T00:00:00Z', '{}', '{}')",
+    );
     legacy.close();
 
     const storage = await SqliteWebhookStorage.create(dbPath);
@@ -225,7 +229,6 @@ maybeDescribe('SqliteWebhookStorage customerQr metadata (Customer Module callbac
     storage.close();
   });
 });
-
 
 maybeDescribe('SqliteWebhookStorage.fromDb (shared handle)', () => {
   it('round-trips records on a caller-owned db the instance does not close', async () => {

@@ -28,9 +28,7 @@ describe('B5 error parity: gateway code classification', () => {
   });
 
   it('throws PayWaySignatureError for 200-wrapped status.code "01" with the endpoint hash-order hint', async () => {
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: '01', message: 'Wrong Hash' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '01', message: 'Wrong Hash' } }));
 
     const err = await payway.checkout.checkTransaction('TX-01').catch((e) => e);
     expect(err).toBeInstanceOf(PayWaySignatureError);
@@ -137,7 +135,21 @@ describe('B5 error parity: explain-code cof/qr families', () => {
   it('explains the qr string-code family', () => {
     for (const code of [
       // '8'/'12' intentionally stay in the gateway/payout families (existing pins).
-      '6', '16', '17', '18', '19', '21', '23', '32', '35', '44', '47', '48', '96', '102', '429',
+      '6',
+      '16',
+      '17',
+      '18',
+      '19',
+      '21',
+      '23',
+      '32',
+      '35',
+      '44',
+      '47',
+      '48',
+      '96',
+      '102',
+      '429',
     ]) {
       const ex = explainPayWayCode(code);
       expect(ex?.family, `family for ${code}`).toBe('qr');

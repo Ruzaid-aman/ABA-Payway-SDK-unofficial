@@ -286,7 +286,8 @@ export class AgentOrchestrator {
         'blocked',
         {
           code: 'UNTRUSTED_ACTION_VALUE',
-          message: 'Provider plan contained a resolved sensitive value in an executable action field; no action was executed.',
+          message:
+            'Provider plan contained a resolved sensitive value in an executable action field; no action was executed.',
         },
         { sessionId, plan: normalized.plan, request },
       );
@@ -544,13 +545,17 @@ export class AgentOrchestrator {
               executionId: record.executionId,
               correlationId: execCtx.correlationId,
             });
-            this.appendEvent(sessionId, 'artifact', { artifactId: bundle.metadata.artifactId, path: bundle.metadata.path });
+            this.appendEvent(sessionId, 'artifact', {
+              artifactId: bundle.metadata.artifactId,
+              path: bundle.metadata.path,
+            });
             entry.artifact = this.scrub(bundle.metadata);
             // Phase 2: artifact.written lands in the transaction journal too
             // (env-gated — the agent journal follows PAYWAY_JOURNAL).
             artifactJournalEmitter()?.emit({
               kind: 'artifact.written',
-              correlationId: execCtx.correlationId ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`,
+              correlationId:
+                execCtx.correlationId ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`,
               executionId: record.executionId,
               transactionId: record.transactionId ?? undefined,
               command: 'save_artifact',
@@ -624,12 +629,14 @@ export class AgentOrchestrator {
         ]
           .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== '')
           .map(([label, value]) => `${label}: ${value}`);
-        const amount = typeof fields.amount === 'number' && typeof fields.currency === 'string'
-          ? `${fields.amount} ${fields.currency}`
-          : 'not applicable';
-        const transactionIdStrategy = 'transactionId' in fields && typeof fields.transactionId === 'string'
-          ? `${transactionIdSources[actionIndex] === 'explicit' ? 'explicit' : 'generated'}: ${fields.transactionId}`
-          : 'not used for this route';
+        const amount =
+          typeof fields.amount === 'number' && typeof fields.currency === 'string'
+            ? `${fields.amount} ${fields.currency}`
+            : 'not applicable';
+        const transactionIdStrategy =
+          'transactionId' in fields && typeof fields.transactionId === 'string'
+            ? `${transactionIdSources[actionIndex] === 'explicit' ? 'explicit' : 'generated'}: ${fields.transactionId}`
+            : 'not used for this route';
         const artifacts = this.artifactsForCreateTool(toolOf(action));
         return {
           route: toolOf(action),
@@ -669,10 +676,7 @@ export class AgentOrchestrator {
   }
 
   private secretValues(): string[] {
-    const values: string[] = [
-      ...resolvedSensitiveValues(this.context),
-      process.env.PAYWAY_AGENT_API_KEY ?? '',
-    ];
+    const values: string[] = [...resolvedSensitiveValues(this.context), process.env.PAYWAY_AGENT_API_KEY ?? ''];
     const collect = (value: unknown): void => {
       if (typeof value === 'string') values.push(value);
       else if (Array.isArray(value)) value.forEach(collect);

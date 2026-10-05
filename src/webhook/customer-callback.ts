@@ -124,11 +124,7 @@ const STRING_FIELDS = [
 
 const NUMBER_FIELDS = ['original_amount', 'payment_status_code', 'payment_amount'] as const;
 
-const PUBLISHED_FIELDS = new Set<string>([
-  ...STRING_FIELDS,
-  ...NUMBER_FIELDS,
-  'customer',
-]);
+const PUBLISHED_FIELDS = new Set<string>([...STRING_FIELDS, ...NUMBER_FIELDS, 'customer']);
 
 function requireRecord(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {

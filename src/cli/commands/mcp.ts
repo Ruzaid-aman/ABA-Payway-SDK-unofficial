@@ -11,8 +11,13 @@ import { resolveAllowMutations, runMcpStdio } from '../../mcp/server.js';
 export function registerMcpCommand(program: Command): void {
   program
     .command('mcp')
-    .description('Serve the PayWay tool catalog as an MCP stdio server (read-only by default; --allow-mutations opts in)')
-    .option('--allow-mutations', 'Expose mutation-class tools (create QR/checkout/link) — the host client owns user confirmation')
+    .description(
+      'Serve the PayWay tool catalog as an MCP stdio server (read-only by default; --allow-mutations opts in)',
+    )
+    .option(
+      '--allow-mutations',
+      'Expose mutation-class tools (create QR/checkout/link) — the host client owns user confirmation',
+    )
     // NOTE: no default on --allow-mutations (audit S04) — a defined `false`
     // would override PAYWAY_MCP_ALLOW_MUTATIONS=1 before resolveAllowMutations
     // ever sees the environment. Precedence: explicit flag > env > off.

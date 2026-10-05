@@ -26,7 +26,10 @@ describe('built CLI', () => {
   ])('refund missing required options emits a JSON usage envelope: %j', async (...argv) => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'payway-cli-'));
     temporaryDirectories.push(cwd);
-    const result = await runBuiltCli(argv, { cwd, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', APPDATA: cwd } });
+    const result = await runBuiltCli(argv, {
+      cwd,
+      env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', APPDATA: cwd },
+    });
     expect(result.status).toBe(1);
     expect(JSON.parse(result.stdout).error.kind).toBe('validation');
   });

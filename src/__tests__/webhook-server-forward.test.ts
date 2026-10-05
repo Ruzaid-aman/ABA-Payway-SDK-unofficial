@@ -39,7 +39,10 @@ function getFreePort(): Promise<number> {
   });
 }
 
-function startReceiver(captured: ReceivedRequest[], status = 200): Promise<{ port: number; close: () => Promise<void> }> {
+function startReceiver(
+  captured: ReceivedRequest[],
+  status = 200,
+): Promise<{ port: number; close: () => Promise<void> }> {
   return new Promise((resolve) => {
     const portPromise = getFreePort().then((port) => {
       const srv = http.createServer((req, res) => {
@@ -57,7 +60,12 @@ function startReceiver(captured: ReceivedRequest[], status = 200): Promise<{ por
   });
 }
 
-function postJson(port: number, path: string, body: string, headers?: Record<string, string>): Promise<{ statusCode: number; body: string }> {
+function postJson(
+  port: number,
+  path: string,
+  body: string,
+  headers?: Record<string, string>,
+): Promise<{ statusCode: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = http.request(
       {
@@ -100,7 +108,12 @@ describe('WebhookServer forwardTo (W-1)', () => {
   it('forwards a captured online callback to the receiver with the original signature header', async () => {
     const captured: ReceivedRequest[] = [];
     const receiver = await startReceiver(captured);
-    server = createWebhookServer(storage, { port: serverPort, quiet: true, forwardTo: `http://127.0.0.1:${receiver.port}/webhooks/aba`, apiKey: API_KEY });
+    server = createWebhookServer(storage, {
+      port: serverPort,
+      quiet: true,
+      forwardTo: `http://127.0.0.1:${receiver.port}/webhooks/aba`,
+      apiKey: API_KEY,
+    });
     await server.start();
 
     const body = JSON.stringify({ tran_id: 'fwd-1', status: 'APPROVED' });
@@ -122,10 +135,18 @@ describe('WebhookServer forwardTo (W-1)', () => {
   it('still captures and answers 200 when the forward receiver is unreachable', async () => {
     // Reserve then close a port so nothing is listening on it.
     const deadPort = await getFreePort();
-    server = createWebhookServer(storage, { port: serverPort, quiet: true, forwardTo: `http://127.0.0.1:${deadPort}/cb` });
+    server = createWebhookServer(storage, {
+      port: serverPort,
+      quiet: true,
+      forwardTo: `http://127.0.0.1:${deadPort}/cb`,
+    });
     await server.start();
 
-    const res = await postJson(serverPort, '/aba-payway-webhook', JSON.stringify({ tran_id: 'fwd-2', status: 'PENDING' }));
+    const res = await postJson(
+      serverPort,
+      '/aba-payway-webhook',
+      JSON.stringify({ tran_id: 'fwd-2', status: 'PENDING' }),
+    );
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toMatchObject({ acknowledged: true });
@@ -136,7 +157,11 @@ describe('WebhookServer forwardTo (W-1)', () => {
   it('forwards payment-link pushbacks (no-hash contract) to the receiver', async () => {
     const captured: ReceivedRequest[] = [];
     const receiver = await startReceiver(captured);
-    server = createWebhookServer(storage, { port: serverPort, quiet: true, forwardTo: `http://127.0.0.1:${receiver.port}/pl` });
+    server = createWebhookServer(storage, {
+      port: serverPort,
+      quiet: true,
+      forwardTo: `http://127.0.0.1:${receiver.port}/pl`,
+    });
     await server.start();
 
     const body = JSON.stringify({ tran_id: 'pl-1', status: 0, merchant_ref_no: 'ref-1' });
@@ -153,7 +178,11 @@ describe('WebhookServer forwardTo (W-1)', () => {
   it('forwards offline KHQR notifications after raw capture', async () => {
     const captured: ReceivedRequest[] = [];
     const receiver = await startReceiver(captured);
-    server = createWebhookServer(storage, { port: serverPort, quiet: true, forwardTo: `http://127.0.0.1:${receiver.port}/khqr` });
+    server = createWebhookServer(storage, {
+      port: serverPort,
+      quiet: true,
+      forwardTo: `http://127.0.0.1:${receiver.port}/khqr`,
+    });
     await server.start();
 
     const body = JSON.stringify({

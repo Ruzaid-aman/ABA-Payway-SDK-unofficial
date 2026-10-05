@@ -38,7 +38,10 @@ export function renderTable(
   });
 
   const formatRow = (values: string[]): string =>
-    values.map((value, i) => truncate(value, widths[i]).padEnd(widths[i])).join('  ').trimEnd();
+    values
+      .map((value, i) => truncate(value, widths[i]).padEnd(widths[i]))
+      .join('  ')
+      .trimEnd();
 
   const lines = [formatRow(columns.map((col) => col.header))];
   lines.push(widths.map((w) => '─'.repeat(w)).join('  '));

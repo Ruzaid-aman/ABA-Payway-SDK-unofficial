@@ -28,12 +28,12 @@ const VALID_PARAMS: CreatePaymentLinkParams = {
 
 type AuthCall = { path: string; authPayload: Record<string, unknown> };
 
-function makeDomain(config: PayWayConfig = DUMMY_CONFIG): { domain: ReturnType<typeof createPaymentLinkDomain>; calls: AuthCall[] } {
+function makeDomain(config: PayWayConfig = DUMMY_CONFIG): {
+  domain: ReturnType<typeof createPaymentLinkDomain>;
+  calls: AuthCall[];
+} {
   const calls: AuthCall[] = [];
-  const requestWithMerchantAuth = async <T>(
-    path: string,
-    authPayload: Record<string, unknown>,
-  ): Promise<T> => {
+  const requestWithMerchantAuth = async <T>(path: string, authPayload: Record<string, unknown>): Promise<T> => {
     calls.push({ path, authPayload });
     return { status: { code: '00' } } as T;
   };
@@ -82,11 +82,13 @@ describe('paymentLink.create payout (audit D2)', () => {
     // the pre-refactor CLI copy used to let it through.
     expect(() => domain.create({ ...VALID_PARAMS, payout: [{ acc: '', amt: 5 }] })).toThrow(/non-empty string "acc"/);
     // non-numeric amt
-    expect(() => domain.create({ ...VALID_PARAMS, payout: [{ acc: '000', amt: '5' } as unknown as { acc: string; amt: number }] })).toThrow(
-      PayWayConfigError,
-    );
+    expect(() =>
+      domain.create({ ...VALID_PARAMS, payout: [{ acc: '000', amt: '5' } as unknown as { acc: string; amt: number }] }),
+    ).toThrow(PayWayConfigError);
     // negative amt — same shared-validator gap the old CLI copy missed.
-    expect(() => domain.create({ ...VALID_PARAMS, payout: [{ acc: '000', amt: -5 }] })).toThrow(/non-negative numeric "amt"/);
+    expect(() => domain.create({ ...VALID_PARAMS, payout: [{ acc: '000', amt: -5 }] })).toThrow(
+      /non-negative numeric "amt"/,
+    );
   });
 
   it('throws for an empty payout string', () => {
@@ -113,7 +115,14 @@ describe('paymentLink.create payout (audit D2)', () => {
 
   it('does not warn when the payout total equals the link amount', async () => {
     const { domain } = makeDomain();
-    await domain.create({ ...VALID_PARAMS, amount: 5, payout: [{ acc: '000', amt: 2 }, { acc: '111', amt: 3 }] });
+    await domain.create({
+      ...VALID_PARAMS,
+      amount: 5,
+      payout: [
+        { acc: '000', amt: 2 },
+        { acc: '111', amt: 3 },
+      ],
+    });
 
     expect(console.warn).not.toHaveBeenCalled();
   });
@@ -137,7 +146,9 @@ describe('payment-link merchantRefNo 50-char cap (advisory, strict escalates)', 
     await domain.create({ ...VALID_PARAMS, merchantRefNo: 'r'.repeat(51) });
 
     expect(calls).toHaveLength(1);
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("merchantRefNo exceeds the gateway's 50-character cap"));
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("merchantRefNo exceeds the gateway's 50-character cap"),
+    );
   });
 
   it('does not warn at exactly 50 characters', async () => {

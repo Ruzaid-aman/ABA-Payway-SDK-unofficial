@@ -152,8 +152,12 @@ describe('TLS certificate failure classification (createNetworkError input)', ()
   });
 
   it('does NOT classify ordinary network failures as TLS failures', () => {
-    expect(findTlsCertificateFailure(wrap(Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' })))).toBeUndefined();
-    expect(findTlsCertificateFailure(wrap(Object.assign(new Error('getaddrinfo ENOTFOUND gateway'), { code: 'ENOTFOUND' })))).toBeUndefined();
+    expect(
+      findTlsCertificateFailure(wrap(Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }))),
+    ).toBeUndefined();
+    expect(
+      findTlsCertificateFailure(wrap(Object.assign(new Error('getaddrinfo ENOTFOUND gateway'), { code: 'ENOTFOUND' }))),
+    ).toBeUndefined();
     expect(findTlsCertificateFailure(new Error('plain error without cause'))).toBeUndefined();
   });
 

@@ -8,9 +8,7 @@ describe('mapPollOutcomeToExitCode', () => {
   });
 
   it('maps consecutive poll errors to API failure (2)', () => {
-    expect(
-      mapPollOutcomeToExitCode({ terminalReached: false, abortedReason: 'max_consecutive_errors' }),
-    ).toBe(2);
+    expect(mapPollOutcomeToExitCode({ terminalReached: false, abortedReason: 'max_consecutive_errors' })).toBe(2);
   });
 
   it('maps timeout to network/unknown (3)', () => {

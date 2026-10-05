@@ -82,9 +82,7 @@ export function safeParseArgs(rest: string): string[] {
   return rest.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((t) => t.replace(/^["']|["']$/g, '')) ?? [];
 }
 
-export type DispatchDecision =
-  | { ok: true; tokens: string[] }
-  | { ok: false; message: string };
+export type DispatchDecision = { ok: true; tokens: string[] } | { ok: false; message: string };
 
 /**
  * Validate a `:run` payload against the set of registered top-level command

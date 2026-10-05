@@ -74,13 +74,13 @@ describe('addProfile validation', () => {
   it('rejects blank names, invalid environments, missing credentials, oversized notes, duplicates, and a ninth profile', () => {
     const store = createEmptyProfileStore();
     expect(() => addProfile(store, { ...baseProfile, name: '   ' })).toThrow(/name is required/);
-    expect(() =>
-      addProfile(store, { ...baseProfile, name: 'x', environment: 'staging' as never }),
-    ).toThrow(/sandbox or production/);
+    expect(() => addProfile(store, { ...baseProfile, name: 'x', environment: 'staging' as never })).toThrow(
+      /sandbox or production/,
+    );
     expect(() => addProfile(store, { ...baseProfile, name: 'x', merchantId: '' })).toThrow(/Merchant ID and API key/);
-    expect(() =>
-      addProfile(store, { ...baseProfile, name: 'x', note: 'n'.repeat(301) }),
-    ).toThrow(/at most 300 characters/);
+    expect(() => addProfile(store, { ...baseProfile, name: 'x', note: 'n'.repeat(301) })).toThrow(
+      /at most 300 characters/,
+    );
     addProfile(store, baseProfile);
     expect(() => addProfile(store, { ...baseProfile })).toThrow(/already exists/);
     for (let i = store.profiles.length; i < 8; i += 1) {

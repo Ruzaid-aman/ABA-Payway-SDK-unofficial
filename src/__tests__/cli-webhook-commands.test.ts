@@ -120,7 +120,14 @@ describe('webhook verify-callback (W-4)', () => {
   it('rejects an invalid signature with exit 1 and the failure reason', async () => {
     process.env.PAYWAY_API_KEY = 'cli-key-1';
     const body = { tran_id: 'vc-2', status: 'APPROVED' };
-    const { text, exitCode } = await run(['webhook', 'verify-callback', '--body', JSON.stringify(body), '--sig', 'bogus-signature']);
+    const { text, exitCode } = await run([
+      'webhook',
+      'verify-callback',
+      '--body',
+      JSON.stringify(body),
+      '--sig',
+      'bogus-signature',
+    ]);
     expect(exitCode).toBe(1);
     expect(text).toContain('INVALID');
     expect(text).toContain('signature_mismatch');
@@ -131,7 +138,15 @@ describe('webhook verify-callback (W-4)', () => {
     process.env.PAYWAY_API_KEY = 'cli-key-1';
     const body = { tran_id: 'vc-3', status: 'DECLINED' };
     const sig = signCallbackBody(body, 'cli-key-1');
-    const { text, exitCode } = await run(['webhook', 'verify-callback', '--body', JSON.stringify(body), '--sig', sig, '--json']);
+    const { text, exitCode } = await run([
+      'webhook',
+      'verify-callback',
+      '--body',
+      JSON.stringify(body),
+      '--sig',
+      sig,
+      '--json',
+    ]);
     expect(exitCode).toBeUndefined();
     const parsed = JSON.parse(stripJson(text)) as { valid: boolean; reason: string | null; tranId: string };
     expect(parsed).toEqual({ valid: true, reason: null, tranId: 'vc-3' });
@@ -202,7 +217,14 @@ describe('webhook resend (W-3)', () => {
     const captured: Array<{ body: string; headers: Record<string, string | string[] | undefined> }> = [];
     const receiver = await startReceiver(captured);
     try {
-      const { text, exitCode } = await run(['webhook', 'resend', '--record', id, '--to', `http://127.0.0.1:${receiver.port}/cb`]);
+      const { text, exitCode } = await run([
+        'webhook',
+        'resend',
+        '--record',
+        id,
+        '--to',
+        `http://127.0.0.1:${receiver.port}/cb`,
+      ]);
       expect(exitCode).toBeUndefined();
       expect(text).toContain('delivered');
       expect(captured.length).toBe(1);
@@ -218,7 +240,15 @@ describe('webhook resend (W-3)', () => {
     const captured: Array<{ body: string; headers: Record<string, string | string[] | undefined> }> = [];
     const receiver = await startReceiver(captured);
     try {
-      const { text, exitCode } = await run(['webhook', 'resend', '--record', id, '--to', `http://127.0.0.1:${receiver.port}/cb`, '--json']);
+      const { text, exitCode } = await run([
+        'webhook',
+        'resend',
+        '--record',
+        id,
+        '--to',
+        `http://127.0.0.1:${receiver.port}/cb`,
+        '--json',
+      ]);
       expect(exitCode).toBeUndefined();
       const parsed = JSON.parse(stripJson(text)) as { record: string; httpStatus: number; ok: boolean };
       expect(parsed.record).toBe(id);
@@ -237,7 +267,15 @@ describe('webhook resend (W-3)', () => {
   it('exits 3 when the target is unreachable (network kind)', async () => {
     seedCaptures();
     // Nothing listens on this port.
-    const { text, exitCode } = await run(['webhook', 'resend', '--record', 'wh_seed1', '--to', 'http://127.0.0.1:9/x', '--json']);
+    const { text, exitCode } = await run([
+      'webhook',
+      'resend',
+      '--record',
+      'wh_seed1',
+      '--to',
+      'http://127.0.0.1:9/x',
+      '--json',
+    ]);
     expect(exitCode).toBe(3);
     const parsed = JSON.parse(stripJson(text)) as { error: { kind: string; exitCode: number } };
     expect(parsed.error.kind).toBe('network');
@@ -250,7 +288,16 @@ describe('webhook trigger (W-2)', () => {
     const captured: Array<{ body: string; headers: Record<string, string | string[] | undefined> }> = [];
     const receiver = await startReceiver(captured);
     try {
-      const { text, exitCode } = await run(['webhook', 'trigger', '--url', `http://127.0.0.1:${receiver.port}/cb`, '--event', 'payment.approved', '-t', 'trg-1']);
+      const { text, exitCode } = await run([
+        'webhook',
+        'trigger',
+        '--url',
+        `http://127.0.0.1:${receiver.port}/cb`,
+        '--event',
+        'payment.approved',
+        '-t',
+        'trg-1',
+      ]);
       expect(exitCode).toBeUndefined();
       expect(text).toContain('signed');
       expect(captured.length).toBe(1);
@@ -291,13 +338,28 @@ describe('webhook trigger (W-2)', () => {
   });
 
   it('rejects an unknown event with exit 1', async () => {
-    const { text, exitCode } = await run(['webhook', 'trigger', '--url', 'http://127.0.0.1:1/x', '--event', 'payment.exploded']);
+    const { text, exitCode } = await run([
+      'webhook',
+      'trigger',
+      '--url',
+      'http://127.0.0.1:1/x',
+      '--event',
+      'payment.exploded',
+    ]);
     expect(exitCode).toBe(1);
     expect(text).toContain('Unknown fixture event');
   });
 
   it('requires the API key for signed online fixtures (validation error, exit 1)', async () => {
-    const { text, exitCode } = await run(['webhook', 'trigger', '--url', 'http://127.0.0.1:1/x', '--event', 'payment.approved', '--json']);
+    const { text, exitCode } = await run([
+      'webhook',
+      'trigger',
+      '--url',
+      'http://127.0.0.1:1/x',
+      '--event',
+      'payment.approved',
+      '--json',
+    ]);
     expect(exitCode).toBe(1);
     const parsed = JSON.parse(stripJson(text)) as { error: { kind: string } };
     expect(parsed.error.kind).toBe('validation');
@@ -308,9 +370,18 @@ describe('webhook trigger (W-2)', () => {
     const rx = await startReceiver(captured);
     try {
       const { text } = await run([
-        'webhook', 'trigger', '--event', 'cof-link.linked',
-        '--url', `http://127.0.0.1:${rx.port}/aba-payway-webhook`,
-        '--ctid', 'fxtcust9', '--tran-id', 'fxtreq9', '--api-key', 'cli-key-1',
+        'webhook',
+        'trigger',
+        '--event',
+        'cof-link.linked',
+        '--url',
+        `http://127.0.0.1:${rx.port}/aba-payway-webhook`,
+        '--ctid',
+        'fxtcust9',
+        '--tran-id',
+        'fxtreq9',
+        '--api-key',
+        'cli-key-1',
       ]);
       expect(text).toContain('body `hash`');
       expect(text).toContain('cof token list');

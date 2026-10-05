@@ -125,7 +125,11 @@ export class WebhookForwarder {
    */
   async forward(
     body: string,
-    context: { headers?: Record<string, string | string[] | undefined>; sourceRequest?: IncomingMessage; label?: string } = {},
+    context: {
+      headers?: Record<string, string | string[] | undefined>;
+      sourceRequest?: IncomingMessage;
+      label?: string;
+    } = {},
   ): Promise<ForwardOutcome> {
     const label = context.label ?? 'callback';
     const headers: Record<string, string> = {
@@ -137,9 +141,13 @@ export class WebhookForwarder {
 
     // Re-deliver the original HMAC header when present so the receiving app
     // can run its full verifyCallback path — not a blank unsigned delivery.
-    const signature = pickHeader(context.headers ?? {}, 'x-payway-hmac-sha512')
-      ?? (context.sourceRequest?.headers
-        ? pickHeader(context.sourceRequest.headers as Record<string, string | string[] | undefined>, 'x-payway-hmac-sha512')
+    const signature =
+      pickHeader(context.headers ?? {}, 'x-payway-hmac-sha512') ??
+      (context.sourceRequest?.headers
+        ? pickHeader(
+            context.sourceRequest.headers as Record<string, string | string[] | undefined>,
+            'x-payway-hmac-sha512',
+          )
         : undefined);
     if (signature !== undefined) headers['X-PAYWAY-HMAC-SHA512'] = signature;
 
@@ -163,7 +171,8 @@ export class WebhookForwarder {
       if (error instanceof Error && error.name === 'TimeoutError') {
         this.stats.timedOut += 1;
         this.stats.failed -= 1;
-        if (!this.quiet) this.logLine(`  → forward ${label} to ${this.url} aborted after ${this.timeoutMs}ms (receiver too slow)`);
+        if (!this.quiet)
+          this.logLine(`  → forward ${label} to ${this.url} aborted after ${this.timeoutMs}ms (receiver too slow)`);
         return { ok: false, error: `timeout after ${this.timeoutMs}ms` };
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -234,7 +243,11 @@ export class WebhookForwardQueue {
    */
   enqueue(
     body: string,
-    context: { headers?: Record<string, string | string[] | undefined>; sourceRequest?: IncomingMessage; label?: string } = {},
+    context: {
+      headers?: Record<string, string | string[] | undefined>;
+      sourceRequest?: IncomingMessage;
+      label?: string;
+    } = {},
   ): boolean {
     if (this.stopped) return false;
     if (this.pending.length >= this.maxQueue) {

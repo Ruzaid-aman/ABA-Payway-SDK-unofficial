@@ -28,13 +28,13 @@ const STRICT_CONFIG = { ...TEST_CONFIG, strictValidation: true } as unknown as P
 type DomainConfig = PayWayConfig & { merchantId: string; apiKey: string };
 
 function makeCheckout(config: DomainConfig = TEST_CONFIG as unknown as DomainConfig) {
-  const request = async <T>(path: string): Promise<T> => ({ path, status: { code: '00' } } as T);
-  const requestWithMerchantAuth = async <T>(path: string): Promise<T> => ({ path, status: { code: '00' } } as T);
+  const request = async <T>(path: string): Promise<T> => ({ path, status: { code: '00' } }) as T;
+  const requestWithMerchantAuth = async <T>(path: string): Promise<T> => ({ path, status: { code: '00' } }) as T;
   return createCheckoutDomain(config, request, requestWithMerchantAuth, 'https://sandbox.example');
 }
 
 function makeKhqr(config: DomainConfig = TEST_CONFIG as unknown as DomainConfig) {
-  const request = async <T>(path: string): Promise<T> => ({ path, status: { code: '00' } } as T);
+  const request = async <T>(path: string): Promise<T> => ({ path, status: { code: '00' } }) as T;
   return createKhqrDomain(config, request);
 }
 
@@ -171,12 +171,12 @@ describe('purchase advisory caps (buildPurchasePayload)', () => {
 
   it('paymentOption outside official ∪ legacy throws citing PUR-003; official values are silent; legacy values advise without throwing', () => {
     const payway = makeCheckout();
-    expect(() =>
-      payway.createTransaction({ ...base, paymentOption: 'not_an_option' as unknown as 'abapay' }),
-    ).toThrow(PayWayConfigError);
-    expect(() =>
-      payway.createTransaction({ ...base, paymentOption: 'not_an_option' as unknown as 'abapay' }),
-    ).toThrow(/PUR-003/);
+    expect(() => payway.createTransaction({ ...base, paymentOption: 'not_an_option' as unknown as 'abapay' })).toThrow(
+      PayWayConfigError,
+    );
+    expect(() => payway.createTransaction({ ...base, paymentOption: 'not_an_option' as unknown as 'abapay' })).toThrow(
+      /PUR-003/,
+    );
     // Official value: silent in normal mode.
     payway.createTransaction({ ...base, paymentOption: 'cards' });
     expect(console.warn).not.toHaveBeenCalled();
@@ -194,7 +194,6 @@ describe('purchase advisory caps (buildPurchasePayload)', () => {
     ).not.toThrow();
   });
 });
-
 
 describe('getTransactionList advisory limits', () => {
   beforeEach(() => {
@@ -279,7 +278,9 @@ describe('validateAmountFloor', () => {
   // mode — rule QR-009, OFFICIAL_DOCUMENTATION + OFFICIAL_API_BEHAVIOR
   // (gateway error code 47), so it no longer routes through warnAdvisory.
   it('USD 0.005 throws citing QR-009 (below 0.01 floor)', () => {
-    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.005, 'USD', 'generate-qr')).toThrow(PayWayConfigError);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.005, 'USD', 'generate-qr')).toThrow(
+      PayWayConfigError,
+    );
     expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.005, 'USD', 'generate-qr')).toThrow(/QR-009/);
   });
 
@@ -301,8 +302,12 @@ describe('validateAmountFloor', () => {
 
   it('wired contexts cover qr, cof payment, payout and payment-link', () => {
     expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'generate-qr')).toThrow(/QR-009/);
-    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payment-credential')).toThrow(/QR-009/);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payment-credential')).toThrow(
+      /QR-009/,
+    );
     expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payout')).toThrow(/QR-009/);
-    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payment-link create')).toThrow(/QR-009/);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payment-link create')).toThrow(
+      /QR-009/,
+    );
   });
 });

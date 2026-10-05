@@ -63,9 +63,7 @@ describe('renderHumanResult', () => {
 
 describe('serializeCommandResult', () => {
   it('produces JSON that validates against the agent-command/v1 schema', () => {
-    const serialized = serializeCommandResult(
-      baseResult({ message: 'ok', sessionId: 's1' }),
-    );
+    const serialized = serializeCommandResult(baseResult({ message: 'ok', sessionId: 's1' }));
     const parsed = JSON.parse(serialized) as AgentCommandResultV1;
     expect(parsed.version).toBe('agent-command/v1');
     expect(parsed.message).toBe('ok');

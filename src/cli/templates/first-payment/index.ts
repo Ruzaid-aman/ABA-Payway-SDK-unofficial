@@ -43,6 +43,4 @@ try {
 }
 `;
 
-export const FIRST_PAYMENT_TEMPLATE: readonly TemplateFile[] = [
-  { path: 'payway-first-payment.mjs', content: starter },
-];
+export const FIRST_PAYMENT_TEMPLATE: readonly TemplateFile[] = [{ path: 'payway-first-payment.mjs', content: starter }];

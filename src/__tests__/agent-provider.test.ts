@@ -400,8 +400,12 @@ describe('provider adapter - strict-JSON repair round', () => {
     const request = 'make me a 10 USD QR';
     const fetchImpl = vi
       .fn()
-      .mockResolvedValueOnce(mockResponse({ choices: [{ message: { role: 'assistant', content: invalidPlanJson() } }] }))
-      .mockResolvedValueOnce(mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }));
+      .mockResolvedValueOnce(
+        mockResponse({ choices: [{ message: { role: 'assistant', content: invalidPlanJson() } }] }),
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
+      );
     const adapter = createProviderAdapter(strictConfig(), fetchImpl);
 
     const plan = await adapter.propose(request);
@@ -444,7 +448,9 @@ describe('provider adapter - transient error retry', () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(mockResponse({ error: { message: 'ResourceExhausted' } }, 503, false))
-      .mockResolvedValueOnce(mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }));
+      .mockResolvedValueOnce(
+        mockResponse({ choices: [{ message: { role: 'assistant', content: validPlanJson(request) } }] }),
+      );
     const adapter = createProviderAdapter(strictConfig(), fetchImpl);
 
     const pending = adapter.propose(request);

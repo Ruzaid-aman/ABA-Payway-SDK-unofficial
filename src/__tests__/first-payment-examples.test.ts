@@ -98,7 +98,13 @@ describe('Task 7 acceptance: the full payment lifecycle', () => {
     // Replay the same signed callback body 3 more times. The signature
     // covers the exact body — replaying it verbatim (header included) is
     // what a genuine duplicate delivery looks like.
-    const replayBody = { tran_id: transactionId, status: '0', payway_amount: '1', payway_currency: 'USD', apex_mark: '000000' };
+    const replayBody = {
+      tran_id: transactionId,
+      status: '0',
+      payway_amount: '1',
+      payway_currency: 'USD',
+      apex_mark: '000000',
+    };
     for (let i = 0; i < 3; i++) {
       const replay = await api('/api/payway/callback', {
         method: 'POST',
@@ -162,7 +168,10 @@ describe('Task 7 acceptance: the full payment lifecycle', () => {
     // Wrong key.
     const badSig = await api('/api/payway/callback', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-payway-hmac-sha512': sign({ tran_id: transactionId, status: '0' }, 'wrong-key') },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-payway-hmac-sha512': sign({ tran_id: transactionId, status: '0' }, 'wrong-key'),
+      },
       body: JSON.stringify({ tran_id: transactionId, status: '0' }),
     });
     expect(badSig.status).toBe(401);
@@ -172,7 +181,12 @@ describe('Task 7 acceptance: the full payment lifecycle', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-payway-hmac-sha512': sign({ tran_id: transactionId, status: '0', payway_amount: '1', payway_currency: 'USD' }),
+        'x-payway-hmac-sha512': sign({
+          tran_id: transactionId,
+          status: '0',
+          payway_amount: '1',
+          payway_currency: 'USD',
+        }),
       },
       body: JSON.stringify({ tran_id: transactionId, status: '0', payway_amount: '999', payway_currency: 'USD' }),
     });

@@ -89,7 +89,9 @@ async function runProviderStage(ctx: StageContext): Promise<StageResult> {
   if (placement === 'dotenv') {
     await ctx.io.writeEnvVar('PAYWAY_AGENT_API_KEY', key);
   } else if (placement === 'user') {
-    ctx.io.note('Persist for future sessions:\n  [Environment]::SetEnvironmentVariable("PAYWAY_AGENT_API_KEY", "<key>", "User")');
+    ctx.io.note(
+      'Persist for future sessions:\n  [Environment]::SetEnvironmentVariable("PAYWAY_AGENT_API_KEY", "<key>", "User")',
+    );
   } else {
     ctx.io.note('Key set for this session only — re-export it in new shells.');
   }
@@ -158,7 +160,11 @@ async function runProfileStage(ctx: StageContext): Promise<StageResult> {
   addProfile(store, profile);
   if (!store.defaultProfile) setDefaultProfile(store, profile.name);
   saveProfileStore(store);
-  return { name: 'profile', status: 'done', notes: [`Profile ${profile.name} (${profile.environment})`].concat(profile.khqr ? ['KHQR configured'] : []) };
+  return {
+    name: 'profile',
+    status: 'done',
+    notes: [`Profile ${profile.name} (${profile.environment})`].concat(profile.khqr ? ['KHQR configured'] : []),
+  };
 }
 
 async function runCallbackStage(ctx: StageContext): Promise<StageResult> {

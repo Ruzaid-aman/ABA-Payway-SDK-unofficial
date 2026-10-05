@@ -58,7 +58,8 @@ async function runJournalTimeline(args: Record<string, unknown>): Promise<McpExt
   }
 
   const kind = typeof args.kind === 'string' && args.kind.trim() ? args.kind.trim() : undefined;
-  const last = typeof args.last === 'number' && Number.isFinite(args.last) && args.last > 0 ? Math.floor(args.last) : 100;
+  const last =
+    typeof args.last === 'number' && Number.isFinite(args.last) && args.last > 0 ? Math.floor(args.last) : 100;
 
   // Honor the documented PAYWAY_JOURNAL_DIR override directly (the bare call
   // only consults it when journaling is enabled; MCP reads must work either way).
@@ -83,10 +84,7 @@ async function runJournalTimeline(args: Record<string, unknown>): Promise<McpExt
   };
 }
 
-async function runListTransactions(
-  args: Record<string, unknown>,
-  client: PayWay | undefined,
-): Promise<McpExtraResult> {
+async function runListTransactions(args: Record<string, unknown>, client: PayWay | undefined): Promise<McpExtraResult> {
   const asDate = (value: unknown): string | undefined =>
     typeof value === 'string' && value.trim() ? value.trim() : undefined;
   const fromDate = asDate(args.from);
@@ -100,13 +98,19 @@ async function runListTransactions(
     ['to', toDate],
   ] as const) {
     if (value && !DATE_FMT.test(value)) {
-      return failure('VALIDATION', `${label} must use "YYYY-MM-DD HH:mm:ss" (gateway time UTC+7); e.g. "2026-09-01 00:00:00"`);
+      return failure(
+        'VALIDATION',
+        `${label} must use "YYYY-MM-DD HH:mm:ss" (gateway time UTC+7); e.g. "2026-09-01 00:00:00"`,
+      );
     }
   }
   const winFromMs = fromDate ? Date.parse(fromDate.replace(' ', 'T')) : Number.NaN;
   const winToMs = toDate ? Date.parse(toDate.replace(' ', 'T')) : Number.NaN;
   if (!Number.isNaN(winFromMs) && !Number.isNaN(winToMs) && winToMs - winFromMs > 3 * 86_400_000) {
-    return failure('VALIDATION', 'The requested window spans more than 3 days, which PayWay rejects — split into ≤3-day windows.');
+    return failure(
+      'VALIDATION',
+      'The requested window spans more than 3 days, which PayWay rejects — split into ≤3-day windows.',
+    );
   }
   const pagination =
     args.pagination === undefined ? 50 : typeof args.pagination === 'number' ? Math.floor(args.pagination) : Number.NaN;
@@ -118,7 +122,10 @@ async function runListTransactions(
     return failure('VALIDATION', 'page must be a positive whole number');
   }
   if (!client) {
-    return failure('CONFIG_ERROR', 'list_transactions requires PayWay credentials (PAYWAY_ENV/MERCHANT_ID/API_KEY or a profile)');
+    return failure(
+      'CONFIG_ERROR',
+      'list_transactions requires PayWay credentials (PAYWAY_ENV/MERCHANT_ID/API_KEY or a profile)',
+    );
   }
 
   const { fromDate: gwFrom, toDate: gwTo } = gatewayDayWindow();

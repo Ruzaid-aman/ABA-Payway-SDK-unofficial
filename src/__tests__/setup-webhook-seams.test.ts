@@ -211,10 +211,13 @@ describe('setup-webhook command seams', () => {
       isRunning: true,
     };
 
-    const runPromise = h.run({}, {
-      findCloudflared: async () => '/usr/bin/cloudflared',
-      createTunnel: () => fakeTunnel,
-    });
+    const runPromise = h.run(
+      {},
+      {
+        findCloudflared: async () => '/usr/bin/cloudflared',
+        createTunnel: () => fakeTunnel,
+      },
+    );
     await feed(input, ['n', 'y']);
     await runPromise;
 

@@ -300,9 +300,7 @@ describe('server.initiateTransaction (end-to-end against mock PayWay)', () => {
   });
 
   it('rejects payloads missing amount', async () => {
-    await expect(
-      server.initiateTransaction({ transactionId: 'x' } as any, config),
-    ).rejects.toThrow(/amount/);
+    await expect(server.initiateTransaction({ transactionId: 'x' } as any, config)).rejects.toThrow(/amount/);
   });
 
   it('does not replay a purchase after an ambiguous transport failure by default', async () => {
@@ -397,9 +395,7 @@ describe('mock harness parity with client status endpoints', () => {
     const res = await client.checkout.getTransactionList({});
     expect(res.status?.code).toBe('00');
     expect(Array.isArray((res as unknown as { data: unknown[] }).data)).toBe(true);
-    expect((res as unknown as { data: { transaction_id: string }[] }).data[0]?.transaction_id).toBe(
-      'e2e-list-row-1',
-    );
+    expect((res as unknown as { data: { transaction_id: string }[] }).data[0]?.transaction_id).toBe('e2e-list-row-1');
   });
 
   it('closeTransaction succeeds (close-transaction route)', async () => {

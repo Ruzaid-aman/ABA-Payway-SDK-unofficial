@@ -226,8 +226,12 @@ export function inspectKhqrPayload(qrString: string): KhqrPayloadInspection | un
 
   // Nested templates must parse completely — a broken template inside a
   // well-formed root is a structurally malformed payload, not a valid one.
-  const accountTemplate = rootTags.has('30') ? decodeTlvTemplate(Buffer.from(rootTags.get('30') as string, 'utf8')) : undefined;
-  const additionalData = rootTags.has('62') ? decodeTlvTemplate(Buffer.from(rootTags.get('62') as string, 'utf8')) : undefined;
+  const accountTemplate = rootTags.has('30')
+    ? decodeTlvTemplate(Buffer.from(rootTags.get('30') as string, 'utf8'))
+    : undefined;
+  const additionalData = rootTags.has('62')
+    ? decodeTlvTemplate(Buffer.from(rootTags.get('62') as string, 'utf8'))
+    : undefined;
   if (rootTags.has('30') && !accountTemplate) return undefined;
   if (rootTags.has('62') && !additionalData) return undefined;
   if (rootTags.has('99') && !decodeTlvTemplate(Buffer.from(rootTags.get('99') as string, 'utf8'))) return undefined;

@@ -10,11 +10,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  signCallbackBody,
-  verifyCallbackDetailed,
-  verifyCallbackSignatureRaw,
-} from '../auth.js';
+import { signCallbackBody, verifyCallbackDetailed, verifyCallbackSignatureRaw } from '../auth.js';
 import { PayWay, type PayWayConfig } from '../client.js';
 import {
   CREDENTIAL_ERROR_CODES,
@@ -34,20 +30,11 @@ import {
 } from '../domains/payment-link.js';
 import { explainPayWayCode } from '../cli/explain-code.js';
 import { loadPaymentLinkImage } from '../cli/payment-link-image.js';
-import {
-  latestTokenForCtid,
-  markTokenCharged,
-  saveLinkedToken,
-  tokenExpiryStatus,
-} from '../webhook/token-store.js';
+import { latestTokenForCtid, markTokenCharged, saveLinkedToken, tokenExpiryStatus } from '../webhook/token-store.js';
 import { parseCofLinkCallback } from '../webhook/cof-callback.js';
 import { reconcileTransactions } from '../journal/reconcile.js';
 import { mockJsonResponse } from '../test/test-utils.js';
-import {
-  buildAbaPayDeeplink,
-  formatAmount,
-  validateTransactionId,
-} from '../utils.js';
+import { buildAbaPayDeeplink, formatAmount, validateTransactionId } from '../utils.js';
 import { PayWayConfigError, PayWayRateLimitError } from '../errors.js';
 import * as utilsModule from '../utils.js';
 
@@ -98,9 +85,7 @@ describe('production token_flag subsets', () => {
       paymentToken: 'pwt-1',
       tokenFlag: 'MITU_FIX',
     });
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/outside the production-documented charging set/),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/outside the production-documented charging set/));
     warnSpy.mockRestore();
   });
 
@@ -142,10 +127,7 @@ describe('rolling token expiry anchor', () => {
   });
 
   it('a NEWER charge beats an older renewal (latest of the three anchors)', () => {
-    const status = tokenExpiryStatus(
-      { capturedAt, renewedAt: '2026-08-01T00:00:00.000Z', lastChargedAt },
-      now,
-    );
+    const status = tokenExpiryStatus({ capturedAt, renewedAt: '2026-08-01T00:00:00.000Z', lastChargedAt }, now);
     expect(status.daysLeft).toBe(77);
   });
 
@@ -527,10 +509,7 @@ describe('scheduled-token explicit expiry (FU-08)', () => {
   });
 
   it('scheduled tokens without a parseable expiry are unknown (never guessed)', () => {
-    const status = tokenExpiryStatus(
-      { capturedAt: '2026-06-01T00:00:00.000Z', tokenFlag: 'MITR_FIX' },
-      now,
-    );
+    const status = tokenExpiryStatus({ capturedAt: '2026-06-01T00:00:00.000Z', tokenFlag: 'MITR_FIX' }, now);
     expect(status.status).toBe('unknown');
     expect(status.expiresAt).toBeNull();
   });

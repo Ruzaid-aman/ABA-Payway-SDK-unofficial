@@ -79,7 +79,9 @@ export function registerDocsCommand(program: Command): void {
           console.log(`  ${c.dim(' '.repeat(26))} ${topic.description}`);
         }
         console.log();
-        console.log(`  ${c.dim('Read one:')} ${c.cyan('payway-sdk docs <topic>')}  ${c.dim('Search:')} ${c.cyan('payway-sdk docs search <terms>')}`);
+        console.log(
+          `  ${c.dim('Read one:')} ${c.cyan('payway-sdk docs <topic>')}  ${c.dim('Search:')} ${c.cyan('payway-sdk docs search <terms>')}`,
+        );
         console.log();
         return;
       }
@@ -110,11 +112,14 @@ export function registerDocsCommand(program: Command): void {
           console.log(JSON.stringify({ query: needle, ...result }, null, 2));
           return;
         }
-        console.log(`\n${c.bold('Search')}: "${needle}" — ${result.totalHits} hits${result.truncated ? c.dim(' (showing first 40)') : ''}\n`);
+        console.log(
+          `\n${c.bold('Search')}: "${needle}" — ${result.totalHits} hits${result.truncated ? c.dim(' (showing first 40)') : ''}\n`,
+        );
         for (const hit of result.hits) {
           console.log(`  ${c.cyan(`${hit.topic}:${hit.line}`)}  ${hit.text}`);
         }
-        if (result.hits.length === 0) console.log(`  ${c.dim('No hits. Try shorter terms — e.g.')} ${c.cyan('payway-sdk docs search lifetime')}`);
+        if (result.hits.length === 0)
+          console.log(`  ${c.dim('No hits. Try shorter terms — e.g.')} ${c.cyan('payway-sdk docs search lifetime')}`);
         console.log();
         return;
       }

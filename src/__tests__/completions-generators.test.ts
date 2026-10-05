@@ -16,7 +16,7 @@ function fixtureProgram(): Command {
   program.name('payway-sdk').description('CLI').version('1.0.0');
   program.option('--profile <name>', 'Use a saved credential profile');
   const qr = program.command('generate-qr').description('Online QR');
-  qr.option('-a, --amount <n>', "Amount to charge — it's \"quoted\"");
+  qr.option('-a, --amount <n>', 'Amount to charge — it\'s "quoted"');
   const link = program.command('payment-link').description('Payment links');
   link.command('create').description('Create a link').option('--title <t>', 'Link title');
   link.command('detail').description('Link detail by id');

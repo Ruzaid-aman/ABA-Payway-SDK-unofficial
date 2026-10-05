@@ -174,7 +174,12 @@ describe('doctor rendering', () => {
 
   it('merges connectivity into the provider row (remedy cleared once, then preserved)', () => {
     const fresh = () => [
-      row({ id: 'provider', label: 'Provider connectivity', state: 'unverified' as const, remedyId: 'AGENT_SETUP' as const }),
+      row({
+        id: 'provider',
+        label: 'Provider connectivity',
+        state: 'unverified' as const,
+        remedyId: 'AGENT_SETUP' as const,
+      }),
     ];
 
     const ready = fresh();
@@ -197,7 +202,13 @@ describe('doctor rendering', () => {
 
   it('renders rows, remedies, connectivity detail, and the onboarding hint', () => {
     const matrix: CapabilityRow[] = [
-      row({ id: 'provider', label: 'Provider connectivity', state: 'unverified', detail: 'unreachable', remedyId: 'AGENT_SETUP' }),
+      row({
+        id: 'provider',
+        label: 'Provider connectivity',
+        state: 'unverified',
+        detail: 'unreachable',
+        remedyId: 'AGENT_SETUP',
+      }),
       row({ id: 'privacy', label: 'Privacy acknowledgment', state: 'ready' }),
     ];
     const lines = renderDoctorOutput(matrix, {
@@ -235,9 +246,9 @@ describe('ack helpers', () => {
     expect(validateAckPrerequisites({ ...defaultConfig(), model: '' })).toBe(
       'Privacy acknowledgment requires a configured provider.',
     );
-    expect(
-      validateAckPrerequisites({ ...defaultConfig(), model: 'm', provider: 'custom', baseUrl: ' ' }),
-    ).toBe('Custom provider requires a baseUrl in the config.');
+    expect(validateAckPrerequisites({ ...defaultConfig(), model: 'm', provider: 'custom', baseUrl: ' ' })).toBe(
+      'Custom provider requires a baseUrl in the config.',
+    );
     expect(validateAckPrerequisites({ ...defaultConfig(), model: 'm' })).toBeNull();
   });
 
@@ -272,9 +283,7 @@ describe('renderSessionList', () => {
         events: [],
       },
     ]);
-    expect(stripAnsi(lines[0])).toBe(
-      's-1  profile: demo (sandbox)  events:0  updated:2026-08-30T01:00:00.000Z',
-    );
+    expect(stripAnsi(lines[0])).toBe('s-1  profile: demo (sandbox)  events:0  updated:2026-08-30T01:00:00.000Z');
   });
 });
 

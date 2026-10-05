@@ -119,7 +119,12 @@ export async function stopReceiver(options: ReceiverControlOptions): Promise<Sto
 
   // Step 1: identity check. Only OUR receiver can answer with our random
   // instanceId — a reused PID or a foreign receiver on the same port cannot.
-  const identify = await controlFetch(`${baseUrl}${CONTROL_PATH}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'identify' }) }, requestTimeoutMs, fetchImpl);
+  const identify = await controlFetch(
+    `${baseUrl}${CONTROL_PATH}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'identify' }) },
+    requestTimeoutMs,
+    fetchImpl,
+  );
   if (identify !== 'refused' && identify !== 'error') {
     let identity: { instanceId?: string } | null = null;
     try {
@@ -142,7 +147,11 @@ export async function stopReceiver(options: ReceiverControlOptions): Promise<Sto
     // cleanup path (listener close, tunnel stop, .env restore).
     const shutdown = await controlFetch(
       `${baseUrl}${CONTROL_PATH}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'shutdown', token: state.controlToken }) },
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'shutdown', token: state.controlToken }),
+      },
       requestTimeoutMs,
       fetchImpl,
     );
@@ -161,7 +170,8 @@ export async function stopReceiver(options: ReceiverControlOptions): Promise<Sto
       return {
         stopped: false,
         reason: 'unauthorized',
-        detail: 'The running receiver rejected the control token — the state file does not belong to it. Nothing was signalled.',
+        detail:
+          'The running receiver rejected the control token — the state file does not belong to it. Nothing was signalled.',
         pid: state.pid,
         port: state.port,
         stateCleared: false,
@@ -173,7 +183,14 @@ export async function stopReceiver(options: ReceiverControlOptions): Promise<Sto
     while (Date.now() < deadline) {
       if (!isProcessAlive(state.pid)) {
         say(`  Receiver (pid ${state.pid}) shut down and exited.`);
-        return { stopped: true, reason: 'stopped', detail: 'receiver exited after authenticated shutdown', pid: state.pid, port: state.port, stateCleared: true };
+        return {
+          stopped: true,
+          reason: 'stopped',
+          detail: 'receiver exited after authenticated shutdown',
+          pid: state.pid,
+          port: state.port,
+          stateCleared: true,
+        };
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }

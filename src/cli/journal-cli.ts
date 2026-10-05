@@ -41,10 +41,7 @@ export function emitCliJournal(event: JournalEmitterInput): void {
 }
 
 /** Prefer the client's emitter (same instance/mode); fall back to the CLI one. */
-export function emitCliJournalVia(
-  payway: PayWay | undefined,
-  event: JournalEmitterInput,
-): void {
+export function emitCliJournalVia(payway: PayWay | undefined, event: JournalEmitterInput): void {
   (payway?.journal ?? cliJournal())?.emit(event);
 }
 

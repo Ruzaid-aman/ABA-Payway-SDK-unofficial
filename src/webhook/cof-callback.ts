@@ -113,11 +113,7 @@ function firstScalar(source: Record<string, unknown>, ...keys: string[]): string
   return undefined;
 }
 
-function collectExtraFields(
-  target: Record<string, string>,
-  source: Record<string, unknown>,
-  known: Set<string>,
-): void {
+function collectExtraFields(target: Record<string, string>, source: Record<string, unknown>, known: Set<string>): void {
   for (const [key, value] of Object.entries(source)) {
     if (known.has(key) || key === 'hash' || key === 'payment_credential') continue;
     // Empty strings are contract-meaningful on the live shape (frequency: ""
@@ -142,9 +138,7 @@ export function parseCofLinkCallback(payload: unknown): ParsedCofLinkCallback {
   }
   const top = payload as Record<string, unknown>;
   const credential = (
-    typeof top.payment_credential === 'object' && top.payment_credential !== null
-      ? top.payment_credential
-      : top
+    typeof top.payment_credential === 'object' && top.payment_credential !== null ? top.payment_credential : top
   ) as Record<string, unknown>;
 
   const known = new Set(['pwt', 'ctid', 'cust_id', 'request_id', 'req_id', 'status', 'token_flag', 'expired_at']);

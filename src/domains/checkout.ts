@@ -113,9 +113,7 @@ export interface CheckoutDomain {
     params: CreateTransactionParams,
     callOptions?: RequestCallOptions,
   ) => Promise<
-    | components['schemas']['PurchaseQrResponse']
-    | components['schemas']['ErrorStatus']
-    | PurchaseHostedHtmlResult
+    components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus'] | PurchaseHostedHtmlResult
   >;
   /**
    * Create a purchase transaction and get the HOSTED checkout page
@@ -225,7 +223,10 @@ export interface CheckoutDomain {
     currency?: 'USD' | 'KHR',
     callOptions?: RequestCallOptions,
   ) => Promise<components['schemas']['RefundResponse']>;
-  getExchangeRate: (requestTime?: string, callOptions?: RequestCallOptions) => Promise<components['schemas']['ExchangeRateResponse']>;
+  getExchangeRate: (
+    requestTime?: string,
+    callOptions?: RequestCallOptions,
+  ) => Promise<components['schemas']['ExchangeRateResponse']>;
 
   /**
    * Poll transaction status at regular intervals using an AsyncIterator.
@@ -307,7 +308,10 @@ export function createCheckoutDomain(
     }
     if (params.firstname !== undefined) {
       if (params.firstname.length > 100 || /\d|[^\p{L}\p{M}\s'.-]/u.test(params.firstname)) {
-        warnAdvisory(config, `firstname violates the gateway rules (≤100 chars, no digits/specials) — gateway may reject with error 16`);
+        warnAdvisory(
+          config,
+          `firstname violates the gateway rules (≤100 chars, no digits/specials) — gateway may reject with error 16`,
+        );
       }
     }
     if (params.lastname !== undefined && params.lastname.length > 100) {
@@ -397,7 +401,10 @@ export function createCheckoutDomain(
       if (params.frequency === undefined) {
         throw new PayWayConfigError("frequency is required when tokenFlag='CITR_FIX' (1W | 1M | 2M)");
       }
-      if (params.paymentOption !== undefined && !['cards', 'abapay', 'abapay_deeplink'].includes(params.paymentOption)) {
+      if (
+        params.paymentOption !== undefined &&
+        !['cards', 'abapay', 'abapay_deeplink'].includes(params.paymentOption)
+      ) {
         warnAdvisory(
           config,
           `subscription payment_option "${params.paymentOption}" is outside the documented set (cards, abapay, abapay_deeplink)`,
@@ -642,12 +649,26 @@ export function createCheckoutDomain(
       const DATE_FORMAT = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
       if (params.fromDate != null) {
         if (typeof params.fromDate === 'string' && !DATE_FORMAT.test(params.fromDate)) {
-          warnAdvisory(config, `fromDate "${params.fromDate}" must use the format "YYYY-MM-DD HH:mm:ss" (gateway err 49)`);
+          warnAdvisory(
+            config,
+            `fromDate "${params.fromDate}" must use the format "YYYY-MM-DD HH:mm:ss" (gateway err 49)`,
+          );
         }
-        if (params.toDate != null && typeof params.fromDate === 'string' && typeof params.toDate === 'string' && DATE_FORMAT.test(params.fromDate) && DATE_FORMAT.test(params.toDate)) {
-          const spanDays = (Date.parse(`${params.toDate.replace(' ', 'T')}Z`) - Date.parse(`${params.fromDate.replace(' ', 'T')}Z`)) / 86_400_000;
+        if (
+          params.toDate != null &&
+          typeof params.fromDate === 'string' &&
+          typeof params.toDate === 'string' &&
+          DATE_FORMAT.test(params.fromDate) &&
+          DATE_FORMAT.test(params.toDate)
+        ) {
+          const spanDays =
+            (Date.parse(`${params.toDate.replace(' ', 'T')}Z`) - Date.parse(`${params.fromDate.replace(' ', 'T')}Z`)) /
+            86_400_000;
           if (spanDays > 3) {
-            warnAdvisory(config, `date range spans ${spanDays.toFixed(1)} days; the gateway allows at most 3 days (err 52)`);
+            warnAdvisory(
+              config,
+              `date range spans ${spanDays.toFixed(1)} days; the gateway allows at most 3 days (err 52)`,
+            );
           }
         }
       }
@@ -698,7 +719,12 @@ export function createCheckoutDomain(
      * PayWay rejects refund_amount < 0.01 USD with HTTP 400 / PTL04
      * ("Parameter validation required — refund_amount must be ≥ 0.01").
      */
-    refund: (transactionId: string, amount: number, currency: 'USD' | 'KHR' = 'USD', callOptions?: RequestCallOptions) => {
+    refund: (
+      transactionId: string,
+      amount: number,
+      currency: 'USD' | 'KHR' = 'USD',
+      callOptions?: RequestCallOptions,
+    ) => {
       validateTransactionId(transactionId);
       validateRefundAmount(amount, currency);
 
@@ -729,16 +755,16 @@ export function createCheckoutDomain(
      * Poll transaction status at regular intervals using an AsyncIterator.
      *
      * Yields a `PollTransactionResult` on each poll. Stops when:
-      * - A terminal status is reached (APPROVED, DECLINED, CANCELLED, REFUNDED), OR
-      * - `maxDurationMs` elapses (default 10 minutes — matching QR lifetime), OR
-      * - `maxConsecutiveErrors` consecutive poll failures occur (default 3).
-      *
-      * Sandbox note: a freshly-created transaction may not be visible to
-      * check-transaction for a few seconds (HTTP 200 with `status.code 6`
-      * "tran_id not found"). The poller recognizes this grace period and
-      * yields `paymentStatus: 'NOT_FOUND'` without counting it as an error,
-      * so a legitimate purchase flow is never aborted by propagation delay.
-      * If the ID never appears, polling ends via the max-duration abort.
+     * - A terminal status is reached (APPROVED, DECLINED, CANCELLED, REFUNDED), OR
+     * - `maxDurationMs` elapses (default 10 minutes — matching QR lifetime), OR
+     * - `maxConsecutiveErrors` consecutive poll failures occur (default 3).
+     *
+     * Sandbox note: a freshly-created transaction may not be visible to
+     * check-transaction for a few seconds (HTTP 200 with `status.code 6`
+     * "tran_id not found"). The poller recognizes this grace period and
+     * yields `paymentStatus: 'NOT_FOUND'` without counting it as an error,
+     * so a legitimate purchase flow is never aborted by propagation delay.
+     * If the ID never appears, polling ends via the max-duration abort.
      *
      * @example
      * ```ts
@@ -842,9 +868,7 @@ export function createCheckoutDomain(
                 totalAttempts: attempt,
               });
             }
-            await new Promise<void>((resolve) =>
-              setTimeout(resolve, Math.min(intervalMs, remainingNotFoundMs)),
-            );
+            await new Promise<void>((resolve) => setTimeout(resolve, Math.min(intervalMs, remainingNotFoundMs)));
             continue;
           }
 

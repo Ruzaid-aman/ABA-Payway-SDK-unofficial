@@ -40,16 +40,11 @@ function hintForCode(code: string | undefined): string | undefined {
   return entry ? `${entry.title}: ${entry.hint}` : undefined;
 }
 
-export function explainTransaction(
-  transactionId: string,
-  options: RcaOptions = {},
-): RcaReport {
+export function explainTransaction(transactionId: string, options: RcaOptions = {}): RcaReport {
   const dir = options.journalDir ?? resolveJournalDir();
   const { events } = readJournalEvents(dir);
 
-  const relevant = events
-    .filter((e) => e.transactionId === transactionId)
-    .sort((a, b) => a.ts.localeCompare(b.ts));
+  const relevant = events.filter((e) => e.transactionId === transactionId).sort((a, b) => a.ts.localeCompare(b.ts));
 
   if (relevant.length === 0) {
     return {
@@ -94,7 +89,8 @@ export function explainTransaction(
       });
     } else if (event.kind === 'execution.error') {
       sawError = true;
-      const code = event.paywayCode ?? (event.httpStatus !== undefined ? `HTTP ${event.httpStatus}` : event.error?.code);
+      const code =
+        event.paywayCode ?? (event.httpStatus !== undefined ? `HTTP ${event.httpStatus}` : event.error?.code);
       steps.push({
         at: event.ts,
         title: `Failed attempt${event.attempt !== undefined ? ` #${event.attempt}` : ''}`,
@@ -104,7 +100,11 @@ export function explainTransaction(
       if (hint) hints.push(`Gateway hint for code ${event.paywayCode}: ${hint}`);
     } else if (event.kind === 'poll.attempt') {
       if (event.status && !event.status.startsWith('ERROR:')) {
-        steps.push({ at: event.ts, title: `Poll #${event.attempt ?? '?'}: ${event.status}`, detail: `${event.durationMs ?? '?'}ms` });
+        steps.push({
+          at: event.ts,
+          title: `Poll #${event.attempt ?? '?'}: ${event.status}`,
+          detail: `${event.durationMs ?? '?'}ms`,
+        });
       }
     } else if (event.kind === 'status.observed') {
       if (event.status) {
@@ -119,7 +119,11 @@ export function explainTransaction(
         detail: `${event.endpoint ?? 'webhook route'} (webhook record ${event.correlationId})`,
       });
     } else if (event.kind === 'artifact.written') {
-      steps.push({ at: event.ts, title: 'Artifact saved', detail: event.artifact?.path ?? event.artifact?.artifactId ?? '' });
+      steps.push({
+        at: event.ts,
+        title: 'Artifact saved',
+        detail: event.artifact?.path ?? event.artifact?.artifactId ?? '',
+      });
     }
   }
 
@@ -132,8 +136,11 @@ export function explainTransaction(
   } else if (sawError && !lastStatus) {
     verdict = 'The exchange failed before a status was ever observed.';
   } else if (lastStatus === 'APPROVED') {
-    verdict = 'APPROVED per status reads, but NO callback was captured — deliver on the status read or re-check; PayWay never retries missed callbacks.';
-    hints.push('A missing callback is NOT proof of non-payment — the delivery may have been missed while no listener ran.');
+    verdict =
+      'APPROVED per status reads, but NO callback was captured — deliver on the status read or re-check; PayWay never retries missed callbacks.';
+    hints.push(
+      'A missing callback is NOT proof of non-payment — the delivery may have been missed while no listener ran.',
+    );
   } else if (lastStatus === 'DECLINED' || lastStatus === 'CANCELLED') {
     verdict = `Terminal non-success status: ${lastStatus}.`;
   } else {
@@ -141,7 +148,8 @@ export function explainTransaction(
     hints.push('Keep an authoritative local closed/expired flag; the gateway cannot tell you remotely.');
     hints.push('Unpaid QR-only transactions never appear in transaction-list — poll with check-transaction instead.');
   }
-  if (attempts > 1) hints.push(`This exchange was attempted ${attempts} times (retries) — check the transport errors above.`);
+  if (attempts > 1)
+    hints.push(`This exchange was attempted ${attempts} times (retries) — check the transport errors above.`);
 
   return { transactionId, found: true, verdict, steps, hints };
 }
@@ -193,7 +201,8 @@ export function detectJournalAnomalies(options: RcaOptions = {}): AnomaliesRepor
           subject: day,
           metric: `${count} failed attempts`,
           baseline: `mean ${baseline.toFixed(1)}/other active day`,
-          detail: 'Group the day by paywayCode with `journal stats --json` (topErrors) before escalating to the gateway.',
+          detail:
+            'Group the day by paywayCode with `journal stats --json` (topErrors) before escalating to the gateway.',
         });
       }
     }
@@ -240,7 +249,8 @@ export function detectJournalAnomalies(options: RcaOptions = {}): AnomaliesRepor
         subject: row.endpoint,
         metric: `p99 ${row.p99}ms vs p50 ${row.p50}ms`,
         baseline: `${row.count} samples`,
-        detail: 'A heavy tail on one endpoint suggests gateway-side slowness — correlate with provider errors on the same day.',
+        detail:
+          'A heavy tail on one endpoint suggests gateway-side slowness — correlate with provider errors on the same day.',
       });
     }
   }

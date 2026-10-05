@@ -74,9 +74,11 @@ describe('getLinkCardFormHtml (PayWay wiring)', () => {
     // Pin request_time so both calls compose the same hash; the fetch spy
     // records the urlencoded body linkCard() sends over the wire.
     vi.spyOn(utils, 'formatRequestTime').mockReturnValue('20260901120000');
-    const fetchSpy = vi.fn().mockResolvedValue(
-      new Response('{"status":{"code":"00"}}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
-    );
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(
+        new Response('{"status":{"code":"00"}}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      );
     vi.stubGlobal('fetch', fetchSpy);
     const payway = new PayWay({ merchantId: 'mid-42', apiKey: 'key-42', environment: 'sandbox' });
 
@@ -163,12 +165,12 @@ describe('getLinkCardFormHtml (PayWay wiring)', () => {
   it('propagates linkCard validation rules (required ctid / tokenFlag)', () => {
     const payway = new PayWay({ merchantId: 'mid', apiKey: 'key', environment: 'sandbox' });
     expect(() => payway.credentialsOnFile.getLinkCardFormHtml({ ...BASE_PARAMS, ctid: '' })).toThrow(PayWayConfigError);
-    expect(() =>
-      payway.credentialsOnFile.getLinkCardFormHtml({ ...BASE_PARAMS, tokenFlag: 'MITR_FIX' }),
-    ).toThrow(PayWayConfigError);
-    expect(() =>
-      payway.credentialsOnFile.getLinkCardFormHtml({ ...BASE_PARAMS, ctid: 'CUST-005' }),
-    ).toThrow(PayWayConfigError);
+    expect(() => payway.credentialsOnFile.getLinkCardFormHtml({ ...BASE_PARAMS, tokenFlag: 'MITR_FIX' })).toThrow(
+      PayWayConfigError,
+    );
+    expect(() => payway.credentialsOnFile.getLinkCardFormHtml({ ...BASE_PARAMS, ctid: 'CUST-005' })).toThrow(
+      PayWayConfigError,
+    );
   });
 
   it('requires merchant credentials to sign (FINDING: no unsigned form can ship)', () => {

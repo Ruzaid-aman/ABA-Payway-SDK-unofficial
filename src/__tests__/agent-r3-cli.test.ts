@@ -10,17 +10,16 @@ const temporaryDirectories: string[] = [];
 const servers: Server[] = [];
 
 afterEach(async () => {
-  await Promise.all(
-    servers.splice(0).map(
-      (server) => new Promise<void>((resolve) => server.close(() => resolve())),
-    ),
-  );
+  await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
 });
 
-function runCli(args: string[], env: NodeJS.ProcessEnv): Promise<{ status: number | null; stdout: string; stderr: string }> {
+function runCli(
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(process.cwd(), 'dist', 'cli.js'), ...args], {
       cwd: process.cwd(),

@@ -168,7 +168,14 @@ describe('explainTransaction (Phase 6)', () => {
   it('surfaces gateway hints for provider codes and retry counts', () => {
     writeJournal([
       ev({ kind: 'execution.request', endpoint: CREATE_QR, transactionId: 'T-3' }),
-      ev({ kind: 'execution.error', endpoint: CREATE_QR, paywayCode: '35', attempt: 0, transactionId: 'T-3', error: { code: 'api_error', message: 'rejected' } }),
+      ev({
+        kind: 'execution.error',
+        endpoint: CREATE_QR,
+        paywayCode: '35',
+        attempt: 0,
+        transactionId: 'T-3',
+        error: { code: 'api_error', message: 'rejected' },
+      }),
       ev({ kind: 'execution.request', endpoint: CREATE_QR, transactionId: 'T-3', attempt: 1 }),
     ]);
 
@@ -194,14 +201,27 @@ describe('detectJournalAnomalies (Phase 6)', () => {
       lines.push(ev({ kind: 'execution.error', httpStatus: 502, ts: `${day}T10:00:00.000Z` }));
       const cid = `quiet-${d}`;
       lines.push(ev({ kind: 'execution.request', correlationId: cid, endpoint: CHECK, ts: `${day}T09:00:00.000Z` }));
-      lines.push(ev({ kind: 'execution.request', correlationId: cid, endpoint: CHECK, attempt: 1, ts: `${day}T09:01:00.000Z` }));
+      lines.push(
+        ev({ kind: 'execution.request', correlationId: cid, endpoint: CHECK, attempt: 1, ts: `${day}T09:01:00.000Z` }),
+      );
     }
     // Today: an error spike (6) and a retry burst (6) against the 1/day baseline.
-    for (let i = 0; i < 6; i += 1) lines.push(ev({ kind: 'execution.error', httpStatus: 502, ts: `${today}T1${i}:00:00.000Z` }));
+    for (let i = 0; i < 6; i += 1)
+      lines.push(ev({ kind: 'execution.error', httpStatus: 502, ts: `${today}T1${i}:00:00.000Z` }));
     for (let i = 0; i < 6; i += 1) {
       const cid = `burst-${i}`;
-      lines.push(ev({ kind: 'execution.request', correlationId: cid, endpoint: CHECK, ts: `${today}T09:0${i}:00.000Z` }));
-      lines.push(ev({ kind: 'execution.request', correlationId: cid, endpoint: CHECK, attempt: 1, ts: `${today}T09:1${i}:00.000Z` }));
+      lines.push(
+        ev({ kind: 'execution.request', correlationId: cid, endpoint: CHECK, ts: `${today}T09:0${i}:00.000Z` }),
+      );
+      lines.push(
+        ev({
+          kind: 'execution.request',
+          correlationId: cid,
+          endpoint: CHECK,
+          attempt: 1,
+          ts: `${today}T09:1${i}:00.000Z`,
+        }),
+      );
     }
     // Latency outlier: 5 samples with p99 >= 3x p50.
     for (const ms of [100, 100, 100, 100, 900]) {

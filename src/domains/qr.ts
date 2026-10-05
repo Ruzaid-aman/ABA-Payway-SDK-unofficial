@@ -132,24 +132,27 @@ export function createQrDomain(
       // (official code 23), so there is deliberately no local enablement
       // check. The Soundbox endpoint (requestQr below) keeps its own
       // spec-derived superset REQUEST_QR_PAYMENT_OPTIONS.
-      if (params.paymentOption !== undefined && !(QR_PAYMENT_OPTIONS as readonly string[]).includes(params.paymentOption)) {
+      if (
+        params.paymentOption !== undefined &&
+        !(QR_PAYMENT_OPTIONS as readonly string[]).includes(params.paymentOption)
+      ) {
         throw new PayWayConfigError(
           `payment_option "${params.paymentOption}" is not documented for generate-qr (rule QR-012, source: official); documented values: ${QR_PAYMENT_OPTIONS.join(', ')}`,
         );
       }
 
       const currency = params.currency || 'USD';
-      if (
-        (params.paymentOption === 'wechat' || params.paymentOption === 'alipay') &&
-        currency !== 'USD'
-      ) {
+      if ((params.paymentOption === 'wechat' || params.paymentOption === 'alipay') && currency !== 'USD') {
         warnAdvisory(
           config,
           `payment_option "${params.paymentOption}" is USD-only per the QR API docs; currency is ${currency}`,
         );
       }
       if (params.firstName !== undefined && params.firstName.length > 20) {
-        warnAdvisory(config, `firstName exceeds the gateway's 20-character cap (err 16); gateway may reject with error 16`);
+        warnAdvisory(
+          config,
+          `firstName exceeds the gateway's 20-character cap (err 16); gateway may reject with error 16`,
+        );
       }
       if (params.lastName !== undefined && params.lastName.length > 20) {
         warnAdvisory(config, `lastName exceeds the gateway's 20-character cap; gateway may reject with error 17`);
@@ -192,7 +195,8 @@ export function createQrDomain(
           purchase_type: params.purchaseType || 'purchase',
           payment_option: params.paymentOption || 'abapay_khqr',
           callback_url: encodeBase64IfNeeded(params.callbackUrl),
-          return_deeplink: params.returnDeeplink !== undefined ? encodeBase64IfNeeded(params.returnDeeplink) : undefined,
+          return_deeplink:
+            params.returnDeeplink !== undefined ? encodeBase64IfNeeded(params.returnDeeplink) : undefined,
           currency,
           custom_fields: params.customFields !== undefined ? encodeBase64IfNeeded(params.customFields) : undefined,
           return_params: params.returnParams,
@@ -223,10 +227,7 @@ export function createQrDomain(
           `paymentOption is required for request-qr and must be one of ${REQUEST_QR_PAYMENT_OPTIONS.join(', ')}, received: ${params.paymentOption}`,
         );
       }
-      if (
-        (params.paymentOption === 'wechat' || params.paymentOption === 'alipay') &&
-        params.currency !== 'USD'
-      ) {
+      if ((params.paymentOption === 'wechat' || params.paymentOption === 'alipay') && params.currency !== 'USD') {
         warnAdvisory(config, `payment_option "${params.paymentOption}" is USD-only; currency is ${params.currency}`);
       }
       validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
@@ -246,7 +247,11 @@ export function createQrDomain(
           );
         }
       }
-      if (params.purchaseType !== undefined && params.purchaseType !== 'purchase' && params.purchaseType !== 'pre-auth') {
+      if (
+        params.purchaseType !== undefined &&
+        params.purchaseType !== 'purchase' &&
+        params.purchaseType !== 'pre-auth'
+      ) {
         throw new PayWayConfigError(`purchaseType must be 'purchase' or 'pre-auth', received: ${params.purchaseType}`);
       }
 
@@ -254,7 +259,10 @@ export function createQrDomain(
         ENDPOINTS.requestQr,
         filterParams({
           tran_id: params.transactionId,
-          amount: params.amount !== undefined && params.amount !== null ? formatAmount(params.amount, params.currency) : undefined,
+          amount:
+            params.amount !== undefined && params.amount !== null
+              ? formatAmount(params.amount, params.currency)
+              : undefined,
           purchase_type: params.purchaseType || 'purchase',
           payment_option: params.paymentOption,
           callback_url: encodeBase64IfNeeded(params.callbackUrl),

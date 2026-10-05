@@ -78,7 +78,10 @@ function toolResultJson(payload: unknown): { content: Array<{ type: 'text'; text
   return { content: [{ type: 'text', text: JSON.stringify(payload) }] };
 }
 
-function errorResult(code: string, message: string): { content: Array<{ type: 'text'; text: string }>; isError: boolean } {
+function errorResult(
+  code: string,
+  message: string,
+): { content: Array<{ type: 'text'; text: string }>; isError: boolean } {
   return { ...toolResultJson({ error: { code, message } }), isError: true };
 }
 
@@ -161,10 +164,7 @@ export function createPayWayMcpServer(options: McpServerOptions = {}): Server {
       if (error instanceof PayWayConfigError) {
         return errorResult('CONFIG_ERROR', error.message);
       }
-      return errorResult(
-        'INTERNAL',
-        error instanceof Error ? error.message : String(error),
-      );
+      return errorResult('INTERNAL', error instanceof Error ? error.message : String(error));
     }
   });
 

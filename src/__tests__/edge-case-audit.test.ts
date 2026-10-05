@@ -45,13 +45,11 @@ interface CapturedRequest {
   contentType: string | undefined;
 }
 
-type Handler = (
-  req: IncomingMessage,
-  res: ServerResponse,
-  captured: CapturedRequest,
-) => void | Promise<void>;
+type Handler = (req: IncomingMessage, res: ServerResponse, captured: CapturedRequest) => void | Promise<void>;
 
-async function startServer(handler: Handler): Promise<{ url: string; close: () => Promise<void>; requests: CapturedRequest[] }> {
+async function startServer(
+  handler: Handler,
+): Promise<{ url: string; close: () => Promise<void>; requests: CapturedRequest[] }> {
   const requests: CapturedRequest[] = [];
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -310,9 +308,7 @@ describe('edge-case: non-OK HTTP responses', () => {
   });
 
   it('Retry-After seconds are converted to milliseconds (was FINDING EC-03, fixed)', async () => {
-    server = await startServer((_req, res) =>
-      jsonResponse(res, 429, { message: 'too many' }, { 'Retry-After': '1' }),
-    );
+    server = await startServer((_req, res) => jsonResponse(res, 429, { message: 'too many' }, { 'Retry-After': '1' }));
     // RFC 7231 defines Retry-After in seconds; parseRetryAfterMs converts
     // to ms so retry pacing honors a "60s pause" as 60_000ms, not 60ms.
     try {
@@ -326,9 +322,7 @@ describe('edge-case: non-OK HTTP responses', () => {
 
   it('Retry-After as an HTTP-date is converted to a millisecond delay', async () => {
     const date = new Date(Date.now() + 60_000).toUTCString();
-    server = await startServer((_req, res) =>
-      jsonResponse(res, 429, { message: 'too many' }, { 'Retry-After': date }),
-    );
+    server = await startServer((_req, res) => jsonResponse(res, 429, { message: 'too many' }, { 'Retry-After': date }));
     try {
       await checkTransaction(makeClient(server.url));
       expect.unreachable('expected PayWayRateLimitError');
@@ -572,11 +566,27 @@ describe('edge-case: input validation', () => {
   it('beneficiary sums are compared in minor units — float drift no longer false-rejects (was FINDING EC-16, fixed)', () => {
     // 1.1 + 2.2 === 3.3000000000000003; the accumulated error (4.4e-16)
     // exceeds Number.EPSILON, which used to reject this legitimate split.
-    expect(() => validateBeneficiaries([{ account: 'a', amount: 1.1 }, { account: 'b', amount: 2.2 }], 3.3, 'USD')).not.toThrow();
+    expect(() =>
+      validateBeneficiaries(
+        [
+          { account: 'a', amount: 1.1 },
+          { account: 'b', amount: 2.2 },
+        ],
+        3.3,
+        'USD',
+      ),
+    ).not.toThrow();
     // Genuinely unbalanced splits are still rejected.
-    expect(() => validateBeneficiaries([{ account: 'a', amount: 1.1 }, { account: 'b', amount: 2.2 }], 3.31, 'USD')).toThrow(
-      /must sum to total amount/,
-    );
+    expect(() =>
+      validateBeneficiaries(
+        [
+          { account: 'a', amount: 1.1 },
+          { account: 'b', amount: 2.2 },
+        ],
+        3.31,
+        'USD',
+      ),
+    ).toThrow(/must sum to total amount/);
   });
 
   it('short tran_id is accepted but warns once per process (was FINDING EC-20, fixed)', () => {
@@ -611,7 +621,9 @@ describe('edge-case: input validation', () => {
   });
 
   it('public callback URLs reject explicit non-443 ports (PayWay callback delivery requires standard HTTPS)', () => {
-    expect(() => validatePublicHttpsUrl('https://example.com:8443/cb', 'callbackUrl')).toThrow(/standard HTTPS port 443/);
+    expect(() => validatePublicHttpsUrl('https://example.com:8443/cb', 'callbackUrl')).toThrow(
+      /standard HTTPS port 443/,
+    );
     expect(() => validatePublicHttpsUrl('https://example.com:443/cb', 'callbackUrl')).not.toThrow();
     expect(() => validatePublicHttpsUrl('https://example.com/cb', 'callbackUrl')).not.toThrow();
   });
@@ -764,7 +776,10 @@ describe('edge-case: verifyCallbackSignature', () => {
 
   it('stripHash option verifies payloads that still carry the hash field (was FINDING EC-22, fixed)', () => {
     const withoutHash: Record<string, string> = { tran_id: 'T1', amount: '5.00' };
-    const concatenated = Object.keys(withoutHash).sort().map((k) => withoutHash[k]).join('');
+    const concatenated = Object.keys(withoutHash)
+      .sort()
+      .map((k) => withoutHash[k])
+      .join('');
     const sig = crypto.createHmac('sha512', apiKey).update(concatenated).digest('base64');
     const withHash = { ...withoutHash, hash: 'abc123' };
     // Default (no options) stays strict: hash in the body → no valid signature.
@@ -779,7 +794,10 @@ describe('edge-case: verifyCallbackSignature', () => {
 
   it('tampered value is rejected', () => {
     const body: Record<string, string> = { tran_id: 'T1', amount: '5.00' };
-    const concatenated = Object.keys(body).sort().map((k) => String(body[k])).join('');
+    const concatenated = Object.keys(body)
+      .sort()
+      .map((k) => String(body[k]))
+      .join('');
     const sig = crypto.createHmac('sha512', apiKey).update(concatenated).digest('base64');
     expect(verifyCallbackSignature({ tran_id: 'T1', amount: '9.99' }, sig, apiKey)).toBe(false);
   });
@@ -791,7 +809,9 @@ describe('edge-case: verifyCallbackSignature', () => {
 
 describe('edge-case: observability hooks', () => {
   it('onResponse IS invoked before a 200 business error is thrown (was FINDING EC-06, fixed; B5: code 1 is now a PayWaySignatureError)', async () => {
-    const server = await startServer((_req, res) => jsonResponse(res, 200, { status: { code: '1', message: 'Wrong Hash.' } }));
+    const server = await startServer((_req, res) =>
+      jsonResponse(res, 200, { status: { code: '1', message: 'Wrong Hash.' } }),
+    );
     try {
       const onResponse = vi.fn();
       const client = makeClient(server.url, { onResponse });
@@ -835,7 +855,10 @@ describe('edge-case: sanitizeForLog', () => {
   });
 
   it('token-shaped keys are masked by the fuzzy matcher', async () => {
-    const out = sanitizeForLog({ 'x-payway-token': 'tok_abc', paymentToken: 'pwt', note: 'hello' }) as Record<string, unknown>;
+    const out = sanitizeForLog({ 'x-payway-token': 'tok_abc', paymentToken: 'pwt', note: 'hello' }) as Record<
+      string,
+      unknown
+    >;
     expect(out['x-payway-token']).toBe('***HIDDEN***');
     expect(out.paymentToken).toBe('***HIDDEN***');
     expect(out.note).toBe('hello');

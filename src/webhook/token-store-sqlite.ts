@@ -162,17 +162,17 @@ export class SqliteLinkedTokenStore {
   }
 
   latestForCtid(ctid: string): LinkedTokenRecord | undefined {
-    const row = this.db
-      .prepare('SELECT * FROM linked_tokens WHERE ctid = ? ORDER BY rowid DESC LIMIT 1')
-      .get(ctid) as TokenRow | undefined;
+    const row = this.db.prepare('SELECT * FROM linked_tokens WHERE ctid = ? ORDER BY rowid DESC LIMIT 1').get(ctid) as
+      | TokenRow
+      | undefined;
     return row ? rowToRecord(row) : undefined;
   }
 
   /** Record a renewal on the stored (ctid,pwt) record; preserves other fields; undefined when absent. */
   markRenewed(ctid: string, pwt: string, renewedAt?: string): LinkedTokenRecord | undefined {
-    const row = this.db
-      .prepare('SELECT * FROM linked_tokens WHERE ctid = ? AND pwt = ?')
-      .get(ctid, pwt) as TokenRow | undefined;
+    const row = this.db.prepare('SELECT * FROM linked_tokens WHERE ctid = ? AND pwt = ?').get(ctid, pwt) as
+      | TokenRow
+      | undefined;
     if (!row) return undefined;
     const updated: LinkedTokenRecord = { ...rowToRecord(row), renewedAt: renewedAt ?? new Date().toISOString() };
     this.save(updated);
@@ -181,9 +181,9 @@ export class SqliteLinkedTokenStore {
 
   /** Record a successful charge (rolling 90-day window anchor); undefined when absent. */
   markCharged(ctid: string, pwt: string, chargedAt?: string): LinkedTokenRecord | undefined {
-    const row = this.db
-      .prepare('SELECT * FROM linked_tokens WHERE ctid = ? AND pwt = ?')
-      .get(ctid, pwt) as TokenRow | undefined;
+    const row = this.db.prepare('SELECT * FROM linked_tokens WHERE ctid = ? AND pwt = ?').get(ctid, pwt) as
+      | TokenRow
+      | undefined;
     if (!row) return undefined;
     const updated: LinkedTokenRecord = { ...rowToRecord(row), lastChargedAt: chargedAt ?? new Date().toISOString() };
     this.save(updated);

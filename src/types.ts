@@ -4,2206 +4,2206 @@
  */
 
 export interface paths {
-    "/api/payment-gateway/v1/payments/purchase": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create a purchase transaction
-         * @description Initiates a payment transaction and returns either a hosted checkout page (HTML) or, for abapay_khqr_deeplink, a JSON payload containing the KHQR string and deeplinks. See info.description for the auth model this endpoint depends on.
-         */
-        post: operations["createPurchase"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  '/api/payment-gateway/v1/payments/purchase': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v1/payments/check-transaction-2": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Check transaction status (transactions younger than 7 days only)
-         * @description Rate limit: 600 requests/second. For transactions older than 7 days, use Get Transaction Details instead (not in this skeleton — add before shipping if needed). NOTE: path includes an unverified "-2" suffix — confirm against sandbox; see info.description item 6.
-         */
-        post: operations["checkTransaction"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Create a purchase transaction
+     * @description Initiates a payment transaction and returns either a hosted checkout page (HTML) or, for abapay_khqr_deeplink, a JSON payload containing the KHQR string and deeplinks. See info.description for the auth model this endpoint depends on.
+     */
+    post: operations['createPurchase'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v1/payments/check-transaction-2': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v1/payments/close-transaction": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Close (cancel) a transaction before payment completes
-         * @description Use for flash sales, bookings, or any flow needing to invalidate a transaction before the customer pays. Once closed, any incoming payment is rejected/reversed and no callback fires.
-         */
-        post: operations["closeTransaction"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Check transaction status (transactions younger than 7 days only)
+     * @description Rate limit: 600 requests/second. For transactions older than 7 days, use Get Transaction Details instead (not in this skeleton — add before shipping if needed). NOTE: path includes an unverified "-2" suffix — confirm against sandbox; see info.description item 6.
+     */
+    post: operations['checkTransaction'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v1/payments/close-transaction': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v1/payments/transaction-detail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get full details of a past transaction, including operation history
-         * @description Unlike check-transaction, this is NOT for real-time status checks during payment processing — it's for retrieving history on any past transaction, including its list of operations (captures, refunds, cancellations). Hard rate limit: 10 requests/minute, and per the docs this "cannot be increased" — do not build a polling pattern against this endpoint; use check-transaction for anything time-sensitive within 7 days.
-         */
-        post: operations["getTransactionDetail"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Close (cancel) a transaction before payment completes
+     * @description Use for flash sales, bookings, or any flow needing to invalidate a transaction before the customer pays. Once closed, any incoming payment is rejected/reversed and no callback fires.
+     */
+    post: operations['closeTransaction'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v1/payments/transaction-detail': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v1/payments/transaction-list-2": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * List transactions for one outlet, filtered and paginated
-         * @description Scoped to a SINGLE outlet — there is no "all outlets under this business profile" mode. Date range is capped at 3 days (including today), even reaching arbitrarily far into the past. Rate limit: 50 requests/minute. NOTE: path includes an unverified "-2" suffix, same caveat as check-transaction — see info.description item 6.
-         */
-        post: operations["getTransactionList"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Get full details of a past transaction, including operation history
+     * @description Unlike check-transaction, this is NOT for real-time status checks during payment processing — it's for retrieving history on any past transaction, including its list of operations (captures, refunds, cancellations). Hard rate limit: 10 requests/minute, and per the docs this "cannot be increased" — do not build a polling pattern against this endpoint; use check-transaction for anything time-sensitive within 7 days.
+     */
+    post: operations['getTransactionDetail'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v1/payments/transaction-list-2': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/merchant-portal/merchant-access/online-transaction/refund": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Issue a full or partial refund
-         * @description Only COMPLETED transactions are eligible. Must be requested within 30 days of the original payment. Multiple partial refunds are allowed until the full paid amount is exhausted. ABA PAY refunds are immediate; Card/WeChat/Alipay follow PayWay's settlement agreement timing. Rate limit: 500 requests/second. CREDENTIALS: requires an RSA public key IN ADDITION TO the HMAC api_key — see info.description item 7. This is the only operation in this spec with that requirement.
-         */
-        post: operations["refundTransaction"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * List transactions for one outlet, filtered and paginated
+     * @description Scoped to a SINGLE outlet — there is no "all outlets under this business profile" mode. Date range is capped at 3 days (including today), even reaching arbitrarily far into the past. Rate limit: 50 requests/minute. NOTE: path includes an unverified "-2" suffix, same caveat as check-transaction — see info.description item 6.
+     */
+    post: operations['getTransactionList'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/merchant-portal/merchant-access/online-transaction/refund': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v1/exchange-rate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Fetch ABA Bank's current buy/sell exchange rates
-         * @description Rates match https://www.ababank.com/en/forex-exchange. This is the only operation with a 2-field hash (no tran_id involved).
-         */
-        post: operations["getExchangeRate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Issue a full or partial refund
+     * @description Only COMPLETED transactions are eligible. Must be requested within 30 days of the original payment. Multiple partial refunds are allowed until the full paid amount is exhausted. ABA PAY refunds are immediate; Card/WeChat/Alipay follow PayWay's settlement agreement timing. Rate limit: 500 requests/second. CREDENTIALS: requires an RSA public key IN ADDITION TO the HMAC api_key — see info.description item 7. This is the only operation in this spec with that requirement.
+     */
+    post: operations['refundTransaction'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v1/exchange-rate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-credential/v3/aof/link-account": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Link an ABA account to your platform
-         * @description Returns a QR code or ABA Mobile deeplink, enabling users to scan or use the deeplink to launch ABA Mobile and select an account to link. Once linked, PayWay sends account details and token to the merchant via callback_url. The QR/deeplink expires in 10 minutes. Live docs mark ctid, token_flag, and currency as REQUIRED.
-         */
-        post: operations["linkAccount"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Fetch ABA Bank's current buy/sell exchange rates
+     * @description Rates match https://www.ababank.com/en/forex-exchange. This is the only operation with a 2-field hash (no tran_id involved).
+     */
+    post: operations['getExchangeRate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-credential/v3/aof/link-account': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-credential/v3/cof/link-card": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Link a credit/debit card to your platform
-         * @description Securely stores a customer's credit/debit card. ALWAYS responds with an HTML page (Visa/Mastercard/JCB/UPI form) to render in an iframe — on success AND on error; the token is delivered via callback_url. Live docs mark ctid, token_flag, and currency as REQUIRED.
-         */
-        post: operations["linkCard"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Link an ABA account to your platform
+     * @description Returns a QR code or ABA Mobile deeplink, enabling users to scan or use the deeplink to launch ABA Mobile and select an account to link. Once linked, PayWay sends account details and token to the merchant via callback_url. The QR/deeplink expires in 10 minutes. Live docs mark ctid, token_flag, and currency as REQUIRED.
+     */
+    post: operations['linkAccount'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-credential/v3/cof/link-card': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v3/purchase/payment-credential": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Charge a stored payment token
-         * @description Initiates a payment using a previously linked account or card token. Live-documented token_flag values: CITU_FLEX, MITU_FLEX, MITR_FIX (ensure the merchant profile enables the matching business case). Amount floor: KHR >= 100, USD >= 0.01.
-         */
-        post: operations["cofPayment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Link a credit/debit card to your platform
+     * @description Securely stores a customer's credit/debit card. ALWAYS responds with an HTML page (Visa/Mastercard/JCB/UPI form) to render in an iframe — on success AND on error; the token is delivered via callback_url. Live docs mark ctid, token_flag, and currency as REQUIRED.
+     */
+    post: operations['linkCard'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v3/purchase/payment-credential': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-credential/v3/token-management/renew-expired-account-token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Renew an existing payment token
-         * @description Renews an expired (or expiring) ACCOUNT token — card tokens cannot be renewed. CITI_FLEX/CITO_FLEX tokens expire 90 days after linking, renewal, or the last successful transaction (whichever is most recent). Renewal extends by 90 days. A callback is expected within 3 minutes; otherwise fall back to Get Token Details.
-         */
-        post: operations["renewToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Charge a stored payment token
+     * @description Initiates a payment using a previously linked account or card token. Live-documented token_flag values: CITU_FLEX, MITU_FLEX, MITR_FIX (ensure the merchant profile enables the matching business case). Amount floor: KHR >= 100, USD >= 0.01.
+     */
+    post: operations['cofPayment'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-credential/v3/token-management/renew-expired-account-token': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-credential/v3/token-management/get-token-details": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get details of a linked account or card token
-         * @description Manual retrieval when a link/renew callback was missed. Per the live docs this endpoint takes ONLY request_time, merchant_id, and request_id — no ctid and no pwt.
-         */
-        post: operations["getTokenDetails"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Renew an existing payment token
+     * @description Renews an expired (or expiring) ACCOUNT token — card tokens cannot be renewed. CITI_FLEX/CITO_FLEX tokens expire 90 days after linking, renewal, or the last successful transaction (whichever is most recent). Renewal extends by 90 days. A callback is expected within 3 minutes; otherwise fall back to Get Token Details.
+     */
+    post: operations['renewToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-credential/v3/token-management/get-token-details': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-credential/v3/token-management/remove-token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Remove a stored payment token
-         * @description Removes a linked account OR card token. IRREVERSIBLE — future charges decline with purchase error 87 and the ABA Mobile user is notified. Users can also remove the token themselves in ABA Mobile; the merchant then receives a CoF callback with status 0.
-         */
-        post: operations["removeToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Get details of a linked account or card token
+     * @description Manual retrieval when a link/renew callback was missed. Per the live docs this endpoint takes ONLY request_time, merchant_id, and request_id — no ctid and no pwt.
+     */
+    post: operations['getTokenDetails'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-credential/v3/token-management/remove-token': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v1/payments/generate-qr": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Generate a dynamic QR code for payment
-         * @description Generates a dynamic KHQR code that can be displayed on any screen (POS terminal, kiosk, website) for customers to scan and pay. The QR is unique per transaction and expires after the configured lifetime. Supports ABA PAY and KHQR payment methods.
-         */
-        post: operations["generateQr"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Remove a stored payment token
+     * @description Removes a linked account OR card token. IRREVERSIBLE — future charges decline with purchase error 87 and the ABA Mobile user is notified. Users can also remove the token themselves in ABA Mobile; the merchant then receives a CoF callback with status 0.
+     */
+    post: operations['removeToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v1/payments/generate-qr': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/merchant-portal/merchant-access/payment-link/create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create a payment link
-         * @description Generates a shareable payment link that can be sent to customers via SMS, email, chat, or any messaging platform. The link opens PayWay's hosted checkout page. Requires RSA-encrypted merchant_auth. Sandbox-verified: `currency` and `return_url` are REQUIRED inside merchant_auth — the gateway responds PTL04 "Parameter validation required" when either is omitted (undocumented in official docs).
-         */
-        post: operations["createPaymentLink"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Generate a dynamic QR code for payment
+     * @description Generates a dynamic KHQR code that can be displayed on any screen (POS terminal, kiosk, website) for customers to scan and pay. The QR is unique per transaction and expires after the configured lifetime. Supports ABA PAY and KHQR payment methods.
+     */
+    post: operations['generateQr'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/merchant-portal/merchant-access/payment-link/create': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/merchant-portal/merchant-access/payment-link/detail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get payment link details
-         * @description Retrieves the status and details of a previously created payment link. Also uses RSA-encrypted merchant_auth. The `id` is the `data.id` value returned by the create endpoint — NOT the slug in the payment_link URL.
-         */
-        post: operations["getPaymentLinkDetails"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Create a payment link
+     * @description Generates a shareable payment link that can be sent to customers via SMS, email, chat, or any messaging platform. The link opens PayWay's hosted checkout page. Requires RSA-encrypted merchant_auth. Sandbox-verified: `currency` and `return_url` are REQUIRED inside merchant_auth — the gateway responds PTL04 "Parameter validation required" when either is omitted (undocumented in official docs).
+     */
+    post: operations['createPaymentLink'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/merchant-portal/merchant-access/payment-link/detail': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/merchant-portal/merchant-access/payment-link/void": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Void (cancel) a payment link
-         * @description Voids a previously created payment link before it has been paid. Once voided the link can no longer receive payments and the action CANNOT be reversed. UNDOCUMENTED by PayWay (no official docs page) — the full contract is live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11): same request family as detail (RSA-encrypted merchant_auth carrying {mc_id, id}); Content-Type lenient (both application/json and urlencoded accepted); success answers {status:{code:"00",message:"Success."}, tran_id} with a NUMERIC tran_id; double-void answers HTTP 403 code PTL188 "The payment link is already voided."; a bogus link id answers HTTP 403 code 96 "Invalid merchant data". Post-void, detail reports status "VOIDED" and the hosted page renders an invalid-data shell (page code 07).
-         */
-        post: operations["voidPaymentLink"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Get payment link details
+     * @description Retrieves the status and details of a previously created payment link. Also uses RSA-encrypted merchant_auth. The `id` is the `data.id` value returned by the create endpoint — NOT the slug in the payment_link URL.
+     */
+    post: operations['getPaymentLinkDetails'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/merchant-portal/merchant-access/payment-link/void': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Complete a pre-authorized transaction (capture funds)
-         * @description Captures funds from a pre-authorized transaction. Must be called within the hold period (typically 7 days for cards). Only PRE-AUTH status transactions are eligible.
-         */
-        post: operations["completePreAuth"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Void (cancel) a payment link
+     * @description Voids a previously created payment link before it has been paid. Once voided the link can no longer receive payments and the action CANNOT be reversed. UNDOCUMENTED by PayWay (no official docs page) — the full contract is live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11): same request family as detail (RSA-encrypted merchant_auth carrying {mc_id, id}); Content-Type lenient (both application/json and urlencoded accepted); success answers {status:{code:"00",message:"Success."}, tran_id} with a NUMERIC tran_id; double-void answers HTTP 403 code PTL188 "The payment link is already voided."; a bogus link id answers HTTP 403 code 96 "Invalid merchant data". Post-void, detail reports status "VOIDED" and the hosted page renders an invalid-data shell (page code 07).
+     */
+    post: operations['voidPaymentLink'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Cancel a pre-authorized transaction (release hold)
-         * @description Releases the hold on funds from a pre-authorized transaction. Only PRE-AUTH status transactions can be cancelled.
-         */
-        post: operations["cancelPreAuth"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Complete a pre-authorized transaction (capture funds)
+     * @description Captures funds from a pre-authorized transaction. Must be called within the hold period (typically 7 days for cards). Only PRE-AUTH status transactions are eligible.
+     */
+    post: operations['completePreAuth'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v2/direct-payment/merchant/payout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Disburse funds to a beneficiary account
-         * @description Transfers funds from the merchant's settlement account to a whitelisted beneficiary ABA account. Beneficiaries must be added to the whitelist and approved before payouts can be made.
-         *     NOTE: Per the official PayWay docs (developer.payway.com.kh), the payout hash uses hex-encoded HMAC (NOT base64): `hash_hmac('sha512', ..., api_key)` returns hex string directly. This differs from all other endpoints which use base64 encoding. The SDK should handle this accordingly.
-         */
-        post: operations["payout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Cancel a pre-authorized transaction (release hold)
+     * @description Releases the hold on funds from a pre-authorized transaction. Only PRE-AUTH status transactions can be cancelled.
+     */
+    post: operations['cancelPreAuth'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v2/direct-payment/merchant/payout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Update the status of a beneficiary
-         * @description Enables or disables a whitelisted beneficiary account. Disabled beneficiaries cannot receive payouts until re-enabled.
-         */
-        post: operations["updateBeneficiaryStatus"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Disburse funds to a beneficiary account
+     * @description Transfers funds from the merchant's settlement account to a whitelisted beneficiary ABA account. Beneficiaries must be added to the whitelist and approved before payouts can be made.
+     *     NOTE: Per the official PayWay docs (developer.payway.com.kh), the payout hash uses hex-encoded HMAC (NOT base64): `hash_hmac('sha512', ..., api_key)` returns hex string directly. This differs from all other endpoints which use base64 encoding. The SDK should handle this accordingly.
+     */
+    post: operations['payout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add a beneficiary to the payout whitelist
-         * @description Registers a new ABA account as a payout beneficiary. The beneficiary must be approved by ABA Bank before payouts can be directed to it. Up to 10 beneficiaries can be whitelisted.
-         */
-        post: operations["addBeneficiary"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Update the status of a beneficiary
+     * @description Enables or disables a whitelisted beneficiary account. Disabled beneficiaries cannot receive payouts until re-enabled.
+     */
+    post: operations['updateBeneficiaryStatus'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/payment-gateway/v1/payments/get-transactions-by-mc-ref": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get transactions by merchant reference
-         * @description Retrieves purchase transactions using a merchant_ref number. Returns details for any past transaction, limited to the last 50 transactions matching the reference.
-         */
-        post: operations["getTransactionsByMerchantRef"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Add a beneficiary to the payout whitelist
+     * @description Registers a new ABA account as a payout beneficiary. The beneficiary must be approved by ABA Bank before payouts can be directed to it. Up to 10 beneficiaries can be whitelisted.
+     */
+    post: operations['addBeneficiary'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/payment-gateway/v1/payments/get-transactions-by-mc-ref': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    get?: never;
+    put?: never;
+    /**
+     * Get transactions by merchant reference
+     * @description Retrieves purchase transactions using a merchant_ref number. Returns details for any past transaction, limited to the last 50 transactions matching the reference.
+     */
+    post: operations['getTransactionsByMerchantRef'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export interface webhooks {
-    paymentCallback: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * PayWay's return_url callback (server-to-server pushback)
-         * @description PayWay POSTs this to the merchant's return_url (or the profile's configured default) after payment completion. Verify X-PAYWAY-HMAC-SHA512 using the SORTED-KEY algorithm described in info.description item 3 — this is NOT the same signing function used for outbound requests. Reject with 401 on mismatch; do not process the notification.
-         */
-        post: operations["paymentCallback"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  paymentCallback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    get?: never;
+    put?: never;
+    /**
+     * PayWay's return_url callback (server-to-server pushback)
+     * @description PayWay POSTs this to the merchant's return_url (or the profile's configured default) after payment completion. Verify X-PAYWAY-HMAC-SHA512 using the SORTED-KEY algorithm described in info.description item 3 — this is NOT the same signing function used for outbound requests. Reject with 401 on mismatch; do not process the notification.
+     */
+    post: operations['paymentCallback'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export interface components {
-    schemas: {
-        PurchaseRequest: {
-            /**
-             * @description UTC request timestamp, format YYYYMMDDHHmmss. Must be freshly generated at signing time.
-             * @example 20250213065545
-             */
-            req_time: string;
-            /** @description Merchant key issued by ABA Bank. */
-            merchant_id: string;
-            /** @description Merchant-generated unique transaction identifier. */
-            tran_id: string;
-            /** @description Buyer's first name. Must not contain digits/special characters (rejected as error code 16). */
-            firstname?: string;
-            /** @description Buyer's last name. Same validation as firstname (error code 17). */
-            lastname?: string;
-            /** @description Buyer's email (validated server-side, error code 19 if invalid). */
-            email?: string;
-            /** @description Buyer's phone (validated server-side, error code 18 if invalid). */
-            phone?: string;
-            /**
-             * @description "pre-auth" only supports ABA PAY, KHQR, and Card. Using pre-auth with an unsupported payment_option returns error code 22.
-             * @default purchase
-             * @enum {string}
-             */
-            type: "purchase" | "pre-auth";
-            /**
-             * @description Omit to let PayWay auto-display all payment options the merchant profile supports. abapay_khqr_deeplink changes the 200 response from HTML to a JSON object (qr_string, abapay_deeplink, checkout_qr_url) — see PurchaseQrResponse.
-             * @enum {string}
-             */
-            payment_option?: "cards" | "abapay_khqr" | "abapay_khqr_deeplink" | "alipay" | "wechat" | "google_pay";
-            /** @description Base64-encoded JSON array of {name, quantity, price}. Descriptive only — NOT used for amount validation or calculation; `amount` is the sole source of truth for what's charged. */
-            items?: string;
-            /**
-             * @description Shipping fee, additive to amount at checkout.
-             * @default 0
-             */
-            shipping: number;
-            /** @description Purchase amount. Zero is rejected (error 45). KHR currency cannot carry decimals (error 46) and must exceed 100 KHR (error 47). */
-            amount: number;
-            /**
-             * @description Defaults to the currency of the first account on the merchant profile if omitted.
-             * @enum {string}
-             */
-            currency?: "KHR" | "USD";
-            /** @description Base64-encoded callback URL. Custom return_url values must be pre-whitelisted on the merchant profile (error 6/81) or the request is rejected. */
-            return_url?: string;
-            /** @description Redirect target when the customer closes/cancels the payment dialog. */
-            cancel_url?: string;
-            /**
-             * @description Overrides the profile-level "skip success page" setting for this request only. 1 = skip, redirecting via continue_success_url.
-             * @enum {integer}
-             */
-            skip_success_page?: 0 | 1;
-            /** @description Redirect target after a successful payment (used when skip_success_page=1). */
-            continue_success_url?: string;
-            /** @description Base64-encoded JSON {ios_scheme, android_scheme}. Mandatory for mobile-app integrations so ABA Mobile can hand control back to the merchant's native app. */
-            return_deeplink?: string;
-            /** @description Base64-encoded arbitrary JSON merchants want attached to the transaction record/export (not used by PayWay's own logic). */
-            custom_fields?: string;
-            /** @description Opaque string echoed back verbatim in the return_url pushback payload. */
-            return_params?: string;
-            /**
-             * @description hosted_view opens a new tab; popup renders as a bottom sheet (mobile) or modal (desktop).
-             * @enum {string}
-             */
-            view_type?: "hosted_view" | "popup";
-            /** @description Set to 0 to route through Checkout service when the profile also has QR Payment API enabled. */
-            payment_gate?: number;
-            /** @description Base64-encoded JSON array of {acc, amt} splitting the payment across up to 10 destination accounts (error 25 if exceeded). Accounts must be whitelisted first (error 37). */
-            payout?: string;
-            /** @description Base64-encoded JSON, currently only used for WeChat Mini Program (wechat_sub_appid, wechat_sub_openid). */
-            additional_params?: string;
-            /** @description Minutes before the payment link expires. Min 3, max 43200 (30 days). Below 3 is rejected (error 69). Behavior on expiry differs by method: ABA PAY/Card simply fail; KHQR reverses funds to the payer; WeChat/Alipay do not reverse. */
-            lifetime?: number;
-            /** @description Required when payment_option=google_pay and the merchant manages payment-method selection itself. */
-            google_pay_token?: string;
-            /** @description base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)). See operation-level x-hmac-fields for the exact field order — it is NOT alphabetical and NOT the same as check/close-transaction. */
-            hash: string;
-        };
-        /** @description Returned instead of HTML when payment_option=abapay_khqr_deeplink. */
-        PurchaseQrResponse: {
-            /** @description Raw KHQR payload string, scannable by any KHQR-member banking app. */
-            qr_string?: string;
-            /** @description Deeplink that opens ABA Mobile directly to the pre-filled payment. */
-            abapay_deeplink?: string;
-            /** @description Hosted URL rendering the QR code as an image/page, for platforms that can't render qr_string themselves. */
-            checkout_qr_url?: string;
-        };
-        /** @description purchase's JSON error shape (distinct from the HTML success path). Non-exhaustive: purchase alone defines ~80 distinct error codes (wrong hash, invalid amount, currency not allowed, payout validation, Google Pay token failures, etc.) — pull the full table from the scraped spec into your SDK's error-code enum rather than hand-copying a subset here; this skeleton intentionally does not restate all ~80 to keep the spec reviewable, but the generated client MUST surface `code` typed, not just `message` stringly. */
-        ErrorStatus: {
-            status: {
-                code: string;
-                message: string;
-            };
-        };
-        StatusBlock: {
-            /** @description Endpoint-specific status code. NOTE: check-transaction and close-transaction each define their own code space (e.g. "00" success vs "0" on purchase-family errors) — do not assume a single shared enum across endpoints; encode per-operation code tables separately in the generated SDK's error types. */
-            code: string;
-            /** @description Human-readable detail for `code`. */
-            message: string;
-            /** @description Echoes the transaction id the status applies to. */
-            tran_id?: string;
-            /** @description Observed empirically (live sandbox probe, 2026-07-16) on transaction-list-2's error responses only (e.g. "en"). Not confirmed present on other -2 endpoints or on success responses -- treat as optional/nullable everywhere, and re-verify before assuming it appears on a given operation. */
-            lang?: string;
-            /** @description Observed empirically (live sandbox probe, 2026-07-16) on transaction-list-2's error responses only. Same caveat as `lang` -- optional, not confirmed on other endpoints. */
-            trace_id?: string;
-        };
-        /** @description Standard error response returned by PayWay on validation failures, authentication errors, or business-logic rejections. The `status.code` field contains an endpoint-specific error code (e.g. "1" for wrong hash, "49" for invalid date). The `status.message` provides a human-readable explanation. */
-        ErrorResponse: {
-            status: components["schemas"]["StatusBlock"];
-        };
-        /** @description Shared shape for check-transaction and close-transaction — both sign only these 3 fields (see per-operation x-hmac-fields). */
-        TranLookupRequest: {
-            /** @description UTC request timestamp, format YYYYMMDDHHmmss. */
-            req_time: string;
-            /** @description Merchant key issued by ABA Bank. */
-            merchant_id: string;
-            /** @description The original purchase transaction id to look up or close. */
-            tran_id: string;
-            /** @description base64(HMAC-SHA512(req_time + merchant_id + tran_id, api_key)). */
-            hash: string;
-        };
-        "ecommerce-checkout_StatusBlock": {
-            /** @description Endpoint-specific status code. NOTE: check-transaction and close-transaction each define their own code space (e.g. "00" success vs "0" on purchase-family errors) — do not assume a single shared enum across endpoints; encode per-operation code tables separately in the generated SDK's error types. */
-            code: string;
-            /** @description Human-readable detail for `code`. */
-            message: string;
-            /** @description Echoes the transaction id the status applies to. */
-            tran_id?: string;
-        };
-        /**
-         * @example {
-         *       "data": {
-         *         "payment_status_code": 0,
-         *         "payment_status": "APPROVED",
-         *         "total_amount": 10,
-         *         "original_amount": 10,
-         *         "refund_amount": 0,
-         *         "discount_amount": 0,
-         *         "payment_amount": 10,
-         *         "payment_currency": "USD",
-         *         "apv": "619195",
-         *         "transaction_date": "2025-02-13 06:56:00"
-         *       },
-         *       "status": {
-         *         "code": "00",
-         *         "message": "Success!",
-         *         "tran_id": "17394277693"
-         *       }
-         *     }
-         */
-        CheckTransactionResponse: {
-            /** @description Present on successful lookup (status.code == "00"). */
-            data?: {
-                /** @description 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED */
-                payment_status_code?: number;
-                /** @enum {string} */
-                payment_status?: "APPROVED" | "PRE-AUTH" | "REFUNDED" | "PENDING" | "DECLINED" | "CANCELLED";
-                /** @description Amount due after discount. */
-                total_amount?: number;
-                original_amount?: number;
-                /** @description Sum of all refunds issued against this transaction. */
-                refund_amount?: number;
-                /** @description In the original transaction's currency. */
-                discount_amount?: number;
-                /** @description Amount actually paid by the customer. */
-                payment_amount?: number;
-                payment_currency?: string;
-                /** @description Transaction approval code. */
-                apv?: string;
-                /** @description Timestamp the transaction was created in the payment gateway. */
-                transaction_date?: string;
-            };
-            status: components["schemas"]["ecommerce-checkout_StatusBlock"];
-        };
-        CloseTransactionResponse: {
-            status: components["schemas"]["ecommerce-checkout_StatusBlock"];
-        };
-        /** @description One entry in a transaction's operation history (capture, pre-auth completion/cancellation, refund). */
-        TransactionOperation: {
-            /** @enum {string} */
-            status?: "Completed" | "Pre-Auth" | "Completed Pre-Auth" | "Cancelled Pre-Auth" | "Refunded";
-            /** @description Amount associated with this specific operation, not the transaction total. */
-            amount?: number;
-            /** @description Timestamp this operation occurred. */
-            transaction_date?: string;
-            /** @description Core-banking booking entry id — populated for ABA PAY operations only, blank otherwise. */
-            bank_ref?: string;
-        };
-        /** @description Response for getTransactionDetail. NOT intended for real-time polling — see rate-limit note on the operation (10 req/min, not raisable). */
-        TransactionDetailResponse: {
-            /** @description Present when status.code == "00". */
-            data?: {
-                /** @description Echoes the requested tran_id. */
-                transaction_id?: string;
-                /** @description 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED */
-                payment_status_code?: number;
-                /** @enum {string} */
-                payment_status?: "APPROVED" | "PRE-AUTH" | "PENDING" | "DECLINED" | "REFUNDED" | "CANCELLED";
-                /** @description Before discount. */
-                original_amount?: number;
-                original_currency?: string;
-                /** @description Amount actually paid by the customer. */
-                payment_amount?: number;
-                payment_currency?: string;
-                /** @description Amount due after discount. */
-                total_amount?: number;
-                /** @description Total refunded to date. */
-                refund_amount?: number;
-                discount_amount?: number;
-                /** @description Transaction approval code. */
-                apv?: string;
-                transaction_date?: string;
-                /** @description Payer first name. */
-                first_name?: string;
-                /** @description Payer last name. */
-                last_name?: string;
-                email?: string;
-                phone?: string;
-                /** @description ABA core-banking booking entry reference. */
-                bank_ref?: string;
-                /** @enum {string} */
-                payment_type?: "ABA Pay" | "Alipay" | "Wechat" | "KHQR" | "VISA" | "MC" | "JCB" | "CUP";
-                /** @description Masked account number or card PAN. */
-                payer_account?: string;
-                /** @description ABA Bank for ABA PAY, or issuer bank for KHQR. */
-                bank_name?: string;
-                /** @enum {string} */
-                card_source?: "ONUS" | "OFFUS_DOMESTIC" | "OFFUS_INTERNATIONAL";
-                /** @description Full operation history for this transaction. */
-                transaction_operations?: components["schemas"]["TransactionOperation"][];
-            };
-            /** @description code space for this endpoint: "00" success, "5" wrong hash (note: NOT "1" as in check/close-transaction — do not assume a shared numeric code space across endpoints), "6" transaction not found, "8" invalid merchant profile, "11" internal server error, "429" rate limit exceeded. */
-            status: components["schemas"]["ecommerce-checkout_StatusBlock"];
-        };
-        /** @description All filter fields are optional but each still occupies a fixed position in the HMAC input per x-hmac-fields on the operation — pass them as null/empty rather than omitting the key. */
-        TransactionListRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            req_time: string;
-            merchant_id: string;
-            /** @description Format YYYY-MM-DD HH:mm:ss. Defaults to today 00:00:00 if omitted. */
-            from_date?: string | null;
-            /** @description Format YYYY-MM-DD HH:mm:ss. Defaults to today 23:59:59 if omitted. Date range capped at 3 days total. */
-            to_date?: string | null;
-            from_amount?: number | null;
-            to_amount?: number | null;
-            /** @description Comma-separated for multiple values. Case-insensitive. One of APPROVED, PRE-AUTH, REFUNDED, PENDING, DECLINED, CANCELLED. */
-            status?: string | null;
-            /** @default 1 */
-            page: string;
-            /**
-             * @description Max 1000 records per page.
-             * @default 40
-             */
-            pagination: string;
-            hash: string;
-        };
-        /** @description Same shape as TransactionDetailResponse.data minus transaction_operations (no per-item history in list view). */
-        TransactionListItem: {
-            transaction_id?: string;
-            transaction_date?: string;
-            apv?: string;
-            /** @enum {string} */
-            payment_status?: "APPROVED" | "PRE-AUTH" | "REFUNDED" | "PENDING" | "DECLINED" | "CANCELLED";
-            payment_status_code?: number;
-            original_amount?: number;
-            /** @enum {string} */
-            original_currency?: "KHR" | "USD";
-            total_amount?: number;
-            discount_amount?: number;
-            refund_amount?: number;
-            payment_amount?: number;
-            payment_currency?: string;
-            /** @description Only present if enabled on the merchant profile. */
-            first_name?: string;
-            /** @description Only present if enabled on the merchant profile. */
-            last_name?: string;
-            /** @description Only present if enabled on the merchant profile. */
-            email?: string;
-            /** @description Only present if enabled on the merchant profile. */
-            phone?: string;
-            /** @description Only present if enabled on the merchant profile. */
-            bank_ref?: string;
-            payer_account?: string;
-            bank_name?: string;
-            /** @enum {string} */
-            card_source?: "ONUS" | "OFFUS_DOMESTIC" | "OFFUS_INTERNATIONAL";
-            /**
-             * @description N/A for transactions still pending payment.
-             * @enum {string}
-             */
-            payment_type?: "N/A" | "ABA Pay" | "Alipay" | "Wechat" | "KHQR" | "VISA" | "MC" | "JCB" | "CUP";
-        };
-        TransactionListResponse: {
-            data?: components["schemas"]["TransactionListItem"][];
-            /** @description Current page index. */
-            page?: string;
-            /** @description Records per page (max 1000). */
-            pagination?: string;
-            /** @description code space: "00" success, "1" wrong hash, "8" invalid merchant profile, "11" internal server error, "429" rate limit exceeded (50 req/min on this endpoint). */
-            status: components["schemas"]["ecommerce-checkout_StatusBlock"];
-        };
-        /** @description NOTE the field name is `request_time`, not `req_time` as on every other endpoint in this spec — see info.description item 8. */
-        RefundRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description Base64 of RSA-encrypted, chunked JSON {mc_id, tran_id, refund_amount}. See x-merchant-auth-encryption on the refund operation for the exact construction process and required credential (a separate RSA public key from ABA Bank, distinct from the HMAC api_key). */
-            merchant_auth: string;
-            /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
-            hash: string;
-        };
-        RefundResponse: {
-            /**
-             * Format: double
-             * @description Amount after any discount, e.g. $20 purchase with $2 discount -> grand_total $18.
-             */
-            grand_total?: number;
-            /**
-             * Format: double
-             * @description Cumulative refunded amount across all partial refunds issued so far.
-             */
-            total_refunded?: number;
-            /** @description Original transaction currency. */
-            currency?: string;
-            /** @description REFUNDED for both full and partial refunds. */
-            transaction_status?: string;
-            /** @description Distinct, alphanumeric code space unique to this endpoint — do not reuse StatusBlock's assumption of numeric-string codes. Notable codes: 00 success, PTL02 invalid hash, PTL37 refund exceeds original amount, PTL57/PTL58 unable/failed to refund, PTL168 concurrent request rejected, PTL181 insufficient available balance. */
-            status: {
-                code: string;
-                message: string;
-            };
-        };
-        ExchangeRateRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            req_time: string;
-            merchant_id: string;
-            /** @description base64(HMAC-SHA512(req_time + merchant_id, api_key)) — only 2 fields, the shortest hash input in this API surface. */
-            hash: string;
-        };
-        CurrencyRate: {
-            /** @description Sell rate, as a decimal string. */
-            sell: string;
-            /** @description Buy rate, as a decimal string. */
-            buy: string;
-        };
-        /** @description The vendor's own schema listed an inconsistent `required` array under exchange_rates (omitting some currencies present in `properties`) — treated as a docs artifact and modeled here via additionalProperties instead of a hardcoded required list, since the actual currency set PayWay returns may change over time without notice. */
-        ExchangeRateResponse: {
-            status: {
-                /** @description 00 success, 1 wrong hash, 26 invalid merchant profile. */
-                code: string;
-                message: string;
-            };
-            /** @description Keyed by lowercase ISO currency code (observed: aud, sgd, eur, gbp, myr, thb, hkd, cny, cad, krw, jpy, vnd). Modeled with additionalProperties rather than enumerating every key as required, since PayWay could add/remove currencies. */
-            exchange_rates: {
-                [key: string]: components["schemas"]["CurrencyRate"];
-            };
-        };
-        LinkAccountRequest: {
-            /** @description Unique request identifier generated by the merchant. 5–24 chars, letters+digits only. "We only return the last record" for a reused request_id. */
-            request_id: string;
-            /** @description UTC timestamp, format YYYYMMDDHHmmss. */
-            request_time: string;
-            /** @description Merchant key issued by ABA Bank. */
-            merchant_id: string;
-            /** @description Customer token identifier — merchant-side unique ID for the customer. 5–24 chars, letters+digits only. Required per live docs. */
-            ctid: string;
-            /** @description Base64-encoded JSON {ios_scheme, android_scheme} for mobile app integration. */
-            return_deeplink?: string;
-            /**
-             * @description Live docs list CITI_FLEX (customer-initiated, variable amount) and CITO_FLEX (merchant charges later, variable) for link-account. Sandbox additionally accepted CITO_FIX / CITR_FLEX (§9b) — keep sending them only if the merchant profile enables them.
-             * @enum {string}
-             */
-            token_flag: "CITI_FLEX" | "CITO_FLEX";
-            /**
-             * @description Required per live docs (profile-enabled currency).
-             * @enum {string}
-             */
-            currency: "KHR" | "USD";
-            /** @description Base64-encoded URL where PayWay sends the account details and token after linking. Defaults to the profile pushback_url. */
-            callback_url?: string;
-            /** @description base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)). */
-            hash: string;
-        };
-        LinkAccountResponse: {
-            /** @description On code 04 the binding layer adds an `errors` object keyed by field name. */
-            status?: {
-                /** @description 00 success; 04 invalid data (see errors map); 01 wrong hash; 98 merchant id not found; 104 merchant not enabled token flag. */
-                code?: string;
-                message?: string;
-                trace_id?: string;
-            };
-            data?: {
-                /** @description ABA Mobile deeplink for linking. */
-                deeplink?: string;
-                /** @description QR payload for linking. */
-                qr_string?: string;
-                /** @description QR/deeplink expiry (10 minutes per live docs). */
-                expire_in?: unknown;
-            };
-        };
-        LinkCardRequest: {
-            /** @description 5–24 chars, letters+digits only. */
-            request_id: string;
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description Customer token identifier. 5–24 chars, letters+digits only. Required per live docs. */
-            ctid: string;
-            /**
-             * @description Live docs list CITI_FLEX / CITO_FLEX for link-card.
-             * @enum {string}
-             */
-            token_flag: "CITI_FLEX" | "CITO_FLEX";
-            /**
-             * @description Marked 'Required for Link Card' in live docs; the SDK warns when omitted (§16 realignment). Billing frequency.
-             * @enum {string}
-             */
-            frequency?: "1W" | "1M" | "2M";
-            /** @description Hash position ONLY (§16) — it participates in the HMAC (hashes as '') but has NO request body field. Listed here to document the quirk; do not send it. */
-            amount?: string;
-            /** @description Base64-encoded URL — target of the hosted form's "Done" button. */
-            continue_success_url?: string;
-            /** @description Base64-encoded token pushback URL; defaults to the profile pushback_url. */
-            callback_url?: string;
-            /**
-             * @description Required per live docs (sandbox binds USD by default — §9a).
-             * @enum {string}
-             */
-            currency: "KHR" | "USD";
-            hash: string;
-        };
-        CofPaymentRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description Merchant-generated unique transaction identifier. */
-            tran_id: string;
-            /** @description Payment amount. Floor: KHR >= 100, USD >= 0.01. */
-            amount: number;
-            /** @description PayWay token from link-account or link-card. */
-            pwt: string;
-            /** @description Customer token identifier. */
-            ctid: string;
-            first_name?: string;
-            last_name?: string;
-            email?: string;
-            phone?: string;
-            /**
-             * @default purchase
-             * @enum {string}
-             */
-            purchase_type: "purchase" | "pre-auth";
-            /** @description Base64-encoded. */
-            callback_url?: string;
-            /** @description Base64-encoded JSON [{name,quantity,price}]. */
-            items?: string;
-            return_params?: string;
-            /** @description Base64-encoded JSON [{acc,amt}]. */
-            payout?: string;
-            /** @description Base64-encoded JSON. */
-            custom_fields?: string;
-            /**
-             * @description Live-documented charging flags. Sandbox additionally accepted MITU_FIX / MITR_FLEX (§9b).
-             * @enum {string}
-             */
-            token_flag: "CITU_FLEX" | "MITU_FLEX" | "MITR_FIX";
-            /** @description Shipping fee — 'can be any amount' per live docs. */
-            shipping_fee?: number;
-            /** @enum {string} */
-            currency: "KHR" | "USD";
-            hash: string;
-        };
-        CofPaymentResponse: {
-            /** @description On code 04 the binding layer adds an `errors` object keyed by field name. */
-            status?: {
-                /** @description 00 success; 04 invalid data (errors map); 01 wrong hash; 98 merchant id not found. */
-                code?: string;
-                message?: string;
-                tran_id?: string;
-                trace_id?: string;
-            };
-        };
-        /** @description Account tokens only. Live-documented hash order: ctid, request_time, pwt, merchant_id, request_id (differs from every other CoF endpoint). */
-        RenewTokenRequest: {
-            /** @description 5–24 chars, letters+digits only. */
-            request_id: string;
-            request_time: string;
-            merchant_id: string;
-            /** @description 5–24 chars, letters+digits only. */
-            ctid: string;
-            pwt: string;
-            hash: string;
-        };
-        RenewTokenResponse: {
-            status?: {
-                /** @description 00 success (example also carries tran_id); 4 invalid data; 1 wrong hash; 98 merchant id not found; 105 invalid payment credential token. */
-                code?: string;
-                message?: string;
-                tran_id?: string;
-                trace_id?: string;
-            };
-            /** @description New payment token replacing the old one. */
-            new_token?: string;
-        };
-        /** @description Per the live docs this endpoint takes ONLY request_time, merchant_id, and request_id — no ctid, no pwt. Hash order: merchant_id, request_time, request_id. */
-        GetTokenDetailsRequest: {
-            /** @description 5–24 chars, letters+digits only — the original link/renew request_id. */
-            request_id: string;
-            request_time: string;
-            merchant_id: string;
-            hash: string;
-        };
-        GetTokenDetailsResponse: {
-            status?: {
-                /** @description 00 success; 04 invalid data (errors map); 1 wrong hash; 98 merchant id not found; 104 data not found. */
-                code?: string;
-                message?: string;
-                trace_id?: string;
-            };
-            data?: {
-                /** @description Masked account/card — last 4 visible. */
-                source_of_fund?: string;
-                /** @description Visa | MC | CUP | JCB | ABA ACCOUNT. */
-                type?: string;
-                /** @description 0 removed, 1 active, 2 frozen. */
-                status?: number;
-                /** @description Token expiry (date-time). */
-                expired_at?: string;
-                /** @description CITI_FLEX | CITO_FLEX | CITR_FIX. */
-                token_flag?: string;
-                /** @description Empty for FLEX flags; 1W/1M/2M for CITR_FIX. */
-                frequency?: string;
-                /** @description = subscribed_amount for CITR_FIX. */
-                amount_limit_per_tran?: number;
-                ctid?: string;
-                pwt?: string;
-                /** @description Fixed recurring amount; 0 for FLEX flags. */
-                subscribed_amount?: number;
-                currency?: string;
-            };
-        };
-        /** @description Per the live docs the request carries request_time, merchant_id, ctid, and pwt — no request_id. Hash order: merchant_id, ctid, request_time, pwt. */
-        RemoveTokenRequest: {
-            request_time: string;
-            merchant_id: string;
-            ctid: string;
-            pwt: string;
-            hash: string;
-        };
-        RemoveTokenResponse: {
-            status?: {
-                /** @description 00 success; 04 invalid data (errors map); 98 merchant id not found; 01 wrong hash. */
-                code?: string;
-                message?: string;
-                trace_id?: string;
-            };
-        };
-        GenerateQrRequest: {
-            /** @description UTC request timestamp, format YYYYMMDDHHmmss. */
-            req_time: string;
-            /** @description Merchant key issued by ABA Bank. */
-            merchant_id: string;
-            /** @description Merchant-generated unique transaction identifier. */
-            tran_id: string;
-            /** @description Payer's first name. */
-            first_name?: string;
-            /** @description Payer's last name. */
-            last_name?: string;
-            /** @description Payer's email address. */
-            email?: string;
-            /** @description Payer's phone number. */
-            phone?: string;
-            /** @description Payment amount. Minimum: 100 KHR or 0.01 USD. */
-            amount: number;
-            /**
-             * @description Supported values: `pre-auth` and `purchase`. Default: `purchase`. Note: Alipay & WeChat do not support pre-auth.
-             * @enum {string}
-             */
-            purchase_type?: "purchase" | "pre-auth";
-            /** @description Supported payment options: - `abapay_khqr`: ABA KHQR - `wechat`: WeChat QR (USD only) - `alipay`: Alipay QR (USD only) */
-            payment_option: string;
-            /** @description Item list description in Base64-encoded JSON format. Maximum of 10 items. Note: This is only description/remark — price/quantity not used for validation. */
-            items?: string;
-            /** @description Base64-encoded callback URL. */
-            callback_url?: string;
-            /** @description Base64-encoded JSON with `android_scheme` and `ios_scheme` keys. */
-            return_deeplink?: string;
-            /** @description Base64-encoded additional custom fields. */
-            custom_fields?: string;
-            /** @description Additional information to include in the pushback. */
-            return_params?: string;
-            /** @description Payout instructions in a Base64-encoded JSON string. */
-            payout?: string;
-            /** @enum {string} */
-            currency: "KHR" | "USD";
-            /** @description QR image template option. */
-            qr_image_template: string;
-            /** @description Transaction lifetime in minutes. Default: 30 days. Minimum: 3 mins. Maximum: 120 days. */
-            lifetime: number;
-            /** @description base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)). */
-            hash: string;
-        };
-        GenerateQrResponse: {
-            status?: {
-                /** @description Response code: - `0`: Success - `1`: Wrong Hash - `6`: Domain not in whitelist - `12`: Currency not allowed - `23`: Payment option not enabled - `429`: Rate limit exceeded */
-                code?: string;
-                message?: string;
-                /** @description Unique request trace identifier. */
-                trace_id?: string;
-            };
-            /** @description Transaction amount. */
-            amount?: number;
-            /** @description Transaction currency. */
-            currency?: string;
-            /** @description Raw KHQR payload string, scannable by any KHQR-member banking app. */
-            qrString?: string;
-            /** @description Data URL containing the rendered QR PNG image (base64). */
-            qrImage?: string;
-            /** @description ABA Mobile deeplink to open ABA Mobile for payment confirmation. */
-            abapay_deeplink?: string;
-            /** @description App Store URL for ABA Mobile (fallback if deeplink fails). */
-            app_store?: string;
-            /** @description Play Store URL for ABA Mobile (fallback if deeplink fails). */
-            play_store?: string;
-        };
-        /** @description Uses RSA-encrypted merchant_auth containing transaction details. See x-merchant-auth-encryption on the operation for encryption process. Sandbox-verified: currency and return_url are REQUIRED inside merchant_auth (PTL04 "Parameter validation required" when omitted). Sent as multipart/form-data. The HMAC hash covers request_time + merchant_id + merchant_auth ONLY — the optional image bytes are never hashed (per ABA's official PHP sample). */
-        CreatePaymentLinkRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            /** @description Merchant key issued by ABA Bank. */
-            merchant_id: string;
-            /** @description Base64 of RSA-encrypted, chunked JSON containing transaction details (title, amount, currency, description, payment_limit, return_url, merchant_ref_no, expired_date, payout). */
-            merchant_auth: string;
-            /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
-            hash: string;
-            /** @description Optional split-payout instructions INSIDE the merchant_auth plaintext (JSON array "[{acc, amt}]" as a string value — the whole auth payload is JSON-encoded, so an array value would double-encode). Documented rule: the total payout amt must equal the link amount. Officially optional. Listed here as a top-level property so schema tooling can see it; the wire format is the merchant_auth plaintext shape (see x-merchant-auth-encryption). */
-            payout?: string;
-            /**
-             * Format: binary
-             * @description Optional image shown with the payment link (top-level multipart part, not part of the hash). The created PaymentLink echoes it back as the `image` object.
-             */
-            image?: string;
-        };
-        PaymentLinkStatus: {
-            code?: string;
-            message?: string;
-            tran_id?: string;
-            lang?: string;
-            trace_id?: string;
-        };
-        /** @description A payment link resource as returned by the create and detail endpoints (sandbox-verified shape). */
-        PaymentLink: {
-            /** @description Payment link id used with the detail endpoint (e.g. "zX71gfZgVme0juZANHfZMA=="). NOT the slug in the payment_link URL. */
-            id?: string;
-            title?: string;
-            image?: {
-                image?: string;
-                filename?: string;
-                size?: number;
-            };
-            /** @description Amount as a string (e.g. "0.02"). */
-            amount?: string;
-            /** @enum {string} */
-            currency?: "USD" | "KHR";
-            /** @description Link status (e.g. OPEN). */
-            status?: string;
-            description?: string;
-            payment_limit?: number;
-            /** @description Total payment amount before refunds (official schema says string; observed numeric — do not rely on the type). */
-            total_amount_org?: number;
-            /** @description Total refunded amount (official create schema: number; official detail schema: string — observed numeric; do not rely on the type). */
-            total_refund?: number;
-            /** @description Total amount after refunds. */
-            total_amount?: number;
-            /** @description The total number of completed payment transactions (0 on create). */
-            total_trxn?: number;
-            /** @description YYYY-MM-DD HH:mm:ss */
-            created_at?: string;
-            /** @description YYYY-MM-DD HH:mm:ss */
-            updated_at?: string;
-            /** @description Epoch seconds when set; echoes "0" (string) when unset. Number or string both accepted at create. Sandbox-verified (2026-09-06): a past value or one under ~5 minutes in the future is rejected PTL04; offsets from +300s upward are accepted. No EXPIRED status exists — detail keeps reporting OPEN after expiry and the hosted page still answers 200. */
-            expired_date?: number | string;
-            /** @description Decoded callback URL. */
-            return_url?: string;
-            /** @description The URL the gateway calls to send payment status updates (detail endpoint; official detail schema — absent from sandbox detail responses). The pushback body is live-captured (2026-09-06): POST application/json, User-Agent PayWayApp/3.0, body {tran_id (string), status (numeric 0 = approved), merchant_ref_no} — NO hash field; verify via check-transaction, not verifyCallback. */
-            pushback_url?: string;
-            merchant_ref_no?: string;
-            outlet_id?: string;
-            outlet_name?: string;
-            /** @description Payout details (null when none). PLACEMENT IS UNVERIFIED: the official apidog create schema places a top-level payout array of {acc, amt, acc_name}; the official overview sample response shows it inside data as an array. oneOf both shapes until probe V-2 settles it (see HANDOFF §9 open items) — do not rely on either. */
-            payout?: Record<string, never> | unknown[] | null;
-            /** @description Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N). */
-            payment_link?: string;
-        };
-        CreatePaymentLinkResponse: {
-            status?: components["schemas"]["PaymentLinkStatus"];
-            /** @description Gateway log id. Official schemas say string; sandbox-observed as a NUMBER on both create and detail (2026-09-06) — coerce, do not rely on the type. */
-            tran_id?: number | string;
-            data?: components["schemas"]["PaymentLink"];
-        };
-        GetPaymentLinkDetailsRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description RSA-encrypted JSON {mc_id, id}. */
-            merchant_auth: string;
-            /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
-            hash: string;
-        };
-        /** @description Sandbox-observed (2026-09-06): a bogus link id answers HTTP 403 code 96 "Invalid merchant data" — the officially documented PTL132 was NOT reproduced on this sandbox profile. Sandbox detail responses carry no pushback_url. */
-        GetPaymentLinkDetailsResponse: {
-            status?: components["schemas"]["PaymentLinkStatus"];
-            /** @description Gateway log id. Official schemas say string; sandbox-observed as a NUMBER (2026-09-06) — coerce, do not rely on the type. */
-            tran_id?: number | string;
-            data?: components["schemas"]["PaymentLink"];
-        };
-        /** @description UNDOCUMENTED endpoint — live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11). Content-Type lenient: both application/json and application/x-www-form-urlencoded are accepted. */
-        VoidPaymentLinkRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description RSA-encrypted JSON {mc_id, id} — same shape as the detail endpoint. */
-            merchant_auth: string;
-            /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
-            hash: string;
-        };
-        /** @description Live-verified (SANDBOX-FINDINGS §23, 2026-09-11): success answers {status:{code:"00",message:"Success.",lang,trace_id}, tran_id}. Void is NOT idempotent — a second void answers HTTP 403 code PTL188 "The payment link is already voided."; a bogus link id answers HTTP 403 code 96 "Invalid merchant data". Post-void, detail reports the previously-unobserved status "VOIDED". */
-        VoidPaymentLinkResponse: {
-            status?: components["schemas"]["PaymentLinkStatus"];
-            /** @description Gateway log id. Sandbox-observed as a NUMBER (2026-09-11) — coerce, do not rely on the type. */
-            tran_id?: number | string;
-        };
-        /** @description Uses RSA-encrypted merchant_auth. NOTE: uses request_time (not req_time), same convention as the Refund endpoint. */
-        CompletePreAuthRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description Base64 of RSA-encrypted JSON {mc_id, tran_id, complete_amount, payout?}. */
-            merchant_auth: string;
-            /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
-            hash: string;
-        };
-        CompletePreAuthResponse: {
-            status?: {
-                code: string;
-                message: string;
-            };
-            /** @description Updated status after completion (e.g., APPROVED). */
-            transaction_status?: string;
-            total_amount?: number;
-        };
-        CancelPreAuthRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description Base64 of RSA-encrypted JSON {mc_id, tran_id}. */
-            merchant_auth: string;
-            /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
-            hash: string;
-        };
-        CancelPreAuthResponse: {
-            status?: {
-                code: string;
-                message: string;
-            };
-            /** @description Updated status after cancellation (e.g., CANCELLED). */
-            transaction_status?: string;
-        };
-        PayoutRequest: {
-            /** @description Merchant key issued by ABA Bank. */
-            merchant_id: string;
-            /** @description Merchant-generated unique payout transaction identifier. */
-            tran_id: string;
-            /** @description Payout amount. */
-            amount: number;
-            /** @description Base64 of RSA-encrypted JSON array of {account, amount}. */
-            beneficiaries: string;
-            /** @enum {string} */
-            currency: "KHR" | "USD";
-            /** @description JSON string associated with the payout. */
-            custom_fields?: string;
-            /** @description hex(HMAC-SHA512(merchant_id + tran_id + beneficiaries + amount + custom_fields + currency, api_key)). */
-            hash: string;
-        };
-        PayoutResponse: {
-            status?: {
-                code: string;
-                message: string;
-                tran_id?: string;
-            };
-            /** @description Core-banking reference for the payout transaction. */
-            bank_ref?: string;
-        };
-        UpdateBeneficiaryStatusRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description Base64 of RSA-encrypted JSON {mc_id, payee, status}, where status is 0 or 1. */
-            merchant_auth: string;
-            /** @description base64(HMAC-SHA512(request_time + merchant_auth, api_key)). */
-            hash: string;
-        };
-        BeneficiaryResponse: {
-            status?: {
-                code: string;
-                message: string;
-            };
-        };
-        AddBeneficiaryRequest: {
-            /** @description UTC timestamp, YYYYMMDDHHmmss. */
-            request_time: string;
-            merchant_id: string;
-            /** @description Base64 of RSA-encrypted JSON {mc_id, payee}. */
-            merchant_auth: string;
-            /** @description base64(HMAC-SHA512(request_time + merchant_auth, api_key)). */
-            hash: string;
-        };
-        GetTransactionsByMcRefRequest: {
-            /**
-             * @description UTC timestamp, format YYYYMMDDHHmmss.
-             * @example 20250213084236
-             */
-            req_time: string;
-            /**
-             * @description Merchant key issued by ABA Bank.
-             * @example ec000002
-             */
-            merchant_id: string;
-            /**
-             * @description Merchant reference number.
-             * @example 17394277693
-             */
-            merchant_ref: string;
-            /** @description base64(HMAC-SHA512(req_time + merchant_id + merchant_ref, api_key)). */
-            hash: string;
-        };
-        KhqrTransaction: {
-            transaction_id?: string;
-            transaction_date?: string;
-            bank_ref?: string;
-            apv?: string;
-            discount_amount?: number;
-            payment_status?: string;
-            payment_amount?: number;
-            payment_currency?: string;
-            payment_type?: string;
-            payer_account?: string;
-            total_amount?: number;
-            original_amount?: number;
-            original_currency?: string;
-            payment_status_code?: number;
-            bank_name?: string;
-            refund_amount?: number;
-            merchant_ref?: string;
-        };
-        /** @description Response envelope as merchant-captured in production (2026-08): rows under `data`, status under a nested `status` object with STRING code ("00" = Success). The official doc page models {status: integer, transactions: []} but every captured production response uses the data/status-object shape; consumers should tolerate both (SDK normalizes). Status codes: "00"/0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error. */
-        GetTransactionsByMcRefResponse: {
-            data?: components["schemas"]["KhqrTransaction"][];
-            status?: {
-                code?: string | number;
-                message?: string;
-                merchant_ref?: string;
-            };
-            /** @description Legacy doc-page row slot — production captures use `data`. */
-            transactions?: components["schemas"]["KhqrTransaction"][];
-        };
-        /** @description Body shape is NOT fixed — PayWay states additional fields may be present depending on payment method. Treat unknown keys as pass-through when computing the signature (item 3 in info.description sorts ALL present keys, not a fixed subset). */
-        PaymentCallbackBody: {
-            /** @description The tran_id supplied on the original purchase call. */
-            tran_id: string;
-            /** @description Transaction approval code. */
-            apv: string;
-            /** @description Payment status for this callback. */
-            status: string;
-            /** @description Echoes the return_params value from the original purchase request, if any was supplied. */
-            return_params?: string;
-        };
+  schemas: {
+    PurchaseRequest: {
+      /**
+       * @description UTC request timestamp, format YYYYMMDDHHmmss. Must be freshly generated at signing time.
+       * @example 20250213065545
+       */
+      req_time: string;
+      /** @description Merchant key issued by ABA Bank. */
+      merchant_id: string;
+      /** @description Merchant-generated unique transaction identifier. */
+      tran_id: string;
+      /** @description Buyer's first name. Must not contain digits/special characters (rejected as error code 16). */
+      firstname?: string;
+      /** @description Buyer's last name. Same validation as firstname (error code 17). */
+      lastname?: string;
+      /** @description Buyer's email (validated server-side, error code 19 if invalid). */
+      email?: string;
+      /** @description Buyer's phone (validated server-side, error code 18 if invalid). */
+      phone?: string;
+      /**
+       * @description "pre-auth" only supports ABA PAY, KHQR, and Card. Using pre-auth with an unsupported payment_option returns error code 22.
+       * @default purchase
+       * @enum {string}
+       */
+      type: 'purchase' | 'pre-auth';
+      /**
+       * @description Omit to let PayWay auto-display all payment options the merchant profile supports. abapay_khqr_deeplink changes the 200 response from HTML to a JSON object (qr_string, abapay_deeplink, checkout_qr_url) — see PurchaseQrResponse.
+       * @enum {string}
+       */
+      payment_option?: 'cards' | 'abapay_khqr' | 'abapay_khqr_deeplink' | 'alipay' | 'wechat' | 'google_pay';
+      /** @description Base64-encoded JSON array of {name, quantity, price}. Descriptive only — NOT used for amount validation or calculation; `amount` is the sole source of truth for what's charged. */
+      items?: string;
+      /**
+       * @description Shipping fee, additive to amount at checkout.
+       * @default 0
+       */
+      shipping: number;
+      /** @description Purchase amount. Zero is rejected (error 45). KHR currency cannot carry decimals (error 46) and must exceed 100 KHR (error 47). */
+      amount: number;
+      /**
+       * @description Defaults to the currency of the first account on the merchant profile if omitted.
+       * @enum {string}
+       */
+      currency?: 'KHR' | 'USD';
+      /** @description Base64-encoded callback URL. Custom return_url values must be pre-whitelisted on the merchant profile (error 6/81) or the request is rejected. */
+      return_url?: string;
+      /** @description Redirect target when the customer closes/cancels the payment dialog. */
+      cancel_url?: string;
+      /**
+       * @description Overrides the profile-level "skip success page" setting for this request only. 1 = skip, redirecting via continue_success_url.
+       * @enum {integer}
+       */
+      skip_success_page?: 0 | 1;
+      /** @description Redirect target after a successful payment (used when skip_success_page=1). */
+      continue_success_url?: string;
+      /** @description Base64-encoded JSON {ios_scheme, android_scheme}. Mandatory for mobile-app integrations so ABA Mobile can hand control back to the merchant's native app. */
+      return_deeplink?: string;
+      /** @description Base64-encoded arbitrary JSON merchants want attached to the transaction record/export (not used by PayWay's own logic). */
+      custom_fields?: string;
+      /** @description Opaque string echoed back verbatim in the return_url pushback payload. */
+      return_params?: string;
+      /**
+       * @description hosted_view opens a new tab; popup renders as a bottom sheet (mobile) or modal (desktop).
+       * @enum {string}
+       */
+      view_type?: 'hosted_view' | 'popup';
+      /** @description Set to 0 to route through Checkout service when the profile also has QR Payment API enabled. */
+      payment_gate?: number;
+      /** @description Base64-encoded JSON array of {acc, amt} splitting the payment across up to 10 destination accounts (error 25 if exceeded). Accounts must be whitelisted first (error 37). */
+      payout?: string;
+      /** @description Base64-encoded JSON, currently only used for WeChat Mini Program (wechat_sub_appid, wechat_sub_openid). */
+      additional_params?: string;
+      /** @description Minutes before the payment link expires. Min 3, max 43200 (30 days). Below 3 is rejected (error 69). Behavior on expiry differs by method: ABA PAY/Card simply fail; KHQR reverses funds to the payer; WeChat/Alipay do not reverse. */
+      lifetime?: number;
+      /** @description Required when payment_option=google_pay and the merchant manages payment-method selection itself. */
+      google_pay_token?: string;
+      /** @description base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)). See operation-level x-hmac-fields for the exact field order — it is NOT alphabetical and NOT the same as check/close-transaction. */
+      hash: string;
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** @description Returned instead of HTML when payment_option=abapay_khqr_deeplink. */
+    PurchaseQrResponse: {
+      /** @description Raw KHQR payload string, scannable by any KHQR-member banking app. */
+      qr_string?: string;
+      /** @description Deeplink that opens ABA Mobile directly to the pre-filled payment. */
+      abapay_deeplink?: string;
+      /** @description Hosted URL rendering the QR code as an image/page, for platforms that can't render qr_string themselves. */
+      checkout_qr_url?: string;
+    };
+    /** @description purchase's JSON error shape (distinct from the HTML success path). Non-exhaustive: purchase alone defines ~80 distinct error codes (wrong hash, invalid amount, currency not allowed, payout validation, Google Pay token failures, etc.) — pull the full table from the scraped spec into your SDK's error-code enum rather than hand-copying a subset here; this skeleton intentionally does not restate all ~80 to keep the spec reviewable, but the generated client MUST surface `code` typed, not just `message` stringly. */
+    ErrorStatus: {
+      status: {
+        code: string;
+        message: string;
+      };
+    };
+    StatusBlock: {
+      /** @description Endpoint-specific status code. NOTE: check-transaction and close-transaction each define their own code space (e.g. "00" success vs "0" on purchase-family errors) — do not assume a single shared enum across endpoints; encode per-operation code tables separately in the generated SDK's error types. */
+      code: string;
+      /** @description Human-readable detail for `code`. */
+      message: string;
+      /** @description Echoes the transaction id the status applies to. */
+      tran_id?: string;
+      /** @description Observed empirically (live sandbox probe, 2026-07-16) on transaction-list-2's error responses only (e.g. "en"). Not confirmed present on other -2 endpoints or on success responses -- treat as optional/nullable everywhere, and re-verify before assuming it appears on a given operation. */
+      lang?: string;
+      /** @description Observed empirically (live sandbox probe, 2026-07-16) on transaction-list-2's error responses only. Same caveat as `lang` -- optional, not confirmed on other endpoints. */
+      trace_id?: string;
+    };
+    /** @description Standard error response returned by PayWay on validation failures, authentication errors, or business-logic rejections. The `status.code` field contains an endpoint-specific error code (e.g. "1" for wrong hash, "49" for invalid date). The `status.message` provides a human-readable explanation. */
+    ErrorResponse: {
+      status: components['schemas']['StatusBlock'];
+    };
+    /** @description Shared shape for check-transaction and close-transaction — both sign only these 3 fields (see per-operation x-hmac-fields). */
+    TranLookupRequest: {
+      /** @description UTC request timestamp, format YYYYMMDDHHmmss. */
+      req_time: string;
+      /** @description Merchant key issued by ABA Bank. */
+      merchant_id: string;
+      /** @description The original purchase transaction id to look up or close. */
+      tran_id: string;
+      /** @description base64(HMAC-SHA512(req_time + merchant_id + tran_id, api_key)). */
+      hash: string;
+    };
+    'ecommerce-checkout_StatusBlock': {
+      /** @description Endpoint-specific status code. NOTE: check-transaction and close-transaction each define their own code space (e.g. "00" success vs "0" on purchase-family errors) — do not assume a single shared enum across endpoints; encode per-operation code tables separately in the generated SDK's error types. */
+      code: string;
+      /** @description Human-readable detail for `code`. */
+      message: string;
+      /** @description Echoes the transaction id the status applies to. */
+      tran_id?: string;
+    };
+    /**
+     * @example {
+     *       "data": {
+     *         "payment_status_code": 0,
+     *         "payment_status": "APPROVED",
+     *         "total_amount": 10,
+     *         "original_amount": 10,
+     *         "refund_amount": 0,
+     *         "discount_amount": 0,
+     *         "payment_amount": 10,
+     *         "payment_currency": "USD",
+     *         "apv": "619195",
+     *         "transaction_date": "2025-02-13 06:56:00"
+     *       },
+     *       "status": {
+     *         "code": "00",
+     *         "message": "Success!",
+     *         "tran_id": "17394277693"
+     *       }
+     *     }
+     */
+    CheckTransactionResponse: {
+      /** @description Present on successful lookup (status.code == "00"). */
+      data?: {
+        /** @description 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED */
+        payment_status_code?: number;
+        /** @enum {string} */
+        payment_status?: 'APPROVED' | 'PRE-AUTH' | 'REFUNDED' | 'PENDING' | 'DECLINED' | 'CANCELLED';
+        /** @description Amount due after discount. */
+        total_amount?: number;
+        original_amount?: number;
+        /** @description Sum of all refunds issued against this transaction. */
+        refund_amount?: number;
+        /** @description In the original transaction's currency. */
+        discount_amount?: number;
+        /** @description Amount actually paid by the customer. */
+        payment_amount?: number;
+        payment_currency?: string;
+        /** @description Transaction approval code. */
+        apv?: string;
+        /** @description Timestamp the transaction was created in the payment gateway. */
+        transaction_date?: string;
+      };
+      status: components['schemas']['ecommerce-checkout_StatusBlock'];
+    };
+    CloseTransactionResponse: {
+      status: components['schemas']['ecommerce-checkout_StatusBlock'];
+    };
+    /** @description One entry in a transaction's operation history (capture, pre-auth completion/cancellation, refund). */
+    TransactionOperation: {
+      /** @enum {string} */
+      status?: 'Completed' | 'Pre-Auth' | 'Completed Pre-Auth' | 'Cancelled Pre-Auth' | 'Refunded';
+      /** @description Amount associated with this specific operation, not the transaction total. */
+      amount?: number;
+      /** @description Timestamp this operation occurred. */
+      transaction_date?: string;
+      /** @description Core-banking booking entry id — populated for ABA PAY operations only, blank otherwise. */
+      bank_ref?: string;
+    };
+    /** @description Response for getTransactionDetail. NOT intended for real-time polling — see rate-limit note on the operation (10 req/min, not raisable). */
+    TransactionDetailResponse: {
+      /** @description Present when status.code == "00". */
+      data?: {
+        /** @description Echoes the requested tran_id. */
+        transaction_id?: string;
+        /** @description 0=APPROVED/PRE-AUTH, 2=PENDING, 3=DECLINED, 4=REFUNDED, 7=CANCELLED */
+        payment_status_code?: number;
+        /** @enum {string} */
+        payment_status?: 'APPROVED' | 'PRE-AUTH' | 'PENDING' | 'DECLINED' | 'REFUNDED' | 'CANCELLED';
+        /** @description Before discount. */
+        original_amount?: number;
+        original_currency?: string;
+        /** @description Amount actually paid by the customer. */
+        payment_amount?: number;
+        payment_currency?: string;
+        /** @description Amount due after discount. */
+        total_amount?: number;
+        /** @description Total refunded to date. */
+        refund_amount?: number;
+        discount_amount?: number;
+        /** @description Transaction approval code. */
+        apv?: string;
+        transaction_date?: string;
+        /** @description Payer first name. */
+        first_name?: string;
+        /** @description Payer last name. */
+        last_name?: string;
+        email?: string;
+        phone?: string;
+        /** @description ABA core-banking booking entry reference. */
+        bank_ref?: string;
+        /** @enum {string} */
+        payment_type?: 'ABA Pay' | 'Alipay' | 'Wechat' | 'KHQR' | 'VISA' | 'MC' | 'JCB' | 'CUP';
+        /** @description Masked account number or card PAN. */
+        payer_account?: string;
+        /** @description ABA Bank for ABA PAY, or issuer bank for KHQR. */
+        bank_name?: string;
+        /** @enum {string} */
+        card_source?: 'ONUS' | 'OFFUS_DOMESTIC' | 'OFFUS_INTERNATIONAL';
+        /** @description Full operation history for this transaction. */
+        transaction_operations?: components['schemas']['TransactionOperation'][];
+      };
+      /** @description code space for this endpoint: "00" success, "5" wrong hash (note: NOT "1" as in check/close-transaction — do not assume a shared numeric code space across endpoints), "6" transaction not found, "8" invalid merchant profile, "11" internal server error, "429" rate limit exceeded. */
+      status: components['schemas']['ecommerce-checkout_StatusBlock'];
+    };
+    /** @description All filter fields are optional but each still occupies a fixed position in the HMAC input per x-hmac-fields on the operation — pass them as null/empty rather than omitting the key. */
+    TransactionListRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      req_time: string;
+      merchant_id: string;
+      /** @description Format YYYY-MM-DD HH:mm:ss. Defaults to today 00:00:00 if omitted. */
+      from_date?: string | null;
+      /** @description Format YYYY-MM-DD HH:mm:ss. Defaults to today 23:59:59 if omitted. Date range capped at 3 days total. */
+      to_date?: string | null;
+      from_amount?: number | null;
+      to_amount?: number | null;
+      /** @description Comma-separated for multiple values. Case-insensitive. One of APPROVED, PRE-AUTH, REFUNDED, PENDING, DECLINED, CANCELLED. */
+      status?: string | null;
+      /** @default 1 */
+      page: string;
+      /**
+       * @description Max 1000 records per page.
+       * @default 40
+       */
+      pagination: string;
+      hash: string;
+    };
+    /** @description Same shape as TransactionDetailResponse.data minus transaction_operations (no per-item history in list view). */
+    TransactionListItem: {
+      transaction_id?: string;
+      transaction_date?: string;
+      apv?: string;
+      /** @enum {string} */
+      payment_status?: 'APPROVED' | 'PRE-AUTH' | 'REFUNDED' | 'PENDING' | 'DECLINED' | 'CANCELLED';
+      payment_status_code?: number;
+      original_amount?: number;
+      /** @enum {string} */
+      original_currency?: 'KHR' | 'USD';
+      total_amount?: number;
+      discount_amount?: number;
+      refund_amount?: number;
+      payment_amount?: number;
+      payment_currency?: string;
+      /** @description Only present if enabled on the merchant profile. */
+      first_name?: string;
+      /** @description Only present if enabled on the merchant profile. */
+      last_name?: string;
+      /** @description Only present if enabled on the merchant profile. */
+      email?: string;
+      /** @description Only present if enabled on the merchant profile. */
+      phone?: string;
+      /** @description Only present if enabled on the merchant profile. */
+      bank_ref?: string;
+      payer_account?: string;
+      bank_name?: string;
+      /** @enum {string} */
+      card_source?: 'ONUS' | 'OFFUS_DOMESTIC' | 'OFFUS_INTERNATIONAL';
+      /**
+       * @description N/A for transactions still pending payment.
+       * @enum {string}
+       */
+      payment_type?: 'N/A' | 'ABA Pay' | 'Alipay' | 'Wechat' | 'KHQR' | 'VISA' | 'MC' | 'JCB' | 'CUP';
+    };
+    TransactionListResponse: {
+      data?: components['schemas']['TransactionListItem'][];
+      /** @description Current page index. */
+      page?: string;
+      /** @description Records per page (max 1000). */
+      pagination?: string;
+      /** @description code space: "00" success, "1" wrong hash, "8" invalid merchant profile, "11" internal server error, "429" rate limit exceeded (50 req/min on this endpoint). */
+      status: components['schemas']['ecommerce-checkout_StatusBlock'];
+    };
+    /** @description NOTE the field name is `request_time`, not `req_time` as on every other endpoint in this spec — see info.description item 8. */
+    RefundRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description Base64 of RSA-encrypted, chunked JSON {mc_id, tran_id, refund_amount}. See x-merchant-auth-encryption on the refund operation for the exact construction process and required credential (a separate RSA public key from ABA Bank, distinct from the HMAC api_key). */
+      merchant_auth: string;
+      /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
+      hash: string;
+    };
+    RefundResponse: {
+      /**
+       * Format: double
+       * @description Amount after any discount, e.g. $20 purchase with $2 discount -> grand_total $18.
+       */
+      grand_total?: number;
+      /**
+       * Format: double
+       * @description Cumulative refunded amount across all partial refunds issued so far.
+       */
+      total_refunded?: number;
+      /** @description Original transaction currency. */
+      currency?: string;
+      /** @description REFUNDED for both full and partial refunds. */
+      transaction_status?: string;
+      /** @description Distinct, alphanumeric code space unique to this endpoint — do not reuse StatusBlock's assumption of numeric-string codes. Notable codes: 00 success, PTL02 invalid hash, PTL37 refund exceeds original amount, PTL57/PTL58 unable/failed to refund, PTL168 concurrent request rejected, PTL181 insufficient available balance. */
+      status: {
+        code: string;
+        message: string;
+      };
+    };
+    ExchangeRateRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      req_time: string;
+      merchant_id: string;
+      /** @description base64(HMAC-SHA512(req_time + merchant_id, api_key)) — only 2 fields, the shortest hash input in this API surface. */
+      hash: string;
+    };
+    CurrencyRate: {
+      /** @description Sell rate, as a decimal string. */
+      sell: string;
+      /** @description Buy rate, as a decimal string. */
+      buy: string;
+    };
+    /** @description The vendor's own schema listed an inconsistent `required` array under exchange_rates (omitting some currencies present in `properties`) — treated as a docs artifact and modeled here via additionalProperties instead of a hardcoded required list, since the actual currency set PayWay returns may change over time without notice. */
+    ExchangeRateResponse: {
+      status: {
+        /** @description 00 success, 1 wrong hash, 26 invalid merchant profile. */
+        code: string;
+        message: string;
+      };
+      /** @description Keyed by lowercase ISO currency code (observed: aud, sgd, eur, gbp, myr, thb, hkd, cny, cad, krw, jpy, vnd). Modeled with additionalProperties rather than enumerating every key as required, since PayWay could add/remove currencies. */
+      exchange_rates: {
+        [key: string]: components['schemas']['CurrencyRate'];
+      };
+    };
+    LinkAccountRequest: {
+      /** @description Unique request identifier generated by the merchant. 5–24 chars, letters+digits only. "We only return the last record" for a reused request_id. */
+      request_id: string;
+      /** @description UTC timestamp, format YYYYMMDDHHmmss. */
+      request_time: string;
+      /** @description Merchant key issued by ABA Bank. */
+      merchant_id: string;
+      /** @description Customer token identifier — merchant-side unique ID for the customer. 5–24 chars, letters+digits only. Required per live docs. */
+      ctid: string;
+      /** @description Base64-encoded JSON {ios_scheme, android_scheme} for mobile app integration. */
+      return_deeplink?: string;
+      /**
+       * @description Live docs list CITI_FLEX (customer-initiated, variable amount) and CITO_FLEX (merchant charges later, variable) for link-account. Sandbox additionally accepted CITO_FIX / CITR_FLEX (§9b) — keep sending them only if the merchant profile enables them.
+       * @enum {string}
+       */
+      token_flag: 'CITI_FLEX' | 'CITO_FLEX';
+      /**
+       * @description Required per live docs (profile-enabled currency).
+       * @enum {string}
+       */
+      currency: 'KHR' | 'USD';
+      /** @description Base64-encoded URL where PayWay sends the account details and token after linking. Defaults to the profile pushback_url. */
+      callback_url?: string;
+      /** @description base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)). */
+      hash: string;
+    };
+    LinkAccountResponse: {
+      /** @description On code 04 the binding layer adds an `errors` object keyed by field name. */
+      status?: {
+        /** @description 00 success; 04 invalid data (see errors map); 01 wrong hash; 98 merchant id not found; 104 merchant not enabled token flag. */
+        code?: string;
+        message?: string;
+        trace_id?: string;
+      };
+      data?: {
+        /** @description ABA Mobile deeplink for linking. */
+        deeplink?: string;
+        /** @description QR payload for linking. */
+        qr_string?: string;
+        /** @description QR/deeplink expiry (10 minutes per live docs). */
+        expire_in?: unknown;
+      };
+    };
+    LinkCardRequest: {
+      /** @description 5–24 chars, letters+digits only. */
+      request_id: string;
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description Customer token identifier. 5–24 chars, letters+digits only. Required per live docs. */
+      ctid: string;
+      /**
+       * @description Live docs list CITI_FLEX / CITO_FLEX for link-card.
+       * @enum {string}
+       */
+      token_flag: 'CITI_FLEX' | 'CITO_FLEX';
+      /**
+       * @description Marked 'Required for Link Card' in live docs; the SDK warns when omitted (§16 realignment). Billing frequency.
+       * @enum {string}
+       */
+      frequency?: '1W' | '1M' | '2M';
+      /** @description Hash position ONLY (§16) — it participates in the HMAC (hashes as '') but has NO request body field. Listed here to document the quirk; do not send it. */
+      amount?: string;
+      /** @description Base64-encoded URL — target of the hosted form's "Done" button. */
+      continue_success_url?: string;
+      /** @description Base64-encoded token pushback URL; defaults to the profile pushback_url. */
+      callback_url?: string;
+      /**
+       * @description Required per live docs (sandbox binds USD by default — §9a).
+       * @enum {string}
+       */
+      currency: 'KHR' | 'USD';
+      hash: string;
+    };
+    CofPaymentRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description Merchant-generated unique transaction identifier. */
+      tran_id: string;
+      /** @description Payment amount. Floor: KHR >= 100, USD >= 0.01. */
+      amount: number;
+      /** @description PayWay token from link-account or link-card. */
+      pwt: string;
+      /** @description Customer token identifier. */
+      ctid: string;
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+      phone?: string;
+      /**
+       * @default purchase
+       * @enum {string}
+       */
+      purchase_type: 'purchase' | 'pre-auth';
+      /** @description Base64-encoded. */
+      callback_url?: string;
+      /** @description Base64-encoded JSON [{name,quantity,price}]. */
+      items?: string;
+      return_params?: string;
+      /** @description Base64-encoded JSON [{acc,amt}]. */
+      payout?: string;
+      /** @description Base64-encoded JSON. */
+      custom_fields?: string;
+      /**
+       * @description Live-documented charging flags. Sandbox additionally accepted MITU_FIX / MITR_FLEX (§9b).
+       * @enum {string}
+       */
+      token_flag: 'CITU_FLEX' | 'MITU_FLEX' | 'MITR_FIX';
+      /** @description Shipping fee — 'can be any amount' per live docs. */
+      shipping_fee?: number;
+      /** @enum {string} */
+      currency: 'KHR' | 'USD';
+      hash: string;
+    };
+    CofPaymentResponse: {
+      /** @description On code 04 the binding layer adds an `errors` object keyed by field name. */
+      status?: {
+        /** @description 00 success; 04 invalid data (errors map); 01 wrong hash; 98 merchant id not found. */
+        code?: string;
+        message?: string;
+        tran_id?: string;
+        trace_id?: string;
+      };
+    };
+    /** @description Account tokens only. Live-documented hash order: ctid, request_time, pwt, merchant_id, request_id (differs from every other CoF endpoint). */
+    RenewTokenRequest: {
+      /** @description 5–24 chars, letters+digits only. */
+      request_id: string;
+      request_time: string;
+      merchant_id: string;
+      /** @description 5–24 chars, letters+digits only. */
+      ctid: string;
+      pwt: string;
+      hash: string;
+    };
+    RenewTokenResponse: {
+      status?: {
+        /** @description 00 success (example also carries tran_id); 4 invalid data; 1 wrong hash; 98 merchant id not found; 105 invalid payment credential token. */
+        code?: string;
+        message?: string;
+        tran_id?: string;
+        trace_id?: string;
+      };
+      /** @description New payment token replacing the old one. */
+      new_token?: string;
+    };
+    /** @description Per the live docs this endpoint takes ONLY request_time, merchant_id, and request_id — no ctid, no pwt. Hash order: merchant_id, request_time, request_id. */
+    GetTokenDetailsRequest: {
+      /** @description 5–24 chars, letters+digits only — the original link/renew request_id. */
+      request_id: string;
+      request_time: string;
+      merchant_id: string;
+      hash: string;
+    };
+    GetTokenDetailsResponse: {
+      status?: {
+        /** @description 00 success; 04 invalid data (errors map); 1 wrong hash; 98 merchant id not found; 104 data not found. */
+        code?: string;
+        message?: string;
+        trace_id?: string;
+      };
+      data?: {
+        /** @description Masked account/card — last 4 visible. */
+        source_of_fund?: string;
+        /** @description Visa | MC | CUP | JCB | ABA ACCOUNT. */
+        type?: string;
+        /** @description 0 removed, 1 active, 2 frozen. */
+        status?: number;
+        /** @description Token expiry (date-time). */
+        expired_at?: string;
+        /** @description CITI_FLEX | CITO_FLEX | CITR_FIX. */
+        token_flag?: string;
+        /** @description Empty for FLEX flags; 1W/1M/2M for CITR_FIX. */
+        frequency?: string;
+        /** @description = subscribed_amount for CITR_FIX. */
+        amount_limit_per_tran?: number;
+        ctid?: string;
+        pwt?: string;
+        /** @description Fixed recurring amount; 0 for FLEX flags. */
+        subscribed_amount?: number;
+        currency?: string;
+      };
+    };
+    /** @description Per the live docs the request carries request_time, merchant_id, ctid, and pwt — no request_id. Hash order: merchant_id, ctid, request_time, pwt. */
+    RemoveTokenRequest: {
+      request_time: string;
+      merchant_id: string;
+      ctid: string;
+      pwt: string;
+      hash: string;
+    };
+    RemoveTokenResponse: {
+      status?: {
+        /** @description 00 success; 04 invalid data (errors map); 98 merchant id not found; 01 wrong hash. */
+        code?: string;
+        message?: string;
+        trace_id?: string;
+      };
+    };
+    GenerateQrRequest: {
+      /** @description UTC request timestamp, format YYYYMMDDHHmmss. */
+      req_time: string;
+      /** @description Merchant key issued by ABA Bank. */
+      merchant_id: string;
+      /** @description Merchant-generated unique transaction identifier. */
+      tran_id: string;
+      /** @description Payer's first name. */
+      first_name?: string;
+      /** @description Payer's last name. */
+      last_name?: string;
+      /** @description Payer's email address. */
+      email?: string;
+      /** @description Payer's phone number. */
+      phone?: string;
+      /** @description Payment amount. Minimum: 100 KHR or 0.01 USD. */
+      amount: number;
+      /**
+       * @description Supported values: `pre-auth` and `purchase`. Default: `purchase`. Note: Alipay & WeChat do not support pre-auth.
+       * @enum {string}
+       */
+      purchase_type?: 'purchase' | 'pre-auth';
+      /** @description Supported payment options: - `abapay_khqr`: ABA KHQR - `wechat`: WeChat QR (USD only) - `alipay`: Alipay QR (USD only) */
+      payment_option: string;
+      /** @description Item list description in Base64-encoded JSON format. Maximum of 10 items. Note: This is only description/remark — price/quantity not used for validation. */
+      items?: string;
+      /** @description Base64-encoded callback URL. */
+      callback_url?: string;
+      /** @description Base64-encoded JSON with `android_scheme` and `ios_scheme` keys. */
+      return_deeplink?: string;
+      /** @description Base64-encoded additional custom fields. */
+      custom_fields?: string;
+      /** @description Additional information to include in the pushback. */
+      return_params?: string;
+      /** @description Payout instructions in a Base64-encoded JSON string. */
+      payout?: string;
+      /** @enum {string} */
+      currency: 'KHR' | 'USD';
+      /** @description QR image template option. */
+      qr_image_template: string;
+      /** @description Transaction lifetime in minutes. Default: 30 days. Minimum: 3 mins. Maximum: 120 days. */
+      lifetime: number;
+      /** @description base64(HMAC-SHA512(concat_in_x-hmac-fields-order, api_key)). */
+      hash: string;
+    };
+    GenerateQrResponse: {
+      status?: {
+        /** @description Response code: - `0`: Success - `1`: Wrong Hash - `6`: Domain not in whitelist - `12`: Currency not allowed - `23`: Payment option not enabled - `429`: Rate limit exceeded */
+        code?: string;
+        message?: string;
+        /** @description Unique request trace identifier. */
+        trace_id?: string;
+      };
+      /** @description Transaction amount. */
+      amount?: number;
+      /** @description Transaction currency. */
+      currency?: string;
+      /** @description Raw KHQR payload string, scannable by any KHQR-member banking app. */
+      qrString?: string;
+      /** @description Data URL containing the rendered QR PNG image (base64). */
+      qrImage?: string;
+      /** @description ABA Mobile deeplink to open ABA Mobile for payment confirmation. */
+      abapay_deeplink?: string;
+      /** @description App Store URL for ABA Mobile (fallback if deeplink fails). */
+      app_store?: string;
+      /** @description Play Store URL for ABA Mobile (fallback if deeplink fails). */
+      play_store?: string;
+    };
+    /** @description Uses RSA-encrypted merchant_auth containing transaction details. See x-merchant-auth-encryption on the operation for encryption process. Sandbox-verified: currency and return_url are REQUIRED inside merchant_auth (PTL04 "Parameter validation required" when omitted). Sent as multipart/form-data. The HMAC hash covers request_time + merchant_id + merchant_auth ONLY — the optional image bytes are never hashed (per ABA's official PHP sample). */
+    CreatePaymentLinkRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      /** @description Merchant key issued by ABA Bank. */
+      merchant_id: string;
+      /** @description Base64 of RSA-encrypted, chunked JSON containing transaction details (title, amount, currency, description, payment_limit, return_url, merchant_ref_no, expired_date, payout). */
+      merchant_auth: string;
+      /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
+      hash: string;
+      /** @description Optional split-payout instructions INSIDE the merchant_auth plaintext (JSON array "[{acc, amt}]" as a string value — the whole auth payload is JSON-encoded, so an array value would double-encode). Documented rule: the total payout amt must equal the link amount. Officially optional. Listed here as a top-level property so schema tooling can see it; the wire format is the merchant_auth plaintext shape (see x-merchant-auth-encryption). */
+      payout?: string;
+      /**
+       * Format: binary
+       * @description Optional image shown with the payment link (top-level multipart part, not part of the hash). The created PaymentLink echoes it back as the `image` object.
+       */
+      image?: string;
+    };
+    PaymentLinkStatus: {
+      code?: string;
+      message?: string;
+      tran_id?: string;
+      lang?: string;
+      trace_id?: string;
+    };
+    /** @description A payment link resource as returned by the create and detail endpoints (sandbox-verified shape). */
+    PaymentLink: {
+      /** @description Payment link id used with the detail endpoint (e.g. "zX71gfZgVme0juZANHfZMA=="). NOT the slug in the payment_link URL. */
+      id?: string;
+      title?: string;
+      image?: {
+        image?: string;
+        filename?: string;
+        size?: number;
+      };
+      /** @description Amount as a string (e.g. "0.02"). */
+      amount?: string;
+      /** @enum {string} */
+      currency?: 'USD' | 'KHR';
+      /** @description Link status (e.g. OPEN). */
+      status?: string;
+      description?: string;
+      payment_limit?: number;
+      /** @description Total payment amount before refunds (official schema says string; observed numeric — do not rely on the type). */
+      total_amount_org?: number;
+      /** @description Total refunded amount (official create schema: number; official detail schema: string — observed numeric; do not rely on the type). */
+      total_refund?: number;
+      /** @description Total amount after refunds. */
+      total_amount?: number;
+      /** @description The total number of completed payment transactions (0 on create). */
+      total_trxn?: number;
+      /** @description YYYY-MM-DD HH:mm:ss */
+      created_at?: string;
+      /** @description YYYY-MM-DD HH:mm:ss */
+      updated_at?: string;
+      /** @description Epoch seconds when set; echoes "0" (string) when unset. Number or string both accepted at create. Sandbox-verified (2026-09-06): a past value or one under ~5 minutes in the future is rejected PTL04; offsets from +300s upward are accepted. No EXPIRED status exists — detail keeps reporting OPEN after expiry and the hosted page still answers 200. */
+      expired_date?: number | string;
+      /** @description Decoded callback URL. */
+      return_url?: string;
+      /** @description The URL the gateway calls to send payment status updates (detail endpoint; official detail schema — absent from sandbox detail responses). The pushback body is live-captured (2026-09-06): POST application/json, User-Agent PayWayApp/3.0, body {tran_id (string), status (numeric 0 = approved), merchant_ref_no} — NO hash field; verify via check-transaction, not verifyCallback. */
+      pushback_url?: string;
+      merchant_ref_no?: string;
+      outlet_id?: string;
+      outlet_name?: string;
+      /** @description Payout details (null when none). PLACEMENT IS UNVERIFIED: the official apidog create schema places a top-level payout array of {acc, amt, acc_name}; the official overview sample response shows it inside data as an array. oneOf both shapes until probe V-2 settles it (see HANDOFF §9 open items) — do not rely on either. */
+      payout?: Record<string, never> | unknown[] | null;
+      /** @description Hosted checkout URL to share with customers (e.g. https://link-sandbox.payway.com.kh/ABAPAYzC80644N). */
+      payment_link?: string;
+    };
+    CreatePaymentLinkResponse: {
+      status?: components['schemas']['PaymentLinkStatus'];
+      /** @description Gateway log id. Official schemas say string; sandbox-observed as a NUMBER on both create and detail (2026-09-06) — coerce, do not rely on the type. */
+      tran_id?: number | string;
+      data?: components['schemas']['PaymentLink'];
+    };
+    GetPaymentLinkDetailsRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description RSA-encrypted JSON {mc_id, id}. */
+      merchant_auth: string;
+      /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
+      hash: string;
+    };
+    /** @description Sandbox-observed (2026-09-06): a bogus link id answers HTTP 403 code 96 "Invalid merchant data" — the officially documented PTL132 was NOT reproduced on this sandbox profile. Sandbox detail responses carry no pushback_url. */
+    GetPaymentLinkDetailsResponse: {
+      status?: components['schemas']['PaymentLinkStatus'];
+      /** @description Gateway log id. Official schemas say string; sandbox-observed as a NUMBER (2026-09-06) — coerce, do not rely on the type. */
+      tran_id?: number | string;
+      data?: components['schemas']['PaymentLink'];
+    };
+    /** @description UNDOCUMENTED endpoint — live-verified on the sandbox (SANDBOX-FINDINGS §23, 2026-09-11). Content-Type lenient: both application/json and application/x-www-form-urlencoded are accepted. */
+    VoidPaymentLinkRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description RSA-encrypted JSON {mc_id, id} — same shape as the detail endpoint. */
+      merchant_auth: string;
+      /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
+      hash: string;
+    };
+    /** @description Live-verified (SANDBOX-FINDINGS §23, 2026-09-11): success answers {status:{code:"00",message:"Success.",lang,trace_id}, tran_id}. Void is NOT idempotent — a second void answers HTTP 403 code PTL188 "The payment link is already voided."; a bogus link id answers HTTP 403 code 96 "Invalid merchant data". Post-void, detail reports the previously-unobserved status "VOIDED". */
+    VoidPaymentLinkResponse: {
+      status?: components['schemas']['PaymentLinkStatus'];
+      /** @description Gateway log id. Sandbox-observed as a NUMBER (2026-09-11) — coerce, do not rely on the type. */
+      tran_id?: number | string;
+    };
+    /** @description Uses RSA-encrypted merchant_auth. NOTE: uses request_time (not req_time), same convention as the Refund endpoint. */
+    CompletePreAuthRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description Base64 of RSA-encrypted JSON {mc_id, tran_id, complete_amount, payout?}. */
+      merchant_auth: string;
+      /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
+      hash: string;
+    };
+    CompletePreAuthResponse: {
+      status?: {
+        code: string;
+        message: string;
+      };
+      /** @description Updated status after completion (e.g., APPROVED). */
+      transaction_status?: string;
+      total_amount?: number;
+    };
+    CancelPreAuthRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description Base64 of RSA-encrypted JSON {mc_id, tran_id}. */
+      merchant_auth: string;
+      /** @description base64(HMAC-SHA512(request_time + merchant_id + merchant_auth, api_key)). */
+      hash: string;
+    };
+    CancelPreAuthResponse: {
+      status?: {
+        code: string;
+        message: string;
+      };
+      /** @description Updated status after cancellation (e.g., CANCELLED). */
+      transaction_status?: string;
+    };
+    PayoutRequest: {
+      /** @description Merchant key issued by ABA Bank. */
+      merchant_id: string;
+      /** @description Merchant-generated unique payout transaction identifier. */
+      tran_id: string;
+      /** @description Payout amount. */
+      amount: number;
+      /** @description Base64 of RSA-encrypted JSON array of {account, amount}. */
+      beneficiaries: string;
+      /** @enum {string} */
+      currency: 'KHR' | 'USD';
+      /** @description JSON string associated with the payout. */
+      custom_fields?: string;
+      /** @description hex(HMAC-SHA512(merchant_id + tran_id + beneficiaries + amount + custom_fields + currency, api_key)). */
+      hash: string;
+    };
+    PayoutResponse: {
+      status?: {
+        code: string;
+        message: string;
+        tran_id?: string;
+      };
+      /** @description Core-banking reference for the payout transaction. */
+      bank_ref?: string;
+    };
+    UpdateBeneficiaryStatusRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description Base64 of RSA-encrypted JSON {mc_id, payee, status}, where status is 0 or 1. */
+      merchant_auth: string;
+      /** @description base64(HMAC-SHA512(request_time + merchant_auth, api_key)). */
+      hash: string;
+    };
+    BeneficiaryResponse: {
+      status?: {
+        code: string;
+        message: string;
+      };
+    };
+    AddBeneficiaryRequest: {
+      /** @description UTC timestamp, YYYYMMDDHHmmss. */
+      request_time: string;
+      merchant_id: string;
+      /** @description Base64 of RSA-encrypted JSON {mc_id, payee}. */
+      merchant_auth: string;
+      /** @description base64(HMAC-SHA512(request_time + merchant_auth, api_key)). */
+      hash: string;
+    };
+    GetTransactionsByMcRefRequest: {
+      /**
+       * @description UTC timestamp, format YYYYMMDDHHmmss.
+       * @example 20250213084236
+       */
+      req_time: string;
+      /**
+       * @description Merchant key issued by ABA Bank.
+       * @example ec000002
+       */
+      merchant_id: string;
+      /**
+       * @description Merchant reference number.
+       * @example 17394277693
+       */
+      merchant_ref: string;
+      /** @description base64(HMAC-SHA512(req_time + merchant_id + merchant_ref, api_key)). */
+      hash: string;
+    };
+    KhqrTransaction: {
+      transaction_id?: string;
+      transaction_date?: string;
+      bank_ref?: string;
+      apv?: string;
+      discount_amount?: number;
+      payment_status?: string;
+      payment_amount?: number;
+      payment_currency?: string;
+      payment_type?: string;
+      payer_account?: string;
+      total_amount?: number;
+      original_amount?: number;
+      original_currency?: string;
+      payment_status_code?: number;
+      bank_name?: string;
+      refund_amount?: number;
+      merchant_ref?: string;
+    };
+    /** @description Response envelope as merchant-captured in production (2026-08): rows under `data`, status under a nested `status` object with STRING code ("00" = Success). The official doc page models {status: integer, transactions: []} but every captured production response uses the data/status-object shape; consumers should tolerate both (SDK normalizes). Status codes: "00"/0=Success, 1=Wrong hash, 8=Invalid merchant profile, 11=Internal server error. */
+    GetTransactionsByMcRefResponse: {
+      data?: components['schemas']['KhqrTransaction'][];
+      status?: {
+        code?: string | number;
+        message?: string;
+        merchant_ref?: string;
+      };
+      /** @description Legacy doc-page row slot — production captures use `data`. */
+      transactions?: components['schemas']['KhqrTransaction'][];
+    };
+    /** @description Body shape is NOT fixed — PayWay states additional fields may be present depending on payment method. Treat unknown keys as pass-through when computing the signature (item 3 in info.description sorts ALL present keys, not a fixed subset). */
+    PaymentCallbackBody: {
+      /** @description The tran_id supplied on the original purchase call. */
+      tran_id: string;
+      /** @description Transaction approval code. */
+      apv: string;
+      /** @description Payment status for this callback. */
+      status: string;
+      /** @description Echoes the return_params value from the original purchase request, if any was supplied. */
+      return_params?: string;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    createPurchase: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["PurchaseRequest"];
-            };
-        };
-        responses: {
-            /** @description Hosted checkout page (HTML) or a JSON QR payload, depending on payment_option. Response codes for the JSON error case are enumerated in ErrorStatus. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/html": string;
-                    "application/json": components["schemas"]["PurchaseQrResponse"] | components["schemas"]["ErrorStatus"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  createPurchase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    checkTransaction: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "req_time": "20250213065545",
-                 *       "merchant_id": "ec000002",
-                 *       "tran_id": "17394277693",
-                 *       "hash": "4slqXzgVig09Hf...2vgALgdENA=="
-                 *     }
-                 */
-                "application/json": components["schemas"]["TranLookupRequest"];
-            };
-        };
-        responses: {
-            /** @description Transaction status payload */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CheckTransactionResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['PurchaseRequest'];
+      };
     };
-    closeTransaction: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Hosted checkout page (HTML) or a JSON QR payload, depending on payment_option. Response codes for the JSON error case are enumerated in ErrorStatus. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "req_time": "20241022053608",
-                 *       "merchant_id": "lavacafe",
-                 *       "tran_id": "1729573626",
-                 *       "hash": "ln9Td4JiGPc...R6y2tmUoF2NERNaQ=="
-                 *     }
-                 */
-                "application/json": components["schemas"]["TranLookupRequest"];
-            };
+        content: {
+          'text/html': string;
+          'application/json': components['schemas']['PurchaseQrResponse'] | components['schemas']['ErrorStatus'];
         };
-        responses: {
-            /** @description Close confirmation */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CloseTransactionResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
-    getTransactionDetail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "req_time": "20250213084236",
-                 *       "merchant_id": "ec000002",
-                 *       "tran_id": "17394277693",
-                 *       "hash": "QskVi2gEctW...j7Td6kEi/KLPvGcK3ZiA=="
-                 *     }
-                 */
-                "application/json": components["schemas"]["TranLookupRequest"];
-            };
-        };
-        responses: {
-            /** @description Full transaction detail with operation history */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TransactionDetailResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  checkTransaction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    getTransactionList: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "req_time": "20250213081756",
-                 *       "merchant_id": "ec000002",
-                 *       "from_date": null,
-                 *       "to_date": null,
-                 *       "from_amount": "0.01",
-                 *       "to_amount": "1000",
-                 *       "status": null,
-                 *       "page": "1",
-                 *       "pagination": "40",
-                 *       "hash": "o1mDvIjTyzoFcN7zvm7...aUYAGXjsx4Ej0E6P2CoxtOQ=="
-                 *     }
-                 */
-                "application/json": components["schemas"]["TransactionListRequest"];
-            };
-        };
-        responses: {
-            /** @description Paginated transaction list for the outlet */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TransactionListResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "req_time": "20250213065545",
+         *       "merchant_id": "ec000002",
+         *       "tran_id": "17394277693",
+         *       "hash": "4slqXzgVig09Hf...2vgALgdENA=="
+         *     }
+         */
+        'application/json': components['schemas']['TranLookupRequest'];
+      };
     };
-    refundTransaction: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Transaction status payload */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "request_time": "20200728093403",
-                 *       "merchant_id": "ec000002",
-                 *       "merchant_auth": "REPLACE_ME",
-                 *       "hash": "3nd/2Z4g45...wnA2WA/M/Qg=="
-                 *     }
-                 */
-                "application/json": components["schemas"]["RefundRequest"];
-            };
+        content: {
+          'application/json': components['schemas']['CheckTransactionResponse'];
         };
-        responses: {
-            /** @description Refund result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RefundResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
-    getExchangeRate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "req_time": "20250212104216",
-                 *       "merchant_id": "ec000002",
-                 *       "hash": "2P+5NrSb5g2XyITaxttsnjW...JVKguqghoQrq4y4C3tbUiA=="
-                 *     }
-                 */
-                "application/json": components["schemas"]["ExchangeRateRequest"];
-            };
-        };
-        responses: {
-            /** @description Current exchange rates keyed by lowercase ISO currency code */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExchangeRateResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  closeTransaction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    linkAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LinkAccountRequest"];
-            };
-        };
-        responses: {
-            /** @description QR code or deeplink for account linking */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LinkAccountResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "req_time": "20241022053608",
+         *       "merchant_id": "lavacafe",
+         *       "tran_id": "1729573626",
+         *       "hash": "ln9Td4JiGPc...R6y2tmUoF2NERNaQ=="
+         *     }
+         */
+        'application/json': components['schemas']['TranLookupRequest'];
+      };
     };
-    linkCard: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Close confirmation */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/x-www-form-urlencoded": components["schemas"]["LinkCardRequest"];
-            };
+        content: {
+          'application/json': components['schemas']['CloseTransactionResponse'];
         };
-        responses: {
-            /** @description Hosted card-linking HTML page (returned on success AND error) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/html": string;
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
-    cofPayment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CofPaymentRequest"];
-            };
-        };
-        responses: {
-            /** @description Payment result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CofPaymentResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  getTransactionDetail: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    renewToken: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RenewTokenRequest"];
-            };
-        };
-        responses: {
-            /** @description New token details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RenewTokenResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "req_time": "20250213084236",
+         *       "merchant_id": "ec000002",
+         *       "tran_id": "17394277693",
+         *       "hash": "QskVi2gEctW...j7Td6kEi/KLPvGcK3ZiA=="
+         *     }
+         */
+        'application/json': components['schemas']['TranLookupRequest'];
+      };
     };
-    getTokenDetails: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Full transaction detail with operation history */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GetTokenDetailsRequest"];
-            };
+        content: {
+          'application/json': components['schemas']['TransactionDetailResponse'];
         };
-        responses: {
-            /** @description Token details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GetTokenDetailsResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
-    removeToken: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RemoveTokenRequest"];
-            };
-        };
-        responses: {
-            /** @description Token removal result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RemoveTokenResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  getTransactionList: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    generateQr: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GenerateQrRequest"];
-            };
-        };
-        responses: {
-            /** @description QR code payload and deeplinks */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GenerateQrResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "req_time": "20250213081756",
+         *       "merchant_id": "ec000002",
+         *       "from_date": null,
+         *       "to_date": null,
+         *       "from_amount": "0.01",
+         *       "to_amount": "1000",
+         *       "status": null,
+         *       "page": "1",
+         *       "pagination": "40",
+         *       "hash": "o1mDvIjTyzoFcN7zvm7...aUYAGXjsx4Ej0E6P2CoxtOQ=="
+         *     }
+         */
+        'application/json': components['schemas']['TransactionListRequest'];
+      };
     };
-    createPaymentLink: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Paginated transaction list for the outlet */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["CreatePaymentLinkRequest"];
-            };
+        content: {
+          'application/json': components['schemas']['TransactionListResponse'];
         };
-        responses: {
-            /** @description Payment link creation result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreatePaymentLinkResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
-    getPaymentLinkDetails: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GetPaymentLinkDetailsRequest"];
-            };
-        };
-        responses: {
-            /** @description Payment link details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GetPaymentLinkDetailsResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  refundTransaction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    voidPaymentLink: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/x-www-form-urlencoded": components["schemas"]["VoidPaymentLinkRequest"];
-                "application/json": components["schemas"]["VoidPaymentLinkRequest"];
-            };
-        };
-        responses: {
-            /** @description Payment link voided (terminal — a second void answers 403 PTL188) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoidPaymentLinkResponse"];
-                };
-            };
-            /** @description Client error (PTL188 already voided, 96 invalid link id, wrong hash) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "request_time": "20200728093403",
+         *       "merchant_id": "ec000002",
+         *       "merchant_auth": "REPLACE_ME",
+         *       "hash": "3nd/2Z4g45...wnA2WA/M/Qg=="
+         *     }
+         */
+        'application/json': components['schemas']['RefundRequest'];
+      };
     };
-    completePreAuth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Refund result */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CompletePreAuthRequest"];
-            };
+        content: {
+          'application/json': components['schemas']['RefundResponse'];
         };
-        responses: {
-            /** @description Pre-auth completion result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CompletePreAuthResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
-    cancelPreAuth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CancelPreAuthRequest"];
-            };
-        };
-        responses: {
-            /** @description Pre-auth cancellation result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CancelPreAuthResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  getExchangeRate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    payout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PayoutRequest"];
-            };
-        };
-        responses: {
-            /** @description Payout result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PayoutResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "req_time": "20250212104216",
+         *       "merchant_id": "ec000002",
+         *       "hash": "2P+5NrSb5g2XyITaxttsnjW...JVKguqghoQrq4y4C3tbUiA=="
+         *     }
+         */
+        'application/json': components['schemas']['ExchangeRateRequest'];
+      };
     };
-    updateBeneficiaryStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Current exchange rates keyed by lowercase ISO currency code */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateBeneficiaryStatusRequest"];
-            };
+        content: {
+          'application/json': components['schemas']['ExchangeRateResponse'];
         };
-        responses: {
-            /** @description Beneficiary status update result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BeneficiaryResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
-    addBeneficiary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddBeneficiaryRequest"];
-            };
-        };
-        responses: {
-            /** @description Beneficiary addition result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BeneficiaryResponse"];
-                };
-            };
-            /** @description Client error (invalid hash, missing parameters, validation failure) */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
+  };
+  linkAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    getTransactionsByMerchantRef: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GetTransactionsByMcRefRequest"];
-            };
-        };
-        responses: {
-            /** @description Matching transactions */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GetTransactionsByMcRefResponse"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LinkAccountRequest'];
+      };
     };
-    paymentCallback: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Base64 HMAC-SHA512 of the sorted-and-concatenated response body values, keyed by the merchant's api_key. */
-                "X-PAYWAY-HMAC-SHA512": string;
-            };
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description QR code or deeplink for account linking */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PaymentCallbackBody"];
-            };
+        content: {
+          'application/json': components['schemas']['LinkAccountResponse'];
         };
-        responses: {
-            /** @description Acknowledge receipt (merchant endpoint's own response, not PayWay's) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
+  };
+  linkCard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/x-www-form-urlencoded': components['schemas']['LinkCardRequest'];
+      };
+    };
+    responses: {
+      /** @description Hosted card-linking HTML page (returned on success AND error) */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/html': string;
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  cofPayment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CofPaymentRequest'];
+      };
+    };
+    responses: {
+      /** @description Payment result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CofPaymentResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  renewToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RenewTokenRequest'];
+      };
+    };
+    responses: {
+      /** @description New token details */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RenewTokenResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getTokenDetails: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GetTokenDetailsRequest'];
+      };
+    };
+    responses: {
+      /** @description Token details */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GetTokenDetailsResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  removeToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RemoveTokenRequest'];
+      };
+    };
+    responses: {
+      /** @description Token removal result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RemoveTokenResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  generateQr: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GenerateQrRequest'];
+      };
+    };
+    responses: {
+      /** @description QR code payload and deeplinks */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GenerateQrResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  createPaymentLink: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['CreatePaymentLinkRequest'];
+      };
+    };
+    responses: {
+      /** @description Payment link creation result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreatePaymentLinkResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getPaymentLinkDetails: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GetPaymentLinkDetailsRequest'];
+      };
+    };
+    responses: {
+      /** @description Payment link details */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GetPaymentLinkDetailsResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  voidPaymentLink: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/x-www-form-urlencoded': components['schemas']['VoidPaymentLinkRequest'];
+        'application/json': components['schemas']['VoidPaymentLinkRequest'];
+      };
+    };
+    responses: {
+      /** @description Payment link voided (terminal — a second void answers 403 PTL188) */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VoidPaymentLinkResponse'];
+        };
+      };
+      /** @description Client error (PTL188 already voided, 96 invalid link id, wrong hash) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  completePreAuth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CompletePreAuthRequest'];
+      };
+    };
+    responses: {
+      /** @description Pre-auth completion result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CompletePreAuthResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  cancelPreAuth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CancelPreAuthRequest'];
+      };
+    };
+    responses: {
+      /** @description Pre-auth cancellation result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CancelPreAuthResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  payout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PayoutRequest'];
+      };
+    };
+    responses: {
+      /** @description Payout result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PayoutResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  updateBeneficiaryStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateBeneficiaryStatusRequest'];
+      };
+    };
+    responses: {
+      /** @description Beneficiary status update result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BeneficiaryResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  addBeneficiary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AddBeneficiaryRequest'];
+      };
+    };
+    responses: {
+      /** @description Beneficiary addition result */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BeneficiaryResponse'];
+        };
+      };
+      /** @description Client error (invalid hash, missing parameters, validation failure) */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getTransactionsByMerchantRef: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GetTransactionsByMcRefRequest'];
+      };
+    };
+    responses: {
+      /** @description Matching transactions */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GetTransactionsByMcRefResponse'];
+        };
+      };
+    };
+  };
+  paymentCallback: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Base64 HMAC-SHA512 of the sorted-and-concatenated response body values, keyed by the merchant's api_key. */
+        'X-PAYWAY-HMAC-SHA512': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PaymentCallbackBody'];
+      };
+    };
+    responses: {
+      /** @description Acknowledge receipt (merchant endpoint's own response, not PayWay's) */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
 }

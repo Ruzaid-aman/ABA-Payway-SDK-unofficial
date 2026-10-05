@@ -49,9 +49,7 @@ export class SqliteJournalSink {
 
   constructor(db: SqliteDb) {
     prepareJournalSchema(db);
-    this.insert = db.prepare(
-      `INSERT OR REPLACE INTO journal_events (event_id, ts, kind, payload) VALUES (?, ?, ?, ?)`,
-    );
+    this.insert = db.prepare(`INSERT OR REPLACE INTO journal_events (event_id, ts, kind, payload) VALUES (?, ?, ?, ?)`);
   }
 
   emit(event: JournalEventV1): void {
@@ -88,8 +86,6 @@ export function pruneSqliteJournal(db: SqliteDb, before: Date): JournalPruneResu
   const cutoff = before.toISOString();
   const result = db.prepare('DELETE FROM journal_events WHERE ts < ?').run(cutoff);
   const removed = Number(result.changes ?? 0);
-  const total = Number(
-    (db.prepare('SELECT COUNT(*) AS n FROM journal_events').get() as { n: number | bigint }).n ?? 0,
-  );
+  const total = Number((db.prepare('SELECT COUNT(*) AS n FROM journal_events').get() as { n: number | bigint }).n ?? 0);
   return { removed, kept: total };
 }

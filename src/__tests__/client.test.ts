@@ -136,12 +136,13 @@ describe('PayWay configuration validation (audit S06/S07)', () => {
   });
 
   it('S06: partner-only credentials construct without merchant credentials', () => {
-    expect(() =>
-      new PayWay({
-        partnerId: 'partner-1',
-        partnerApiKey: 'partner-key-1',
-        publicKeyPem: TEST_RSA.publicKey,
-      }),
+    expect(
+      () =>
+        new PayWay({
+          partnerId: 'partner-1',
+          partnerApiKey: 'partner-key-1',
+          publicKeyPem: TEST_RSA.publicKey,
+        }),
     ).not.toThrow();
   });
 
@@ -271,9 +272,9 @@ describe('hook body redaction (M8)', () => {
   let debugSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    fetchSpy = vi.fn().mockResolvedValue(
-      mockJsonResponse({ status: { code: '00', message: 'Success' }, hash: RAW_RESPONSE_HASH }),
-    );
+    fetchSpy = vi
+      .fn()
+      .mockResolvedValue(mockJsonResponse({ status: { code: '00', message: 'Success' }, hash: RAW_RESPONSE_HASH }));
     vi.stubGlobal('fetch', fetchSpy);
     // debug: true paths console.debug — keep test output clean.
     debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
@@ -410,9 +411,7 @@ describe('checkResponseError (via API calls)', () => {
 
   it('stamps the request correlation id onto API errors (journal/hook join key)', async () => {
     const onRequest = vi.fn();
-    fetchSpy.mockResolvedValueOnce(
-      mockJsonResponse({ status: { code: 6, message: 'Transaction not found' } }),
-    );
+    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: 6, message: 'Transaction not found' } }));
     const paywayWithHook = new PayWay({ ...TEST_CONFIG, maxRetries: 0, onRequest });
 
     const error = (await paywayWithHook.checkout.checkTransaction('TX-CID').catch((e: unknown) => e)) as PayWayAPIError;
@@ -1381,7 +1380,9 @@ describe('paymentLink domain', () => {
   });
 
   it('void sends form-encoded request to the void path with merchant_auth and hash', async () => {
-    fetchSpy.mockResolvedValueOnce(mockJsonResponse({ status: { code: '00', message: 'Success.' }, tran_id: 178912355579535 }));
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'Success.' }, tran_id: 178912355579535 }),
+    );
 
     const result = await payway.paymentLink.void('PL-001');
 
@@ -1498,9 +1499,7 @@ describe('preAuth domain', () => {
   });
 
   it('rejects completion that exceeds the 110% over-capture ceiling', () => {
-    expect(() => payway.preAuth.complete('T-PREAUTH-001', 200.0, { originalAmount: 100 })).toThrow(
-      PayWayConfigError,
-    );
+    expect(() => payway.preAuth.complete('T-PREAUTH-001', 200.0, { originalAmount: 100 })).toThrow(PayWayConfigError);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -2000,12 +1999,8 @@ describe('checkout.pollTransactionStatus', () => {
 
   it('yields NOT_FOUND for early tran_id-not-found grace period and keeps polling', async () => {
     fetchSpy
-      .mockResolvedValueOnce(
-        mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } }),
-      )
-      .mockResolvedValueOnce(
-        mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } }),
-      )
+      .mockResolvedValueOnce(mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } }))
+      .mockResolvedValueOnce(mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } }))
       .mockResolvedValueOnce(mockJsonResponse(approvedResponse));
 
     const results: PollTransactionResult[] = [];
@@ -2025,8 +2020,7 @@ describe('checkout.pollTransactionStatus', () => {
   });
 
   it('does not abort when NOT_FOUND repeats past maxConsecutiveErrors', async () => {
-    const notFound = () =>
-      mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } });
+    const notFound = () => mockJsonResponse({ status: { code: 6, message: 'tran_id not found' } });
     fetchSpy
       .mockResolvedValueOnce(notFound())
       .mockResolvedValueOnce(notFound())

@@ -16,8 +16,7 @@ const temporaryDirectories: string[] = [];
 
 beforeAll(() => requireFreshDist());
 
-const runCli = (args: string[], env: NodeJS.ProcessEnv, input?: string) =>
-  runDistCliSync(args, { env, input });
+const runCli = (args: string[], env: NodeJS.ProcessEnv, input?: string) => runDistCliSync(args, { env, input });
 
 function baseEnv(appData: string): NodeJS.ProcessEnv {
   return {
@@ -39,12 +38,10 @@ type PromptConfirmForTest = (
   createReadline: () => { question(message: string, callback: (answer: string) => void): void; close(): void },
 ) => Promise<boolean>;
 
-type CreateInteractivePlanConfirmationForTest = (
-  prompt: (message: string) => Promise<boolean>,
-  ) => (proposal: {
-    request: string;
-    context: string;
-    environment: 'sandbox' | 'production';
+type CreateInteractivePlanConfirmationForTest = (prompt: (message: string) => Promise<boolean>) => (proposal: {
+  request: string;
+  context: string;
+  environment: 'sandbox' | 'production';
   actions: Array<{
     route: string;
     money: string;
@@ -179,9 +176,7 @@ describe('agentic payway CLI (TASK-011)', () => {
       baseEnv(appData),
     );
     expect(result.status).toBe(0);
-    const config = JSON.parse(
-      readFileSync(path.join(appData, 'aba-payway-sdk', 'agent', 'agent-config.json'), 'utf8'),
-    );
+    const config = JSON.parse(readFileSync(path.join(appData, 'aba-payway-sdk', 'agent', 'agent-config.json'), 'utf8'));
     expect(typeof config.privacyAcknowledgedAt).toBe('string');
     expect(Number.isNaN(Date.parse(config.privacyAcknowledgedAt))).toBe(false);
   });
@@ -209,9 +204,7 @@ describe('agentic payway CLI (TASK-011)', () => {
     const second = runCli(['agent', 'ack'], baseEnv(appData));
     expect(second.status).toBe(0);
     const updated = JSON.parse(readFileSync(configPath, 'utf8')) as { privacyAcknowledgedAt: string };
-    expect(Date.parse(updated.privacyAcknowledgedAt)).toBeGreaterThanOrEqual(
-      Date.parse(seeded.privacyAcknowledgedAt),
-    );
+    expect(Date.parse(updated.privacyAcknowledgedAt)).toBeGreaterThanOrEqual(Date.parse(seeded.privacyAcknowledgedAt));
 
     // Never persists the provider API key.
     expect(readFileSync(configPath, 'utf8')).not.toContain('dummy-agent-key');
@@ -367,7 +360,12 @@ describe('agentic payway CLI (TASK-011)', () => {
     // provider/network call while still proving the real REPL session boundary.
     writeFileSync(
       path.join(profileDirectory, 'agent', 'agent-config.json'),
-      JSON.stringify({ version: 'agent-config/v1', provider: 'openai', model: 'gpt-4o', capabilityMode: 'strict-json-plan' }),
+      JSON.stringify({
+        version: 'agent-config/v1',
+        provider: 'openai',
+        model: 'gpt-4o',
+        capabilityMode: 'strict-json-plan',
+      }),
     );
 
     const result = runCli(['agent'], baseEnv(appData), [':profile production', 'pay $3', ':exit'].join('\n'));

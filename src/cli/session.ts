@@ -53,7 +53,9 @@ export interface CliSessionFile {
   entries: Array<{ ts: string; argv: string[]; exitCode: number | null }>;
 }
 
-export function getSessionDir(appDataDirectory: string = process.env.APPDATA ?? path.join(homedir(), '.config')): string {
+export function getSessionDir(
+  appDataDirectory: string = process.env.APPDATA ?? path.join(homedir(), '.config'),
+): string {
   return path.join(appDataDirectory, 'aba-payway-sdk', 'sessions', 'cli');
 }
 
@@ -64,7 +66,9 @@ function newSessionId(now = new Date()): string {
 
 function loadMostRecentSession(dir: string): CliSessionFile | null {
   try {
-    const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith('.json'))
+      .sort();
     const latest = files[files.length - 1];
     if (!latest) return null;
     return JSON.parse(readFileSync(path.join(dir, latest), 'utf8')) as CliSessionFile;
@@ -111,7 +115,7 @@ export interface SessionIo {
 
 export async function runSessionLoop(io: SessionIo): Promise<void> {
   const dir = io.sessionDir ?? getSessionDir();
-  const started: CliSessionFile = io.resume ? loadMostRecentSession(dir) ?? emptySession() : emptySession();
+  const started: CliSessionFile = io.resume ? (loadMostRecentSession(dir) ?? emptySession()) : emptySession();
   const history: string[] = started.entries.map((entry) => entry.argv.join(' '));
 
   const program = io.program ?? null;
@@ -125,8 +129,11 @@ export async function runSessionLoop(io: SessionIo): Promise<void> {
     terminal: io.interactive,
   });
 
-  console.log(`\n${c.bold('PayWay session')} ${c.dim('(command-first shell — type :help for directives, :exit to quit)')}`);
-  if (io.resume) console.log(`  ${c.dim(`resumed session ${c.cyan(started.id)} (${history.length} prior command(s))`)}`);
+  console.log(
+    `\n${c.bold('PayWay session')} ${c.dim('(command-first shell — type :help for directives, :exit to quit)')}`,
+  );
+  if (io.resume)
+    console.log(`  ${c.dim(`resumed session ${c.cyan(started.id)} (${history.length} prior command(s))`)}`);
   if (!io.interactive) console.log(`${c.dim('(non-interactive: reading commands from stdin)')}`);
   console.log();
 
@@ -200,7 +207,9 @@ export async function runSessionLoop(io: SessionIo): Promise<void> {
     if (trimmed === ':use' || trimmed.startsWith(':use ')) {
       const value = trimmed.slice(':use'.length).trim();
       if (!value) {
-        console.log(`  sticky transaction: ${stickyTranId ? c.cyan(stickyTranId) : c.dim('(none — :use <tran-id> to set)')}`);
+        console.log(
+          `  sticky transaction: ${stickyTranId ? c.cyan(stickyTranId) : c.dim('(none — :use <tran-id> to set)')}`,
+        );
         return;
       }
       if (value === 'off' || value === 'clear') {
@@ -209,7 +218,9 @@ export async function runSessionLoop(io: SessionIo): Promise<void> {
         return;
       }
       stickyTranId = value;
-      console.log(`  sticky transaction: ${c.cyan(stickyTranId)} ${c.dim('— -t commands inherit it unless you pass -t')}`);
+      console.log(
+        `  sticky transaction: ${c.cyan(stickyTranId)} ${c.dim('— -t commands inherit it unless you pass -t')}`,
+      );
       return;
     }
     if (trimmed.startsWith(':')) {

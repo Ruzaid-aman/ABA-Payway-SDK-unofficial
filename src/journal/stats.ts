@@ -156,7 +156,9 @@ export function computeJournalStats(options: JournalStatsOptions = {}): JournalS
       : event.httpStatus !== undefined
         ? 'http'
         : 'transport';
-    const code = event.paywayCode ?? (event.httpStatus !== undefined ? String(event.httpStatus) : event.error?.code ?? 'unknown');
+    const code =
+      event.paywayCode ??
+      (event.httpStatus !== undefined ? String(event.httpStatus) : (event.error?.code ?? 'unknown'));
     const row = errorKey.get(code) ?? { code, kind, count: 0, lastSeen: event.ts };
     row.count += 1;
     if (event.ts > row.lastSeen) row.lastSeen = event.ts;
@@ -180,8 +182,7 @@ export function computeJournalStats(options: JournalStatsOptions = {}): JournalS
   for (const event of events) {
     if (!event.transactionId) continue;
     const tracked =
-      transactions.get(event.transactionId) ??
-      ({ created: false, callback: false } as TrackedTransaction);
+      transactions.get(event.transactionId) ?? ({ created: false, callback: false } as TrackedTransaction);
     if (event.kind === 'execution.request' && event.endpoint && !isReadEndpoint(event.endpoint)) {
       tracked.created = true;
     }

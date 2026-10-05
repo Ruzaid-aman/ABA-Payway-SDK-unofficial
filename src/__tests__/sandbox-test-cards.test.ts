@@ -45,9 +45,7 @@ describe('sandbox test-card seed data (ABA relay 2026-09-12)', () => {
 describe('buildAbaPayDeeplink (scheme confirmed by ABA 2026-09-12)', () => {
   it('wraps a KHQR string in the confirmed abamobilebank scheme', () => {
     const qr = '00020101021229370016A000000677010111013006668401160610ABC1235303840';
-    expect(buildAbaPayDeeplink(qr)).toBe(
-      `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(qr)}`,
-    );
+    expect(buildAbaPayDeeplink(qr)).toBe(`abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(qr)}`);
   });
 
   it('trims surrounding whitespace and tolerates separators', () => {

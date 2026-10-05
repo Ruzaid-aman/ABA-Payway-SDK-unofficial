@@ -72,11 +72,14 @@ describe('guide 16 verdict-mode snippet (WP09)', () => {
       // snippet's own shutdown tail is cut so this test drives the deliveries
       // and stops the listener itself.
       const port = await getFreePort();
-      const code = snippet.replace("import { createWebhookServer, createStorage } from 'aba-payway-ts';", '')
+      const code = snippet
+        .replace("import { createWebhookServer, createStorage } from 'aba-payway-ts';", '')
         .replace('port: 8443', `port: ${port}`)
         .split('// ... later, on shutdown:')[0];
       const runner = new Function(
-        'createWebhookServer', 'createStorage', 'process',
+        'createWebhookServer',
+        'createStorage',
+        'process',
         `"use strict"; return (async () => {\n${code}\nreturn listener; })();`,
       );
       const listener = await runner(createWebhookServer, createStorage, process);
@@ -84,12 +87,23 @@ describe('guide 16 verdict-mode snippet (WP09)', () => {
 
       const base = `http://127.0.0.1:${listener.port}/aba-payway-webhook`;
       const body = JSON.stringify({ tran_id: 'doc-snippet-1', apv: '123', status: '0', return_params: '' });
-      const goodSig = signCallbackBody({ tran_id: 'doc-snippet-1', apv: '123', status: '0', return_params: '' }, apiKey);
+      const goodSig = signCallbackBody(
+        { tran_id: 'doc-snippet-1', apv: '123', status: '0', return_params: '' },
+        apiKey,
+      );
 
-      const valid = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json', 'x-payway-hmac-sha512': goodSig }, body });
+      const valid = await fetch(base, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-payway-hmac-sha512': goodSig },
+        body,
+      });
       expect(valid.status, 'valid signature → 200 acknowledged').toBe(200);
 
-      const tampered = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json', 'x-payway-hmac-sha512': goodSig }, body: body.replace('doc-snippet-1', 'doc-snippet-TAMPERED') });
+      const tampered = await fetch(base, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-payway-hmac-sha512': goodSig },
+        body: body.replace('doc-snippet-1', 'doc-snippet-TAMPERED'),
+      });
       expect(tampered.status, 'invalid signature → 401 in verdict mode').toBe(401);
 
       const unsigned = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body });

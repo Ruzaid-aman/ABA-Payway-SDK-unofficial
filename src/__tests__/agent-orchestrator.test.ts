@@ -307,16 +307,13 @@ describe('AgentOrchestrator — consent', () => {
     const orch = createOrchestrator({ context: makeContext(), provider });
     let proposal: unknown;
 
-    const result = await orch.runOneShot(
-      'pay $3',
-      {
-        ...baseOptions({ tty: true, payway }),
-        confirmCreatePlan: async (candidate: unknown) => {
-          proposal = candidate;
-          return true;
-        },
-      } as OrchestratorOptions,
-    );
+    const result = await orch.runOneShot('pay $3', {
+      ...baseOptions({ tty: true, payway }),
+      confirmCreatePlan: async (candidate: unknown) => {
+        proposal = candidate;
+        return true;
+      },
+    } as OrchestratorOptions);
 
     expect(result.status).toBe('succeeded');
     expect(calls.generateQr).toBe(1);
@@ -341,14 +338,10 @@ describe('AgentOrchestrator — consent', () => {
     const orch = createOrchestrator({ context: makeContext(), provider });
     const sessionId = 'declined-confirmation-session';
 
-    const result = await orch.runTurn(
-      sessionId,
-      'pay $3',
-      {
-        ...baseOptions({ tty: true, payway }),
-        confirmCreatePlan: async () => false,
-      } as OrchestratorOptions,
-    );
+    const result = await orch.runTurn(sessionId, 'pay $3', {
+      ...baseOptions({ tty: true, payway }),
+      confirmCreatePlan: async () => false,
+    } as OrchestratorOptions);
 
     expect(result.status).toBe('needs_confirmation');
     expect(calls.generateQr).toBe(0);

@@ -14,9 +14,7 @@ describe('resolvePaywayDataRoot', () => {
   });
 
   it('falls back to APPDATA then ~/.config', () => {
-    expect(resolvePaywayDataRoot(undefined, {})).toBe(
-      path.join(homedir(), '.config', 'aba-payway-sdk', 'data'),
-    );
+    expect(resolvePaywayDataRoot(undefined, {})).toBe(path.join(homedir(), '.config', 'aba-payway-sdk', 'data'));
     expect(resolvePaywayDataRoot(undefined, { APPDATA: '/roaming' })).toBe(
       path.join('/roaming', 'aba-payway-sdk', 'data'),
     );
@@ -37,9 +35,7 @@ describe('resolveWebhookDir', () => {
   });
 
   it('defaults to <dataRoot>/webhook_data via PAYWAY_DATA_DIR', () => {
-    expect(resolveWebhookDir(undefined, { PAYWAY_DATA_DIR: '/data' })).toBe(
-      path.join('/data', 'webhook_data'),
-    );
+    expect(resolveWebhookDir(undefined, { PAYWAY_DATA_DIR: '/data' })).toBe(path.join('/data', 'webhook_data'));
   });
 
   it('JsonWebhookStorage default capture file lands under the data root', async () => {

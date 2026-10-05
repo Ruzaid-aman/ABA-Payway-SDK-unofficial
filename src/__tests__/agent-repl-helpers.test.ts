@@ -95,8 +95,7 @@ describe('validateDispatch', () => {
   it('rejects shell escapes, paths, and URIs with a distinct message', () => {
     expect(validateDispatch('generate-qr --amount 3; rm -rf /', registered)).toEqual({
       ok: false,
-      message:
-        "Rejected: 'generate-qr --amount 3; rm -rf /' looks like a shell, path, or URI — not a PayWay command",
+      message: "Rejected: 'generate-qr --amount 3; rm -rf /' looks like a shell, path, or URI — not a PayWay command",
     });
     expect(validateDispatch('check-transaction ./local', registered)).toMatchObject({ ok: false });
   });
@@ -234,9 +233,7 @@ describe('progress presentation helpers', () => {
   it('maps orchestrator phases to labels', () => {
     expect(progressLabel({ phase: 'validate' })).toBe('Validating plan…');
     expect(progressLabel({ phase: 'authorize' })).toBe('Authorizing plan…');
-    expect(progressLabel({ phase: 'execute', detail: 'generate_online_qr' })).toBe(
-      'Executing generate_online_qr…',
-    );
+    expect(progressLabel({ phase: 'execute', detail: 'generate_online_qr' })).toBe('Executing generate_online_qr…');
     expect(progressLabel({ phase: 'execute' })).toBe('Executing action…');
     expect(progressLabel({ phase: 'anything-else' })).toBe('Finalizing…');
   });
@@ -245,9 +242,7 @@ describe('progress presentation helpers', () => {
     expect(stripAnsi(contactingProviderLine('openai', 'gpt-4o'))).toBe(
       '  · Contacting openai (gpt-4o) to propose a plan…',
     );
-    expect(stripAnsi(contactingProviderLine('openai', ''))).toBe(
-      '  · Contacting openai (no model) to propose a plan…',
-    );
+    expect(stripAnsi(contactingProviderLine('openai', ''))).toBe('  · Contacting openai (no model) to propose a plan…');
   });
 
   it('renders the provider proposal failure hint', () => {

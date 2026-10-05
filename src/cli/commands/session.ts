@@ -10,12 +10,16 @@ import { getSessionDir, runSessionLoop } from '../session.js';
 export function registerSessionCommand(program: Command): void {
   program
     .command('session')
-    .description('Interactive command-first shell over the CLI (:use <tran-id> sticks a transaction id; :help for directives)')
+    .description(
+      'Interactive command-first shell over the CLI (:use <tran-id> sticks a transaction id; :help for directives)',
+    )
     .option('--profile <name>', 'Credential profile shown in the prompt and used for gateway commands')
     .option('--resume', 'Resume the most recent persisted session history', false)
     .action((opts: { profile?: string; resume?: boolean }) => {
       if (resolvePromptMode() !== 'clack') {
-        console.error('  payway-sdk session needs an interactive terminal (TTY). Pipe commands directly instead, e.g. `payway-sdk check-transaction -t <id>`.');
+        console.error(
+          '  payway-sdk session needs an interactive terminal (TTY). Pipe commands directly instead, e.g. `payway-sdk check-transaction -t <id>`.',
+        );
         process.exitCode = 2;
         return;
       }

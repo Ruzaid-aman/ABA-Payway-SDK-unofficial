@@ -36,7 +36,10 @@ describe('createDispatcher', () => {
 
   it('rejects unknown commands, shells, and agent-management commands with exact messages', async () => {
     const program = new Command();
-    program.command('real-command').description('x').action(() => {});
+    program
+      .command('real-command')
+      .description('x')
+      .action(() => {});
     const dispatch = createDispatcher(() => program);
 
     const captured = captureConsole();
@@ -48,16 +51,19 @@ describe('createDispatcher', () => {
     } finally {
       captured.restore();
     }
-    expect(captured.lines.some((l) => l.includes("not a dispatchable PayWay command"))).toBe(true);
+    expect(captured.lines.some((l) => l.includes('not a dispatchable PayWay command'))).toBe(true);
     expect(captured.lines.some((l) => l.includes('looks like a shell, path, or URI'))).toBe(true);
     expect(captured.lines.filter((l) => l.includes('Running:'))).toHaveLength(0);
   });
 
   it('traps process.exit from a dispatched command and restores the exit code', async () => {
     const program = new Command();
-    program.command('exiter').description('exits').action(() => {
-      process.exit(7);
-    });
+    program
+      .command('exiter')
+      .description('exits')
+      .action(() => {
+        process.exit(7);
+      });
     const dispatch = createDispatcher(() => program);
 
     const captured = captureConsole();
@@ -76,9 +82,13 @@ describe('createDispatcher', () => {
     const program = new Command();
     let seen: string | undefined;
     const group = program.command('group-thing').description('g');
-    group.command('leaf').description('l').option('-v, --value <v>', 'v').action((opts: { value?: string }) => {
-      seen = opts.value;
-    });
+    group
+      .command('leaf')
+      .description('l')
+      .option('-v, --value <v>', 'v')
+      .action((opts: { value?: string }) => {
+        seen = opts.value;
+      });
 
     const captured = captureConsole();
     try {
@@ -94,9 +104,12 @@ describe('createDispatcher', () => {
     let voidInvoked = false;
     let detailInvoked = false;
     const group = program.command('payment-link').description('pl');
-    group.command('void').description('v').action(() => {
-      voidInvoked = true;
-    });
+    group
+      .command('void')
+      .description('v')
+      .action(() => {
+        voidInvoked = true;
+      });
     group
       .command('detail')
       .description('d')
