@@ -1,0 +1,40 @@
+{
+  "vectorId": "hmac-request-qr-001",
+  "operation": "qr.requestQr",
+  "endpoint": "/api/payment-gateway/v1/payments/request-qr",
+  "description": "Soundbox request-qr — spec-derived 9-field order; amount OMITTED (keypad entry on device), lifetime at the 3-minute minimum boundary",
+  "hashFieldsFamily": "REQUEST_QR_HASH_FIELDS",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "tran_id",
+    "amount",
+    "purchase_type",
+    "payment_option",
+    "callback_url",
+    "currency",
+    "lifetime"
+  ],
+  "fieldOrderSource": "repository export REQUEST_QR_HASH_FIELDS (src/domains/qr.ts; spec-derived, NOT live-verified — see the REQUEST_QR hash-drift note)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-SB-1",
+    "purchase_type": "purchase",
+    "payment_option": "abapay",
+    "callback_url": "aHR0cHM6Ly9leGFtcGxlLmNvbS9zb3VuZGJveA==",
+    "currency": "USD",
+    "lifetime": 3,
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-TXN-SB-1purchaseabapayaHR0cHM6Ly9leGFtcGxlLmNvbS9zb3VuZGJveA==USD3",
+  "preimageSha256": "a5cbae47f91ee145b827ac3b6aabc8a8adc8c13a461fb2f42a2c2f17c604e390",
+  "expectedHash": "yEw6p456FLVkyTyyhY8qxFwO7jGYZg2HJeUzizA7/IWlhAZgDSZ4W0FtSU29rYB482/8x19Edhh8oFFs//Rsww==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

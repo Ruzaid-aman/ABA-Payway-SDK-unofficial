@@ -1,0 +1,33 @@
+{
+  "vectorId": "hmac-renew-token-001",
+  "operation": "credentialsOnFile.renewToken",
+  "endpoint": "/api/payment-credential/v3/token-management/renew-expired-account-token",
+  "description": "renew-token — §16-verified 5-field order (ctid leads)",
+  "hashFieldsFamily": "inline:renewToken",
+  "fieldOrder": [
+    "ctid",
+    "request_time",
+    "pwt",
+    "merchant_id",
+    "request_id"
+  ],
+  "fieldOrderSource": "inline list at the credentials-on-file call site (HASH_ORDER_HINTS[renewToken]; sandbox-verified 2026-08-31)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "request_id": "REQGV00001",
+    "ctid": "CTIDGV0001",
+    "pwt": "pwt-golden-vector-0002",
+    "request_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "CTIDGV000120260101000000pwt-golden-vector-0002TESTMIDREQGV00001",
+  "preimageSha256": "b84f22c4ca1b5d45ddec96a3bc3f1c4acbb92c9fec1e1b05df2f63f7659b9da0",
+  "expectedHash": "I6xZwoxfivO+mWvCG9prz8/0cKrXE0BHCF7IvKP4HlUnBynQpSbXSpEb/8H4qGZcETy2CyRCYpAycwJQmBJfNg==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

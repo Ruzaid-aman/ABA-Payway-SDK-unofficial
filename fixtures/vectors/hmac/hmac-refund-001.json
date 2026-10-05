@@ -1,0 +1,41 @@
+{
+  "vectorId": "hmac-refund-001",
+  "operation": "checkout.refund",
+  "endpoint": "/api/merchant-portal/merchant-access/online-transaction/refund",
+  "description": "refund — merchant-auth default composition request_time.merchant_id.merchant_auth (no hmacFields override); refund amount rides INSIDE the RSA merchant_auth, not the preimage",
+  "hashFieldsFamily": "MERCHANT_AUTH_DEFAULT_HASH_FIELDS",
+  "fieldOrder": [
+    "request_time",
+    "merchant_id",
+    "merchant_auth"
+  ],
+  "fieldOrderSource": "repository export MERCHANT_AUTH_DEFAULT_HASH_FIELDS (src/client.ts; effective order for refund + payment-link)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "merchant_id": "TESTMID",
+    "merchant_auth": "golden-vector-rsa-merchant-auth-sentinel",
+    "request_time": "20260101000000"
+  },
+  "preimage": "20260101000000TESTMIDgolden-vector-rsa-merchant-auth-sentinel",
+  "preimageSha256": "37a94013cc1107ac2adb0e87170f714a5008eaeaac0df7daac9e96612a9bac05",
+  "expectedHash": "/FjHwMRtyp7UsaUNFjI5yjMdNd2IO7xNumSomwOkRm3bUlYi08x4y3g1QZjJf6vm37fYuXo29tBPf8DjCioWrg==",
+  "normalization": [
+    {
+      "field": "merchant_auth",
+      "rule": "GOLDEN-RSA-SENTINEL",
+      "note": "PKCS1 RSA encryption is randomized per call; the encrypted blob is pinned as a fixed sentinel so the HMAC composition is deterministic"
+    }
+  ],
+  "context": {
+    "merchantAuthPayload": {
+      "tran_id": "GV-TXN-REF-1",
+      "refund_amount": 1.5
+    }
+  },
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

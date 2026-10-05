@@ -1,0 +1,63 @@
+{
+  "vectorId": "hmac-purchase-005",
+  "operation": "checkout.purchase",
+  "endpoint": "/api/payment-gateway/v1/payments/purchase",
+  "description": "Coercion pin — numeric amount 7 formatted to \"7.00\" by formatAmount and boolean skip_success_page String()-coerced to \"true\" in the preimage",
+  "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "tran_id",
+    "amount",
+    "items",
+    "ctid",
+    "shipping",
+    "firstname",
+    "lastname",
+    "email",
+    "phone",
+    "type",
+    "payment_option",
+    "return_url",
+    "cancel_url",
+    "continue_success_url",
+    "return_deeplink",
+    "currency",
+    "custom_fields",
+    "return_params",
+    "payout",
+    "lifetime",
+    "additional_params",
+    "google_pay_token",
+    "skip_success_page",
+    "token_flag",
+    "frequency"
+  ],
+  "fieldOrderSource": "repository export PURCHASE_HASH_FIELDS (src/domains/checkout.ts; live 27-field order, ctid after items, sandbox-verified 2026-09-05)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-COR-1",
+    "amount": "7.00",
+    "type": "purchase",
+    "currency": "USD",
+    "skip_success_page": true,
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-TXN-COR-17.00purchaseUSDtrue",
+  "preimageSha256": "496639e91d63ab4aa5a30029a676cf912ae6c07034298ed2c4e613ff9306d6fe",
+  "expectedHash": "sLlqRduvHljvuKFoh/u4z4v8s4zawz6voowZybonbChw2ezRE0wWYxouXfolCvE15Mmzf368ohygQpDMawso2g==",
+  "normalization": [
+    {
+      "field": "req_time",
+      "rule": "GOLDEN-FIXED-TIME",
+      "note": "run wall-clock value replaced by the fixed golden request time"
+    }
+  ],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

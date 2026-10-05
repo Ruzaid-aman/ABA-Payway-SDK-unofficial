@@ -1,0 +1,41 @@
+{
+  "vectorId": "hmac-payout-001",
+  "operation": "payout.payout",
+  "endpoint": "/api/payment-gateway/v2/direct-payment/merchant/payout",
+  "description": "Direct payout — the SDK's ONLY hex-encoded hash (PO-003 pin: a regression to base64 changes this digest); numeric amount 5 String()-coerced to \"5\" (NOT \"5.00\"); RSA-encrypted beneficiaries pinned as sentinel",
+  "hashFieldsFamily": "inline:payout",
+  "fieldOrder": [
+    "merchant_id",
+    "tran_id",
+    "beneficiaries",
+    "amount",
+    "custom_fields",
+    "currency"
+  ],
+  "fieldOrderSource": "inline list at the payout call site (HASH_ORDER_HINTS[payout]; hex encoding per payout.ts)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "hex",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-PO-1",
+    "amount": 5,
+    "beneficiaries": "golden-vector-rsa-beneficiaries-sentinel",
+    "currency": "USD",
+    "merchant_id": "TESTMID",
+    "req_time": "20260101000000"
+  },
+  "preimage": "TESTMIDGV-TXN-PO-1golden-vector-rsa-beneficiaries-sentinel5USD",
+  "preimageSha256": "a84d63befb33a489f31e02200feb7c7781ab8536aed155fbd2a6f07ef1c0406e",
+  "expectedHash": "1e1305bbe1dab3f88f3c1af5bc8771725aee413a67127e5cee7628b2a41df877b7bc5879f89161e0b5013d0de07126b64623c3c83c3758205a9a3f8c1dd34731",
+  "normalization": [
+    {
+      "field": "beneficiaries",
+      "rule": "GOLDEN-RSA-SENTINEL",
+      "note": "PKCS1 RSA encryption is randomized per call; the encrypted beneficiary list is pinned as a fixed sentinel"
+    }
+  ],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "vectorId": "hmac-purchase-003",
+  "operation": "checkout.purchase",
+  "endpoint": "/api/payment-gateway/v1/payments/purchase",
+  "description": "Subscription registration — ctid hashed AFTER items (sandbox-verified position) plus the token_flag/frequency tail (CITR_FIX + 1M)",
+  "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "tran_id",
+    "amount",
+    "items",
+    "ctid",
+    "shipping",
+    "firstname",
+    "lastname",
+    "email",
+    "phone",
+    "type",
+    "payment_option",
+    "return_url",
+    "cancel_url",
+    "continue_success_url",
+    "return_deeplink",
+    "currency",
+    "custom_fields",
+    "return_params",
+    "payout",
+    "lifetime",
+    "additional_params",
+    "google_pay_token",
+    "skip_success_page",
+    "token_flag",
+    "frequency"
+  ],
+  "fieldOrderSource": "repository export PURCHASE_HASH_FIELDS (src/domains/checkout.ts; live 27-field order, ctid after items, sandbox-verified 2026-09-05)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-SUB-1",
+    "amount": "9.99",
+    "type": "purchase",
+    "payment_option": "cards",
+    "currency": "USD",
+    "return_url": "aHR0cHM6Ly9leGFtcGxlLmNvbS9yZXR1cm4=",
+    "ctid": "CTIDGV0001",
+    "token_flag": "CITR_FIX",
+    "frequency": "1M",
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-TXN-SUB-19.99CTIDGV0001purchasecardsaHR0cHM6Ly9leGFtcGxlLmNvbS9yZXR1cm4=USDCITR_FIX1M",
+  "preimageSha256": "b9fcb092aa940a9acd8cf3e28ecb7747715f32870a30369b1883d3a3e297ab3f",
+  "expectedHash": "rXU9rAXUKQ1RNcNWrlUYPI5Ou3slXSY1/GBBLMA/8G3FuEh8S5RlZExPCZ+epbVmon2rprdbtUTW083kUKXdJA==",
+  "normalization": [
+    {
+      "field": "req_time",
+      "rule": "GOLDEN-FIXED-TIME",
+      "note": "run wall-clock value replaced by the fixed golden request time"
+    }
+  ],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

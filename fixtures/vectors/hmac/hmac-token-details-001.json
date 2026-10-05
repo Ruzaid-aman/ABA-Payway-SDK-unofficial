@@ -1,0 +1,29 @@
+{
+  "vectorId": "hmac-token-details-001",
+  "operation": "credentialsOnFile.getTokenDetails",
+  "endpoint": "/api/payment-credential/v3/token-management/get-token-details",
+  "description": "get-token-details — request_id ONLY (no ctid, no pwt): merchant_id.request_time.request_id",
+  "hashFieldsFamily": "inline:getTokenDetails",
+  "fieldOrder": [
+    "merchant_id",
+    "request_time",
+    "request_id"
+  ],
+  "fieldOrderSource": "inline list at the credentials-on-file call site (HASH_ORDER_HINTS[getTokenDetails]; sandbox-verified 2026-08-31)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "request_id": "REQGV00001",
+    "request_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "TESTMID20260101000000REQGV00001",
+  "preimageSha256": "deba7c5a02f4c31086a4ad6259fdf9cd00f8b3c8eeec06ae7cda6efc55e17480",
+  "expectedHash": "xS748GSnRfzsZskWCQ0/eRhT808xYFJx6D9t7LWqA7ATDMBKhjO97P0B5Ccu8bzYiLrVTIcJRaswPhn36kjtyw==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

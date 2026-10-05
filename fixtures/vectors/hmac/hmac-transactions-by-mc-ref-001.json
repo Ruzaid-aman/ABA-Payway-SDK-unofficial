@@ -1,0 +1,29 @@
+{
+  "vectorId": "hmac-transactions-by-mc-ref-001",
+  "operation": "khqr.getTransactionsByMerchantRef",
+  "endpoint": "/api/payment-gateway/v1/payments/get-transactions-by-mc-ref",
+  "description": "get-transactions-by-mc-ref — req_time.merchant_id.merchant_ref (merchant_ref NOT base64-encoded)",
+  "hashFieldsFamily": "inline:getTransactionsByMerchantRef",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "merchant_ref"
+  ],
+  "fieldOrderSource": "inline list at the khqr-domain call site (HASH_ORDER_HINTS[getTransactionsByMerchantRef])",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "merchant_ref": "GV-MC-REF-01",
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-MC-REF-01",
+  "preimageSha256": "3c14e9ff1b98747f52b6e57c0e98939f0018f99e52ca4a08aa6fedc829a58b54",
+  "expectedHash": "yyyoeTeDNqzJfjpy0D67kEx3ZRRW7yjBjfSYza2IJnuLJngeaxTyUZnaNHwp9G8t9i6Yndt4WOcPYEt9IPEERA==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

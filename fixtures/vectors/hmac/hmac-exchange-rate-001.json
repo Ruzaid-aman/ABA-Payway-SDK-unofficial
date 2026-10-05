@@ -1,0 +1,27 @@
+{
+  "vectorId": "hmac-exchange-rate-001",
+  "operation": "checkout.getExchangeRate",
+  "endpoint": "/api/payment-gateway/v1/exchange-rate",
+  "description": "exchange-rate — the shortest family: req_time.merchant_id only",
+  "hashFieldsFamily": "inline:getExchangeRate",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id"
+  ],
+  "fieldOrderSource": "inline list at the checkout-domain call site (HASH_ORDER_HINTS[getExchangeRate])",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMID",
+  "preimageSha256": "af1ca9f888b6d27ba34f9a9524ae88fa219915b5b3262fdba6f8c3ed75641503",
+  "expectedHash": "wamAWckVkOxTyBFP+5FXuD38LLGblJkI28ZFJp9UM1C61y1Lq4pLX0TKTznmlvohG868c2gZoj+oaZR2nzk4yw==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

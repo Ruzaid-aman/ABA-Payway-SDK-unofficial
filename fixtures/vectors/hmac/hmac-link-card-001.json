@@ -1,0 +1,42 @@
+{
+  "vectorId": "hmac-link-card-001",
+  "operation": "credentialsOnFile.linkCard",
+  "endpoint": "/api/payment-credential/v3/cof/link-card",
+  "description": "link-card — LINK_CARD_HMAC_FIELDS with NO amount supplied: the live-doc quirk where `amount` is a hash position with no body field and hashes as empty string",
+  "hashFieldsFamily": "LINK_CARD_HMAC_FIELDS",
+  "fieldOrder": [
+    "merchant_id",
+    "request_time",
+    "ctid",
+    "callback_url",
+    "request_id",
+    "token_flag",
+    "frequency",
+    "amount",
+    "currency",
+    "continue_success_url"
+  ],
+  "fieldOrderSource": "repository export LINK_CARD_HMAC_FIELDS (src/domains/credentials-on-file.ts; §16-verified)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "request_id": "REQGV00002",
+    "ctid": "CTIDGV0001",
+    "token_flag": "CITI_FLEX",
+    "frequency": "1M",
+    "continue_success_url": "aHR0cHM6Ly9leGFtcGxlLmNvbS9kb25l",
+    "callback_url": "aHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvbGluay1jYWxsYmFjaw==",
+    "currency": "USD",
+    "request_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "TESTMID20260101000000CTIDGV0001aHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvbGluay1jYWxsYmFjaw==REQGV00002CITI_FLEX1MUSDaHR0cHM6Ly9leGFtcGxlLmNvbS9kb25l",
+  "preimageSha256": "144a262d0c6552e57a1e0ba42030b4d4e3bcc70e2aabafe6eebedcedebe5f4eb",
+  "expectedHash": "NrgzBpE9y9t6rx6VWj0XwkGSLA+Mp95UB7ltN4xPeRIWsgz8bDuqTyZ3mfNBoqd7mTYKQY6evbHevYOtveubrg==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

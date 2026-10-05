@@ -1,0 +1,65 @@
+{
+  "vectorId": "hmac-purchase-004",
+  "operation": "checkout.purchase",
+  "endpoint": "/api/payment-gateway/v1/payments/purchase",
+  "description": "Unicode payer names (Khmer + Latin diacritics) — pins UTF-8 byte handling in the concatenated preimage",
+  "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "tran_id",
+    "amount",
+    "items",
+    "ctid",
+    "shipping",
+    "firstname",
+    "lastname",
+    "email",
+    "phone",
+    "type",
+    "payment_option",
+    "return_url",
+    "cancel_url",
+    "continue_success_url",
+    "return_deeplink",
+    "currency",
+    "custom_fields",
+    "return_params",
+    "payout",
+    "lifetime",
+    "additional_params",
+    "google_pay_token",
+    "skip_success_page",
+    "token_flag",
+    "frequency"
+  ],
+  "fieldOrderSource": "repository export PURCHASE_HASH_FIELDS (src/domains/checkout.ts; live 27-field order, ctid after items, sandbox-verified 2026-09-05)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-UNI-1",
+    "amount": "1.23",
+    "firstname": "សុខា",
+    "lastname": "Müller-Ñoño",
+    "email": "unicode@example.com",
+    "type": "purchase",
+    "currency": "USD",
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-TXN-UNI-11.23សុខាMüller-Ñoñounicode@example.compurchaseUSD",
+  "preimageSha256": "67389d607f134821f56334ba464bd635dc6cb9a3ee8d8cf2fe43b35b28e795ad",
+  "expectedHash": "sXr9rIGxp5TTCLD4COO7hqh3tUphqM6nbokEjpZCQMlS12QsGp0j0c0FJa+TV5kY6ixSxy3FXTBS0yQ62gaXyA==",
+  "normalization": [
+    {
+      "field": "req_time",
+      "rule": "GOLDEN-FIXED-TIME",
+      "note": "run wall-clock value replaced by the fixed golden request time"
+    }
+  ],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

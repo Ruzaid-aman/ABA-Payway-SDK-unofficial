@@ -1,0 +1,39 @@
+{
+  "vectorId": "hmac-beneficiary-add-001",
+  "operation": "payout.addBeneficiary",
+  "endpoint": "/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout",
+  "description": "beneficiary whitelist add — two-field override request_time.merchant_auth (no merchant_id in the preimage)",
+  "hashFieldsFamily": "inline:addBeneficiary",
+  "fieldOrder": [
+    "request_time",
+    "merchant_auth"
+  ],
+  "fieldOrderSource": "inline override at the payout call site (HASH_ORDER_HINTS[addBeneficiary])",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "merchant_id": "TESTMID",
+    "merchant_auth": "golden-vector-rsa-merchant-auth-sentinel",
+    "request_time": "20260101000000"
+  },
+  "preimage": "20260101000000golden-vector-rsa-merchant-auth-sentinel",
+  "preimageSha256": "7e95778510eed33ff1a7036410c6fc9258728f86ca0ea9f85c691fe6e4b33446",
+  "expectedHash": "wAhjhnsEPNkZikoi6Z9SV6sdAUWcR09bwWHZvZI1ordZAlBdJ1DlJkUNCO91xVKD5u4DMsp1CNybkQKSKXt2Ew==",
+  "normalization": [
+    {
+      "field": "merchant_auth",
+      "rule": "GOLDEN-RSA-SENTINEL",
+      "note": "PKCS1 RSA encryption is randomized per call; the encrypted blob is pinned as a fixed sentinel so the HMAC composition is deterministic"
+    }
+  ],
+  "context": {
+    "merchantAuthPayload": {
+      "payee": "500000001"
+    }
+  },
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

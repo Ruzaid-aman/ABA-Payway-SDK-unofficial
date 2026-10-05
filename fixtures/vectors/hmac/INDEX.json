@@ -1,0 +1,333 @@
+{
+  "schema": "payway-golden-vectors-index/v1",
+  "scope": "hmac",
+  "description": "Golden HMAC vectors (audit DX-TEST-001, §27): expected signatures pinned by driving the live signing code with fixed inputs and the repo test key. One JSON file per vector; the runner is src/__tests__/golden-vectors.test.ts.",
+  "keyAlias": "golden-vector-test-key",
+  "keyNote": "The fixtures never contain the key material — only this alias. The key is the repo test fixture key from src/__tests__/cli.test.ts, never a credential.",
+  "regenerate": "npx tsx scripts/generate/gen-golden-vectors.ts",
+  "verifyDeterminism": "npx tsx scripts/generate/gen-golden-vectors.ts --check",
+  "vectorCount": 33,
+  "hashFieldsFamilies": [
+    "GENERATE_QR_HASH_FIELDS",
+    "LINK_CARD_HMAC_FIELDS",
+    "MERCHANT_AUTH_DEFAULT_HASH_FIELDS",
+    "PURCHASE_HASH_FIELDS",
+    "REQUEST_QR_HASH_FIELDS",
+    "SELF_ACTIVATION_HASH_FIELDS",
+    "inline:addBeneficiary",
+    "inline:cancelPreAuth",
+    "inline:checkTransaction",
+    "inline:closeTransaction",
+    "inline:completePreAuth",
+    "inline:getExchangeRate",
+    "inline:getTokenDetails",
+    "inline:getTransactionDetail",
+    "inline:getTransactionList",
+    "inline:getTransactionsByMerchantRef",
+    "inline:linkAccount",
+    "inline:payment",
+    "inline:payout",
+    "inline:removeToken",
+    "inline:renewToken",
+    "inline:updateBeneficiaryStatus"
+  ],
+  "vectors": [
+    {
+      "vectorId": "hmac-beneficiary-add-001",
+      "file": "hmac-beneficiary-add-001.json",
+      "operation": "payout.addBeneficiary",
+      "endpoint": "/api/merchant-portal/merchant-access/whitelist-account/add-whitelist-payout",
+      "hashFieldsFamily": "inline:addBeneficiary",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-beneficiary-update-status-001",
+      "file": "hmac-beneficiary-update-status-001.json",
+      "operation": "payout.updateBeneficiaryStatus",
+      "endpoint": "/api/merchant-portal/merchant-access/whitelist-account/update-whitelist-status",
+      "hashFieldsFamily": "inline:updateBeneficiaryStatus",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-check-transaction-001",
+      "file": "hmac-check-transaction-001.json",
+      "operation": "checkout.checkTransaction",
+      "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+      "hashFieldsFamily": "inline:checkTransaction",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-close-transaction-001",
+      "file": "hmac-close-transaction-001.json",
+      "operation": "checkout.closeTransaction",
+      "endpoint": "/api/payment-gateway/v1/payments/close-transaction",
+      "hashFieldsFamily": "inline:closeTransaction",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-cof-payment-001",
+      "file": "hmac-cof-payment-001.json",
+      "operation": "credentialsOnFile.payment",
+      "endpoint": "/api/payment-gateway/v3/purchase/payment-credential",
+      "hashFieldsFamily": "inline:payment",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-exchange-rate-001",
+      "file": "hmac-exchange-rate-001.json",
+      "operation": "checkout.getExchangeRate",
+      "endpoint": "/api/payment-gateway/v1/exchange-rate",
+      "hashFieldsFamily": "inline:getExchangeRate",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-generate-qr-001",
+      "file": "hmac-generate-qr-001.json",
+      "operation": "qr.generateQr",
+      "endpoint": "/api/payment-gateway/v1/payments/generate-qr",
+      "hashFieldsFamily": "GENERATE_QR_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-generate-qr-002",
+      "file": "hmac-generate-qr-002.json",
+      "operation": "qr.generateQr",
+      "endpoint": "/api/payment-gateway/v1/payments/generate-qr",
+      "hashFieldsFamily": "GENERATE_QR_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-link-account-001",
+      "file": "hmac-link-account-001.json",
+      "operation": "credentialsOnFile.linkAccount",
+      "endpoint": "/api/payment-credential/v3/aof/link-account",
+      "hashFieldsFamily": "inline:linkAccount",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-link-card-001",
+      "file": "hmac-link-card-001.json",
+      "operation": "credentialsOnFile.linkCard",
+      "endpoint": "/api/payment-credential/v3/cof/link-card",
+      "hashFieldsFamily": "LINK_CARD_HMAC_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-payment-link-create-001",
+      "file": "hmac-payment-link-create-001.json",
+      "operation": "paymentLink.create",
+      "endpoint": "/api/merchant-portal/merchant-access/payment-link/create",
+      "hashFieldsFamily": "MERCHANT_AUTH_DEFAULT_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-payment-link-detail-001",
+      "file": "hmac-payment-link-detail-001.json",
+      "operation": "paymentLink.getDetails",
+      "endpoint": "/api/merchant-portal/merchant-access/payment-link/detail",
+      "hashFieldsFamily": "MERCHANT_AUTH_DEFAULT_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-payment-link-void-001",
+      "file": "hmac-payment-link-void-001.json",
+      "operation": "paymentLink.void",
+      "endpoint": "/api/merchant-portal/merchant-access/payment-link/void",
+      "hashFieldsFamily": "MERCHANT_AUTH_DEFAULT_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-payout-001",
+      "file": "hmac-payout-001.json",
+      "operation": "payout.payout",
+      "endpoint": "/api/payment-gateway/v2/direct-payment/merchant/payout",
+      "hashFieldsFamily": "inline:payout",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "hex"
+    },
+    {
+      "vectorId": "hmac-preauth-cancel-001",
+      "file": "hmac-preauth-cancel-001.json",
+      "operation": "preAuth.cancel",
+      "endpoint": "/api/merchant-portal/merchant-access/online-transaction/pre-auth-cancellation",
+      "hashFieldsFamily": "inline:cancelPreAuth",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-preauth-complete-001",
+      "file": "hmac-preauth-complete-001.json",
+      "operation": "preAuth.complete",
+      "endpoint": "/api/merchant-portal/merchant-access/online-transaction/pre-auth-completion",
+      "hashFieldsFamily": "inline:completePreAuth",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-purchase-001",
+      "file": "hmac-purchase-001.json",
+      "operation": "checkout.purchase",
+      "endpoint": "/api/payment-gateway/v1/payments/purchase",
+      "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-purchase-002",
+      "file": "hmac-purchase-002.json",
+      "operation": "checkout.purchase",
+      "endpoint": "/api/payment-gateway/v1/payments/purchase",
+      "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-purchase-003",
+      "file": "hmac-purchase-003.json",
+      "operation": "checkout.purchase",
+      "endpoint": "/api/payment-gateway/v1/payments/purchase",
+      "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-purchase-004",
+      "file": "hmac-purchase-004.json",
+      "operation": "checkout.purchase",
+      "endpoint": "/api/payment-gateway/v1/payments/purchase",
+      "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-purchase-005",
+      "file": "hmac-purchase-005.json",
+      "operation": "checkout.purchase",
+      "endpoint": "/api/payment-gateway/v1/payments/purchase",
+      "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-purchase-006",
+      "file": "hmac-purchase-006.json",
+      "operation": "auth.generateHmac",
+      "endpoint": "n/a (canonicalization unit — audit N-11 hazard pin)",
+      "hashFieldsFamily": "PURCHASE_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-refund-001",
+      "file": "hmac-refund-001.json",
+      "operation": "checkout.refund",
+      "endpoint": "/api/merchant-portal/merchant-access/online-transaction/refund",
+      "hashFieldsFamily": "MERCHANT_AUTH_DEFAULT_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-remove-token-001",
+      "file": "hmac-remove-token-001.json",
+      "operation": "credentialsOnFile.removeToken",
+      "endpoint": "/api/payment-credential/v3/token-management/remove-token",
+      "hashFieldsFamily": "inline:removeToken",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-renew-token-001",
+      "file": "hmac-renew-token-001.json",
+      "operation": "credentialsOnFile.renewToken",
+      "endpoint": "/api/payment-credential/v3/token-management/renew-expired-account-token",
+      "hashFieldsFamily": "inline:renewToken",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-request-qr-001",
+      "file": "hmac-request-qr-001.json",
+      "operation": "qr.requestQr",
+      "endpoint": "/api/payment-gateway/v1/payments/request-qr",
+      "hashFieldsFamily": "REQUEST_QR_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-self-activation-credential-info-001",
+      "file": "hmac-self-activation-credential-info-001.json",
+      "operation": "selfActivation.getCredentialInfo",
+      "endpoint": "/api/merchant-portal/online-self-activation/get-mc-credential-info",
+      "hashFieldsFamily": "SELF_ACTIVATION_HASH_FIELDS",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-self-activation-mc-info-001",
+      "file": "hmac-self-activation-mc-info-001.json",
+      "operation": "selfActivation.getMerchantInfo",
+      "endpoint": "/api/merchant-portal/online-self-activation/get-mc-info",
+      "hashFieldsFamily": "SELF_ACTIVATION_HASH_FIELDS",
+      "hashAlgorithm": "sha256",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-self-activation-register-001",
+      "file": "hmac-self-activation-register-001.json",
+      "operation": "selfActivation.registerMerchant",
+      "endpoint": "/api/merchant-portal/online-self-activation/new-merchant",
+      "hashFieldsFamily": "SELF_ACTIVATION_HASH_FIELDS",
+      "hashAlgorithm": "sha256",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-token-details-001",
+      "file": "hmac-token-details-001.json",
+      "operation": "credentialsOnFile.getTokenDetails",
+      "endpoint": "/api/payment-credential/v3/token-management/get-token-details",
+      "hashFieldsFamily": "inline:getTokenDetails",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-transaction-detail-001",
+      "file": "hmac-transaction-detail-001.json",
+      "operation": "checkout.getTransactionDetail",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-detail",
+      "hashFieldsFamily": "inline:getTransactionDetail",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-transaction-list-001",
+      "file": "hmac-transaction-list-001.json",
+      "operation": "checkout.getTransactionList",
+      "endpoint": "/api/payment-gateway/v1/payments/transaction-list-2",
+      "hashFieldsFamily": "inline:getTransactionList",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    },
+    {
+      "vectorId": "hmac-transactions-by-mc-ref-001",
+      "file": "hmac-transactions-by-mc-ref-001.json",
+      "operation": "khqr.getTransactionsByMerchantRef",
+      "endpoint": "/api/payment-gateway/v1/payments/get-transactions-by-mc-ref",
+      "hashFieldsFamily": "inline:getTransactionsByMerchantRef",
+      "hashAlgorithm": "sha512",
+      "hashEncoding": "base64"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "vectorId": "hmac-check-transaction-001",
+  "operation": "checkout.checkTransaction",
+  "endpoint": "/api/payment-gateway/v1/payments/check-transaction-2",
+  "description": "check-transaction-2 — the 3-field req_time.merchant_id.tran_id read composition",
+  "hashFieldsFamily": "inline:checkTransaction",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "tran_id"
+  ],
+  "fieldOrderSource": "inline list at the checkout-domain call site (HASH_ORDER_HINTS[checkTransaction])",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-CHK-1",
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-TXN-CHK-1",
+  "preimageSha256": "c02bc6a8582539ff64dc488d2e935abeff05754d7174a9ffe2b5e31e935f2808",
+  "expectedHash": "SKbIYKJrt0rUNZ8WDtmLBdKBYEjmE8jqFjvwS3OsY8Dy9KOP9Dd1+RqGlylgp9AyjROwRjnnyY25IKcYqk/OKA==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

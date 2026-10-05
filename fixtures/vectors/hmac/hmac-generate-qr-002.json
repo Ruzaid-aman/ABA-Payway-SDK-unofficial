@@ -1,0 +1,62 @@
+{
+  "vectorId": "hmac-generate-qr-002",
+  "operation": "qr.generateQr",
+  "endpoint": "/api/payment-gateway/v1/payments/generate-qr",
+  "description": "Fully populated generate-qr — items array + payout {account,amount} base64-encoded as JSON (QR payout keys), unicode names, lifetime 360s floored to 6 minutes, unicode + template tail",
+  "hashFieldsFamily": "GENERATE_QR_HASH_FIELDS",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "tran_id",
+    "amount",
+    "items",
+    "first_name",
+    "last_name",
+    "email",
+    "phone",
+    "purchase_type",
+    "payment_option",
+    "callback_url",
+    "return_deeplink",
+    "currency",
+    "custom_fields",
+    "return_params",
+    "payout",
+    "lifetime",
+    "qr_image_template"
+  ],
+  "fieldOrderSource": "repository export GENERATE_QR_HASH_FIELDS (src/domains/qr.ts; official developer.payway.com.kh qr-api order)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-QR-2",
+    "amount": "6.12",
+    "items": "W3sibmFtZSI6IkdvbGRlbiB3aWRnZXQiLCJxdWFudGl0eSI6MiwicHJpY2UiOjMuMDZ9XQ==",
+    "first_name": "សុខា",
+    "last_name": "Müller",
+    "email": "golden.vector@example.com",
+    "phone": "+855-92-000-000",
+    "purchase_type": "purchase",
+    "payment_option": "abapay_khqr",
+    "callback_url": "aHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvY2FsbGJhY2s=",
+    "currency": "USD",
+    "custom_fields": "{\"campaign\":\"golden\"}",
+    "return_params": {
+      "inv": "GV-QR-1"
+    },
+    "payout": "W3siYWNjb3VudCI6IjUwMDAwMDAwMSIsImFtb3VudCI6Ni4xMn1d",
+    "lifetime": 6,
+    "qr_image_template": "template3_color",
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-TXN-QR-26.12W3sibmFtZSI6IkdvbGRlbiB3aWRnZXQiLCJxdWFudGl0eSI6MiwicHJpY2UiOjMuMDZ9XQ==សុខាMüllergolden.vector@example.com+855-92-000-000purchaseabapay_khqraHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvY2FsbGJhY2s=USD{\"campaign\":\"golden\"}[object Object]W3siYWNjb3VudCI6IjUwMDAwMDAwMSIsImFtb3VudCI6Ni4xMn1d6template3_color",
+  "preimageSha256": "7fde28e4b2d283c7dacfa9d51ce12ef2f4f121d1f68c811b22c201a5eba69a97",
+  "expectedHash": "Wv8y7Q0zqoYN5Iz0VSYHg0WCCK+cXldH9JtSgEPt1dJCVN4GhD7Ep8e24DB9vjjs0a65QBp2JuyYNSVLL7/Ipw==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

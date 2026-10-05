@@ -1,0 +1,51 @@
+{
+  "vectorId": "hmac-cof-payment-001",
+  "operation": "credentialsOnFile.payment",
+  "endpoint": "/api/payment-gateway/v3/purchase/payment-credential",
+  "description": "CoF charge — §16-verified 19-field order; request_id is NOT sent and NOT hashed; pwt hashes raw",
+  "hashFieldsFamily": "inline:payment",
+  "fieldOrder": [
+    "request_time",
+    "merchant_id",
+    "tran_id",
+    "amount",
+    "currency",
+    "items",
+    "ctid",
+    "pwt",
+    "first_name",
+    "last_name",
+    "email",
+    "phone",
+    "purchase_type",
+    "callback_url",
+    "custom_fields",
+    "return_params",
+    "payout",
+    "token_flag",
+    "shipping_fee"
+  ],
+  "fieldOrderSource": "inline list at the credentials-on-file call site (HASH_ORDER_HINTS[payment]; sandbox-verified 2026-08-31)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-COF-1",
+    "amount": "5.00",
+    "currency": "USD",
+    "ctid": "CTIDGV0001",
+    "pwt": "pwt-golden-vector-0001",
+    "first_name": "Sokha",
+    "callback_url": "aHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvY29mLWNhbGxiYWNr",
+    "request_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-TXN-COF-15.00USDCTIDGV0001pwt-golden-vector-0001SokhaaHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvY29mLWNhbGxiYWNr",
+  "preimageSha256": "df4e4d65b7e3ce86ac94d9ccd075b8f2eace5ecb0aa99a2539e78b3250ad9d39",
+  "expectedHash": "g6TJSPZ15+S/CUGJ0QlELgwkvNPL3HKhvr5ilJ4MurANwyh+gDqgonpJYWs3QTEZ7tWoAkxESGS5uSPf2CkNZQ==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

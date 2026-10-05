@@ -1,0 +1,31 @@
+{
+  "vectorId": "hmac-remove-token-001",
+  "operation": "credentialsOnFile.removeToken",
+  "endpoint": "/api/payment-credential/v3/token-management/remove-token",
+  "description": "remove-token — ctid + pwt only (no request_id): merchant_id.ctid.request_time.pwt",
+  "hashFieldsFamily": "inline:removeToken",
+  "fieldOrder": [
+    "merchant_id",
+    "ctid",
+    "request_time",
+    "pwt"
+  ],
+  "fieldOrderSource": "inline list at the credentials-on-file call site (HASH_ORDER_HINTS[removeToken]; sandbox-verified 2026-08-31)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "ctid": "CTIDGV0001",
+    "pwt": "pwt-golden-vector-0003",
+    "request_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "TESTMIDCTIDGV000120260101000000pwt-golden-vector-0003",
+  "preimageSha256": "080cd8a9e34fcdd8d844dea6db76ed828aa3bb3239ec31fde7c53487da349742",
+  "expectedHash": "FSbcG3ar3CtkfzWfUFtuCOL1tP5cENV7ijHfoI3n/E4ezvI832VHl/TtlJMPS7BfSQ1GxvwWzR+bKV0jJJzd/g==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

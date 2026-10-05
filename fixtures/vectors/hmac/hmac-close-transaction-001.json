@@ -1,0 +1,29 @@
+{
+  "vectorId": "hmac-close-transaction-001",
+  "operation": "checkout.closeTransaction",
+  "endpoint": "/api/payment-gateway/v1/payments/close-transaction",
+  "description": "close-transaction — same 3-field read composition as check/detail (shared family, pinned per endpoint)",
+  "hashFieldsFamily": "inline:closeTransaction",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "tran_id"
+  ],
+  "fieldOrderSource": "inline list at the checkout-domain call site (HASH_ORDER_HINTS[checkTransaction])",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "tran_id": "GV-TXN-CLS-1",
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMIDGV-TXN-CLS-1",
+  "preimageSha256": "c436d756135dae92a2e11b74095b634939c25325d5e3f36ad2439d1c9f19b3b7",
+  "expectedHash": "2W92ycYAqra+Lcl7tvJ1ZsxmYFLNOyG680CC40e5pIQzExdoY88WETkrC98jlbieolze4g+3N1p8YusXY/RPoA==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

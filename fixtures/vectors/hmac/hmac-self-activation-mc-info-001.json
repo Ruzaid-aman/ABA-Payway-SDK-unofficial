@@ -1,0 +1,41 @@
+{
+  "vectorId": "hmac-self-activation-mc-info-001",
+  "operation": "selfActivation.getMerchantInfo",
+  "endpoint": "/api/merchant-portal/online-self-activation/get-mc-info",
+  "description": "get-mc-info — SHA256 partner composition; request_data carries the deterministic public_key_hash_encrypt HMAC (fixed key material) plus the merchant key",
+  "hashFieldsFamily": "SELF_ACTIVATION_HASH_FIELDS",
+  "fieldOrder": [
+    "partner_id",
+    "request_data",
+    "request_time"
+  ],
+  "fieldOrderSource": "repository export SELF_ACTIVATION_HASH_FIELDS (src/client.ts; spec-derived, NOT live-verified)",
+  "hashAlgorithm": "sha256",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "request_time": "20260101000000",
+    "partner_id": "TESTPARTNER",
+    "request_data": "golden-vector-rsa-request-data-sentinel"
+  },
+  "preimage": "TESTPARTNERgolden-vector-rsa-request-data-sentinel20260101000000",
+  "preimageSha256": "19a9e142236a7b77b5139ee019a3740dec6ba0bd6ae867991ad1212e6b546b23",
+  "expectedHash": "aXy38+awNr3yqGS79My+D1E2BpFNGYaNdFO3RSoqOZI=",
+  "normalization": [
+    {
+      "field": "request_data",
+      "rule": "GOLDEN-RSA-SENTINEL",
+      "note": "PKCS1 RSA encryption is randomized per call; the encrypted blob is pinned as a fixed sentinel so the HMAC composition is deterministic"
+    }
+  ],
+  "context": {
+    "requestDataPayload": {
+      "merchant_key": "GV-MC-KEY-0001",
+      "public_key_hash_encrypt": "d6f65f894eae0f713156b280a4fd8ad7b377de1b7d68e57aa3681f34df44ef3062496994a9a811c1d7a233e0a67848c8ce6e49c5d177a1882edc4eff30ba45c5"
+    }
+  },
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

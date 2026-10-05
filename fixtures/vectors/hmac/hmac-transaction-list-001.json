@@ -1,0 +1,41 @@
+{
+  "vectorId": "hmac-transaction-list-001",
+  "operation": "checkout.getTransactionList",
+  "endpoint": "/api/payment-gateway/v1/payments/transaction-list-2",
+  "description": "transaction-list-2 — the 9-field from/to/status/page/pagination composition; numeric from/to amounts String()-coerced (\"10.5\", \"99\")",
+  "hashFieldsFamily": "inline:getTransactionList",
+  "fieldOrder": [
+    "req_time",
+    "merchant_id",
+    "from_date",
+    "to_date",
+    "from_amount",
+    "to_amount",
+    "status",
+    "page",
+    "pagination"
+  ],
+  "fieldOrderSource": "inline list at the checkout-domain call site (HASH_ORDER_HINTS[getTransactionList] — live list-2 shape)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "from_date": "2026-01-01 00:00:00",
+    "to_date": "2026-01-02 00:00:00",
+    "from_amount": 10.5,
+    "to_amount": 99,
+    "status": "APPROVED",
+    "page": "1",
+    "pagination": "50",
+    "req_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "20260101000000TESTMID2026-01-01 00:00:002026-01-02 00:00:0010.599APPROVED150",
+  "preimageSha256": "1203913ac3703078229abb78a040398da353f23c235fa73b5b88368ba5f40b3f",
+  "expectedHash": "QOZkJo1/f8dp5O3rIFyxDD/uk8rWMvBnFu5oopBTFG13SFOlmNoiOqpxS7PKRMwfEPFhJ+SVWbiiPsV9c+0ZTA==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}

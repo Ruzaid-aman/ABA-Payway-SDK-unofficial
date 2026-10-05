@@ -1,0 +1,39 @@
+{
+  "vectorId": "hmac-link-account-001",
+  "operation": "credentialsOnFile.linkAccount",
+  "endpoint": "/api/payment-credential/v3/aof/link-account",
+  "description": "link-account — §16-verified 8-field order (merchant_id leads); callback_url base64-encoded, return_deeplink scheme passed raw",
+  "hashFieldsFamily": "inline:linkAccount",
+  "fieldOrder": [
+    "merchant_id",
+    "request_time",
+    "ctid",
+    "return_deeplink",
+    "callback_url",
+    "request_id",
+    "token_flag",
+    "currency"
+  ],
+  "fieldOrderSource": "inline list at the credentials-on-file call site (HASH_ORDER_HINTS[linkAccount]; sandbox-verified 2026-08-31)",
+  "hashAlgorithm": "sha512",
+  "hashEncoding": "base64",
+  "keyAlias": "golden-vector-test-key",
+  "canonicalPayload": {
+    "request_id": "REQGV00001",
+    "ctid": "CTIDGV0001",
+    "return_deeplink": "abamobilebank://ababank.com?type=payway&qrcode=GVLA",
+    "token_flag": "CITI_FLEX",
+    "currency": "USD",
+    "callback_url": "aHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvbGluay1jYWxsYmFjaw==",
+    "request_time": "20260101000000",
+    "merchant_id": "TESTMID"
+  },
+  "preimage": "TESTMID20260101000000CTIDGV0001abamobilebank://ababank.com?type=payway&qrcode=GVLAaHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvbGluay1jYWxsYmFjaw==REQGV00001CITI_FLEXUSD",
+  "preimageSha256": "692a1a4920663503ea90c5d962e7607a8e554578a4a4c693696176198456d510",
+  "expectedHash": "a8YZRV8mtDWibmAkTAbQf+MmW5JWViTbSaYyP8Dwj7icI3T2GfZbeFgAABy4G9/bimTZFCkru23NGUAX3wYe9A==",
+  "normalization": [],
+  "provenance": {
+    "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
+    "verifiedAgainst": "self-referential — behaviour-pinning vector (see audit §27.3 #3)"
+  }
+}
