@@ -2,7 +2,7 @@
  * Coverage for the zero-boilerplate facade (`src/sdk.ts`) and the Cloudflare
  * tunnel manager (`src/webhook/tunnel.ts`) — no network, no real cloudflared.
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -95,27 +95,61 @@ describe('tunnel manager', () => {
     expect(manager.isRunning).toBe(false);
   });
 
-  it('start() resolves the public URL from a fake cloudflared and stop() cleans up', async () => {
-    // Windows batch shim: print a tunnel URL on stdout, then idle.
-    const dir = mkdtempSync(path.join(tmpdir(), 'payway-tunnel-'));
-    tempDirs.push(dir);
-    const scriptPath = path.join(dir, 'fake-cloudflared.cmd');
-    writeFileSync(
-      scriptPath,
-      [
-        '@echo off',
-        'echo INF Starting tunnel https://fake-tunnel-abc123.trycloudflare.com',
-        'ping -n 20 127.0.0.1 > nul',
-        '',
-      ].join('\r\n'),
-    );
-    const manager = createTunnelManager(scriptPath);
-    const url = await manager.start(4598);
-    expect(url).toBe('https://fake-tunnel-abc123.trycloudflare.com');
-    expect(manager.isRunning).toBe(true);
-    await manager.stop();
-    expect(manager.isRunning).toBe(false);
-  }, 20_000);
+  // DX-BUILD-003: the spawn-based fixture is platform-specific. The `.cmd`
+  // batch shim only executes under cmd.exe (Windows `needsShell` spawn path);
+  // on POSIX, spawning a batch file fails with EACCES/ENOENT before any
+  // tunnel logic runs. Each variant is gated to its platform and both
+  // exercise the same contract: spawn → parse stdout URL → stop() cleanup.
+  it(
+    'start() resolves the public URL from a fake cloudflared (.cmd shim) and stop() cleans up',
+    { skip: process.platform !== 'win32', timeout: 20_000 },
+    async () => {
+      // Windows batch shim: print a tunnel URL on stdout, then idle.
+      const dir = mkdtempSync(path.join(tmpdir(), 'payway-tunnel-'));
+      tempDirs.push(dir);
+      const scriptPath = path.join(dir, 'fake-cloudflared.cmd');
+      writeFileSync(
+        scriptPath,
+        [
+          '@echo off',
+          'echo INF Starting tunnel https://fake-tunnel-abc123.trycloudflare.com',
+          'ping -n 20 127.0.0.1 > nul',
+          '',
+        ].join('\r\n'),
+      );
+      const manager = createTunnelManager(scriptPath);
+      const url = await manager.start(4598);
+      expect(url).toBe('https://fake-tunnel-abc123.trycloudflare.com');
+      expect(manager.isRunning).toBe(true);
+      await manager.stop();
+      expect(manager.isRunning).toBe(false);
+    },
+  );
+
+  it(
+    'start() resolves the public URL from a fake cloudflared (POSIX sh shim) and stop() cleans up',
+    { skip: process.platform === 'win32', timeout: 20_000 },
+    async () => {
+      // POSIX shim: executable shebang script (spawned directly, no shell).
+      // print a tunnel URL on stdout, then idle.
+      const dir = mkdtempSync(path.join(tmpdir(), 'payway-tunnel-'));
+      tempDirs.push(dir);
+      const scriptPath = path.join(dir, 'fake-cloudflared.sh');
+      writeFileSync(
+        scriptPath,
+        ['#!/bin/sh', 'echo INF Starting tunnel https://fake-tunnel-posix9.trycloudflare.com', 'sleep 15', ''].join(
+          '\n',
+        ),
+      );
+      chmodSync(scriptPath, 0o755);
+      const manager = createTunnelManager(scriptPath);
+      const url = await manager.start(4598);
+      expect(url).toBe('https://fake-tunnel-posix9.trycloudflare.com');
+      expect(manager.isRunning).toBe(true);
+      await manager.stop();
+      expect(manager.isRunning).toBe(false);
+    },
+  );
 
   it('findCloudflared returns null or a path without throwing', async () => {
     const result = await findCloudflared();

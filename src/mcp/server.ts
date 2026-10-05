@@ -52,8 +52,13 @@ export interface McpServerOptions {
  * a number.
  */
 function readPackageVersion(): string {
+  // CJS bundles replace `import.meta` with `{}` (esbuild), so `.url` is
+  // undefined there and `new URL(relative, undefined)` would throw. Only
+  // offer this candidate when a real module URL exists; the CJS path
+  // resolves via the argv-layout fallback below instead (DX-BUILD-005).
+  const importMetaUrl: string | undefined = import.meta.url;
   const candidates: Array<{ path: string }> = [
-    { path: fileURLToPath(new URL('../../package.json', import.meta.url)) },
+    ...(importMetaUrl ? [{ path: fileURLToPath(new URL('../../package.json', importMetaUrl)) }] : []),
     ...(process.argv[1] ? [{ path: path.join(path.dirname(process.argv[1]), '..', 'package.json') }] : []),
   ];
   for (const { path: candidate } of candidates) {

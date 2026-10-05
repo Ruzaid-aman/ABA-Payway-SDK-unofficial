@@ -34,7 +34,7 @@ jobs:
           exit 1
 
   quality-gates:
-    name: Typecheck · Lint · Tests
+    name: Build · Typecheck · Lint · Tests
     runs-on: ${{ matrix.os }}
     needs: secret-scan
     strategy:
@@ -52,14 +52,49 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
       # dist must exist before the suite: the child-process suites
       # (cli.test.ts, agent-cli.test.ts, webhook-cli.test.ts) spawn dist/cli.js.
+      # Build also gates typecheck:dist (it reads the emitted dist/index.d.ts).
       - name: Build
         run: npm run build
+      - name: CJS bundle smoke (DX-BUILD-005)
+        run: |
+          node -e "const m = require('./dist/index.cjs'); if (typeof m.PayWay !== 'function' || typeof m.createWebhookServer !== 'function' || typeof m.verifyCallbackDetailed !== 'function') process.exit(1)"
+          node dist/cli.cjs mcp --list-tools --json > cjs-cli-smoke.json
+          node -e "const t = JSON.parse(require('fs').readFileSync('cjs-cli-smoke.json','utf8')); if (!Array.isArray(t) || t.length < 10) process.exit(1)"
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Typecheck:dist
+        run: npm run typecheck:dist
+      - name: Lint
+        run: npm run lint
+      # Allowlist self-test: the script existed but was invoked by no workflow
+      # (audit addendum A-1); it verifies the gitleaks allowlist entries bite.
+      # Runners have no gitleaks preinstalled — fetch the pinned official
+      # release first (asset names verified against the v8.30.1 release API).
+      - name: Install gitleaks (allowlist self-test dependency)
+        shell: bash
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          case "$RUNNER_OS" in
+            Linux) ASSET="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" ;;
+            macOS) ASSET="gitleaks_${GITLEAKS_VERSION}_darwin_x64.tar.gz" ;;
+            Windows) ASSET="gitleaks_${GITLEAKS_VERSION}_windows_x64.zip" ;;
+            *) echo "Unsupported runner OS: $RUNNER_OS"; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.download" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${ASSET}"
+          case "$ASSET" in
+            *.tar.gz) tar -xzf "$RUNNER_TEMP/gitleaks.download" -C "$RUNNER_TEMP/gitleaks-bin" ;;
+            *.zip) powershell -NoProfile -Command "Expand-Archive -Force -Path '$RUNNER_TEMP/gitleaks.download' -DestinationPath '$RUNNER_TEMP/gitleaks-bin'" ;;
+          esac
+          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
+      - name: Secret allowlist self-test
+        run: npm run check:secret-allowlists
+      - name: Rules registry generated-module check (DX-KNOW-001)
+        run: npm run gen:rules -- --check
       - name: Public package and documentation boundaries
         run: |
           npm run check:package

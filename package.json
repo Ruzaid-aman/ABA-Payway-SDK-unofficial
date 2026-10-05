@@ -58,7 +58,10 @@
   ],
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "typecheck:dist": "tsc --noEmit -p tsconfig.dist.json",
+    "format:check": "biome format src",
+    "gen:rules": "tsx scripts/generate/gen-rules.ts",
     "lint": "biome lint src skills",
     "lint:fix": "biome lint src --write",
     "format": "biome format src --write",

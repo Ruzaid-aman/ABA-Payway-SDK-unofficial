@@ -8,11 +8,13 @@ Use Node 24.11+ for the complete maintainer toolchain (including optional mutati
 npm ci
 npm run build
 npm run typecheck
+npm run typecheck:dist
 npm run lint
+npm run check:secret-allowlists
 npm test
 ```
 
-Build before testing: CLI integration tests execute `dist/cli.js`. Rebuild after CLI changes. Unit tests and the local demo need no merchant credentials:
+This is the CI quality-gates order. Build first: `typecheck:dist` and the CLI integration tests consume `dist/` (`typecheck:dist` reads the emitted `dist/index.d.ts`; the integration suites execute `dist/cli.js`). `npm run typecheck` itself resolves the package from source and passes on a clean clone with no prior build. Rebuild after CLI changes. Unit tests and the local demo need no merchant credentials:
 
 ```bash
 npm exec -- payway-sdk demo --check

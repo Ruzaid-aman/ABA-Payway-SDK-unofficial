@@ -88,9 +88,9 @@
       "description": "Contributor setup, offline checks, gateway verification, and release review.",
       "source": "CONTRIBUTING.md",
       "file": "contributing.md",
-      "bytes": 3356,
-      "sha256": "ccb593341fe04eb5",
-      "sourceSha256": "41f218094d6e015f"
+      "bytes": 3667,
+      "sha256": "5a292b6de4b7d795",
+      "sourceSha256": "aecbbf2dce3898d9"
     },
     {
       "topic": "security",
@@ -657,8 +657,8 @@
     {
       "file": "skills/aba-payway-integration/references/contributing.md",
       "source": "CONTRIBUTING.md",
-      "sourceSha256": "41f218094d6e015f",
-      "sha256": "ccb593341fe04eb5"
+      "sourceSha256": "aecbbf2dce3898d9",
+      "sha256": "5a292b6de4b7d795"
     },
     {
       "file": "skills/aba-payway-integration/references/security.md",
@@ -914,7 +914,7 @@
     },
     {
       "file": "skills/aba-payway-integration/references/MANIFEST.json",
-      "sha256": "a05d1df674732214"
+      "sha256": "67e578efaa43c77d"
     }
   ]
 }
