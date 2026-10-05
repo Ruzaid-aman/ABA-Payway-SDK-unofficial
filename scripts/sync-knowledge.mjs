@@ -20,7 +20,7 @@
  *    while the prose section references stay meaningful.
  */
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SOURCES } from './knowledge-sources.mjs';
@@ -161,8 +161,16 @@ function countPackagedSkills() {
 function main() {
   assertPublicSources(SOURCES);
   const knowledgeDir = path.join(repoRoot, 'knowledge');
+  // knowledge/rules/ is an AUTHORED registry (DX-KNOW-001), not generated —
+  // move it aside across the rebuild so the corpus wipe cannot delete it
+  // (prepublishOnly runs this script).
+  const rulesDir = path.join(knowledgeDir, 'rules');
+  const rulesStash = path.join(repoRoot, '.sync-knowledge-rules-stash');
+  const stashedRules = existsSync(rulesDir);
+  if (stashedRules) renameSync(rulesDir, rulesStash);
   rmSync(knowledgeDir, { recursive: true, force: true });
   mkdirSync(knowledgeDir, { recursive: true });
+  if (stashedRules) renameSync(rulesStash, rulesDir);
 
   const targetMap = buildTargetMap();
   const topics = [];
