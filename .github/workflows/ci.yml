@@ -84,11 +84,11 @@ jobs:
             *) echo "Unsupported runner OS: $RUNNER_OS"; exit 1 ;;
           esac
           mkdir -p "$RUNNER_TEMP/gitleaks-bin"
-          curl -fsSL -o "$RUNNER_TEMP/gitleaks.download" \
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks-archive.zip" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${ASSET}"
           case "$ASSET" in
-            *.tar.gz) tar -xzf "$RUNNER_TEMP/gitleaks.download" -C "$RUNNER_TEMP/gitleaks-bin" ;;
-            *.zip) powershell -NoProfile -Command "Expand-Archive -Force -Path '$RUNNER_TEMP/gitleaks.download' -DestinationPath '$RUNNER_TEMP/gitleaks-bin'" ;;
+            *.tar.gz) tar -xzf "$RUNNER_TEMP/gitleaks-archive.zip" -C "$RUNNER_TEMP/gitleaks-bin" ;;
+            *.zip) powershell -NoProfile -Command "Expand-Archive -Force -Path '$RUNNER_TEMP/gitleaks-archive.zip' -DestinationPath '$RUNNER_TEMP/gitleaks-bin'" ;;
           esac
           echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
       - name: Secret allowlist self-test

@@ -2177,8 +2177,11 @@ export class PayWay {
         }
       }
       const part = options.multipartFile;
-      const partData = part.data.buffer.slice(part.data.byteOffset, part.data.byteOffset + part.data.byteLength);
-      form.append(part.name, new Blob([partData], { type: part.contentType }), part.filename);
+      // Uint8Array view (not buffer.slice): a valid BlobPart under every
+      // @types/node — Buffer#buffer is ArrayBuffer | SharedArrayBuffer in
+      // newer typings, which BlobPart rejects (CI sqlite-contract job).
+      const partView = new Uint8Array(part.data.buffer, part.data.byteOffset, part.data.byteLength);
+      form.append(part.name, new Blob([partView], { type: part.contentType }), part.filename);
       // No Content-Type header: undici generates `multipart/form-data; boundary=…`.
       return this._executeFetch<TResponse>(path, {}, form, undefined, options.callOptions);
     }
