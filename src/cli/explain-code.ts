@@ -405,3 +405,209 @@ export function explainAll(): CodeExplanation[] {
   }
   return all;
 }
+
+// --- Endpoint-scoped resolution (audit DX-ERR-003a / N-02, additive only) ---
+//
+// A bare numeric lookup in explainPayWayCode answers the FIRST family that
+// claims the code (qr before gateway for numerics), which reproduces a wrong
+// answer on the qr∩gateway colliding codes (e.g. bare `explain 16` answers the
+// QR "Invalid First Name" when a purchase failed with gateway "Invalid
+// Amount"). The registry's family:code data model is correct — the lookup
+// surface just could not express the scope. Everything below is additive:
+// explainPayWayCode's default answer and return shape are untouched; scoped
+// resolution is opt-in via --operation/--family, and bare lookups only GAIN
+// the `ambiguous`/`alternatives` fields when the code exists in several
+// families (risk R-C mitigation).
+
+/** Valid `--family` values, in explainPayWayCode precedence order (also the deterministic alternatives order). */
+export const EXPLAIN_FAMILIES = [
+  'refund',
+  'pre-auth',
+  'payout',
+  'credential',
+  'payment-link',
+  'cof',
+  'cda',
+  'qr',
+  'gateway',
+] as const;
+
+export type ExplainFamily = (typeof EXPLAIN_FAMILIES)[number];
+
+/**
+ * Endpoint-style operation keys → the family whose codes that operation can
+ * return (audit DX-ERR-003a). Canonical keys are dot-namespaced domain +
+ * endpoint names; the ABA_TELEMETRY `apis` labels above are the flat forms of
+ * the same endpoints. Backs `explain <code> --operation <op>`.
+ */
+export const OPERATION_FAMILY: Record<string, ExplainFamily> = {
+  // Checkout / purchase endpoints (gateway-family codes)
+  'checkout.purchase': 'gateway',
+  'checkout.generate-checkout': 'gateway', // CLI command name for the same purchase endpoint
+  'checkout.check-transaction': 'gateway',
+  'checkout.transaction-detail': 'gateway',
+  'checkout.transaction-list': 'gateway',
+  'checkout.close-transaction': 'gateway',
+  'exchange-rate.get': 'gateway',
+  // QR endpoints (generate-qr / request-qr share the qr-family code space)
+  'qr.create': 'qr',
+  'qr.request': 'qr',
+  // Refund / pre-auth / payout
+  'refund.create': 'refund',
+  'pre-auth.complete': 'pre-auth',
+  'pre-auth.complete-payout': 'pre-auth',
+  'pre-auth.cancel': 'pre-auth',
+  'payout.create': 'payout',
+  // Credentials-on-file
+  'cof.charge': 'cof',
+  'cof.link-account': 'cof',
+  'cof.link-card': 'cof',
+  // Payment links
+  'payment-link.create': 'payment-link',
+  'payment-link.detail': 'payment-link',
+  'payment-link.void': 'payment-link',
+};
+
+/** One family's entry inside an ambiguous bare lookup's `alternatives` list. */
+export interface CodeAlternative {
+  readonly code: string;
+  readonly family: CodeExplanation['family'];
+  readonly title: string;
+  readonly hint: string;
+}
+
+/** Scope selector for {@link explainPayWayCodeScoped}. `operation` wins over `family`. */
+export interface ScopedExplainOptions {
+  /** Endpoint-style operation key (see {@link OPERATION_FAMILY}). Unknown keys throw. */
+  readonly operation?: string;
+  /** Direct family scope (see {@link EXPLAIN_FAMILIES}). Unknown families throw. */
+  readonly family?: string;
+}
+
+/**
+ * A {@link CodeExplanation}, plus — on ambiguous BARE lookups only — the
+ * additive ambiguity fields. Scoped lookups and single-family bare lookups
+ * return exactly the explainPayWayCode entry (no extra fields).
+ */
+export interface ScopedCodeExplanation extends CodeExplanation {
+  /** True when the code exists in more than one family and no scope was given. */
+  readonly ambiguous?: boolean;
+  /** Every family containing the code, in EXPLAIN_FAMILIES order (includes the default-resolved family). */
+  readonly alternatives?: readonly CodeAlternative[];
+}
+
+/**
+ * Resolve a code within ONE family only, using the same tables and code
+ * normalization as explainPayWayCode (the string `04`/`01` cof codes claim the
+ * raw string; the qr/gateway tables match the leading-zero-stripped numeric).
+ * Returns undefined when that family does not claim the code. The refund
+ * family's SUCCESS ('00') resolves under 'gateway', matching
+ * explainPayWayCode's family assignment for it.
+ */
+function explainInFamily(rawCode: string, family: ExplainFamily): CodeExplanation | undefined {
+  const code = rawCode.trim().toUpperCase().replace(/^PTL0+/, 'PTL0').replace(/^CODE[=: ]*/, '');
+  const numeric = code.replace(/^0+(?=\d)/, '');
+  switch (family) {
+    case 'refund':
+      if (code in REFUND_LABELS && code !== REFUND_ERROR_CODES.SUCCESS) {
+        return withProvenance({ code, family: 'refund', title: REFUND_LABELS[code], hint: REFUND_HINTS[code] ?? '' });
+      }
+      return undefined;
+    case 'gateway':
+      // explainPayWayCode answers refund-table SUCCESS ('00') with family 'gateway'.
+      if (code in REFUND_LABELS && code === REFUND_ERROR_CODES.SUCCESS) {
+        return withProvenance({ code, family: 'gateway', title: REFUND_LABELS[code], hint: REFUND_HINTS[code] ?? '' });
+      }
+      if (numeric in GATEWAY_CODE_HINTS) {
+        return withProvenance({
+          code: numeric,
+          family: 'gateway',
+          title: GATEWAY_CODE_HINTS[numeric].title,
+          hint: GATEWAY_CODE_HINTS[numeric].hint,
+        });
+      }
+      return undefined;
+    case 'pre-auth':
+      if (code in PRE_AUTH_TITLES) {
+        return withProvenance({ code, family: 'pre-auth', title: PRE_AUTH_TITLES[code], hint: PRE_AUTH_HINTS[code] ?? '' });
+      }
+      return undefined;
+    case 'payout':
+      if (code in PAYOUT_TITLES) {
+        return withProvenance({ code, family: 'payout', title: PAYOUT_TITLES[code], hint: PAYOUT_HINTS[code] ?? '' });
+      }
+      return undefined;
+    case 'credential':
+      if (code in CREDENTIAL_TITLES) {
+        return withProvenance({ code, family: 'credential', title: CREDENTIAL_TITLES[code], hint: CREDENTIAL_HINTS[code] ?? '' });
+      }
+      return undefined;
+    case 'payment-link':
+      if (code in PAYMENT_LINK_TITLES) {
+        return withProvenance({ code, family: 'payment-link', title: PAYMENT_LINK_TITLES[code], hint: PAYMENT_LINK_HINTS[code] ?? '' });
+      }
+      return undefined;
+    case 'cof':
+      if (code in COF_TITLES) {
+        return withProvenance({ code, family: 'cof', title: COF_TITLES[code], hint: COF_HINTS[code] ?? '' });
+      }
+      return undefined;
+    case 'cda':
+      if (code in CDA_TITLES) {
+        return withProvenance({ code, family: 'cda', title: CDA_TITLES[code], hint: CDA_HINTS[code] ?? '' });
+      }
+      return undefined;
+    case 'qr':
+      if ((QR_CODES as readonly string[]).includes(numeric)) {
+        return withProvenance({
+          code: numeric,
+          family: 'qr',
+          title: QR_TITLES[numeric] ?? `QR gateway error code ${numeric}`,
+          hint: QR_HINTS[numeric] ?? 'Meaning not individually published — consult the generate-qr page on developer.payway.com.kh.',
+        });
+      }
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** All families that claim the code, in EXPLAIN_FAMILIES (precedence) order. */
+export function explainCodeFamilies(rawCode: string): ExplainFamily[] {
+  return EXPLAIN_FAMILIES.filter((family) => explainInFamily(rawCode, family) !== undefined);
+}
+
+/**
+ * Family/operation-scoped resolver (audit DX-ERR-003a). With a scope, resolves
+ * within that family only and returns the plain entry (unknown scope values
+ * throw — callers validate against OPERATION_FAMILY / EXPLAIN_FAMILIES and
+ * surface their own error). Without a scope, returns exactly
+ * explainPayWayCode's result when the code lives in a single family; when it
+ * lives in several, the default (qr-first) entry gains `ambiguous: true` plus
+ * one `alternatives` entry per family — additive fields only, the default
+ * answer never changes.
+ */
+export function explainPayWayCodeScoped(rawCode: string, opts: ScopedExplainOptions = {}): ScopedCodeExplanation | undefined {
+  if (opts.operation) {
+    const family = OPERATION_FAMILY[opts.operation];
+    if (!family) {
+      throw new Error(`Unknown explain operation '${opts.operation}'. Valid operations: ${Object.keys(OPERATION_FAMILY).join(', ')}`);
+    }
+    return explainInFamily(rawCode, family);
+  }
+  if (opts.family) {
+    if (!(EXPLAIN_FAMILIES as readonly string[]).includes(opts.family)) {
+      throw new Error(`Unknown explain family '${opts.family}'. Valid families: ${EXPLAIN_FAMILIES.join(', ')}`);
+    }
+    return explainInFamily(rawCode, opts.family as ExplainFamily);
+  }
+  const bare = explainPayWayCode(rawCode);
+  if (!bare) return undefined;
+  const families = explainCodeFamilies(rawCode);
+  if (families.length <= 1) return bare;
+  const alternatives = families
+    .map((family) => explainInFamily(rawCode, family))
+    .filter((entry): entry is CodeExplanation => entry !== undefined)
+    .map(({ code, family, title, hint }) => ({ code, family, title, hint }) satisfies CodeAlternative);
+  return { ...bare, ambiguous: true, alternatives };
+}

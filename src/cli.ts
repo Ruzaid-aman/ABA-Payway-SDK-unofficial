@@ -10,7 +10,8 @@ import { chooseNextStep } from './cli/flows/next-steps.js';
 import { applyCliJournalPolicy } from './cli/journal-policy.js';
 import { collectQrParams } from './cli/flows/qr-flow.js';
 import { loadDotEnvIntoProcess } from './cli/dotenv.js';
-import { explainAll, explainPayWayCode } from './cli/explain-code.js';
+import { EXPLAIN_FAMILIES, OPERATION_FAMILY, explainAll, explainPayWayCodeScoped } from './cli/explain-code.js';
+import type { ScopedCodeExplanation } from './cli/explain-code.js';
 import { renderFirstPaymentQuickstart } from './cli/first-payment.js';
 import { paymentLifecycle, paymentNextStep } from './payment-lifecycle.js';
 import { renderBanner } from './cli/ui/banner.js';
@@ -1465,15 +1466,67 @@ program
   .description('Decode a PayWay error/status code (e.g. explain PTL36, explain 49). No credentials needed.')
   .argument('[code]', 'PayWay code to explain — omit to list all known codes')
   .option('--json', 'Print machine-readable JSON: one document (or array for bare explain); error envelope on unknown code')
-  .action((code: string | undefined, opts: { json?: boolean }) => {
-    if (opts.json) {
+  .option(
+    '--operation <op>',
+    `Resolve within an endpoint operation's error family (e.g. checkout.purchase, qr.create). Valid: ${Object.keys(OPERATION_FAMILY).join(', ')}`,
+  )
+  .option('--family <fam>', `Resolve within one family only. Valid: ${EXPLAIN_FAMILIES.join(', ')}`)
+  .action((code: string | undefined, opts: { json?: boolean; operation?: string; family?: string }) => {
+    const json = Boolean(opts.json);
+    // Machine-mode convention: failure = {error:{kind,exitCode,…}} envelope on stdout, diagnostics to stderr.
+    const explainScopeError = (message: string): void => {
+      if (json) {
+        process.exitCode = printValidationErrorJson(message);
+        return;
+      }
+      console.error(`  ${c.red('✗')} ${message}`);
+      process.exitCode = EXIT_VALIDATION;
+    };
+
+    // DX-ERR-003a: validate the scope BEFORE resolving; unknown values list the valid keys.
+    let family: string | undefined;
+    if (opts.operation) {
+      const mapped = OPERATION_FAMILY[opts.operation];
+      if (!mapped) {
+        explainScopeError(`Unknown operation '${opts.operation}'. Valid operations: ${Object.keys(OPERATION_FAMILY).join(', ')}`);
+        return;
+      }
+      family = mapped;
+      if (opts.family && opts.family !== family) {
+        console.error(`  ${c.yellow('⚠')} Both --operation and --family given — --operation wins (family '${family}').`);
+      }
+    } else if (opts.family) {
+      if (!(EXPLAIN_FAMILIES as readonly string[]).includes(opts.family)) {
+        explainScopeError(`Unknown family '${opts.family}'. Valid families: ${EXPLAIN_FAMILIES.join(', ')}`);
+        return;
+      }
+      family = opts.family;
+    }
+    if (!code && family) {
+      explainScopeError('--operation/--family need a [code] argument — omit them to list all known codes.');
+      return;
+    }
+    const scope = opts.operation ? { operation: opts.operation } : family ? { family } : {};
+
+    if (json) {
       if (!code) {
         console.log(JSON.stringify(explainAll(), null, 2));
         return;
       }
-      const jsonExplanation = explainPayWayCode(code);
+      let jsonExplanation: ScopedCodeExplanation | undefined;
+      try {
+        jsonExplanation = explainPayWayCodeScoped(code, scope);
+      } catch (error) {
+        explainScopeError((error as Error).message);
+        return;
+      }
       if (!jsonExplanation) {
-        process.exitCode = printValidationErrorJson(`Unknown or undocumented code: ${code}`);
+        const where = opts.operation
+          ? ` for operation '${opts.operation}' (family '${family}')`
+          : family
+            ? ` in family '${family}'`
+            : '';
+        process.exitCode = printValidationErrorJson(`Unknown or undocumented code: ${code}${where}`);
         return;
       }
       console.log(JSON.stringify(jsonExplanation, null, 2));
@@ -1488,9 +1541,16 @@ program
       console.log();
       return;
     }
-    const explanation = explainPayWayCode(code);
+    let explanation: ScopedCodeExplanation | undefined;
+    try {
+      explanation = explainPayWayCodeScoped(code, scope);
+    } catch (error) {
+      explainScopeError((error as Error).message);
+      return;
+    }
     if (!explanation) {
-      console.log(`  ${c.yellow('?')} Unknown or undocumented code: ${c.bold(code)}`);
+      const where = family ? ` in family '${family}'` : '';
+      console.log(`  ${c.yellow('?')} Unknown or undocumented code: ${c.bold(code)}${where}`);
       console.log(`  ${c.dim('Run')} ${c.cyan('payway-sdk explain')} ${c.dim('to list all known codes.')}`);
       console.log();
       return;
@@ -1498,6 +1558,14 @@ program
     console.log(`  ${c.cyan(explanation.code)}  ${c.bold(explanation.title)}  ${c.dim(`(${explanation.family})`)}`);
     if (explanation.hint) console.log(`  → ${explanation.hint}`);
     if (explanation.sandboxVerified) console.log(`  ${c.green('✓ sandbox-verified')} ${c.dim(`(${explanation.evidence})`)}`);
+    if (explanation.ambiguous && explanation.alternatives?.length) {
+      console.log(
+        `  ${c.yellow('⚠')} This code exists in ${explanation.alternatives.length} families — scope it with ${c.cyan('--operation <op>')} or ${c.cyan('--family <fam>')}:`,
+      );
+      for (const alt of explanation.alternatives) {
+        console.log(`      [${alt.family}] ${alt.title}`);
+      }
+    }
     console.log();
   });
 
@@ -5559,8 +5627,21 @@ export async function runCli(argv: string[]): Promise<void> {
 }
 
 const invokedDirectly = (() => {
+  const argvPath = process.argv[1];
+  if (!argvPath) return false;
   try {
-    return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
+    // ESM (src, vitest, dist/*.js): a real module URL exists — exact identity.
+    const moduleUrl: string | undefined = import.meta.url;
+    if (moduleUrl) return moduleUrl === pathToFileURL(argvPath).href;
+  } catch {
+    // fall through to the CJS candidate
+  }
+  // CJS bundle (DX-BUILD-005): esbuild replaces `import.meta` with `{}`, so
+  // the module URL is undefined there. `__filename` is the executing bundle's
+  // own file — the CLI bundle when run directly, index.cjs for library
+  // consumers — which is exactly the identity the ESM comparison provides.
+  try {
+    return typeof __filename === 'string' && __filename === path.resolve(argvPath);
   } catch {
     return false;
   }
