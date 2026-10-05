@@ -38,6 +38,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: secret-scan
     strategy:
+      # fail-fast false: a runner-provisioning cancellation must not cascade-
+      # cancel the remaining legs (free-tier capacity flakes observed).
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         node-version: ['22.12.0', '22.x', '24.x']
