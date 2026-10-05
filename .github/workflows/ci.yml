@@ -42,6 +42,9 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         node-version: ['22.12.0', '22.x', '24.x']
     steps:
+      - name: Enable Git long paths on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

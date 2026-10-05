@@ -1971,7 +1971,8 @@ export class PayWay {
         }
       }
       const part = options.multipartFile;
-      form.append(part.name, new Blob([part.data], { type: part.contentType }), part.filename);
+      const partData = part.data.buffer.slice(part.data.byteOffset, part.data.byteOffset + part.data.byteLength);
+      form.append(part.name, new Blob([partData], { type: part.contentType }), part.filename);
       // No Content-Type header: undici generates `multipart/form-data; boundary=…`.
       return this._executeFetch<TResponse>(path, {}, form, undefined, options.callOptions);
     }

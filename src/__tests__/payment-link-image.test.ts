@@ -290,6 +290,22 @@ describe('paymentLink.create multipart wire format (client)', () => {
     expect(new Uint8Array(await (file as File).arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]));
   });
 
+  it('preserves bytes from sliced Uint8Array image views', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      mockJsonResponse({ status: { code: '00', message: 'Created' }, data: { id: 'PL-IMG-SLICE' } }),
+    );
+
+    const source = new Uint8Array([99, 1, 2, 3, 4, 88]);
+    await payway.paymentLink.create({
+      ...VALID_PARAMS,
+      image: { data: source.subarray(1, 5), filename: 'slice.png', contentType: 'image/png' },
+    });
+
+    const form = fetchSpy.mock.calls[0][1].body as FormData;
+    const file = form.get('image') as File;
+    expect(new Uint8Array(await file.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]));
+  });
+
   it('FINDING: image bytes are excluded from the HMAC hash', async () => {
     fetchSpy.mockResolvedValueOnce(
       mockJsonResponse({ status: { code: '00', message: 'Created' }, data: { id: 'PL-IMG-2' } }),
