@@ -71,6 +71,8 @@ jobs:
         run: npm run typecheck:dist
       - name: Lint
         run: npm run lint
+      - name: Format check (DX-BUILD-004)
+        run: npm run format:check
       # Allowlist self-test: the script existed but was invoked by no workflow
       # (audit addendum A-1); it verifies the gitleaks allowlist entries bite.
       # Runners have no gitleaks preinstalled — fetch the pinned official
