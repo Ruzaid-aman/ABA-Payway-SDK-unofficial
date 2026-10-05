@@ -127,7 +127,7 @@ describe('PayWay configuration validation (audit S06/S07)', () => {
     const payway = new PayWay({ ...TEST_CONFIG, maxRetries: 0, retryDelayMs: 0 });
     await payway.qr.generateQr({
       transactionId: 'one-attempt-1',
-      paymentOption: 'abapay',
+      paymentOption: 'abapay_khqr',
       amount: 1,
       currency: 'USD',
       callbackUrl: 'https://example.com/cb',
@@ -183,7 +183,7 @@ describe('PayWay configuration validation (audit S06/S07)', () => {
     await expect(
       payway.qr.generateQr({
         transactionId: 'guard-1',
-        paymentOption: 'abapay',
+        paymentOption: 'abapay_khqr',
         amount: 1,
         currency: 'USD',
         callbackUrl: 'https://example.com/cb',

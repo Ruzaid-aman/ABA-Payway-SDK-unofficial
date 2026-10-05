@@ -1,6 +1,6 @@
 import { generateHmac } from '../auth.js';
 import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig, RequestCallOptions } from '../client.js';
-import { ENDPOINTS, PURCHASE_PAYMENT_OPTIONS } from '../constants.js';
+import { ENDPOINTS, PURCHASE_PAYMENT_OPTIONS, PURCHASE_PAYMENT_OPTIONS_LEGACY } from '../constants.js';
 import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
 import type { components } from '../types.js';
 import type { PollTransactionOptions, PollTransactionResult, PurchaseHostedHtmlResult } from '../domain-types.js';
@@ -18,6 +18,7 @@ import {
   validateRefundAmount,
   validateTransactionId,
   warnAdvisory,
+  warnNonEscalating,
 } from '../utils.js';
 
 /**
@@ -319,19 +320,49 @@ export function createCheckoutDomain(
       warnAdvisory(config, `phone exceeds the gateway's 20-character cap — gateway may reject with error 18`);
     }
     if (params.items !== undefined) {
-      if (Array.isArray(params.items) && params.items.length > 10) {
-        warnAdvisory(config, `items carries ${params.items.length} entries; the gateway accepts at most 10`);
-      }
-      const encoded = encodeBase64IfNeeded(params.items);
-      if (encoded.length > 500) {
-        warnAdvisory(config, `items exceeds the gateway's 500-character wire cap (encoded) — gateway may reject with error 13`);
+      // Rule QR-016 (OFFICIAL_DOCUMENTATION — developer.payway.com.kh purchase
+      // page, retrieved 2026-10-05): items "supports up to 50 line items with
+      // no character limit. Note: This is only description/remark. The price
+      // or quantity in this info will not be used for calculation or any
+      // validation purposes." Line items are therefore NOT an amount-integrity
+      // signal — the `amount` field alone is what the gateway validates.
+      //
+      // The former purchase-side 500-encoded-character advisory was REMOVED
+      // (audit N-06, 2026-10-05): the official purchase documentation states
+      // "no character limit" (the 500-char cap is a generate-qr rule), the
+      // warning never had recorded sandbox evidence ("may reject with error
+      // 13" was speculative), and any cart above ~10 items inherently exceeds
+      // 500 encoded characters, so the advisory fired on ordinary valid
+      // purchases. Re-add only with a recorded observation, tagged
+      // `source: sandbox`.
+      if (Array.isArray(params.items) && params.items.length > 50) {
+        warnAdvisory(
+          config,
+          `purchase: items carries ${params.items.length} entries; official documentation allows up to 50 line items, and item price/quantity are not used for calculation or validation (rule QR-016, source: official)`,
+        );
       }
     }
-    if (params.paymentOption !== undefined && !(PURCHASE_PAYMENT_OPTIONS as readonly string[]).includes(params.paymentOption)) {
-      warnAdvisory(
-        config,
-        `payment_option "${params.paymentOption}" is outside the documented purchase enum (${PURCHASE_PAYMENT_OPTIONS.join(', ')})`,
-      );
+    // Rule PUR-003 (OFFICIAL_DOCUMENTATION — developer.payway.com.kh purchase
+    // page, retrieved 2026-10-05): purchase payment_option is one of
+    // PURCHASE_PAYMENT_OPTIONS. Legacy archived-spec values
+    // (PURCHASE_PAYMENT_OPTIONS_LEGACY) advise but NEVER reject — real
+    // profiles may still accept them and enablement is profile-scoped
+    // (official code 23; audit risk R-A), so this advisory does not escalate
+    // under strictValidation. Values in NEITHER set are typos or
+    // misconfigurations and throw in normal AND strict mode.
+    if (params.paymentOption !== undefined) {
+      const isOfficial = (PURCHASE_PAYMENT_OPTIONS as readonly string[]).includes(params.paymentOption);
+      const isLegacy = (PURCHASE_PAYMENT_OPTIONS_LEGACY as readonly string[]).includes(params.paymentOption);
+      if (!isOfficial && !isLegacy) {
+        throw new PayWayConfigError(
+          `payment_option "${params.paymentOption}" is not a documented purchase value (rule PUR-003, source: official); documented values: ${PURCHASE_PAYMENT_OPTIONS.join(', ')}`,
+        );
+      }
+      if (isLegacy) {
+        warnNonEscalating(
+          `payment_option "${params.paymentOption}" is a legacy purchase value from the archived spec (rule PUR-003) — official documentation lists: ${PURCHASE_PAYMENT_OPTIONS.join(', ')}; the gateway may still accept it depending on the merchant profile`,
+        );
+      }
     }
     // Split-payout entries use the purchase-path keys {acc, amt} (NOT the
     // QR/payout-domain {account, amount}). Before W1-5 (2026-09-05) wrong-key

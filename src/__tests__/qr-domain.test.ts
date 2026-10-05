@@ -213,11 +213,20 @@ describe('generateQr advisory validations', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('warns when items exceeds 10 entries', async () => {
+  it('does not warn when items exceeds the former 10-entry cap (official cap is 50, rule QR-016)', async () => {
     const { spy } = makeRequestSpy();
     const domain = createQrDomain(CONFIG, spy);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await domain.generateQr({ ...BASE_PARAMS, items: Array.from({ length: 11 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 0.01 })) });
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('at most 10'));
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns when items exceeds 50 entries, citing rule QR-016', async () => {
+    const { spy } = makeRequestSpy();
+    const domain = createQrDomain(CONFIG, spy);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await domain.generateQr({ ...BASE_PARAMS, items: Array.from({ length: 51 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 0.01 })) });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('QR-016'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('50 line items'));
   });
 });

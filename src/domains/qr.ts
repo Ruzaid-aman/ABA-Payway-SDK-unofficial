@@ -5,7 +5,7 @@ import type {
   RequestQrParams,
   RequestQrResponse,
 } from '../client.js';
-import { ENDPOINTS } from '../constants.js';
+import { ENDPOINTS, QR_PAYMENT_OPTIONS } from '../constants.js';
 import { PayWayConfigError } from '../errors.js';
 import { type GenerateOfflineQrParams, generateOfflineQR } from '../khqr-offline.js';
 import type { components } from '../types.js';
@@ -122,6 +122,22 @@ export function createQrDomain(
       });
       validateQrLifetimeSeconds(params.lifetime);
 
+      // Rule QR-012 (OFFICIAL_DOCUMENTATION — developer.payway.com.kh qr-api
+      // page, retrieved 2026-10-05): generate-qr payment_option accepts
+      // exactly {abapay_khqr, wechat, alipay}. Values outside the official
+      // set (including purchase-path values such as `cards` or
+      // `abapay_khqr_deeplink`) throw in normal AND strict mode. Omission
+      // still defaults to `abapay_khqr` (requiredness is probed separately —
+      // audit N-17), and profile enablement remains the gateway's decision
+      // (official code 23), so there is deliberately no local enablement
+      // check. The Soundbox endpoint (requestQr below) keeps its own
+      // spec-derived superset REQUEST_QR_PAYMENT_OPTIONS.
+      if (params.paymentOption !== undefined && !(QR_PAYMENT_OPTIONS as readonly string[]).includes(params.paymentOption)) {
+        throw new PayWayConfigError(
+          `payment_option "${params.paymentOption}" is not documented for generate-qr (rule QR-012, source: official); documented values: ${QR_PAYMENT_OPTIONS.join(', ')}`,
+        );
+      }
+
       const currency = params.currency || 'USD';
       if (
         (params.paymentOption === 'wechat' || params.paymentOption === 'alipay') &&
@@ -145,8 +161,22 @@ export function createQrDomain(
         warnAdvisory(config, `phone exceeds the gateway's 20-character cap; gateway may reject with error 18`);
       }
       const itemCount = Array.isArray(params.items) ? params.items.length : undefined;
-      if (itemCount !== undefined && itemCount > 10) {
-        warnAdvisory(config, `items carries ${itemCount} entries; the gateway accepts at most 10`);
+      // Rule QR-016 (OFFICIAL_DOCUMENTATION — developer.payway.com.kh qr-api
+      // page, retrieved 2026-10-05): generate-qr items supports "up to 50
+      // line items" and "price or quantity … will not be used for calculation
+      // or any validation purposes" — line items are description only, never
+      // an amount-integrity signal. The page also documents "<= 500
+      // characters" (encoded), but that check is deliberately NOT enforced
+      // here yet: any cart above ~10 items inherently exceeds 500 encoded
+      // characters, so an active advisory would fire on ordinary valid
+      // carts and contradict the audit acceptance criterion "no advisory at
+      // ≤50 items on either endpoint" (§48.6 item 8). Enforce it from
+      // rules.yaml (DX-KNOW-001) once the interaction is decided.
+      if (itemCount !== undefined && itemCount > 50) {
+        warnAdvisory(
+          config,
+          `generate-qr: items carries ${itemCount} entries; official documentation allows up to 50 line items, and item price/quantity are not used for calculation or validation (rule QR-016, source: official)`,
+        );
       }
 
       return request<components['schemas']['GenerateQrResponse']>(

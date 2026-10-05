@@ -1,11 +1,12 @@
 /**
  * Behavior pins for the B4 advisory-validation framework (live-docs parity,
  * 2026-08-31). Load-bearing contracts:
- * - Advisory limits (length caps, enums, min amounts, list windows) warn once
+ * - Advisory limits (length caps, enum advisory sets, list windows) warn once
  *   per distinct message via `warnAdvisory` and escalate to `PayWayConfigError`
  *   under `strictValidation` (config flag OR `PAYWAY_STRICT_VALIDATION=1` env).
  * - Gateway-REQUIRED rules always throw regardless of the flag
- *   (googlePayToken for google_pay; non-empty merchantRef).
+ *   (googlePayToken for google_pay; non-empty merchantRef). The QR-009 amount
+ *   floor joined the HARD set (audit DX-RULE-004, 2026-10-05).
  * - khqr merchantRef errors are now `PayWayConfigError` (previously plain Error).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -149,24 +150,39 @@ describe('purchase advisory caps (buildPurchasePayload)', () => {
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('phone'));
   });
 
-  it('items > 10 entries and > 500 encoded chars warn', () => {
+  it('items > 50 entries warn citing QR-016 (official cap); 11 entries stay silent (audit DX-RULE-003)', () => {
     const payway = makeCheckout();
     payway.createTransaction({
       ...base,
       items: Array.from({ length: 11 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 1 })),
     });
+    expect(console.warn).not.toHaveBeenCalled();
+    payway.createTransaction({
+      ...base,
+      items: Array.from({ length: 51 }, (_, i) => ({ name: `i${i}`, quantity: 1, price: 1 })),
+    });
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('QR-016'));
+    // N-06: official purchase text states "no character limit" — the former
+    // 500-encoded-char advisory was removed, so a single long item is silent.
+    vi.mocked(console.warn).mockClear();
     payway.createTransaction({ ...base, items: [{ name: 'z'.repeat(600), quantity: 1, price: 1 }] });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('10'));
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('500'));
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
-  it('paymentOption outside the documented enum warns; inside does not', () => {
+  it('paymentOption outside official ∪ legacy throws citing PUR-003; official values are silent; legacy values advise without throwing', () => {
     const payway = makeCheckout();
-    payway.createTransaction({ ...base, paymentOption: 'not_an_option' as unknown as 'abapay' });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('payment_option'));
-    vi.mocked(console.warn).mockClear();
+    expect(() =>
+      payway.createTransaction({ ...base, paymentOption: 'not_an_option' as unknown as 'abapay' }),
+    ).toThrow(PayWayConfigError);
+    expect(() =>
+      payway.createTransaction({ ...base, paymentOption: 'not_an_option' as unknown as 'abapay' }),
+    ).toThrow(/PUR-003/);
+    // Official value: silent in normal mode.
     payway.createTransaction({ ...base, paymentOption: 'cards' });
     expect(console.warn).not.toHaveBeenCalled();
+    // Legacy archived-spec value: non-escalating advisory (risk R-A).
+    payway.createTransaction({ ...base, paymentOption: 'abapay' });
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('legacy purchase value'));
   });
 
   it('google_pay without googlePayToken throws even without strictValidation', () => {
@@ -259,32 +275,34 @@ describe('validateAmountFloor', () => {
     vi.restoreAllMocks();
   });
 
-  it('USD 0.005 warns (below 0.01 floor)', () => {
-    validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.005, 'USD', 'generate-qr');
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('0.01'));
+  // Audit DX-RULE-004 (2026-10-05): the floor is HARD in normal AND strict
+  // mode — rule QR-009, OFFICIAL_DOCUMENTATION + OFFICIAL_API_BEHAVIOR
+  // (gateway error code 47), so it no longer routes through warnAdvisory.
+  it('USD 0.005 throws citing QR-009 (below 0.01 floor)', () => {
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.005, 'USD', 'generate-qr')).toThrow(PayWayConfigError);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.005, 'USD', 'generate-qr')).toThrow(/QR-009/);
   });
 
-  it('KHR 50 warns (below 100 floor)', () => {
-    validateAmountFloor(TEST_CONFIG as PayWayConfig, 50, 'KHR', 'payout');
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('100'));
+  it('KHR 50 throws citing QR-009 (below 100 floor)', () => {
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 50, 'KHR', 'payout')).toThrow(PayWayConfigError);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 50, 'KHR', 'payout')).toThrow(/QR-009/);
   });
 
-  it('amounts at/above the floor do not warn', () => {
-    validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.01, 'USD', 'generate-qr');
-    validateAmountFloor(TEST_CONFIG as PayWayConfig, 100, 'KHR', 'payout');
+  it('amounts at/above the floor pass without warning', () => {
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.01, 'USD', 'generate-qr')).not.toThrow();
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 100, 'KHR', 'payout')).not.toThrow();
     expect(console.warn).not.toHaveBeenCalled();
   });
 
-  it('strict config escalates floors to PayWayConfigError', () => {
+  it('strict config throws identically (the rule is already maximally strict)', () => {
     expect(() => validateAmountFloor(STRICT_CONFIG, 0.005, 'USD', 'generate-qr')).toThrow(PayWayConfigError);
     expect(() => validateAmountFloor(STRICT_CONFIG, 50, 'KHR', 'payout')).toThrow(PayWayConfigError);
   });
 
   it('wired contexts cover qr, cof payment, payout and payment-link', () => {
-    validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'generate-qr');
-    validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payment-credential');
-    validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payout');
-    validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payment-link create');
-    expect(console.warn).toHaveBeenCalledTimes(4);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'generate-qr')).toThrow(/QR-009/);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payment-credential')).toThrow(/QR-009/);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payout')).toThrow(/QR-009/);
+    expect(() => validateAmountFloor(TEST_CONFIG as PayWayConfig, 0.001, 'USD', 'payment-link create')).toThrow(/QR-009/);
   });
 });

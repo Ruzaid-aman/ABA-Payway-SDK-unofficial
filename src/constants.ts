@@ -363,9 +363,11 @@ export type QrTemplateName = (typeof QR_TEMPLATES)[number]['value'];
 export const QR_TEMPLATE_NAMES: readonly string[] = QR_TEMPLATES.map((template) => template.value);
 
 /**
- * Payment options accepted by purchase/generate-qr endpoints (src/client.ts).
- * `abapay_khqr` is the generate-qr default; `abapay_khqr_deeplink` the
- * generate-checkout default.
+ * Superset of payment_option string values across the online endpoints
+ * (`abapay_khqr` is the generate-qr default; `abapay_khqr_deeplink` the
+ * generate-checkout default). This is the shared TYPE surface only —
+ * enforcement is per endpoint via the official sets below
+ * (PURCHASE_PAYMENT_OPTIONS for purchase, QR_PAYMENT_OPTIONS for generate-qr).
  *
  * Note on `google_pay`: the ABA integration team reported (2026-09-12) that
  * online Google Pay was "not available at the time of the guidance" with no
@@ -378,21 +380,48 @@ export const PAYMENT_OPTIONS = ['cards', 'abapay_khqr', 'abapay_khqr_deeplink', 
 export type PaymentOptionName = (typeof PAYMENT_OPTIONS)[number];
 
 /**
- * payment_option values documented for the PURCHASE path (generate-checkout /
- * hosted checkout). The archived gateway spec
- * (docs/archive/Default module.openapi.json) documents `cards`, `abapay`,
- * `abapay_deeplink`; `abapay_khqr_deeplink` (the checkout default) and
- * `google_pay` (requires googlePayToken — see checkout domain validation) are
- * live-verified additions. QR-only values (`abapay_khqr`, `wechat`, `alipay`)
- * are intentionally absent — use PAYMENT_OPTIONS for the QR endpoints.
+ * Official purchase-path `payment_option` enum (rule PUR-003,
+ * OFFICIAL_DOCUMENTATION — developer.payway.com.kh purchase page, retrieved
+ * 2026-10-05): `cards`, `abapay_khqr`, `abapay_khqr_deeplink`, `alipay`,
+ * `wechat`, `google_pay`. `google_pay` additionally requires `googlePayToken`
+ * (see checkout domain validation). Omitting payment_option entirely lets the
+ * merchant profile decide.
+ *
+ * Never hard-reject a value this set lists (audit risk R-A): profile
+ * enablement is the gateway's decision (official response code 23).
  */
 export const PURCHASE_PAYMENT_OPTIONS = [
   'cards',
-  'abapay',
-  'abapay_deeplink',
+  'abapay_khqr',
   'abapay_khqr_deeplink',
+  'alipay',
+  'wechat',
   'google_pay',
 ] as const;
 
 export type PurchasePaymentOptionName = (typeof PURCHASE_PAYMENT_OPTIONS)[number];
+
+/**
+ * Legacy purchase-path `payment_option` values (`abapay`, `abapay_deeplink`)
+ * from the archived gateway spec (docs/archive/Default module.openapi.json).
+ * Real profiles may still accept them, so they produce an advisory noting
+ * their legacy status and are NEVER hard-rejected — not even under
+ * `strictValidation` (audit risk R-A). Values in NEITHER this set nor
+ * {@link PURCHASE_PAYMENT_OPTIONS} throw (rule PUR-003).
+ */
+export const PURCHASE_PAYMENT_OPTIONS_LEGACY = ['abapay', 'abapay_deeplink'] as const;
+
+/**
+ * Official generate-qr `payment_option` values (rule QR-012,
+ * OFFICIAL_DOCUMENTATION — developer.payway.com.kh qr-api page, retrieved
+ * 2026-10-05): exactly `abapay_khqr` (default), `wechat` (USD only) and
+ * `alipay` (USD only). Values outside this set throw on the generate-qr path;
+ * purchase-path values such as `cards`/`abapay_khqr_deeplink` are NOT valid
+ * here. Profile enablement remains the gateway's decision (official code 23).
+ * The Soundbox endpoint keeps its own spec-derived superset
+ * (REQUEST_QR_PAYMENT_OPTIONS in src/domains/qr.ts — adds `abapay`).
+ */
+export const QR_PAYMENT_OPTIONS = ['abapay_khqr', 'wechat', 'alipay'] as const;
+
+export type QrPaymentOptionName = (typeof QR_PAYMENT_OPTIONS)[number];
 

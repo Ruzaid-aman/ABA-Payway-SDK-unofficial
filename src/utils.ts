@@ -26,10 +26,11 @@ const VALID_CURRENCIES: Array<'USD' | 'KHR'> = ['USD', 'KHR'];
 
 /**
  * Advisory-limit escalation (live-docs audit 2026-08-31): gateway limits that
- * are NOT hard requirements — length caps, enum membership, minimum amounts —
- * warn once per distinct message by default and throw `PayWayConfigError`
- * when `config.strictValidation` is set. Gateway-documented REQUIRED fields
- * must NOT go through here; they validate directly.
+ * are NOT hard requirements — length caps, enum advisory sets — warn once per
+ * distinct message by default and throw `PayWayConfigError` when
+ * `config.strictValidation` is set. Gateway-documented REQUIRED fields and
+ * documented deterministic minimums (QR-009 amount floor) must NOT go through
+ * here; they validate directly.
  */
 const advisoryWarned = new Set<string>();
 
@@ -40,6 +41,20 @@ export function warnAdvisory(
   if (config?.strictValidation) {
     throw new PayWayConfigError(message);
   }
+  if (advisoryWarned.has(message)) return;
+  advisoryWarned.add(message);
+  console.warn(`[payway] ${message}`);
+}
+
+/**
+ * Non-escalating companion to {@link warnAdvisory} for advisories that must
+ * NEVER become hard errors: profile-dependent facts (official response code 23
+ * shows option enablement is profile-scoped) and legacy-value notices (audit
+ * risk R-A — never reject a value the official docs or an archived spec
+ * lists). Warns once per distinct message, like warnAdvisory, but
+ * `strictValidation` does NOT escalate it.
+ */
+export function warnNonEscalating(message: string): void {
   if (advisoryWarned.has(message)) return;
   advisoryWarned.add(message);
   console.warn(`[payway] ${message}`);
@@ -83,20 +98,29 @@ export function buildAbaPayDeeplink(qrString: string): string {
 }
 
 /**
- * Gateway-documented amount floors (audit §5.9): KHR >= 100, USD >= 0.01 on
- * payout / CoF payment / QR / payment-link. Advisory — warns (escalates to
- * PayWayConfigError under strictValidation) because the exact enforcement
- * surface per endpoint is not uniformly documented.
+ * Gateway-documented amount floors (rule QR-009, OFFICIAL_DOCUMENTATION +
+ * OFFICIAL_API_BEHAVIOR — developer.payway.com.kh qr-api page, retrieved
+ * 2026-10-05): KHR >= 100, USD >= 0.01 on payout / CoF payment / QR /
+ * payment-link. HARD (audit DX-RULE-004): a documented minimum with its own
+ * gateway error code (47 "KHR Amount must be greater than 100 KHR") is not an
+ * opinion — under-spend throws `PayWayConfigError` in normal AND strict mode,
+ * before any network call.
+ *
+ * The `config` parameter is kept for call-site signature stability; strict
+ * mode no longer changes this validator's behaviour because it is already
+ * maximally strict.
  */
 export function validateAmountFloor(
-  config: { strictValidation?: boolean } | undefined,
+  _config: { strictValidation?: boolean } | undefined,
   amount: number,
   currency: 'USD' | 'KHR',
   context: string,
 ): void {
   const floor = currency === 'KHR' ? 100 : 0.01;
   if (amount < floor) {
-    warnAdvisory(config, `${context}: amount ${amount} ${currency} is below the gateway minimum ${floor} ${currency}`);
+    throw new PayWayConfigError(
+      `${context}: amount ${amount} ${currency} is below the gateway minimum ${floor} ${currency} (rule QR-009, source: official; gateway error code 47)`,
+    );
   }
 }
 
