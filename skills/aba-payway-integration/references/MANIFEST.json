@@ -155,8 +155,8 @@
     {
       "file": "references/errors-and-debugging.md",
       "source": "docs/guides/12-error-handling-and-debugging.md",
-      "sourceSha256": "7e84a3630de6333e",
-      "sha256": "3207f27af1e1068c"
+      "sourceSha256": "8a5981f579744c21",
+      "sha256": "2b65ad8f1234347a"
     },
     {
       "file": "references/deployment-checklist.md",
@@ -251,8 +251,8 @@
     {
       "file": "references/error-codes.json",
       "source": "docs/error-codes.json",
-      "sourceSha256": "c269b690af673eba",
-      "sha256": "14980490236b5de0"
+      "sourceSha256": "583bc2fdb3bd1722",
+      "sha256": "97cad658b2669a41"
     },
     {
       "file": "assets/service.ts",

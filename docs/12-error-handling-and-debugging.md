@@ -210,30 +210,30 @@ Codes observed on the credentials-on-file endpoints (`link-account`, `link-card`
 > found) instead. And no CoF callback fires for a FAILED link attempt (e.g. the 104
 > page) — silence after an error page is expected, not a lost delivery.
 
-### QR error family *(new in v1.3.6)*
+### QR error family *(new in v1.3.6; official harvest 2026-10-05)*
 
-String codes observed on `generate-qr` (KHQR). Note: `"8"` and `"12"` intentionally stay in the gateway/payout families (they are not KHQR-specific). Meanings for `6`, `12`, `16`, `17`, `19`, `21`, `32`, `44`, `96` come from **ABA production telemetry (2026-09-15)** — the shared numeric code space is also used by the purchase validators, and several old spec-page glosses (`16` "invalid amount", `19` "invalid QR request", `21` "invalid transaction ID", `32` "invalid lifetime", `44` "invalid template") do **not** match what the gateway actually sends:
+String codes observed on `generate-qr` (KHQR). Titles below are quoted from the **official generate-qr response-code table** (developer.payway.com.kh/qr-api-14530840e0, retrieved 2026-10-05 — evidence: `knowledge/rules/evidence/ERR-001.md`, audit N-01); hints keep the ABA production-telemetry (2026-09-15) and sandbox context. The shared numeric code space is also used by the purchase validators — old spec-page glosses (`16` "invalid amount", `21` "invalid transaction ID", `44` "invalid template") did **not** match what the gateway actually sends, and the official table now confirms the telemetry-derived meanings. Note: `"8"` and `"12"` intentionally stay in the gateway/payout families for bare lookups (they are not KHQR-specific; `12` also has a scoped `qr` entry):
 
 | Code | Meaning |
 |---|---|
 | `"6"` | Requested Domain is not in whitelist (purchase telemetry; ask PayWay to whitelist the domain) |
 | `"16"` | Invalid First Name — no numbers/special chars, ≤ 100 chars |
 | `"17"` | Invalid Last Name — same rules |
-| `"18"` | Invalid request data *(spec-page gloss, not yet telemetry-observed)* |
+| `"18"` | Invalid Phone Number — the phone field failed validation (official table) |
 | `"19"` | Invalid Email (purchase field validation) |
 | `"21"` | End of API lifetime — the QR/transaction lifetime elapsed before payment; create a fresh transaction |
-| `"23"` | Transaction not found |
+| `"23"` | Selected Payment Option is not enabled for this Merchant Profile — ask PayWay to provision it, or use one of the officially documented `payment_option` values (abapay_khqr; wechat/alipay USD-only) |
 | `"32"` | "Service is not enable." — the feature this call needs is not provisioned on the merchant profile (e.g. pushback); sandbox-verified on payment-link create (§22) |
 | `"35"` | Payout info invalid — a payout entry cannot be parsed or has invalid structure (payment-credential endpoint table 2026-10; supersedes the old spec-page gloss "Invalid hash") |
-| `"44"` | Purchase has reached transaction limit — daily/monthly transaction or amount limit (payment-credential endpoint table 2026-10) |
-| `"47"` | Invalid items data *(spec-page gloss, not yet telemetry-observed)* |
-| `"48"` | Invalid purchase type *(spec-page gloss, not yet telemetry-observed)* |
+| `"44"` | Purchase amount has reached transaction limit — daily/monthly transaction or amount limit (payment-credential endpoint table 2026-10) |
+| `"47"` | KHR Amount must be greater than 100 KHR — raise the amount above the KHR minimum (official table) |
+| `"48"` | Something went wrong with requested parameters — validate every field against the generate-qr schema (official table) |
 | `"96"` | Invalid merchant data / payee not found |
-| `"102"` | URL not in whitelist — callback_url host is not whitelisted or is not a valid URL (payment-credential endpoint table 2026-10; supersedes the old "QR request limit exceeded" gloss) |
-| `"403"` | Forbidden (merchant not enabled for this operation) |
-| `"429"` | Too many requests — throttled, retry after the window |
+| `"102"` | The URL is not in the whitelist — callback_url host is not whitelisted or is not a valid URL (payment-credential endpoint table 2026-10; supersedes the old "QR request limit exceeded" gloss) |
+| `"403"` | Duplicated Transaction ID — the `tran_id` already exists; mint a fresh one. ⚠️ **Recorded conflict (audit N-03):** the official table's title contradicts the repo's sandbox doctrine that duplicate `tran_id`s are silently accepted (unpayable QR, W5-7); production telemetry reports duplicates as gateway code `4` "Duplicated Transaction ID." (code `83` on the payment-credential purchase leg). The single-attempt mutation policy and the CLI duplicate warning are **unchanged** — they hold under all three sources (unknown outcome + no documented idempotency key) |
+| `"429"` | Maximum attempt limit — "You've reached the maximum attempt limit. Please try again in (min)"; business-level 429 also serves as the rate-limit signal on other APIs (see §rate limiting below) |
 
-All of these are queryable via `payway-sdk explain <code>` (the `explain` command now covers `cof` and `qr` families — `explainAll()` ships ≥ 6 CoF and 18 QR entries).
+All of these are queryable via `payway-sdk explain <code>` (the `explain` command now covers `cof` and `qr` families — `explainAll()` ships ≥ 6 CoF and 18 QR entries, every one titled from the official table).
 
 ### Purchase payment-credential endpoint error table *(added 2026-10-01)*
 

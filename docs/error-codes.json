@@ -1,8 +1,8 @@
 {
   "registryVersion": 1,
-  "generated": "2026-10-03T06:44:36.297Z",
-  "source": "src/cli/explain-code.ts",
-  "description": "Consolidated ABA PayWay error/status code registry. sandboxVerified: true means the meaning was reproduced against the live sandbox; evidence points into docs/SANDBOX-FINDINGS.md. observedOn/observedMessage carry ABA production telemetry (dev-team CSV, 2026-09-15): the gateway APIs where the code was seen and the exact gateway message; API labels map to paths in docs/12 (errors-and-debugging topic). Hints additionally fold the purchase payment-credential endpoint error table (ABA dev team, 2026-10-01 — raw table archived at docs/internal/PAYMENT-CREDENTIAL-ERROR-TABLE-2026-10.md, maintainers only). Regenerate with `npm run gen:error-registry`.",
+  "generated": "2026-10-05T18:24:29.481Z",
+  "source": "src/error-registry.ts",
+  "description": "Consolidated ABA PayWay error/status code registry. sandboxVerified: true means the meaning was reproduced against the live sandbox; evidence points into docs/SANDBOX-FINDINGS.md. observedOn/observedMessage carry ABA production telemetry (dev-team CSV, 2026-09-15): the gateway APIs where the code was seen and the exact gateway message; API labels map to paths in docs/12 (errors-and-debugging topic). QR-family titles are harvested from the OFFICIAL generate-qr response-code table (developer.payway.com.kh/qr-api-14530840e0, retrieved 2026-10-05; evidence: knowledge/rules/evidence/ERR-001.md). Hints additionally fold the purchase payment-credential endpoint error table (ABA dev team, 2026-10-01 — raw table archived at docs/internal/PAYMENT-CREDENTIAL-ERROR-TABLE-2026-10.md, maintainers only). Regenerate with `npm run gen:error-registry`.",
   "codes": [
     {
       "code": "CDA00",
@@ -613,8 +613,8 @@
     {
       "code": "1",
       "family": "qr",
-      "title": "QR request rejected (wrong hash or malformed request)",
-      "hint": "Check the 19-field HMAC order (req_time..payout) and the API key.",
+      "title": "Wrong Hash",
+      "hint": "Wrong HMAC composition or a malformed request — check the 19-field HMAC order (req_time..payout) and the API key.",
       "sandboxVerified": true,
       "evidence": "SANDBOX-FINDINGS §6"
     },
@@ -631,7 +631,7 @@
     {
       "code": "12",
       "family": "qr",
-      "title": "Payment currency not allowed",
+      "title": "Payment currency is not allowed",
       "hint": "Currency not enabled for the merchant profile — use USD/KHR or ask PayWay to enable it (generate-qr + purchase telemetry).",
       "sandboxVerified": true,
       "evidence": "SANDBOX-FINDINGS §9",
@@ -664,8 +664,8 @@
     {
       "code": "18",
       "family": "qr",
-      "title": "QR gateway error code 18",
-      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+      "title": "Invalid Phone Number",
+      "hint": "The phone field failed validation (official generate-qr table, harvested 2026-10-05: \"Invalid Phone Number\") — check the phone number format and length, then resend."
     },
     {
       "code": "19",
@@ -690,8 +690,8 @@
     {
       "code": "23",
       "family": "qr",
-      "title": "QR gateway error code 23",
-      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+      "title": "Selected Payment Option is not enabled for this Merchant Profile",
+      "hint": "The payment_option value is well-formed but not enabled on this merchant profile — ask PayWay to provision it, or use one of the officially documented options (abapay_khqr; wechat/alipay USD-only — QR-012). The SDK validates payment_option against the official set before sending."
     },
     {
       "code": "32",
@@ -715,20 +715,20 @@
     {
       "code": "44",
       "family": "qr",
-      "title": "Purchase has reached transaction limit",
+      "title": "Purchase amount has reached transaction limit",
       "hint": "The merchant/profile transaction limit was reached (purchase telemetry; the spec-page gloss \"invalid template\" does not match production). payment-credential endpoint table (2026-10): daily/monthly transaction or amount limit."
     },
     {
       "code": "47",
       "family": "qr",
-      "title": "QR gateway error code 47",
-      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+      "title": "KHR Amount must be greater than 100 KHR",
+      "hint": "KHR transactions must total more than 100 KHR — raise the amount above the KHR minimum (official generate-qr table, harvested 2026-10-05). USD amounts have their own floor (gateway 3: below-minimum amount)."
     },
     {
       "code": "48",
       "family": "qr",
-      "title": "QR gateway error code 48",
-      "hint": "Meaning not individually published — consult the generate-qr page on developer.payway.com.kh."
+      "title": "Something went wrong with requested parameters",
+      "hint": "One or more requested parameters were rejected (official generate-qr table, harvested 2026-10-05: \"Something went wrong with requested parameters. Please try again or contact the merchant for help.\") — validate every field against the generate-qr schema (amount, currency, lifetime, template, payment_option) before retrying."
     },
     {
       "code": "96",
@@ -741,20 +741,20 @@
     {
       "code": "102",
       "family": "qr",
-      "title": "URL is not in the whitelist",
+      "title": "The URL is not in the whitelist",
       "hint": "URL not in whitelist — callback_url host is not whitelisted or is not a valid URL (payment-credential endpoint error table 2026-10; supersedes the old \"QR request limit exceeded\" gloss)."
     },
     {
       "code": "403",
       "family": "qr",
-      "title": "Forbidden",
-      "hint": "Merchant credential not authorized for generate-qr in this environment."
+      "title": "Duplicated Transaction ID",
+      "hint": "The tran_id already exists for this merchant — the official generate-qr table (retrieved 2026-10-05) names this code \"Duplicated Transaction ID\": mint a fresh unique tran_id instead of retrying the same one, and do NOT rotate credentials for this code. CONFLICT recorded (audit N-03): 2026-08 sandbox probes saw duplicate tran_ids silently accepted into unpayable QRs (W5-7), while production telemetry reports duplicates on the wire as gateway code 4 \"Duplicated Transaction ID.\" (code 83 on the payment-credential purchase leg). The single-attempt mutation policy and the CLI duplicate warning are UNCHANGED — they stand on unknown-outcome + no documented idempotency key, which holds under all three sources."
     },
     {
       "code": "429",
       "family": "qr",
-      "title": "Rate limit exceeded",
-      "hint": "Pace requests — the SDK throttles locally, but concurrent callers share the window.",
+      "title": "Maximum attempt limit",
+      "hint": "Official generate-qr table: \"You've reached the maximum attempt limit. Please try again in (min)\" — pace requests and retry after the window; the SDK throttles locally, but concurrent callers share the window. Business-level 429 also serves as the rate-limit signal on other PayWay APIs (docs/guides/12 §the two 429 surfaces).",
       "sandboxVerified": true,
       "evidence": "SANDBOX-FINDINGS §11"
     },

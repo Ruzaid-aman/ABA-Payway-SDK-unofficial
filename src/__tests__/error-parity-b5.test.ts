@@ -154,7 +154,9 @@ describe('B5 error parity: explain-code cof/qr families', () => {
       const ex = explainPayWayCode(code);
       expect(ex?.family, `family for ${code}`).toBe('qr');
     }
-    expect(explainPayWayCode('429')?.title).toBe('Rate limit exceeded');
+    // Title harvested from the official generate-qr table (2026-10-05, N-01):
+    // 429 = "Maximum attempt limit" (the observed rate-limit reading lives in the hint).
+    expect(explainPayWayCode('429')?.title).toBe('Maximum attempt limit');
   });
 
   it('lists cof and qr entries in explainAll', () => {

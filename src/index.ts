@@ -43,6 +43,26 @@ export {
   CREDENTIAL_ERROR_CODES,
   GATEWAY_CODE_HINTS,
 } from './constants.js';
+// ─── Error-code registry (DX-ERR-001: explain() without the CLI) ───────────
+// CLI-free module (no commander / node:child_process) — see src/error-registry.ts.
+export {
+  ABA_TELEMETRY,
+  EXPLAIN_FAMILIES,
+  OPERATION_FAMILY,
+  SANDBOX_VERIFIED_EVIDENCE,
+  explain,
+  explainAll,
+  explainCodeFamilies,
+  explainPayWayCode,
+  explainPayWayCodeScoped,
+} from './error-registry.js';
+export type {
+  CodeAlternative,
+  CodeExplanation,
+  ExplainFamily,
+  ScopedCodeExplanation,
+  ScopedExplainOptions,
+} from './error-registry.js';
 export type { CheckoutDomain, CheckoutFormOptions } from './domains/checkout.js';
 export type { CredentialsOnFileDomain, LinkCardFormOptions } from './domains/credentials-on-file.js';
 export type { KhqrDomain, MerchantRefTransaction, TransactionsByMerchantRefResult } from './domains/khqr.js';
