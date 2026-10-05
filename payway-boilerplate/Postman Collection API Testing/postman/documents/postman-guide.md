@@ -127,7 +127,7 @@ Use the **desktop app**. The web build relays requests through Postman's backend
 
 ### TLS errors against the sandbox
 
-The sandbox presents a self-signed certificate chain — that's expected, and production is unaffected. In Node-based tooling, scope `NODE_TLS_REJECT_UNAUTHORIZED='0'` to the single command; never set it globally.
+The sandbox presents a self-signed certificate chain — that's expected, and production is unaffected. In Node-based tooling, point `PAYWAY_TLS_CA_FILE` (or the SDK's `tlsCaFile` option) at a locally-extracted CA bundle for the single command; never disable certificate verification.
 
 ### A response code you don't recognize
 

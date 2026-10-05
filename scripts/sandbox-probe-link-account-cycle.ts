@@ -20,7 +20,7 @@
  *
  * All captures append to test-output/cof-account-review/captures.jsonl.
  *
- *   NODE_TLS_REJECT_UNAUTHORIZED='0' npx tsx scripts/sandbox-probe-link-account-cycle.ts \
+ *   PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" npx tsx scripts/sandbox-probe-link-account-cycle.ts \
  *     [--ctid cust0001] [--token-flag CITI_FLEX] [--request-id reqXXXX]
  */
 

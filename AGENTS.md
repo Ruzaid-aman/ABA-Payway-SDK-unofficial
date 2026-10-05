@@ -4,51 +4,51 @@ Prefer the SDK CLI over editing scripts. Read `npx tsx src/cli.ts <command> --he
 
 ## Canonical commands (run from repo root)
 
-PowerShell syntax shown. On POSIX, replace `$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; ` with the inline form `NODE_TLS_REJECT_UNAUTHORIZED=0 ` (sandbox presents a self-signed cert chain).
+PowerShell syntax shown. On POSIX, replace `$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; ` with the inline form `PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" ` (sandbox TLS — see "## Sandbox TLS caveat"; the gitignored bundle is regenerated with `node scripts/extract-sandbox-ca.mjs`).
 
 ```powershell
 # Online QR: amount, currency, lifetime (seconds), template; auto tx ID + PNG + polling
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-qr -a 6.12 -c USD --lifetime 360 --template template3_color -y
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts generate-qr -a 6.12 -c USD --lifetime 360 --template template3_color -y
 
 # Checkout link (full purchase flag set incl. --payout --additional-params --google-pay-token --return-deeplink); -y is REQUIRED for agents
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-checkout -a 5.00 -c USD --return-url <url> -y
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts generate-checkout -a 5.00 -c USD --return-url <url> -y
 
 # One-shot status / full detail
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts check-transaction -t <id>
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts transaction-detail -t <id>
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts check-transaction -t <id>
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts transaction-detail -t <id>
 
 # Subscription (recurring) checkout on the purchase path: ctid + CITR_FIX + frequency
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts generate-checkout -a 9.99 -c USD --return-url <url> --ctid customer123 --token-flag CITR_FIX --frequency 1M
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts generate-checkout -a 9.99 -c USD --return-url <url> --ctid customer123 --token-flag CITR_FIX --frequency 1M
 
 # Credentials-on-file: link an ABA account (QR/deeplink arrives via callback_url), then charge the returned pwt
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof link-account -r req0001 -c customer123 -f CITI_FLEX --currency USD --callback-url <url>
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof charge -t order-0001 -a 4.50 --token <pwt> --currency USD
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts cof link-account -r req0001 -c customer123 -f CITI_FLEX --currency USD --callback-url <url>
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts cof charge -t order-0001 -a 4.50 --token <pwt> --currency USD
 
 # COF token lifecycle: renew (account tokens only; restarts the local ~90d window), details (request_id ONLY), remove (irreversible; prunes the local store)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token renew -r req0002 -c customer123 --token <pwt>
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token details -r req0001
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token remove -c customer123 --token <pwt>
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts cof token renew -r req0002 -c customer123 --token <pwt>
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts cof token details -r req0001
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts cof token remove -c customer123 --token <pwt>
 
 # Token-flag blocker sweep (diagnostic: one POST per linking flag + card leg; 104 = profile-level blocker, no receiver needed)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof token-flag-sweep -c customer123 --json
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts cof token-flag-sweep -c customer123 --json
 
 # Link-card hosted page: local signed form (NO API call, urlencoded browser POST)
 npx tsx src/cli.ts cof link-card-form -c customer123 -f CITI_FLEX --callback-url <url> -o link-card.html
 # link-card API call: saves the hosted page to payway-output/ and opens it (TTY auto)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts cof link-card -r req0003 -c customer123 -f CITI_FLEX --callback-url <url>
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts cof link-card -r req0003 -c customer123 -f CITI_FLEX --callback-url <url>
 
 # Payout beneficiary whitelist (requires RSA key) — use seeded sandbox accounts
 # (500000001 etc., see `sandbox-beneficiaries`); 000999888 is NOT in the sandbox
 # whitelist and live payout calls to it 403 "Payout accounts are not in whitelist"
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary add 500000001
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts beneficiary update-status 500000001 -s 1
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts beneficiary add 500000001
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts beneficiary update-status 500000001 -s 1
 
 # Payment link with split payout (payout keys {acc, amt}; total must equal --amount)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link create -t "Invoice 1" -a 5.00 -r inv-001 --return-url <url> --payout '[{"acc":"500000001","amt":5.00}]'
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts payment-link create -t "Invoice 1" -a 5.00 -r inv-001 --return-url <url> --payout '[{"acc":"500000001","amt":5.00}]'
 # Payment-link detail by Link ID (-i ONLY — data.id from create, NOT merchant ref/slug; --json error envelope on failure)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link detail -i <link-id> --json
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts payment-link detail -i <link-id> --json
 # Payment-link void — permanent, irreversible (prompts on TTY; -y/--json skip; PTL188 = already voided, exit 2)
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx src/cli.ts payment-link void -i <link-id> -y --json
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npx tsx src/cli.ts payment-link void -i <link-id> -y --json
 
 # Transaction journal (local reads — no API call; ON by default for API commands, --no-journal to disable)
 npx tsx src/cli.ts journal timeline -t <tran-id> --json                   # reconstruct one transaction
@@ -197,9 +197,26 @@ the anti-checklist of past agent mistakes. Deep rules: `.agents/AGENTS.md`.
 
 ## Sandbox TLS caveat
 
-The sandbox presents a self-signed cert chain → Node fetch fails with
-`self-signed certificate in certificate chain`. Set `NODE_TLS_REJECT_UNAUTHORIZED='0'`
-scoped to the command only (same workaround as official boilerplate). Never set it globally.
+The sandbox presents a privately-issued/self-signed cert chain (historically
+`self-signed certificate in certificate chain`; on 2026-10-05 it serves a
+GlobalSign EV chain that stock Node happens to trust — the mechanism below is
+required again the moment that changes, and is the ONLY sanctioned fix for
+corporate TLS interception). The safe alternative (DX-SEC-001) is a
+locally-extracted CA bundle, NEVER a verification bypass:
+
+- `PAYWAY_TLS_CA_FILE` (SDK option: `tlsCaFile`) points at a PEM bundle; the
+  transport routes requests through an undici Agent trusting ONLY that bundle.
+  `PAYWAY_TLS_MIN_VERSION` / `tlsMinVersion` optionally pins the protocol floor.
+- The bundle lives at the repo root as `payway-sandbox-ca.pem` — gitignored,
+  NEVER committed. On a fresh machine regenerate it with
+  `node scripts/extract-sandbox-ca.mjs` (runs `openssl s_client -showcerts`
+  against `checkout-sandbox.payway.com.kh`, anchors at the matching
+  self-signed root from Node's bundled store — the presented chain stops at a
+  CROSS-SIGNED root that dead-ends the chain builder on its own).
+- Do NOT use `NODE_TLS_REJECT_UNAUTHORIZED=0`. It is purged from all tracked
+  instructional docs; when TLS verification fails, the SDK error message names
+  this CA-file fix instead (src/__tests__/no-tls-bypass.test.ts enforces the
+  purge with an allow-list).
 
 ## Skills
 

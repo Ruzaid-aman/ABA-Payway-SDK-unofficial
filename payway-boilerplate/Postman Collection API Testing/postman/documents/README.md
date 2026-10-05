@@ -63,7 +63,7 @@ The one-line versions live in the collection's **Overview** tab (§ 6 · 60-seco
 - **RSA endpoints answer `SKIPPED`** — the runtime lacks secure randomness (`crypto.getRandomValues`); use the desktop app, or paste a pre-encrypted value into the fallback variable the request names (e.g. `{{pl_merchant_auth}}`).
 - **Malformed-PEM-class errors** (`Too few bytes to parse DER`, `Invalid PEM formatted message`) — the key material must be a complete PEM block (`-----BEGIN PUBLIC KEY-----` … `-----END PUBLIC KEY-----`); check that no trailing newline or placeholder text got pasted in.
 - **Web Postman is slow or CORS-blocked** — use the desktop app; the web build relays requests through Postman's backend.
-- **Sandbox TLS errors** — the sandbox presents a self-signed cert chain; that's expected. In Node tooling, scope `NODE_TLS_REJECT_UNAUTHORIZED='0'` to the single command, never globally.
+- **Sandbox TLS errors** — the sandbox presents a self-signed cert chain; that's expected. In Node tooling, point `PAYWAY_TLS_CA_FILE` (or the SDK's `tlsCaFile` option) at a locally-extracted CA bundle for the single command — never disable certificate verification.
 - **A request fails with a code you don't recognize** — look it up in `postman/documents/error-codes.json` (83 codes, 8 families) or the error table in the Overview tab; each entry carries the verified meaning and first fix.
 
 ## Workspace map (what actually exists)

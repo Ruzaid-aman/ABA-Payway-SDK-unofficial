@@ -17,7 +17,7 @@
  *
  * Evidence → test-output/payment-link-void-e2e/ (worktree-local).
  *
- *   NODE_TLS_REJECT_UNAUTHORIZED=0 npx tsx scripts/e2e-payment-link-void.ts
+ *   PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" npx tsx scripts/e2e-payment-link-void.ts
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -109,7 +109,10 @@ async function main(): Promise<void> {
   const cli = (args: string[]): { status: number | null; stdout: string; stderr: string } =>
     spawnSync(process.execPath, ['--import', 'tsx', 'src/cli.ts', ...args], {
       encoding: 'utf8',
-      env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: '0' },
+      // Sandbox TLS (DX-SEC-001): the child inherits PAYWAY_TLS_CA_FILE from
+      // the environment (a locally-extracted CA bundle) instead of a
+      // verification bypass — the CA-bundle mechanism replaces it.
+      env: { ...process.env },
     });
 
   // The E1 link is already voided — create a FRESH link and void THAT

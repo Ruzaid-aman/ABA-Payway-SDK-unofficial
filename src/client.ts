@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { generateHmac, verifyCallbackDetailed, verifyCallbackSignature } from './auth.js';
 import type { CallbackVerificationResult } from './auth.js';
 import { BASE_URLS, ENDPOINTS, MUTATION_ENDPOINTS } from './constants.js';
@@ -227,6 +228,28 @@ export interface PayWayConfig {
    * `PAYWAY_PARTNER_API_KEY`.
    */
   partnerApiKey?: string;
+  /**
+   * DX-SEC-001 (P0-04): path to a PEM file with the CA certificate bundle
+   * used to VERIFY the gateway's TLS certificate — the safe alternative to
+   * `NODE_TLS_REJECT_UNAUTHORIZED=0` for self-signed / corporate-intercepted
+   * chains. The file must contain at least one `-----BEGIN CERTIFICATE-----`
+   * block (the full presented chain, leaf first, is the safest bundle).
+   *
+   * When set, requests are routed through an `undici` Agent constructed with
+   * this CA (loaded lazily — the default path never imports undici). A
+   * missing or unparsable file throws `PayWayConfigError` at construction.
+   * Settable via `PAYWAY_TLS_CA_FILE`.
+   */
+  tlsCaFile?: string;
+  /**
+   * Minimum TLS protocol version accepted on the transport
+   * (DX-SEC-001). One of `TLSv1`, `TLSv1.1`, `TLSv1.2`, `TLSv1.3`;
+   * the undici agent defaults to `TLSv1.2` (Node's own floor for modern
+   * TLS) — anything lower must be set explicitly and is a red flag.
+   * Only meaningful together with `tlsCaFile` today (the default global-fetch
+   * path uses Node's built-in defaults). Settable via `PAYWAY_TLS_MIN_VERSION`.
+   */
+  tlsMinVersion?: 'TLSv1' | 'TLSv1.1' | 'TLSv1.2' | 'TLSv1.3';
 }
 
 interface ResolvedPayWayConfig extends PayWayConfig {
@@ -1023,6 +1046,42 @@ function createJsonParseError(rawBody: string, endpoint?: string, contentType?: 
   );
 }
 
+/**
+ * TLS certificate-verification error codes raised by Node's TLS layer
+ * (surfaced as the `cause` of undici's `fetch failed`). Matching on code
+ * first keeps the classification precise; the message pattern is the
+ * fallback for cross-version wording.
+ */
+const TLS_CERT_ERROR_CODE = /^(UNABLE_TO_|SELF_SIGNED_|DEPTH_ZERO_SELF_SIGNED|CERT_|ERR_TLS_|ERR_SSL_)/;
+const TLS_CERT_ERROR_MESSAGE =
+  /(self-signed|unable to verify the first certificate|unable to get (local )?issuer certificate|certificate (has expired|is not yet valid|verify failed|unknown)|certificate verify failed|altname mismatch|does not match certificate's altnames|ssl routines|sslv3 alert)/i;
+
+/**
+ * Walk an error's `cause` chain looking for a TLS certificate-verification
+ * failure. `fetch failed` (undici) wraps the real TLS error one or two levels
+ * deep, so the raw message alone is useless to integrators.
+ *
+ * Exported for tests only — NOT part of the package surface (index.ts
+ * re-exports a fixed name list from this module).
+ */
+export function findTlsCertificateFailure(error: unknown): { code?: string; message: string } | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (typeof current !== 'object' || current === null) return undefined;
+    const candidate = current as { code?: unknown; message?: unknown; cause?: unknown };
+    const code = typeof candidate.code === 'string' ? candidate.code : undefined;
+    const message = typeof candidate.message === 'string' ? candidate.message : '';
+    if (
+      (code !== undefined && TLS_CERT_ERROR_CODE.test(code)) ||
+      TLS_CERT_ERROR_MESSAGE.test(message)
+    ) {
+      return { code, message: message || code || 'TLS certificate verification failed' };
+    }
+    current = candidate.cause;
+  }
+  return undefined;
+}
+
 function createNetworkError(error: unknown, timeoutMs: number, endpoint?: string): PayWayAPIError {
   if (isAbortError(error)) {
     return new PayWayNetworkError(`Request timed out after ${timeoutMs}ms`, {
@@ -1036,6 +1095,26 @@ function createNetworkError(error: unknown, timeoutMs: number, endpoint?: string
     error !== null && typeof error === 'object'
       ? String((error as { message?: unknown }).message ?? 'Unknown network failure')
       : 'Unknown network failure';
+  // DX-SEC-001 (P0-04): a TLS certificate failure is a CONFIGURATION problem,
+  // not a transient network fault — name the safe fix (CA bundle) instead of
+  // leaking a bare "fetch failed", and never retry it.
+  const tlsFailure = findTlsCertificateFailure(error);
+  if (tlsFailure) {
+    const tlsError = new PayWayNetworkError(
+      `TLS certificate verification failed: ${tlsFailure.message}` +
+        `${tlsFailure.code ? ` (code ${tlsFailure.code})` : ''}. ` +
+        'Provide the gateway\u2019s CA chain via the `tlsCaFile` config option or the PAYWAY_TLS_CA_FILE environment ' +
+        'variable: extract the presented chain with ' +
+        '`openssl s_client -showcerts -connect <host>:443 -servername <host>` (save every certificate, leaf first) ' +
+        'and point the option at the bundle file. Do NOT disable certificate verification with NODE_TLS_REJECT_UNAUTHORIZED=0.',
+      { rawBody: error, endpoint, retryable: false },
+    );
+    // PayWayNetworkError hard-codes retryable:true (network errors default to
+    // retryable); a certificate failure is deterministic — flip it off so the
+    // retry engine does not burn 3 attempts + backoff on a config error.
+    (tlsError as { retryable?: boolean }).retryable = false;
+    return tlsError;
+  }
   return new PayWayNetworkError(`Network error: ${message}`, {
     rawBody: error,
     endpoint,
@@ -1219,6 +1298,95 @@ function parseHttpBaseUrl(value: string | undefined): string | undefined {
   }
 }
 
+/** TLS protocol versions accepted for `tlsMinVersion` (audit P0-04: default floor TLS 1.2). */
+const TLS_MIN_VERSIONS = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'] as const;
+type TlsMinVersion = (typeof TLS_MIN_VERSIONS)[number];
+
+/**
+ * DX-SEC-001 (P0-04): load and sanity-check a PEM CA bundle for `tlsCaFile`.
+ * Synchronous by design — it runs in `resolveConfig` so a missing or garbage
+ * file fails AT CONSTRUCTION with a `PayWayConfigError` that names the path
+ * and the fix, instead of surfacing as an opaque network error mid-request.
+ */
+export function loadTlsCaBundle(path: string): string {
+  let contents: string;
+  try {
+    contents = readFileSync(path, 'utf8');
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    const reason =
+      code === 'ENOENT'
+        ? 'file not found'
+        : code === 'EACCES' || code === 'EPERM'
+          ? 'file is not readable (permission denied)'
+          : `could not be read (${error instanceof Error ? error.message : String(error)})`;
+    throw new PayWayConfigError(
+      `TLS CA file "${path}" ${reason}. Extract the gateway's presented chain with ` +
+        '`openssl s_client -showcerts -connect <host>:443 -servername <host>` ' +
+        '(save every certificate, leaf first), point tlsCaFile / PAYWAY_TLS_CA_FILE at it, or unset the option.',
+    );
+  }
+  if (!contents.includes('-----BEGIN CERTIFICATE-----')) {
+    throw new PayWayConfigError(
+      `TLS CA file "${path}" does not contain any PEM certificate block ` +
+        '(expected at least one -----BEGIN CERTIFICATE----- section). ' +
+        'Regenerate the bundle from the presented chain: ' +
+        '`openssl s_client -showcerts -connect <host>:443 -servername <host>` (leaf first).',
+    );
+  }
+  return contents;
+}
+
+type UndiciModule = typeof import('undici');
+
+/**
+ * Lazy undici import (DX-SEC-001): the module (and its Agent) is only loaded
+ * when `tlsCaFile` is configured — the default global-fetch path never pays
+ * for it. Cached so a client with many requests imports it exactly once.
+ */
+let undiciModulePromise: Promise<UndiciModule | undefined> | undefined;
+async function loadUndici(): Promise<UndiciModule | undefined> {
+  undiciModulePromise ??= import('undici').catch(() => undefined);
+  return undiciModulePromise;
+}
+
+/**
+ * Signature-compatible subset of `fetch` used inside `_executeFetch` so the
+ * TLS-dispatcher path can swap the transport without touching the retry loop.
+ */
+type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+
+/**
+ * Build the undici-backed fetch for `tlsCaFile` clients: an Agent whose
+ * `connect` carries the CA bundle (and the optional minimum TLS version).
+ * Returns a fetch that pins every request to that dispatcher.
+ */
+async function createTlsCaFetch(caFile: string, minVersion?: TlsMinVersion): Promise<FetchLike> {
+  const ca = loadTlsCaBundle(caFile);
+  const undici = await loadUndici();
+  if (!undici) {
+    throw new PayWayConfigError(
+      `The "undici" package could not be imported, but tlsCaFile is configured ("${caFile}"). ` +
+        'Install undici (npm install undici) or remove tlsCaFile / PAYWAY_TLS_CA_FILE.',
+    );
+  }
+  const agent = new undici.Agent({
+    connect: {
+      ca,
+      ...(minVersion ? { minVersion } : {}),
+    },
+  });
+  const undiciFetch = undici.fetch;
+  return (url, init) =>
+    undiciFetch(url, {
+      method: init.method as 'POST' | undefined,
+      headers: init.headers as import('undici').RequestInit['headers'],
+      body: init.body as import('undici').RequestInit['body'],
+      signal: init.signal as AbortSignal | undefined,
+      dispatcher: agent,
+    }) as unknown as Promise<Response>;
+}
+
 /**
  * PayWay SDK client.
  *
@@ -1235,6 +1403,12 @@ export class PayWay {
   private readonly journalContext: JournalContext | undefined;
   private lastCid: string | undefined;
   private lastTrace: string | undefined;
+  /**
+   * DX-SEC-001: undici-backed fetch created when `tlsCaFile` is configured
+   * (undefined → plain global fetch, undici never imported). The promise is
+   * created in the constructor but awaited on the first request.
+   */
+  private tlsFetchPromise: Promise<FetchLike> | undefined;
 
   // --- Sub-Clients ---
   public readonly checkout: CheckoutDomain;
@@ -1293,6 +1467,13 @@ export class PayWay {
     // JSONL record of every API exchange. Undefined unless configured or
     // PAYWAY_JOURNAL is set — the library never writes files silently.
     this.journalContext = createJournalEmitter(this.config.journal, process.env);
+
+    // DX-SEC-001 (P0-04): safe TLS verification — when a CA bundle is
+    // configured, requests are routed through an undici Agent that trusts
+    // exactly that CA (replacing the NODE_TLS_REJECT_UNAUTHORIZED=0 hack).
+    this.tlsFetchPromise = this.config.tlsCaFile
+      ? createTlsCaFetch(this.config.tlsCaFile, this.config.tlsMinVersion)
+      : undefined;
 
     // Initialize domain sub-clients
     this.checkout = createCheckoutDomain(
@@ -1368,6 +1549,15 @@ export class PayWay {
     const timeoutFromEnv = Number.parseInt(process.env.PAYWAY_TIMEOUT ?? '', 10);
     const debugFromEnv = process.env.DEBUG_PAYWAY === 'true' || process.env.DEBUG_PAYWAY === '1';
     const strictFromEnv = process.env.PAYWAY_STRICT_VALIDATION === '1' || process.env.PAYWAY_STRICT_VALIDATION === 'true';
+    // DX-SEC-001: safe TLS verification via a locally-provided CA bundle —
+    // replaces the NODE_TLS_REJECT_UNAUTHORIZED=0 workaround (P0-04).
+    const tlsCaFileFromEnv = process.env.PAYWAY_TLS_CA_FILE?.trim();
+    const tlsMinVersionFromEnv = process.env.PAYWAY_TLS_MIN_VERSION?.trim();
+    if (tlsMinVersionFromEnv !== undefined && !TLS_MIN_VERSIONS.includes(tlsMinVersionFromEnv as TlsMinVersion)) {
+      throw new PayWayConfigError(
+        `PAYWAY_TLS_MIN_VERSION must be one of ${TLS_MIN_VERSIONS.join(', ')}, received: ${tlsMinVersionFromEnv}`,
+      );
+    }
     const resolvedConfig: ResolvedPayWayConfig = {
       ...config,
       merchantId: (config.merchantId ?? process.env.PAYWAY_MERCHANT_ID ?? '').trim(),
@@ -1380,6 +1570,8 @@ export class PayWay {
       timeout: config.timeout ?? (Number.isNaN(timeoutFromEnv) ? undefined : timeoutFromEnv),
       debug: config.debug ?? debugFromEnv,
       strictValidation: config.strictValidation ?? strictFromEnv,
+      tlsCaFile: config.tlsCaFile ?? (tlsCaFileFromEnv || undefined),
+      tlsMinVersion: config.tlsMinVersion ?? (tlsMinVersionFromEnv as TlsMinVersion | undefined),
       khqr: resolveKhqrConfiguration(config.khqr),
     };
 
@@ -1423,6 +1615,14 @@ export class PayWay {
       throw new PayWayConfigError(
         `retryDelayMs must be a non-negative number of milliseconds, received: ${resolvedConfig.retryDelayMs}`,
       );
+    }
+    // DX-SEC-001: validate the TLS CA bundle at the boundary — a bad path
+    // must fail at construction, not as an opaque network error on the first
+    // request. (tlsMinVersion is validated above, before config assembly.)
+    if (resolvedConfig.tlsCaFile !== undefined) {
+      // Discard the contents — loadTlsCaBundle is called here for validation
+      // only; the dispatcher re-reads (and re-validates) the file lazily.
+      loadTlsCaBundle(resolvedConfig.tlsCaFile);
     }
     if (!resolvedConfig.debug) {
       return resolvedConfig;
@@ -1580,6 +1780,12 @@ export class PayWay {
 
     await this._acquireRateLimitToken(endpoint);
 
+    // DX-SEC-001: TLS CA-bundle clients go through the undici Agent dispatcher
+    // (created once per client); the default path keeps plain global fetch and
+    // never imports undici. A malformed bundle surfaces here as a
+    // PayWayConfigError BEFORE any request is attempted.
+    const doFetch = this.tlsFetchPromise ? await this.tlsFetchPromise : fetch;
+
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -1634,7 +1840,7 @@ export class PayWay {
           });
         }
 
-        const response = await fetch(url, {
+        const response = await doFetch(url, {
           method: 'POST',
           headers,
           body: bodyPayload,

@@ -11,10 +11,10 @@
  * the profile named by PAYWAY_PROFILE, or the profile store's default profile.
  *
  * Idempotent: existing PNGs are skipped unless `--force` is passed.
- * Run (sandbox presents a self-signed chain — TLS bypass is scoped to this
- * process only, mirroring the official boilerplate workaround):
+ * Run (sandbox TLS: pass PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" —
+ * a locally-extracted CA bundle, gitignored; see scripts/extract-sandbox-ca.mjs):
  *
- *     NODE_TLS_REJECT_UNAUTHORIZED=0 npx tsx scripts/capture-qr-template-gallery.ts
+ *     PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" npx tsx scripts/capture-qr-template-gallery.ts
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

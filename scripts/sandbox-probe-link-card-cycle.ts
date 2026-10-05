@@ -25,7 +25,7 @@
  *
  *   npx tsx scripts/sandbox-probe-link-card-cycle.ts [--ctid revcard01] [--frequency 1M]
  *
- * Requires NODE_TLS_REJECT_UNAUTHORIZED='0' scoped to the command (sandbox TLS).
+ * Requires PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" scoped to the command (sandbox TLS; regenerate the gitignored bundle with node scripts/extract-sandbox-ca.mjs).
  */
 
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

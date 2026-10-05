@@ -18,8 +18,8 @@
  * other business code (00, 04, 69, …) proves the hash layer ACCEPTED the
  * composition. No money movement — at most a PENDING checkout session.
  *
- * Usage (TLS workaround scoped to this command only — never export it):
- *   NODE_TLS_REJECT_UNAUTHORIZED='0' npx tsx scripts/sandbox-probe-subscription.ts
+ * Usage (sandbox TLS via a local CA bundle, scoped to this command only (PAYWAY_TLS_CA_FILE, DX-SEC-001)):
+ *   PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" npx tsx scripts/sandbox-probe-subscription.ts
  *
  * Evidence: test-output/subscription-hash/probe-<timestamp>.log
  * Findings: append a dated section to docs/SANDBOX-FINDINGS.md (never rewrite).

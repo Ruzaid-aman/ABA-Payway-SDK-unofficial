@@ -22,11 +22,12 @@
  * (vitest runs tests in a file serially). Residue: sandbox transactions
  * with 180 s lifetimes that expire on their own.
  *
- * TLS: the sandbox presents a self-signed chain. `NODE_TLS_REJECT_UNAUTHORIZED`
- * is set inside `beforeAll` and restored in `afterAll` — scoped to this
- * file's worker only, per the workspace rule against setting it globally.
- * Node's fetch (undici) evaluates the variable lazily at connect time, so
- * this is effective without a shell prefix.
+ * TLS: the sandbox presents a self-signed chain. No verification bypass —
+ * the clients use the safe `tlsCaFile` CA-bundle mechanism (DX-SEC-001,
+ * see beforeAll below): the gitignored repo-root `payway-sandbox-ca.pem`
+ * bundle (regenerate with `node scripts/extract-sandbox-ca.mjs`) or the
+ * PAYWAY_TLS_CA_FILE value from .env. When neither exists the stock Node
+ * trust store applies.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -62,23 +63,22 @@ const voidSuite = describe.skipIf(!gate || !hasCredentials || rsaPublicKey.lengt
 let client: PayWay;
 /** Separate client wired with publicKeyPem for the payment-link void legs. */
 let rsaClient: PayWay;
-let previousTlsReject: string | undefined;
+
+/**
+ * Sandbox TLS (DX-SEC-001): NO verification bypass. The clients opt into the
+ * safe CA-bundle mechanism — `tlsCaFile` from the parsed .env
+ * (PAYWAY_TLS_CA_FILE), falling back to the gitignored repo-root bundle
+ * `payway-sandbox-ca.pem` (regenerate: `node scripts/extract-sandbox-ca.mjs`).
+ * With neither present, the stock Node trust store applies.
+ */
+const tlsCaFile =
+  env.PAYWAY_TLS_CA_FILE ?? path.join(path.resolve(import.meta.dirname ?? '.', '../..'), 'payway-sandbox-ca.pem');
 
 beforeAll(() => {
   if (!gate || !hasCredentials) return;
-  previousTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  client = new PayWay({ merchantId, apiKey, environment: 'sandbox' });
+  client = new PayWay({ merchantId, apiKey, environment: 'sandbox', tlsCaFile });
   if (rsaPublicKey.length > 0) {
-    rsaClient = new PayWay({ merchantId, apiKey, environment: 'sandbox', publicKeyPem: rsaPublicKey });
-  }
-});
-
-afterAll(() => {
-  if (previousTlsReject === undefined) {
-    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  } else {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = previousTlsReject;
+    rsaClient = new PayWay({ merchantId, apiKey, environment: 'sandbox', publicKeyPem: rsaPublicKey, tlsCaFile });
   }
 });
 

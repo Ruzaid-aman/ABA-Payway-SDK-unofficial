@@ -79,10 +79,10 @@ $env:PAYWAY_API_KEY = '<sandbox-api-key>'
 $env:PAYWAY_CALLBACK_URL = '<public-https-callback-url>'
 ```
 
-The PayWay sandbox can present a self-signed certificate chain in some environments. If needed, scope the TLS workaround to one sandbox command only, and never set it globally:
+The PayWay sandbox can present a self-signed certificate chain in some environments. If needed, point the CLI at a locally-extracted CA bundle — never disable certificate verification. The bundle is extracted from the gateway's presented chain (see `scripts/extract-sandbox-ca.mjs` in the SDK repository) and is scoped to one command:
 
 ```powershell
-$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm exec -- payway-sdk doctor --route online-qr
+$env:PAYWAY_TLS_CA_FILE="$PWD\payway-sandbox-ca.pem"; npm exec -- payway-sdk doctor --route online-qr
 ```
 
 ### Callback and first payment

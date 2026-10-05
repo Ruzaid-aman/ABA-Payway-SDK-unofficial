@@ -45,6 +45,10 @@ PaywAySandboxkey.txt
 *key*.txt
 *secret*.txt
 
+# Locally-extracted TLS CA bundle for the sandbox (self-signed chain — DX-SEC-001).
+# Extracted per machine with openssl s_client; NEVER commit it.
+/payway-sandbox-ca.pem
+
 # Python (for scripts)
 __pycache__/
 *.pyc

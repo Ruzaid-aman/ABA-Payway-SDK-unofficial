@@ -36,6 +36,10 @@ const KNOWN_VARS: ReadonlySet<string> = new Set([
   'PAYWAY_FORCE_JSON_STORAGE',
   'PAYWAY_PARTNER_ID',
   'PAYWAY_PARTNER_API_KEY',
+  // DX-SEC-001 (P0-04): safe TLS verification — CA bundle + minimum protocol
+  // version, mapped onto the client's tlsCaFile / tlsMinVersion options.
+  'PAYWAY_TLS_CA_FILE',
+  'PAYWAY_TLS_MIN_VERSION',
 ]);
 
 /** Validate env-only vars actually carry values that appear in the env map. */

@@ -58,8 +58,9 @@ creation call for the flow under investigation.
 - Create the output directory BEFORE redirecting the rig's stdout into it —
   `mkdir -p test-output/<slug>` or the shell redirect fails before the script
   runs.
-- Set `NODE_TLS_REJECT_UNAUTHORIZED='0'` scoped to the single command only
-  (sandbox TLS chain); never export it.
+- Point `PAYWAY_TLS_CA_FILE` at a locally-extracted CA bundle for the single
+  command (sandbox TLS chain — see `scripts/extract-sandbox-ca.mjs`; never
+  disable certificate verification).
 - The receiver must answer 200 fast; ACK first, verify/process after.
 - Multi-payment targets (payment_limit > 1 links) fire one callback per
   completed payment — one capture per payment, not one per link.

@@ -20,7 +20,7 @@
  *
  * Evidence JSON → test-output/payment-link-void-probe/.
  *
- *   NODE_TLS_REJECT_UNAUTHORIZED=0 npx tsx scripts/sandbox-probe-payment-link-void.ts
+ *   PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" npx tsx scripts/sandbox-probe-payment-link-void.ts
  */
 import crypto from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';

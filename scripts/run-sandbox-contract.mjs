@@ -5,8 +5,8 @@
  * hermetic-env setup file scrubs every PAYWAY_* var at test-file load)
  * and delegates to vitest for the single gated suite. TLS for the
  * self-signed sandbox chain is handled inside the suite file itself
- * (beforeAll/afterAll), so no shell-level NODE_TLS_REJECT_UNAUTHORIZED
- * prefix is needed here.
+ * (beforeAll/afterAll), so no shell-level TLS-bypass prefix (DX-SEC-001)
+ * (PAYWAY_TLS_CA_FILE / tlsCaFile) is needed here.
  */
 import { spawnSync } from 'node:child_process';
 

@@ -11,8 +11,8 @@
  * not found, 04 invalid data) proves the hash layer ACCEPTED it. Synthetic
  * request_id/ctid/pwt values are therefore sufficient.
  *
- * Usage (TLS workaround scoped to this command only — never export it):
- *   NODE_TLS_REJECT_UNAUTHORIZED='0' npx tsx scripts/sandbox-probe-token-trio.ts
+ * Usage (sandbox TLS via a local CA bundle, scoped to this command only (PAYWAY_TLS_CA_FILE, DX-SEC-001)):
+ *   PAYWAY_TLS_CA_FILE="$PWD/payway-sandbox-ca.pem" npx tsx scripts/sandbox-probe-token-trio.ts
  *
  * Evidence: test-output/token-trio/probe-<timestamp>.log
  * Findings: append a dated section to docs/SANDBOX-FINDINGS.md (do not
