@@ -2177,10 +2177,12 @@ export class PayWay {
         }
       }
       const part = options.multipartFile;
-      // Uint8Array view (not buffer.slice): a valid BlobPart under every
-      // @types/node — Buffer#buffer is ArrayBuffer | SharedArrayBuffer in
-      // newer typings, which BlobPart rejects (CI sqlite-contract job).
-      const partView = new Uint8Array(part.data.buffer, part.data.byteOffset, part.data.byteLength);
+      // Copy into a fresh ArrayBuffer: newer @types/node type Buffer#buffer
+      // as ArrayBuffer | SharedArrayBuffer and restrict BlobPart to views
+      // over plain ArrayBuffer — only a copy satisfies every typings
+      // generation (CI sqlite-contract job; also byte-identical to the
+      // previous buffer.slice behavior).
+      const partView = new Uint8Array(part.data);
       form.append(part.name, new Blob([partView], { type: part.contentType }), part.filename);
       // No Content-Type header: undici generates `multipart/form-data; boundary=…`.
       return this._executeFetch<TResponse>(path, {}, form, undefined, options.callOptions);
