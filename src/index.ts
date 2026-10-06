@@ -96,6 +96,7 @@ export {
   PayWayAPIError,
   PayWayBusinessError,
   PayWayConfigError,
+  PayWayGuardError,
   PayWayError,
   PayWayNetworkError,
   PayWayRateLimitError,
