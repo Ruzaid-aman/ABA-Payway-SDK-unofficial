@@ -14,20 +14,21 @@ export type OperationClass = 'read-only' | 'attempt-creation' | 'money-moving' |
 /** §12.2 class-3 ("moves money or terminates") CLI command paths.
  * Keep in sync with src/cli/commands/capabilities.ts MONEY_MOVING_COMMANDS. */
 export const MONEY_MOVING_PATHS: readonly string[] = [
-  'refund', 'payout',
-  'pre-auth complete', 'pre-auth complete-payout', 'pre-auth cancel',
-  'close-transaction', 'payment-link void',
+  'refund',
+  'payout',
+  'pre-auth complete',
+  'pre-auth complete-payout',
+  'pre-auth cancel',
+  'close-transaction',
+  'payment-link void',
   'cof token remove',
-  'beneficiary add', 'beneficiary update-status',
+  'beneficiary add',
+  'beneficiary update-status',
 ];
 
-export const SANDBOX_ONLY_PATHS: readonly string[] = [
-  'demo', 'sandbox-test-cards', 'sandbox-beneficiaries',
-];
+export const SANDBOX_ONLY_PATHS: readonly string[] = ['demo', 'sandbox-test-cards', 'sandbox-beneficiaries'];
 
-export const UNVERIFIED_PATHS: readonly string[] = [
-  'request-qr', 'self-activation',
-];
+export const UNVERIFIED_PATHS: readonly string[] = ['request-qr', 'self-activation'];
 
 /** Resolve the environment from explicit config first, then env vars, then
  * the base-URL shape. Never throws; 'unknown' when nothing is determinable. */
@@ -69,8 +70,8 @@ export function classifyOperation(commandPath: string): OperationClass {
 
 export interface GuardDecision {
   allowed: boolean;
-  reason?: string;   // required when not allowed
-  ruleId: string;    // e.g. 'PW-GUARD-001'
+  reason?: string; // required when not allowed
+  ruleId: string; // e.g. 'PW-GUARD-001'
 }
 
 /** The §12.2 matrix. `flags` are the guard flags the user supplied. */
@@ -102,7 +103,8 @@ export function assertOperationAllowed(
     return {
       allowed: false,
       ruleId: 'PW-GUARD-003',
-      reason: 'This command is unverified against production; pass --allow-unverified AND --confirm-production to proceed.',
+      reason:
+        'This command is unverified against production; pass --allow-unverified AND --confirm-production to proceed.',
     };
   }
 
@@ -120,7 +122,11 @@ export function assertOperationAllowed(
   return { allowed: true, ruleId: 'PW-GUARD-000' };
 }
 
-export function guardCliCommand(commandPath: string, environment: EnvironmentIdentity, flags: { confirmProduction?: boolean; allowUnverified?: boolean }): void {
+export function guardCliCommand(
+  commandPath: string,
+  environment: EnvironmentIdentity,
+  flags: { confirmProduction?: boolean; allowUnverified?: boolean },
+): void {
   const decision = assertOperationAllowed(classifyOperation(commandPath), environment, flags);
   if (!decision.allowed) throw new PayWayGuardError(`${decision.reason} (${decision.ruleId})`);
 }

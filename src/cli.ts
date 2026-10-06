@@ -1210,11 +1210,15 @@ program
   .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .action(async (opts: { port?: string; check?: boolean; confirmProduction?: boolean }) => {
     try {
-      guardCliCommand('demo', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true });
+      guardCliCommand(
+        'demo',
+        resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }),
+        { confirmProduction: opts.confirmProduction === true },
+      );
     } catch (e) {
       process.exitCode = routeCliError(e, undefined);
       return;
@@ -1822,11 +1826,15 @@ program
     }
     try {
       validateTransactionId(opts.transactionId);
-      guardCliCommand('close-transaction', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true });
+      guardCliCommand(
+        'close-transaction',
+        resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }),
+        { confirmProduction: opts.confirmProduction === true },
+      );
       if (!opts.force && !opts.json) {
         const confirmed = io
           ? await io.confirm({
@@ -2383,11 +2391,15 @@ program
         return;
       }
       try {
-        guardCliCommand('refund', resolveEnvironment({
-          environment: process.env.PAYWAY_ENV,
-          apiBaseUrl: process.env.PAYWAY_BASE_URL,
-          env: process.env,
-        }), { confirmProduction: opts.confirmProduction === true });
+        guardCliCommand(
+          'refund',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true },
+        );
       } catch (e) {
         process.exitCode = routeCliError(e, opts.json);
         return;
@@ -3382,11 +3394,15 @@ program
         return;
       }
       try {
-        guardCliCommand('request-qr', resolveEnvironment({
-          environment: process.env.PAYWAY_ENV,
-          apiBaseUrl: process.env.PAYWAY_BASE_URL,
-          env: process.env,
-        }), { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true });
+        guardCliCommand(
+          'request-qr',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true },
+        );
       } catch (e) {
         process.exitCode = routeCliError(e, opts.json);
         return;
@@ -4131,11 +4147,15 @@ paymentLinkCmd
     }
 
     try {
-      guardCliCommand('payment-link void', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true });
+      guardCliCommand(
+        'payment-link void',
+        resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }),
+        { confirmProduction: opts.confirmProduction === true },
+      );
       if (!opts.force && !opts.json) {
         const confirmed = io
           ? await io.confirm({ message: `Void payment link ${opts.id}? This cannot be undone.`, initial: false })
@@ -4178,11 +4198,15 @@ program
   .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .action((opts: { currency?: string; json?: boolean; confirmProduction?: boolean }) => {
     try {
-      guardCliCommand('sandbox-beneficiaries', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true });
+      guardCliCommand(
+        'sandbox-beneficiaries',
+        resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }),
+        { confirmProduction: opts.confirmProduction === true },
+      );
     } catch (e) {
       process.exitCode = routeCliError(e, opts.json);
       return;
@@ -4234,11 +4258,15 @@ program
   .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .action((opts: { outcome?: string; json?: boolean; confirmProduction?: boolean }) => {
     try {
-      guardCliCommand('sandbox-test-cards', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true });
+      guardCliCommand(
+        'sandbox-test-cards',
+        resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }),
+        { confirmProduction: opts.confirmProduction === true },
+      );
     } catch (e) {
       process.exitCode = routeCliError(e, opts.json);
       return;
@@ -4382,11 +4410,15 @@ program
       try {
         const payway = new PayWay();
         if (!opts.json) console.log(`  ${c.dim('Calling PayWay payout API...')}`);
-        guardCliCommand('payout', resolveEnvironment({
-          environment: process.env.PAYWAY_ENV,
-          apiBaseUrl: process.env.PAYWAY_BASE_URL,
-          env: process.env,
-        }), { confirmProduction: opts.confirmProduction === true });
+        guardCliCommand(
+          'payout',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true },
+        );
         const result = await payway.payout.payout({
           transactionId: opts.transactionId,
           amount,
@@ -5209,11 +5241,15 @@ cofTokenCmd
       return;
     }
     try {
-      guardCliCommand('cof token remove', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true });
+      guardCliCommand(
+        'cof token remove',
+        resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }),
+        { confirmProduction: opts.confirmProduction === true },
+      );
       const payway = new PayWay();
       const result = await payway.credentialsOnFile.removeToken({
         ctid: opts.ctid as string,
@@ -5344,11 +5380,15 @@ beneficiaryCmd
     }
     try {
       const payway = new PayWay();
-      guardCliCommand('beneficiary add', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true });
+      guardCliCommand(
+        'beneficiary add',
+        resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }),
+        { confirmProduction: opts.confirmProduction === true },
+      );
       const result = await payway.payout.addBeneficiary({ payee });
       if (opts.json) {
         printApiResultJson(result, payway);
@@ -5382,11 +5422,15 @@ beneficiaryCmd
     }
     try {
       const payway = new PayWay();
-      guardCliCommand('beneficiary update-status', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true });
+      guardCliCommand(
+        'beneficiary update-status',
+        resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }),
+        { confirmProduction: opts.confirmProduction === true },
+      );
       const result = await payway.payout.updateBeneficiaryStatus({ payee, status: status as 0 | 1 });
       if (opts.json) {
         printApiResultJson(result, payway);
@@ -5682,11 +5726,15 @@ const preAuthComplete = new Command('complete')
       try {
         const amount = Number(opts.amount);
         validateTransactionId(opts.transactionId);
-        guardCliCommand('pre-auth complete', resolveEnvironment({
-          environment: process.env.PAYWAY_ENV,
-          apiBaseUrl: process.env.PAYWAY_BASE_URL,
-          env: process.env,
-        }), { confirmProduction: opts.confirmProduction === true });
+        guardCliCommand(
+          'pre-auth complete',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true },
+        );
         const originalAmount = opts.originalAmount !== undefined ? Number(opts.originalAmount) : undefined;
         const payway = new PayWay();
         const result = io
@@ -5748,11 +5796,15 @@ const preAuthCompletePayout = new Command('complete-payout')
       try {
         const amount = Number(opts.amount);
         validateTransactionId(opts.transactionId);
-        guardCliCommand('pre-auth complete-payout', resolveEnvironment({
-          environment: process.env.PAYWAY_ENV,
-          apiBaseUrl: process.env.PAYWAY_BASE_URL,
-          env: process.env,
-        }), { confirmProduction: opts.confirmProduction === true });
+        guardCliCommand(
+          'pre-auth complete-payout',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true },
+        );
         let payout: { acc: string; amt: number }[];
         try {
           payout = JSON.parse(opts.payout) as { acc: string; amt: number }[];
@@ -5820,11 +5872,15 @@ const preAuthCancel = new Command('cancel')
       }
       try {
         validateTransactionId(opts.transactionId);
-        guardCliCommand('pre-auth cancel', resolveEnvironment({
-          environment: process.env.PAYWAY_ENV,
-          apiBaseUrl: process.env.PAYWAY_BASE_URL,
-          env: process.env,
-        }), { confirmProduction: opts.confirmProduction === true });
+        guardCliCommand(
+          'pre-auth cancel',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true },
+        );
         if (!opts.force && !opts.json) {
           const confirmed = io
             ? await io.confirm({
@@ -5918,11 +5974,15 @@ const selfActivationNewMerchant = new Command('new-merchant')
         return;
       }
       try {
-        guardCliCommand('self-activation new-merchant', resolveEnvironment({
-          environment: process.env.PAYWAY_ENV,
-          apiBaseUrl: process.env.PAYWAY_BASE_URL,
-          env: process.env,
-        }), { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true });
+        guardCliCommand(
+          'self-activation new-merchant',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true },
+        );
         const merchantType = opts.merchantType !== undefined ? (Number(opts.merchantType) as 0 | 1) : undefined;
         const type = opts.type !== undefined ? (Number(opts.type) as 0 | 1) : undefined;
         const redirect = parseJsonOrString(opts.redirectUrl) as string | { ios_scheme: string; android_scheme: string };
@@ -5958,34 +6018,40 @@ const selfActivationCredentialInfo = new Command('credential-info')
   .option('--json', 'Print the raw JSON response')
   .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .option('--allow-unverified', 'Permit running spec-derived, unverified endpoints against production (WP-07 guard)')
-  .action(async (opts: { registerRef: string; json?: boolean; confirmProduction?: boolean; allowUnverified?: boolean }) => {
-    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: credential info\n`);
-    if (!assertPartnerCredentialsPresent(opts.json)) {
-      process.exitCode = 1;
-      return;
-    }
-    try {
-      guardCliCommand('self-activation credential-info', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true });
-      const payway = new PayWay();
-      const result = await payway.selfActivation.getCredentialInfo({ registerRef: opts.registerRef });
-      if (opts.json) {
-        printApiResultJson(result, payway);
-      } else {
-        console.log(`  ${c.green('✓')} Credential info retrieved`);
-        console.log(`  ${c.bold('Register ref:')} ${opts.registerRef}`);
-        if (result.data)
-          console.log(`  ${c.bold('Encrypted data:')} ${c.dim(`${String(result.data).slice(0, 120)}…`)}`);
-        console.log();
+  .action(
+    async (opts: { registerRef: string; json?: boolean; confirmProduction?: boolean; allowUnverified?: boolean }) => {
+      if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: credential info\n`);
+      if (!assertPartnerCredentialsPresent(opts.json)) {
+        process.exitCode = 1;
+        return;
       }
-      process.exitCode = EXIT_OK;
-    } catch (error) {
-      process.exitCode = routeCliError(error, opts.json);
-    }
-  });
+      try {
+        guardCliCommand(
+          'self-activation credential-info',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true },
+        );
+        const payway = new PayWay();
+        const result = await payway.selfActivation.getCredentialInfo({ registerRef: opts.registerRef });
+        if (opts.json) {
+          printApiResultJson(result, payway);
+        } else {
+          console.log(`  ${c.green('✓')} Credential info retrieved`);
+          console.log(`  ${c.bold('Register ref:')} ${opts.registerRef}`);
+          if (result.data)
+            console.log(`  ${c.bold('Encrypted data:')} ${c.dim(`${String(result.data).slice(0, 120)}…`)}`);
+          console.log();
+        }
+        process.exitCode = EXIT_OK;
+      } catch (error) {
+        process.exitCode = routeCliError(error, opts.json);
+      }
+    },
+  );
 
 const selfActivationMcInfo = new Command('mc-info')
   .description('Fetch merchant API info (accounts, payment methods) by merchant key (get-mc-info)')
@@ -5997,40 +6063,52 @@ const selfActivationMcInfo = new Command('mc-info')
   .option('--json', 'Print the raw JSON response')
   .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .option('--allow-unverified', 'Permit running spec-derived, unverified endpoints against production (WP-07 guard)')
-  .action(async (opts: { merchantKey: string; requestTime?: string; json?: boolean; confirmProduction?: boolean; allowUnverified?: boolean }) => {
-    if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: merchant info\n`);
-    if (!assertPartnerCredentialsPresent(opts.json)) {
-      process.exitCode = 1;
-      return;
-    }
-    try {
-      guardCliCommand('self-activation mc-info', resolveEnvironment({
-        environment: process.env.PAYWAY_ENV,
-        apiBaseUrl: process.env.PAYWAY_BASE_URL,
-        env: process.env,
-      }), { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true });
-      const payway = new PayWay();
-      const result = await payway.selfActivation.getMerchantInfo({
-        merchantKey: opts.merchantKey,
-        requestTime: opts.requestTime,
-      });
-      if (opts.json) {
-        printApiResultJson(result, payway);
-      } else {
-        console.log(`  ${c.green('✓')} Merchant info retrieved`);
-        const data = result.data;
-        if (data) {
-          console.log(`  ${c.bold('Outlet:')}           ${data.outlet_name ?? '-'}`);
-          console.log(`  ${c.bold('ABA account KHR:')}  ${data.aba_account_khr ?? '-'}`);
-          console.log(`  ${c.bold('ABA account USD:')}  ${data.aba_account_usd ?? '-'}`);
-        }
-        console.log();
+  .action(
+    async (opts: {
+      merchantKey: string;
+      requestTime?: string;
+      json?: boolean;
+      confirmProduction?: boolean;
+      allowUnverified?: boolean;
+    }) => {
+      if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: merchant info\n`);
+      if (!assertPartnerCredentialsPresent(opts.json)) {
+        process.exitCode = 1;
+        return;
       }
-      process.exitCode = EXIT_OK;
-    } catch (error) {
-      process.exitCode = routeCliError(error, opts.json);
-    }
-  });
+      try {
+        guardCliCommand(
+          'self-activation mc-info',
+          resolveEnvironment({
+            environment: process.env.PAYWAY_ENV,
+            apiBaseUrl: process.env.PAYWAY_BASE_URL,
+            env: process.env,
+          }),
+          { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true },
+        );
+        const payway = new PayWay();
+        const result = await payway.selfActivation.getMerchantInfo({
+          merchantKey: opts.merchantKey,
+          requestTime: opts.requestTime,
+        });
+        if (opts.json) {
+          printApiResultJson(result, payway);
+        } else {
+          console.log(`  ${c.green('✓')} Merchant info retrieved`);
+          const data = result.data;
+          if (data) {
+            console.log(`  ${c.bold('Outlet:')}           ${data.outlet_name ?? '-'}`);
+            console.log(`  ${c.bold('ABA account KHR:')}  ${data.aba_account_khr ?? '-'}`);
+            console.log(`  ${c.bold('ABA account USD:')}  ${data.aba_account_usd ?? '-'}`);
+          }
+          console.log();
+        }
+        process.exitCode = EXIT_OK;
+      } catch (error) {
+        process.exitCode = routeCliError(error, opts.json);
+      }
+    },
+  );
 
 program
   .command('self-activation')
