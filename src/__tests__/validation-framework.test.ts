@@ -16,6 +16,7 @@ import { createCheckoutDomain } from '../domains/checkout.js';
 import { createKhqrDomain } from '../domains/khqr.js';
 import { PayWayConfigError } from '../errors.js';
 import { validateAmountFloor, warnAdvisory } from '../utils.js';
+import { resetAdvisoryDedupeForTests } from '../core/advisories.js';
 
 const TEST_CONFIG = {
   merchantId: 'test-merchant-001',
@@ -44,6 +45,7 @@ describe('warnAdvisory (advisory framework core)', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    resetAdvisoryDedupeForTests();
   });
 
   it('warns once per distinct message and dedups repeats', () => {
@@ -54,11 +56,11 @@ describe('warnAdvisory (advisory framework core)', () => {
     expect(console.warn).toHaveBeenCalledWith(`[payway] ${msg}`);
   });
 
-  it('different messages each warn', () => {
+  it('different rule ids each warn (dedupe key is ruleId, not message)', () => {
     const a = `dedup-a-${Date.now()}`;
     const b = `dedup-b-${Date.now()}`;
-    warnAdvisory(TEST_CONFIG as PayWayConfig, a);
-    warnAdvisory(TEST_CONFIG as PayWayConfig, b);
+    warnAdvisory(TEST_CONFIG as PayWayConfig, a, { ruleId: 'GW-CAP-AAA' });
+    warnAdvisory(TEST_CONFIG as PayWayConfig, b, { ruleId: 'GW-CAP-BBB' });
     expect(console.warn).toHaveBeenCalledTimes(2);
   });
 });
@@ -69,6 +71,7 @@ describe('strictValidation escalation', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    resetAdvisoryDedupeForTests();
   });
 
   it('config flag escalates an advisory to PayWayConfigError', () => {
@@ -117,6 +120,7 @@ describe('purchase advisory caps (buildPurchasePayload)', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    resetAdvisoryDedupeForTests();
   });
 
   const base: CreateTransactionParams = { transactionId: 'CAP-1', amount: 10 };
@@ -201,6 +205,7 @@ describe('getTransactionList advisory limits', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    resetAdvisoryDedupeForTests();
   });
 
   it('malformed dates warn with the required format', () => {
@@ -253,6 +258,7 @@ describe('khqr merchantRef validation', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    resetAdvisoryDedupeForTests();
   });
 
   it('empty merchantRef throws PayWayConfigError (error-class change)', () => {
@@ -272,6 +278,7 @@ describe('validateAmountFloor', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    resetAdvisoryDedupeForTests();
   });
 
   // Audit DX-RULE-004 (2026-10-05): the floor is HARD in normal AND strict

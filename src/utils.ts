@@ -1,3 +1,4 @@
+import { emitAdvisory, type AdvisoryOptions } from './core/advisories.js';
 import { PayWayConfigError } from './errors.js';
 import {
   PURCHASE_LIFETIME_MIN_MINUTES,
@@ -27,20 +28,17 @@ const VALID_CURRENCIES: Array<'USD' | 'KHR'> = ['USD', 'KHR'];
 /**
  * Advisory-limit escalation (live-docs audit 2026-08-31): gateway limits that
  * are NOT hard requirements — length caps, enum advisory sets — warn once per
- * distinct message by default and throw `PayWayConfigError` when
+ * rule id (WP-19) by default and throw `PayWayConfigError` when
  * `config.strictValidation` is set. Gateway-documented REQUIRED fields and
  * documented deterministic minimums (QR-009 amount floor) must NOT go through
  * here; they validate directly.
  */
-const advisoryWarned = new Set<string>();
-
-export function warnAdvisory(config: { strictValidation?: boolean } | undefined, message: string): void {
-  if (config?.strictValidation) {
-    throw new PayWayConfigError(message);
-  }
-  if (advisoryWarned.has(message)) return;
-  advisoryWarned.add(message);
-  console.warn(`[payway] ${message}`);
+export function warnAdvisory(
+  config: { strictValidation?: boolean } | undefined,
+  message: string,
+  options?: Partial<AdvisoryOptions>,
+): void {
+  emitAdvisory(config, message, { ruleId: options?.ruleId ?? 'UNSUPPORTED-TMP', ...options });
 }
 
 /**
@@ -48,13 +46,14 @@ export function warnAdvisory(config: { strictValidation?: boolean } | undefined,
  * NEVER become hard errors: profile-dependent facts (official response code 23
  * shows option enablement is profile-scoped) and legacy-value notices (audit
  * risk R-A — never reject a value the official docs or an archived spec
- * lists). Warns once per distinct message, like warnAdvisory, but
+ * lists). Warns once per rule id, like warnAdvisory, but
  * `strictValidation` does NOT escalate it.
+ *
+ * @deprecated Use `emitAdvisory(config, message, { ruleId, strictEscalable: false })`
+ * directly — kept for back-compat with the legacy purchase-option advisory.
  */
 export function warnNonEscalating(message: string): void {
-  if (advisoryWarned.has(message)) return;
-  advisoryWarned.add(message);
-  console.warn(`[payway] ${message}`);
+  emitAdvisory(undefined, message, { ruleId: 'PUR-003', source: 'official', strictEscalable: false });
 }
 
 export function validateCurrency(currency: 'USD' | 'KHR' | string | undefined): void {

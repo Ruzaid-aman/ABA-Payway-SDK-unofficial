@@ -21,6 +21,7 @@ import { createCheckoutDomain } from '../domains/checkout.js';
 import { createQrDomain } from '../domains/qr.js';
 import { PayWayConfigError } from '../errors.js';
 import { DEFAULT_TEST_CASES, generateMockSession, runTestSuite } from '../test/index.js';
+import { resetAdvisoryDedupeForTests } from '../core/advisories.js';
 import { validateAmountFloor } from '../utils.js';
 
 const TEST_CONFIG = {
@@ -78,6 +79,7 @@ async function checkoutPurchase(config: PayWayConfig, params: Record<string, unk
 
 afterEach(() => {
   vi.restoreAllMocks();
+  resetAdvisoryDedupeForTests();
 });
 
 // ───────────────────────────────────────────────────────────────────────────
