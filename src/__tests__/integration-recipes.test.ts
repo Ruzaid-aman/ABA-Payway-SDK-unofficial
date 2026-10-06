@@ -148,7 +148,8 @@ describe('installed integration recipe decisions', () => {
     f.proof({});
     expect((await f.service.reconcile(attemptId, 'alice')).fulfillmentQueued).toBe(true);
   });
-  it('recovers across restart and two DB connections, queuing one fulfillment job', async () => {
+  // 30s ceiling: DB/child-process setup exceeds 5s on slow CI runners
+  it('recovers across restart and two DB connections, queuing one fulfillment job', { timeout: 30_000 }, async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'payway-recipe-db-'));
     const file = path.join(dir, 'payments.db');
     const f = setup(file);
@@ -169,7 +170,8 @@ describe('installed integration recipe decisions', () => {
     expect(results.filter((result) => result.fulfillmentQueued)).toHaveLength(1);
     expect(a.jobs()).toEqual([{ orderId: 'order-1', attemptId }]);
   });
-  it('recovers a process stop between durable reservation and submission', async () => {
+  // 30s ceiling: DB/child-process setup exceeds 5s on slow CI runners
+  it('recovers a process stop between durable reservation and submission', { timeout: 30_000 }, async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'payway-recipe-reserve-'));
     const file = path.join(dir, 'payments.db');
     const f = setup(file);

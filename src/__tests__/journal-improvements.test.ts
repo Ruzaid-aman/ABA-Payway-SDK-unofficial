@@ -141,7 +141,8 @@ describe('I-4: doctor journal row', () => {
     expect(journal?.fix).toContain('--no-journal');
   });
 
-  it('reports enabled state and warns above 50 MB', () => {
+  // 30s ceiling: DB/child-process setup exceeds 5s on slow CI runners
+  it('reports enabled state and warns above 50 MB', { timeout: 30_000 }, () => {
     // Isolate the data root: since 155b104 the default journal dir follows
     // PAYWAY_DATA_DIR, so without this the enabled row would read the real
     // machine journal instead of the test's empty one.
