@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { PayWayGuardError } from '../../errors.js';
 import type {
   Envelope,
   EnvelopeContext,
@@ -91,7 +92,9 @@ export function exitCodeForError(e: unknown): number {
     return 3;
   }
   if (name === 'PayWayNetworkError' || name === 'PayWayRateLimitError') return 3;
-  if (name === 'PayWayGuardError') return 6;
+  // instanceof (not name): esbuild renames the class symbol in bundles.
+  if (e instanceof PayWayGuardError) return 6;
+
   if (name === 'PayWayAPIError') {
     const anyErr = e as { statusCode?: number; retryable?: boolean };
     if (anyErr.statusCode === undefined && anyErr.retryable === true) return 3;

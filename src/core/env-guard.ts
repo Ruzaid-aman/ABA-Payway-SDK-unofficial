@@ -37,20 +37,24 @@ export function resolveEnvironment(input: {
   apiBaseUrl?: string;
   env?: Record<string, string | undefined>;
 }): EnvironmentIdentity {
-  // 1. input.environment 'sandbox'|'production' wins (case-insensitive).
+  // 1. THE ENDPOINT IS AUTHORITATIVE (audit DX-GUARD-001): a recognized
+  // production URL wins over any sandbox label — the fail-safe direction is
+  // to demand --confirm-production, never to wave a production-bound
+  // money-move through because a label said "sandbox".
+  const url = input.apiBaseUrl?.toLowerCase() ?? '';
+  if (url.includes('payway.com.kh')) {
+    return url.includes('sandbox') ? 'sandbox' : 'production';
+  }
+
+  // 2. Explicit label beats env vars.
   const explicit = input.environment?.trim().toLowerCase();
   if (explicit === 'sandbox' || explicit === 'production') return explicit;
 
   const env = input.env ?? {};
-  // 2. env.PAYWAY_ENV 'production'|'sandbox' wins over PAYWAY_SANDBOX.
+  // 3. PAYWAY_ENV 'production'|'sandbox' wins over PAYWAY_SANDBOX.
   const paywayEnv = env.PAYWAY_ENV?.trim().toLowerCase();
   if (paywayEnv === 'production' || paywayEnv === 'sandbox') return paywayEnv;
   if (env.PAYWAY_SANDBOX === '1') return 'sandbox';
-
-  // 3. apiBaseUrl shape.
-  const url = input.apiBaseUrl?.toLowerCase() ?? '';
-  if (url.includes('sandbox')) return 'sandbox';
-  if (url.includes('payway.com.kh')) return 'production';
 
   // 4. otherwise 'unknown'.
   return 'unknown';

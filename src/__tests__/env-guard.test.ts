@@ -59,10 +59,20 @@ describe('resolveEnvironment precedence', () => {
     );
   });
 
-  it('env vars beat URL', () => {
+  it('URL is AUTHORITATIVE over labels (audit DX-GUARD-001, fail-safe)', () => {
+    // A sandbox label with a production endpoint MUST resolve production —
+    // the guard demands --confirm-production rather than waving a
+    // production-bound money-move through.
     expect(
-      resolveEnvironment({ env: { PAYWAY_ENV: 'production' }, apiBaseUrl: 'https://checkout-sandbox.payway.com.kh/' }),
+      resolveEnvironment({
+        env: { PAYWAY_ENV: 'sandbox', PAYWAY_SANDBOX: '1' },
+        apiBaseUrl: 'https://checkout.payway.com.kh/',
+      }),
     ).toBe('production');
+    // The reverse mismatch also resolves production (safe, may over-block).
+    expect(
+      resolveEnvironment({ environment: 'production', apiBaseUrl: 'https://checkout-sandbox.payway.com.kh/' }),
+    ).toBe('sandbox');
   });
 
   it('URL shape resolves sandbox/production', () => {

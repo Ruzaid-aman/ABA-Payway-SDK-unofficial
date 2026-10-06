@@ -84,6 +84,7 @@ import {
   PayWayAPIError,
   PayWayBusinessError,
   PayWayConfigError,
+  PayWayGuardError,
   PayWayError,
   PayWayNetworkError,
   PayWayRateLimitError,
@@ -272,7 +273,9 @@ function classifyError(e: unknown): number {
     if (e.statusCode === undefined && e.retryable === true) return EXIT_NETWORK;
     return EXIT_API_FAILURE;
   }
-  if (e instanceof Error && e.constructor.name === 'PayWayGuardError') return 6;
+  // instanceof (not constructor.name): esbuild renames the class symbol in the
+  // bundle ("_PayWayGuardError"), so the name-based check broke in dist.
+  if (e instanceof PayWayGuardError) return 6;
   if (e instanceof PayWayError) return EXIT_VALIDATION;
   return EXIT_VALIDATION;
 }
@@ -330,9 +333,11 @@ function apiErrorHint(e: PayWayAPIError): string | undefined {
 
 function printApiError(e: unknown): number {
   const next =
-    classifyError(e) === EXIT_NETWORK
-      ? paymentNextStep('unknown')
-      : 'Correct the reported input or gateway rejection; run payway-sdk doctor for configuration help.';
+    classifyError(e) === 6
+      ? 'A safety guard refused this operation: production money-moves need --confirm-production (unverified commands also need --allow-unverified). Never retry blindly.'
+      : classifyError(e) === EXIT_NETWORK
+        ? paymentNextStep('unknown')
+        : 'Correct the reported input or gateway rejection; run payway-sdk doctor for configuration help.';
   if (e instanceof PayWayAPIError) {
     console.log(`  ${c.red('✗')} ${e.message}`);
     if (e.paywayCode) console.log(`  ${c.dim(`PayWay code: ${e.paywayCode}`)}`);
