@@ -104,6 +104,7 @@ describe('env registry — registry shape', () => {
       'PAYWAY_TLS_CA_FILE',
       'PAYWAY_TLS_MIN_VERSION',
       'PAYWAY_UI',
+      'PAYWAY_ADVISORY_IGNORE',
       'PAYWAY_LOG_LEVEL',
       'PAYWAY_NO_UPDATE_CHECK',
       'PAYWAY_ONBOARD_AUTO',

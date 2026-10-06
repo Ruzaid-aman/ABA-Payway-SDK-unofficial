@@ -258,6 +258,17 @@ export const PAYWAY_ENV_VARS: readonly PayWayEnvVarDefinition[] = [
     docsAnchor: 'docs/guides/AGENTIC-PAYWAY-CLI-USER-GUIDE.md',
   },
   {
+    name: 'PAYWAY_ADVISORY_IGNORE',
+    kind: 'non-secret',
+    group: 'behavior',
+    description:
+      "Comma-separated advisory rule ids (e.g. 'QR-016,GW-CAP-EMAIL') to suppress entirely — no warning, no session collection, and no strictValidation escalation.",
+    defaultValue: null,
+    required: false,
+    consumedBy: ['src/core/advisories.ts'],
+    docsAnchor: 'docs/guides/12-error-handling-and-debugging.md',
+  },
+  {
     name: 'PAYWAY_LOG_LEVEL',
     kind: 'non-secret',
     group: 'behavior',

@@ -16,6 +16,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import type { CreatePaymentLinkParams, PayWayConfig } from '../client.js';
 import { createPaymentLinkDomain } from '../domains/payment-link.js';
 import { PayWayConfigError } from '../errors.js';
+import { resetAdvisoryDedupeForTests } from '../core/advisories.js';
 
 const DUMMY_CONFIG = {} as unknown as PayWayConfig;
 
@@ -41,7 +42,10 @@ function makeDomain(config: PayWayConfig = DUMMY_CONFIG): {
 }
 
 beforeEach(() => vi.spyOn(console, 'warn').mockImplementation(() => {}));
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  resetAdvisoryDedupeForTests();
+});
 
 describe('paymentLink.create payout (audit D2)', () => {
   it('forwards payout entries into the merchant_auth payload as a JSON string', async () => {

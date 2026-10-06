@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  collectAdvisories,
-  emitAdvisory,
-  resetAdvisoryDedupeForTests,
-} from '../core/advisories.js';
+import { collectAdvisories, emitAdvisory, resetAdvisoryDedupeForTests } from '../core/advisories.js';
 import type { AdvisoryRecord } from '../core/advisories.js';
 import { PayWayConfigError } from '../errors.js';
 import { warnAdvisory } from '../utils.js';
@@ -22,12 +18,12 @@ describe('advisories (WP-19)', () => {
   });
 
   it('strictValidation escalates an advisory and the message carries (rule ID)', () => {
-    expect(() =>
-      emitAdvisory({ strictValidation: true }, 'items overflow', { ruleId: 'QR-016' }),
-    ).toThrow(PayWayConfigError);
-    expect(() =>
-      emitAdvisory({ strictValidation: true }, 'items overflow', { ruleId: 'QR-016' }),
-    ).toThrow(/\(rule QR-016\)/);
+    expect(() => emitAdvisory({ strictValidation: true }, 'items overflow', { ruleId: 'QR-016' })).toThrow(
+      PayWayConfigError,
+    );
+    expect(() => emitAdvisory({ strictValidation: true }, 'items overflow', { ruleId: 'QR-016' })).toThrow(
+      /\(rule QR-016\)/,
+    );
   });
 
   it('strictEscalable:false + strictValidation does NOT throw, warns once', () => {
