@@ -92,6 +92,7 @@ import {
 import { CircuitOpenError } from './circuit-breaker.js';
 import type { KhqrCallbackEnrollment, KhqrCallbackVerification, KhqrMerchantConfiguration } from './khqr-config.js';
 import { openImageInDefaultViewer } from './open-image.js';
+import { guardCliCommand, resolveEnvironment } from './core/env-guard.js';
 import { sdk } from './sdk.js';
 import { formatTestReport } from './test/index.js';
 import {
@@ -1206,7 +1207,18 @@ program
   .description('Run a credential-free simulated payment journey on localhost')
   .option('-p, --port <number>', 'Local UI port (default: an available port)')
   .option('--check', 'Start the demo, verify its local endpoints, and exit')
-  .action(async (opts: { port?: string; check?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .action(async (opts: { port?: string; check?: boolean; confirmProduction?: boolean }) => {
+    try {
+      guardCliCommand('demo', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true });
+    } catch (e) {
+      process.exitCode = routeCliError(e, undefined);
+      return;
+    }
     if (opts.check) {
       const result = await checkDemoApp();
       console.log(`Credential-free demo check passed (${result.url}).`);
@@ -1801,7 +1813,8 @@ program
   .requiredOption('-t, --transaction-id <id>', 'Transaction ID')
   .option('-y, --force', 'Skip confirmation prompt (for scripts/agents)')
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: { transactionId: string; force?: boolean; json?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .action(async (opts: { transactionId: string; force?: boolean; json?: boolean; confirmProduction?: boolean }) => {
     const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
     if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
@@ -1809,6 +1822,11 @@ program
     }
     try {
       validateTransactionId(opts.transactionId);
+      guardCliCommand('close-transaction', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true });
       if (!opts.force && !opts.json) {
         const confirmed = io
           ? await io.confirm({
@@ -2344,6 +2362,7 @@ program
   )
   .option('--no-preflight', 'Skip the balance pre-flight check (detail API is rate-limited to 10/min)')
   .option('--json', 'Print the raw JSON response')
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .addHelpText(
     'after',
     '\nTimeout recovery: do not blindly repeat a refund. Use transaction-detail and journal timeline\nto reconcile refund_amount and transaction_operations against the pre-submit total.\nREFUNDED also covers partial refunds; an unchanged status does not prove this attempt failed.\nKeep unresolved attempts pending and consult payway-sdk docs errors-and-debugging.\n',
@@ -2356,10 +2375,21 @@ program
       force?: boolean;
       preflight?: boolean;
       json?: boolean;
+      confirmProduction?: boolean;
     }) => {
       const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
       if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
         process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      try {
+        guardCliCommand('refund', resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }), { confirmProduction: opts.confirmProduction === true });
+      } catch (e) {
+        process.exitCode = routeCliError(e, opts.json);
         return;
       }
       const currency = opts.currency.toUpperCase() as 'USD' | 'KHR';
@@ -3327,6 +3357,8 @@ program
   .option('--allow-duplicate-id', 'Silence the duplicate transaction-id journal warning (W5-7)')
   .option('--json', 'Print the raw JSON response')
   .option('-y, --non-interactive', 'Accepted for agent compatibility (this command never prompts)')
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .option('--allow-unverified', 'Permit running spec-derived, unverified endpoints against production (WP-07 guard)')
   .action(
     async (opts: {
       amount?: string;
@@ -3341,10 +3373,22 @@ program
       allowDuplicateId?: boolean;
       json?: boolean;
       nonInteractive?: boolean;
+      confirmProduction?: boolean;
+      allowUnverified?: boolean;
     }) => {
       if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — Soundbox QR (request-qr)\n`);
       if (!assertCredentialsPresent(Boolean(opts.json))) {
         process.exitCode = 1;
+        return;
+      }
+      try {
+        guardCliCommand('request-qr', resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }), { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true });
+      } catch (e) {
+        process.exitCode = routeCliError(e, opts.json);
         return;
       }
 
@@ -4076,7 +4120,8 @@ paymentLinkCmd
   .requiredOption('-i, --id <id>', 'Payment link id (data.id returned by create)')
   .option('-y, --force', 'Skip confirmation prompt (for scripts/agents)')
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: { id: string; force?: boolean; json?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .action(async (opts: { id: string; force?: boolean; json?: boolean; confirmProduction?: boolean }) => {
     const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
     if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — void payment link\n`);
 
@@ -4086,6 +4131,11 @@ paymentLinkCmd
     }
 
     try {
+      guardCliCommand('payment-link void', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true });
       if (!opts.force && !opts.json) {
         const confirmed = io
           ? await io.confirm({ message: `Void payment link ${opts.id}? This cannot be undone.`, initial: false })
@@ -4125,7 +4175,18 @@ program
   .description('List seeded sandbox beneficiary accounts and test MIDs for payout testing (SANDBOX ONLY)')
   .option('--currency <code>', 'Filter by currency: USD or KHR')
   .option('--json', 'Print as JSON')
-  .action((opts: { currency?: string; json?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .action((opts: { currency?: string; json?: boolean; confirmProduction?: boolean }) => {
+    try {
+      guardCliCommand('sandbox-beneficiaries', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true });
+    } catch (e) {
+      process.exitCode = routeCliError(e, opts.json);
+      return;
+    }
     const currency = opts.currency?.toUpperCase();
     if (currency && currency !== 'USD' && currency !== 'KHR') {
       if (opts.json) {
@@ -4170,7 +4231,18 @@ program
   .description('List ABA sandbox test cards for hosted card-checkout testing (SANDBOX ONLY)')
   .option('--outcome <outcome>', 'Filter by outcome: approved or declined')
   .option('--json', 'Print as JSON')
-  .action((opts: { outcome?: string; json?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .action((opts: { outcome?: string; json?: boolean; confirmProduction?: boolean }) => {
+    try {
+      guardCliCommand('sandbox-test-cards', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true });
+    } catch (e) {
+      process.exitCode = routeCliError(e, opts.json);
+      return;
+    }
     const outcome = opts.outcome?.toLowerCase();
     if (outcome && outcome !== 'approved' && outcome !== 'declined') {
       if (opts.json) {
@@ -4237,6 +4309,7 @@ program
   )
   .option('--custom-fields <json>', 'Optional JSON custom fields object/string')
   .option('--json', 'Print the raw response as JSON')
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .action(
     async (opts: {
       transactionId: string;
@@ -4245,6 +4318,7 @@ program
       beneficiaries: string;
       customFields?: string;
       json?: boolean;
+      confirmProduction?: boolean;
     }) => {
       if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — payout\n`);
 
@@ -4308,6 +4382,11 @@ program
       try {
         const payway = new PayWay();
         if (!opts.json) console.log(`  ${c.dim('Calling PayWay payout API...')}`);
+        guardCliCommand('payout', resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }), { confirmProduction: opts.confirmProduction === true });
         const result = await payway.payout.payout({
           transactionId: opts.transactionId,
           amount,
@@ -5123,12 +5202,18 @@ cofTokenCmd
   .requiredOption('-c, --ctid <ctid>', 'Customer token identifier')
   .requiredOption('--token <pwt>', 'Payment token (pwt) to remove')
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: Record<string, string | undefined>) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
     if (!assertCredentialsPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
     try {
+      guardCliCommand('cof token remove', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true });
       const payway = new PayWay();
       const result = await payway.credentialsOnFile.removeToken({
         ctid: opts.ctid as string,
@@ -5251,13 +5336,19 @@ beneficiaryCmd
   .description('Add a payout beneficiary to the merchant whitelist')
   .argument('<payee>', 'Beneficiary account number (ABA account or test MID)')
   .option('--json', 'Print the raw JSON response')
-  .action(async (payee: string, opts: { json?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .action(async (payee: string, opts: { json?: boolean; confirmProduction?: boolean }) => {
     if (!assertCredentialsPresent(Boolean(opts.json)) || !assertRsaKeyPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
     }
     try {
       const payway = new PayWay();
+      guardCliCommand('beneficiary add', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true });
       const result = await payway.payout.addBeneficiary({ payee });
       if (opts.json) {
         printApiResultJson(result, payway);
@@ -5277,7 +5368,8 @@ beneficiaryCmd
   .argument('<payee>', 'Beneficiary account number')
   .requiredOption('-s, --status <0|1>', 'New status: 0 (deactivated) or 1 (active)')
   .option('--json', 'Print the raw JSON response')
-  .action(async (payee: string, opts: { status: string; json?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .action(async (payee: string, opts: { status: string; json?: boolean; confirmProduction?: boolean }) => {
     if (!assertCredentialsPresent(Boolean(opts.json)) || !assertRsaKeyPresent(Boolean(opts.json))) {
       process.exitCode = EXIT_VALIDATION;
       return;
@@ -5290,6 +5382,11 @@ beneficiaryCmd
     }
     try {
       const payway = new PayWay();
+      guardCliCommand('beneficiary update-status', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true });
       const result = await payway.payout.updateBeneficiaryStatus({ payee, status: status as 0 | 1 });
       if (opts.json) {
         printApiResultJson(result, payway);
@@ -5565,6 +5662,7 @@ const preAuthComplete = new Command('complete')
   .option('--idempotency-key <key>', 'Idempotency key forwarded to PayWay')
   .option('-y, --force', 'Skip confirmation prompt (for scripts/agents)')
   .option('--json', 'Print the raw JSON response')
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .action(
     async (opts: {
       transactionId: string;
@@ -5574,6 +5672,7 @@ const preAuthComplete = new Command('complete')
       idempotencyKey?: string;
       force?: boolean;
       json?: boolean;
+      confirmProduction?: boolean;
     }) => {
       const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
       if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
@@ -5583,6 +5682,11 @@ const preAuthComplete = new Command('complete')
       try {
         const amount = Number(opts.amount);
         validateTransactionId(opts.transactionId);
+        guardCliCommand('pre-auth complete', resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }), { confirmProduction: opts.confirmProduction === true });
         const originalAmount = opts.originalAmount !== undefined ? Number(opts.originalAmount) : undefined;
         const payway = new PayWay();
         const result = io
@@ -5624,6 +5728,7 @@ const preAuthCompletePayout = new Command('complete-payout')
   .option('--max-over-capture-pct <number>', 'Over-capture ceiling as % of original (default 110)', '110')
   .option('--idempotency-key <key>', 'Idempotency key forwarded to PayWay')
   .option('--json', 'Print the raw JSON response')
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .action(
     async (opts: {
       transactionId: string;
@@ -5633,6 +5738,7 @@ const preAuthCompletePayout = new Command('complete-payout')
       maxOverCapturePct?: string;
       idempotencyKey?: string;
       json?: boolean;
+      confirmProduction?: boolean;
     }) => {
       const io = resolvePromptMode({ json: opts.json }) === 'clack' ? createClackIO() : null;
       if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
@@ -5642,6 +5748,11 @@ const preAuthCompletePayout = new Command('complete-payout')
       try {
         const amount = Number(opts.amount);
         validateTransactionId(opts.transactionId);
+        guardCliCommand('pre-auth complete-payout', resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }), { confirmProduction: opts.confirmProduction === true });
         let payout: { acc: string; amt: number }[];
         try {
           payout = JSON.parse(opts.payout) as { acc: string; amt: number }[];
@@ -5692,6 +5803,7 @@ const preAuthCancel = new Command('cancel')
   .option('--idempotency-key <key>', 'Idempotency key forwarded to PayWay')
   .option('-y, --force', 'Skip confirmation prompt')
   .option('--json', 'Print the raw JSON response')
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
   .action(
     async (opts: {
       transactionId: string;
@@ -5699,6 +5811,7 @@ const preAuthCancel = new Command('cancel')
       idempotencyKey?: string;
       force?: boolean;
       json?: boolean;
+      confirmProduction?: boolean;
     }) => {
       const io = resolvePromptMode({ json: opts.json, force: opts.force }) === 'clack' ? createClackIO() : null;
       if (!assertCredentialsPresent(opts.json) || !assertRsaKeyPresent(opts.json)) {
@@ -5707,6 +5820,11 @@ const preAuthCancel = new Command('cancel')
       }
       try {
         validateTransactionId(opts.transactionId);
+        guardCliCommand('pre-auth cancel', resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }), { confirmProduction: opts.confirmProduction === true });
         if (!opts.force && !opts.json) {
           const confirmed = io
             ? await io.confirm({
@@ -5779,6 +5897,8 @@ const selfActivationNewMerchant = new Command('new-merchant')
   .option('--type <0|1>', '1 native app, 0 web (gateway default: 0)')
   .option('--reference-id <id>', 'Optional top-level echo of register_ref (must match)')
   .option('--json', 'Print the raw JSON response')
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .option('--allow-unverified', 'Permit running spec-derived, unverified endpoints against production (WP-07 guard)')
   .action(
     async (opts: {
       pushbackUrl: string;
@@ -5789,6 +5909,8 @@ const selfActivationNewMerchant = new Command('new-merchant')
       type?: string;
       referenceId?: string;
       json?: boolean;
+      confirmProduction?: boolean;
+      allowUnverified?: boolean;
     }) => {
       if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: register merchant\n`);
       if (!assertPartnerCredentialsPresent(opts.json)) {
@@ -5796,6 +5918,11 @@ const selfActivationNewMerchant = new Command('new-merchant')
         return;
       }
       try {
+        guardCliCommand('self-activation new-merchant', resolveEnvironment({
+          environment: process.env.PAYWAY_ENV,
+          apiBaseUrl: process.env.PAYWAY_BASE_URL,
+          env: process.env,
+        }), { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true });
         const merchantType = opts.merchantType !== undefined ? (Number(opts.merchantType) as 0 | 1) : undefined;
         const type = opts.type !== undefined ? (Number(opts.type) as 0 | 1) : undefined;
         const redirect = parseJsonOrString(opts.redirectUrl) as string | { ios_scheme: string; android_scheme: string };
@@ -5829,13 +5956,20 @@ const selfActivationCredentialInfo = new Command('credential-info')
   .description('Inquire encrypted merchant credential details by register_ref (get-mc-credential-info)')
   .requiredOption('--register-ref <ref>', 'The register_ref used at new-merchant')
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: { registerRef: string; json?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .option('--allow-unverified', 'Permit running spec-derived, unverified endpoints against production (WP-07 guard)')
+  .action(async (opts: { registerRef: string; json?: boolean; confirmProduction?: boolean; allowUnverified?: boolean }) => {
     if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: credential info\n`);
     if (!assertPartnerCredentialsPresent(opts.json)) {
       process.exitCode = 1;
       return;
     }
     try {
+      guardCliCommand('self-activation credential-info', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true });
       const payway = new PayWay();
       const result = await payway.selfActivation.getCredentialInfo({ registerRef: opts.registerRef });
       if (opts.json) {
@@ -5861,13 +5995,20 @@ const selfActivationMcInfo = new Command('mc-info')
     'Pin request_time (required: the HMAC covers partner_id + merchant_key + request_time)',
   )
   .option('--json', 'Print the raw JSON response')
-  .action(async (opts: { merchantKey: string; requestTime?: string; json?: boolean }) => {
+  .option('--confirm-production', 'Required to run money-moving commands against production (WP-07 guard)')
+  .option('--allow-unverified', 'Permit running spec-derived, unverified endpoints against production (WP-07 guard)')
+  .action(async (opts: { merchantKey: string; requestTime?: string; json?: boolean; confirmProduction?: boolean; allowUnverified?: boolean }) => {
     if (!opts.json) console.log(`\n${c.bold('ABA PayWay SDK')} — self-activation: merchant info\n`);
     if (!assertPartnerCredentialsPresent(opts.json)) {
       process.exitCode = 1;
       return;
     }
     try {
+      guardCliCommand('self-activation mc-info', resolveEnvironment({
+        environment: process.env.PAYWAY_ENV,
+        apiBaseUrl: process.env.PAYWAY_BASE_URL,
+        env: process.env,
+      }), { confirmProduction: opts.confirmProduction === true, allowUnverified: opts.allowUnverified === true });
       const payway = new PayWay();
       const result = await payway.selfActivation.getMerchantInfo({
         merchantKey: opts.merchantKey,
