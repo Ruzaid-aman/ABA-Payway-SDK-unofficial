@@ -41,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { generateHmac } from '../auth.js';
+import { PayWayConfigError } from '../errors.js';
 import * as clientModule from '../client.js';
 import { HASH_ORDER_HINTS, type PayWayConfig } from '../client.js';
 import { ENDPOINTS } from '../constants.js';
@@ -649,5 +650,30 @@ describe('payout regression controls: the machinery catches reorder + encoding r
     const evaluation = evaluateVector({ ...payoutVector!, hashEncoding: 'base64' }, GOLDEN_TEST_API_KEY);
     expect(evaluation.ok).toBe(false);
     expect(evaluation.failure?.kind).toBe('digest_shape');
+  });
+});
+
+describe('N-11: generateHmac rejects objects/arrays in hashed positions', () => {
+  it('throws PayWayConfigError naming the field instead of hashing "[object Object]"', () => {
+    // The former hmac-purchase-006 vector pinned the silent '[object Object]'
+    // coercion; the N-11 fix (2026-10-06) made that a hard throw. The QR
+    // return_params passthrough this guard exposed is fixed in qr.ts.
+    const payload = { req_time: '20260101120000', items: { raw: 'object' } };
+    expect(() =>
+      generateHmac(payload, ['req_time', 'items'], GOLDEN_TEST_API_KEY),
+    ).toThrow(PayWayConfigError);
+    expect(() => generateHmac(payload, ['req_time', 'items'], GOLDEN_TEST_API_KEY)).toThrow(/"items"/);
+  });
+
+  it('arrays throw; booleans/numbers keep the pinned coercion (hmac-purchase-005)', () => {
+    expect(() =>
+      generateHmac({ payout: [{ account: '1' }] }, ['payout'], GOLDEN_TEST_API_KEY),
+    ).toThrow(PayWayConfigError);
+    expect(generateHmac({ skip_success_page: true }, ['skip_success_page'], GOLDEN_TEST_API_KEY)).toBe(
+      generateHmac({ skip_success_page: 'true' }, ['skip_success_page'], GOLDEN_TEST_API_KEY),
+    );
+    expect(generateHmac({ amount: 5 }, ['amount'], GOLDEN_TEST_API_KEY)).toBe(
+      generateHmac({ amount: '5' }, ['amount'], GOLDEN_TEST_API_KEY),
+    );
   });
 });

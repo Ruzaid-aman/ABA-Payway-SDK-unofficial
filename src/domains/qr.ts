@@ -199,7 +199,13 @@ export function createQrDomain(
             params.returnDeeplink !== undefined ? encodeBase64IfNeeded(params.returnDeeplink) : undefined,
           currency,
           custom_fields: params.customFields !== undefined ? encodeBase64IfNeeded(params.customFields) : undefined,
-          return_params: params.returnParams,
+          // return_params is a hashed field: it must reach the preimage as
+          // its wire string, not a raw object — generateHmac throws on
+          // objects since N-11, and before that guard this field silently
+          // hashed "[object Object]". encodeBase64IfNeeded passes strings
+          // verbatim and encodes objects as base64 JSON (custom_fields
+          // convention).
+          return_params: params.returnParams !== undefined ? encodeBase64IfNeeded(params.returnParams) : undefined,
           payout: params.payout !== undefined ? encodeBase64IfNeeded(params.payout) : undefined,
           // The API takes whole minutes; floor keeps the actual expiry at or
           // below the merchant's requested countdown (a live QR must never

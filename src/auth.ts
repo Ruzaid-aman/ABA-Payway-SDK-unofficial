@@ -1,9 +1,18 @@
 import * as crypto from 'node:crypto';
+import { PayWayConfigError } from './errors.js';
 
 /**
  * Generates the PayWay HMAC signature.
  * Concatenates the values of the fields in the order specified by the fieldList,
  * substituting empty string for undefined/null values.
+ *
+ * Preimage policy (audit N-11): strings, numbers and booleans coerce to
+ * their string form (booleans legitimately reach the purchase preimage via
+ * skip_success_page — pinned by golden vector hmac-purchase-005); objects
+ * and arrays THROW naming the field instead of silently hashing
+ * "[object Object]", which corrupted the signature preimage. Any object a
+ * caller means to send must be pre-encoded (e.g. base64 via
+ * encodeBase64IfNeeded) before it enters a hashed position.
  *
  * `algorithm` defaults to sha512 (every merchant-portal/gateway endpoint).
  * The online-self-activation partner endpoints sign with sha256 per the
@@ -23,6 +32,11 @@ export function generateHmac(
       const val = payload[field];
       if (val === undefined || val === null) {
         return '';
+      }
+      if (typeof val === 'object') {
+        throw new PayWayConfigError(
+          `hashed field "${field}" is an object/array; encode it (e.g. base64) before signing — raw objects would corrupt the HMAC preimage (audit N-11)`,
+        );
       }
       return String(val);
     })

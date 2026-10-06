@@ -518,39 +518,9 @@ function buildVectors(): GoldenVector[] {
     );
   }
 
-  // N-11 pin: an object passed RAW into a hashed position does NOT throw —
-  // generateHmac String()-coerces it to "[object Object]". Pinning current
-  // behaviour so the audit's N-11 fix (type guard + throw) is a deliberate,
-  // vector-visible change, never an accident.
-  {
-    const payload: Record<string, unknown> = {
-      req_time: FIXED_REQUEST_TIME,
-      merchant_id: FIXED_MERCHANT_ID,
-      tran_id: 'GV-TXN-OBJ-1',
-      amount: '3.00',
-      items: { raw: 'object-passed-without-encodeBase64IfNeeded' },
-    };
-    const preimage = buildPreimage(payload, [...PURCHASE_HASH_FIELDS]);
-    vectors.push({
-      vectorId: 'hmac-purchase-006',
-      operation: 'auth.generateHmac',
-      endpoint: 'n/a (canonicalization unit — audit N-11 hazard pin)',
-      description:
-        'N-11 pin: a raw JS object in a hashed position is String()-coerced to "[object Object]" instead of throwing — current behaviour pinned deliberately so the N-11 type-guard fix shows up as a vector change',
-      hashFieldsFamily: 'PURCHASE_HASH_FIELDS',
-      fieldOrder: [...PURCHASE_HASH_FIELDS],
-      fieldOrderSource: 'repository export PURCHASE_HASH_FIELDS (src/domains/checkout.ts)',
-      hashAlgorithm: 'sha512',
-      hashEncoding: 'base64',
-      keyAlias: GOLDEN_KEY_ALIAS,
-      canonicalPayload: payload,
-      preimage,
-      preimageSha256: sha256Hex(preimage),
-      expectedHash: generateHmac(payload, [...PURCHASE_HASH_FIELDS], GOLDEN_TEST_API_KEY),
-      normalization: [],
-      provenance: PROVENANCE,
-    });
-  }
+  // N-11 (implemented 2026-10-06): generateHmac now THROWS on objects/arrays
+  // naming the field — the former hmac-purchase-006 '[object Object]' pin is
+  // replaced by the negative unit test in golden-vectors.test.ts.
 
   // ── QR families via the qr domain ──
   {

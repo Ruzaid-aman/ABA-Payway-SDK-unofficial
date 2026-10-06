@@ -42,18 +42,16 @@
     "callback_url": "aHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvY2FsbGJhY2s=",
     "currency": "USD",
     "custom_fields": "{\"campaign\":\"golden\"}",
-    "return_params": {
-      "inv": "GV-QR-1"
-    },
+    "return_params": "eyJpbnYiOiJHVi1RUi0xIn0=",
     "payout": "W3siYWNjb3VudCI6IjUwMDAwMDAwMSIsImFtb3VudCI6Ni4xMn1d",
     "lifetime": 6,
     "qr_image_template": "template3_color",
     "req_time": "20260101000000",
     "merchant_id": "TESTMID"
   },
-  "preimage": "20260101000000TESTMIDGV-TXN-QR-26.12W3sibmFtZSI6IkdvbGRlbiB3aWRnZXQiLCJxdWFudGl0eSI6MiwicHJpY2UiOjMuMDZ9XQ==សុខាMüllergolden.vector@example.com+855-92-000-000purchaseabapay_khqraHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvY2FsbGJhY2s=USD{\"campaign\":\"golden\"}[object Object]W3siYWNjb3VudCI6IjUwMDAwMDAwMSIsImFtb3VudCI6Ni4xMn1d6template3_color",
-  "preimageSha256": "7fde28e4b2d283c7dacfa9d51ce12ef2f4f121d1f68c811b22c201a5eba69a97",
-  "expectedHash": "Wv8y7Q0zqoYN5Iz0VSYHg0WCCK+cXldH9JtSgEPt1dJCVN4GhD7Ep8e24DB9vjjs0a65QBp2JuyYNSVLL7/Ipw==",
+  "preimage": "20260101000000TESTMIDGV-TXN-QR-26.12W3sibmFtZSI6IkdvbGRlbiB3aWRnZXQiLCJxdWFudGl0eSI6MiwicHJpY2UiOjMuMDZ9XQ==សុខាMüllergolden.vector@example.com+855-92-000-000purchaseabapay_khqraHR0cHM6Ly9leGFtcGxlLmNvbS9wYXl3YXkvY2FsbGJhY2s=USD{\"campaign\":\"golden\"}eyJpbnYiOiJHVi1RUi0xIn0=W3siYWNjb3VudCI6IjUwMDAwMDAwMSIsImFtb3VudCI6Ni4xMn1d6template3_color",
+  "preimageSha256": "58654166040800fd0664129fda784d0b8c1de32ca8cf3668339bef5c3f9cd135",
+  "expectedHash": "3R2Fevc6ZELKkS1cF3F78/h3I5BG1GXUQyEYDIER7esl1tydFqjNvZ79jFSqkETSBODnXxRzTdcn9LcH+7wjLQ==",
   "normalization": [],
   "provenance": {
     "generatedBy": "scripts/generate/gen-golden-vectors.ts driving src/auth.ts generateHmac + the live domain factories",
