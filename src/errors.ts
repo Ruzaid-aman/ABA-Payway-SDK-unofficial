@@ -5,7 +5,8 @@ export type PayWayErrorType =
   | 'network_error'
   | 'rate_limit_error'
   | 'signature_error'
-  | 'polling_aborted';
+  | 'polling_aborted'
+  | 'guard_error';
 
 export class PayWayError extends Error {
   public readonly type: PayWayErrorType;
@@ -23,6 +24,18 @@ export class PayWayConfigError extends PayWayError {
     super(message, 'config_error');
     Object.setPrototypeOf(this, PayWayConfigError.prototype);
     this.name = 'PayWayConfigError';
+  }
+}
+
+/**
+ * Thrown by the env-guard when a safety rule refuses an operation; maps to
+ * exit code 6 (PW-GUARD); never retryable.
+ */
+export class PayWayGuardError extends PayWayError {
+  constructor(message: string) {
+    super(message, 'guard_error');
+    Object.setPrototypeOf(this, PayWayGuardError.prototype);
+    this.name = 'PayWayGuardError';
   }
 }
 

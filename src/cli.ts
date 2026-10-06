@@ -271,6 +271,7 @@ function classifyError(e: unknown): number {
     if (e.statusCode === undefined && e.retryable === true) return EXIT_NETWORK;
     return EXIT_API_FAILURE;
   }
+  if (e instanceof Error && e.constructor.name === 'PayWayGuardError') return 6;
   if (e instanceof PayWayError) return EXIT_VALIDATION;
   return EXIT_VALIDATION;
 }
