@@ -18,7 +18,8 @@ describe('first-payment boundary', () => {
     // Gateway typo (acknowledged by ABA 2026-09-12, still observed live in
     // transaction-list output) must classify as failed, not unknown.
     expect(paymentLifecycle('DECLINDED')).toBe('failed');
-    expect(paymentLifecycle('CANCELLED')).toBe('failed');
+    expect(paymentLifecycle('CANCELLED')).toBe('cancelled'); // §20.3: cancelled ≠ failed
+    expect(paymentLifecycle('cancelled')).toBe('cancelled'); // case-insensitive input
     expect(paymentNextStep('unknown')).toContain('existing transaction');
     expect(paymentNextStep('approved')).toContain('fulfill once atomically');
   });

@@ -222,7 +222,7 @@ describe('paymentLifecycle mapping and next steps', () => {
     expect(paymentLifecycle('approved')).toBe('approved');
     expect(paymentLifecycle('PENDING')).toBe('pending');
     expect(paymentLifecycle('DECLINED')).toBe('failed');
-    expect(paymentLifecycle('CANCELLED')).toBe('failed');
+    expect(paymentLifecycle('CANCELLED')).toBe('cancelled');
     expect(paymentLifecycle('REFUNDED')).toBe('unknown');
     expect(paymentLifecycle(0)).toBe('unknown');
     expect(paymentLifecycle(undefined)).toBe('unknown');
