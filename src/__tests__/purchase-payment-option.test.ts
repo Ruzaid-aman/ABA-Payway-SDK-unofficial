@@ -12,6 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { type PayWayConfig, PayWay } from '../client.js';
 import { PURCHASE_PAYMENT_OPTIONS, PURCHASE_PAYMENT_OPTIONS_LEGACY } from '../constants.js';
+import { resetAdvisoryDedupeForTests } from '../core/advisories.js';
 import { PayWayConfigError } from '../errors.js';
 
 const TEST_CONFIG: PayWayConfig = {
@@ -53,6 +54,7 @@ describe('purchase payment_option official set (PUR-003)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    resetAdvisoryDedupeForTests();
   });
 
   it('documents the official purchase enum and the legacy advisory set', () => {

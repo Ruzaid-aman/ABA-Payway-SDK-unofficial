@@ -91,6 +91,13 @@ export type {
   SelfActivationStatus,
 } from './domains/self-activation.js';
 export { createSelfActivationDomain } from './domains/self-activation.js';
+export {
+  collectAdvisories,
+  emitAdvisory,
+  isAdvisoryIgnored,
+  resetAdvisoryDedupeForTests,
+} from './core/advisories.js';
+export type { AdvisoryOptions, AdvisoryRecord, AdvisorySeverity, AdvisorySource } from './core/advisories.js';
 export type { HostedPageOutcome, PollAbortReason } from './errors.js';
 export {
   PayWayAPIError,

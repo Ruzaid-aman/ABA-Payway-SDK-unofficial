@@ -23,8 +23,8 @@ import {
   validateRefundAmount,
   validateTransactionId,
   warnAdvisory,
-  warnNonEscalating,
 } from '../utils.js';
+import { emitAdvisory } from '../core/advisories.js';
 
 /**
  * Rendering options for {@link CheckoutDomain.getCheckoutFormHtml}.
@@ -309,6 +309,7 @@ export function createCheckoutDomain(
       warnAdvisory(
         config,
         `lifetime ${params.lifetime} minutes exceeds the documented maximum of 43200 (30 days) — advisory only: the sandbox gateway accepted values above it (2026-09-05), so this is not enforced locally`,
+        { ruleId: 'GW-CAP-LIFETIME', source: 'docs' },
       );
     }
     if (params.firstname !== undefined) {
@@ -316,17 +317,27 @@ export function createCheckoutDomain(
         warnAdvisory(
           config,
           `firstname violates the gateway rules (≤100 chars, no digits/specials) — gateway may reject with error 16`,
+          { ruleId: 'GW-CAP-NAME', source: 'docs' },
         );
       }
     }
     if (params.lastname !== undefined && params.lastname.length > 100) {
-      warnAdvisory(config, `lastname exceeds the gateway's 100-character cap — gateway may reject with error 17`);
+      warnAdvisory(config, `lastname exceeds the gateway's 100-character cap — gateway may reject with error 17`, {
+        ruleId: 'GW-CAP-NAME',
+        source: 'docs',
+      });
     }
     if (params.email !== undefined && params.email.length > 50) {
-      warnAdvisory(config, `email exceeds the gateway's 50-character cap — gateway may reject with error 19`);
+      warnAdvisory(config, `email exceeds the gateway's 50-character cap — gateway may reject with error 19`, {
+        ruleId: 'GW-CAP-EMAIL',
+        source: 'docs',
+      });
     }
     if (params.phone !== undefined && params.phone.length > 20) {
-      warnAdvisory(config, `phone exceeds the gateway's 20-character cap — gateway may reject with error 18`);
+      warnAdvisory(config, `phone exceeds the gateway's 20-character cap — gateway may reject with error 18`, {
+        ruleId: 'GW-CAP-PHONE',
+        source: 'docs',
+      });
     }
     if (params.items !== undefined) {
       // Rule QR-016 (OFFICIAL_DOCUMENTATION — developer.payway.com.kh purchase
@@ -348,6 +359,7 @@ export function createCheckoutDomain(
         warnAdvisory(
           config,
           `purchase: items carries ${params.items.length} entries; official documentation allows up to 50 line items, and item price/quantity are not used for calculation or validation (rule QR-016, source: official)`,
+          { ruleId: 'QR-016', source: 'official' },
         );
       }
     }
@@ -368,8 +380,10 @@ export function createCheckoutDomain(
         );
       }
       if (isLegacy) {
-        warnNonEscalating(
+        emitAdvisory(
+          config,
           `payment_option "${params.paymentOption}" is a legacy purchase value from the archived spec (rule PUR-003) — official documentation lists: ${PURCHASE_PAYMENT_OPTIONS.join(', ')}; the gateway may still accept it depending on the merchant profile`,
+          { ruleId: 'PUR-003', source: 'official', strictEscalable: false },
         );
       }
       // Rule PUR-022 (OFFICIAL_DOCUMENTATION — developer.payway.com.kh
@@ -426,6 +440,7 @@ export function createCheckoutDomain(
         warnAdvisory(
           config,
           `subscription payment_option "${params.paymentOption}" is outside the documented set (cards, abapay, abapay_deeplink)`,
+          { ruleId: 'GW-CAP-SUBSCRIPTION', source: 'docs' },
         );
       }
     } else if (params.frequency !== undefined) {
@@ -670,6 +685,7 @@ export function createCheckoutDomain(
           warnAdvisory(
             config,
             `fromDate "${params.fromDate}" must use the format "YYYY-MM-DD HH:mm:ss" (gateway err 49)`,
+            { ruleId: 'GW-CAP-DATE', source: 'docs' },
           );
         }
         if (
@@ -686,24 +702,34 @@ export function createCheckoutDomain(
             warnAdvisory(
               config,
               `date range spans ${spanDays.toFixed(1)} days; the gateway allows at most 3 days (err 52)`,
+              { ruleId: 'GW-CAP-RANGE', source: 'docs' },
             );
           }
         }
       }
       if (params.toDate != null && typeof params.toDate === 'string' && !DATE_FORMAT.test(params.toDate)) {
-        warnAdvisory(config, `toDate "${params.toDate}" must use the format "YYYY-MM-DD HH:mm:ss" (gateway err 50)`);
+        warnAdvisory(config, `toDate "${params.toDate}" must use the format "YYYY-MM-DD HH:mm:ss" (gateway err 50)`, {
+          ruleId: 'GW-CAP-TODATE',
+          source: 'docs',
+        });
       }
       if (params.pagination !== undefined) {
         const n = Number.parseInt(params.pagination, 10);
         if (!Number.isNaN(n) && n > 1000) {
-          warnAdvisory(config, `pagination ${n} exceeds the gateway maximum of 1000`);
+          warnAdvisory(config, `pagination ${n} exceeds the gateway maximum of 1000`, {
+            ruleId: 'GW-CAP-PAGINATION',
+            source: 'docs',
+          });
         }
       }
       if (params.status != null) {
         const allowed = ['APPROVED', 'PRE-AUTH', 'REFUNDED', 'PENDING', 'DECLINED', 'DECLINDED', 'CANCELLED'];
         for (const part of String(params.status).split(',')) {
           if (!allowed.includes(part.trim().toUpperCase())) {
-            warnAdvisory(config, `status "${part.trim()}" is outside the documented set (${allowed.join(', ')})`);
+            warnAdvisory(config, `status "${part.trim()}" is outside the documented set (${allowed.join(', ')})`, {
+              ruleId: 'GW-CAP-STATUS',
+              source: 'docs',
+            });
           }
         }
       }
