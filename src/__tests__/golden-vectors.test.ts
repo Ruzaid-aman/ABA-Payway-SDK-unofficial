@@ -659,16 +659,14 @@ describe('N-11: generateHmac rejects objects/arrays in hashed positions', () => 
     // coercion; the N-11 fix (2026-10-06) made that a hard throw. The QR
     // return_params passthrough this guard exposed is fixed in qr.ts.
     const payload = { req_time: '20260101120000', items: { raw: 'object' } };
-    expect(() =>
-      generateHmac(payload, ['req_time', 'items'], GOLDEN_TEST_API_KEY),
-    ).toThrow(PayWayConfigError);
+    expect(() => generateHmac(payload, ['req_time', 'items'], GOLDEN_TEST_API_KEY)).toThrow(PayWayConfigError);
     expect(() => generateHmac(payload, ['req_time', 'items'], GOLDEN_TEST_API_KEY)).toThrow(/"items"/);
   });
 
   it('arrays throw; booleans/numbers keep the pinned coercion (hmac-purchase-005)', () => {
-    expect(() =>
-      generateHmac({ payout: [{ account: '1' }] }, ['payout'], GOLDEN_TEST_API_KEY),
-    ).toThrow(PayWayConfigError);
+    expect(() => generateHmac({ payout: [{ account: '1' }] }, ['payout'], GOLDEN_TEST_API_KEY)).toThrow(
+      PayWayConfigError,
+    );
     expect(generateHmac({ skip_success_page: true }, ['skip_success_page'], GOLDEN_TEST_API_KEY)).toBe(
       generateHmac({ skip_success_page: 'true' }, ['skip_success_page'], GOLDEN_TEST_API_KEY),
     );

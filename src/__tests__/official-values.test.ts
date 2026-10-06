@@ -324,9 +324,7 @@ describe('runTestSuite emits no purchase-enum advisory', () => {
 
 describe('N-10 / PUR-022: pre-auth restricts payment_option to ABA PAY + KHQR + Card', () => {
   it.each(PRE_AUTH_PAYMENT_OPTIONS)('accepts %s with type pre-auth', async (option) => {
-    await expect(
-      checkoutPurchase(TEST_CONFIG, { type: 'pre-auth', paymentOption: option }),
-    ).resolves.toBeDefined();
+    await expect(checkoutPurchase(TEST_CONFIG, { type: 'pre-auth', paymentOption: option })).resolves.toBeDefined();
   });
 
   it.each(['alipay', 'wechat', 'google_pay'] as const)(
@@ -346,9 +344,6 @@ describe('N-10 / PUR-022: pre-auth restricts payment_option to ABA PAY + KHQR + 
   });
 
   it('explicit purchase type with an excluded method is untouched', async () => {
-    await expect(
-      checkoutPurchase(TEST_CONFIG, { type: 'purchase', paymentOption: 'wechat' }),
-    ).resolves.toBeDefined();
+    await expect(checkoutPurchase(TEST_CONFIG, { type: 'purchase', paymentOption: 'wechat' })).resolves.toBeDefined();
   });
 });
-

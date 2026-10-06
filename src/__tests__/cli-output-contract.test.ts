@@ -33,11 +33,7 @@ function makeSyntheticProgram(): CommanderCommand {
   const refund = program.command('refund').description('Refund a paid transaction');
   refund.command('create').description('Create a refund');
   const cof = program.command('cof').description('Credentials on file');
-  cof
-    .command('token')
-    .description('Token lifecycle')
-    .command('remove')
-    .description('Remove a linked token');
+  cof.command('token').description('Token lifecycle').command('remove').description('Remove a linked token');
   program.command('status').description('Code reference tables');
   return program;
 }
@@ -52,14 +48,22 @@ describe('v2 envelope contract (§16.1)', () => {
   });
 
   it('invariants: ok:true requires data; ok:false requires errors and omits data', () => {
+    expect(() => assertEnvelopeInvariants(buildEnvelope({ kind: 'result', command: 'x', ok: true }))).toThrow(
+      /requires data/,
+    );
+    expect(() => assertEnvelopeInvariants(buildEnvelope({ kind: 'error', command: 'x', ok: false }))).toThrow(
+      /requires errors/,
+    );
     expect(() =>
-      assertEnvelopeInvariants(buildEnvelope({ kind: 'result', command: 'x', ok: true })),
-    ).toThrow(/requires data/);
-    expect(() =>
-      assertEnvelopeInvariants(buildEnvelope({ kind: 'error', command: 'x', ok: false })),
-    ).toThrow(/requires errors/);
-    expect(() =>
-      assertEnvelopeInvariants(buildEnvelope({ kind: 'error', command: 'x', ok: false, data: {}, errors: [{ type: 'E', message: 'm', exitCode: 1 }] })),
+      assertEnvelopeInvariants(
+        buildEnvelope({
+          kind: 'error',
+          command: 'x',
+          ok: false,
+          data: {},
+          errors: [{ type: 'E', message: 'm', exitCode: 1 }],
+        }),
+      ),
     ).toThrow(/must omit data/);
   });
 });
