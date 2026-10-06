@@ -122,6 +122,7 @@ import { registerSessionCommand } from './cli/commands/session.js';
 import { renderTable } from './cli/ui/tables.js';
 import { confirmSubmit } from './cli/flows/confirm-flow.js';
 import { getUpdateCheckCachePath, isTopLevelHelpArgv, maybeNoticeUpdate } from './cli/update-check.js';
+import { buildCapabilities, capabilitiesEnvelope, collectRegistryTree } from './cli/commands/capabilities.js';
 
 // ---------------------------------------------------------------------------
 // Load .env file if present (shared parser; supports multi-line quoted PEMs)
@@ -1038,6 +1039,7 @@ program
   .exitOverride()
   .option('--profile <name>', 'Use a saved credential profile for this command')
   .option('--no-color', 'Disable ANSI colors in output')
+  .option('--output <format>', 'Global machine-output format: json | ndjson (DX-CLI-003; per-command --json stays an alias of --output json)')
   .option('--journal', 'Force the transaction journal on (<data root>/journal.jsonl; ON by default for API commands)')
   .option('--no-journal', 'Disable the transaction journal for this invocation')
   .showSuggestionAfterError()
@@ -1523,6 +1525,30 @@ program
       console.log(`    ${c.cyan(code.padEnd(12))} ${label}`);
     }
     console.log();
+  });
+
+// --- capabilities (DX-CLI-007: registry-derived catalog, v2 envelope) ---
+program
+  .command('capabilities')
+  .description('Machine-readable catalog of every command with moneyMoving/readOnly/unverified classification')
+  .option('--json', 'Emit the v2 envelope (schemaVersion 2.0) with the full catalog')
+  .action((opts: { json?: boolean }) => {
+    const tree = collectRegistryTree(program);
+    const caps = buildCapabilities(tree);
+    if (opts.json || argvRequestsMachineOutput(process.argv)) {
+      process.stdout.write(`${JSON.stringify(capabilitiesEnvelope(caps), null, 2)}\n`);
+      process.exitCode = EXIT_OK;
+      return;
+    }
+    console.log(`\n${c.bold('payway-sdk')} — ${caps.length} commands (from the live registry)\n`);
+    for (const cap of caps) {
+      const tag = cap.moneyMoving ? c.red('money') : cap.unverified ? c.yellow('unverified') : c.dim('read');
+      console.log(`  ${c.cyan(cap.path.padEnd(28))} ${tag.padEnd(22)} ${cap.description.slice(0, 60)}`);
+    }
+    console.log(
+      `\n  ${c.dim(`money-moving: ${caps.filter((x) => x.moneyMoving).length} · unverified: ${caps.filter((x) => x.unverified).length}`)}\n`,
+    );
+    process.exitCode = EXIT_OK;
   });
 
 // --- explain ---
