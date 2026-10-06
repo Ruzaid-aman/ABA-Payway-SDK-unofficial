@@ -1,11 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-  TLS_BYPASS_ALLOW_LIST,
-  TLS_BYPASS_FORBIDDEN,
-  findBypassOccurrences,
-} from '../cli/tls-bypass-scan.js';
+import { TLS_BYPASS_ALLOW_LIST, TLS_BYPASS_FORBIDDEN, findBypassOccurrences } from '../cli/tls-bypass-scan.js';
 
 /**
  * DX-SEC-002 (audit P0-04): blocking gate — every TRACKED file (`git
@@ -18,24 +14,18 @@ import {
 const FORBIDDEN = TLS_BYPASS_FORBIDDEN;
 
 describe('no TLS-verification bypass in tracked files (DX-SEC-002)', () => {
-  it(
-    'every tracked occurrence of the bypass string is allow-listed with a recorded reason',
-    () => {
-      // -z: NUL-separated and NEVER quoted — with the default
-      // core.quotePath=true, git wraps non-ASCII paths (em dashes in
-      // docs/test-cases/*) in literal quotes and octal escapes, which then
-      // cannot be opened (CI linux runners; local checkouts set quotePath
-      // false, which masked this).
-      const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
-        .split('\0')
-        .filter(Boolean);
-      const offenders = findBypassOccurrences(
-        tracked.map((filePath) => ({ path: filePath, content: readFileSync(filePath, 'utf8') })),
-      );
-      expect(offenders).toEqual([]);
-    },
-    60_000,
-  );
+  it('every tracked occurrence of the bypass string is allow-listed with a recorded reason', () => {
+    // -z: NUL-separated and NEVER quoted — with the default
+    // core.quotePath=true, git wraps non-ASCII paths (em dashes in
+    // docs/test-cases/*) in literal quotes and octal escapes, which then
+    // cannot be opened (CI linux runners; local checkouts set quotePath
+    // false, which masked this).
+    const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+    const offenders = findBypassOccurrences(
+      tracked.map((filePath) => ({ path: filePath, content: readFileSync(filePath, 'utf8') })),
+    );
+    expect(offenders).toEqual([]);
+  }, 60_000);
 
   it('negative control: a synthetic unlisted path containing the string FAILS the scan', () => {
     const synthetic = [

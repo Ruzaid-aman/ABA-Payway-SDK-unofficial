@@ -278,7 +278,7 @@ vars:
     group: tls
     description: >-
       Path to a PEM CA bundle used to verify the PayWay endpoint certificate
-      (DX-SEC-001: the safe replacement for NODE_TLS_REJECT_UNAUTHORIZED=0).
+      (DX-SEC-001: the safe replacement for the legacy TLS-verification bypass).
     default: null
     required: false
     consumedBy:

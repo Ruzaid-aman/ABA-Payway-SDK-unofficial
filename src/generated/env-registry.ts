@@ -227,7 +227,7 @@ export const PAYWAY_ENV_VARS: readonly PayWayEnvVarDefinition[] = [
     kind: 'non-secret',
     group: 'tls',
     description:
-      'Path to a PEM CA bundle used to verify the PayWay endpoint certificate (DX-SEC-001: the safe replacement for NODE_TLS_REJECT_UNAUTHORIZED=0).',
+      'Path to a PEM CA bundle used to verify the PayWay endpoint certificate (DX-SEC-001: the safe replacement for the legacy TLS-verification bypass).',
     defaultValue: null,
     required: false,
     consumedBy: ['src/client.ts'],
