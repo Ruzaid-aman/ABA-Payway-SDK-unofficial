@@ -1039,7 +1039,6 @@ program
   .exitOverride()
   .option('--profile <name>', 'Use a saved credential profile for this command')
   .option('--no-color', 'Disable ANSI colors in output')
-  .option('--output <format>', 'Global machine-output format: json | ndjson (DX-CLI-003; per-command --json stays an alias of --output json)')
   .option('--journal', 'Force the transaction journal on (<data root>/journal.jsonl; ON by default for API commands)')
   .option('--no-journal', 'Disable the transaction journal for this invocation')
   .showSuggestionAfterError()
@@ -1496,7 +1495,7 @@ program
   .description('Display payment status codes and refund error codes reference')
   .option('--json', 'Emit the code tables as one JSON document')
   .action((opts: { json?: boolean }) => {
-    if (opts.json) {
+    if (opts.json || getGlobalOutputFormat()) {
       console.log(
         JSON.stringify({ paymentStatusCodes: PAYMENT_STATUS_CODES, refundErrorCodes: REFUND_ERROR_CODES }, null, 2),
       );
@@ -1566,7 +1565,7 @@ program
   )
   .option('--family <fam>', `Resolve within one family only. Valid: ${EXPLAIN_FAMILIES.join(', ')}`)
   .action((code: string | undefined, opts: { json?: boolean; operation?: string; family?: string }) => {
-    const json = Boolean(opts.json);
+    const json = Boolean(opts.json) || getGlobalOutputFormat() !== undefined;
     // Machine-mode convention: failure = {error:{kind,exitCode,…}} envelope on stdout, diagnostics to stderr.
     const explainScopeError = (message: string): void => {
       if (json) {
@@ -5926,6 +5925,9 @@ for (const command of program.commands) {
  * without a parsed context.
  */
 function argvRequestsMachineOutput(argv: string[]): boolean {
+  // DX-CLI-003: a stripped global --output counts as machine mode even
+  // though it no longer appears in the argv handed to Commander.
+  if (globalOutputFormat !== undefined) return true;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') return true;
@@ -5941,9 +5943,59 @@ function argvRequestsMachineOutput(argv: string[]): boolean {
  * child process; `node dist/cli.js` / `npx tsx src/cli.ts` executions go
  * through the direct-invocation guard below instead.
  */
+/**
+ * DX-CLI-003: the two streaming commands (generate-qr, generate-checkout)
+ * declare their OWN `--output <format>` option; a program-level declaration
+ * of the same name collides in Commander's parent-opts merge (the parent's
+ * undefined clobbers the command-parsed value). So the global `--output
+ * json|ndjson` is applied at the ARGV level: for commands with a native
+ * --output the flag passes through untouched; for every other command it is
+ * stripped before parse (they would reject it as unknown) and recorded in
+ * globalOutputFormat, which the machine-mode detector consults.
+ */
+const NATIVE_OUTPUT_COMMANDS = new Set(['generate-qr', 'generate-checkout', 'checkout-form']);
+
+/** Set by runCli when a global (non-native) `--output` was supplied. */
+let globalOutputFormat: 'json' | 'ndjson' | undefined;
+
+export function getGlobalOutputFormat(): 'json' | 'ndjson' | undefined {
+  return globalOutputFormat;
+}
+
+/** Exported for the contract-test suite (pure argv transform). */
+export function extractGlobalOutputForTest(argv: string[]): { argv: string[]; format: 'json' | 'ndjson' | undefined } {
+  globalOutputFormat = undefined;
+  const rest = extractGlobalOutput(argv);
+  return { argv: rest, format: globalOutputFormat };
+}
+
+function extractGlobalOutput(argv: string[]): string[] {
+  const out: string[] = [];
+  let commandToken: string | undefined;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (commandToken === undefined && !arg.startsWith('-')) commandToken = arg;
+    const native = commandToken !== undefined && NATIVE_OUTPUT_COMMANDS.has(commandToken);
+    if (arg === '--output' && !native && (argv[i + 1] === 'json' || argv[i + 1] === 'ndjson')) {
+      globalOutputFormat = argv[i + 1] as 'json' | 'ndjson';
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith('--output=') && !native) {
+      const v = arg.slice('--output='.length);
+      if (v === 'json' || v === 'ndjson') {
+        globalOutputFormat = v;
+        continue;
+      }
+    }
+    out.push(arg);
+  }
+  return out;
+}
+
 export async function runCli(argv: string[]): Promise<void> {
   try {
-    await program.parseAsync(argv, { from: 'user' });
+    await program.parseAsync(extractGlobalOutput(argv), { from: 'user' });
   } catch (error) {
     if (error instanceof CommanderError && error.exitCode === 0) {
       // Help/version succeeded — keep the human output and exit 0.

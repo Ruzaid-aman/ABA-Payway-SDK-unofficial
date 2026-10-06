@@ -177,3 +177,31 @@ describe('capabilities catalog (DX-CLI-007)', () => {
     expect(rec).toMatchObject({ type: 'PayWayAPIError', message: 'boom', exitCode: 2 });
   });
 });
+
+describe('global --output (DX-CLI-003, argv-level)', () => {
+  it('strips --output for non-native commands and records the format', async () => {
+    const { extractGlobalOutputForTest } = await import('../cli.js');
+    const { argv, format } = extractGlobalOutputForTest(['status', '--output', 'json']);
+    expect(argv).toEqual(['status']);
+    expect(format).toBe('json');
+  });
+
+  it('keeps the flag for the natively-output commands (Commander merge clobbers same-name options)', async () => {
+    const { extractGlobalOutputForTest } = await import('../cli.js');
+    for (const cmd of ['generate-qr', 'generate-checkout', 'checkout-form']) {
+      const { argv, format } = extractGlobalOutputForTest([cmd, '--output', 'json']);
+      expect(argv).toEqual([cmd, '--output', 'json']);
+      expect(format).toBeUndefined();
+    }
+  });
+
+  it('handles the = form and leaves unknown values in place', async () => {
+    const { extractGlobalOutputForTest } = await import('../cli.js');
+    const a = extractGlobalOutputForTest(['status', '--output=ndjson']);
+    expect(a.argv).toEqual(['status']);
+    expect(a.format).toBe('ndjson');
+    const b = extractGlobalOutputForTest(['status', '--output', 'bogus']);
+    expect(b.argv).toEqual(['status', '--output', 'bogus']);
+    expect(b.format).toBeUndefined();
+  });
+});
