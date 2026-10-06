@@ -201,12 +201,14 @@ export function createCredentialsOnFileDomain(
       warnAdvisory(
         config,
         `tokenFlag "${params.tokenFlag}" is outside the live-documented link-card set (CITI_FLEX, CITO_FLEX) — verify the merchant profile enables it`,
+        { ruleId: 'GW-CAP-TOKENFLAG', source: 'docs' },
       );
     }
     if (params.returnUrl !== undefined || params.returnDeeplink !== undefined) {
       warnAdvisory(
         config,
         'linkCard returnUrl/returnDeeplink are no longer sent: they are not part of the live-documented link-card request and would break the hash (use continueSuccessUrl for the hosted form Done target)',
+        { ruleId: 'GW-CAP-LINKURL', source: 'docs' },
       );
     }
 
@@ -221,6 +223,7 @@ export function createCredentialsOnFileDomain(
       warnAdvisory(
         config,
         'linkCard: no callbackUrl supplied — the pwt token is delivered ONLY via the callback URL, so the link result cannot reach you without one',
+        { ruleId: 'GW-CAP-CALLBACK', source: 'docs' },
       );
     }
 
@@ -230,11 +233,13 @@ export function createCredentialsOnFileDomain(
       warnAdvisory(
         config,
         'link-card frequency is live-documented as required for Link Card (1W|1M|2M); card linking may fail without it',
+        { ruleId: 'GW-CAP-FREQUENCY', source: 'docs' },
       );
     } else if (!['1W', '1M', '2M'].includes(params.frequency)) {
       warnAdvisory(
         config,
         `link-card frequency "${params.frequency}" is outside the live-documented set (1W, 1M, 2M) — verify the gateway accepts it for this profile`,
+        { ruleId: 'GW-CAP-FREQUENCY', source: 'docs' },
       );
     }
 
@@ -284,6 +289,7 @@ export function createCredentialsOnFileDomain(
         warnAdvisory(
           config,
           `tokenFlag "${params.tokenFlag}" is outside the live-documented link-account set (CITI_FLEX, CITO_FLEX); sandbox additionally accepted CITO_FIX/CITR_FLEX — verify the merchant profile enables it`,
+          { ruleId: 'GW-CAP-TOKENFLAG', source: 'docs' },
         );
       }
 
@@ -414,6 +420,7 @@ export function createCredentialsOnFileDomain(
           warnAdvisory(
             config,
             `tokenFlag "${params.tokenFlag}" is outside the production-documented charging set (CITU_FLEX, MITU_FLEX, MITR_FIX); sandbox acceptance of MITU_FIX/MITR_FLEX is not a production contract`,
+            { ruleId: 'GW-CAP-TOKENFLAG', source: 'docs' },
           );
         }
       }

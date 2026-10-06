@@ -157,7 +157,10 @@ export function createKhqrDomain(
         throw new PayWayConfigError('merchantRef is required and must be a non-empty string');
       }
       if (merchantRef.length > 20) {
-        warnAdvisory(config, `merchantRef exceeds the gateway's 20-character cap; gateway may reject with error 5`);
+        warnAdvisory(config, `merchantRef exceeds the gateway's 20-character cap; gateway may reject with error 5`, {
+          ruleId: 'GW-CAP-MERCHANTREF',
+          source: 'docs',
+        });
       }
 
       return request<components['schemas']['GetTransactionsByMcRefResponse'] & Record<string, unknown>>(

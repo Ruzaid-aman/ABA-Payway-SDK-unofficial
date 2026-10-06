@@ -146,22 +146,33 @@ export function createQrDomain(
         warnAdvisory(
           config,
           `payment_option "${params.paymentOption}" is USD-only per the QR API docs; currency is ${currency}`,
+          { ruleId: 'QR-013', source: 'official' },
         );
       }
       if (params.firstName !== undefined && params.firstName.length > 20) {
         warnAdvisory(
           config,
           `firstName exceeds the gateway's 20-character cap (err 16); gateway may reject with error 16`,
+          { ruleId: 'GW-CAP-NAME', source: 'docs' },
         );
       }
       if (params.lastName !== undefined && params.lastName.length > 20) {
-        warnAdvisory(config, `lastName exceeds the gateway's 20-character cap; gateway may reject with error 17`);
+        warnAdvisory(config, `lastName exceeds the gateway's 20-character cap; gateway may reject with error 17`, {
+          ruleId: 'GW-CAP-NAME',
+          source: 'docs',
+        });
       }
       if (params.email !== undefined && params.email.length > 50) {
-        warnAdvisory(config, `email exceeds the gateway's 50-character cap; gateway may reject with error 19`);
+        warnAdvisory(config, `email exceeds the gateway's 50-character cap; gateway may reject with error 19`, {
+          ruleId: 'GW-CAP-EMAIL',
+          source: 'docs',
+        });
       }
       if (params.phone !== undefined && params.phone.length > 20) {
-        warnAdvisory(config, `phone exceeds the gateway's 20-character cap; gateway may reject with error 18`);
+        warnAdvisory(config, `phone exceeds the gateway's 20-character cap; gateway may reject with error 18`, {
+          ruleId: 'GW-CAP-PHONE',
+          source: 'docs',
+        });
       }
       const itemCount = Array.isArray(params.items) ? params.items.length : undefined;
       // Rule QR-016 (OFFICIAL_DOCUMENTATION — developer.payway.com.kh qr-api
@@ -179,6 +190,7 @@ export function createQrDomain(
         warnAdvisory(
           config,
           `generate-qr: items carries ${itemCount} entries; official documentation allows up to 50 line items, and item price/quantity are not used for calculation or validation (rule QR-016, source: official)`,
+          { ruleId: 'QR-016', source: 'official' },
         );
       }
 
@@ -234,7 +246,10 @@ export function createQrDomain(
         );
       }
       if ((params.paymentOption === 'wechat' || params.paymentOption === 'alipay') && params.currency !== 'USD') {
-        warnAdvisory(config, `payment_option "${params.paymentOption}" is USD-only; currency is ${params.currency}`);
+        warnAdvisory(config, `payment_option "${params.paymentOption}" is USD-only; currency is ${params.currency}`, {
+          ruleId: 'QR-013',
+          source: 'official',
+        });
       }
       validatePublicHttpsUrl(params.callbackUrl, 'callbackUrl', {
         allowPrivateHosts: config.allowPrivateCallbackHosts === true,

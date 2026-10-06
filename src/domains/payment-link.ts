@@ -119,7 +119,10 @@ export function createPaymentLinkDomain(
       validatePositiveAmount(params.amount, currency);
       validateAmountFloor(config, params.amount, currency, 'payment-link create');
       if (params.title.length > 250) {
-        warnAdvisory(config, `title exceeds the gateway's 250-character cap`);
+        warnAdvisory(config, `title exceeds the gateway's 250-character cap`, {
+          ruleId: 'GW-CAP-TITLE',
+          source: 'docs',
+        });
       }
 
       if (typeof params.merchantRefNo !== 'string' || params.merchantRefNo.trim().length === 0) {
@@ -128,7 +131,10 @@ export function createPaymentLinkDomain(
       // Spec: merchant_ref_no max length 50 (payway-openapi/paths/payment-link.yaml).
       // Advisory — the gateway is the final arbiter; strictValidation escalates.
       if (params.merchantRefNo.length > 50) {
-        warnAdvisory(config, `merchantRefNo exceeds the gateway's 50-character cap`);
+        warnAdvisory(config, `merchantRefNo exceeds the gateway's 50-character cap`, {
+          ruleId: 'GW-CAP-REF',
+          source: 'docs',
+        });
       }
 
       // Sandbox-verified: PayWay rejects descriptions over 250 characters (PTL04).
@@ -142,6 +148,7 @@ export function createPaymentLinkDomain(
         warnAdvisory(
           config,
           'payment-link description should not start with =, +, -, or @ (PayWay chatbot guidance; not gateway-verified)',
+          { ruleId: 'GW-CAP-DESCRIPTION', source: 'docs' },
         );
       }
 
@@ -171,6 +178,7 @@ export function createPaymentLinkDomain(
             warnAdvisory(
               config,
               `payout total ${total} does not equal the link amount ${params.amount} — the documented rule requires them to match`,
+              { ruleId: 'GW-CAP-PAYOUT', source: 'docs' },
             );
           }
         } else if (typeof params.payout !== 'string' || params.payout.trim().length === 0) {
@@ -196,12 +204,14 @@ export function createPaymentLinkDomain(
           warnAdvisory(
             config,
             `image.data is ${image.data.byteLength} bytes, exceeding the documented 3MB (${PAYMENT_LINK_IMAGE_MAX_BYTES} bytes) payment-link image limit — the gateway may reject the upload`,
+            { ruleId: 'GW-CAP-IMAGE-SIZE', source: 'docs' },
           );
         }
         if (!PAYMENT_LINK_IMAGE_CONTENT_TYPES.has(contentType)) {
           warnAdvisory(
             config,
             `image contentType "${contentType}" is outside the documented JPG/JPEG/PNG set (image/jpeg, image/jpg, image/png) — the gateway may reject the upload`,
+            { ruleId: 'GW-CAP-IMAGE-TYPE', source: 'docs' },
           );
         }
         // ABA-bot relay 2026-10-03: image WIDTH must not exceed 2,000 pixels
@@ -213,12 +223,14 @@ export function createPaymentLinkDomain(
           warnAdvisory(
             config,
             `image width ${width}px exceeds the documented ${PAYMENT_LINK_IMAGE_MAX_WIDTH_PX}px maximum — the gateway may reject the upload`,
+            { ruleId: 'GW-CAP-IMAGE-WIDTH', source: 'docs' },
           );
         }
         if (!/^[A-Za-z0-9._-]+$/.test(filename)) {
           warnAdvisory(
             config,
             `image filename "${filename}" contains special characters — the documented rule forbids them (e.g. parentheses); use letters, digits, dots, hyphens, underscores`,
+            { ruleId: 'GW-CAP-IMAGE-NAME', source: 'docs' },
           );
         }
         multipartFile = {
@@ -240,11 +252,13 @@ export function createPaymentLinkDomain(
           warnAdvisory(
             config,
             'expired_date is in the past — the gateway rejects past values with PTL04 (sandbox-verified); omit it for no expiry or use a future epoch',
+            { ruleId: 'GW-CAP-EXPIRY', source: 'docs' },
           );
         } else if (params.expiredDate - nowSec < PAYMENT_LINK_EXPIRY_MIN_SECONDS) {
           warnAdvisory(
             config,
             `expired_date is under ~5 minutes out — sandbox rejects offsets below ~5 minutes with PTL04 (boundary measured in (150s, 300s]); use at least ${PAYMENT_LINK_EXPIRY_MIN_SECONDS}s ahead. No EXPIRED status exists: after expiry the link still reads OPEN, so enforce expiry merchant-side`,
+            { ruleId: 'GW-CAP-EXPIRY', source: 'docs' },
           );
         }
       }
