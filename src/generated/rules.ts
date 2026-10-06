@@ -132,6 +132,20 @@ export const RULES: readonly RuleDefinition[] = [
     ],
   },
   {
+    id: 'PUR-022',
+    statement:
+      'Purchase transactions with type "pre-auth" support only ABA PAY, KHQR and Card payment options (cards, abapay_khqr, abapay_khqr_deeplink); alipay, wechat and google_pay are not supported for pre-auth.',
+    endpoints: ['checkout.purchase'],
+    severity: 'hard',
+    source: 'official',
+    status: 'active',
+    evidence: 'knowledge/rules/evidence/PUR-022.md',
+    evidenceUrl: 'https://developer.payway.com.kh/purchase-14530820e0',
+    retrievedAt: '2026-10-05',
+    expiresAt: '2027-04-03',
+    enforcement: [{ file: 'src/domains/checkout.ts', symbol: 'createCheckoutDomain' }],
+  },
+  {
     id: 'QR-001',
     statement:
       'the generate-qr lifetime UNIT is unresolved and NO unit change is encoded. Official wording reads "Transaction lifetime in minutes... Minimum: 3 mins" but the plain minutes reading was falsified live: lifetime 3 was rejected while 180 was accepted (sandbox-pinned boundary 2026-08-30: 179 -> HTTP 400 code "04", 180 -> OK). The repository keeps its coded two-domain split — generate-qr takes SECONDS with a local 180-second floor (QR_LIFETIME_MIN_SECONDS), checkout.purchase takes MINUTES with a 3-minute floor (gateway error-69 parity) — and the residual seconds-vs-minutes-180-floor ambiguity is unresolvable without a read-back expiry probe, because no read API returns the expiry. No consumer may "fix" the unit on a single dated observation; the conflict stays recorded until a read-back probe or an ABA answer resolves it.',

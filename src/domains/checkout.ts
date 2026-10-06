@@ -1,6 +1,11 @@
 import { generateHmac } from '../auth.js';
 import type { CreateTransactionParams, GetTransactionListParams, PayWayConfig, RequestCallOptions } from '../client.js';
-import { ENDPOINTS, PURCHASE_PAYMENT_OPTIONS, PURCHASE_PAYMENT_OPTIONS_LEGACY } from '../constants.js';
+import {
+  ENDPOINTS,
+  PRE_AUTH_PAYMENT_OPTIONS,
+  PURCHASE_PAYMENT_OPTIONS,
+  PURCHASE_PAYMENT_OPTIONS_LEGACY,
+} from '../constants.js';
 import { PayWayAPIError, PayWayConfigError, PollingAbortedError } from '../errors.js';
 import type { components } from '../types.js';
 import type { PollTransactionOptions, PollTransactionResult, PurchaseHostedHtmlResult } from '../domain-types.js';
@@ -365,6 +370,19 @@ export function createCheckoutDomain(
       if (isLegacy) {
         warnNonEscalating(
           `payment_option "${params.paymentOption}" is a legacy purchase value from the archived spec (rule PUR-003) — official documentation lists: ${PURCHASE_PAYMENT_OPTIONS.join(', ')}; the gateway may still accept it depending on the merchant profile`,
+        );
+      }
+      // Rule PUR-022 (OFFICIAL_DOCUMENTATION — developer.payway.com.kh
+      // purchase page, `type` field, retrieved 2026-10-05): "pre-auth only
+      // support ABA PAY, KHQR and Card Payment" (the QR page states the same
+      // from the other side: "Alipay & WeChat do not support pre-auth").
+      // Deterministic and unconditional per the official text, so HARD.
+      if (
+        (params.type || 'purchase') === 'pre-auth' &&
+        !PRE_AUTH_PAYMENT_OPTIONS.includes(params.paymentOption as never)
+      ) {
+        throw new PayWayConfigError(
+          `payment_option "${params.paymentOption}" is not supported for type "pre-auth" (rule PUR-022, source: official): pre-auth supports only ${PRE_AUTH_PAYMENT_OPTIONS.join(', ')}`,
         );
       }
     }

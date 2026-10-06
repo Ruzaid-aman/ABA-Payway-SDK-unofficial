@@ -11,7 +11,12 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GenerateQrParams, PayWayConfig } from '../client.js';
-import { PURCHASE_PAYMENT_OPTIONS, PURCHASE_PAYMENT_OPTIONS_LEGACY, QR_PAYMENT_OPTIONS } from '../constants.js';
+import {
+  PRE_AUTH_PAYMENT_OPTIONS,
+  PURCHASE_PAYMENT_OPTIONS,
+  PURCHASE_PAYMENT_OPTIONS_LEGACY,
+  QR_PAYMENT_OPTIONS,
+} from '../constants.js';
 import { createCheckoutDomain } from '../domains/checkout.js';
 import { createQrDomain } from '../domains/qr.js';
 import { PayWayConfigError } from '../errors.js';
@@ -316,3 +321,34 @@ describe('runTestSuite emits no purchase-enum advisory', () => {
     );
   });
 });
+
+describe('N-10 / PUR-022: pre-auth restricts payment_option to ABA PAY + KHQR + Card', () => {
+  it.each(PRE_AUTH_PAYMENT_OPTIONS)('accepts %s with type pre-auth', async (option) => {
+    await expect(
+      checkoutPurchase(TEST_CONFIG, { type: 'pre-auth', paymentOption: option }),
+    ).resolves.toBeDefined();
+  });
+
+  it.each(['alipay', 'wechat', 'google_pay'] as const)(
+    'throws citing PUR-022 for %s with type pre-auth',
+    async (option) => {
+      await expect(checkoutPurchase(TEST_CONFIG, { type: 'pre-auth', paymentOption: option })).rejects.toThrow(
+        PayWayConfigError,
+      );
+      await expect(checkoutPurchase(TEST_CONFIG, { type: 'pre-auth', paymentOption: option })).rejects.toThrow(
+        /PUR-022/,
+      );
+    },
+  );
+
+  it('default type is purchase — excluded methods stay legal there', async () => {
+    await expect(checkoutPurchase(TEST_CONFIG, { paymentOption: 'alipay' })).resolves.toBeDefined();
+  });
+
+  it('explicit purchase type with an excluded method is untouched', async () => {
+    await expect(
+      checkoutPurchase(TEST_CONFIG, { type: 'purchase', paymentOption: 'wechat' }),
+    ).resolves.toBeDefined();
+  });
+});
+

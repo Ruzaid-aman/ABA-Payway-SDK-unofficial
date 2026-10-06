@@ -531,6 +531,17 @@ export type PurchasePaymentOptionName = (typeof PURCHASE_PAYMENT_OPTIONS)[number
 export const PURCHASE_PAYMENT_OPTIONS_LEGACY = ['abapay', 'abapay_deeplink'] as const;
 
 /**
+ * Payment options officially supported for `type: 'pre-auth'` (rule PUR-022,
+ * OFFICIAL_DOCUMENTATION — developer.payway.com.kh purchase page `type`
+ * field, retrieved 2026-10-05): "pre-auth only support ABA PAY, KHQR and
+ * Card Payment" (the QR page states the same from the other side: "Alipay &
+ * WeChat do not support pre-auth"). The official text is unconditional, so
+ * the checkout domain enforces this as a hard cross-field check — options
+ * outside this set throw before signing.
+ */
+export const PRE_AUTH_PAYMENT_OPTIONS = ['cards', 'abapay_khqr', 'abapay_khqr_deeplink'] as const;
+
+/**
  * Official generate-qr `payment_option` values (rule QR-012,
  * OFFICIAL_DOCUMENTATION — developer.payway.com.kh qr-api page, retrieved
  * 2026-10-05): exactly `abapay_khqr` (default), `wechat` (USD only) and

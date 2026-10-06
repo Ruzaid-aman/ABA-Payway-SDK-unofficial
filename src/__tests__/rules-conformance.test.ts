@@ -51,7 +51,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const yamlText = readFileSync(path.join(repoRoot, RULES_YAML_RELATIVE_PATH), 'utf8');
 const doc = parseRulesYaml(yamlText);
 
-const EXPECTED_RULE_IDS = ['PUR-003', 'QR-012', 'QR-016', 'QR-009', 'ERR-001', 'QR-001'];
+const EXPECTED_RULE_IDS = ['PUR-003', 'QR-012', 'QR-016', 'QR-009', 'ERR-001', 'PUR-022', 'QR-001'];
 
 /** A valid synthetic rule the negative tests mutate one defect at a time. */
 function syntheticRule(overrides: Partial<RuleDefinition> = {}): RuleDefinition {
@@ -125,7 +125,7 @@ describe('rules registry conformance (DX-KNOW-007)', () => {
 
   it('keeps every source:official rule on the official evidence host, within 180 days', () => {
     const officials = officialRules();
-    expect(officials.map((rule) => rule.id)).toEqual(['PUR-003', 'QR-012', 'QR-016', 'QR-009', 'ERR-001']);
+    expect(officials.map((rule) => rule.id)).toEqual(['PUR-003', 'QR-012', 'QR-016', 'QR-009', 'ERR-001', 'PUR-022']);
     for (const rule of officials) {
       const host = new URL(rule.evidenceUrl).host;
       expect(host, `${rule.id} evidence URL host`).toBe(OFFICIAL_EVIDENCE_HOST);
@@ -244,7 +244,7 @@ describe('rules registry conformance (DX-KNOW-007)', () => {
   it('generated module mirrors the authored registry', () => {
     expect(RULES.map((rule) => rule.id)).toEqual(doc.rules.map((rule) => rule.id));
     expect(getRuleById('QR-009')?.statement).toContain('100 KHR');
-    expect(officialRules()).toHaveLength(5);
+    expect(officialRules()).toHaveLength(6);
     expect(conflictedRules().map((rule) => rule.id)).toEqual(['QR-001']);
     const conflicted = conflictedRules()[0];
     expect(conflicted.conflicts?.map((variant) => variant.source)).toEqual(['official', 'sandbox', 'repository']);

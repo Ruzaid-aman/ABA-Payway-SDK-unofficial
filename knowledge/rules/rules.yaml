@@ -169,6 +169,22 @@ rules:
       - file: src/cli/explain-code.ts
         symbol: explainCodeFamilies
 
+  - id: PUR-022
+    statement: >-
+      Purchase transactions with type "pre-auth" support only ABA PAY, KHQR
+      and Card payment options (cards, abapay_khqr, abapay_khqr_deeplink);
+      alipay, wechat and google_pay are not supported for pre-auth.
+    endpoints: [checkout.purchase]
+    severity: hard
+    enforcement:
+      - file: src/domains/checkout.ts
+        symbol: createCheckoutDomain
+    source: official
+    evidence: knowledge/rules/evidence/PUR-022.md
+    evidenceUrl: https://developer.payway.com.kh/purchase-14530820e0
+    retrievedAt: 2026-10-05
+    expiresAt: 2027-04-03
+    status: active
   - id: QR-001
     statement: >-
       the generate-qr lifetime UNIT is unresolved and NO unit change is
